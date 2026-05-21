@@ -1,0 +1,258 @@
+/**
+ * VAL-NO-PROMPTS contract test.
+ *
+ * Every v1 command must:
+ * 1. Accept required input via flags / env (not TTY prompts).
+ * 2. When called with missing required input and stdin=/dev/null,
+ *    fail fast (non-zero exit) with an actionable error — never hang.
+ */
+import { describe, expect, test } from 'bun:test'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+const repoRoot = new URL('../../../', import.meta.url).pathname
+const cliBin = join(repoRoot, 'apps/cli/bin/ctxindex.mjs')
+const TIMEOUT_MS = 5000
+
+async function spawnCli(
+  args: string[],
+  env: Record<string, string | undefined> = {},
+  stdinMode: 'null' | 'pipe' = 'null',
+): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  const proc = Bun.spawn([process.execPath, cliBin, ...args], {
+    cwd: repoRoot,
+    env: { ...process.env, ...env },
+    stdout: 'pipe',
+    stderr: 'pipe',
+    stdin: stdinMode === 'null' ? null : 'pipe',
+  })
+
+  const exitCode = await Promise.race([
+    proc.exited,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              `CLI hung after ${TIMEOUT_MS}ms for: ctxindex ${args.join(' ')}`,
+            ),
+          ),
+        TIMEOUT_MS,
+      ),
+    ),
+  ])
+
+  const [stdout, stderr] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ])
+
+  return { exitCode, stdout, stderr }
+}
+
+async function mkSandbox(): Promise<{
+  env: Record<string, string | undefined>
+  cleanup: () => Promise<void>
+}> {
+  const dir = await mkdtemp(join(tmpdir(), 'ctxindex-noprompts-'))
+  const env: Record<string, string | undefined> = {
+    XDG_CONFIG_HOME: join(dir, 'config'),
+    XDG_DATA_HOME: join(dir, 'data'),
+    XDG_STATE_HOME: join(dir, 'state'),
+    XDG_CACHE_HOME: join(dir, 'cache'),
+    CTXINDEX_CONFIG_HOME: undefined,
+    CTXINDEX_DATA_HOME: undefined,
+    CTXINDEX_STATE_HOME: undefined,
+    CTXINDEX_CACHE_HOME: undefined,
+  }
+  await mkdir(join(dir, 'config'), { recursive: true })
+  await mkdir(join(dir, 'data'), { recursive: true })
+  // bootstrap the DB
+  await spawnCli(['init'], env, 'null')
+  return { env, cleanup: () => rm(dir, { recursive: true, force: true }) }
+}
+
+describe('no-prompts contract', () => {
+  // ---------------------------------------------------------------------------
+  // Commands that succeed with no required input
+  // ---------------------------------------------------------------------------
+  test('init: exits 0 with stdin=null', async () => {
+    const { env, cleanup } = await mkSandbox()
+    try {
+      const { exitCode } = await spawnCli(['init'], env, 'null')
+      expect(exitCode).toBe(0)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  test('realm list: exits 0 with stdin=null', async () => {
+    const { env, cleanup } = await mkSandbox()
+    try {
+      const { exitCode } = await spawnCli(['realm', 'list'], env, 'null')
+      expect(exitCode).toBe(0)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  test('source list: exits 0 with stdin=null', async () => {
+    const { env, cleanup } = await mkSandbox()
+    try {
+      const { exitCode } = await spawnCli(['source', 'list'], env, 'null')
+      expect(exitCode).toBe(0)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  test('status: exits 0 with stdin=null', async () => {
+    const { env, cleanup } = await mkSandbox()
+    try {
+      const { exitCode } = await spawnCli(['status'], env, 'null')
+      expect(exitCode).toBe(0)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  test('skills list: exits 0 with stdin=null', async () => {
+    const { env, cleanup } = await mkSandbox()
+    try {
+      const { exitCode } = await spawnCli(['skills', 'list'], env, 'null')
+      expect(exitCode).toBe(0)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  test('skills path: exits 0 with stdin=null', async () => {
+    const { env, cleanup } = await mkSandbox()
+    try {
+      const { exitCode } = await spawnCli(['skills', 'path'], env, 'null')
+      expect(exitCode).toBe(0)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  // ---------------------------------------------------------------------------
+  // Commands that require args — must fail fast (non-zero), not hang
+  // ---------------------------------------------------------------------------
+  test('realm add (missing slug): exits non-zero fast', async () => {
+    const { env, cleanup } = await mkSandbox()
+    try {
+      const { exitCode, stderr } = await spawnCli(['realm', 'add'], env, 'null')
+      expect(exitCode).not.toBe(0)
+      expect(stderr.length).toBeGreaterThan(0)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  test('source add (missing adapter-id): exits non-zero fast', async () => {
+    const { env, cleanup } = await mkSandbox()
+    try {
+      const { exitCode, stderr } = await spawnCli(
+        ['source', 'add'],
+        env,
+        'null',
+      )
+      expect(exitCode).not.toBe(0)
+      expect(stderr.length).toBeGreaterThan(0)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  test('source add --realm unknown: exits 2 with actionable message', async () => {
+    const { env, cleanup } = await mkSandbox()
+    try {
+      const { exitCode, stderr } = await spawnCli(
+        ['source', 'add', 'local.directory', '--realm', 'unknown'],
+        env,
+        'null',
+      )
+      expect(exitCode).toBe(2)
+      expect(stderr).toContain('unknown realm')
+      expect(stderr).toContain('ctxindex realm add unknown')
+    } finally {
+      await cleanup()
+    }
+  })
+
+  test('source remove (missing id): exits non-zero fast', async () => {
+    const { env, cleanup } = await mkSandbox()
+    try {
+      const { exitCode, stderr } = await spawnCli(
+        ['source', 'remove'],
+        env,
+        'null',
+      )
+      expect(exitCode).not.toBe(0)
+      expect(stderr.length).toBeGreaterThan(0)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  test('source remove (unknown id): exits 2 with actionable message', async () => {
+    const { env, cleanup } = await mkSandbox()
+    try {
+      const { exitCode, stderr } = await spawnCli(
+        ['source', 'remove', 'nonexistent-source-id'],
+        env,
+        'null',
+      )
+      expect(exitCode).toBe(2)
+      expect(stderr.length).toBeGreaterThan(0)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  test('skills get (missing name): exits non-zero fast', async () => {
+    const { env, cleanup } = await mkSandbox()
+    try {
+      const { exitCode, stderr } = await spawnCli(
+        ['skills', 'get'],
+        env,
+        'null',
+      )
+      expect(exitCode).not.toBe(0)
+      expect(stderr.length).toBeGreaterThan(0)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  // ---------------------------------------------------------------------------
+  // Pending commands: exit non-zero, not hang, actionable message
+  // ---------------------------------------------------------------------------
+  test('auth (pending): exits non-zero with actionable message', async () => {
+    const { env, cleanup } = await mkSandbox()
+    try {
+      const { exitCode, stderr } = await spawnCli(
+        ['auth', 'add', 'google'],
+        env,
+        'null',
+      )
+      expect(exitCode).not.toBe(0)
+      expect(stderr.length).toBeGreaterThan(0)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  test('sync (pending): exits non-zero with actionable message', async () => {
+    const { env, cleanup } = await mkSandbox()
+    try {
+      const { exitCode, stderr } = await spawnCli(['sync'], env, 'null')
+      expect(exitCode).not.toBe(0)
+      expect(stderr.length).toBeGreaterThan(0)
+    } finally {
+      await cleanup()
+    }
+  })
+})

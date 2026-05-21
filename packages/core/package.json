@@ -1,0 +1,47 @@
+{
+  "name": "@ctxindex/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./paths": "./src/paths.ts",
+    "./config": "./src/config.ts",
+    "./logger": "./src/logger.ts",
+    "./secrets": "./src/secrets.ts",
+    "./schema": "./src/schema.ts",
+    "./storage": "./src/storage.ts",
+    "./registry": "./src/registry.ts",
+    "./sync": "./src/sync.ts",
+    "./search": "./src/search.ts",
+    "./errors": "./src/errors.ts",
+    "./ids": "./src/ids.ts",
+    "./migrations": "./src/migrations/index.ts"
+  },
+  "scripts": {
+    "build": "tsgo --noEmit -p tsconfig.json",
+    "lint": "biome check .",
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@iarna/toml": "latest",
+    "@noble/ciphers": "latest",
+    "@noble/hashes": "latest",
+    "citty": "latest",
+    "drizzle-orm": "latest",
+    "fdir": "latest",
+    "file-type": "latest",
+    "google-auth-library": "latest",
+    "ignore": "latest",
+    "keytar": "latest",
+    "letterparser": "latest",
+    "linkedom": "latest",
+    "pino": "latest",
+    "pino-pretty": "latest",
+    "pino-roll": "latest",
+    "ulid": "latest",
+    "zod": "latest"
+  }
+}

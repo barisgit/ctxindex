@@ -1,0 +1,31 @@
+{
+  "name": "@ctxindex/adapters",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./registry": "./src/registry.ts",
+    "./local-directory": "./src/local-directory/index.ts",
+    "./google-mailbox": "./src/google-mailbox/index.ts"
+  },
+  "scripts": {
+    "build": "tsgo --noEmit -p tsconfig.json",
+    "lint": "biome check .",
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@ctxindex/core": "workspace:*",
+    "drizzle-orm": "latest",
+    "fdir": "latest",
+    "file-type": "latest",
+    "google-auth-library": "latest",
+    "ignore": "latest",
+    "letterparser": "latest",
+    "linkedom": "latest",
+    "ulid": "latest",
+    "zod": "latest"
+  }
+}

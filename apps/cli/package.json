@@ -1,0 +1,23 @@
+{
+  "name": "@ctxindex/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "ctxindex": "./bin/ctxindex.mjs"
+  },
+  "exports": {
+    ".": "./src/main.ts"
+  },
+  "scripts": {
+    "build": "tsgo --noEmit -p tsconfig.json",
+    "lint": "biome check .",
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@ctxindex/adapters": "workspace:*",
+    "@ctxindex/core": "workspace:*",
+    "citty": "latest"
+  }
+}
