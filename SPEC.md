@@ -112,6 +112,14 @@ SQLite and declarative config MUST store secret references, not raw secrets.
 
 An encrypted local secret-store fallback MAY exist for environments without a usable OS keychain.
 
+Secret references in declarative config (TOML or otherwise) MUST be one of the following typed URI forms:
+
+- `keychain:<service>/<account>/<key>` — OS keychain entry.
+- `file:<absolute-or-config-relative-path>#<key>` — entry inside an encrypted secrets file.
+- `env:<VAR_NAME>` or `env://<VAR_NAME>` — environment variable, resolved through the central env loader (no direct `process.env` reads outside the loader). The variable name MUST match `^[A-Z_][A-Z0-9_]*$`.
+
+A bare secret string in config (no URI scheme) MUST be rejected at config-load time with an actionable error.
+
 ## 8. Sync operations
 
 ctxindex MUST support at least the `sync` mode and SHOULD support `resync` and `diff`:

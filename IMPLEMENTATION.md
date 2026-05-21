@@ -331,10 +331,12 @@ Locked v1:
 - **Log enrichment**: every record carries `{ runId?, sourceId?, adapterId?, accountId?, realmId?, op? }` so a sync trace is reconstructable. Adapter code receives a scoped child logger pre-bound to its `sourceId`.
 - **Sensitive fields**: pino redaction list configured for `*.access_token`, `*.refresh_token`, `*.authorization`, `*.cookie`, `*.password`, `*.apiKey`. Redacted at the logger boundary, not at call sites.
 
-- **Tests**: Bun's built-in test runner (`bun test`). No Vitest, no Jest. Tests live next to source as `*.test.ts`. Integration tests for adapters spin a temp SQLite DB.
+- **Tests**: Bun's built-in test runner (`bun test`). No Vitest, no Jest. Tests live next to source as `*.test.ts`. Integration tests for adapters spin a temp SQLite DB. Three lanes via `bunfig.toml` `pathIgnorePatterns` + scripts: `test` (unit), `test:integration` (under `**/*.integration.test.ts`), `test:e2e` (spawns the linked CLI binary). The e2e lane uses a `scripts/with-timeout.ts` wall-clock guard (kills process group, exits `124` on timeout) so a hung Google API call cannot freeze CI. JUnit reporter via `bun test --reporter=junit --reporter-outfile=.cache/bun-junit.xml` is optional in CI.
+- **Test harness** (`packages/core/src/testing/`): a `createSandbox()` helper returns `{ envOverrides, paths, openDb, cleanup }` where `envOverrides` is the `CTXINDEX_*` map a child process inherits, `paths` is a resolved `paths` module bound to a tmpdir, `openDb()` opens (or rehydrates from a migrated template) the sandboxed SQLite file, and `cleanup()` removes the tmpdir. Every integration and e2e test MUST use `createSandbox()` rather than ad-hoc `mkdtempSync` calls.
 - **Lint + format**: **Biome** (`biome.json` checked in). Single tool, no ESLint/Prettier. CI runs `biome check`.
 - **Typecheck**: `@typescript/native-preview` (`tsgo`) is the CI typecheck binary (`tsgo --noEmit`). `typescript` stays as a dev dep so editors/LSP keep working and to retain a `tsc --noEmit` fallback. `tsconfig.json` flags: `strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`, `noImplicitOverride: true`, `noFallthroughCasesInSwitch: true`, `verbatimModuleSyntax: true`.
-- **CI sequence**: `bun install` → `biome check` → `tsgo --noEmit` → `bun test`.
+- **Env loader**: a single Zod schema in `packages/core/src/config/env.ts` parses `process.env` into a frozen object via a `getEnv()` singleton; `resetEnvForTests()` clears the cache. Direct `process.env.CTXINDEX_*` reads outside this module are a lint-enforceable v1 violation. The schema covers every `CTXINDEX_*` key plus `XDG_*` and optional Google OAuth fallbacks (`CTXINDEX_GMAIL_CLIENT_ID`, `CTXINDEX_GMAIL_CLIENT_SECRET`) used by the e2e harness.
+- **CI sequence**: `bun install` → `biome check` → `tsgo --noEmit` → `bun test` → `bun test:integration` → `bun test:e2e` (gated on presence of CI env vars; falls back to mocked harness when no Google credentials are configured).
 
 ## 3d. Repo layout, adapter registry, distribution
 
@@ -373,11 +375,13 @@ Adapters do NOT each get their own package. One `@ctxindex/adapters` package own
 
 Workspace tool: **Turborepo + Bun workspaces** (Turborepo task graph + caching, Bun for installs and runtime). Turborepo pnpm support is more polished today but Bun workspace support is improving and matches our Bun-only stance.
 
-`turbo.json` pipelines: `build`, `lint` (biome), `typecheck` (tsgo), `test` (bun test), `db:generate` (drizzle-kit per namespace).
+`turbo.json` pipelines: `build`, `lint` (biome), `typecheck` (tsgo), `test` (bun test, unit), `test:integration`, `test:e2e`, `db:generate` (drizzle-kit per namespace).
+
+Root `turbo.json` MUST set `globalDependencies: ['**/.env', '**/.env.*', '**/bunfig.toml']` so any env/config change busts caches. Each workspace (`apps/cli`, `packages/core`, `packages/adapters`) MAY extend `//` and declare an `env:` array per task listing the `CTXINDEX_*` variables that should bust that task's cache; the e2e lane in `apps/cli/turbo.json` MUST list `CTXINDEX_GMAIL_CLIENT_ID`, `CTXINDEX_GMAIL_CLIENT_SECRET`, `CTXINDEX_GMAIL_REFRESH_TOKEN` so live-credential changes do not silently reuse a stale pass.
 
 ### 3d.2 Adapter registry
 
-Locked: a **fully-typed, capability-rich adapter registry** modeled after sessionloom's `createIntegrationRegistry`. The registry is constructed once over a `const` map of adapter definitions; from that point on, every capability a consumer might need is a typed method on the returned handle. Consumers do not reach into adapter objects directly. Unknown ids fail at compile time.
+Locked: a **fully-typed, capability-rich adapter registry** using a `createIntegrationRegistry`-style pattern. The registry is constructed once over a `const` map of adapter definitions; from that point on, every capability a consumer might need is a typed method on the returned handle. Consumers do not reach into adapter objects directly. Unknown ids fail at compile time.
 
 Design rules:
 
@@ -388,7 +392,7 @@ Design rules:
 5. Lookups by free `string` (e.g. resolving a CLI-entered adapter name) go through `isKnownAdapter(v)` first; that's a type guard that narrows `string` to the literal union for subsequent calls.
 6. Migration coordinator, sync runner, auth flow, CLI `source add`, and `ctxindex status` all consume the registry through dedicated typed methods (`listMigrations()`, `getSyncFn(id)`, `getAuthSpec(id)`, `getAdaptersByProvider(provider)`, etc.). Each consumer's needs become methods on the handle, not patterns repeated in callers.
 7. The handle also exposes typed `registerAdapter` / `unregisterAdapter` runtime hooks (for tests, future out-of-tree adapters). v1 binary ships the built-in map only; runtime hooks are present but unused.
-8. All registry errors throw `CtxindexRegistryError` with a `code` + structured `metadata`, matching the sessionloom pattern.
+8. All registry errors throw `CtxindexRegistryError` with a `code` + structured `metadata`.
 
 #### 3d.2.1 Adapter definition shape (`packages/core/src/registry/types.ts`)
 
@@ -1286,7 +1290,9 @@ CTXINDEX_STATE_HOME     -> $XDG_STATE_HOME/ctxindex
 CTXINDEX_CACHE_HOME     -> $XDG_CACHE_HOME/ctxindex
 ```
 
-A `paths` module exposes `configDir()`, `dataDir()`, `stateDir()`, `cacheDir()`, `logDir()` and is the only legal way to resolve these paths in code. No ad-hoc `~/.local/...` joins.
+A `paths` module exposes `configDir()`, `dataDir()`, `stateDir()`, `cacheDir()`, `logDir()` and is the only legal way to resolve these paths in code. No ad-hoc `~/.local/...` joins. The `paths` module reads env exclusively through the `getEnv()` loader described in §3c — it does not touch `process.env` directly.
+
+A `.env.example` at the repo root documents every `CTXINDEX_*` key with sectioned comments (paths, log, secrets, gmail e2e). Real env files (`.env`, `.env.local`, `.env.*`) are gitignored. The `getEnv()` schema is the source of truth; `.env.example` is regenerated from the schema's metadata or hand-maintained to match.
 
 Source declarations should be hybrid, with TOML as desired state and SQLite as applied state:
 
@@ -1324,6 +1330,27 @@ Default retention should be conservative for sensitive sources such as mail. Can
 Adapter-specific tables are for provider-specific query/state that is useful beyond raw debugging, such as Gmail threads, labels, recurring calendar series, or ClickUp custom fields.
 
 ## 13. CLI surface and output
+
+### 13.0 End-to-end test harness
+
+Every V1.md §4 exit criterion MUST be exercised by a test that spawns the real `ctxindex` binary (`bun apps/cli/bin/ctxindex.mjs`) inside a sandboxed XDG environment built by `createSandbox()` (§3c). The harness:
+
+1. Allocates a tmpdir per test and sets `CTXINDEX_{CONFIG,DATA,STATE,CACHE}_HOME` to subdirs under it.
+2. Spawns the binary with `Bun.spawn` (or equivalent), captures `stdout`/`stderr` and `exitCode`, optionally feeds `stdin`.
+3. Wraps long-running commands in `scripts/with-timeout.ts <secs>` so a stuck remote API cannot hang CI; exit `124` is asserted as the timeout case.
+4. After the command exits, opens the sandboxed SQLite file with `bun:sqlite` and asserts on row counts in `items`, `chunks`, `attachments`, `sync_runs`, `source_sync_state`, `grants`, `accounts`, `realms`.
+5. Greps the sandboxed `logDir()` for any redacted-token regression.
+
+Library-only verifiers (calling `runSync()` / `search()` from TypeScript) are acceptable for unit/integration tests but MUST NOT be the sole evidence for any V1.md §4 criterion. The e2e lane (`bun test:e2e`) holds that contract.
+
+For the Gmail loopback flow, the e2e harness MAY:
+
+- Use mocked OAuth (`MSW`-style fetch interceptor against `oauth2.googleapis.com/token` and `gmail.googleapis.com`) for CI without credentials.
+- Use real credentials from `CTXINDEX_GMAIL_CLIENT_ID` + `CTXINDEX_GMAIL_CLIENT_SECRET` + `CTXINDEX_GMAIL_REFRESH_TOKEN` (the e2e harness exchanges the refresh token directly to skip the interactive browser step) when the env vars are present.
+
+The loopback listener implementation lives in `apps/cli/src/auth/google-loopback.ts`: `http.createServer` bound to `127.0.0.1:0`, opens the user's browser via `open` (or platform `xdg-open` / `start`), accepts the first GET to `/callback?code=...`, exchanges, persists, and shuts the listener down. A 5-minute timeout returns exit `50` with an actionable message.
+
+### 13.1 v1 commands
 
 v1 CLI command sketch:
 
