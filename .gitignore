@@ -1,0 +1,14 @@
+.worktrees/
+.ctxindex/
+.envrc
+node_modules/
+dist/
+build/
+.turbo/
+.cache/
+*.log
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+.DS_Store
