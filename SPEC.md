@@ -206,6 +206,18 @@ ctxindex SHOULD ship bundled skill documentation alongside the binary so agents 
 
 Bundled skill docs MUST be versioned with the ctxindex release that ships them.
 
+## 10d. Module boundaries
+
+`apps/cli` is a thin shell around `@ctxindex/core` services. Command files under `apps/cli/src/commands/**/*.ts` MUST limit themselves to parsing arguments, calling a core service, formatting the result, mapping typed errors, and returning an exit code.
+
+Code under `apps/cli/src/**` MUST NOT import `bun:sqlite` or `drizzle-orm/*`. It MUST NOT contain raw SQL literals for `INSERT`, `UPDATE`, `DELETE`, or `SELECT` statements.
+
+Code under `apps/cli/src/**` MUST NOT issue `fetch()` calls to provider APIs such as OAuth or Gmail endpoints. Provider HTTP behavior belongs in `@ctxindex/core` or `@ctxindex/adapters`.
+
+Code under `apps/cli/src/**` MUST NOT generate ULIDs or UUIDs and MUST NOT encode schema column names. Identity assignment and schema knowledge are core concerns.
+
+The OAuth loopback flow MAY bind a `127.0.0.1` socket from `apps/cli` because browser launch and redirect capture are user-interface concerns. The authorization code exchange MUST be delegated to a `@ctxindex/core/auth` function.
+
 ## 11. Concurrency
 
 ctxindex MUST coordinate sync executions through an advisory lock table:

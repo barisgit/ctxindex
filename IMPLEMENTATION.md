@@ -379,6 +379,8 @@ Workspace tool: **Turborepo + Bun workspaces** (Turborepo task graph + caching, 
 
 Root `turbo.json` MUST set `globalDependencies: ['**/.env', '**/.env.*', '**/bunfig.toml']` so any env/config change busts caches. Each workspace (`apps/cli`, `packages/core`, `packages/adapters`) MAY extend `//` and declare an `env:` array per task listing the `CTXINDEX_*` variables that should bust that task's cache; the e2e lane in `apps/cli/turbo.json` MUST list `CTXINDEX_GMAIL_CLIENT_ID`, `CTXINDEX_GMAIL_CLIENT_SECRET`, `CTXINDEX_GMAIL_REFRESH_TOKEN` so live-credential changes do not silently reuse a stale pass.
 
+The monorepo boundary is enforced by `scripts/verify/architecture-lint.sh`: `apps/cli` command files stay thin wrappers around `@ctxindex/core` services, while SQLite access, raw SQL, provider HTTP calls, identity assignment, and schema knowledge stay out of the CLI layer.
+
 ### 3d.2 Adapter registry
 
 Locked: a **fully-typed, capability-rich adapter registry** using a `createIntegrationRegistry`-style pattern. The registry is constructed once over a `const` map of adapter definitions; from that point on, every capability a consumer might need is a typed method on the returned handle. Consumers do not reach into adapter objects directly. Unknown ids fail at compile time.
