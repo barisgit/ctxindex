@@ -1,22 +1,25 @@
 {
-  "name": "ctxindex-root",
+  "name": "ctxindex",
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "packageManager": "bun@1.3.12",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
-  "bin": {
-    "ctxindex": "./apps/cli/bin/ctxindex.mjs"
-  },
   "scripts": {
     "build": "turbo run build",
     "lint": "biome check .",
     "typecheck": "tsgo --noEmit -p tsconfig.base.json",
     "test": "bun test",
+    "test:integration": "bun test --path-ignore-patterns '__none__' integration.test",
+    "test:e2e": "bun run scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' --pass-with-no-tests e2e.test",
+    "with-timeout": "bun scripts/with-timeout.ts",
     "ci": "bash scripts/verify/ci.sh",
-    "db:generate": "turbo run db:generate"
+    "db:generate": "turbo run db:generate",
+    "link": "bun --filter @ctxindex/cli link",
+    "unlink": "bun --filter @ctxindex/cli unlink"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",
