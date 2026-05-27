@@ -2,9 +2,7 @@
 
 ## f01-monorepo-bootstrap
 
-- Ambiguity: The charter asks for root package name `ctxindex-root`, but `bun link` consumers normally link by package name while the verifier asks to run `bun link ctxindex`.
-  Chosen answer: Keep the mandated root package name, expose the `ctxindex` binary from the root `bin` field, and let `scripts/verify/bun-link.sh` try `bun link ctxindex` before falling back to `bun link ctxindex-root` so the binary path is still validated from a temp project.
-  Rationale: Bun derives the link package name from `package.json`, so `ctxindex` is the bin name rather than the link package name when the root package is `ctxindex-root`.
+- ~~Ambiguity: The charter asks for root package name `ctxindex-root`~~. **Resolved (charter ctxindex-arch-refactor)**: root package renamed to `ctxindex`, root `bin` field removed. Linking is now `bun run link` from repo root (delegates to `bun --filter @ctxindex/cli link`) or `cd apps/cli && bun link`. `scripts/verify/bun-link.sh` already links the `@ctxindex/cli` workspace package from `apps/cli`, which is what `bun link` consumers should use anyway.
 - Ambiguity: The explicit dev-dependency list omits `turbo`, but the feature requires a Turborepo `turbo.json` and root scripts that run Turbo tasks.
   Chosen answer: Install `turbo` as a root dev dependency along with the explicitly listed dev tools.
   Rationale: Without the Turbo CLI, `bun run build` and `bun run db:generate` cannot execute the required task graph.
@@ -41,3 +39,19 @@
 - Ambiguity: Adapter sync stubs are required to throw `not_implemented_yet`, but SPEC §12 does not include `not_implemented_yet` in the `CtxindexSyncError` code set.
   Chosen answer: Include `not_implemented_yet` as a temporary placeholder `CtxindexSyncError` code in addition to the SPEC §12 codes.
   Rationale: The f05 request explicitly requires the stubs to throw `not_implemented_yet`, while downstream sync features can replace the placeholder before the sync runner maps terminal SPEC codes.
+
+## f09-f15-cli-e2e
+
+- Production follow-up: `ctxindex realm add "bad name!"` currently exits 0 and inserts the realm, but `apps/cli/src/e2e/realm.e2e.test.ts` pins the requested behavior that invalid realm names exit 2 and do not create a row.
+  Rationale: The e2e feature explicitly asks for `invalid realm name exits 2`; this run is limited to read-only tests against `apps/cli/src/commands/*`.
+- Production follow-up: `ctxindex skills get nonexistent` currently exits 1, but `apps/cli/src/e2e/skills.e2e.test.ts` pins the requested behavior that unknown skill names exit 2.
+  Rationale: The e2e feature explicitly asks for `unknown skill name exits 2`; this run is limited to read-only tests against `apps/cli/src/commands/*`.
+- Production follow-up: `ctxindex status --json` currently emits `source_id`, `adapter_id`, `realm_slug`, `last_status`, and `updated_at` from `source_sync_state`, but `apps/cli/src/e2e/status.e2e.test.ts` pins the charter contract keys `sourceId`, `adapterId`, `realmSlug`, `lastStatus`, `lastRunAt`, `errorsCount`, and `cursor`.
+  Rationale: VAL-CLI-STATUS requires status output to include last-run summary, error count, and cursor data; this run is limited to read-only tests against `apps/cli/src/commands/*`.
+
+## f18-f20-cli-e2e
+
+- Chosen answer: Add minimal runtime columns (`sync_runs.released_at`, `sync_locks.pid`, `sync_locks.released_at`) and CLI-side stale lock recovery so binary-spawn crash-recovery tests can distinguish a live lock from a dead-pid/SIGKILL lock.
+  Rationale: The current migration had only a lock PK and run id; f18 needs observable recovery without overhauling the sync runner.
+- Chosen answer: `CTXINDEX_LOG_CANARY_TOKEN`, test-only log rotation bytes, and test-only log spam are redacted/gated in non-production code paths for e2e log assertions.
+  Rationale: f20 needs deterministic rotation and a canary leak check while keeping normal user-facing logs quiet in non-TTY binary-spawn tests.

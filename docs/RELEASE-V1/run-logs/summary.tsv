@@ -1,0 +1,10 @@
+bun run typecheck	0	1	docs/RELEASE-V1/run-logs/01-bun-run-typecheck.log
+bun run lint	0	0	docs/RELEASE-V1/run-logs/02-bun-run-lint.log
+bun test	0	18	docs/RELEASE-V1/run-logs/03-bun-test.log
+bun run test:e2e	0	34	docs/RELEASE-V1/run-logs/04-bun-run-test-e2e.log
+bun run test:integration	0	1	docs/RELEASE-V1/run-logs/05-bun-run-test-integration.log
+bash scripts/verify/ci.sh	0	58	docs/RELEASE-V1/run-logs/06-bash-scripts-verify-ci.sh.log
+bash scripts/verify/bun-link.sh	0	0	docs/RELEASE-V1/run-logs/07-bash-scripts-verify-bun-link.sh.log
+bash scripts/verify/env-loader.sh	0	0	docs/RELEASE-V1/run-logs/08-bash-scripts-verify-env-loader.sh.log
+bash scripts/verify/network-egress.sh	0	1	docs/RELEASE-V1/run-logs/09-bash-scripts-verify-network-egress.sh.log
+bash scripts/verify/no-prompts-static.sh	0	0	docs/RELEASE-V1/run-logs/10-bash-scripts-verify-no-prompts-static.sh.log

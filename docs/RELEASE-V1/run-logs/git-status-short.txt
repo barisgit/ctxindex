@@ -1,0 +1,59 @@
+ M apps/cli/package.json
+ M apps/cli/src/auth/headless-google.test.ts
+ M apps/cli/src/commands/auth.ts
+ M apps/cli/src/commands/realm.ts
+ M apps/cli/src/commands/secrets.ts
+ M apps/cli/src/commands/skills.ts
+ M apps/cli/src/commands/source.ts
+ M apps/cli/src/commands/status.ts
+ M apps/cli/src/main.ts
+ M apps/cli/src/skills/loader.ts
+ M bunfig.toml
+ M docs/OPEN-QUESTIONS.md
+ M package.json
+ M packages/adapters/package.json
+ M packages/adapters/src/google-mailbox/api.ts
+ M packages/adapters/src/google-mailbox/index.ts
+ M packages/adapters/src/local-directory/sync.ts
+ M packages/core/migrations/0000_init.sql
+ M packages/core/package.json
+ M packages/core/src/config/index.ts
+ M packages/core/src/config/io.ts
+ M packages/core/src/errors.ts
+ M packages/core/src/index.ts
+ M packages/core/src/logger/index.ts
+ M packages/core/src/logger/redaction.integration.test.ts
+ M packages/core/src/paths/index.ts
+ M packages/core/src/paths/paths.test.ts
+ M packages/core/src/schema/sync_locks.ts
+ M packages/core/src/schema/sync_runs.ts
+ M packages/core/src/secrets/file.test.ts
+ M packages/core/src/secrets/file.ts
+ M packages/core/src/secrets/keychain.ts
+ M packages/core/src/secrets/migrate.test.ts
+ M scripts/verify/bun-link.sh
+ M scripts/verify/ci.sh
+ M scripts/verify/network-egress.sh
+ M turbo.json
+?? .env.example
+?? apps/cli/src/auth/google-loopback.ts
+?? apps/cli/src/commands/search.ts
+?? apps/cli/src/commands/sync.ts
+?? apps/cli/src/e2e/
+?? apps/cli/turbo.json
+?? docs/AGENT-HOWTOS.md
+?? docs/RELEASE-V1/
+?? packages/adapters/turbo.json
+?? packages/core/src/config/env-example.test.ts
+?? packages/core/src/config/env-loader.ts
+?? packages/core/src/config/env-uri.test.ts
+?? packages/core/src/config/env-uri.ts
+?? packages/core/src/config/test-lanes.test.ts
+?? packages/core/src/config/turbo-env.test.ts
+?? packages/core/src/meta/
+?? packages/core/src/testing/
+?? packages/core/turbo.json
+?? scripts/verify/env-loader.sh
+?? scripts/verify/no-prompts-static.sh
+?? scripts/with-timeout.test.ts
+?? scripts/with-timeout.ts

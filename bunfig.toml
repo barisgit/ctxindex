@@ -1,2 +1,8 @@
 [install]
 linker = "hoisted"
+
+[test]
+pathIgnorePatterns = [
+  "**/*.integration.test.ts",
+  "**/*.e2e.test.ts",
+]

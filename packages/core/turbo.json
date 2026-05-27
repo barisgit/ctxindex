@@ -1,0 +1,54 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "env": []
+    },
+    "lint": {
+      "env": []
+    },
+    "typecheck": {
+      "env": []
+    },
+    "test": {
+      "env": [
+        "CTXINDEX_CONFIG_HOME",
+        "CTXINDEX_DATA_HOME",
+        "CTXINDEX_STATE_HOME",
+        "CTXINDEX_CACHE_HOME",
+        "CTXINDEX_KEYTAR_MOCK_FILE",
+        "CTXINDEX_LOG_LEVEL",
+        "CTXINDEX_LOG_SYNC",
+        "CTXINDEX_SECRETS_PASSPHRASE",
+        "CTXINDEX_SKIP_TURBO_DRY_JSON"
+      ]
+    },
+    "test:integration": {
+      "env": [
+        "CTXINDEX_CONFIG_HOME",
+        "CTXINDEX_DATA_HOME",
+        "CTXINDEX_STATE_HOME",
+        "CTXINDEX_CACHE_HOME",
+        "CTXINDEX_KEYTAR_MOCK_FILE",
+        "CTXINDEX_LOG_LEVEL",
+        "CTXINDEX_LOG_SYNC",
+        "CTXINDEX_SECRETS_PASSPHRASE",
+        "CTXINDEX_SKIP_TURBO_DRY_JSON"
+      ]
+    },
+    "test:e2e": {
+      "env": [
+        "CTXINDEX_CONFIG_HOME",
+        "CTXINDEX_DATA_HOME",
+        "CTXINDEX_STATE_HOME",
+        "CTXINDEX_CACHE_HOME",
+        "CTXINDEX_KEYTAR_MOCK_FILE",
+        "CTXINDEX_LOG_LEVEL",
+        "CTXINDEX_LOG_SYNC",
+        "CTXINDEX_SECRETS_PASSPHRASE",
+        "CTXINDEX_SKIP_TURBO_DRY_JSON"
+      ]
+    }
+  }
+}
