@@ -3,6 +3,7 @@ import { Buffer } from 'node:buffer'
 import { chmod, mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { resetEnvForTests } from '../config/env-loader'
 import { FileBackend, secretsBoxPath } from './file'
 import { CtxindexSecretsError } from './types'
 
@@ -17,12 +18,21 @@ const pathEnv = [
 const savedEnv = new Map<string, string | undefined>()
 for (const key of pathEnv) savedEnv.set(key, process.env[key])
 
+function setEnv(
+  key: (typeof pathEnv)[number],
+  value: string | undefined,
+): void {
+  if (value === undefined) delete process.env[key]
+  else process.env[key] = value
+}
+
 afterEach(() => {
   for (const key of pathEnv) {
     const value = savedEnv.get(key)
     if (value === undefined) delete process.env[key]
     else process.env[key] = value
   }
+  resetEnvForTests()
 })
 
 async function sandbox(): Promise<{
@@ -33,11 +43,12 @@ async function sandbox(): Promise<{
   const root = await mkdtemp(join(tmpdir(), 'ctxindex-secrets-file-'))
   const configHome = join(root, 'config', 'ctxindex')
   const dataHome = join(root, 'data', 'ctxindex')
-  process.env.XDG_CONFIG_HOME = join(root, 'config')
-  process.env.XDG_DATA_HOME = join(root, 'data')
-  delete process.env.CTXINDEX_CONFIG_HOME
-  delete process.env.CTXINDEX_DATA_HOME
-  delete process.env.CTXINDEX_SECRETS_PASSPHRASE
+  setEnv('XDG_CONFIG_HOME', join(root, 'config'))
+  setEnv('XDG_DATA_HOME', join(root, 'data'))
+  setEnv('CTXINDEX_CONFIG_HOME', undefined)
+  setEnv('CTXINDEX_DATA_HOME', undefined)
+  setEnv('CTXINDEX_SECRETS_PASSPHRASE', undefined)
+  resetEnvForTests()
   return { root, configHome, dataHome }
 }
 

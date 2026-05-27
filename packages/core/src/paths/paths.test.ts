@@ -1,39 +1,49 @@
 import { afterEach, expect, test } from 'bun:test'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import { resetEnvForTests } from '../config/env-loader'
 import { cacheDir, configDir, dataDir, logDir, stateDir } from '.'
 
 const savedEnv = { ...process.env }
 
+const pathEnvKeys = [
+  'CTXINDEX_CONFIG_HOME',
+  'CTXINDEX_DATA_HOME',
+  'CTXINDEX_STATE_HOME',
+  'CTXINDEX_CACHE_HOME',
+  'XDG_CONFIG_HOME',
+  'XDG_DATA_HOME',
+  'XDG_STATE_HOME',
+  'XDG_CACHE_HOME',
+] as const
+
 afterEach(() => {
   process.env = { ...savedEnv }
+  resetEnvForTests()
 })
 
 function clearPathEnv(): void {
-  for (const key of [
-    'CTXINDEX_CONFIG_HOME',
-    'CTXINDEX_DATA_HOME',
-    'CTXINDEX_STATE_HOME',
-    'CTXINDEX_CACHE_HOME',
-    'XDG_CONFIG_HOME',
-    'XDG_DATA_HOME',
-    'XDG_STATE_HOME',
-    'XDG_CACHE_HOME',
-  ]) {
+  for (const key of pathEnvKeys) {
     delete process.env[key]
   }
+  resetEnvForTests()
+}
+
+function setPathEnv(key: (typeof pathEnvKeys)[number], value: string): void {
+  process.env[key] = value
 }
 
 test('CTXINDEX path env vars take precedence over XDG vars', () => {
   clearPathEnv()
-  process.env.CTXINDEX_CONFIG_HOME = '/ctx/config'
-  process.env.CTXINDEX_DATA_HOME = '/ctx/data'
-  process.env.CTXINDEX_STATE_HOME = '/ctx/state'
-  process.env.CTXINDEX_CACHE_HOME = '/ctx/cache'
-  process.env.XDG_CONFIG_HOME = '/xdg/config'
-  process.env.XDG_DATA_HOME = '/xdg/data'
-  process.env.XDG_STATE_HOME = '/xdg/state'
-  process.env.XDG_CACHE_HOME = '/xdg/cache'
+  setPathEnv('CTXINDEX_CONFIG_HOME', '/ctx/config')
+  setPathEnv('CTXINDEX_DATA_HOME', '/ctx/data')
+  setPathEnv('CTXINDEX_STATE_HOME', '/ctx/state')
+  setPathEnv('CTXINDEX_CACHE_HOME', '/ctx/cache')
+  setPathEnv('XDG_CONFIG_HOME', '/xdg/config')
+  setPathEnv('XDG_DATA_HOME', '/xdg/data')
+  setPathEnv('XDG_STATE_HOME', '/xdg/state')
+  setPathEnv('XDG_CACHE_HOME', '/xdg/cache')
+  resetEnvForTests()
 
   expect(configDir()).toBe('/ctx/config')
   expect(dataDir()).toBe('/ctx/data')
@@ -44,10 +54,11 @@ test('CTXINDEX path env vars take precedence over XDG vars', () => {
 
 test('XDG path env vars are used when CTXINDEX vars are absent', () => {
   clearPathEnv()
-  process.env.XDG_CONFIG_HOME = '/xdg/config'
-  process.env.XDG_DATA_HOME = '/xdg/data'
-  process.env.XDG_STATE_HOME = '/xdg/state'
-  process.env.XDG_CACHE_HOME = '/xdg/cache'
+  setPathEnv('XDG_CONFIG_HOME', '/xdg/config')
+  setPathEnv('XDG_DATA_HOME', '/xdg/data')
+  setPathEnv('XDG_STATE_HOME', '/xdg/state')
+  setPathEnv('XDG_CACHE_HOME', '/xdg/cache')
+  resetEnvForTests()
 
   expect(configDir()).toBe('/xdg/config/ctxindex')
   expect(dataDir()).toBe('/xdg/data/ctxindex')

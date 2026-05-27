@@ -8,12 +8,17 @@
     "./paths": "./src/paths.ts",
     "./config": "./src/config.ts",
     "./logger": "./src/logger.ts",
+    "./auth": "./src/auth/index.ts",
+    "./realm": "./src/realm/index.ts",
+    "./source": "./src/source/index.ts",
     "./secrets": "./src/secrets.ts",
+    "./secrets-service": "./src/secrets/service.ts",
     "./schema": "./src/schema.ts",
     "./storage": "./src/storage.ts",
+    "./testing": "./src/testing/index.ts",
     "./registry": "./src/registry.ts",
-    "./sync": "./src/sync.ts",
-    "./search": "./src/search.ts",
+    "./sync": "./src/sync/index.ts",
+    "./search": "./src/search/index.ts",
     "./errors": "./src/errors.ts",
     "./ids": "./src/ids.ts",
     "./migrations": "./src/migrations/index.ts"
@@ -23,6 +28,8 @@
     "lint": "biome check .",
     "typecheck": "tsgo --noEmit -p tsconfig.json",
     "test": "bun test",
+    "test:integration": "bun test --path-ignore-patterns '__none__' --pass-with-no-tests integration.test",
+    "test:e2e": "bun run ../../scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' --pass-with-no-tests e2e.test",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {

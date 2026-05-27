@@ -1,15 +1,13 @@
-import { Database } from 'bun:sqlite'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { applyPragmas, runMigrations } from '@ctxindex/core/storage'
-import { authAddGoogle } from '../commands/auth'
+import { obtainGoogleTokens, resolveAddCreds } from './add-google'
 
-let db: Database
-let sandbox: string
 let originalFetch: typeof fetch
 let originalEnv: Record<string, string | undefined>
+
+const gmailClientIdEnvKey = 'CTXINDEX_GMAIL_CLIENT_ID'
+const gmailClientSecretEnvKey = 'CTXINDEX_GMAIL_CLIENT_SECRET'
+const gmailRefreshTokenEnvKey = 'CTXINDEX_GMAIL_REFRESH_TOKEN'
+const noBrowserEnvKey = 'CTXINDEX_NO_BROWSER'
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -18,45 +16,29 @@ function jsonResponse(body: unknown, status = 200): Response {
   })
 }
 
-beforeEach(async () => {
-  sandbox = await mkdtemp(join(tmpdir(), 'ctxindex-auth-test-'))
+beforeEach(() => {
   originalFetch = globalThis.fetch
   originalEnv = {
-    XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
-    XDG_DATA_HOME: process.env.XDG_DATA_HOME,
-    XDG_STATE_HOME: process.env.XDG_STATE_HOME,
-    XDG_CACHE_HOME: process.env.XDG_CACHE_HOME,
-    CTXINDEX_CONFIG_HOME: process.env.CTXINDEX_CONFIG_HOME,
-    CTXINDEX_DATA_HOME: process.env.CTXINDEX_DATA_HOME,
-    CTXINDEX_STATE_HOME: process.env.CTXINDEX_STATE_HOME,
-    CTXINDEX_CACHE_HOME: process.env.CTXINDEX_CACHE_HOME,
+    CTXINDEX_GMAIL_CLIENT_ID: process.env[gmailClientIdEnvKey],
+    CTXINDEX_GMAIL_CLIENT_SECRET: process.env[gmailClientSecretEnvKey],
+    CTXINDEX_GMAIL_REFRESH_TOKEN: process.env[gmailRefreshTokenEnvKey],
+    CTXINDEX_NO_BROWSER: process.env[noBrowserEnvKey],
   }
-  process.env.XDG_CONFIG_HOME = join(sandbox, 'config')
-  process.env.XDG_DATA_HOME = join(sandbox, 'data')
-  process.env.XDG_STATE_HOME = join(sandbox, 'state')
-  process.env.XDG_CACHE_HOME = join(sandbox, 'cache')
-  delete process.env.CTXINDEX_CONFIG_HOME
-  delete process.env.CTXINDEX_DATA_HOME
-  delete process.env.CTXINDEX_STATE_HOME
-  delete process.env.CTXINDEX_CACHE_HOME
-
-  db = new Database(':memory:', { create: true })
-  applyPragmas(db)
-  await runMigrations(db)
+  delete process.env[gmailClientIdEnvKey]
+  delete process.env[gmailClientSecretEnvKey]
+  delete process.env[gmailRefreshTokenEnvKey]
 })
 
-afterEach(async () => {
+afterEach(() => {
   globalThis.fetch = originalFetch
   for (const [key, value] of Object.entries(originalEnv)) {
     if (value === undefined) delete process.env[key]
     else process.env[key] = value
   }
-  db.close()
-  await rm(sandbox, { recursive: true, force: true })
 })
 
 describe('headless google auth', () => {
-  test('auth-code exchange persists an account, grant, and refresh token ref without browser', async () => {
+  test('auth-code exchange returns tokens without browser fallback', async () => {
     const fetchedHosts: string[] = []
     globalThis.fetch = ((
       input: Parameters<typeof fetch>[0],
@@ -77,39 +59,22 @@ describe('headless google auth', () => {
       )
     }) as unknown as typeof fetch
 
-    const grantId = await authAddGoogle(db, [
-      'google',
-      '--client-id',
-      'client-id',
-      '--client-secret',
-      'client-secret',
-      '--auth-code',
-      'auth-code-1',
-    ])
+    const parsed = {
+      kind: 'add' as const,
+      provider: 'google',
+      clientId: 'client-id',
+      clientSecret: 'client-secret',
+      authCode: 'auth-code-1',
+      loopback: false,
+      fromEnv: false,
+    }
+    const creds = resolveAddCreds(parsed)
+    const token = await obtainGoogleTokens(parsed, creds.id, creds.secret)
 
     expect(fetchedHosts).toEqual(['oauth2.googleapis.com'])
-    const account = db.prepare('SELECT provider FROM accounts').get() as {
-      provider: string
-    }
-    expect(account.provider).toBe('google')
-    const grant = db
-      .prepare(
-        'SELECT id, refresh_token_ref, access_token_ref FROM grants WHERE id = ?',
-      )
-      .get(grantId) as {
-      id: string
-      refresh_token_ref: string
-      access_token_ref: string
-    }
-    expect(grant.id).toBe(grantId)
-    expect(grant.refresh_token_ref).toMatch(
-      /^(file:secrets\.box#|keychain:ctxindex\/)/,
-    )
-    expect(grant.access_token_ref).toMatch(
-      /^(file:secrets\.box#|keychain:ctxindex\/)/,
-    )
-    expect(grant.refresh_token_ref).not.toContain('refresh-token-secret')
-    expect(grant.access_token_ref).not.toContain('access-token-secret')
+    expect(token.access_token).toBe('access-token-secret')
+    expect(token.refresh_token).toBe('refresh-token-secret')
+    expect(token.expires_at).toBeGreaterThan(Date.now())
   })
 
   test('missing auth-code inputs fail fast without network', async () => {
@@ -117,8 +82,13 @@ describe('headless google auth', () => {
       throw new Error('fetch should not be called')
     }) as unknown as typeof fetch
 
-    await expect(authAddGoogle(db, ['google'])).rejects.toThrow(
-      'requires --client-id, --client-secret, and --auth-code',
-    )
+    expect(() =>
+      resolveAddCreds({
+        kind: 'add',
+        provider: 'google',
+        loopback: false,
+        fromEnv: false,
+      }),
+    ).toThrow('requires --client-id and --client-secret')
   })
 })

@@ -100,7 +100,9 @@ export async function getSkill(
   const fileStat = await stat(path).catch(() => null)
 
   if (!fileStat?.isFile()) {
-    throw new Error(`Bundled skill not found: ${name}`)
+    throw Object.assign(new Error(`Bundled skill not found: ${name}`), {
+      exitCode: 2,
+    })
   }
 
   const content = await readFile(path, 'utf8')

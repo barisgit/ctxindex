@@ -13,10 +13,17 @@ import {
   type GmailMessage,
   GmailMessageListSchema,
   GmailMessageSchema,
+  gmailApiUrl,
   safeFetch,
 } from './api'
 
-export { OAuthTokenResponseSchema, safeFetch } from './api'
+export {
+  exchangeGoogleRefreshToken,
+  type GoogleRefreshTokenOptions,
+  type OAuthTokenResponse,
+  OAuthTokenResponseSchema,
+  safeFetch,
+} from './api'
 
 export const migrations = {
   namespace: 'google.mailbox',
@@ -123,7 +130,7 @@ async function* emitMessage(
 ): AsyncGenerator<GmailOp, string | undefined, unknown> {
   const message = await safeFetch(
     GmailMessageSchema,
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`,
+    gmailApiUrl(`/gmail/v1/users/me/messages/${messageId}?format=full`),
     { headers: authHeaders(cursor) },
   )
   const itemId = ulid()
@@ -205,7 +212,9 @@ async function* emitMessage(
         z
           .object({ data: z.string().optional(), size: z.number().optional() })
           .passthrough(),
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${part.body.attachmentId}`,
+        gmailApiUrl(
+          `/gmail/v1/users/me/messages/${messageId}/attachments/${part.body.attachmentId}`,
+        ),
         { headers: authHeaders(cursor) },
       )
       const attachmentText = decodeBase64Url(attachment.data)
@@ -217,6 +226,12 @@ async function* emitMessage(
           chunkIndex: 1,
           content: attachmentText,
         }
+      }
+    } else if ((part.body?.size ?? 0) > 25 * 1024 * 1024) {
+      yield {
+        type: 'error',
+        code: 'attachment_too_large',
+        message: `gmail attachment too large: ${part.filename}`,
       }
     }
   }
@@ -241,7 +256,9 @@ export const sync: SyncFunction = async function* googleMailboxSync(
     try {
       const history = await safeFetch(
         GmailHistorySchema,
-        `https://gmail.googleapis.com/gmail/v1/users/me/history?startHistoryId=${encodeURIComponent(cursor.historyId)}`,
+        gmailApiUrl(
+          `/gmail/v1/users/me/history?startHistoryId=${encodeURIComponent(cursor.historyId)}`,
+        ),
         { headers: authHeaders(cursor) },
       )
       for (const entry of history.history) {
@@ -269,9 +286,7 @@ export const sync: SyncFunction = async function* googleMailboxSync(
   } else {
     let pageToken: string | undefined
     do {
-      const url = new URL(
-        'https://gmail.googleapis.com/gmail/v1/users/me/messages',
-      )
+      const url = new URL(gmailApiUrl('/gmail/v1/users/me/messages'))
       url.searchParams.set('q', 'in:inbox OR in:sent OR label:important')
       if (pageToken) url.searchParams.set('pageToken', pageToken)
       const page = await safeFetch(GmailMessageListSchema, url.toString(), {

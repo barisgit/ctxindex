@@ -1,4 +1,5 @@
 import { readFile, writeFile } from 'node:fs/promises'
+import { getEnv } from '../config/env-loader'
 import {
   CtxindexSecretsError,
   keychainRef,
@@ -29,7 +30,7 @@ function serviceName(scope: string): string {
 }
 
 async function defaultImportKeytar(): Promise<KeytarModule> {
-  const mockFile = process.env.CTXINDEX_KEYTAR_MOCK_FILE
+  const mockFile = getEnv().CTXINDEX_KEYTAR_MOCK_FILE
   if (mockFile) return fileBackedKeytarMock(mockFile) as KeytarModule
   return import('keytar')
 }

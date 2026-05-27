@@ -12,6 +12,7 @@ import { dirname, join } from 'node:path'
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
 import { pbkdf2 } from '@noble/hashes/pbkdf2.js'
 import { sha256 } from '@noble/hashes/sha2.js'
+import { getEnv } from '../config/env-loader'
 import { configDir, dataDir } from '../paths'
 import {
   CtxindexSecretsError,
@@ -116,7 +117,7 @@ export async function ensureSecretKeyFile(
 export async function hasFileSecretMaterial(
   options: Pick<FileBackendOptions, 'passphrase' | 'configDirectory'> = {},
 ): Promise<boolean> {
-  if (options.passphrase || process.env.CTXINDEX_SECRETS_PASSPHRASE) return true
+  if (options.passphrase || getEnv().CTXINDEX_SECRETS_PASSPHRASE) return true
   return exists(secretKeyPath(options.configDirectory))
 }
 
@@ -235,7 +236,7 @@ export class FileBackend implements SecretsStore {
       nonce: toBase64(nonce),
       salt: toBase64(salt),
       kdf: 'pbkdf2-sha256',
-      ...(this.passphrase || process.env.CTXINDEX_SECRETS_PASSPHRASE
+      ...(this.passphrase || getEnv().CTXINDEX_SECRETS_PASSPHRASE
         ? { iters: kdfIters }
         : {}),
       entries: { box: toBase64(encrypted) },
@@ -253,8 +254,7 @@ export class FileBackend implements SecretsStore {
   }
 
   private async deriveKey(salt: Uint8Array): Promise<Uint8Array> {
-    const passphrase =
-      this.passphrase ?? process.env.CTXINDEX_SECRETS_PASSPHRASE
+    const passphrase = this.passphrase ?? getEnv().CTXINDEX_SECRETS_PASSPHRASE
     if (passphrase) {
       return pbkdf2(sha256, textBytes(passphrase), salt, {
         c: kdfIters,

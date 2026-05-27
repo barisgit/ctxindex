@@ -3,6 +3,8 @@ import { FileBackend, type FileBackendOptions } from './file'
 import { KeychainBackend, type KeychainBackendOptions } from './keychain'
 import { CtxindexSecretsError, type SecretsStore } from './types'
 
+export * from './service'
+
 export interface LoadSecretsStoreOptions {
   readonly file?: FileBackendOptions
   readonly keychain?: KeychainBackendOptions

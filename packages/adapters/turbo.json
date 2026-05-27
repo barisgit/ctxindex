@@ -1,0 +1,51 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "env": []
+    },
+    "lint": {
+      "env": []
+    },
+    "typecheck": {
+      "env": []
+    },
+    "test": {
+      "env": [
+        "CTXINDEX_CONFIG_HOME",
+        "CTXINDEX_DATA_HOME",
+        "CTXINDEX_STATE_HOME",
+        "CTXINDEX_CACHE_HOME"
+      ]
+    },
+    "test:integration": {
+      "env": [
+        "CTXINDEX_CONFIG_HOME",
+        "CTXINDEX_DATA_HOME",
+        "CTXINDEX_STATE_HOME",
+        "CTXINDEX_CACHE_HOME",
+        "CTXINDEX_GMAIL_TOKEN_URL",
+        "CTXINDEX_GMAIL_MOCK_BASE_URL",
+        "CTXINDEX_TEST_FETCH_LOG",
+        "CTXINDEX_GMAIL_CLIENT_ID",
+        "CTXINDEX_GMAIL_CLIENT_SECRET",
+        "CTXINDEX_GMAIL_REFRESH_TOKEN"
+      ]
+    },
+    "test:e2e": {
+      "env": [
+        "CTXINDEX_CONFIG_HOME",
+        "CTXINDEX_DATA_HOME",
+        "CTXINDEX_STATE_HOME",
+        "CTXINDEX_CACHE_HOME",
+        "CTXINDEX_GMAIL_TOKEN_URL",
+        "CTXINDEX_GMAIL_MOCK_BASE_URL",
+        "CTXINDEX_TEST_FETCH_LOG",
+        "CTXINDEX_GMAIL_CLIENT_ID",
+        "CTXINDEX_GMAIL_CLIENT_SECRET",
+        "CTXINDEX_GMAIL_REFRESH_TOKEN"
+      ]
+    }
+  }
+}

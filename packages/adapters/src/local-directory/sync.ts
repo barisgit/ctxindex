@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { getEnv } from '@ctxindex/core/config'
 import type { SyncContext, SyncFunction } from '@ctxindex/core/registry'
 import { ulid } from 'ulid'
 import { chunkText } from './chunker'
@@ -7,6 +8,18 @@ import { detectMime } from './mime'
 import { walkDirectory } from './walker'
 
 const SIZE_CAP_BYTES = 2 * 1024 * 1024 // 2 MiB default
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function testSyncDelayMs(): number {
+  if (process.env.NODE_ENV === 'production') return 0
+  const raw = getEnv().CTXINDEX_TEST_SYNC_DELAY_MS
+  if (!raw) return 0
+  const value = Number(raw)
+  return Number.isFinite(value) && value > 0 ? value : 0
+}
 
 export interface LocalDirectoryConfig {
   root_path: string
@@ -35,7 +48,19 @@ export const localDirectorySync: SyncFunction =
     const walkOpts: { include?: string[]; exclude?: string[] } = {}
     if (config.include) walkOpts.include = config.include
     if (config.exclude) walkOpts.exclude = config.exclude
-    const entries = await walkDirectory(rootPath, walkOpts)
+    let entries: Awaited<ReturnType<typeof walkDirectory>>
+    try {
+      entries = await walkDirectory(rootPath, walkOpts)
+    } catch (err) {
+      yield {
+        type: 'error',
+        message: `walk error: ${rootPath}: ${String(err)}`,
+        path: rootPath,
+      }
+      return
+    }
+    const delayMs = testSyncDelayMs()
+    if (delayMs > 0) await sleep(delayMs)
 
     for (const entry of entries) {
       if (ctx.signal.aborted) {

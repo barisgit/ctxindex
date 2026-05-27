@@ -6,6 +6,7 @@ import pino from 'pino'
 import pinoPretty from 'pino-pretty'
 import pinoRoll, { type PinoRollOptions } from 'pino-roll'
 import { type CtxindexConfig, type LogLevel, readConfig } from '../config'
+import { getEnv } from '../config/env-loader'
 import { logDir as defaultLogDir } from '../paths'
 
 export type Logger = pino.Logger
@@ -49,7 +50,14 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null
 }
 
+function redactString(value: string): string {
+  const canary = getEnv().CTXINDEX_LOG_CANARY_TOKEN
+  if (!canary) return value
+  return value.split(canary).join('[Redacted]')
+}
+
 function sanitizeLogValue(value: unknown): unknown {
+  if (typeof value === 'string') return redactString(value)
   if (Array.isArray(value)) return value.map((entry) => sanitizeLogValue(entry))
   if (!isPlainObject(value)) return value
 
@@ -91,9 +99,10 @@ function scheduleCompression(
   activeFile: () => string | undefined,
 ): void {
   for (const delay of [25, 100, 250]) {
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       void compressRotatedLogs(directory, activeFile())
-    }, delay).unref()
+    }, delay)
+    if (!getEnv().CTXINDEX_TEST_LOG_ROTATE_BYTES) timer.unref()
   }
 }
 
@@ -102,9 +111,18 @@ function isLogLevel(value: string): value is LogLevel {
 }
 
 function resolveLevel(config: CtxindexConfig, override?: LogLevel): LogLevel {
-  const envLevel = process.env.CTXINDEX_LOG_LEVEL
+  const envLevel = getEnv().CTXINDEX_LOG_LEVEL
   if (envLevel && isLogLevel(envLevel)) return envLevel
   return override ?? config.log.level ?? 'info'
+}
+
+function testRollOptions(): Partial<PinoRollOptions> {
+  if (process.env.NODE_ENV === 'production') return {}
+  const raw = getEnv().CTXINDEX_TEST_LOG_ROTATE_BYTES
+  if (!raw) return {}
+  const bytes = Number(raw)
+  if (!Number.isFinite(bytes) || bytes <= 0) return {}
+  return { size: `${Math.trunc(bytes)}b` } as Partial<PinoRollOptions>
 }
 
 async function fileStream(
@@ -117,7 +135,7 @@ async function fileStream(
 }> {
   await mkdir(directory, { recursive: true, mode: 0o700 })
 
-  if (process.env.CTXINDEX_LOG_SYNC === '1') {
+  if (getEnv().CTXINDEX_LOG_SYNC === '1') {
     const destination = pino.destination({
       dest: join(directory, 'ctxindex.log'),
       sync: true,
@@ -138,6 +156,7 @@ async function fileStream(
       removeOtherLogFiles: true,
     },
     mkdir: true,
+    ...testRollOptions(),
     ...roll,
   })
 
@@ -154,10 +173,13 @@ export async function createLogger(
   const directory = options.logDir ?? defaultLogDir()
   const level = resolveLevel(config, options.level)
   const file = await fileStream(directory, config, options.roll)
-  const stderrStream =
-    process.stderr.isTTY === true
-      ? pinoPretty({ destination: 2, colorize: true, singleLine: true })
-      : pino.destination({ dest: 2, sync: false })
+  const streams: pino.StreamEntry[] = [{ level, stream: file.stream }]
+  if (process.stderr.isTTY === true) {
+    streams.unshift({
+      level,
+      stream: pinoPretty({ destination: 2, colorize: true, singleLine: true }),
+    })
+  }
 
   return pino(
     {
@@ -171,17 +193,22 @@ export async function createLogger(
           if (inputArgs.length > 0) {
             const [firstArg, ...rest] = inputArgs
             if (isPlainObject(firstArg)) {
-              return method.apply(this, [sanitizeLogValue(firstArg), ...rest])
+              return method.apply(this, [
+                sanitizeLogValue(firstArg),
+                ...rest.map((entry) => sanitizeLogValue(entry)),
+              ] as Parameters<typeof method>)
             }
           }
-          return method.apply(this, inputArgs)
+          return method.apply(
+            this,
+            inputArgs.map((entry) => sanitizeLogValue(entry)) as Parameters<
+              typeof method
+            >,
+          )
         },
       },
     },
-    pino.multistream([
-      { level, stream: stderrStream },
-      { level, stream: file.stream },
-    ]),
+    pino.multistream(streams),
   )
 }
 

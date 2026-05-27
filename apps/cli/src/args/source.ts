@@ -1,0 +1,111 @@
+import { CTXINDEX_ADAPTER_REGISTRY } from '@ctxindex/adapters'
+import { hasHelpFlag, parseFlags, stringFlag } from './flags'
+
+export type SourceArgs =
+  | {
+      readonly kind: 'add'
+      readonly adapterId: string
+      readonly realmSlug?: string
+      readonly displayName?: string
+      readonly configJson?: string
+    }
+  | {
+      readonly kind: 'list'
+      readonly realmSlug?: string
+      readonly json: boolean
+    }
+  | { readonly kind: 'remove'; readonly sourceId: string }
+  | { readonly kind: 'help' }
+  | { readonly kind: 'unknown'; readonly message: string }
+
+export const sourceUsage =
+  'source add [<adapter-id>] [--adapter <adapter-id>] [--realm <slug>] [--root|--path <path>] [--display-name <name>] [--config-json <json>] | source list [--realm <slug>] [--json] | source remove <source-id>'
+
+function normalizeAdapterId(adapterId: string): string {
+  return adapterId === 'local-directory' ? 'local.directory' : adapterId
+}
+
+function configJson(
+  adapterId: string,
+  flags: Record<string, boolean | string>,
+  positional: string[],
+): { value?: string; message?: string } {
+  const existing = stringFlag(flags, 'config-json')
+  const rootPath =
+    stringFlag(flags, 'root') ??
+    stringFlag(flags, 'path') ??
+    (adapterId === 'local.directory'
+      ? stringFlag(flags, 'adapter')
+        ? positional[0]
+        : positional[1]
+      : undefined)
+  if (!rootPath) return existing ? { value: existing } : {}
+  if (!existing) return { value: JSON.stringify({ root_path: rootPath }) }
+  try {
+    const parsed = JSON.parse(existing) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { message: 'source add: --config-json must be a JSON object' }
+    }
+    return {
+      value: JSON.stringify({
+        ...(parsed as Record<string, unknown>),
+        root_path: rootPath,
+      }),
+    }
+  } catch {
+    return { message: 'source add: --config-json must be a JSON object' }
+  }
+}
+
+function validateAdapter(adapterId: string): string | undefined {
+  try {
+    const assertKnownAdapter: (value: string) => void =
+      CTXINDEX_ADAPTER_REGISTRY.assertKnownAdapter
+    assertKnownAdapter(adapterId)
+    return undefined
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err)
+  }
+}
+
+export function parseSourceArgs(args: string[]): SourceArgs {
+  if (hasHelpFlag(args)) return { kind: 'help' }
+  const [subcommand, ...rest] = args
+  const { flags, positional } = parseFlags(rest)
+  if (subcommand === 'add') {
+    const rawAdapterId = stringFlag(flags, 'adapter') ?? positional[0]
+    if (!rawAdapterId)
+      return { kind: 'unknown', message: 'source add: missing <adapter-id>' }
+    const adapterId = normalizeAdapterId(rawAdapterId)
+    const adapterError = validateAdapter(adapterId)
+    if (adapterError) return { kind: 'unknown', message: adapterError }
+    const config = configJson(adapterId, flags, positional)
+    if (config.message) return { kind: 'unknown', message: config.message }
+    let result: Extract<SourceArgs, { kind: 'add' }> = {
+      kind: 'add',
+      adapterId,
+    }
+    const realmSlug = stringFlag(flags, 'realm')
+    const displayName = stringFlag(flags, 'display-name')
+    if (realmSlug) result = { ...result, realmSlug }
+    if (displayName) result = { ...result, displayName }
+    if (config.value) result = { ...result, configJson: config.value }
+    return result
+  }
+  if (subcommand === 'list') {
+    const realmSlug = stringFlag(flags, 'realm')
+    return realmSlug
+      ? { kind: 'list', realmSlug, json: flags.json === true }
+      : { kind: 'list', json: flags.json === true }
+  }
+  if (subcommand === 'remove') {
+    const sourceId = positional[0]
+    return sourceId
+      ? { kind: 'remove', sourceId }
+      : { kind: 'unknown', message: 'source remove: missing <source-id>' }
+  }
+  return {
+    kind: 'unknown',
+    message: `source: unknown subcommand "${subcommand ?? ''}"`,
+  }
+}

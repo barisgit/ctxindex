@@ -1,5 +1,10 @@
+import { appendFile } from 'node:fs/promises'
+import { getEnv } from '@ctxindex/core/config'
 import { CtxindexSyncError } from '@ctxindex/core/errors'
 import { z } from 'zod'
+
+const GMAIL_API_BASE_URL = 'https://gmail.googleapis.com'
+const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 
 export const GOOGLE_EGRESS_ALLOWLIST = new Set([
   'oauth2.googleapis.com',
@@ -7,6 +12,91 @@ export const GOOGLE_EGRESS_ALLOWLIST = new Set([
   'gmail.googleapis.com',
   'www.googleapis.com',
 ])
+
+function isLoopbackHost(hostname: string): boolean {
+  return hostname === '127.0.0.1'
+}
+
+function nonProductionMockBaseUrl(): URL | undefined {
+  const mockBaseUrl = getEnv().CTXINDEX_GMAIL_MOCK_BASE_URL
+  if (!mockBaseUrl) return undefined
+  const parsed = new URL(mockBaseUrl)
+  if (!isLoopbackHost(parsed.hostname)) {
+    throw new CtxindexSyncError(
+      `network egress host is not allowlisted: ${parsed.hostname}`,
+      'provider_bad_response',
+    )
+  }
+  if (process.env.NODE_ENV === 'production') return undefined
+  return parsed
+}
+
+function nonProductionTokenOverrideUrl(): URL | undefined {
+  const tokenOverride = getEnv().CTXINDEX_GMAIL_TOKEN_URL
+  if (!tokenOverride || process.env.NODE_ENV === 'production') return undefined
+  const parsed = new URL(tokenOverride)
+  if (!isLoopbackHost(parsed.hostname)) {
+    throw new CtxindexSyncError(
+      `network egress host is not allowlisted: ${parsed.hostname}`,
+      'provider_bad_response',
+    )
+  }
+  return parsed
+}
+
+function isNonProductionMockEndpoint(parsed: URL): boolean {
+  const mockBase = nonProductionMockBaseUrl()
+  if (mockBase && parsed.origin === mockBase.origin) return true
+  const tokenOverride = nonProductionTokenOverrideUrl()
+  return tokenOverride ? parsed.href === tokenOverride.href : false
+}
+
+function joinUrl(base: URL, path: string): string {
+  const href = base.href.endsWith('/') ? base.href : `${base.href}/`
+  return new URL(path.replace(/^\//, ''), href).toString()
+}
+
+export function routeGoogleApiUrl(url: string): string {
+  const parsed = new URL(url)
+  const mockBase = nonProductionMockBaseUrl()
+  if (!mockBase) return url
+
+  if (parsed.hostname === 'gmail.googleapis.com') {
+    return joinUrl(mockBase, `${parsed.pathname}${parsed.search}`)
+  }
+  if (
+    parsed.hostname === 'oauth2.googleapis.com' &&
+    parsed.pathname === '/token'
+  ) {
+    return joinUrl(mockBase, '/token')
+  }
+
+  return url
+}
+
+async function recordTestFetch(url: string, init?: RequestInit): Promise<void> {
+  const fetchLog = getEnv().CTXINDEX_TEST_FETCH_LOG
+  if (fetchLog && process.env.NODE_ENV !== 'production') {
+    await appendFile(
+      fetchLog,
+      `${(init?.method ?? 'GET').toUpperCase()} ${url}\n`,
+    )
+  }
+}
+
+export function gmailApiUrl(path: string): string {
+  return joinUrl(
+    nonProductionMockBaseUrl() ?? new URL(GMAIL_API_BASE_URL),
+    path,
+  )
+}
+
+export function googleTokenUrl(): string {
+  return (
+    nonProductionTokenOverrideUrl()?.toString() ??
+    routeGoogleApiUrl(GOOGLE_TOKEN_URL)
+  )
+}
 
 export const OAuthTokenResponseSchema = z
   .object({
@@ -19,6 +109,29 @@ export const OAuthTokenResponseSchema = z
   .passthrough()
 
 export type OAuthTokenResponse = z.infer<typeof OAuthTokenResponseSchema>
+
+export interface GoogleRefreshTokenOptions {
+  readonly clientId: string
+  readonly clientSecret: string
+  readonly refreshToken: string
+}
+
+export async function exchangeGoogleRefreshToken({
+  clientId,
+  clientSecret,
+  refreshToken,
+}: GoogleRefreshTokenOptions): Promise<OAuthTokenResponse> {
+  return safeFetch(OAuthTokenResponseSchema, googleTokenUrl(), {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+    }).toString(),
+  })
+}
 
 export const GmailMessageListSchema = z
   .object({
@@ -89,7 +202,10 @@ export type GmailHistory = z.infer<typeof GmailHistorySchema>
 
 export function assertGoogleEgressAllowed(url: string): URL {
   const parsed = new URL(url)
-  if (!GOOGLE_EGRESS_ALLOWLIST.has(parsed.hostname)) {
+  if (
+    !GOOGLE_EGRESS_ALLOWLIST.has(parsed.hostname) &&
+    !isNonProductionMockEndpoint(parsed)
+  ) {
     throw new CtxindexSyncError(
       `network egress host is not allowlisted: ${parsed.hostname}`,
       'provider_bad_response',
@@ -98,12 +214,18 @@ export function assertGoogleEgressAllowed(url: string): URL {
   return parsed
 }
 
-export async function safeFetch<T extends z.ZodTypeAny>(
+async function delay(ms: number): Promise<void> {
+  if (ms <= 0) return
+  await new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function fetchAndParse<T extends z.ZodTypeAny>(
   schema: T,
   url: string,
   init?: RequestInit,
 ): Promise<z.infer<T>> {
   assertGoogleEgressAllowed(url)
+  await recordTestFetch(url, init)
   let response: Response
   try {
     response = await fetch(url, init)
@@ -181,5 +303,22 @@ export async function safeFetch<T extends z.ZodTypeAny>(
         cause: err,
       },
     )
+  }
+}
+
+export async function safeFetch<T extends z.ZodTypeAny>(
+  schema: T,
+  url: string,
+  init?: RequestInit,
+): Promise<z.infer<T>> {
+  const routedUrl = routeGoogleApiUrl(url)
+  try {
+    return await fetchAndParse(schema, routedUrl, init)
+  } catch (err) {
+    if (err instanceof CtxindexSyncError && err.code === 'rate_limited') {
+      await delay(err.retryAfterMs ?? 0)
+      return fetchAndParse(schema, routedUrl, init)
+    }
+    throw err
   }
 }

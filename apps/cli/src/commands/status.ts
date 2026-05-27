@@ -1,28 +1,36 @@
-import type { CtxindexDatabase } from '@ctxindex/core/storage'
+import { defineCommand } from 'citty'
+import { parseStatusArgs, statusUsage } from '../args/status'
+import { openDeps } from '../deps'
+import { mapErrorToExit, runWithExit } from '../format/exit'
+import { formatStatus } from '../format/status'
 
-interface StatusRow {
-  source_id: string
-  adapter_id: string
-  realm_slug: string
-  last_status: string
-  updated_at: number
+function printOutput(output: string): void {
+  if (output.length > 0) console.log(output)
 }
 
-export function getStatus(
-  db: CtxindexDatabase,
-  sourceId?: string,
-): StatusRow[] {
-  const base = `
-    SELECT sss.source_id, s.adapter_id, r.slug AS realm_slug,
-           sss.last_status, sss.updated_at
-    FROM source_sync_state sss
-    JOIN sources s ON s.id = sss.source_id
-    JOIN realms r ON r.id = s.realm_id
-  `
-  if (sourceId) {
-    return db
-      .prepare(`${base} WHERE sss.source_id = ?`)
-      .all(sourceId) as StatusRow[]
+export async function handleStatusCommand(args: string[]): Promise<number> {
+  const parsed = parseStatusArgs(args)
+  if (parsed.kind === 'help') return 0
+  if (parsed.kind === 'unknown') {
+    console.error(`${parsed.message}. Try: ${statusUsage}`)
+    return 2
   }
-  return db.prepare(`${base} ORDER BY sss.updated_at DESC`).all() as StatusRow[]
+
+  try {
+    const deps = await openDeps()
+    printOutput(formatStatus(deps.sourceService.getStatus(parsed), parsed))
+    return 0
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err))
+    return mapErrorToExit(err)
+  }
 }
+
+export const statusCommand = defineCommand({
+  meta: { name: 'status', description: 'Show last sync status.' },
+  args: {
+    source: { type: 'string', description: 'Source ID' },
+    json: { type: 'boolean', description: 'Print JSON' },
+  },
+  run: ({ rawArgs }) => runWithExit(() => handleStatusCommand(rawArgs)),
+})

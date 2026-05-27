@@ -10,6 +10,7 @@ export const syncRuns = sqliteTable('sync_runs', {
   status: text('status').notNull(),
   startedAt: integer('started_at', { mode: 'number' }).notNull(),
   completedAt: integer('completed_at', { mode: 'number' }),
+  releasedAt: integer('released_at', { mode: 'number' }),
   cursorBeforeJson: text('cursor_before_json'),
   cursorAfterJson: text('cursor_after_json'),
   itemsSeen: integer('items_seen', { mode: 'number' }).notNull().default(0),

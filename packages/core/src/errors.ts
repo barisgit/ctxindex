@@ -33,6 +33,93 @@ export class CtxindexError extends Error {
   }
 }
 
+export type CtxindexAuthErrorCode =
+  | 'needs_auth'
+  | 'missing_oauth_client_creds'
+  | 'invalid_grant'
+  | 'invalid_client'
+  | 'oauth_failed'
+  | 'network_error'
+  | 'token_refresh_failed'
+  | 'unknown_auth_error'
+  | 'unknown'
+  | 'not_implemented_yet'
+
+export class CtxindexAuthError extends CtxindexError {
+  override readonly code: CtxindexAuthErrorCode
+
+  constructor(
+    code: CtxindexAuthErrorCode,
+    message: string,
+    options?: CtxindexErrorOptions,
+  ) {
+    super(message, code, options)
+    this.name = 'CtxindexAuthError'
+    this.code = code
+  }
+}
+
+export class CtxindexNotFoundError extends CtxindexError {
+  override readonly code = 'not_found'
+
+  constructor(message: string, options?: CtxindexErrorOptions) {
+    super(message, 'not_found', options)
+    this.name = 'CtxindexNotFoundError'
+  }
+}
+
+export type CtxindexValidationErrorCode =
+  | 'duplicate_realm_slug'
+  | 'unknown_realm'
+  | 'invalid_filter'
+
+export class CtxindexValidationError extends CtxindexError {
+  override readonly code: CtxindexValidationErrorCode
+
+  constructor(
+    code: CtxindexValidationErrorCode,
+    message: string,
+    options?: CtxindexErrorOptions,
+  ) {
+    super(message, code, options)
+    this.name = 'CtxindexValidationError'
+    this.code = code
+  }
+}
+
+export type CtxindexConfigErrorCode =
+  | 'secret_must_be_uri'
+  | 'secret_uri_invalid'
+  | 'env_var_unset'
+  | 'env_loader_invalid'
+
+export interface CtxindexConfigErrorOptions extends CtxindexErrorOptions {
+  readonly field?: string
+  readonly envVar?: string
+}
+
+export class CtxindexConfigError extends CtxindexError {
+  override readonly code: CtxindexConfigErrorCode
+  readonly field?: string
+  readonly envVar?: string
+
+  constructor(
+    message: string,
+    code: CtxindexConfigErrorCode,
+    options?: CtxindexConfigErrorOptions,
+  ) {
+    super(message, code, options)
+    this.name = 'CtxindexConfigError'
+    this.code = code
+    if (options && 'field' in options) {
+      this.field = options.field
+    }
+    if (options && 'envVar' in options) {
+      this.envVar = options.envVar
+    }
+  }
+}
+
 export interface CtxindexSyncErrorOptions extends CtxindexErrorOptions {
   readonly retryAfterMs?: number
 }

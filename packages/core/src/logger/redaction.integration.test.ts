@@ -5,10 +5,11 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { gunzip } from 'node:zlib'
 import * as TOML from '@iarna/toml'
-import { defaultConfig } from '../config'
+import { defaultConfig, resetEnvForTests } from '../config'
 import { createLogger, resetLoggerForTest } from './index'
 
 const gunzipAsync = promisify(gunzip)
+const logSyncEnvKey = 'CTXINDEX_LOG_SYNC'
 
 async function sleep(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms))
@@ -43,8 +44,9 @@ test('rotated JSONL logs redact secret values', async () => {
     TOML.stringify(config as unknown as Parameters<typeof TOML.stringify>[0]),
   )
 
-  const previousSync = process.env.CTXINDEX_LOG_SYNC
-  delete process.env.CTXINDEX_LOG_SYNC
+  const previousSync = process.env[logSyncEnvKey]
+  delete process.env[logSyncEnvKey]
+  resetEnvForTests()
 
   try {
     resetLoggerForTest()
@@ -78,8 +80,9 @@ test('rotated JSONL logs redact secret values', async () => {
     expect(text).not.toContain('Bearer secret')
     expect(text).toContain('"other":"visible"')
   } finally {
-    if (previousSync === undefined) delete process.env.CTXINDEX_LOG_SYNC
-    else process.env.CTXINDEX_LOG_SYNC = previousSync
+    if (previousSync === undefined) delete process.env[logSyncEnvKey]
+    else process.env[logSyncEnvKey] = previousSync
+    resetEnvForTests()
     resetLoggerForTest()
   }
 })

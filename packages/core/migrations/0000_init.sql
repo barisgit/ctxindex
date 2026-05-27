@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS sync_runs (
   status TEXT NOT NULL DEFAULT 'running',
   started_at INTEGER NOT NULL,
   completed_at INTEGER,
+  released_at INTEGER,
   items_added INTEGER NOT NULL DEFAULT 0,
   items_updated INTEGER NOT NULL DEFAULT 0,
   items_deleted INTEGER NOT NULL DEFAULT 0,
@@ -85,7 +86,9 @@ CREATE TABLE IF NOT EXISTS sync_run_checkpoints (
 CREATE TABLE IF NOT EXISTS sync_locks (
   scope TEXT NOT NULL PRIMARY KEY,
   run_id TEXT NOT NULL REFERENCES sync_runs(id),
-  acquired_at INTEGER NOT NULL
+  pid INTEGER,
+  acquired_at INTEGER NOT NULL,
+  released_at INTEGER
 );
 
 -- Items

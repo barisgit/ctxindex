@@ -1,74 +1,76 @@
-import type { CtxindexDatabase } from '@ctxindex/core/storage'
-import { ulid } from 'ulid'
+import { defineCommand } from 'citty'
+import { parseSourceArgs, sourceUsage } from '../args/source'
+import { openDeps } from '../deps'
+import { mapErrorToExit, runWithExit } from '../format/exit'
+import {
+  formatSourceAdded,
+  formatSourceRemoved,
+  formatSources,
+} from '../format/source'
 
-interface SourceRow {
-  id: string
-  realm_id: string
-  adapter_id: string
-  display_name: string | null
-  config_json: string | null
-  created_at: number
+function printOutput(output: string): void {
+  if (output.length > 0) console.log(output)
 }
 
-export function sourceAdd(
-  db: CtxindexDatabase,
-  adapterId: string,
-  opts: { realmSlug?: string; displayName?: string; configJson?: string } = {},
-): string {
-  const slug = opts.realmSlug ?? 'global'
-  const realm = db
-    .prepare('SELECT id FROM realms WHERE slug = ?')
-    .get(slug) as { id: string } | null
-  if (!realm) {
-    throw Object.assign(
-      new Error(
-        `unknown realm "${slug}"; create it with: ctxindex realm add ${slug}`,
-      ),
-      { code: 'UNKNOWN_REALM', exitCode: 2 },
-    )
+export async function handleSourceCommand(args: string[]): Promise<number> {
+  const parsed = parseSourceArgs(args)
+  if (parsed.kind === 'help') return 0
+  if (parsed.kind === 'unknown') {
+    console.error(`${parsed.message}. Try: ${sourceUsage}`)
+    return 2
   }
-  const id = ulid()
-  db.prepare(
-    `INSERT INTO sources (id, realm_id, adapter_id, display_name, config_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-  ).run(
-    id,
-    realm.id,
-    adapterId,
-    opts.displayName ?? null,
-    opts.configJson ?? null,
-    Date.now(),
-  )
-  return id
-}
 
-export function sourceList(
-  db: CtxindexDatabase,
-  realmSlug?: string,
-): SourceRow[] {
-  if (realmSlug) {
-    return db
-      .prepare(
-        `SELECT s.id, s.realm_id, s.adapter_id, s.display_name, s.config_json, s.created_at
-       FROM sources s JOIN realms r ON r.id = s.realm_id
-       WHERE r.slug = ? ORDER BY s.created_at`,
-      )
-      .all(realmSlug) as SourceRow[]
+  try {
+    const deps = await openDeps()
+    if (parsed.kind === 'add') {
+      const { sourceId } = deps.sourceService.addSource(parsed)
+      console.log(formatSourceAdded(sourceId))
+    } else if (parsed.kind === 'list') {
+      printOutput(formatSources(deps.sourceService.listSources(parsed), parsed))
+    } else {
+      deps.sourceService.removeSource(parsed.sourceId)
+      console.log(formatSourceRemoved(parsed.sourceId))
+    }
+    return 0
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err))
+    return mapErrorToExit(err)
   }
-  return db
-    .prepare(
-      'SELECT id, realm_id, adapter_id, display_name, config_json, created_at FROM sources ORDER BY created_at',
-    )
-    .all() as SourceRow[]
 }
 
-export function sourceRemove(db: CtxindexDatabase, sourceId: string): void {
-  const existing = db
-    .prepare('SELECT id FROM sources WHERE id = ?')
-    .get(sourceId)
-  if (!existing)
-    throw Object.assign(new Error(`source not found: "${sourceId}"`), {
-      exitCode: 2,
-    })
-  db.prepare('DELETE FROM sources WHERE id = ?').run(sourceId)
-}
+const sourceOptionArgs = {
+  realm: { type: 'string', description: 'Realm slug' },
+  json: { type: 'boolean', description: 'Print JSON' },
+} as const
+
+export const sourceCommand = defineCommand({
+  meta: { name: 'source', description: 'Manage indexed sources.' },
+  subCommands: {
+    add: defineCommand({
+      meta: { name: 'add', description: 'Add a source.' },
+      args: {
+        adapter: { type: 'string', description: 'Adapter ID' },
+        root: { type: 'string', description: 'Local root path' },
+        path: { type: 'string', description: 'Local root path' },
+        'display-name': { type: 'string', description: 'Display name' },
+        'config-json': { type: 'string', description: 'Adapter config JSON' },
+        'adapter-id': { type: 'positional', required: false },
+        realm: sourceOptionArgs.realm,
+      },
+      run: ({ rawArgs }) =>
+        runWithExit(() => handleSourceCommand(['add', ...rawArgs])),
+    }),
+    list: defineCommand({
+      meta: { name: 'list', description: 'List sources.' },
+      args: sourceOptionArgs,
+      run: ({ rawArgs }) =>
+        runWithExit(() => handleSourceCommand(['list', ...rawArgs])),
+    }),
+    remove: defineCommand({
+      meta: { name: 'remove', description: 'Remove a source.' },
+      args: { 'source-id': { type: 'positional', required: false } },
+      run: ({ rawArgs }) =>
+        runWithExit(() => handleSourceCommand(['remove', ...rawArgs])),
+    }),
+  },
+})

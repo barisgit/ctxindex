@@ -36,6 +36,12 @@ function tableNames(db: Database): string[] {
   ).map((r) => r.name)
 }
 
+function columnNames(db: Database, table: string): string[] {
+  return (
+    db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
+  ).map((r) => r.name)
+}
+
 test('core migrations create all expected tables', async () => {
   const db = freshDb()
   await runMigrations(db)
@@ -147,4 +153,35 @@ test('per-namespace migration journal tables created for all adapters', async ()
   expect(tables).toContain('ctxindex_migrations_google_mailbox')
   expect(tables).toContain('local_directory_file_state')
   expect(tables).toContain('google_mailbox_sync_state')
+})
+
+test('idempotent', async () => {
+  const db = freshDb()
+
+  await runMigrations(db)
+  await runMigrations(db)
+
+  const applied = (
+    db
+      .prepare(
+        "SELECT name FROM ctxindex_migrations_core WHERE name = '0002_grants_client_creds.sql'",
+      )
+      .all() as { name: string }[]
+  ).map((r) => r.name)
+
+  expect(applied).toEqual(['0002_grants_client_creds.sql'])
+
+  const columns = columnNames(db, 'grants')
+  expect(columns.filter((name) => name === 'client_id_ref')).toHaveLength(1)
+  expect(columns.filter((name) => name === 'client_secret_ref')).toHaveLength(1)
+})
+
+test('credential columns', async () => {
+  const db = freshDb()
+  await runMigrations(db)
+
+  const columns = columnNames(db, 'grants')
+
+  expect(columns).toContain('client_id_ref')
+  expect(columns).toContain('client_secret_ref')
 })

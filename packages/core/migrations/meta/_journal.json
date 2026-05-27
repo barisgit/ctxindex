@@ -15,6 +15,13 @@
       "when": 1700000001000,
       "tag": "0001_items_fts",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1700000002000,
+      "tag": "0002_grants_client_creds",
+      "breakpoints": true
     }
   ]
 }

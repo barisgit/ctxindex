@@ -3,9 +3,10 @@ import { describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type { Logger } from '@ctxindex/core/logger'
+import { createRealmService } from '@ctxindex/core/realm'
+import { createSourceService } from '@ctxindex/core/source'
 import { applyPragmas, runMigrations } from '@ctxindex/core/storage'
-import { realmAdd } from '../commands/realm'
-import { sourceAdd } from '../commands/source'
 
 const repoRoot = new URL('../../../../', import.meta.url).pathname
 const cliBin = join(repoRoot, 'apps/cli/bin/ctxindex.mjs')
@@ -34,6 +35,8 @@ async function spawnCli(
 // ---------------------------------------------------------------------------
 
 describe('realm-cli unit: sourceAdd realm semantics', () => {
+  const logger = { debug() {} } as unknown as Logger
+
   async function freshDb(): Promise<Database> {
     const db = new Database(':memory:', { create: true })
     applyPragmas(db)
@@ -43,12 +46,15 @@ describe('realm-cli unit: sourceAdd realm semantics', () => {
 
   test('omitting realm lands source in global', async () => {
     const db = await freshDb()
-    const id = sourceAdd(db, 'local.directory', {})
+    const sourceService = createSourceService({ db, logger })
+    const { sourceId } = sourceService.addSource({
+      adapterId: 'local.directory',
+    })
     const row = db
       .prepare(
         'SELECT r.slug FROM sources s JOIN realms r ON r.id = s.realm_id WHERE s.id = ?',
       )
-      .get(id) as { slug: string } | null
+      .get(sourceId) as { slug: string } | null
     expect(row).not.toBeNull()
     expect(row?.slug).toBe('global')
     db.close()
@@ -56,30 +62,39 @@ describe('realm-cli unit: sourceAdd realm semantics', () => {
 
   test('unknown realm throws with exit code 2 and exact message', async () => {
     const db = await freshDb()
+    const sourceService = createSourceService({ db, logger })
     let thrown: unknown
     try {
-      sourceAdd(db, 'local.directory', { realmSlug: 'unknown' })
+      sourceService.addSource({
+        adapterId: 'local.directory',
+        realmSlug: 'unknown',
+      })
     } catch (err) {
       thrown = err
     }
     expect(thrown).toBeInstanceOf(Error)
-    const e = thrown as Error & { exitCode?: number }
+    const e = thrown as Error & { code?: string }
     expect(e.message).toBe(
       'unknown realm "unknown"; create it with: ctxindex realm add unknown',
     )
-    expect(e.exitCode).toBe(2)
+    expect(e.code).toBe('unknown_realm')
     db.close()
   })
 
   test('realm add work then source add --realm work succeeds', async () => {
     const db = await freshDb()
-    realmAdd(db, 'work')
-    const id = sourceAdd(db, 'local.directory', { realmSlug: 'work' })
+    const realmService = createRealmService({ db, logger })
+    const sourceService = createSourceService({ db, logger, realmService })
+    realmService.createRealm({ slug: 'work' })
+    const { sourceId } = sourceService.addSource({
+      adapterId: 'local.directory',
+      realmSlug: 'work',
+    })
     const row = db
       .prepare(
         'SELECT r.slug FROM sources s JOIN realms r ON r.id = s.realm_id WHERE s.id = ?',
       )
-      .get(id) as { slug: string } | null
+      .get(sourceId) as { slug: string } | null
     expect(row?.slug).toBe('work')
     db.close()
   })
