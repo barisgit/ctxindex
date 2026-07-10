@@ -111,7 +111,7 @@ export const localDirectorySync: SyncFunction =
         sourceId: ctx.sourceId,
         uri: `file://${entry.absolutePath}`,
         title: entry.relativePath.split('/').pop() ?? entry.relativePath,
-        kind: 'directory',
+        kind: 'file',
         contentHash,
         byteSize: entry.size,
         indexedAt: Date.now(),

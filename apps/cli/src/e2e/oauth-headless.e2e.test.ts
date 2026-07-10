@@ -18,7 +18,9 @@ interface TokenResponse {
 
 interface TokenServer {
   readonly url: string
+  readonly baseUrl: string
   readonly calls: TokenCall[]
+  readonly profileCalls: string[]
   close(): Promise<void>
 }
 
@@ -48,10 +50,26 @@ async function readRequestBody(req: IncomingMessage): Promise<string> {
 
 async function startTokenServer(
   respond: (call: TokenCall) => TokenResponse,
+  opts: { readonly profileEmail?: string } = {},
 ): Promise<TokenServer> {
   const calls: TokenCall[] = []
+  const profileCalls: string[] = []
   const server = createServer(async (req, res) => {
     try {
+      if (req.method === 'GET' && req.url === '/gmail/v1/users/me/profile') {
+        profileCalls.push(req.headers.authorization ?? '')
+        res.writeHead(opts.profileEmail ? 200 : 404, {
+          'content-type': 'application/json',
+        })
+        res.end(
+          JSON.stringify(
+            opts.profileEmail
+              ? { emailAddress: opts.profileEmail, messagesTotal: 0 }
+              : { error: 'not_found' },
+          ),
+        )
+        return
+      }
       if (req.method !== 'POST') {
         res.writeHead(405, { 'content-type': 'application/json' })
         res.end(JSON.stringify({ error: 'method_not_allowed' }))
@@ -81,9 +99,12 @@ async function startTokenServer(
   })
 
   const address = server.address() as AddressInfo
+  const baseUrl = `http://127.0.0.1:${address.port}`
   return {
-    url: `http://127.0.0.1:${address.port}/token`,
+    url: `${baseUrl}/token`,
+    baseUrl,
     calls,
+    profileCalls,
     close: () =>
       new Promise<void>((resolve, reject) => {
         server.close((err) => (err ? reject(err) : resolve()))
@@ -136,15 +157,20 @@ function tokenEnv(
   sandbox: Sandbox,
   tokenUrl: string,
   browser: BrowserCounter,
+  mockBaseUrl?: string,
 ): Record<string, string> {
   return {
     ...browser.env,
     CTXINDEX_GMAIL_TOKEN_URL: tokenUrl,
+    ...(mockBaseUrl ? { CTXINDEX_GMAIL_MOCK_BASE_URL: mockBaseUrl } : {}),
     CTXINDEX_KEYTAR_MOCK_FILE: join(sandbox.dir, 'keytar.json'),
   }
 }
 
-async function createOauthSandbox(tokenUrl: string): Promise<{
+async function createOauthSandbox(
+  tokenUrl: string,
+  mockBaseUrl?: string,
+): Promise<{
   readonly sandbox: Sandbox
   readonly browser: BrowserCounter
   readonly env: Record<string, string>
@@ -152,7 +178,7 @@ async function createOauthSandbox(tokenUrl: string): Promise<{
 }> {
   const sandbox = await createSandbox()
   const browser = await installBrowserCounter(sandbox)
-  const env = tokenEnv(sandbox, tokenUrl, browser)
+  const env = tokenEnv(sandbox, tokenUrl, browser, mockBaseUrl)
   const keytarMockFile = env.CTXINDEX_KEYTAR_MOCK_FILE
   if (!keytarMockFile) throw new Error('missing keytar mock file')
   return {
@@ -257,6 +283,46 @@ describe('oauth headless e2e', () => {
       expect(result.exitCode, result.stderr).toBe(0)
       expect(tokenServer.calls).toHaveLength(1)
       expect(tokenServer.calls[0]?.params.get('code')).toBe('called-once-code')
+    } finally {
+      await sandbox.cleanup()
+      await tokenServer.close()
+    }
+  })
+
+  test('stores Gmail profile email when access token is available', async () => {
+    const tokenServer = await startTokenServer(() => successTokenResponse(), {
+      profileEmail: 'baristovnik@gmail.com',
+    })
+    const { sandbox, env } = await createOauthSandbox(
+      tokenServer.url,
+      tokenServer.baseUrl,
+    )
+
+    try {
+      const result = await runHeadlessAuth(sandbox, env, 'profile-code')
+
+      expect(result.exitCode, result.stderr).toBe(0)
+      expect(tokenServer.profileCalls).toEqual(['Bearer access-token-secret'])
+
+      const db = openSandboxDb(sandbox)
+      try {
+        const account = db
+          .prepare('SELECT display_name, email FROM accounts')
+          .get() as {
+          display_name: string
+          email: string
+        }
+        expect(account).toEqual({
+          display_name: 'baristovnik@gmail.com',
+          email: 'baristovnik@gmail.com',
+        })
+      } finally {
+        db.close()
+      }
+
+      const list = await sandbox.run(['auth', 'list'], { env })
+      expect(list.exitCode, list.stderr).toBe(0)
+      expect(list.stdout).toContain('baristovnik@gmail.com')
     } finally {
       await sandbox.cleanup()
       await tokenServer.close()

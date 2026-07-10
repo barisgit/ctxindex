@@ -1,6 +1,6 @@
 import { CTXINDEX_ADAPTER_REGISTRY } from '@ctxindex/adapters'
 import { type AuthService, createAuthService } from '@ctxindex/core/auth'
-import { getEnv, readConfig } from '@ctxindex/core/config'
+import { getEnv, type LogLevel, readConfig } from '@ctxindex/core/config'
 import { logger as createLogger, type Logger } from '@ctxindex/core/logger'
 import { createRealmService, type RealmService } from '@ctxindex/core/realm'
 import { createSearchService, type SearchService } from '@ctxindex/core/search'
@@ -36,6 +36,13 @@ export interface CliDeps {
   close(): Promise<void>
 }
 
+// Set from the global `--log-level` flag in main.ts before any command runs.
+let cliLogLevel: LogLevel | undefined
+
+export function setCliLogLevel(level: LogLevel | undefined): void {
+  cliLogLevel = level
+}
+
 async function loadWritableSecretsStore(): Promise<SecretsStore> {
   try {
     return await loadSecretsStore(await readConfig())
@@ -54,7 +61,7 @@ export async function openDeps(
   opts: { readonly filePassphrase?: string } = {},
 ): Promise<CliDeps> {
   const db = await getDb()
-  const log = await createLogger()
+  const log = await createLogger(cliLogLevel ? { level: cliLogLevel } : {})
   const config = await readConfig()
   const realmService = createRealmService({ db, logger: log })
   const sourceService = createSourceService({ db, logger: log, realmService })

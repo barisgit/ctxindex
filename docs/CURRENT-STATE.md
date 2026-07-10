@@ -1,5 +1,54 @@
 # Current State
 
+> The per-feature notes below (f04–f13) are historical and were stale as of the
+> 2026-05-28 spec-conformance pass; trust the code and `SPEC.md`/`V1.md` over them.
+
+## Spec-conformance pass (2026-05-28)
+
+Audited the live code against `SPEC.md` + `V1.md` and closed the confirmed
+discrepancies. Fixed and verified (unit + integration + e2e + verifier gates all
+green):
+
+- **Chunker**: `chunkText` over-chunked (a 53-char file produced 53 near-duplicate
+  chunks); now terminates at end-of-text. `chunker.test.ts` added.
+- **Sync exit codes / status** (SPEC §12, V1 §1.6): completed-with-warnings now
+  exits `0` (was `20`); unmatched terminal errors map to `50` (was `1`);
+  `permission_denied`/`cancelled` set `last_status = failed` (not `disabled`/`idle`);
+  the one-line summary prints `errors=N` when non-zero. CLI `mapErrorToExit` never
+  returns the non-stable exit code `1`.
+- **Transactional apply** (SPEC §8): a sync run's writes commit atomically and the
+  cursor advances only on success (rollback on error). `sync_runs` now records
+  `cursor_before_json` / `cursor_after_json`.
+- **Schema** (SPEC §4, migration `0003`): `external_refs` gained `source_id` +
+  `UNIQUE(source_id, kind, value)` with idempotent upsert; `item_chunks` gained
+  `UNIQUE(item_id, chunk_index)`; `item_relations` gained `source_id`.
+- **local.directory**: built-in ignores now match V1 §1.3.1 exactly; include globs
+  use gitignore semantics (not substring); file items get `kind = 'file'`.
+- **google.mailbox**: backfill query excludes SPAM/TRASH/CHAT/DRAFT and honors
+  `labels_include`/`labels_exclude`; attachment text extraction is gated by a
+  text-treatable MIME allowlist.
+- **Search** (V1 §1.4): `--provider` is a real provider-module filter
+  (adapter-id prefix), distinct from `--adapter`.
+- **Network egress** (SPEC §17): single chokepoint `egressFetch` in
+  `@ctxindex/core/net`; the CLI loopback delegates OAuth exchange to
+  `@ctxindex/core/auth` (SPEC §10d); `network-egress.sh` passes.
+- **CLI/UX**: `--log-level` flag wired; `source remove` cascades (no more
+  `FOREIGN KEY constraint failed`); `status --source <unknown>` fails fast (exit 2);
+  `skills list` no longer lists `README`; `source`/`realm` list JSON is camelCase.
+
+Remaining spec gaps (deferred, not yet implemented):
+
+- **M5** local.directory does not tombstone deleted/renamed files (stale items stay
+  searchable) — needs a walk-vs-`local_directory_file_state` diff or a service-side
+  full-scan reconcile; deferred to avoid data-loss risk from rushed logic.
+- **M8** gmail incremental 404/too-old path only emits `resync_required`; the bounded
+  `before:`/`after:` re-list is not performed.
+- **M9** gmail extractable attachments are stored as a chunk on the parent item, not
+  as separate items linked via `item_relations`.
+- **M2** `item_relations.kind` is not renamed to `relation_type` (cosmetic; source_id
+  added).
+- **m1** content hashes are stored but not used to skip re-indexing unchanged files.
+
 ## f04-core-schema-migrations
 
 The core schema/migration slice is mostly real rather than placeholder: `packages/core/src/schema/` contains the named core tables, `packages/core/src/ids.ts` uses ULIDs, `packages/core/src/storage/db.ts` applies the required SQLite PRAGMAs, and `packages/core/src/storage/migrator.ts` runs core migrations before adapter migrations. The verifier path `bun test packages/core/src/storage/migrator.test.ts` exists and asserts journal tables, PRAGMAs, FTS5 queryability, and the seeded `global` realm. `packages/core/src/cli-init.test.ts` also exists for VAL-INIT-PATHS, but it still needs to be confirmed that it asserts the seeded `global` realm row as requested by the cleanup sweep.
@@ -34,7 +83,7 @@ Realm, source, status, init, secrets, and skills command files exist in `apps/cl
 
 ## f12-skills
 
-The bundled skills surface is implemented through `apps/cli/src/commands/skills.ts`, `apps/cli/src/skills/loader.ts`, `apps/cli/src/skills/resolve.ts`, the root `skills/` directory, and `apps/cli/src/skills/skills.cli.test.ts`. The main state to verify is whether the CLI entrypoint uses this implementation consistently for `skills list|get|path`, including `--inline` and `--json`, and whether `scripts/verify/bun-link.sh` sees `skills` in top-level help.
+The bundled skills surface is implemented through `apps/cli/src/commands/skills.ts`, `apps/cli/src/skills/loader.ts`, `apps/cli/src/skills/resolve.ts`, the root `skills/` directory, and `apps/cli/src/skills/skills.cli.test.ts`. The main state to verify is whether the CLI entrypoint uses this implementation consistently for `skills list|get|path`, including `--inline` and `--json`, and whether `scripts/verify/cli.sh` sees `skills` in top-level help (the old `bun-link` verifier was removed; v1 invokes the CLI only via `bun cli` / `bun run cli`).
 
 ## f13-network-egress-audit
 

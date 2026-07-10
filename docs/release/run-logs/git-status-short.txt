@@ -42,7 +42,7 @@
 ?? apps/cli/src/e2e/
 ?? apps/cli/turbo.json
 ?? docs/AGENT-HOWTOS.md
-?? docs/RELEASE-V1/
+?? docs/release/
 ?? packages/adapters/turbo.json
 ?? packages/core/src/config/env-example.test.ts
 ?? packages/core/src/config/env-loader.ts

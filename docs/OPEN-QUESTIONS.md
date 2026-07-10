@@ -2,7 +2,7 @@
 
 ## f01-monorepo-bootstrap
 
-- ~~Ambiguity: The charter asks for root package name `ctxindex-root`~~. **Resolved (charter ctxindex-arch-refactor)**: root package renamed to `ctxindex`, root `bin` field removed. Linking is now `bun run link` from repo root (delegates to `bun --filter @ctxindex/cli link`) or `cd apps/cli && bun link`. `scripts/verify/bun-link.sh` already links the `@ctxindex/cli` workspace package from `apps/cli`, which is what `bun link` consumers should use anyway.
+- ~~Ambiguity: The charter asks for root package name `ctxindex-root`~~. **Resolved**: root package renamed to `ctxindex`, root `bin` field removed. **Superseded**: `bun link` is no longer supported in v1. The CLI is invoked exclusively via `bun cli` (root script) or `bun run cli` (root or from `apps/cli`). `scripts/verify/cli.sh` is the verifier for V1 §4 criterion 1; the old `scripts/verify/bun-link.sh` was removed.
 - Ambiguity: The explicit dev-dependency list omits `turbo`, but the feature requires a Turborepo `turbo.json` and root scripts that run Turbo tasks.
   Chosen answer: Install `turbo` as a root dev dependency along with the explicitly listed dev tools.
   Rationale: Without the Turbo CLI, `bun run build` and `bun run db:generate` cannot execute the required task graph.

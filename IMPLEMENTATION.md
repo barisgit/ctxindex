@@ -739,7 +739,7 @@ for await (const op of sync(ctx)) { ... }
 
 ### 3d.3 Distribution (v1)
 
-Deferred. v1 ships from `bun run`/`bun link` against the cloned repo. No npm publish, no compiled binary in v1. Skills resolved relative to the repo path. Publish and `bun build --compile` story revisited once core is stable enough to commit to a versioning contract.
+Deferred. v1 ships from `bun run cli` / `bun cli` against the cloned repo. No `bun link`, no npm publish, no compiled binary in v1. Skills resolved relative to the repo path. Publish and `bun build --compile` story revisited once core is stable enough to commit to a versioning contract.
 
 This is an explicit choice to keep release surface area small until the schema, sync_runs contract, and adapter shape settle. SPEC documents this so the deferral is intentional, not drift.
 

@@ -77,6 +77,82 @@ describe('search e2e', () => {
     })
   })
 
+  test('adapter-neutral refs format returns item references only', async () => {
+    await withSearchFixture(async (sandbox) => {
+      const result = await sandbox.run([
+        'search',
+        'apple',
+        '--format',
+        'refs',
+        '--limit',
+        '1',
+      ])
+
+      expect(result.stderr).toBe('')
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout.trim()).toMatch(/^file:\/\/.*apple\.txt$/)
+      expect(result.stdout.trim()).not.toContain('\t')
+    })
+  })
+
+  test('compact/context formats expose refs and larger snippets for agents', async () => {
+    await withSearchFixture(async (sandbox) => {
+      const compact = await sandbox.run([
+        'search',
+        'apple',
+        '--format',
+        'compact',
+        '--snippet-chars',
+        '400',
+      ])
+      expect(compact.stderr).toBe('')
+      expect(compact.exitCode).toBe(0)
+      expect(compact.stdout).toContain('file://')
+      expect(compact.stdout).toContain('apple banana')
+
+      const context = await sandbox.run([
+        'search',
+        'apple',
+        '--format',
+        'context',
+        '--limit',
+        '1',
+      ])
+      expect(context.stderr).toBe('')
+      expect(context.exitCode).toBe(0)
+      expect(context.stdout).toContain('ref: file://')
+      expect(context.stdout).toContain('kind: file')
+      expect(context.stdout).toContain('snippet: apple banana')
+    })
+  })
+
+  test('formatted json uses adapter-neutral agent fields', async () => {
+    await withSearchFixture(async (sandbox) => {
+      const result = await sandbox.run([
+        'search',
+        'apple',
+        '--format',
+        'compact',
+        '--json',
+      ])
+
+      expect(result.stderr).toBe('')
+      expect(result.exitCode).toBe(0)
+      const rows = JSON.parse(result.stdout) as Array<{
+        ref: string
+        kind: string
+        source: { adapterId: string }
+        metadata: { path?: string; extension?: string }
+        snippets: string[]
+      }>
+      expect(rows[0]?.ref).toMatch(/^file:\/\//)
+      expect(rows[0]?.kind).toBe('file')
+      expect(rows[0]?.source.adapterId).toBe('local.directory')
+      expect(rows[0]?.metadata.extension).toBe('txt')
+      expect(rows[0]?.snippets[0]).toContain('apple banana')
+    })
+  })
+
   test('all filter flags accepted', async () => {
     await withSearchFixture(async (sandbox, sourceId) => {
       const result = await sandbox.run([
@@ -89,7 +165,7 @@ describe('search e2e', () => {
         '--adapter',
         'local.directory',
         '--kind',
-        'directory',
+        'file',
         '--since',
         '1970-01-01',
         '--until',

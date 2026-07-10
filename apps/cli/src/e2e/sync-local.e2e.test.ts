@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
-import { chmod, mkdir, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createSandbox, type Sandbox } from '@ctxindex/core/testing'
 
@@ -89,6 +89,23 @@ describe('sync local.directory e2e', () => {
       expect(result.stderr).toBe('')
       expect(result.exitCode).toBe(0)
       expect(result.stdout).toContain('sync completed:')
+    })
+  })
+
+  test('sync events format emits low-token progress lines', async () => {
+    await withInitializedSandbox(async (sandbox) => {
+      const root = join(sandbox.dir, 'fixture')
+      await writeTwoFileFixture(root)
+      const sourceId = await addLocalSource(sandbox, root)
+
+      const result = await sandbox.run(['sync', '--format', 'events'])
+
+      expect(result.stderr).toBe('')
+      expect(result.exitCode).toBe(0)
+      expect(result.stdout).toContain(`sync_start source=${sourceId}`)
+      expect(result.stdout).toContain(`sync_done source=${sourceId}`)
+      expect(result.stdout).toContain('items=2')
+      expect(result.stdout).toContain('chunks=2')
     })
   })
 
@@ -190,6 +207,39 @@ describe('sync local.directory e2e', () => {
     })
   })
 
+  test('deleted local files are tombstoned and hidden from search', async () => {
+    await withInitializedSandbox(async (sandbox) => {
+      const root = join(sandbox.dir, 'fixture')
+      await mkdir(root, { recursive: true })
+      const filePath = join(root, 'orchid.txt')
+      await writeFile(filePath, 'ctxdogfood unique orchid tombstone token\n')
+      await addLocalSource(sandbox, root)
+
+      const first = await sandbox.run(['sync'])
+      expect(first.exitCode).toBe(0)
+      const found = await sandbox.run(['search', 'ctxdogfood'])
+      expect(found.exitCode).toBe(0)
+      expect(found.stdout).toContain('orchid.txt')
+
+      await rm(filePath)
+      const second = await sandbox.run(['sync'])
+      expect(second.exitCode).toBe(0)
+      expect(second.stdout).toContain('tombstones=1')
+
+      const hidden = await sandbox.run(['search', 'ctxdogfood'])
+      expect(hidden.exitCode).toBe(0)
+      expect(hidden.stdout).not.toContain('orchid.txt')
+
+      const included = await sandbox.run([
+        'search',
+        'ctxdogfood',
+        '--include-deleted',
+      ])
+      expect(included.exitCode).toBe(0)
+      expect(included.stdout).toContain('orchid.txt')
+    })
+  })
+
   test('missing directory increments errors_count', async () => {
     await withInitializedSandbox(async (sandbox) => {
       const missingRoot = join(sandbox.dir, 'does-not-exist')
@@ -197,7 +247,9 @@ describe('sync local.directory e2e', () => {
 
       const result = await sandbox.run(['sync'])
 
-      expect(result.exitCode).toBe(20)
+      // V1 §1.6: a missing root is a non-fatal warning; the run completes and
+      // exits 0 with errors_count > 0.
+      expect(result.exitCode).toBe(0)
       const db = new Database(dbPath(sandbox), { readonly: true })
       try {
         const row = db
@@ -210,7 +262,7 @@ describe('sync local.directory e2e', () => {
     })
   })
 
-  test('partial results exit 20', async () => {
+  test('partial results exit 0 (completed with warnings)', async () => {
     if (typeof process.getuid === 'function' && process.getuid() === 0) {
       console.warn('skipping unreadable-file check when running as root')
       return
@@ -227,7 +279,8 @@ describe('sync local.directory e2e', () => {
 
       try {
         const result = await sandbox.run(['sync'])
-        expect(result.exitCode).toBe(20)
+        // V1 §1.6: completed-with-warnings exits 0; the skip is in errors_count.
+        expect(result.exitCode).toBe(0)
 
         const db = new Database(dbPath(sandbox), { readonly: true })
         try {

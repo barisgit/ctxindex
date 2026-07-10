@@ -40,6 +40,7 @@ export async function handleSourceCommand(args: string[]): Promise<number> {
 
 const sourceOptionArgs = {
   realm: { type: 'string', description: 'Realm slug' },
+  format: { type: 'string', description: 'Output format: table or compact' },
   json: { type: 'boolean', description: 'Print JSON' },
 } as const
 
@@ -52,6 +53,7 @@ export const sourceCommand = defineCommand({
         adapter: { type: 'string', description: 'Adapter ID' },
         root: { type: 'string', description: 'Local root path' },
         path: { type: 'string', description: 'Local root path' },
+        name: { type: 'string', description: 'Source name' },
         'display-name': { type: 'string', description: 'Display name' },
         'config-json': { type: 'string', description: 'Adapter config JSON' },
         'adapter-id': { type: 'positional', required: false },

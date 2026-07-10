@@ -1,20 +1,30 @@
+import { z } from 'zod'
 import { getEnv } from '../config'
 import { CtxindexAuthError } from '../errors'
+import { EGRESS_ALLOWLIST, egressFetch, isLoopbackHost } from '../net'
 import { type GoogleTokenResponse, GoogleTokenResponseSchema } from './types'
 
 export const GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
 
-const GOOGLE_EGRESS_ALLOWLIST = new Set([
-  'oauth2.googleapis.com',
-  'accounts.google.com',
-  'gmail.googleapis.com',
-  'www.googleapis.com',
-])
+const GMAIL_API_BASE_URL = 'https://gmail.googleapis.com'
 
 export { GoogleTokenResponseSchema }
 
-function isLoopbackHost(hostname: string): boolean {
-  return hostname === '127.0.0.1' || hostname === 'localhost'
+const GoogleProfileSchema = z
+  .object({ emailAddress: z.string().optional() })
+  .passthrough()
+
+function joinUrl(base: URL, path: string): string {
+  const href = base.href.endsWith('/') ? base.href : `${base.href}/`
+  return new URL(path.replace(/^\//, ''), href).toString()
+}
+
+function nonProductionMockBaseUrl(): URL | undefined {
+  const mockBaseUrl = getEnv().CTXINDEX_GMAIL_MOCK_BASE_URL
+  if (!mockBaseUrl || process.env.NODE_ENV === 'production') return undefined
+  const parsed = new URL(mockBaseUrl)
+  if (!isLoopbackHost(parsed.hostname)) return undefined
+  return parsed
 }
 
 function tokenEndpointUrl(): string {
@@ -29,7 +39,7 @@ function tokenEndpointUrl(): string {
 
 export function assertGoogleEgressAllowed(url: string): void {
   const parsed = new URL(url)
-  if (GOOGLE_EGRESS_ALLOWLIST.has(parsed.hostname)) return
+  if (EGRESS_ALLOWLIST.has(parsed.hostname)) return
   if (
     process.env.NODE_ENV !== 'production' &&
     isLoopbackHost(parsed.hostname)
@@ -39,6 +49,13 @@ export function assertGoogleEgressAllowed(url: string): void {
   throw new CtxindexAuthError(
     'network_error',
     `network egress host is not allowlisted: ${parsed.hostname}`,
+  )
+}
+
+function gmailApiUrl(path: string): string {
+  return joinUrl(
+    nonProductionMockBaseUrl() ?? new URL(GMAIL_API_BASE_URL),
+    path,
   )
 }
 
@@ -66,7 +83,10 @@ function oauthErrorMessage(json: unknown, fallback: string): string {
   return fallback
 }
 
-async function parseJsonResponse(response: Response): Promise<unknown> {
+async function parseJsonResponse(
+  response: Response,
+  source = 'google token endpoint',
+): Promise<unknown> {
   const text = await response.text()
   if (text.length === 0) return {}
   try {
@@ -74,7 +94,7 @@ async function parseJsonResponse(response: Response): Promise<unknown> {
   } catch (cause) {
     throw new CtxindexAuthError(
       'unknown_auth_error',
-      'google token endpoint returned non-json response',
+      `${source} returned non-json response`,
       { cause },
     )
   }
@@ -89,7 +109,7 @@ export async function postOAuthTokenRequest(
 
   let response: Response
   try {
-    response = await fetch(endpoint, {
+    response = await egressFetch(endpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
@@ -121,6 +141,47 @@ export async function postOAuthTokenRequest(
     throw new CtxindexAuthError(
       'unknown_auth_error',
       'google token response failed validation',
+      { cause },
+    )
+  }
+}
+
+export async function getGoogleAccountEmail(
+  accessToken: string,
+): Promise<string | null> {
+  const endpoint = gmailApiUrl('/gmail/v1/users/me/profile')
+  assertGoogleEgressAllowed(endpoint)
+
+  let response: Response
+  try {
+    response = await egressFetch(endpoint, {
+      headers: { authorization: `Bearer ${accessToken}` },
+    })
+  } catch (cause) {
+    throw new CtxindexAuthError(
+      'network_error',
+      'google profile request failed',
+      { cause },
+    )
+  }
+
+  const json = await parseJsonResponse(response, 'google profile endpoint')
+  if (!response.ok) {
+    throw new CtxindexAuthError(
+      'oauth_failed',
+      oauthErrorMessage(
+        json,
+        `google profile endpoint returned ${response.status}`,
+      ),
+    )
+  }
+
+  try {
+    return GoogleProfileSchema.parse(json).emailAddress ?? null
+  } catch (cause) {
+    throw new CtxindexAuthError(
+      'unknown_auth_error',
+      'google profile response failed validation',
       { cause },
     )
   }

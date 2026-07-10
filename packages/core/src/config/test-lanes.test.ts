@@ -120,10 +120,14 @@ test('path-ignore-patterns honored', async () => {
 
     const result = await runBunTest(sandbox)
 
-    expect(result.output).toContain('unit.test.ts')
+    // The ignored files contain failing tests; if the patterns were not honored
+    // the run would execute 3 files and exit non-zero. Asserting on the run
+    // summary is robust to bun's reporter omitting filenames for a single
+    // all-passing file.
+    expect(result.exitCode).toBe(0)
+    expect(result.output).toContain('Ran 1 test across 1 file')
     expect(result.output).not.toContain('ignored.integration.test.ts')
     expect(result.output).not.toContain('ignored.e2e.test.ts')
-    expect(result.exitCode).toBe(0)
   } finally {
     await rm(sandbox, { recursive: true, force: true })
   }

@@ -29,8 +29,9 @@ test('skills list shows bundled skills', async () => {
 
   expect(result.exitCode).toBe(0)
   expect(result.stderr).toBe('')
-  expect(result.stdout).toContain('README\t')
   expect(result.stdout).toContain('getting-started\t')
+  // README is directory documentation, not a bundled skill (SPEC §10c).
+  expect(result.stdout).not.toContain('README\t')
 })
 
 test('skills get returns bundled markdown', async () => {
@@ -83,7 +84,7 @@ test('skills --json output is parseable', async () => {
     content: string
   }
 
-  expect(listJson.map((skill) => skill.name)).toContain('README')
+  expect(listJson.map((skill) => skill.name)).not.toContain('README')
   expect(listJson.map((skill) => skill.name)).toContain('getting-started')
   expect(getJson.name).toBe('getting-started')
   expect(getJson.content).toContain('# Getting started with ctxindex')

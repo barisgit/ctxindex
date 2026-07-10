@@ -25,6 +25,15 @@ export interface GoogleGrantRow {
   readonly updatedAt: number
 }
 
+export interface GoogleGrantSummary {
+  readonly id: string
+  readonly provider: 'google'
+  readonly scopes: string
+  readonly expiresAt: number | null
+  readonly accountEmail: string | null
+  readonly accountDisplayName: string | null
+}
+
 export const GoogleTokenResponseSchema = z
   .object({
     access_token: z.string(),
@@ -69,9 +78,7 @@ export interface ExchangeAuthCodeInput {
 export interface AuthService {
   addGoogleGrant(input: AddGoogleGrantInput): Promise<AddGoogleGrantResult>
   getActiveGoogleGrant(): Promise<GoogleGrantRow | null>
-  listGoogleGrants(): Promise<
-    Pick<GoogleGrantRow, 'id' | 'provider' | 'scopes' | 'expiresAt'>[]
-  >
+  listGoogleGrants(): Promise<GoogleGrantSummary[]>
   refreshGoogleAccessToken(grantId: string): Promise<string>
   exchangeGoogleAuthCode(
     input: ExchangeAuthCodeInput,

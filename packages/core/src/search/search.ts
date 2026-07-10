@@ -61,6 +61,18 @@ function buildItemFilter(
     params.push(...filters.adapters)
   }
 
+  if (filters.providers && filters.providers.length > 0) {
+    // Provider module is the adapter-id prefix before the first dot
+    // (e.g. provider "google" matches adapter "google.mailbox").
+    const ors = filters.providers
+      .map(() => '(i.adapter_id = ? OR i.adapter_id LIKE ?)')
+      .join(' OR ')
+    clauses.push(`(${ors})`)
+    for (const provider of filters.providers) {
+      params.push(provider, `${provider}.%`)
+    }
+  }
+
   if (filters.kinds && filters.kinds.length > 0) {
     const ph = filters.kinds.map(() => '?').join(', ')
     clauses.push(`i.kind IN (${ph})`)
@@ -101,6 +113,7 @@ function getBestChunk(
   db: CtxindexDatabase,
   itemId: string,
   chunkId?: string,
+  snippetChars = 200,
 ): SearchResultChunk | null {
   const row = chunkId
     ? (db
@@ -126,7 +139,7 @@ function getBestChunk(
   return {
     chunkId: row.id,
     chunkIndex: row.chunk_index,
-    snippet: row.content.slice(0, 200),
+    snippet: row.content.slice(0, snippetChars),
   }
 }
 
@@ -193,7 +206,13 @@ export function search(
   db: CtxindexDatabase,
   options: SearchOptions,
 ): SearchResult[] {
-  const { query, filters = {}, limit = 20, explain = false } = options
+  const {
+    query,
+    filters = {},
+    limit = 20,
+    snippetChars = 200,
+    explain = false,
+  } = options
   const { strict, relaxed } = sanitizeQuery(query)
 
   let itemResults = runItemFts(db, strict, filters, limit)
@@ -261,7 +280,12 @@ export function search(
     if (!item) continue
     if (!passesFilters(item, filters)) continue
 
-    const bestChunk = getBestChunk(db, itemId, chunkId ?? undefined)
+    const bestChunk = getBestChunk(
+      db,
+      itemId,
+      chunkId ?? undefined,
+      snippetChars,
+    )
 
     let explainInfo: ExplainInfo | undefined
     if (explain) {
@@ -282,7 +306,9 @@ export function search(
         matchedChunkIds: chunkIds,
         snippets: chunkIds
           .slice(0, 3)
-          .map((cid) => getBestChunk(db, itemId, cid)?.snippet ?? ''),
+          .map(
+            (cid) => getBestChunk(db, itemId, cid, snippetChars)?.snippet ?? '',
+          ),
       }
     }
 

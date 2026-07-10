@@ -30,6 +30,10 @@ export const statusCommand = defineCommand({
   meta: { name: 'status', description: 'Show last sync status.' },
   args: {
     source: { type: 'string', description: 'Source ID' },
+    format: {
+      type: 'string',
+      description: 'Output format: summary or compact',
+    },
     json: { type: 'boolean', description: 'Print JSON' },
   },
   run: ({ rawArgs }) => runWithExit(() => handleStatusCommand(rawArgs)),

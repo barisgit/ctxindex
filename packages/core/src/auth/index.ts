@@ -6,6 +6,7 @@ export {
   assertGoogleEgressAllowed,
   GOOGLE_TOKEN_ENDPOINT,
   GoogleTokenResponseSchema,
+  getGoogleAccountEmail,
   postOAuthTokenRequest,
 } from './google-client'
 export * from './service'

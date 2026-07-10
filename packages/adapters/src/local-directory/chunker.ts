@@ -54,7 +54,10 @@ export function chunkText(text: string): Chunk[] {
       index++
     }
 
-    // Advance with overlap
+    // The window reached the end of the text: everything is chunked, stop.
+    if (end >= text.length) break
+
+    // Advance with overlap, but always make forward progress past this chunk.
     offset = Math.max(offset + 1, end - CHUNK_OVERLAP)
   }
 

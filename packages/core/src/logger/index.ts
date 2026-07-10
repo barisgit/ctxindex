@@ -111,9 +111,12 @@ function isLogLevel(value: string): value is LogLevel {
 }
 
 function resolveLevel(config: CtxindexConfig, override?: LogLevel): LogLevel {
+  // An explicit override (the `--log-level` CLI flag) wins over the ambient
+  // CTXINDEX_LOG_LEVEL env var, which in turn wins over the config default.
+  if (override) return override
   const envLevel = getEnv().CTXINDEX_LOG_LEVEL
   if (envLevel && isLogLevel(envLevel)) return envLevel
-  return override ?? config.log.level ?? 'info'
+  return config.log.level ?? 'info'
 }
 
 function testRollOptions(): Partial<PinoRollOptions> {

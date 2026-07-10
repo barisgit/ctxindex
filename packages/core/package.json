@@ -16,6 +16,7 @@
     "./schema": "./src/schema.ts",
     "./storage": "./src/storage.ts",
     "./testing": "./src/testing/index.ts",
+    "./net": "./src/net/index.ts",
     "./registry": "./src/registry.ts",
     "./sync": "./src/sync/index.ts",
     "./search": "./src/search/index.ts",

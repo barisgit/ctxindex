@@ -5,6 +5,7 @@ export type {
   ExecuteSearchResult,
   ExplainRow,
   FormatSearchResultsOptions,
+  SearchOutputFormat,
   SearchService,
   SearchServiceDeps,
 } from './search-service'

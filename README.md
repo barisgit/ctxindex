@@ -5,6 +5,10 @@ ctxindex is a Bun/TypeScript local indexing CLI for syncing configured sources i
 ## Quickstart
 
 ```sh
-bun install && bun link
-ctxindex --help
+bun install
+bun cli --help            # from repo root
+# or, equivalently:
+bun run cli --help        # from repo root or from apps/cli
 ```
+
+There is no `bun link` / global install path. The CLI is invoked only through `bun cli` / `bun run cli`, both of which dispatch to `apps/cli/bin/ctxindex.mjs`.

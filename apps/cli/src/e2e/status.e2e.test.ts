@@ -10,6 +10,7 @@ type StatusRow = {
   lastStatus: string
   lastRunAt: number | null
   errorsCount: number
+  lastError: string | null
   cursor: unknown
 }
 
@@ -142,6 +143,26 @@ test('text output renders', async () => {
   }
 })
 
+test('compact output includes error summary', async () => {
+  const sandbox = await initSandbox()
+  try {
+    const sourceId = await addSource(sandbox)
+    seedSyncState(sandbox, sourceId, 'failed')
+
+    const result = await sandbox.run(['status', '--format', 'compact'])
+
+    expect(result.exitCode).toBe(0)
+    expect(result.stderr).toBe('')
+    expect(result.stdout).toContain(sourceId)
+    expect(result.stdout).toContain('adapter=local.directory')
+    expect(result.stdout).toContain('status=failed')
+    expect(result.stdout).toContain('errors=1')
+    expect(result.stdout).toContain('error=failed')
+  } finally {
+    await sandbox.cleanup()
+  }
+})
+
 test('json output parses', async () => {
   const sandbox = await initSandbox()
   try {
@@ -161,6 +182,7 @@ test('json output parses', async () => {
     expect(rows[0]?.lastStatus).toBe('completed')
     expect(typeof rows[0]?.lastRunAt).toBe('number')
     expect(rows[0]?.errorsCount).toBe(0)
+    expect(rows[0]?.lastError).toBeNull()
     expect(rows[0]?.cursor).toEqual({ page: 1 })
   } finally {
     await sandbox.cleanup()
@@ -187,6 +209,19 @@ test('counts match SQLite', async () => {
     expect(bySourceId.get(secondSourceId)?.errorsCount).toBe(
       syncRunErrorCount(sandbox, secondSourceId),
     )
+  } finally {
+    await sandbox.cleanup()
+  }
+})
+
+test('unknown source id fails fast with exit 2', async () => {
+  const sandbox = await initSandbox()
+  try {
+    const result = await sandbox.run(['status', '--source', 'no-such-source'])
+
+    // SPEC §10b: a reference to an unknown source MUST fail fast, not exit 0.
+    expect(result.exitCode).toBe(2)
+    expect(result.stderr).toContain('no-such-source')
   } finally {
     await sandbox.cleanup()
   }

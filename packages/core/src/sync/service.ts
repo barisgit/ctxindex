@@ -46,6 +46,7 @@ export interface SyncResult {
     readonly items: number
     readonly chunks: number
     readonly tombstones: number
+    readonly errors: number
   }
   readonly error?: { readonly code: string; readonly message: string }
 }
@@ -138,10 +139,11 @@ export function mapSyncErrorToExitCode(code: string): FullErrorMapping {
       }
     case 'permission_denied':
     case 'invalid_arg':
+      // SPEC §12: `disabled` is set only by the CLI, never by the runner.
       return {
         exitCode: 40,
         runStatus: 'failed',
-        lastStatus: 'disabled',
+        lastStatus: 'failed',
         resultStatus: 'failure',
       }
     case 'transient_provider':
@@ -152,15 +154,19 @@ export function mapSyncErrorToExitCode(code: string): FullErrorMapping {
         resultStatus: 'failure',
       }
     case 'cancelled':
+      // SPEC §12: `idle` is reserved for completed runs; a cancelled run is a
+      // terminal non-completion and maps to `failed` last status.
       return {
         exitCode: 130,
         runStatus: 'cancelled',
-        lastStatus: 'idle',
+        lastStatus: 'failed',
         resultStatus: 'cancelled',
       }
     default:
+      // SPEC §12: every other terminal error maps to exit code 50 (other).
+      // Exit code 1 is not a stable ctxindex exit code.
       return {
-        exitCode: 1,
+        exitCode: 50,
         runStatus: 'failed',
         lastStatus: 'failed',
         resultStatus: 'failure',
@@ -318,6 +324,35 @@ function releaseGlobalLock(db: CtxindexDatabase, runId: string): void {
     GLOBAL_LOCK_SCOPE,
     runId,
   )
+}
+
+function tombstoneUnseenLocalDirectoryFiles(
+  db: CtxindexDatabase,
+  source: SourceRow,
+  seenRelativePaths: Set<string>,
+): number {
+  if (!tableExists(db, 'local_directory_file_state')) return 0
+  const rows = db
+    .prepare(
+      `SELECT ldfs.item_id, ldfs.relative_path
+       FROM local_directory_file_state ldfs
+       JOIN items i ON i.id = ldfs.item_id
+       WHERE ldfs.source_id = ? AND i.deleted_at IS NULL`,
+    )
+    .all(source.id) as { item_id: string; relative_path: string }[]
+  let tombstones = 0
+  const deletedAt = Date.now()
+  for (const row of rows) {
+    if (seenRelativePaths.has(row.relative_path)) continue
+    applyTombstoneOp(db, source, {
+      type: 'tombstone',
+      itemId: row.item_id,
+      deletedAt,
+      reason: 'local file missing from completed scan',
+    })
+    tombstones++
+  }
+  return tombstones
 }
 
 function sourceRows(db: CtxindexDatabase, sourceId?: string): SourceRow[] {
@@ -528,14 +563,22 @@ function applyMailAttachmentOp(
 
 function applyExternalRefOp(
   db: CtxindexDatabase,
+  source: SourceRow,
   op: Record<string, unknown>,
+  itemIdByAdapterItemId: Map<string, string>,
 ): void {
+  const adapterItemId = String(op.itemId)
+  const itemId = itemIdByAdapterItemId.get(adapterItemId) ?? adapterItemId
+  // SPEC §4: external identity is unique per (source_id, kind, value); a
+  // re-sync MUST be idempotent rather than accumulate duplicate refs.
   db.prepare(
-    `INSERT INTO external_refs (id, item_id, kind, value, created_at)
-     VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO external_refs (id, source_id, item_id, kind, value, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(source_id, kind, value) DO NOTHING`,
   ).run(
     ulid(),
-    String(op.itemId),
+    source.id,
+    itemId,
     typeof op.kind === 'string' ? op.kind : 'unknown',
     typeof op.value === 'string' ? op.value : JSON.stringify(op.value),
     Date.now(),
@@ -721,7 +764,7 @@ async function runSourceSync(
       status: 'cancelled',
       exitCode: 50,
       lastStatus: 'failed',
-      counts: { items: 0, chunks: 0, tombstones: 0 },
+      counts: { items: 0, chunks: 0, tombstones: 0, errors: 0 },
       error: { code: 'transient_provider', message: 'sync busy' },
     }
   }
@@ -742,10 +785,13 @@ async function runSourceSync(
   let chunksWritten = 0
   let tombstonesWritten = 0
   let errorsCount = 0
+  let txnOpen = false
   let cursorAfterJson: string | null = cursorJson
   const errorMessages: string[] = []
   const itemIdByAdapterItemId = new Map<string, string>()
   const mailMessageIdByItemId = new Map<string, string>()
+  const seenLocalRelativePaths = new Set<string>()
+  let localDirectoryScanCompleted = false
   const runLogger = deps.logger.child({
     runId,
     sourceId: source.id,
@@ -755,10 +801,13 @@ async function runSourceSync(
   })
 
   const startedAt = now(deps)
+  // SPEC §8: persist the cursor-before at run start. Run row + lock are written
+  // in autocommit (outside the data transaction below) so they stay visible to
+  // concurrent readers and to crash-recovery while the run is in progress.
   db.prepare(
-    `INSERT INTO sync_runs (id, source_id, realm_id, mode, status, started_at)
-     VALUES (?, ?, ?, ?, 'running', ?)`,
-  ).run(runId, source.id, source.realm_id, mode, startedAt)
+    `INSERT INTO sync_runs (id, source_id, realm_id, mode, status, started_at, cursor_before_json)
+     VALUES (?, ?, ?, ?, 'running', ?, ?)`,
+  ).run(runId, source.id, source.realm_id, mode, startedAt, cursorJson)
   upsertSourceSyncState(db, source.id, 'syncing', runId, cursorJson)
   acquireGlobalLock(db, runId)
 
@@ -788,6 +837,12 @@ async function runSourceSync(
 
     runLogger.info({ mode }, 'sync started')
 
+    // SPEC §8: core MUST apply operations transactionally and advance the
+    // cursor only after all writes commit. Token refresh above stays in
+    // autocommit; only the data writes below are wrapped.
+    db.prepare('BEGIN IMMEDIATE').run()
+    txnOpen = true
+
     for await (const rawOp of adapter.sync(ctx)) {
       if (signal.aborted) {
         throw Object.assign(new Error('sync cancelled'), { code: 'cancelled' })
@@ -811,6 +866,12 @@ async function runSourceSync(
       if (type === 'upsertItem') {
         const { itemId, existing } = applyItemOp(db, source, op)
         itemIdByAdapterItemId.set(String(op.itemId), itemId)
+        if (
+          source.adapter_id === 'local.directory' &&
+          typeof op.relativePath === 'string'
+        ) {
+          seenLocalRelativePaths.add(op.relativePath)
+        }
         if (existing) itemsUpdated++
         else itemsAdded++
       } else if (type === 'upsertChunk') {
@@ -821,7 +882,7 @@ async function runSourceSync(
       } else if (type === 'upsertMailAttachment') {
         applyMailAttachmentOp(db, op, mailMessageIdByItemId)
       } else if (type === 'upsertExternalRef') {
-        applyExternalRefOp(db, op)
+        applyExternalRefOp(db, source, op, itemIdByAdapterItemId)
       } else if (type === 'tombstone') {
         applyTombstoneOp(db, source, op)
         tombstonesWritten++
@@ -834,6 +895,9 @@ async function runSourceSync(
         applyCheckpointOp(db, runId, op)
       } else if (type === 'setCursor') {
         cursorAfterJson = applySetCursorOp(op)
+        if (source.adapter_id === 'local.directory') {
+          localDirectoryScanCompleted = true
+        }
       } else if (type === 'cancelled') {
         errorsCount++
         errorMessages.push('sync cancelled')
@@ -843,10 +907,18 @@ async function runSourceSync(
       // adapters (notably google.mailbox) that emit item_added canaries.
     }
 
+    if (localDirectoryScanCompleted) {
+      tombstonesWritten += tombstoneUnseenLocalDirectoryFiles(
+        db,
+        source,
+        seenLocalRelativePaths,
+      )
+    }
+
     db.prepare(
       `UPDATE sync_runs SET
          status='completed', completed_at=?, items_added=?, items_updated=?,
-         items_deleted=?, errors_count=?, error_json=?
+         items_deleted=?, errors_count=?, error_json=?, cursor_after_json=?
        WHERE id=?`,
     ).run(
       Date.now(),
@@ -855,9 +927,12 @@ async function runSourceSync(
       tombstonesWritten,
       errorsCount,
       errorMessages.length > 0 ? JSON.stringify(errorMessages) : null,
+      cursorAfterJson,
       runId,
     )
     upsertSourceSyncState(db, source.id, 'completed', runId, cursorAfterJson)
+    db.prepare('COMMIT').run()
+    txnOpen = false
     releaseGlobalLock(db, runId)
     runLogger.info(
       {
@@ -870,16 +945,19 @@ async function runSourceSync(
       'sync completed',
     )
 
+    // V1 §1.6: a run that completed exits 0 regardless of errors_count; the
+    // 'partial' status is for display only, never a non-zero exit code.
     return {
       runId,
       sourceId: source.id,
       status: errorsCount > 0 ? 'partial' : 'success',
-      exitCode: errorsCount > 0 ? 20 : 0,
+      exitCode: EXIT_CODES.OK,
       lastStatus: 'completed',
       counts: {
         items: itemsAdded + itemsUpdated,
         chunks: chunksWritten,
         tombstones: tombstonesWritten,
+        errors: errorsCount,
       },
     }
   } catch (err) {
@@ -888,6 +966,13 @@ async function runSourceSync(
     const mapping = mapSyncErrorToExitCode(code)
     errorMessages.push(message)
     errorsCount++
+
+    // SPEC §8: a failed run rolls back its data writes so the durable cursor is
+    // left untouched; the run/state bookkeeping below runs in autocommit.
+    if (txnOpen) {
+      db.prepare('ROLLBACK').run()
+      txnOpen = false
+    }
 
     db.prepare(
       `UPDATE sync_runs SET
@@ -921,6 +1006,7 @@ async function runSourceSync(
         items: itemsAdded + itemsUpdated,
         chunks: chunksWritten,
         tombstones: tombstonesWritten,
+        errors: errorsCount,
       },
       error: { code, message },
     }
@@ -966,8 +1052,8 @@ export function createSyncService(deps: SyncDependencies): SyncService {
             sourceId: row.id,
             status: 'cancelled',
             exitCode: 130,
-            lastStatus: 'idle',
-            counts: { items: 0, chunks: 0, tombstones: 0 },
+            lastStatus: 'failed',
+            counts: { items: 0, chunks: 0, tombstones: 0, errors: 0 },
             error: { code: 'cancelled', message: 'sync cancelled' },
           })
           continue

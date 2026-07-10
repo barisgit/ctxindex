@@ -1,3 +1,5 @@
+import { getGoogleAccountEmail } from '@ctxindex/core/auth'
+import { getEnv } from '@ctxindex/core/config'
 import { defineCommand } from 'citty'
 import { type AuthArgs, authUsage, parseAuthArgs } from '../args/auth'
 import { obtainGoogleTokens, resolveAddCreds } from '../auth/add-google'
@@ -7,6 +9,26 @@ import { formatGrantAdded, formatGrants } from '../format/auth'
 import { mapErrorToExit, runWithExit } from '../format/exit'
 
 type AddArgs = Extract<AuthArgs, { kind: 'add' }>
+
+async function detectGoogleAccountEmail(token: {
+  readonly refresh_token: string
+  readonly access_token?: string
+}): Promise<string | undefined> {
+  if (!token.access_token) return undefined
+  const env = getEnv()
+  if (
+    env.CTXINDEX_GMAIL_TOKEN_URL &&
+    !env.CTXINDEX_GMAIL_MOCK_BASE_URL &&
+    process.env.NODE_ENV !== 'production'
+  ) {
+    return undefined
+  }
+  try {
+    return (await getGoogleAccountEmail(token.access_token)) ?? undefined
+  } catch {
+    return undefined
+  }
+}
 
 async function handleAdd(p: AddArgs): Promise<number> {
   if (p.provider !== 'google')
@@ -19,6 +41,7 @@ async function handleAdd(p: AddArgs): Promise<number> {
     const t = p.refreshToken
       ? { refresh_token: p.refreshToken }
       : await obtainGoogleTokens(p, id, secret)
+    const accountEmail = p.label ?? (await detectGoogleAccountEmail(t))
     const { grantId } = await deps.authService.addGoogleGrant({
       clientId: id,
       clientSecret: secret,
@@ -28,7 +51,7 @@ async function handleAdd(p: AddArgs): Promise<number> {
         : {}),
       scopes: JSON.stringify([GOOGLE_GMAIL_READONLY_SCOPE]),
       ...('expires_at' in t ? { expiresAt: t.expires_at } : {}),
-      accountEmail: p.label ?? 'google',
+      ...(accountEmail ? { accountEmail } : {}),
     })
     console.log(formatGrantAdded(grantId))
     return 0

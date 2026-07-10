@@ -205,6 +205,8 @@ test('listGoogleGrants returns the inserted grant', async () => {
       provider: 'google',
       scopes: 'scope-one scope-two',
       expiresAt: null,
+      accountEmail: null,
+      accountDisplayName: 'google',
     },
   ])
 })

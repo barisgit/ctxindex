@@ -83,7 +83,13 @@ async function readSkillRecord(
 export async function listSkills(root: string): Promise<SkillRecord[]> {
   const entries = await readdir(root, { withFileTypes: true })
   const markdownFiles = entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+    // README is directory documentation, not a bundled skill (SPEC §10c).
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        entry.name.endsWith('.md') &&
+        entry.name.toLowerCase() !== 'readme.md',
+    )
     .map((entry) => resolve(root, entry.name))
     .sort((a, b) =>
       skillNameFromPath(root, a).localeCompare(skillNameFromPath(root, b)),

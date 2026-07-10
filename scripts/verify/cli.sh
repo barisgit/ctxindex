@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+bin_path="$repo_root/apps/cli/bin/ctxindex.mjs"
+
+log() {
+  printf 'cli: %s\n' "$*" >&2
+}
+
+die() {
+  printf 'cli: ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+assert_semver() {
+  local label="$1"
+  local output="$2"
+
+  if [[ -z "$output" ]]; then
+    die "$label produced empty stdout"
+  fi
+
+  if [[ ! "$output" =~ ^[0-9]+\.[0-9]+ ]]; then
+    die "$label stdout did not start with a semver-ish version: $output"
+  fi
+}
+
+if ! command -v bun >/dev/null 2>&1; then
+  die 'bun is required but was not found on PATH'
+fi
+
+if [[ ! -f "$bin_path" ]]; then
+  die "required CLI binary is missing: $bin_path"
+fi
+
+if [[ ! -d "$repo_root/node_modules" || ! -e "$repo_root/node_modules/@ctxindex/cli" || ! -e "$repo_root/node_modules/@ctxindex/core" ]]; then
+  log 'dependencies are missing; running bun install'
+  if ! (cd "$repo_root" && bun install --frozen-lockfile); then
+    log 'bun install --frozen-lockfile failed; retrying bun install'
+    (cd "$repo_root" && bun install) || die 'bun install failed'
+  fi
+else
+  log 'dependencies already installed; skipping bun install'
+fi
+
+# Probe `bun cli --version` from the repo root.
+version_stderr=$(mktemp)
+trap 'rm -f "$version_stderr"' EXIT
+
+if ! version_output=$(cd "$repo_root" && bun cli --version 2>"$version_stderr"); then
+  cat "$version_stderr" >&2
+  die 'bun cli --version failed from repo root'
+fi
+assert_semver 'bun cli --version (root)' "$version_output"
+
+# Probe `bun run cli --version` from apps/cli.
+if ! workspace_version=$(cd "$repo_root/apps/cli" && bun run cli --version 2>"$version_stderr"); then
+  cat "$version_stderr" >&2
+  die 'bun run cli --version failed from apps/cli'
+fi
+assert_semver 'bun run cli --version (apps/cli)' "$workspace_version"
+
+# Help output sanity: every v1 top-level command must appear.
+if ! help_output=$(cd "$repo_root" && NO_COLOR=1 bun cli --help 2>"$version_stderr"); then
+  cat "$version_stderr" >&2
+  die 'bun cli --help failed'
+fi
+
+for expected in \
+  'USAGE ctxindex init|auth|realm|source|sync|search|status|secrets|skills' \
+  'init' \
+  'auth' \
+  'realm' \
+  'source' \
+  'sync' \
+  'search' \
+  'status' \
+  'secrets' \
+  'skills'; do
+  if ! grep -Fq "$expected" <<<"$help_output"; then
+    die "missing root help text: $expected"
+  fi
+done
+
+# Per-command help sanity: source / skills / auth subcommands enumerated.
+if ! source_help=$(cd "$repo_root" && NO_COLOR=1 bun cli source --help 2>"$version_stderr"); then
+  cat "$version_stderr" >&2
+  die 'bun cli source --help failed'
+fi
+for expected in 'USAGE ctxindex source add|list|remove' 'add' 'list' 'remove'; do
+  grep -Fq "$expected" <<<"$source_help" || die "missing source help text: $expected"
+done
+
+if ! skills_help=$(cd "$repo_root" && NO_COLOR=1 bun cli skills --help 2>"$version_stderr"); then
+  cat "$version_stderr" >&2
+  die 'bun cli skills --help failed'
+fi
+for expected in 'USAGE ctxindex skills list|get|path' 'list' 'get' 'path'; do
+  grep -Fq "$expected" <<<"$skills_help" || die "missing skills help text: $expected"
+done
+
+if ! secrets_help=$(cd "$repo_root" && NO_COLOR=1 bun cli secrets --help 2>"$version_stderr"); then
+  cat "$version_stderr" >&2
+  die 'bun cli secrets --help failed'
+fi
+for expected in 'USAGE ctxindex secrets' 'migrate'; do
+  grep -Fq "$expected" <<<"$secrets_help" || die "missing secrets help text: $expected"
+done
+
+printf '%s\n' "$version_output"
+log "verified bun cli binary at $bin_path"

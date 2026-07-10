@@ -17,8 +17,8 @@ const coverageMatrix = [
   ['2', 'realm add rejects an invalid slug'],
   ['10', 'Gmail invalid_grant marks the source needs_auth'],
   [
-    '20',
-    'local.directory partial sync keeps valid files and reports unreadable-file errors',
+    '0',
+    'local.directory partial sync (completed with warnings) keeps valid files and reports unreadable-file errors',
   ],
   ['30', 'malformed SQLite database exits as data_integrity'],
   ['40', 'malformed TOML config exits as config_error'],
@@ -299,7 +299,7 @@ describe('exit codes e2e', () => {
   })
 
   unreadableFileTest(
-    'exit 20 partial: unreadable local file records errors and keeps valid files',
+    'exit 0 partial: unreadable local file records errors but the run completes',
     async () => {
       const { sandbox, root } = await setupLocalSource()
       const unreadable = join(root, 'unreadable.txt')
@@ -309,7 +309,9 @@ describe('exit codes e2e', () => {
 
         const result = await sandbox.run(['sync'])
 
-        expect(result.exitCode, result.stderr).toBe(20)
+        // V1 §1.6: a completed run exits 0 regardless of errors_count; the
+        // non-fatal skip is surfaced via errors_count, not the exit code.
+        expect(result.exitCode, result.stderr).toBe(0)
         const db = new Database(dbPath(sandbox), { readonly: true })
         try {
           const run = db

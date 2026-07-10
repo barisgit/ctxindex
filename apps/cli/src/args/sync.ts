@@ -7,12 +7,13 @@ export type SyncArgs =
       readonly sourceId?: string
       readonly mode: SyncMode
       readonly json: boolean
+      readonly format: 'summary' | 'events' | 'compact'
     }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
 
 export const syncUsage =
-  'sync [--source <id>] [--mode sync|resync|diff] [--json]'
+  'sync [--source <id>] [--mode sync|resync|diff] [--format summary|events|compact] [--json]'
 
 function parseMode(value: string | undefined): SyncMode | null {
   if (value === undefined) return 'sync'
@@ -31,10 +32,19 @@ export function parseSyncArgs(args: string[]): SyncArgs {
     }
   }
   const sourceId = stringFlag(flags, 'source')
+  const rawFormat = stringFlag(flags, 'format') ?? 'summary'
+  if (
+    rawFormat !== 'summary' &&
+    rawFormat !== 'events' &&
+    rawFormat !== 'compact'
+  ) {
+    return { kind: 'unknown', message: `sync: invalid --format: ${rawFormat}` }
+  }
   return {
     kind: 'run',
     ...(sourceId !== undefined ? { sourceId } : {}),
     mode,
     json: flags.json === true,
+    format: rawFormat,
   }
 }

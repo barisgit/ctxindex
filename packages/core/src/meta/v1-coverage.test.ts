@@ -13,8 +13,8 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
 const v1Coverage: readonly V1CoverageEntry[] = [
   {
     criterionNumber: 1,
-    label: 'bun link produces a working ctxindex binary',
-    testFilePath: 'scripts/verify/bun-link.sh',
+    label: 'bun cli produces a working ctxindex binary',
+    testFilePath: 'scripts/verify/cli.sh',
   },
   {
     criterionNumber: 2,

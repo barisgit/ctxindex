@@ -40,6 +40,9 @@ export const searchCommand = defineCommand({
     since: { type: 'string', description: 'Start ISO date' },
     until: { type: 'string', description: 'End ISO date' },
     limit: { type: 'string', description: 'Result limit' },
+    'snippet-chars': { type: 'string', description: 'Snippet character limit' },
+    format: { type: 'string', description: 'Output format' },
+    refs: { type: 'boolean', description: 'Print item references only' },
     'include-deleted': {
       type: 'boolean',
       description: 'Include deleted items',

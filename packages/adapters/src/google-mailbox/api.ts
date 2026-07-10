@@ -1,17 +1,14 @@
 import { appendFile } from 'node:fs/promises'
 import { getEnv } from '@ctxindex/core/config'
 import { CtxindexSyncError } from '@ctxindex/core/errors'
+import { EGRESS_ALLOWLIST, egressFetch } from '@ctxindex/core/net'
 import { z } from 'zod'
 
 const GMAIL_API_BASE_URL = 'https://gmail.googleapis.com'
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 
-export const GOOGLE_EGRESS_ALLOWLIST = new Set([
-  'oauth2.googleapis.com',
-  'accounts.google.com',
-  'gmail.googleapis.com',
-  'www.googleapis.com',
-])
+// Re-exported for back-compat; the source of truth is `@ctxindex/core/net`.
+export const GOOGLE_EGRESS_ALLOWLIST = EGRESS_ALLOWLIST
 
 function isLoopbackHost(hostname: string): boolean {
   return hostname === '127.0.0.1'
@@ -228,7 +225,7 @@ async function fetchAndParse<T extends z.ZodTypeAny>(
   await recordTestFetch(url, init)
   let response: Response
   try {
-    response = await fetch(url, init)
+    response = await egressFetch(url, init)
   } catch (err) {
     throw new CtxindexSyncError('provider network request failed', 'network', {
       cause: err,

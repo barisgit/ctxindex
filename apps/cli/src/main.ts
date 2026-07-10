@@ -9,7 +9,50 @@ import { skillsCommand } from './commands/skills'
 import { sourceCommand } from './commands/source'
 import { statusCommand } from './commands/status'
 import { syncCommand } from './commands/sync'
+import { setCliLogLevel } from './deps'
 import { mapErrorToExit } from './format/exit'
+
+const LOG_LEVELS = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'] as const
+type LogLevelName = (typeof LOG_LEVELS)[number]
+
+function isLogLevelName(value: string): value is LogLevelName {
+  return (LOG_LEVELS as readonly string[]).includes(value)
+}
+
+/**
+ * Extracts the global `--log-level <level>` / `--log-level=<level>` flag and
+ * strips it from the args so per-command parsers never see it (V1 §1.8).
+ */
+function extractLogLevel(args: string[]): {
+  rest: string[]
+  level?: string
+  error?: string
+} {
+  const rest: string[] = []
+  let level: string | undefined
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]
+    if (arg === undefined) continue
+    if (arg === '--log-level') {
+      const value = args[i + 1]
+      if (value === undefined)
+        return { rest, error: '--log-level requires a value' }
+      level = value
+      i++
+    } else if (arg.startsWith('--log-level=')) {
+      level = arg.slice('--log-level='.length)
+    } else {
+      rest.push(arg)
+    }
+  }
+  if (level !== undefined && !isLogLevelName(level)) {
+    return {
+      rest,
+      error: `invalid --log-level: ${level} (expected ${LOG_LEVELS.join('|')})`,
+    }
+  }
+  return level === undefined ? { rest } : { rest, level }
+}
 
 function staticSubCommands(
   command: CommandDef,
@@ -71,16 +114,25 @@ export const rootCommand = defineCommand({
 
 export async function runCli(args: string[]): Promise<number> {
   process.exitCode = 0
+  const { rest, level, error } = extractLogLevel(args)
+  if (error) {
+    console.error(error)
+    return 2
+  }
+  setCliLogLevel(
+    isLogLevelName(level ?? '') ? (level as LogLevelName) : undefined,
+  )
+
   const restoreExit = captureProcessExit()
   try {
     await runMain(rootCommand, {
-      rawArgs: args.length === 0 ? ['--help'] : args,
+      rawArgs: rest.length === 0 ? ['--help'] : rest,
     })
   } finally {
     restoreExit()
   }
   const exitCode = Number(process.exitCode ?? 0)
   return exitCode === 1
-    ? (cittyCommandSelectionExit(args) ?? exitCode)
+    ? (cittyCommandSelectionExit(rest) ?? exitCode)
     : exitCode
 }

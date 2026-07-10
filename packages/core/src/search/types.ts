@@ -5,6 +5,8 @@ export interface SearchFilters {
   sources?: string[]
   /** Restrict to specific adapter IDs. */
   adapters?: string[]
+  /** Restrict to provider modules (the adapter-id prefix, e.g. "google"). */
+  providers?: string[]
   /** Restrict to item kinds. */
   kinds?: string[]
   /** Only items with indexed_at >= since (ms epoch). */
@@ -55,5 +57,6 @@ export interface SearchOptions {
   query: string
   filters?: SearchFilters
   limit?: number
+  snippetChars?: number
   explain?: boolean
 }

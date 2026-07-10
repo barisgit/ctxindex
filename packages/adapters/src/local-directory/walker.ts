@@ -3,41 +3,33 @@ import { join, relative } from 'node:path'
 import { fdir } from 'fdir'
 import ignore from 'ignore'
 
-/** Built-in ignore patterns per V1.md §1.3.1 */
+/** Built-in default ignore globs, verbatim from V1.md §1.3.1. */
 const BUILTIN_IGNORES = [
-  '.git',
-  '.svn',
-  '.hg',
+  '.git/',
+  'node_modules/',
+  '.venv/',
+  '.tox/',
+  '__pycache__/',
+  'dist/',
+  'build/',
+  'target/',
+  '.next/',
+  '.nuxt/',
+  '.svelte-kit/',
+  '.turbo/',
+  '.cache/',
+  '.parcel-cache/',
   '.DS_Store',
   'Thumbs.db',
-  'node_modules',
-  '.pnp',
-  '__pycache__',
-  '*.pyc',
-  '.venv',
-  'venv',
-  'env',
-  'dist',
-  'build',
-  'out',
-  '.next',
-  '.nuxt',
-  '.cache',
-  'coverage',
-  '.nyc_output',
-  '*.min.js',
-  '*.min.css',
-  '*.map',
   '*.lock',
   'package-lock.json',
-  'yarn.lock',
+  'bun.lock',
+  'bun.lockb',
   'pnpm-lock.yaml',
-  '.env',
-  '.env.*',
-  '*.key',
-  '*.pem',
-  '*.p12',
-  '*.pfx',
+  'yarn.lock',
+  'poetry.lock',
+  'Cargo.lock',
+  'uv.lock',
 ]
 
 export interface WalkerEntry {
@@ -78,6 +70,13 @@ export async function walkDirectory(
 
   if (extra?.exclude) ig.add(extra.exclude)
 
+  // Per-source include globs use gitignore/glob semantics (SPEC §5), not a raw
+  // substring match: a path is kept only if it matches an include pattern.
+  const includeMatcher =
+    extra?.include && extra.include.length > 0
+      ? ignore().add(extra.include)
+      : null
+
   const allFiles = await new fdir()
     .withFullPaths()
     .withErrors()
@@ -90,13 +89,8 @@ export async function walkDirectory(
     const rel = relative(rootPath, absPath)
     if (ig.ignores(rel)) continue
 
-    // include filter
-    if (extra?.include && extra.include.length > 0) {
-      const matchesInclude = extra.include.some((pattern) =>
-        rel.includes(pattern),
-      )
-      if (!matchesInclude) continue
-    }
+    // include filter (glob semantics)
+    if (includeMatcher && !includeMatcher.ignores(rel)) continue
 
     try {
       const st = await stat(absPath)

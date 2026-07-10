@@ -61,6 +61,8 @@ export const configSchema = z
   .object({
     access_token: z.string().optional(),
     raw_records_enabled: z.boolean().optional(),
+    labels_include: z.array(z.string()).optional(),
+    labels_exclude: z.array(z.string()).optional(),
   })
   .passthrough()
 export const googleMailboxConfigSchema = configSchema
@@ -74,6 +76,45 @@ interface GmailCursor {
   readonly historyId?: string
   readonly access_token?: string
   readonly raw_records_enabled?: boolean
+  readonly labels_include?: string[]
+  readonly labels_exclude?: string[]
+}
+
+// V1 §1.3.2: default backfill scope is INBOX/SENT/IMPORTANT + user-labeled
+// threads, excluding SPAM/TRASH/CHAT/DRAFT.
+const DEFAULT_INCLUDE_QUERY = '(in:inbox OR in:sent OR label:important)'
+const DEFAULT_EXCLUDE_CLAUSES = [
+  '-in:spam',
+  '-in:trash',
+  '-in:chats',
+  '-in:drafts',
+]
+
+function buildBackfillQuery(cursor: GmailCursor): string {
+  const include = cursor.labels_include?.length
+    ? `(${cursor.labels_include.map((label) => `label:${label}`).join(' OR ')})`
+    : DEFAULT_INCLUDE_QUERY
+  const exclude = cursor.labels_exclude?.length
+    ? cursor.labels_exclude.map((label) => `-label:${label}`)
+    : DEFAULT_EXCLUDE_CLAUSES
+  return [include, ...exclude].join(' ')
+}
+
+// V1 §1.3.2 / SPEC §4: only extract text from text-treatable attachment types;
+// other types record metadata only.
+function isTextExtractableMime(mime: string | undefined): boolean {
+  if (!mime) return false
+  const normalized = mime.split(';')[0]?.trim().toLowerCase() ?? ''
+  if (normalized.startsWith('text/')) return true
+  return new Set([
+    'application/json',
+    'application/xml',
+    'application/x-yaml',
+    'application/yaml',
+    'application/toml',
+    'application/x-sh',
+    'message/rfc822',
+  ]).has(normalized)
 }
 
 function parseCursor(cursor: unknown): GmailCursor {
@@ -207,7 +248,11 @@ async function* emitMessage(
       sizeBytes: part.body?.size ?? null,
       providerAttachmentId: part.body?.attachmentId ?? null,
     }
-    if (part.body?.attachmentId && (part.body.size ?? 0) <= 25 * 1024 * 1024) {
+    if (
+      part.body?.attachmentId &&
+      (part.body.size ?? 0) <= 25 * 1024 * 1024 &&
+      isTextExtractableMime(part.mimeType)
+    ) {
       const attachment = await safeFetch(
         z
           .object({ data: z.string().optional(), size: z.number().optional() })
@@ -261,6 +306,15 @@ export const sync: SyncFunction = async function* googleMailboxSync(
         ),
         { headers: authHeaders(cursor) },
       )
+      let messagesSeen = 0
+      const messagesTotal = history.history.reduce(
+        (sum, entry) => sum + (entry.messagesAdded?.length ?? 0),
+        0,
+      )
+      ctx.logger.info(
+        { historyEntries: history.history.length, messagesTotal },
+        'gmail incremental changes fetched',
+      )
       for (const entry of history.history) {
         for (const added of entry.messagesAdded ?? []) {
           const messageHistoryId = yield* emitMessage(
@@ -269,6 +323,13 @@ export const sync: SyncFunction = async function* googleMailboxSync(
             added.message.id,
           )
           latestHistoryId = messageHistoryId ?? latestHistoryId
+          messagesSeen += 1
+          if (messagesSeen % 25 === 0 || messagesSeen === messagesTotal) {
+            ctx.logger.info(
+              { messagesProcessed: messagesSeen, messagesTotal },
+              'gmail incremental progress',
+            )
+          }
         }
       }
       latestHistoryId = history.historyId ?? latestHistoryId
@@ -285,17 +346,40 @@ export const sync: SyncFunction = async function* googleMailboxSync(
     }
   } else {
     let pageToken: string | undefined
+    let pagesSeen = 0
+    let messagesSeen = 0
     do {
       const url = new URL(gmailApiUrl('/gmail/v1/users/me/messages'))
-      url.searchParams.set('q', 'in:inbox OR in:sent OR label:important')
+      url.searchParams.set('q', buildBackfillQuery(cursor))
       if (pageToken) url.searchParams.set('pageToken', pageToken)
       const page = await safeFetch(GmailMessageListSchema, url.toString(), {
         headers: authHeaders(cursor),
       })
+      pagesSeen += 1
+      ctx.logger.info(
+        {
+          page: pagesSeen,
+          pageMessages: page.messages.length,
+          resultSizeEstimate: page.resultSizeEstimate,
+          hasNextPage: Boolean(page.nextPageToken),
+        },
+        'gmail backfill page fetched',
+      )
       for (const message of page.messages) {
         const messageHistoryId = yield* emitMessage(ctx, cursor, message.id)
         latestHistoryId = messageHistoryId ?? latestHistoryId
+        messagesSeen += 1
+        if (messagesSeen % 25 === 0) {
+          ctx.logger.info(
+            { pagesProcessed: pagesSeen, messagesProcessed: messagesSeen },
+            'gmail backfill progress',
+          )
+        }
       }
+      ctx.logger.info(
+        { pagesProcessed: pagesSeen, messagesProcessed: messagesSeen },
+        'gmail backfill progress',
+      )
       pageToken = page.nextPageToken
     } while (pageToken)
   }

@@ -11,8 +11,8 @@ function authErrorExit(err: CtxindexAuthError): number {
   if (err.code === 'needs_auth' || err.code === 'invalid_grant') return 10
   if (err.code === 'invalid_client' || err.code === 'oauth_failed') return 10
   if (err.code === 'network_error') return 30
-  if (err.code === 'unknown_auth_error' || err.code === 'unknown') return 50
-  return 1
+  // SPEC §12: any other failure maps to 50; exit code 1 is not stable.
+  return 50
 }
 
 export function mapErrorToExit(err: unknown): number {
@@ -39,11 +39,12 @@ export function mapErrorToExit(err: unknown): number {
   if (err instanceof CtxindexNotFoundError) return 2
   if (err instanceof CtxindexSecretsError && err.code === 'invalid_ref')
     return 2
-  if (err instanceof CtxindexValidationError) {
-    return err.code === 'duplicate_realm_slug' ? 1 : 2
-  }
+  // SPEC §12: validation failures (including duplicate realm) are usage errors.
+  if (err instanceof CtxindexValidationError) return 2
 
-  return 1
+  // SPEC §12: stable exit codes only — an unexpected error is "other" (50),
+  // never the non-stable exit code 1.
+  return 50
 }
 
 export async function runWithExit(

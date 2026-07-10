@@ -18,8 +18,7 @@
     "with-timeout": "bun scripts/with-timeout.ts",
     "ci": "bash scripts/verify/ci.sh",
     "db:generate": "turbo run db:generate",
-    "link": "bun --filter @ctxindex/cli link",
-    "unlink": "bun --filter @ctxindex/cli unlink"
+    "cli": "bun apps/cli/bin/ctxindex.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",

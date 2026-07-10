@@ -13,13 +13,14 @@ export type SourceArgs =
       readonly kind: 'list'
       readonly realmSlug?: string
       readonly json: boolean
+      readonly format: 'table' | 'compact'
     }
   | { readonly kind: 'remove'; readonly sourceId: string }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
 
 export const sourceUsage =
-  'source add [<adapter-id>] [--adapter <adapter-id>] [--realm <slug>] [--root|--path <path>] [--display-name <name>] [--config-json <json>] | source list [--realm <slug>] [--json] | source remove <source-id>'
+  'source add [<adapter-id>] [--adapter <adapter-id>] [--realm <slug>] [--root|--path <path>] [--name|--display-name <name>] [--config-json <json>] | source list [--realm <slug>] [--format table|compact] [--json] | source remove <source-id>'
 
 function normalizeAdapterId(adapterId: string): string {
   return adapterId === 'local-directory' ? 'local.directory' : adapterId
@@ -86,7 +87,8 @@ export function parseSourceArgs(args: string[]): SourceArgs {
       adapterId,
     }
     const realmSlug = stringFlag(flags, 'realm')
-    const displayName = stringFlag(flags, 'display-name')
+    const displayName =
+      stringFlag(flags, 'name') ?? stringFlag(flags, 'display-name')
     if (realmSlug) result = { ...result, realmSlug }
     if (displayName) result = { ...result, displayName }
     if (config.value) result = { ...result, configJson: config.value }
@@ -94,9 +96,21 @@ export function parseSourceArgs(args: string[]): SourceArgs {
   }
   if (subcommand === 'list') {
     const realmSlug = stringFlag(flags, 'realm')
+    const rawFormat = stringFlag(flags, 'format') ?? 'table'
+    if (rawFormat !== 'table' && rawFormat !== 'compact') {
+      return {
+        kind: 'unknown',
+        message: `source list: invalid --format: ${rawFormat}`,
+      }
+    }
     return realmSlug
-      ? { kind: 'list', realmSlug, json: flags.json === true }
-      : { kind: 'list', json: flags.json === true }
+      ? {
+          kind: 'list',
+          realmSlug,
+          json: flags.json === true,
+          format: rawFormat,
+        }
+      : { kind: 'list', json: flags.json === true, format: rawFormat }
   }
   if (subcommand === 'remove') {
     const sourceId = positional[0]

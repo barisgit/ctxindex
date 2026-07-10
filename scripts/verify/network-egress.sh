@@ -26,7 +26,8 @@ grep -RInE \
   | grep -vE "apps/cli/src/auth/google-loopback.ts:.*http://127\.0\.0\.1" \
   >> "$violations" || true
 
-# fetch() is only allowed inside the safeFetch implementation; callers use safeFetch.
+# fetch() is only allowed inside the single core egress chokepoint; every other
+# caller (core auth, gmail adapter) routes through egressFetch.
 grep -RInE \
   --include='*.ts' \
   --exclude='*.test.ts' \
@@ -35,7 +36,7 @@ grep -RInE \
   --exclude-dir='node_modules' \
   "\bfetch\s*\(" \
   . \
-  | grep -v "packages/adapters/src/google-mailbox/api.ts" \
+  | grep -v "packages/core/src/net/index.ts" \
   >> "$violations" || true
 
 # No direct node HTTP clients in runtime source.

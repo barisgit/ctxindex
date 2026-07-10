@@ -1,20 +1,19 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
+// SPEC §10d: the OAuth code/refresh exchange is delegated to @ctxindex/core/auth;
+// the CLI only owns the 127.0.0.1 listener and the browser launch below.
 import {
-  exchangeGoogleRefreshToken as exchangeGoogleRefreshTokenRequest,
-  type OAuthTokenResponse,
-  OAuthTokenResponseSchema,
-  safeFetch,
-} from '@ctxindex/adapters/google-mailbox'
+  CtxindexAuthError as CoreAuthError,
+  type GoogleTokenResponse,
+  postOAuthTokenRequest,
+} from '@ctxindex/core/auth'
 import { getEnv } from '@ctxindex/core/config'
-import { CtxindexSyncError } from '@ctxindex/core/errors'
 
 export const GOOGLE_GMAIL_READONLY_SCOPE =
   'https://www.googleapis.com/auth/gmail.readonly'
 
 const defaultAuthUrl = 'https://accounts.google.com/o/oauth2/v2/auth'
-const defaultTokenUrl = 'https://oauth2.googleapis.com/token'
 const defaultTimeoutMs = 5 * 60 * 1000
 
 export type CtxindexAuthErrorCode =
@@ -96,10 +95,6 @@ function timeoutMsFromEnv(): number {
   return seconds * 1000
 }
 
-function tokenUrl(): string {
-  return getEnv().CTXINDEX_GMAIL_TOKEN_URL ?? defaultTokenUrl
-}
-
 function authUrl(): string {
   return getEnv().CTXINDEX_GMAIL_AUTH_URL ?? defaultAuthUrl
 }
@@ -175,31 +170,14 @@ export async function exchangeGoogleAuthCode({
   })
   if (codeVerifier) body.set('code_verifier', codeVerifier)
 
-  let token: OAuthTokenResponse
+  let token: GoogleTokenResponse
   try {
-    token = await safeFetch(OAuthTokenResponseSchema, tokenUrl(), {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: body.toString(),
-    })
+    token = await postOAuthTokenRequest(body)
   } catch (err) {
-    if (err instanceof CtxindexSyncError && err.code === 'auth_revoked') {
-      throw new CtxindexAuthError(
-        'invalid_grant',
-        'google auth failed: invalid_grant',
-        10,
-        { cause: err },
-      )
-    }
-    throw new CtxindexAuthError(
-      'token_exchange_failed',
-      'google auth failed: token_exchange_failed',
-      10,
-      { cause: err },
-    )
+    throw mapCoreAuthError(err)
   }
 
-  if (token.error === 'invalid_grant' || !token.refresh_token) {
+  if (!token.refresh_token) {
     throw new CtxindexAuthError(
       'invalid_grant',
       'google auth failed: invalid_grant',
@@ -207,15 +185,32 @@ export async function exchangeGoogleAuthCode({
     )
   }
 
-  const expiresAt = token.expires_in
-    ? Date.now() + token.expires_in * 1000
-    : Date.now()
-
   return {
-    ...(token.access_token ? { access_token: token.access_token } : {}),
+    access_token: token.access_token,
     refresh_token: token.refresh_token,
-    expires_at: expiresAt,
+    expires_at: Date.now() + token.expires_in * 1000,
   }
+}
+
+/** Maps a core auth/egress error to the CLI loopback error taxonomy. */
+function mapCoreAuthError(err: unknown): CtxindexAuthError {
+  if (
+    err instanceof CoreAuthError &&
+    (err.code === 'invalid_grant' || err.code === 'invalid_client')
+  ) {
+    return new CtxindexAuthError(
+      'invalid_grant',
+      'google auth failed: invalid_grant',
+      10,
+      { cause: err },
+    )
+  }
+  return new CtxindexAuthError(
+    'token_exchange_failed',
+    'google auth failed: token_exchange_failed',
+    10,
+    { cause: err },
+  )
 }
 
 export async function exchangeGoogleRefreshToken({
@@ -223,46 +218,24 @@ export async function exchangeGoogleRefreshToken({
   clientSecret,
   refreshToken,
 }: RefreshTokenExchangeOptions): Promise<LoopbackTokens> {
-  let token: OAuthTokenResponse
+  const body = new URLSearchParams({
+    client_id: clientId,
+    client_secret: clientSecret,
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+  })
+
+  let token: GoogleTokenResponse
   try {
-    token = await exchangeGoogleRefreshTokenRequest({
-      clientId,
-      clientSecret,
-      refreshToken,
-    })
+    token = await postOAuthTokenRequest(body)
   } catch (err) {
-    if (err instanceof CtxindexSyncError && err.code === 'auth_revoked') {
-      throw new CtxindexAuthError(
-        'invalid_grant',
-        'google auth failed: invalid_grant',
-        10,
-        { cause: err },
-      )
-    }
-    throw new CtxindexAuthError(
-      'token_exchange_failed',
-      'google auth failed: token_exchange_failed',
-      10,
-      { cause: err },
-    )
+    throw mapCoreAuthError(err)
   }
-
-  if (token.error === 'invalid_grant' || !token.access_token) {
-    throw new CtxindexAuthError(
-      'invalid_grant',
-      'google auth failed: invalid_grant',
-      10,
-    )
-  }
-
-  const expiresAt = token.expires_in
-    ? Date.now() + token.expires_in * 1000
-    : Date.now()
 
   return {
     access_token: token.access_token,
     refresh_token: token.refresh_token ?? refreshToken,
-    expires_at: expiresAt,
+    expires_at: Date.now() + token.expires_in * 1000,
   }
 }
 

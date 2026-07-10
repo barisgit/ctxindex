@@ -4,21 +4,21 @@ This page is for autonomous agents driving the real `ctxindex` CLI from a clean 
 
 ## Prerequisites
 
-Install dependencies and verify that `bun link` exposes a working `ctxindex` binary:
+Install dependencies and verify that the CLI runs through `bun cli`:
 
 ```sh
 bun install
-bash scripts/verify/bun-link.sh
+bash scripts/verify/cli.sh
 ```
 
-If the link verifier passes, a linked `ctxindex` command is available for the snippets below.
+The CLI is invoked only through `bun cli` (from repo root) or `bun run cli` (from repo root or from `apps/cli`). There is no `bun link` / global install path. Every snippet below assumes you prefix commands with `bun cli` (or `bun run cli`) when running from a clone of this repo.
 
 ## Setup a fresh ctxindex home
 
 Use sandboxed XDG/CTXINDEX paths in tests. For a normal local smoke, initialize once:
 
 ```sh
-ctxindex init
+bun cli init
 ```
 
 ## Index local files
@@ -26,10 +26,10 @@ ctxindex init
 Add a local directory source to the global realm, run sync, search, and inspect status:
 
 ```sh
-ctxindex source add local.directory --realm global --root <path>
-ctxindex sync
-ctxindex search 'query'
-ctxindex status
+bun cli source add local.directory --realm global --root <path>
+bun cli sync
+bun cli search 'query'
+bun cli status
 ```
 
 Use `--json` on commands that support it when another program will parse output.
@@ -39,9 +39,9 @@ Use `--json` on commands that support it when another program will parse output.
 List available skills, read the getting-started skill, and optionally inline referenced files:
 
 ```sh
-ctxindex skills list
-ctxindex skills get getting-started
-ctxindex skills get getting-started --inline
+bun cli skills list
+bun cli skills get getting-started
+bun cli skills get getting-started --inline
 ```
 
 ## Secrets migration

@@ -9,6 +9,7 @@ import type {
   AuthService,
   ExchangeAuthCodeInput,
   GoogleGrantRow,
+  GoogleGrantSummary,
   GoogleTokenResponse,
   OAuthClientCreds,
 } from './types'
@@ -167,21 +168,22 @@ export function createAuthService(deps: AuthDependencies): AuthService {
       return row ? toGoogleGrantRow(row) : null
     },
 
-    async listGoogleGrants(): Promise<
-      Pick<GoogleGrantRow, 'id' | 'provider' | 'scopes' | 'expiresAt'>[]
-    > {
+    async listGoogleGrants(): Promise<GoogleGrantSummary[]> {
       const rows = deps.db
         .prepare(
-          `SELECT id, provider, scopes, expires_at
-           FROM grants
-           WHERE provider = 'google'
-           ORDER BY updated_at DESC, created_at DESC`,
+          `SELECT g.id, g.provider, g.scopes, g.expires_at, a.email AS account_email, a.display_name AS account_display_name
+           FROM grants AS g
+           LEFT JOIN accounts AS a ON a.id = g.account_id
+           WHERE g.provider = 'google'
+           ORDER BY g.updated_at DESC, g.created_at DESC`,
         )
         .all() as {
         id: string
         provider: 'google'
         scopes: string
         expires_at: number | null
+        account_email: string | null
+        account_display_name: string | null
       }[]
 
       return rows.map((row) => ({
@@ -189,6 +191,8 @@ export function createAuthService(deps: AuthDependencies): AuthService {
         provider: row.provider,
         scopes: row.scopes,
         expiresAt: row.expires_at,
+        accountEmail: row.account_email,
+        accountDisplayName: row.account_display_name,
       }))
     },
 

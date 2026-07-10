@@ -560,7 +560,9 @@ test('AbortSignal cancels and returns exit 130', async () => {
 
   expect(result.exitCode).toBe(130)
   expect(result.status).toBe('cancelled')
-  expect(result.lastStatus).toBe('idle')
+  // SPEC §12: a cancelled run is terminal non-completion -> last_status 'failed'
+  // ('idle' is reserved for completed runs).
+  expect(result.lastStatus).toBe('failed')
 
   // sync_runs row should be marked cancelled
   const run = db

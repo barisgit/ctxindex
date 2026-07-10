@@ -263,6 +263,41 @@ describe('search – adapter filter', () => {
   })
 })
 
+describe('search – provider-module filter', () => {
+  test('--provider google matches the google.mailbox adapter prefix', async () => {
+    const results = search(db, {
+      query: 'meeting',
+      limit: 20,
+      filters: { providers: ['google'] },
+    })
+    expect(results.length).toBeGreaterThan(0)
+    for (const r of results) {
+      expect(r.adapterId).toBe('google.mailbox')
+    }
+  })
+
+  test('--provider local matches the local.directory adapter prefix', async () => {
+    const results = search(db, {
+      query: 'document',
+      limit: 20,
+      filters: { providers: ['local'] },
+    })
+    expect(results.length).toBeGreaterThan(0)
+    for (const r of results) {
+      expect(r.adapterId).toBe('local.directory')
+    }
+  })
+
+  test('--provider with no matching module returns nothing', async () => {
+    const results = search(db, {
+      query: 'document',
+      limit: 20,
+      filters: { providers: ['microsoft'] },
+    })
+    expect(results).toHaveLength(0)
+  })
+})
+
 describe('search – kind filter', () => {
   test('--kind directory returns only directory items', async () => {
     const results = search(db, {

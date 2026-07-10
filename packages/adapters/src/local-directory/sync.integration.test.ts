@@ -194,7 +194,7 @@ describe('local.directory adapter', () => {
       .all()
     expect(items.length).toBe(3)
     for (const item of items as { id: string; uri: string; kind: string }[]) {
-      expect(item.kind).toBe('directory')
+      expect(item.kind).toBe('file')
       expect(item.uri).toMatch(/^file:\/\//)
     }
 

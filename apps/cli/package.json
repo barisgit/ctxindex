@@ -3,9 +3,6 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "bin": {
-    "ctxindex": "./bin/ctxindex.mjs"
-  },
   "exports": {
     ".": "./src/main.ts"
   },
@@ -16,12 +13,12 @@
     "test": "bun test",
     "test:integration": "bun test --path-ignore-patterns '__none__' --pass-with-no-tests integration.test",
     "test:e2e": "bun run ../../scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' --pass-with-no-tests e2e.test",
-    "link": "bun link",
-    "unlink": "bun unlink"
+    "cli": "bun bin/ctxindex.mjs"
   },
   "dependencies": {
     "@ctxindex/adapters": "workspace:*",
     "@ctxindex/core": "workspace:*",
-    "citty": "latest"
+    "citty": "latest",
+    "cli-table3": "^0.6.5"
   }
 }
