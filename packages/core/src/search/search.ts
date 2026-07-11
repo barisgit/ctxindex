@@ -293,6 +293,7 @@ export function search(
         .filter((r) => r.item_id === itemId)
         .map((r) => r.chunk_id)
       explainInfo = {
+        origin: 'local_fts',
         matchedFrom,
         itemFtsRank:
           itemResults.findIndex((r) => r.item_id === itemId) >= 0
@@ -324,6 +325,7 @@ export function search(
       updatedAt: item.updated_at,
       deletedAt: item.deleted_at,
       score,
+      origin: 'local_fts',
       matchedFrom,
       bestChunk,
     }

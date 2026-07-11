@@ -34,6 +34,7 @@ const localAdapter = createSourceAdapter('local.directory', {
   },
   auth: { kind: 'none' },
   sync,
+  searchMode: 'indexed',
 })
 
 const googleAdapter = createSourceAdapter('google.mailbox', {
@@ -62,6 +63,8 @@ const googleAdapter = createSourceAdapter('google.mailbox', {
     clientSecretRef: 'keychain:ctxindex/google/oauth/client_secret',
   },
   sync,
+  searchMode: 'hybrid',
+  search: async () => [],
 })
 
 function makeRegistry() {
@@ -142,6 +145,34 @@ describe('createCtxindexAdapterRegistry', () => {
     expect(registry.getRequiredScopes('local.directory')).toBeNull()
   })
 
+  test('exposes search mode and search capability lookups', () => {
+    const registry = makeRegistry()
+
+    expect(registry.getSearchMode('local.directory')).toBe('indexed')
+    expect(registry.getSearchMode('google.mailbox')).toBe('hybrid')
+    expect(registry.getSearchFn('local.directory')).toBeUndefined()
+    expect(typeof registry.getSearchFn('google.mailbox')).toBe('function')
+    expect(
+      registry.listFederatedAdapters().map((adapter) => adapter.id),
+    ).toEqual(['google.mailbox'])
+  })
+
+  test('createSourceAdapter rejects federated/hybrid definitions without search', () => {
+    expect(() =>
+      createSourceAdapter('broken.federated', {
+        provider: 'local',
+        label: 'Broken',
+        schema: {},
+        configSchema: z.object({}),
+        capabilities: localAdapter.capabilities,
+        migrations: localAdapter.migrations,
+        auth: { kind: 'none' },
+        sync,
+        searchMode: 'federated',
+      }),
+    ).toThrow(CtxindexRegistryError)
+  })
+
   test('registerAdapter and unregisterAdapter round-trip through the overlay', () => {
     const registry = makeRegistry()
     const adapterIds = registry.listAdapterIds()
@@ -154,6 +185,8 @@ describe('createCtxindexAdapterRegistry', () => {
       migrations: googleAdapter.migrations,
       auth: googleAdapter.auth,
       sync,
+      searchMode: 'hybrid',
+      search: async () => [],
     })
 
     expect(registry.registerAdapter(overlayAdapter)).toBeUndefined()

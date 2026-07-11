@@ -93,6 +93,7 @@ function makeAdapter(id: string, fn: SyncFunction): SourceAdapterDefinition {
     },
     auth: { kind: 'none' },
     sync: fn,
+    searchMode: 'indexed',
     configSchema: z.unknown(),
   } as SourceAdapterDefinition
 }
@@ -237,6 +238,104 @@ test('runSync with mock adapter applies operations and exits 0', async () => {
     .prepare("SELECT * FROM sync_locks WHERE scope = 'global'")
     .get()
   expect(lock).toBeNull()
+})
+
+test('runSync tombstones local files missing from a completed scan', async () => {
+  seedGlobalRealm(db)
+  db.exec(`CREATE TABLE local_directory_file_state (
+    source_id TEXT NOT NULL REFERENCES sources(id), item_id TEXT NOT NULL REFERENCES items(id),
+    relative_path TEXT NOT NULL, content_hash TEXT, mtime_ms INTEGER, size_bytes INTEGER,
+    PRIMARY KEY (source_id, relative_path)
+  )`)
+  const sourceId = insertSource(db, 'local.directory')
+  let scan = 1
+  const adapter = makeAdapter('local.directory', async function* () {
+    const paths = scan++ === 1 ? ['removed.md', 'kept.md'] : ['kept.md']
+    for (const relativePath of paths) {
+      yield {
+        type: 'upsertItem',
+        itemId: ulid(),
+        uri: `file:///${relativePath}`,
+        title: relativePath,
+        kind: 'file',
+        relativePath,
+      }
+    }
+    yield { type: 'setCursor', cursor: { completedAt: scan } }
+  })
+  const svc = createSyncService(makeDeps(db, { 'local.directory': adapter }))
+
+  await svc.runSync({ sourceId })
+  const result = await svc.runSync({ sourceId })
+
+  expect(result.status).toBe('success')
+  expect(result.counts.tombstones).toBe(1)
+  const items = db
+    .prepare(
+      'SELECT title, deleted_at FROM items WHERE source_id = ? ORDER BY title',
+    )
+    .all(sourceId) as { title: string; deleted_at: number | null }[]
+  expect(items).toHaveLength(2)
+  expect(items[0]).toMatchObject({ title: 'kept.md', deleted_at: null })
+  expect(items[1]?.title).toBe('removed.md')
+  expect(items[1]?.deleted_at).toBeNumber()
+  expect(
+    db
+      .prepare('SELECT COUNT(*) AS count FROM tombstones WHERE source_id = ?')
+      .get(sourceId),
+  ).toEqual({ count: 1 })
+})
+
+test('runSync does not tombstone local files when a scan fails', async () => {
+  seedGlobalRealm(db)
+  db.exec(`CREATE TABLE local_directory_file_state (
+    source_id TEXT NOT NULL REFERENCES sources(id), item_id TEXT NOT NULL REFERENCES items(id),
+    relative_path TEXT NOT NULL, content_hash TEXT, mtime_ms INTEGER, size_bytes INTEGER,
+    PRIMARY KEY (source_id, relative_path)
+  )`)
+  const sourceId = insertSource(db, 'local.directory')
+  let fail = false
+  const adapter = makeAdapter('local.directory', async function* () {
+    yield {
+      type: 'upsertItem',
+      itemId: ulid(),
+      uri: 'file:///kept.md',
+      title: 'kept.md',
+      kind: 'file',
+      relativePath: 'kept.md',
+    }
+    if (fail)
+      throw new CtxindexSyncError('walk failed', 'provider_bad_response')
+    yield {
+      type: 'upsertItem',
+      itemId: ulid(),
+      uri: 'file:///still-present.md',
+      title: 'still-present.md',
+      kind: 'file',
+      relativePath: 'still-present.md',
+    }
+    yield { type: 'setCursor', cursor: { completedAt: 1 } }
+  })
+  const svc = createSyncService(makeDeps(db, { 'local.directory': adapter }))
+
+  await svc.runSync({ sourceId })
+  fail = true
+  const result = await svc.runSync({ sourceId })
+
+  expect(result.status).toBe('failure')
+  expect(result.counts.tombstones).toBe(0)
+  expect(
+    db
+      .prepare(
+        'SELECT COUNT(*) AS count FROM items WHERE source_id = ? AND deleted_at IS NULL',
+      )
+      .get(sourceId),
+  ).toEqual({ count: 2 })
+  expect(
+    db
+      .prepare('SELECT COUNT(*) AS count FROM tombstones WHERE source_id = ?')
+      .get(sourceId),
+  ).toEqual({ count: 0 })
 })
 
 // ---------------------------------------------------------------------------

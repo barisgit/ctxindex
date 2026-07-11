@@ -405,6 +405,7 @@ import type { Logger } from '@ctxindex/core/logger';
 export type AdapterProvider = 'google' | 'microsoft' | 'clickup' | 'local';
 export type SyncMode = 'sync' | 'resync' | 'diff';
 export type SourceKind = 'mailbox' | 'calendar' | 'directory' | 'tasks';
+export type AdapterSearchMode = 'indexed' | 'federated' | 'hybrid'; // SPEC §10e
 
 export interface AdapterMigrations {
   readonly namespace: string;                     // e.g. 'google.mailbox'
@@ -444,6 +445,36 @@ export type SyncFunction = (
   ctx: SyncContext,
 ) => AsyncIterable<SyncOperation>;
 
+// SPEC §10e — provider-side search capability (required for federated/hybrid)
+export interface AdapterSearchContext {
+  readonly sourceId: string;
+  readonly config: unknown;          // validated per-source config
+  readonly logger: Logger;
+  readonly signal: AbortSignal;
+}
+
+export interface AdapterSearchQuery {
+  readonly text: string;
+  readonly since?: number;           // ms epoch
+  readonly until?: number;           // ms epoch
+  readonly kinds?: readonly string[];
+  readonly limit: number;
+}
+
+export interface AdapterSearchResult {
+  readonly externalId: string;       // provider id; resolved to item via external_refs
+  readonly title: string;
+  readonly snippet?: string;
+  readonly timestamp?: number;       // ms epoch
+  readonly rank: number;             // 0-based provider rank order
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
+export type AdapterSearchFunction = (
+  ctx: AdapterSearchContext,
+  query: AdapterSearchQuery,
+) => Promise<readonly AdapterSearchResult[]>;
+
 export interface SourceAdapterDefinition<TId extends string = string> {
   readonly id: TId;                               // literal in concrete defs
   readonly provider: AdapterProvider;
@@ -453,8 +484,12 @@ export interface SourceAdapterDefinition<TId extends string = string> {
   readonly migrations: AdapterMigrations;
   readonly auth: AdapterAuthSpec;
   readonly sync: SyncFunction;
+  readonly searchMode: AdapterSearchMode;         // SPEC §10e
+  readonly search?: AdapterSearchFunction;        // required when searchMode !== 'indexed'
   readonly configSchema: z.ZodTypeAny;            // per-source-instance config schema
 }
+
+`createSourceAdapter` MUST reject (throw `CtxindexRegistryError`, code `registry_search_capability_missing`) a definition whose `searchMode` is `federated` or `hybrid` without a `search` function.
 ```
 
 #### 3d.2.2 Registry handle interface
@@ -498,6 +533,11 @@ export interface CtxindexAdapterRegistryHandle<
   supportsResume(id: Extract<keyof TAdapters, string>): boolean;
   supportsAttachments(id: Extract<keyof TAdapters, string>): boolean;
   supportsRawRecords(id: Extract<keyof TAdapters, string>): boolean;
+
+  // ---- search (SPEC §10e) --------------------------------------------------
+  getSearchMode(id: Extract<keyof TAdapters, string>): AdapterSearchMode;
+  getSearchFn(id: Extract<keyof TAdapters, string>): AdapterSearchFunction | undefined;
+  listFederatedAdapters(): readonly SourceAdapterDefinition[]; // federated + hybrid
 
   // ---- sync execution ----------------------------------------------------
   getSyncFn(id: Extract<keyof TAdapters, string>): SyncFunction;
@@ -1254,6 +1294,20 @@ Keep `60` as the default RRF constant. Make it an internal setting only if real 
 - matched chunk IDs and snippets.
 
 Vector or embedding failures must degrade to lexical search, not fail the search command.
+
+### 10.1 Search planner (SPEC §10e)
+
+`packages/core/src/search/` exposes a planner that fronts both origins:
+
+1. Resolve candidate sources from filters; group by adapter `searchMode`.
+2. **Local origin**: run FTS5 (items + chunks) over `indexed` sources and hybrid hot windows — the existing search path, unchanged.
+3. **Provider origin**: for `federated`/`hybrid` sources (unless `--local-only`), call `registry.getSearchFn(adapterId)` in parallel per source with a bounded `limit` and the query's time filters. Each provider result is resolved to a core item via `external_refs (source_id, kind, value)`; unmatched results are materialized as metadata-only items inside a small transaction so ids remain ctxindex-owned.
+4. **Dedupe**: a provider result whose item already appears in the local origin's results keeps only the local entry (which has chunk snippets).
+5. **Merge**: rank within each origin, then interleave origins round-robin (local first). Raw BM25 scores and provider rank order are never compared numerically.
+6. **Degradation**: provider-origin errors (network, auth, rate limit) are caught per source and reported as warnings on the result envelope; local results still return. Exit code stays `0` when at least the local origin succeeded.
+7. **Explain**: each result row carries `origin: 'local_fts' | 'provider'`, plus the existing matchedFrom/rank fields for local rows and provider rank for federated rows.
+
+Hydration: `search --json` rows for metadata-only items include `hydrated: false`; a follow-up `ctxindex item get <id> --hydrate` (post-v1 surface; v1 exposes hydration through the adapter-owned cache during search when snippets are requested) fetches full content on demand.
 
 ## 11. Config, data, cache, logs, and dotfiles
 

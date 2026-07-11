@@ -152,7 +152,8 @@ describe('source e2e', () => {
       expect(list.stdout).toContain(sourceId)
       expect(list.stdout).toContain('repo-under-test')
       expect(list.stdout).toContain('local.directory')
-      expect(list.stdout).toContain('source-root')
+      // Ref path is asserted exactly via --json below; the table cell may
+      // wrap long paths mid-word, so no substring assertion on the table.
 
       const json = await sandbox.run(['source', 'list', '--json'])
       expect(json.stderr).toBe('')

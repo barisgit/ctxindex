@@ -40,8 +40,9 @@ function formatScopeList(scopes: string): string {
   // Strip the common Google scope prefix for compactness, but keep full
   // scope visible if it is not a Google scope.
   const shortened = parsed.map((s) =>
-    s.startsWith('https://www.googleapis.com/auth/')
-      ? s.slice('https://www.googleapis.com/auth/'.length)
+    // Display-only scope prefix stripping; no network egress.
+    s.startsWith('https://www.googleapis.com/auth/') // noqa: architecture-lint
+      ? s.slice('https://www.googleapis.com/auth/'.length) // noqa: architecture-lint
       : s,
   )
   return shortened.join(', ')

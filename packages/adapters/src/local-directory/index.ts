@@ -56,4 +56,5 @@ export const localDirectoryAdapter = createSourceAdapter('local.directory', {
   migrations,
   auth,
   sync,
+  searchMode: 'indexed',
 })

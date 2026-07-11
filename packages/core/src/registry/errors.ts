@@ -6,6 +6,7 @@ export type CtxindexRegistryErrorCode =
   | 'registry_unknown_provider'
   | 'registry_unsupported_mode'
   | 'registry_mode_required'
+  | 'registry_search_capability_missing'
 
 export class CtxindexRegistryError extends CtxindexError {
   readonly metadata: Record<string, unknown>

@@ -170,6 +170,30 @@ Search results SHOULD support filtering by source, source adapter, provider modu
 
 Search SHOULD provide an explain/debug mode that shows which index paths contributed to a result and enough ranking information to debug poor matches.
 
+## 10e. Adapter search modes
+
+Every source adapter MUST declare exactly one **search mode**:
+
+- **`indexed`** — the adapter fully replicates searchable content into the local database. All search for its sources is served by local full-text search. This is the required mode for local filesystem sources.
+- **`federated`** — the adapter does not bulk-replicate content. It MUST implement the adapter search capability, translating ctxindex queries into the provider's native search API. Results are normalized into the core item shape at query time.
+- **`hybrid`** — the adapter maintains a **bounded local hot window** of recent/pinned content in the local index and implements the adapter search capability for content outside that window.
+
+Mode requirements:
+
+- An `indexed` adapter MUST NOT require the search capability. A `federated` or `hybrid` adapter MUST implement it.
+- A `hybrid` adapter's local window MUST be bounded by per-source configuration (for example a trailing time window or label set). Full-mailbox or full-corpus replication MUST NOT be the default for `hybrid` adapters.
+- A `hybrid` adapter's window sync MUST reconcile the window on each successful run: items that fall out of the window MAY be demoted to metadata-only rather than tombstoned, since the canonical record still exists at the provider.
+- Federated search calls MUST go through the central network egress chokepoint and are limited to the adapter's declared provider hosts (§17).
+- Federated and hybrid adapters SHOULD support **on-demand hydration**: fetching full content for a specific item at read time. Hydrated content MAY be cached locally and MUST be treated as purgeable.
+
+Search planning:
+
+- The search service MUST serve queries for `indexed` sources (and hybrid hot windows) from the local full-text index, and MUST fan out to the adapter search capability for `federated` sources and for `hybrid` sources when the query is not satisfiable from the local window alone.
+- Merged results MUST be ranked per origin and interleaved; implementations MUST NOT compare raw scores across origins (local BM25 scores and provider relevance are not commensurable).
+- When a federated origin fails (offline, auth expired, provider error), search MUST still return local results and MUST surface a per-origin warning rather than failing the whole query.
+- Explain/debug output (§10) MUST report each result's origin (local index vs. provider search).
+- Offline behavior: with no network, `indexed` sources and hybrid hot windows remain fully searchable; federated origins degrade with a warning.
+
 ## 10a. Realms
 
 A realm is a user-defined organization/search scope. ctxindex MUST support multiple realms and MUST seed a `global` realm on initialization.

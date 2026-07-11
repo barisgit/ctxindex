@@ -2,6 +2,8 @@ import {
   type AdapterAuthSpec,
   type AdapterCapabilities,
   type AdapterMigrations,
+  type AdapterSearchFunction,
+  type AdapterSearchResult,
   createSourceAdapter,
   type SyncContext,
   type SyncFunction,
@@ -57,12 +59,16 @@ export const auth = {
 
 export const googleMailboxAuth = auth
 
+// V1 §1.3.2 hybrid hot window (SPEC §10e): bounded local window, default 90 days.
+export const DEFAULT_SYNC_WINDOW_DAYS = 90
+
 export const configSchema = z
   .object({
     access_token: z.string().optional(),
     raw_records_enabled: z.boolean().optional(),
     labels_include: z.array(z.string()).optional(),
     labels_exclude: z.array(z.string()).optional(),
+    sync_window_days: z.number().int().min(0).optional(),
   })
   .passthrough()
 export const googleMailboxConfigSchema = configSchema
@@ -78,6 +84,7 @@ interface GmailCursor {
   readonly raw_records_enabled?: boolean
   readonly labels_include?: string[]
   readonly labels_exclude?: string[]
+  readonly sync_window_days?: number
 }
 
 // V1 §1.3.2: default backfill scope is INBOX/SENT/IMPORTANT + user-labeled
@@ -90,6 +97,12 @@ const DEFAULT_EXCLUDE_CLAUSES = [
   '-in:drafts',
 ]
 
+function windowStartEpochSeconds(cursor: GmailCursor): number | undefined {
+  const days = cursor.sync_window_days ?? DEFAULT_SYNC_WINDOW_DAYS
+  if (days <= 0) return undefined
+  return Math.floor(Date.now() / 1000) - days * 24 * 60 * 60
+}
+
 function buildBackfillQuery(cursor: GmailCursor): string {
   const include = cursor.labels_include?.length
     ? `(${cursor.labels_include.map((label) => `label:${label}`).join(' OR ')})`
@@ -97,7 +110,10 @@ function buildBackfillQuery(cursor: GmailCursor): string {
   const exclude = cursor.labels_exclude?.length
     ? cursor.labels_exclude.map((label) => `-label:${label}`)
     : DEFAULT_EXCLUDE_CLAUSES
-  return [include, ...exclude].join(' ')
+  const clauses = [include, ...exclude]
+  const windowStart = windowStartEpochSeconds(cursor)
+  if (windowStart !== undefined) clauses.push(`after:${windowStart}`)
+  return clauses.join(' ')
 }
 
 // V1 §1.3.2 / SPEC §4: only extract text from text-treatable attachment types;
@@ -296,6 +312,9 @@ export const sync: SyncFunction = async function* googleMailboxSync(
 ): AsyncGenerator<GmailOp, void, unknown> {
   const cursor = parseCursor(ctx.cursor)
   let latestHistoryId = cursor.historyId
+  // SPEC §10e / V1 §1.3.2: expired historyId falls back to a bounded re-list
+  // of the hot window instead of an unbounded resync.
+  let boundedRelist = !cursor.historyId
 
   if (cursor.historyId) {
     try {
@@ -335,16 +354,24 @@ export const sync: SyncFunction = async function* googleMailboxSync(
       latestHistoryId = history.historyId ?? latestHistoryId
     } catch (err) {
       if ((err as { code?: string }).code === 'not_found') {
+        ctx.logger.warn(
+          { historyId: cursor.historyId },
+          'gmail historyId too old; falling back to bounded window re-list',
+        )
         yield {
           type: 'error',
           code: 'resync_required',
-          message: 'historyId too old',
+          message: 'historyId too old; performed bounded window re-list',
         }
+        boundedRelist = true
+        latestHistoryId = undefined
       } else {
         throw err
       }
     }
-  } else {
+  }
+
+  if (boundedRelist) {
     let pageToken: string | undefined
     let pagesSeen = 0
     let messagesSeen = 0
@@ -400,6 +427,56 @@ export const sync: SyncFunction = async function* googleMailboxSync(
 
 export const googleMailboxSync = sync
 
+// SPEC §10e provider search: translate ctxindex query + filters to Gmail q=
+// syntax, list matching ids, hydrate metadata per message.
+export const search: AdapterSearchFunction = async (ctx, query) => {
+  const config = configSchema.parse(ctx.config ?? {})
+  const cursor: GmailCursor = {
+    ...(config.access_token !== undefined
+      ? { access_token: config.access_token }
+      : {}),
+  }
+  const clauses: string[] = [...DEFAULT_EXCLUDE_CLAUSES]
+  if (query.text.trim().length > 0) clauses.unshift(query.text.trim())
+  if (query.since !== undefined)
+    clauses.push(`after:${Math.floor(query.since / 1000)}`)
+  if (query.until !== undefined)
+    clauses.push(`before:${Math.ceil(query.until / 1000)}`)
+
+  const url = new URL(gmailApiUrl('/gmail/v1/users/me/messages'))
+  url.searchParams.set('q', clauses.join(' '))
+  url.searchParams.set('maxResults', String(query.limit))
+  const page = await safeFetch(GmailMessageListSchema, url.toString(), {
+    headers: authHeaders(cursor),
+  })
+
+  const results: AdapterSearchResult[] = []
+  for (const [rank, entry] of page.messages.entries()) {
+    if (ctx.signal.aborted) break
+    const message = await safeFetch(
+      GmailMessageSchema,
+      gmailApiUrl(`/gmail/v1/users/me/messages/${entry.id}?format=metadata`),
+      { headers: authHeaders(cursor) },
+    )
+    results.push({
+      externalId: message.id,
+      title: messageHeader(message, 'subject') ?? '(no subject)',
+      ...(message.snippet !== undefined ? { snippet: message.snippet } : {}),
+      ...(message.internalDate !== undefined
+        ? { timestamp: Number(message.internalDate) }
+        : {}),
+      rank,
+      metadata: {
+        threadId: message.threadId,
+        from: messageHeader(message, 'from') ?? null,
+      },
+    })
+  }
+  return results
+}
+
+export const googleMailboxSearch = search
+
 export const googleMailboxAdapter = createSourceAdapter('google.mailbox', {
   provider: 'google',
   label: 'Google Mail (Gmail)',
@@ -408,5 +485,7 @@ export const googleMailboxAdapter = createSourceAdapter('google.mailbox', {
   capabilities,
   migrations,
   sync,
+  searchMode: 'hybrid',
+  search,
   auth,
 })

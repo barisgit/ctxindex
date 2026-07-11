@@ -4,6 +4,8 @@ import type {
   AdapterCapabilities,
   AdapterMigrations,
   AdapterProvider,
+  AdapterSearchFunction,
+  AdapterSearchMode,
   SourceAdapterDefinition,
   SourceKind,
   SyncFunction,
@@ -47,6 +49,12 @@ export interface CtxindexAdapterRegistryHandle<
   supportsResume(id: Extract<keyof TAdapters, string>): boolean
   supportsAttachments(id: Extract<keyof TAdapters, string>): boolean
   supportsRawRecords(id: Extract<keyof TAdapters, string>): boolean
+
+  getSearchMode(id: Extract<keyof TAdapters, string>): AdapterSearchMode
+  getSearchFn(
+    id: Extract<keyof TAdapters, string>,
+  ): AdapterSearchFunction | undefined
+  listFederatedAdapters(): readonly SourceAdapterDefinition[]
 
   getSyncFn(id: Extract<keyof TAdapters, string>): SyncFunction
   getSchema(

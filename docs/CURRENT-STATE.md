@@ -35,14 +35,41 @@ green):
 - **CLI/UX**: `--log-level` flag wired; `source remove` cascades (no more
   `FOREIGN KEY constraint failed`); `status --source <unknown>` fails fast (exit 2);
   `skills list` no longer lists `README`; `source`/`realm` list JSON is camelCase.
+- **local.directory reconciliation**: a completed full scan tombstones file-state
+  entries not seen in the walk, while failed scans roll back without tombstoning.
+
+## Search-mode rearchitecture (2026-07-11)
+
+SPEC §10e introduced adapter **search modes**: `indexed` (full local FTS5),
+`federated` (provider-side search), `hybrid` (bounded local hot window +
+provider search). Implemented and verified (all gates green):
+
+- **Adapter contract**: `searchMode` + optional `search()` on
+  `SourceAdapterDefinition`; registry rejects federated/hybrid adapters without
+  a search function; `getSearchMode`/`getSearchFn`/`listFederatedAdapters` on
+  the registry handle. `local.directory` is `indexed`; `google.mailbox` is
+  `hybrid`.
+- **Search planner** (`packages/core/src/search/search-service.ts`): local
+  FTS5 origin + parallel provider-search fan-out; provider results resolved via
+  `external_refs` or materialized as metadata-only items; per-origin ranking
+  with round-robin interleave (local first, local wins dedupe); provider
+  failures degrade to local results with per-source warnings; `--explain`
+  reports `origin: local_fts | provider`; `search --local-only` skips fan-out.
+- **google.mailbox hybrid**: backfill bounded by `sync_window_days` (default
+  90; `0` disables); expired `historyId` falls back to a bounded window
+  re-list (**dissolves former gap M8**); provider `search()` translates
+  query/filters to Gmail `q=` syntax with metadata-format hydration.
+- **CLI**: `bun upgrade` to 1.3.14 required (1.3.10 ignored
+  `pathIgnorePatterns`); `sync`/`auth` command bodies extracted to
+  `apps/cli/src/sync/run-sync-command.ts` and
+  `apps/cli/src/auth/handle-auth-command.ts` for the thin-lines gate.
+
+Deferred from this pass: hot-window demotion of out-of-window items
+(metadata-only downgrade); `item get --hydrate` full-body on-demand fetch.
 
 Remaining spec gaps (deferred, not yet implemented):
 
-- **M5** local.directory does not tombstone deleted/renamed files (stale items stay
-  searchable) — needs a walk-vs-`local_directory_file_state` diff or a service-side
-  full-scan reconcile; deferred to avoid data-loss risk from rushed logic.
-- **M8** gmail incremental 404/too-old path only emits `resync_required`; the bounded
-  `before:`/`after:` re-list is not performed.
+- ~~**M8**~~ dissolved by the 2026-07-11 hybrid rework (bounded window re-list).
 - **M9** gmail extractable attachments are stored as a chunk on the parent item, not
   as separate items linked via `item_relations`.
 - **M2** `item_relations.kind` is not renamed to `relation_type` (cosmetic; source_id

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { SyncContext } from '@ctxindex/core/registry'
-import { googleMailboxAdapter } from './index'
+import { DEFAULT_SYNC_WINDOW_DAYS, googleMailboxAdapter } from './index'
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -182,10 +182,127 @@ describe('google.mailbox adapter', () => {
     expect(ops.some((op) => op.type === 'rawRecord')).toBe(true)
   })
 
-  test('historyId too old surfaces resync_required warning', async () => {
+  test('first-run backfill query is bounded by the default sync window', async () => {
+    let backfillQuery: string | null = null
+    await collectGoogleOps(null, (url) => {
+      if (url.pathname.endsWith('/messages')) {
+        backfillQuery = url.searchParams.get('q')
+        return jsonResponse({ messages: [] })
+      }
+      return jsonResponse({ error: 'unexpected' }, 500)
+    })
+
+    expect(backfillQuery ?? '').toContain('after:')
+    const match = /after:(\d+)/.exec(backfillQuery ?? '')
+    const afterEpoch = Number(match?.[1])
+    const expected =
+      Math.floor(Date.now() / 1000) - DEFAULT_SYNC_WINDOW_DAYS * 24 * 60 * 60
+    expect(Math.abs(afterEpoch - expected)).toBeLessThan(60)
+  })
+
+  test('sync_window_days: 0 disables the window bound', async () => {
+    let backfillQuery: string | null = null
+    await collectGoogleOps({ sync_window_days: 0 }, (url) => {
+      if (url.pathname.endsWith('/messages')) {
+        backfillQuery = url.searchParams.get('q')
+        return jsonResponse({ messages: [] })
+      }
+      return jsonResponse({ error: 'unexpected' }, 500)
+    })
+
+    expect(backfillQuery ?? '').not.toContain('after:')
+  })
+
+  test('provider search capability translates query and returns ranked results', async () => {
+    const originalFetch = globalThis.fetch
+    let searchQuery: string | null = null
+    globalThis.fetch = ((input: Parameters<typeof fetch>[0]) => {
+      const url = new URL(input.toString())
+      expect(url.hostname).toBe('gmail.googleapis.com')
+      if (
+        url.pathname.endsWith('/messages') &&
+        !url.pathname.includes('/m-7')
+      ) {
+        searchQuery = url.searchParams.get('q')
+        return Promise.resolve(jsonResponse({ messages: [{ id: 'm-7' }] }))
+      }
+      if (url.pathname.endsWith('/messages/m-7')) {
+        expect(url.searchParams.get('format')).toBe('metadata')
+        return Promise.resolve(
+          jsonResponse({
+            id: 'm-7',
+            threadId: 't-7',
+            internalDate: '1700000000000',
+            snippet: 'federated snippet',
+            payload: {
+              headers: [
+                { name: 'Subject', value: 'Federated hit' },
+                { name: 'From', value: 'c@example.com' },
+              ],
+            },
+          }),
+        )
+      }
+      return Promise.resolve(jsonResponse({ error: 'unexpected' }, 500))
+    }) as unknown as typeof fetch
+    try {
+      const search = googleMailboxAdapter.search
+      if (!search) throw new Error('google.mailbox must expose search')
+      const results = await search(
+        {
+          sourceId: 'src-gmail-01',
+          config: { access_token: 'tok' },
+          logger: testLogger() as never,
+          signal: new AbortController().signal,
+        },
+        {
+          text: 'quarterly report',
+          since: 1690000000000,
+          limit: 5,
+        },
+      )
+
+      expect(searchQuery ?? '').toContain('quarterly report')
+      expect(searchQuery ?? '').toContain('after:1690000000')
+      expect(searchQuery ?? '').toContain('-in:spam')
+      expect(results).toHaveLength(1)
+      expect(results[0]).toMatchObject({
+        externalId: 'm-7',
+        title: 'Federated hit',
+        snippet: 'federated snippet',
+        rank: 0,
+        timestamp: 1700000000000,
+      })
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  test('historyId too old falls back to bounded window re-list', async () => {
+    let relistQuery: string | null = null
     const ops = await collectGoogleOps({ historyId: 'old' }, (url) => {
-      expect(url.pathname.endsWith('/history')).toBe(true)
-      return jsonResponse({ error: 'historyId too old' }, 404)
+      if (url.pathname.endsWith('/history')) {
+        return jsonResponse({ error: 'historyId too old' }, 404)
+      }
+      if (
+        url.pathname.endsWith('/messages') &&
+        !url.pathname.includes('/m-9')
+      ) {
+        relistQuery = url.searchParams.get('q')
+        return jsonResponse({ messages: [{ id: 'm-9' }] })
+      }
+      if (url.pathname.endsWith('/messages/m-9')) {
+        return jsonResponse({
+          id: 'm-9',
+          threadId: 't-9',
+          historyId: '303',
+          payload: {
+            headers: [{ name: 'Subject', value: 'Relisted' }],
+            body: { data: textBody('relisted body') },
+          },
+        })
+      }
+      return jsonResponse({ error: 'unexpected' }, 500)
     })
 
     expect(ops).toContainEqual(
@@ -193,6 +310,11 @@ describe('google.mailbox adapter', () => {
         type: 'error',
         code: 'resync_required',
       }),
+    )
+    // Bounded re-list of the hot window (SPEC §10e), not an unbounded resync.
+    expect(relistQuery ?? '').toContain('after:')
+    expect(ops).toContainEqual(
+      expect.objectContaining({ type: 'upsertMailMessage', messageId: 'm-9' }),
     )
   })
 })

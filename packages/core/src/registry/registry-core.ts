@@ -110,10 +110,24 @@ function requireNonEmptyAdapterIds<AdapterId extends string>(
   return Object.freeze([first, ...ids.slice(1)])
 }
 
+function assertSearchCapability(
+  id: string,
+  def: Pick<SourceAdapterDefinition, 'searchMode' | 'search'>,
+) {
+  if (def.searchMode !== 'indexed' && typeof def.search !== 'function') {
+    throw new CtxindexRegistryError(
+      `Adapter "${id}" declares searchMode "${def.searchMode}" but provides no search function.`,
+      'registry_search_capability_missing',
+      { adapterId: id, searchMode: def.searchMode },
+    )
+  }
+}
+
 export function createSourceAdapter<
   TId extends string,
   TDef extends Omit<SourceAdapterDefinition, 'id'>,
 >(id: TId, def: TDef): TDef & { readonly id: TId } {
+  assertSearchCapability(id, def)
   return Object.freeze({ id, ...def }) as TDef & { readonly id: TId }
 }
 
@@ -347,6 +361,12 @@ export function createCtxindexAdapterRegistry<
       requireAdapter(id).capabilities.supportsAttachments,
     supportsRawRecords: (id) =>
       requireAdapter(id).capabilities.supportsRawRecords,
+    getSearchMode: (id) => requireAdapter(id).searchMode,
+    getSearchFn: (id) => requireAdapter(id).search,
+    listFederatedAdapters: () =>
+      Object.freeze(
+        listAdapters().filter((adapter) => adapter.searchMode !== 'indexed'),
+      ),
     getSyncFn: (id) => requireAdapter(id).sync,
     getSchema: (id) => requireAdapter(id).schema,
     getConfigSchema: (id) => requireAdapter(id).configSchema,
@@ -359,6 +379,7 @@ export function createCtxindexAdapterRegistry<
       return auth.kind === 'oauth2' ? auth.scopes : null
     },
     registerAdapter: (adapter) => {
+      assertSearchCapability(adapter.id, adapter)
       const previous = overlay.get(adapter.id)
       if (previous) {
         removeFromOverlayIndexes(previous)

@@ -27,6 +27,8 @@ export interface SearchResultChunk {
   snippet: string
 }
 
+export type SearchResultOrigin = 'local_fts' | 'provider'
+
 export interface SearchResult {
   itemId: string
   sourceId: string
@@ -39,12 +41,22 @@ export interface SearchResult {
   updatedAt: number
   deletedAt: number | null
   score: number
+  origin: SearchResultOrigin
   matchedFrom: 'items_fts' | 'chunks_fts' | 'both'
   bestChunk: SearchResultChunk | null
   explain?: ExplainInfo
 }
 
+export interface SearchWarning {
+  sourceId: string
+  adapterId: string
+  code: string
+  message: string
+}
+
 export interface ExplainInfo {
+  origin?: SearchResultOrigin
+  providerRank?: number
   matchedFrom: 'items_fts' | 'chunks_fts' | 'both'
   itemFtsRank: number | null
   chunkFtsRank: number | null

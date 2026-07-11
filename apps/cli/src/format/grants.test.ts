@@ -7,7 +7,7 @@ function grant(overrides: Partial<GrantSummary> = {}): GrantSummary {
   return {
     id: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
     provider: 'google',
-    scopes: '["https://www.googleapis.com/auth/gmail.readonly"]',
+    scopes: '["https://www.googleapis.com/auth/gmail.readonly"]', // noqa: architecture-lint
     expiresAt: null,
     accountEmail: 'me@example.com',
     accountDisplayName: 'me@example.com',
@@ -88,8 +88,8 @@ describe('formatGrants', () => {
       [
         grant({
           scopes: JSON.stringify([
-            'https://www.googleapis.com/auth/gmail.readonly',
-            'https://www.googleapis.com/auth/gmail.send',
+            'https://www.googleapis.com/auth/gmail.readonly', // noqa: architecture-lint
+            'https://www.googleapis.com/auth/gmail.send', // noqa: architecture-lint
           ]),
         }),
       ],

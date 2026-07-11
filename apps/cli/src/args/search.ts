@@ -16,7 +16,7 @@ export type SearchArgs =
   | { readonly kind: 'unknown'; readonly message: string }
 
 export const searchUsage =
-  'search <query> [--realm <slug>] [--provider <id>] [--adapter <id>] [--source <id>] [--mime <pattern>] [--kind <kind>] [--since <iso>] [--until <iso>] [--include-deleted] [--limit <n>] [--snippet-chars <n>] [--format legacy|refs|compact|context] [--refs] [--explain] [--json]'
+  'search <query> [--realm <slug>] [--provider <id>] [--adapter <id>] [--source <id>] [--mime <pattern>] [--kind <kind>] [--since <iso>] [--until <iso>] [--include-deleted] [--limit <n>] [--snippet-chars <n>] [--format legacy|refs|compact|context] [--refs] [--local-only] [--explain] [--json]'
 
 function parseDateFlag(
   name: string,
@@ -98,6 +98,7 @@ export function parseSearchArgs(args: string[]): SearchArgs {
     input = { ...input, snippetChars: snippetChars.value }
   }
   if (flags.explain === true) input = { ...input, explain: true }
+  if (flags['local-only'] === true) input = { ...input, localOnly: true }
   if (flags['include-deleted'] === true)
     input = { ...input, includeDeleted: true }
   input = { ...input, output: flags.json === true ? 'json' : 'text' }

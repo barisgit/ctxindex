@@ -18,7 +18,12 @@ export async function handleSearchCommand(args: string[]): Promise<number> {
 
   try {
     const deps = await openDeps()
-    const result = deps.searchService.executeSearch(parsed.input)
+    const result = await deps.searchService.executeSearch(parsed.input)
+    for (const warning of result.warnings ?? []) {
+      console.error(
+        `warning: provider search failed for source ${warning.sourceId} (${warning.code}): ${warning.message}`,
+      )
+    }
     printOutput(formatSearch(result, parsed))
     return 0
   } catch (err) {
@@ -46,6 +51,10 @@ export const searchCommand = defineCommand({
     'include-deleted': {
       type: 'boolean',
       description: 'Include deleted items',
+    },
+    'local-only': {
+      type: 'boolean',
+      description: 'Skip provider search fan-out',
     },
     explain: { type: 'boolean', description: 'Explain scoring' },
     json: { type: 'boolean', description: 'Print JSON' },

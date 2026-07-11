@@ -65,7 +65,6 @@ export async function openDeps(
   const config = await readConfig()
   const realmService = createRealmService({ db, logger: log })
   const sourceService = createSourceService({ db, logger: log, realmService })
-  const searchService = createSearchService({ db, logger: log })
   const fileStore = new FileBackend(
     opts.filePassphrase === undefined
       ? { createKeyFileIfMissing: false }
@@ -85,6 +84,18 @@ export async function openDeps(
     store: secretsStore,
     logger: log,
     env,
+  })
+  const searchService = createSearchService({
+    db,
+    logger: log,
+    registry: CTXINDEX_ADAPTER_REGISTRY,
+    async resolveSearchConfig(_sourceId, adapterId, config) {
+      if (!adapterId.startsWith('google.')) return config
+      const grant = await authService.getActiveGoogleGrant()
+      if (!grant) return config
+      const accessToken = await authService.refreshGoogleAccessToken(grant.id)
+      return { ...config, access_token: accessToken }
+    },
   })
   const syncService = createSyncService({
     db,
