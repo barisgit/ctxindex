@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS sources (
   id TEXT NOT NULL PRIMARY KEY,
   realm_id TEXT NOT NULL REFERENCES realms(id),
   adapter_id TEXT NOT NULL,
+  grant_id TEXT REFERENCES grants(id),
   display_name TEXT,
   config_json TEXT,
   created_at INTEGER NOT NULL

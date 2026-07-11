@@ -48,31 +48,18 @@ function parseLastError(errorJson: string | null): string | null {
   return errorJson
 }
 
-function hasColumn(
-  deps: SourceServiceDeps,
-  table: string,
-  column: string,
-): boolean {
-  const rows = deps.db.prepare(`PRAGMA table_info(${table})`).all() as {
-    readonly name: string
-  }[]
-  return rows.some((row) => row.name === column)
+function selectSourceColumns(): string {
+  return 'id, realm_id, adapter_id, display_name, config_json, grant_id, created_at'
 }
 
-function selectSourceColumns(includeGrantId: boolean): string {
-  return includeGrantId
-    ? 'id, realm_id, adapter_id, display_name, config_json, grant_id, created_at'
-    : 'id, realm_id, adapter_id, display_name, config_json, created_at'
-}
-
-function sourceListSelect(includeGrantId: boolean): string {
-  const grantColumn = includeGrantId ? ', s.grant_id' : ''
+function sourceListSelect(): string {
   return `SELECT s.id,
                  s.realm_id,
                  r.slug AS realm_slug,
                  s.adapter_id,
                  s.display_name,
-                 s.config_json${grantColumn},
+                 s.config_json,
+                 s.grant_id,
                  s.created_at,
                  sss.last_status,
                  sr.completed_at AS last_run_at,
@@ -83,31 +70,13 @@ function sourceListSelect(includeGrantId: boolean): string {
                     JOIN items i ON i.id = ic.item_id
                    WHERE i.source_id = s.id AND i.deleted_at IS NULL) AS chunks_count,
                  (SELECT i.uri FROM items i WHERE i.source_id = s.id AND i.deleted_at IS NULL ORDER BY i.uri LIMIT 1) AS sample_uri,
-                 ${
-                   includeGrantId
-                     ? `(CASE WHEN s.adapter_id = 'google.mailbox'
-                         THEN COALESCE(
-                           a.email,
-                           (SELECT a2.email
-                              FROM grants g2
-                              JOIN accounts a2 ON a2.id = g2.account_id
-                             WHERE g2.provider = 'google' AND a2.email IS NOT NULL
-                             ORDER BY g2.updated_at DESC, g2.created_at DESC
-                             LIMIT 1)
-                         )
-                         ELSE a.email
-                       END) AS account_email`
-                     : 'NULL AS account_email'
-}
+                 a.email AS account_email
           FROM sources s
           JOIN realms r ON r.id = s.realm_id
           LEFT JOIN source_sync_state sss ON sss.source_id = s.id
           LEFT JOIN sync_runs sr ON sr.id = sss.last_run_id
-          ${
-            includeGrantId
-              ? 'LEFT JOIN grants g ON g.id = s.grant_id LEFT JOIN accounts a ON a.id = g.account_id'
-              : ''
-          }`
+          LEFT JOIN grants g ON g.id = s.grant_id
+          LEFT JOIN accounts a ON a.id = g.account_id`
 }
 
 /** Upper bound on cascade-sweep passes (max FK chain depth is a small constant). */
@@ -172,39 +141,20 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
       const realm = resolveRealm(deps, input.realmSlug ?? 'global')
       const sourceId = ulid()
       const now = Date.now()
-      const includeGrantId =
-        input.grantId !== undefined && hasColumn(deps, 'sources', 'grant_id')
-
-      if (includeGrantId) {
-        deps.db
-          .prepare(
-            `INSERT INTO sources (id, realm_id, adapter_id, display_name, config_json, grant_id, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          )
-          .run(
-            sourceId,
-            realm.id,
-            input.adapterId,
-            input.displayName ?? null,
-            input.configJson ?? null,
-            input.grantId ?? null,
-            now,
-          )
-      } else {
-        deps.db
-          .prepare(
-            `INSERT INTO sources (id, realm_id, adapter_id, display_name, config_json, created_at)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-          )
-          .run(
-            sourceId,
-            realm.id,
-            input.adapterId,
-            input.displayName ?? null,
-            input.configJson ?? null,
-            now,
-          )
-      }
+      deps.db
+        .prepare(
+          `INSERT INTO sources (id, realm_id, adapter_id, display_name, config_json, grant_id, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          sourceId,
+          realm.id,
+          input.adapterId,
+          input.displayName ?? null,
+          input.configJson ?? null,
+          input.grantId ?? null,
+          now,
+        )
 
       deps.logger.debug(
         { sourceId, realmId: realm.id, adapterId: input.adapterId },
@@ -214,8 +164,7 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
     },
 
     listSources(input: ListSourcesInput = {}): SourceRow[] {
-      const includeGrantId = hasColumn(deps, 'sources', 'grant_id')
-      const select = sourceListSelect(includeGrantId)
+      const select = sourceListSelect()
       if (input.realmSlug) {
         return deps.db
           .prepare(
@@ -231,11 +180,8 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
     },
 
     findSourceById(sourceId: string): SourceRow | null {
-      const includeGrantId = hasColumn(deps, 'sources', 'grant_id')
       return deps.db
-        .prepare(
-          `SELECT ${selectSourceColumns(includeGrantId)} FROM sources WHERE id = ?`,
-        )
+        .prepare(`SELECT ${selectSourceColumns()} FROM sources WHERE id = ?`)
         .get(sourceId) as SourceRow | null
     },
 
@@ -280,7 +226,6 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
       if (!existing) {
         throw new CtxindexNotFoundError(`source not found: "${sourceId}"`)
       }
-      if (!hasColumn(deps, 'sources', 'grant_id')) return
       deps.db
         .prepare('UPDATE sources SET grant_id = ? WHERE id = ?')
         .run(grantId, sourceId)

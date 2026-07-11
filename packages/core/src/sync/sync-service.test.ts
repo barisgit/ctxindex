@@ -58,6 +58,11 @@ class StubAuthService implements AuthService {
     return this.opts.grant ?? null
   }
 
+  async getGoogleGrantById(grantId: string): Promise<GoogleGrantRow | null> {
+    const grant = this.opts.grant ?? null
+    return grant?.id === grantId ? grant : null
+  }
+
   async listGoogleGrants() {
     return []
   }
@@ -577,6 +582,18 @@ test('lock recovery from dead pid acquires the lock', async () => {
 test('reauth path returns exit 10 with lastStatus=needs_auth', async () => {
   seedGlobalRealm(db)
   const sourceId = insertSource(db, 'google.mailbox')
+  db.prepare(
+    `INSERT INTO accounts (id, realm_id, provider, display_name, email, created_at)
+     VALUES ('acct-1', 'global', 'google', 'Test', 'test@example.com', ?)`,
+  ).run(Date.now())
+  db.prepare(
+    `INSERT INTO grants (id, account_id, provider, scopes, refresh_token_ref, created_at, updated_at)
+     VALUES ('grant-1', 'acct-1', 'google', 'gmail.readonly', 'secret:test', ?, ?)`,
+  ).run(Date.now(), Date.now())
+  db.prepare('UPDATE sources SET grant_id = ? WHERE id = ?').run(
+    'grant-1',
+    sourceId,
+  )
 
   const adapter = makeAdapter('google.mailbox', async function* () {
     if (Date.now() < 0) yield { type: 'never' }

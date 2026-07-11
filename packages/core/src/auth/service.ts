@@ -168,6 +168,16 @@ export function createAuthService(deps: AuthDependencies): AuthService {
       return row ? toGoogleGrantRow(row) : null
     },
 
+    async getGoogleGrantById(grantId: string): Promise<GoogleGrantRow | null> {
+      const row = deps.db
+        .prepare(
+          `SELECT id, account_id, provider, scopes, access_token_ref, refresh_token_ref, client_id_ref, client_secret_ref, expires_at, created_at, updated_at
+           FROM grants WHERE id = ? AND provider = 'google' LIMIT 1`,
+        )
+        .get(grantId) as GrantSqlRow | null
+      return row ? toGoogleGrantRow(row) : null
+    },
+
     async listGoogleGrants(): Promise<GoogleGrantSummary[]> {
       const rows = deps.db
         .prepare(

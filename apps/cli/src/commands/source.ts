@@ -7,6 +7,7 @@ import {
   formatSourceRemoved,
   formatSources,
 } from '../format/source'
+import { resolveSourceGrant } from '../source/resolve-source-grant'
 
 function printOutput(output: string): void {
   if (output.length > 0) console.log(output)
@@ -23,7 +24,15 @@ export async function handleSourceCommand(args: string[]): Promise<number> {
   try {
     const deps = await openDeps()
     if (parsed.kind === 'add') {
-      const { sourceId } = deps.sourceService.addSource(parsed)
+      const grantId = await resolveSourceGrant(
+        deps.authService,
+        parsed.adapterId,
+        parsed.account,
+      )
+      const { sourceId } = deps.sourceService.addSource({
+        ...parsed,
+        ...(grantId ? { grantId } : {}),
+      })
       console.log(formatSourceAdded(sourceId))
     } else if (parsed.kind === 'list') {
       printOutput(formatSources(deps.sourceService.listSources(parsed), parsed))
@@ -55,6 +64,10 @@ export const sourceCommand = defineCommand({
         path: { type: 'string', description: 'Local root path' },
         name: { type: 'string', description: 'Source name' },
         'display-name': { type: 'string', description: 'Display name' },
+        account: {
+          type: 'string',
+          description: 'Account email or grant ID (required when ambiguous)',
+        },
         'config-json': { type: 'string', description: 'Adapter config JSON' },
         'adapter-id': { type: 'positional', required: false },
         realm: sourceOptionArgs.realm,

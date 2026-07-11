@@ -187,6 +187,7 @@ interface SourceRow {
   realm_id: string
   adapter_id: string
   config_json: string | null
+  grant_id: string | null
 }
 
 interface LockRow {
@@ -359,14 +360,14 @@ function sourceRows(db: CtxindexDatabase, sourceId?: string): SourceRow[] {
   if (sourceId) {
     const row = db
       .prepare(
-        'SELECT id, realm_id, adapter_id, config_json FROM sources WHERE id = ?',
+        'SELECT id, realm_id, adapter_id, config_json, grant_id FROM sources WHERE id = ?',
       )
       .get(sourceId) as SourceRow | null
     return row ? [row] : []
   }
   return db
     .prepare(
-      'SELECT id, realm_id, adapter_id, config_json FROM sources ORDER BY created_at',
+      'SELECT id, realm_id, adapter_id, config_json, grant_id FROM sources ORDER BY created_at',
     )
     .all() as SourceRow[]
 }
@@ -667,10 +668,16 @@ async function cursorForAdapter(
     return { config, previous: cursorJson }
   }
 
-  const grant = await deps.authService.getActiveGoogleGrant()
+  if (!source.grant_id) {
+    throw new CtxindexSyncError(
+      `source ${source.id} has no linked Google grant; recreate it with ctxindex source add google.mailbox --account <email|grant-id>`,
+      'auth_revoked',
+    )
+  }
+  const grant = await deps.authService.getGoogleGrantById(source.grant_id)
   if (!grant) {
     throw new CtxindexSyncError(
-      'google authorization required; run ctxindex auth add google',
+      `linked Google grant not found for source ${source.id}; re-authorize and recreate the source`,
       'auth_revoked',
     )
   }

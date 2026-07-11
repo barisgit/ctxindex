@@ -89,10 +89,15 @@ export async function openDeps(
     db,
     logger: log,
     registry: CTXINDEX_ADAPTER_REGISTRY,
-    async resolveSearchConfig(_sourceId, adapterId, config) {
+    async resolveSearchConfig(sourceId, adapterId, config) {
       if (!adapterId.startsWith('google.')) return config
-      const grant = await authService.getActiveGoogleGrant()
-      if (!grant) return config
+      const source = sourceService.findSourceById(sourceId)
+      if (!source?.grant_id) {
+        throw new Error(`source ${sourceId} has no linked Google grant`)
+      }
+      const grant = await authService.getGoogleGrantById(source.grant_id)
+      if (!grant)
+        throw new Error(`linked Google grant not found: ${source.grant_id}`)
       const accessToken = await authService.refreshGoogleAccessToken(grant.id)
       return { ...config, access_token: accessToken }
     },

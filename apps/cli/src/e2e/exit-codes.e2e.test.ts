@@ -115,6 +115,8 @@ async function setupGoogleSource(): Promise<{
   const sandbox = await createSandbox()
   const mock = startMockGmail()
   await initSandbox(sandbox)
+  const auth = await authAdd(sandbox, mock, 'initial-code')
+  expect(auth.exitCode, auth.stderr).toBe(0)
   const added = await sandbox.run([
     'source',
     'add',
@@ -124,8 +126,6 @@ async function setupGoogleSource(): Promise<{
     'global',
   ])
   expect(added.exitCode, added.stderr).toBe(0)
-  const auth = await authAdd(sandbox, mock, 'initial-code')
-  expect(auth.exitCode, auth.stderr).toBe(0)
   return { sandbox, mock, sourceId: parseSourceId(added.stdout) }
 }
 

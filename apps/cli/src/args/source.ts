@@ -8,6 +8,7 @@ export type SourceArgs =
       readonly realmSlug?: string
       readonly displayName?: string
       readonly configJson?: string
+      readonly account?: string
     }
   | {
       readonly kind: 'list'
@@ -20,7 +21,7 @@ export type SourceArgs =
   | { readonly kind: 'unknown'; readonly message: string }
 
 export const sourceUsage =
-  'source add [<adapter-id>] [--adapter <adapter-id>] [--realm <slug>] [--root|--path <path>] [--name|--display-name <name>] [--config-json <json>] | source list [--realm <slug>] [--format table|compact] [--json] | source remove <source-id>'
+  'source add [<adapter-id>] [--adapter <adapter-id>] [--realm <slug>] [--root|--path <path>] [--name|--display-name <name>] [--account <email|grant-id>] [--config-json <json>] | source list [--realm <slug>] [--format table|compact] [--json] | source remove <source-id>'
 
 function normalizeAdapterId(adapterId: string): string {
   return adapterId === 'local-directory' ? 'local.directory' : adapterId
@@ -92,6 +93,8 @@ export function parseSourceArgs(args: string[]): SourceArgs {
     if (realmSlug) result = { ...result, realmSlug }
     if (displayName) result = { ...result, displayName }
     if (config.value) result = { ...result, configJson: config.value }
+    const account = stringFlag(flags, 'account')
+    if (account) result = { ...result, account }
     return result
   }
   if (subcommand === 'list') {

@@ -204,6 +204,8 @@ Realms MUST NOT be treated as a security boundary. Credentials, grants, and acco
 
 Multiple sources MAY use the same account or grant across different realms when the provider permits it.
 
+Every source whose adapter requires authentication MUST store an explicit `grant_id` link. Such a source MUST NOT be created without a valid provider-compatible grant. When exactly one compatible grant exists, the CLI MAY bind it automatically; when zero or multiple compatible grants exist, source creation MUST fail unless the caller identifies one explicitly. Sync and federated search MUST resolve credentials only through the source's linked grant and MUST NOT select a global "active" or most-recent grant.
+
 Search SHOULD default to all realms when no realm filter is provided. Callers SHOULD be able to filter to one or more realms. When a realm filter is provided, the `global` realm SHOULD be implicitly included unless the caller explicitly opts out via an exclusive filter.
 
 ## 10b. CLI surface and output

@@ -14,9 +14,7 @@ function parseSourceId(stdout: string): string {
   return match[1]
 }
 
-async function initWithGoogleSource(sandbox: Sandbox): Promise<string> {
-  const init = await sandbox.run(['init'])
-  expect(init.exitCode, init.stderr).toBe(0)
+async function addGoogleSource(sandbox: Sandbox): Promise<string> {
   const added = await sandbox.run([
     'source',
     'add',
@@ -57,9 +55,11 @@ async function authedGoogleSandbox(): Promise<{
 }> {
   const sandbox = await createSandbox()
   const mock = startMockGmail()
-  const sourceId = await initWithGoogleSource(sandbox)
+  const init = await sandbox.run(['init'])
+  expect(init.exitCode, init.stderr).toBe(0)
   const auth = await authAdd(sandbox, mock, 'initial-code')
   expect(auth.exitCode, auth.stderr).toBe(0)
+  const sourceId = await addGoogleSource(sandbox)
   return { sandbox, mock, sourceId }
 }
 
@@ -149,21 +149,78 @@ describe('reauth e2e', () => {
     }
   })
 
-  test('no auth at all exits 10', async () => {
+  test('multiple grants require explicit account and persist the link', async () => {
     const sandbox = await createSandbox()
-    const mock = startMockGmail()
     try {
-      const sourceId = await initWithGoogleSource(sandbox)
+      const init = await sandbox.run(['init'])
+      expect(init.exitCode, init.stderr).toBe(0)
+      const db = new Database(dbPath(sandbox))
+      const now = Date.now()
+      for (const [accountId, grantId, email] of [
+        ['acct-work', 'grant-work', 'work@example.com'],
+        ['acct-home', 'grant-home', 'home@example.com'],
+      ] as const) {
+        db.prepare(
+          `INSERT INTO accounts (id, realm_id, provider, display_name, email, created_at)
+           VALUES (?, 'global', 'google', ?, ?, ?)`,
+        ).run(accountId, email, email, now)
+        db.prepare(
+          `INSERT INTO grants (id, account_id, provider, scopes, created_at, updated_at)
+           VALUES (?, ?, 'google', 'gmail.readonly', ?, ?)`,
+        ).run(grantId, accountId, now, now)
+      }
+      db.close()
 
-      const result = await sandbox.run(['sync', '--source', sourceId], {
-        env: mock.env(sandbox),
-      })
+      const ambiguous = await sandbox.run([
+        'source',
+        'add',
+        '--adapter',
+        'google.mailbox',
+      ])
+      expect(ambiguous.exitCode).toBe(2)
+      expect(ambiguous.stderr).toContain('multiple Google grants available')
 
-      expect(result.exitCode, result.stderr).toBe(10)
-      expect(result.stderr).toContain('ctxindex auth add google')
-      expect(lastStatus(sandbox, sourceId)).toBe('needs_auth')
+      const added = await sandbox.run([
+        'source',
+        'add',
+        '--adapter',
+        'google.mailbox',
+        '--account',
+        'work@example.com',
+      ])
+      expect(added.exitCode, added.stderr).toBe(0)
+      const verify = new Database(dbPath(sandbox), { readonly: true })
+      expect(
+        verify
+          .prepare('SELECT grant_id FROM sources WHERE id = ?')
+          .get(parseSourceId(added.stdout)),
+      ).toEqual({ grant_id: 'grant-work' })
+      verify.close()
     } finally {
-      mock.stop()
+      await sandbox.cleanup()
+    }
+  })
+
+  test('source cannot be created without a linked grant', async () => {
+    const sandbox = await createSandbox()
+    try {
+      const init = await sandbox.run(['init'])
+      expect(init.exitCode, init.stderr).toBe(0)
+      const result = await sandbox.run([
+        'source',
+        'add',
+        '--adapter',
+        'google.mailbox',
+      ])
+
+      expect(result.exitCode).toBe(2)
+      expect(result.stderr).toContain('ctxindex auth add google')
+      const db = new Database(dbPath(sandbox), { readonly: true })
+      expect(db.prepare('SELECT COUNT(*) AS count FROM sources').get()).toEqual(
+        { count: 0 },
+      )
+      db.close()
+    } finally {
       await sandbox.cleanup()
     }
   })
