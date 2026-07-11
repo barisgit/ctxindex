@@ -372,12 +372,17 @@ export const sync: SyncFunction = async function* googleMailboxSync(
   }
 
   if (boundedRelist) {
+    // Compute the query once: the after: bound derives from Date.now(), and
+    // Gmail pageTokens are only valid for the exact q they were issued for.
+    // Recomputing per page changes q and restarts the listing (infinite loop).
+    const backfillQuery = buildBackfillQuery(cursor)
     let pageToken: string | undefined
     let pagesSeen = 0
     let messagesSeen = 0
+    const seenMessageIds = new Set<string>()
     do {
       const url = new URL(gmailApiUrl('/gmail/v1/users/me/messages'))
-      url.searchParams.set('q', buildBackfillQuery(cursor))
+      url.searchParams.set('q', backfillQuery)
       if (pageToken) url.searchParams.set('pageToken', pageToken)
       const page = await safeFetch(GmailMessageListSchema, url.toString(), {
         headers: authHeaders(cursor),
@@ -393,6 +398,10 @@ export const sync: SyncFunction = async function* googleMailboxSync(
         'gmail backfill page fetched',
       )
       for (const message of page.messages) {
+        // Defensive: never re-process a message id within one run, even if
+        // the provider returns overlapping pages.
+        if (seenMessageIds.has(message.id)) continue
+        seenMessageIds.add(message.id)
         const messageHistoryId = yield* emitMessage(ctx, cursor, message.id)
         latestHistoryId = messageHistoryId ?? latestHistoryId
         messagesSeen += 1

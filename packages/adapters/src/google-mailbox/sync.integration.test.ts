@@ -200,6 +200,54 @@ describe('google.mailbox adapter', () => {
     expect(Math.abs(afterEpoch - expected)).toBeLessThan(60)
   })
 
+  test('multi-page backfill keeps q stable across pages and terminates', async () => {
+    const queries: string[] = []
+    const ops = await collectGoogleOps(null, (url) => {
+      if (
+        url.pathname.endsWith('/messages') &&
+        !/\/messages\/m-p/.test(url.pathname)
+      ) {
+        queries.push(url.searchParams.get('q') ?? '')
+        const token = url.searchParams.get('pageToken')
+        if (!token) {
+          return jsonResponse({
+            messages: [{ id: 'm-p1' }],
+            nextPageToken: 'page-2',
+            resultSizeEstimate: 2,
+          })
+        }
+        expect(token).toBe('page-2')
+        return jsonResponse({
+          messages: [{ id: 'm-p2' }],
+          resultSizeEstimate: 2,
+        })
+      }
+      const idMatch = /\/messages\/(m-p\d)$/.exec(url.pathname)
+      if (idMatch) {
+        return jsonResponse({
+          id: idMatch[1],
+          threadId: 't-p',
+          historyId: '404',
+          payload: {
+            headers: [{ name: 'Subject', value: idMatch[1] }],
+            body: { data: textBody(`${idMatch[1]} body`) },
+          },
+        })
+      }
+      return jsonResponse({ error: 'unexpected' }, 500)
+    })
+
+    // Two list calls (page 1 + page 2), identical q both times — Gmail
+    // pageTokens are only valid for the q they were issued for.
+    expect(queries).toHaveLength(2)
+    expect(queries[0]).toBe(queries[1] as string)
+    expect(
+      ops
+        .filter((op) => op.type === 'upsertMailMessage')
+        .map((op) => op.messageId),
+    ).toEqual(['m-p1', 'm-p2'])
+  })
+
   test('sync_window_days: 0 disables the window bound', async () => {
     let backfillQuery: string | null = null
     await collectGoogleOps({ sync_window_days: 0 }, (url) => {
