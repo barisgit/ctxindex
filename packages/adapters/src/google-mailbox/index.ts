@@ -15,6 +15,7 @@ import {
   type GmailMessage,
   GmailMessageListSchema,
   GmailMessageSchema,
+  GmailProfileSchema,
   gmailApiUrl,
   safeFetch,
 } from './api'
@@ -418,6 +419,16 @@ export const sync: SyncFunction = async function* googleMailboxSync(
       )
       pageToken = page.nextPageToken
     } while (pageToken)
+
+    // Message historyIds are snapshots from each message and the final listed
+    // message may be old (Gmail lists newest-first). Persist the mailbox-level
+    // current checkpoint so the next run can use users.history.list directly.
+    const profile = await safeFetch(
+      GmailProfileSchema,
+      gmailApiUrl('/gmail/v1/users/me/profile'),
+      { headers: authHeaders(cursor) },
+    )
+    latestHistoryId = profile.historyId
   }
 
   yield {

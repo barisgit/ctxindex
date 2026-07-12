@@ -35,6 +35,9 @@ async function collectGoogleOps(
   globalThis.fetch = ((input: Parameters<typeof fetch>[0]) => {
     const url = new URL(input.toString())
     seenHosts.push(url.hostname)
+    if (url.pathname.endsWith('/profile')) {
+      return Promise.resolve(jsonResponse({ historyId: '999' }))
+    }
     return Promise.resolve(handler(url))
   }) as unknown as typeof fetch
   try {
@@ -120,7 +123,7 @@ describe('google.mailbox adapter', () => {
     expect(ops).toContainEqual(
       expect.objectContaining({
         type: 'setCursor',
-        cursor: JSON.stringify({ historyId: '101' }),
+        cursor: JSON.stringify({ historyId: '999' }),
       }),
     )
   })

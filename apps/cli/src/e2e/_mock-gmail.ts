@@ -149,6 +149,13 @@ export function startMockGmail(
         })
       }
 
+      if (url.pathname === '/gmail/v1/users/me/profile') {
+        return json({
+          emailAddress: 'mock@example.com',
+          historyId: messages.at(-1)?.historyId ?? '0',
+        })
+      }
+
       if (url.pathname === '/gmail/v1/users/me/messages') {
         return json({
           messages: messages.map((message) => ({

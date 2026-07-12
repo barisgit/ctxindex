@@ -57,6 +57,9 @@ describe('VAL-NETWORK-EGRESS runtime interceptor', () => {
       ) {
         return Promise.resolve(jsonResponse({ messages: [{ id: 'm-1' }] }))
       }
+      if (url.pathname.endsWith('/profile')) {
+        return Promise.resolve(jsonResponse({ historyId: '88' }))
+      }
       if (url.pathname.endsWith('/messages/m-1')) {
         return Promise.resolve(
           jsonResponse({
@@ -101,12 +104,16 @@ describe('VAL-NETWORK-EGRESS runtime interceptor', () => {
         googleOps.push(op as Record<string, unknown>)
       }
 
-      expect(hosts).toEqual(['gmail.googleapis.com', 'gmail.googleapis.com'])
+      expect(hosts).toEqual([
+        'gmail.googleapis.com',
+        'gmail.googleapis.com',
+        'gmail.googleapis.com',
+      ])
       expect(hosts.every((host) => ALLOWLIST.has(host))).toBe(true)
       expect(googleOps).toContainEqual(
         expect.objectContaining({
           type: 'setCursor',
-          cursor: JSON.stringify({ historyId: '77' }),
+          cursor: JSON.stringify({ historyId: '88' }),
         }),
       )
     } finally {

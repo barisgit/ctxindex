@@ -147,6 +147,13 @@ function startGmailMockServer(options: GmailMockOptions = {}): GmailMockServer {
         return Response.json({ historyId: '101', history: [] })
       }
 
+      if (url.pathname === '/gmail/v1/users/me/profile') {
+        return Response.json({
+          emailAddress: 'mock@example.com',
+          historyId: '101',
+        })
+      }
+
       if (url.pathname === '/gmail/v1/users/me/messages') {
         calls.messages += 1
         if (options.rateLimitMessagesOnce && !rateLimited) {

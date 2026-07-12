@@ -51,6 +51,13 @@ function startGmailMock(): GmailMock {
         return Response.json(body)
       }
 
+      if (url.pathname === '/gmail/v1/users/me/profile') {
+        return Response.json({
+          emailAddress: 'mock@example.com',
+          historyId: '88',
+        })
+      }
+
       if (url.pathname === '/gmail/v1/users/me/messages') {
         return Response.json({ messages: [{ id: 'm-1' }] })
       }

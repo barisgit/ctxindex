@@ -197,6 +197,15 @@ export const GmailHistorySchema = z
 
 export type GmailHistory = z.infer<typeof GmailHistorySchema>
 
+export const GmailProfileSchema = z
+  .object({
+    emailAddress: z.string().optional(),
+    messagesTotal: z.number().optional(),
+    threadsTotal: z.number().optional(),
+    historyId: z.string(),
+  })
+  .passthrough()
+
 export function assertGoogleEgressAllowed(url: string): URL {
   const parsed = new URL(url)
   if (
