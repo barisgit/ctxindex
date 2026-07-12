@@ -185,6 +185,7 @@ Mode requirements:
 - A `hybrid` adapter's window sync MUST reconcile the window on each successful run: items that fall out of the window MAY be demoted to metadata-only rather than tombstoned, since the canonical record still exists at the provider.
 - Federated search calls MUST go through the central network egress chokepoint and are limited to the adapter's declared provider hosts (§17).
 - Federated and hybrid adapters SHOULD support **on-demand hydration**: fetching full content for a specific item at read time. Hydrated content MAY be cached locally and MUST be treated as purgeable.
+- Every adapter MUST define one canonical item URI scheme and use it identically for synced and provider-search results. Search origin MUST NOT alter item identity or URI. `google.mailbox` uses `gmail:<provider-message-id>`.
 
 Search planning:
 

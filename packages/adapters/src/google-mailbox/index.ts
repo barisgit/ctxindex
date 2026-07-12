@@ -480,6 +480,7 @@ export const search: AdapterSearchFunction = async (ctx, query) => {
     )
     results.push({
       externalId: message.id,
+      uri: `gmail:${message.id}`,
       title: messageHeader(message, 'subject') ?? '(no subject)',
       ...(message.snippet !== undefined ? { snippet: message.snippet } : {}),
       ...(message.internalDate !== undefined

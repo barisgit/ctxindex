@@ -81,6 +81,7 @@ describe('search service', () => {
     const providerSearch: AdapterSearchFunction = async () => [
       {
         externalId: 'msg-1',
+        uri: 'gmail:msg-1',
         title: 'Alpha beta mail thread',
         snippet: 'alpha beta discussed in mail',
         timestamp: now,
@@ -107,10 +108,17 @@ describe('search service', () => {
     expect(localResults.length).toBeGreaterThan(0)
     expect(providerResults[0]?.sourceId).toBe('source-gmail')
     expect(providerResults[0]?.title).toBe('Alpha beta mail thread')
+    expect(providerResults[0]?.uri).toBe('gmail:msg-1')
     expect(providerResults[0]?.explain?.origin).toBe('provider')
     expect(providerResults[0]?.explain?.providerRank).toBe(0)
-    // Materialized metadata-only item resolves via external_refs on repeat:
-    // it is now locally indexed, so dedupe keeps the local entry with the same id.
+    // Provider search repairs a legacy adapter-id URI while local-wins dedupe
+    // still returns the canonical URI in the same invocation.
+    const providerItemId = providerResults[0]?.itemId
+    if (!providerItemId) throw new Error('expected provider result')
+    db.prepare('UPDATE items SET uri = ? WHERE id = ?').run(
+      'google.mailbox:msg-1',
+      providerItemId,
+    )
     const again = await service.executeSearch({
       query: 'alpha beta',
       limit: 10,
@@ -119,6 +127,10 @@ describe('search service', () => {
       (r) => r.itemId === (providerResults[0]?.itemId as string),
     )
     expect(repeat).toHaveLength(1)
+    expect(repeat[0]?.uri).toBe('gmail:msg-1')
+    expect(
+      db.prepare('SELECT uri FROM items WHERE id = ?').get(providerItemId),
+    ).toEqual({ uri: 'gmail:msg-1' })
   })
 
   test('planner degrades to local results when provider search fails', async () => {

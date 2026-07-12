@@ -165,7 +165,18 @@ function resolveProviderItem(
        WHERE source_id = ? AND kind = 'message' AND value = ?`,
     )
     .get(source.id, result.externalId) as { item_id: string } | null
-  if (existing) return existing.item_id
+  if (existing) {
+    // Provider search is authoritative for its canonical URI. This also
+    // repairs rows materialized by older clients that used adapter-id fallbacks.
+    if (result.uri) {
+      db.prepare('UPDATE items SET uri = ?, updated_at = ? WHERE id = ?').run(
+        result.uri,
+        Date.now(),
+        existing.item_id,
+      )
+    }
+    return existing.item_id
+  }
 
   const itemId = ulid()
   const nowMs = Date.now()
@@ -333,12 +344,19 @@ function interleave(
   provider: SearchResult[],
   limit: number,
 ): SearchResult[] {
-  const localIds = new Set(local.map((result) => result.itemId))
+  const providerById = new Map(
+    provider.map((result) => [result.itemId, result] as const),
+  )
+  const normalizedLocal = local.map((result) => {
+    const providerResult = providerById.get(result.itemId)
+    return providerResult ? { ...result, uri: providerResult.uri } : result
+  })
+  const localIds = new Set(normalizedLocal.map((result) => result.itemId))
   const providerOnly = provider.filter((result) => !localIds.has(result.itemId))
   const merged: SearchResult[] = []
-  const max = Math.max(local.length, providerOnly.length)
+  const max = Math.max(normalizedLocal.length, providerOnly.length)
   for (let i = 0; i < max && merged.length < limit; i++) {
-    const localEntry = local[i]
+    const localEntry = normalizedLocal[i]
     if (localEntry) merged.push(localEntry)
     if (merged.length >= limit) break
     const providerEntry = providerOnly[i]

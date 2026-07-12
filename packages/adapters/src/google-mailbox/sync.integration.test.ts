@@ -319,6 +319,7 @@ describe('google.mailbox adapter', () => {
       expect(results).toHaveLength(1)
       expect(results[0]).toMatchObject({
         externalId: 'm-7',
+        uri: 'gmail:m-7',
         title: 'Federated hit',
         snippet: 'federated snippet',
         rank: 0,
