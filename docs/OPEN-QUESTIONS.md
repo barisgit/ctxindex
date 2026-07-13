@@ -1,5 +1,10 @@
 # Open Questions
 
+> Historical per-feature (f01–f20) ambiguity log for the v1 build. Live open
+> questions for the access-layer redesign are in
+> `docs/design/2026-07-13-context-access-layer.md` §13 and the active OpenSpec
+> change `openspec/changes/v2-context-access-layer/`.
+
 ## f01-monorepo-bootstrap
 
 - ~~Ambiguity: The charter asks for root package name `ctxindex-root`~~. **Resolved**: root package renamed to `ctxindex`, root `bin` field removed. **Superseded**: `bun link` is no longer supported in v1. The CLI is invoked exclusively via `bun cli` (root script) or `bun run cli` (root or from `apps/cli`). `scripts/verify/cli.sh` is the verifier for V1 §4 criterion 1; the old `scripts/verify/bun-link.sh` was removed.

@@ -1,5 +1,36 @@
 # ctxindex Implementation Notes
 
+> **Redesign notice (2026-07-13).** The context-access-layer redesign
+> (`docs/design/2026-07-13-context-access-layer.md`, reflected in `SPEC.md`
+> §1/§3/§4/§8/§10e/§10f and `CONTEXT.md`) supersedes parts of this document:
+>
+> - **§3.1–§3.5, §3.8 (per-adapter migration namespaces, adapter table
+>   prefixing)** — superseded. Adapters no longer own tables; storage is the
+>   generic six-table model (resources, field_index, chunks+FTS, relations,
+>   artifacts, sync bookkeeping). Only the `core` migration namespace remains.
+> - **§3d.2 adapter registry sketch** — superseded by the definition/registry
+>   model: `defineExtension`/`defineAdapter`/`defineProfile` factories in
+>   `@ctxindex/extension-sdk`, const-generic registries in core, capability
+>   flags array, `(id, version)` binding, runtime validation of loaded
+>   definitions, in-process dynamic import of extensions.
+> - **§4 (AdapterDbScope, adapter-owned tables)** — superseded. Adapters emit
+>   typed operations only; no scoped DB handle. Operations are resource-level
+>   (`upsertResource` with profile payloads) rather than item-level.
+> - **§8 (mail source schema: `mail_messages`, `mail_bodies`,
+>   `mail_attachments`, external mail tables)** — superseded. Mail persists
+>   through the generic storage model via the `communication.message` /
+>   `communication.conversation` profiles; attachments live in the artifact
+>   store; threading uses natural-key relations.
+>
+> Still current: runtime choice (§1), storage stack (§2, minus adapter
+> namespaces), CLI framework (§3a), provider/secrets dependencies (§3b),
+> observability/testing (§3c), monorepo shape (§3d.1, with the addition of
+> `packages/extension-sdk` and `packages/profiles`), distribution (§3d.3–4,
+> pending the compiled-binary dynamic-import spike), sync run/checkpoint
+> schema (§5), identity schema (§6, `items` renamed `resources`), realms (§7).
+> Sections below are intentionally left unrewritten until the V2 milestone
+> carves its implementation slice.
+
 Status: draft
 
 This document describes the intended reference implementation for `SPEC.md`. It is allowed to change as the codebase evolves, but changes must preserve the normative behavior in `SPEC.md` unless the spec changes too.
