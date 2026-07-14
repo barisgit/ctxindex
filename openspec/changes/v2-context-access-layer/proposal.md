@@ -6,7 +6,7 @@ ctxindex v1 was built as a local indexing CLI: sync sources into SQLite, search 
 
 - **BREAKING** Storage collapses to six generic tables (`resources`, `field_index`, chunks+FTS, `relations`, `artifacts`, sync bookkeeping). Per-domain tables (`mail_messages`, `mail_bodies`, `mail_attachments`, `items`, ...) are removed; domain semantics move into profile payloads + field index.
 - Profiles become the single mechanism for domain semantics: versioned `defineProfile` definitions declaring search fields, relations, exports, docs. Canonical profiles (`communication.message`, `communication.conversation`, `calendar.event`, `task`, `file`, `artifact`) are bundled definitions using the same public API.
-- Extensions: in-process dynamic `import()` of TS/JS modules discovered under `~/.config/ctxindex/extensions/`, contributing adapters, profiles, and auth via `defineExtension`/`defineAdapter` factories with type-only SDK imports (compiled-binary safe, pending D3 spike).
+- Extensions: in-process dynamic `import()` of TS/JS modules discovered under `~/.config/ctxindex/extensions/`, contributing adapters, profiles, and auth via `defineExtension`/`defineAdapter` factories with type-only SDK imports (compiled-binary safety verified by the D3 spike).
 - Universal refs `ctx://<source-id>/<suffix>` for every resource, synced or ad hoc; ad-hoc retrievals are cached as `adhoc`-origin rows.
 - Managed content-addressed artifact store with retention and purge; `download`/`export` verbs.
 - Relations as lazily-resolved bidirectional edges (ref or natural-key targets) powering `thread get` (conversation membership + parent tree walk).
@@ -36,4 +36,4 @@ None yet in `openspec/specs/` — this is the first OpenSpec change; the v1 beha
 - New packages: `@ctxindex/extension-sdk` (type-only public contract), `@ctxindex/profiles` (canonical profile definitions).
 - `packages/adapters/google.mailbox` and `local.directory`: rewritten against the adapter contract (capabilities array, profile emission).
 - `apps/cli`: registry-derived argument space; new verbs; exit codes unchanged (stable codes retained, needs_auth=10).
-- Pre-work gate: D3 spike (`bun build --compile` binary dynamically importing external `.ts`) and realms keep/cut verdict must land before the storage migration is written.
+- Pre-work gates: the D3 compiled-extension spike passed on 2026-07-13 with Bun >=1.3.13 (the project pin moved to 1.3.14 because 1.3.12 failed); the remaining realms keep/cut verdict must land before the storage migration is written.

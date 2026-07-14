@@ -7,7 +7,7 @@ read_minutes: 12
 The 2026-07-13 design session reframed the product, settled 19 decisions, and reduced the model to ten nouns over six generic tables. This page transfers the whole architecture: what changed, why, and where the load-bearing rules live.
 {% /hero %}
 
-{% brief verdict="ctxindex is now the source-of-truth interface through which agents discover, retrieve, and locally materialize personal context; indexing is one implementation strategy, and ALL domain knowledge — including mail — enters through one extension mechanism: profiles." why="The old framing (sync-first local index) could not serve the real agent workflows: ad hoc thread fetches, attachment downloads, non-synced sources, arbitrary connector domains like tenders. Making core domain-ignorant and profile-driven makes every capability additive." next="Run the Bun compiled-binary dynamic-import spike (D3), take a hard look at whether realms survive, then carve the V2 vertical slice: mail profiles + google.mailbox on the new storage + a tenders extension as external proof." /%}
+{% brief verdict="ctxindex is now the source-of-truth interface through which agents discover, retrieve, and locally materialize personal context; indexing is one implementation strategy, and ALL domain knowledge — including mail — enters through one extension mechanism: profiles." why="The old framing (sync-first local index) could not serve the real agent workflows: ad hoc thread fetches, attachment downloads, non-synced sources, arbitrary connector domains like tenders. Making core domain-ignorant and profile-driven makes every capability additive." next="With D3 verified, take a hard look at whether realms survive, settle the remaining cross-cutting contracts, then carve the V2 vertical slice: mail profiles + google.mailbox on the new storage + a tenders extension as external proof." /%}
 
 {% section claim="The product definition changed: indexing is a strategy, access is the product." %}
 The original CONTEXT.md defined ctxindex as “a local-first personal context index for syncing searchable copies … into a local database.” That definition made sync mandatory, retrieval an afterthought, and every non-search operation (download this PDF, export this thread) an off-spec side channel. The redesign inverts it: ctxindex is the interface agents use to **discover** (fast local search, optional live provider search), **retrieve** (whole messages, threads, events, attachments — ad hoc, no sync required), and **sync** (maintained local projections) — three capabilities over one source concept.
@@ -122,21 +122,21 @@ The design doc carries the full D1–D19 log with rationale and reversibility. T
 
 {% decision %}
 {% option name="D1 · Extension power: adapters with open kinds" fate="Chosen" reason="Uniform operations are the product; arbitrary extension subcommands would fragment the agent-facing surface. Typed subcommand registration remains the only future alternative." chosen=true /%}
-{% option name="D2/D3 · In-process loading, sealed binary" fate="Chosen" reason="Bun runs TS natively; factory-receives-API keeps the binary sealed. Spike pending on compiled-binary dynamic import." chosen=true /%}
+{% option name="D2/D3 · In-process loading, sealed binary" fate="Chosen · verified" reason="Bun 1.3.14 compiled binaries dynamically loaded external TypeScript, relative TypeScript imports, and extension-owned dependencies after relocation; factory-receives-API keeps the binary sealed." chosen=true /%}
 {% option name="D13 · No custom tables anywhere" fate="Chosen" reason="Six generic tables cover every walked use case; restoring per-extension storage later is additive, removing it later would be a rewrite." chosen=true /%}
 {% option name="Out-of-process adapters, npm distribution, ctx.storage, multi-profile resources" fate="Deferred" reason="Each is additive later; none has a demonstrated user today." /%}
 {% option name="Write-back to providers" fate="Rejected" reason="Different authorization and safety problem; read-oriented product stays coherent." /%}
 {% /decision %}
 
-Open questions before V2: the D3 loading spike (can invalidate the extension mechanism — run it first), field-index encoding for ranges and multi-valued fields, artifact retention policy shape, stored-payload migration on profile version bumps, the dangling-ref error contract, and whether realms survive.
+Open questions before V2: whether realms survive, field-index encoding for ranges and multi-valued fields, artifact retention policy shape, stored-payload migration on profile version bumps, and the dangling-ref error contract. The D3 loading gate passed; its repeatable evidence lives at `scripts/spikes/d3-compiled-extension/`.
 {% /section %}
 
 {% section claim="Documentation is already propagated; V2 should be a thin vertical slice." %}
 CONTEXT.md is rewritten in the new language (Resource supersedes Item; Ref, Profile, Extension, Artifact, Relation, Field Index added; Source redefined). SPEC.md §1 scope is reversed on plugins and export, §3 is rebuilt around profiles/refs/capabilities/storage/loading, §4 specifies natural-key relations, §8 drops adapter-owned tables, §10e becomes routing precedence, and a new §10f covers retrieval, artifacts, and export. IMPLEMENTATION.md carries a supersession banner mapping each stale section to its replacement rather than a premature rewrite — the V2 milestone should carve the implementation slice: message/conversation profiles + google.mailbox on the new storage, mail get/thread/artifact/export end to end, and one external extension (tenders) as proof that the seam holds.
 
 {% timeline %}
-{% step when="Now — spike" now=true %}Verify `bun build --compile` binaries can dynamically import external `.ts` extensions with the factory contract.{% /step %}
-{% step when="Next — decide realms" %}Keep or cut before any V2 schema work.{% /step %}
+{% step when="Done — D3 spike" %}Bun 1.3.14 compiled binary loaded an external `.ts` factory, relative `.ts` helper, and extension-owned dependency after relocation.{% /step %}
+{% step when="Now — decide realms" now=true %}Keep or cut before any V2 schema work.{% /step %}
 {% step when="Then — V2 slice" %}Mail profiles + google.mailbox on six-table storage; thread/artifact/export verbs; tenders extension externally.{% /step %}
 {% step when="Later — replace Hermes CLI" %}Port the context-hub skill to plain ctxindex invocations; delete the bundled Bun project.{% /step %}
 {% /timeline %}

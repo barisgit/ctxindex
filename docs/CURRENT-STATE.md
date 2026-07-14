@@ -8,9 +8,10 @@ decisions (D1–D19) are logged in
 `docs/design/2026-07-13-context-access-layer.md`; `SPEC.md`, `CONTEXT.md`, and
 the `IMPLEMENTATION.md` banner were updated the same day. Implementation has
 not started; it is tracked as the OpenSpec change
-`openspec/changes/v2-context-access-layer/` and gated on the D3 loader spike
-and the realms keep/cut verdict. The code on disk still implements the v1
-scope described below.
+`openspec/changes/v2-context-access-layer/`. The D3 loader spike passed on Bun
+1.3.14 (`scripts/spikes/d3-compiled-extension/`); the remaining gate before
+storage migration work is the realms keep/cut verdict. The code on disk still
+implements the v1 scope described below.
 
 > The per-feature notes below (f04–f13) are historical and were stale as of the
 > 2026-05-28 spec-conformance pass; trust the code and `SPEC.md`/`V1.md` over them.

@@ -11,17 +11,20 @@ Supporting sources of truth (do not duplicate content here):
 - `IMPLEMENTATION.md` — reference implementation choices; superseded sections are mapped in its banner and get rewritten as slices land.
 - `docs/design/architecture-explainer.md` / `.html` — narrative explainer of the same architecture.
 
+## Resolved gate
+
+- **D3 spike — passed (2026-07-13, Bun >=1.3.13):** a relocated compiled Bun executable dynamically imported an external TypeScript extension using the factory contract, a relative TypeScript import, and an extension-owned dependency. Bun 1.3.12 failed with exit 137; 1.3.13 and 1.3.14 passed, so the project is pinned to 1.3.14. Evidence: `scripts/spikes/d3-compiled-extension/`.
+
 ## Open questions blocking tasks
 
 From design doc §13 — resolve before or during the first implementation slice:
 
-1. **D3 spike (gate)**: confirm a `bun build --compile` binary can dynamically import an external `.ts` extension. A negative result invalidates the loading design.
-2. Realms: keep or cut before the storage migration (flagged as possible ceremony).
-3. `field_index` encoding for ranges/multi-valued fields + `--field` grammar.
-4. Artifact retention shape and disk accounting; stored-payload migration on profile version bumps.
-5. `ctx://` suffix encoding; `source_gone` vs `not_found`.
-6. Revisit D7 (hybrid default) after dogfooding a partial Gmail sync.
+1. Realms: keep or cut before the storage migration (flagged as possible ceremony).
+2. `field_index` encoding for ranges/multi-valued fields + `--field` grammar.
+3. Artifact retention shape and disk accounting; stored-payload migration on profile version bumps.
+4. `ctx://` suffix encoding; `source_gone` vs `not_found`.
+5. Revisit D7 (hybrid default) after dogfooding a partial Gmail sync.
 
 ## Slicing
 
-First implementation slice ("V2 slice") agreed with the user: mail profiles + `google.mailbox` on six-table storage + `thread`/`artifact`/`export` verbs, plus a tenders extension as the external-extension proof. Tasks are generated per slice after the D3 spike and realms verdict.
+First implementation slice ("V2 slice") agreed with the user: mail profiles + `google.mailbox` on six-table storage + `thread`/`artifact`/`export` verbs, plus a tenders extension as the external-extension proof. Tasks are generated per slice after the realms verdict; the D3 gate has passed.

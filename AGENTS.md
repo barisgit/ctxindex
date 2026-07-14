@@ -14,5 +14,5 @@
 
 - Non-trivial behavior changes go through an OpenSpec change (`openspec new change`, then proposal → specs → design → tasks). Trivial fixes do not.
 - The CLI is invoked only via `bun cli` / `bun run cli`; there is no `bun link`. See `docs/AGENT-HOWTOS.md` for sandboxed-XDG and gmail-mock e2e recipes.
-- Gates before the v2 storage migration: the D3 spike (compiled Bun binary dynamically importing an external `.ts` extension) and the realms keep/cut verdict.
+- Gate before the v2 storage migration: the realms keep/cut verdict. D3 passed on Bun 1.3.14; its regression check is `scripts/spikes/d3-compiled-extension/run.sh`.
 - Exit codes are stable API (`needs_auth=10`, etc.); see `SPEC.md` §12.
