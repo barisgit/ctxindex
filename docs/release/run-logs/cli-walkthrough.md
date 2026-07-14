@@ -1,4 +1,8 @@
 ```bash
+
+> Archived prototype run log. It does not describe the target V1 CLI contract;
+> see `SPEC.md` and `V1.md`.
+
 $ ctxindex --version
 0.0.0
 [exit] 0

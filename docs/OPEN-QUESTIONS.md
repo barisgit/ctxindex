@@ -1,9 +1,9 @@
 # Open Questions
 
-> Historical per-feature (f01–f20) ambiguity log for the v1 build. Live open
-> questions for the access-layer redesign are in
-> `docs/design/2026-07-13-context-access-layer.md` §13 and the active OpenSpec
-> change `openspec/changes/v2-context-access-layer/`.
+> Archived prototype ambiguity log. References to “v1” below belong to an
+> abandoned prototype plan, not the current V1 product scope. Live questions
+> are in `docs/design/2026-07-13-context-access-layer.md` §13 and
+> `openspec/changes/v1-context-access-layer/`.
 
 ## f01-monorepo-bootstrap
 

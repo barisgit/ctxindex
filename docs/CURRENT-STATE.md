@@ -1,20 +1,21 @@
 # Current State
 
-## Access-layer redesign (2026-07-13)
+## V1 context-gateway direction (2026-07-14)
 
-ctxindex was redefined from "local indexing CLI" to the agent-facing context
-access layer (discover / retrieve / sync over one Source concept). Nineteen
-decisions (D1–D19) are logged in
-`docs/design/2026-07-13-context-access-layer.md`; `SPEC.md`, `CONTEXT.md`, and
-the `IMPLEMENTATION.md` banner were updated the same day. Implementation has
-not started; it is tracked as the OpenSpec change
-`openspec/changes/v2-context-access-layer/`. The D3 loader spike passed on Bun
-1.3.14 (`scripts/spikes/d3-compiled-extension/`); the remaining gate before
-storage migration work is the realms keep/cut verdict. The code on disk still
-implements the v1 scope described below.
+The accepted product model is documented in `CONTEXT.md`, `SPEC.md`, `V1.md`,
+`IMPLEMENTATION.md`, and `docs/design/2026-07-13-context-access-layer.md`
+(decisions D1–D22). The active OpenSpec change is
+`openspec/changes/v1-context-access-layer/`.
 
-> The per-feature notes below (f04–f13) are historical and were stale as of the
-> 2026-05-28 spec-conformance pass; trust the code and `SPEC.md`/`V1.md` over them.
+The code below those documents is disposable pre-alpha scaffolding, not a
+previous product version. No prototype data or CLI compatibility is preserved.
+D3 passed with Bun >=1.3.13 and the project is pinned to 1.3.14. Realms are
+kept as exact user-defined operating contexts. V1 typed provider Actions are
+limited to reversible email Draft create/update.
+
+> Everything below is an archived prototype implementation log. References to
+> “v1” in those notes describe an abandoned earlier plan, not current V1 scope.
+> Trust current code for prototype behavior and `SPEC.md`/`V1.md` for the target.
 
 ## Spec-conformance pass (2026-05-28)
 

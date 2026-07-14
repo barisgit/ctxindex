@@ -1,35 +1,39 @@
 # ctxindex
 
-ctxindex is the source-of-truth interface through which agents discover, retrieve, and locally materialize personal context — mail, calendars, files, tasks, and arbitrary user-defined sources. Indexing (sync into a local SQLite-backed store) is one implementation strategy, not the product definition: sources can be searched ad hoc, retrieved on demand, and materialized locally (threads, attachments, exports) through one deterministic CLI.
+ctxindex is a local personal-context gateway for agents. It provides one deterministic interface to discover, retrieve, and materialize context across mail, files, calendars, tasks, and extension-defined domains, then perform typed provider Actions through the same configured Source and authentication. Indexing is a strategy for fast local discovery, not the product boundary.
 
-Built with Bun/TypeScript as a monorepo (`apps/cli`, `packages/core`, `packages/adapters`).
+```text
+Agent ───── CLI ────> ctxindex ──> Sources ──> providers/files
+                         │
+                         ├── Realms: personal / company / university
+                         ├── Profiles: portable domain semantics
+                         ├── Adapters: provider operations
+                         └── Resources / Refs / Relations / Artifacts
+```
 
-> The shipped v1 CLI still reflects the original "local indexing" scope. The
-> access-layer architecture is specified in `SPEC.md` and
-> `docs/design/2026-07-13-context-access-layer.md`, and tracked as the active
-> OpenSpec change `openspec/changes/v2-context-access-layer/`.
+V1 is under active development. The code currently in the repository is disposable prototype scaffolding; it is not an earlier released version and receives no schema or CLI compatibility treatment. The target is tracked in `openspec/changes/v1-context-access-layer/`.
 
-## Quickstart
+## Development
 
 ```sh
 bun install
-bun cli --help            # from repo root
-# or, equivalently:
-bun run cli --help        # from repo root or from apps/cli
+bun cli --help
+# equivalently:
+bun run cli --help
 ```
 
-There is no `bun link` / global install path. The CLI is invoked only through `bun cli` / `bun run cli`, both of which dispatch to `apps/cli/bin/ctxindex.mjs`.
+There is no `bun link` development path. Both commands dispatch to `apps/cli/bin/ctxindex.mjs`.
 
 ## Documentation map
 
 | Document | Owns |
 |---|---|
-| `SPEC.md` | Normative external behavior and the adapter/extension contract |
-| `CONTEXT.md` | Domain language (Ref, Resource, Profile, Source, Extension, ...) |
-| `IMPLEMENTATION.md` | Reference implementation choices (see supersession banner) |
-| `V1.md` | Historical v1 milestone scope |
-| `docs/design/2026-07-13-context-access-layer.md` | Access-layer redesign: decision log D1–D19, concept model, storage, open questions |
+| `CONTEXT.md` | Ubiquitous language and domain relationships |
+| `SPEC.md` | Timeless normative behavior and Adapter/Extension contracts |
+| `V1.md` | First-release scope, deferrals, and implementation slices |
+| `IMPLEMENTATION.md` | Reference implementation choices |
+| `docs/design/2026-07-13-context-access-layer.md` | Decisions D1–D22 and cross-cutting rationale |
 | `docs/design/architecture-explainer.md` / `.html` | Narrative architecture explainer |
-| `openspec/` | Spec-driven change management (active: `v2-context-access-layer`) |
-| `docs/AGENT-HOWTOS.md` | Agent recipes for driving the real CLI |
-| `skills/` | Bundled agent-facing skill docs shipped with the CLI |
+| `openspec/changes/v1-context-access-layer/` | Active capability specs and tasks |
+| `docs/AGENT-HOWTOS.md` | Recipes for driving the current prototype while V1 is built |
+| `skills/` | Agent-facing usage docs shipped with the CLI |

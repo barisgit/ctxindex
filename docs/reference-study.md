@@ -1,5 +1,10 @@
 # ctxindex Reference Study
 
+> Historical prototype research. It predates the current V1 context-gateway
+> design and is non-normative; current decisions live in `CONTEXT.md`, `SPEC.md`,
+> `V1.md`, and `docs/design/2026-07-13-context-access-layer.md`.
+
+
 Status: notes from BTCA local reference study. This document is non-normative; promote decisions into `SPEC.md` or `IMPLEMENTATION.md` when locked.
 
 ## References inspected

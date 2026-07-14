@@ -8,25 +8,25 @@ Milestone scope (must-ship lists, deferred items, exit criteria) lives in `V1.md
 
 ## 1. Scope
 
-ctxindex is a local-first personal context access layer. It is the interface through which agents and users discover, retrieve, and locally materialize user-owned context from external services and local files. Indexing searchable local copies is one implementation strategy for fast local discovery, not the product definition.
+ctxindex is a local personal-context gateway. It is the interface through which agents and users discover, retrieve, locally materialize, and perform typed Actions on user-owned context from external services and local files. Indexing searchable local copies is one implementation strategy for fast local discovery, not the product definition.
 
 ctxindex defines:
 
 - a resource/profile model for mail, calendar events, tasks, files, and arbitrary extension-defined domains;
-- a profile vocabulary contract through which all domain semantics reach core;
-- a source adapter contract with capability flags (sync, remote search, retrieval, download), used identically by bundled and extension adapters;
+- a profile vocabulary contract through which all domain semantics and typed Action contracts reach core;
+- a source adapter contract with capability flags (sync, remote search, retrieval, download) and Profile Action implementations, used identically by bundled and extension adapters;
 - an extension loading model for user-provided profiles and adapters;
 - a stable ref grammar addressing resources independent of index state;
 - normalized resource/chunk/tombstone operations emitted by source adapters;
 - local full-text and field search over normalized content, with optional provider-side (remote) search;
 - a managed content-addressed artifact store for attachments, raw records, and rendered exports;
 - export of resources to portable formats declared by profiles;
-- local account, grant, source, sync, and search behavior.
+- local account, grant, realm, source, sync, search, and Action behavior.
 
 ctxindex does not define:
 
 - a SaaS service or remote canonical store;
-- write-back to external services as part of the core contract;
+- agent workflow policy or arbitrary provider automation outside typed Profile Actions;
 - extension-registered arbitrary CLI subcommands (deferred; see design doc D1/D18);
 - a universal sync protocol for arbitrary applications.
 
@@ -41,9 +41,11 @@ The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**, **SHOULD NOT**, 
 - An **extension** is a distributable module providing profiles and source adapters through the public definition API. Bundled (built-in) extensions use the same contract; their only privileges are distributional (always present, loaded first, winning id conflicts with a diagnostic).
 - A **profile** is a versioned, schema-backed declaration of one domain shape plus the vocabulary core uses to serve it (§3a). Profiles are the ONLY mechanism for domain semantics; core MUST NOT contain domain-specific code paths.
 - A **source adapter** is code connecting one provider collection type, such as `google.mailbox` or `local.directory`. It declares capability flags, an auth spec, a config schema, and the profiles it emits.
+- An **action** is a typed provider-side mutation declared by a profile and implemented by a source adapter through a specific source.
+- A **realm** is a user-defined operating context, such as `personal`, `company`, or `university`, used to group sources that should be searched and reasoned about together.
 - An **account** is an external authenticated identity.
 - A **grant** is a permission set and secret reference for an account.
-- A **source** is one configured connection to one collection using exactly one source adapter. Sync is an optional per-source setting; a source with sync disabled participates in remote search and retrieval only.
+- A **source** is one configured connection to one collection using exactly one source adapter. Sync is an optional per-source setting; a Source with sync disabled may still participate in remote search, retrieval, download, and supported Actions.
 - A **resource** is one unit of context emitted by a source: an envelope (ref, primary profile id+version, title, times, origin) plus validated profile payload(s). The envelope kind IS the primary profile id.
 - A **ref** is the stable locator `ctx://<source-id>/<adapter-opaque-suffix>` for one resource, valid whether or not the resource is indexed. The suffix is adapter-owned and opaque to core. Provider-native URIs are envelope metadata, never addressing input.
 - A **chunk** is one searchable segment of a resource's extracted content.
@@ -60,11 +62,12 @@ A profile declares, at minimum: an id, an integer version, and a payload schema.
 - **relations** — pure extractors producing edges to refs or natural keys (§4);
 - **artifacts** — pure extractor producing artifact descriptors (bytes fetched lazily);
 - **exports** — a map of format name to media type + render function;
+- **actions** — typed provider-mutation contracts (stable id, input schema, output contract, effect classification, docs, and examples) whose I/O implementations belong to adapters;
 - **docs** — human summaries, kind aliases, and examples, from which agent-facing documentation is derived.
 
 Vocabulary rules (normative):
 
-1. Vocabulary functions MUST be pure over the validated payload; no I/O. The one exception is export render functions, which MAY receive core-resolved declared dependencies (e.g. related resources by relation type).
+1. Vocabulary functions MUST be pure over the validated payload; no I/O. The one exception is export render functions, which MAY receive core-resolved declared dependencies (e.g. related resources by relation type). Action declarations are pure contracts; their provider I/O is never a profile vocabulary function.
 2. Vocabulary slots are versioned. An implementation encountering an unknown slot MUST ignore it with a diagnostic and continue.
 3. When an adapter emits a payload for an unknown profile id or version, core MUST accept the resource at envelope level, index what the envelope carries, and surface a warning (degraded acceptance). Sync MUST NOT fail on unknown profiles.
 4. Bundled canonical profiles (`communication.message`, `communication.conversation`, `calendar.event`, `task`, `file`, `artifact`) MUST be expressible through the same public profile API as extension profiles.
@@ -77,12 +80,15 @@ Resources carry an origin class: `synced` (produced by sync runs, subject to tom
 
 ### 3c. Adapter capabilities and operations
 
-An adapter declares a set of boolean capability flags: `sync`, `search-remote`, `retrieve`, `download`. Declaring a capability REQUIRES implementing its operation; omitting it FORBIDS it:
+An adapter declares a set of boolean capability flags: `sync`, `search-remote`, `retrieve`, `download`, plus an Action implementation map keyed by Profile Action id. Declaring a capability or Action REQUIRES implementing it; omitting it FORBIDS it:
 
 - `sync` — cursor-driven generator emitting resource upsert/tombstone/cursor operations;
 - `search-remote` — translate a ctxindex query to the provider's search API, returning envelope-level results with refs;
 - `retrieve` — fetch one complete resource by ref;
 - `download` — stream one artifact's bytes by artifact ref into the managed store.
+- Action implementation — validate and execute one Profile-declared mutation through a Source, returning the declared normalized output.
+
+An adapter MUST NOT implement an Action that no supported Profile declares. Core MUST validate capability and Action consistency when building registries. Action support is source-discoverable and is not a license for arbitrary Extension CLI commands.
 
 Search routing mode is NOT a capability. Routing precedence is: CLI flag (`--local-only` / `--remote`) over per-source configuration over adapter decision. The default is hybrid orchestration in which each source answers per its adapter's routing choice, which SHOULD consult sync coverage.
 
@@ -92,7 +98,7 @@ Extensions are TS/JS modules loaded in-process by dynamic import, running with f
 
 When an extension is removed or fails to load, its sources become unavailable (listed; no sync; no remote operations) but their synced resources REMAIN searchable, degrading to envelope-level behavior where profile vocabulary is missing. Removing extension code MUST NOT silently delete data; explicit source removal/purge commands are the only deletion paths.
 
-The CLI's generic verbs MUST derive their argument space from the registries: valid kinds from profile ids and declared aliases, valid `--field` names and value types from profile field declarations, adapter config flags from config schemas, export formats from profile export maps. Parallel hand-maintained command or alias declarations MUST NOT exist.
+The CLI's generic verbs MUST derive their argument space from the registries: valid kinds from profile ids and declared aliases, valid `--field` names and value types from profile field declarations, adapter config flags from config schemas, export formats from profile export maps, and Actions/input schemas from Profile declarations plus Adapter bindings. Parallel hand-maintained command or alias declarations MUST NOT exist.
 
 ## 4. Identity, deletion, and relations
 
@@ -253,13 +259,25 @@ Artifacts: artifact bytes MUST live in a content-addressed store with recorded m
 
 Export: `export <ref> --format <f>` resolves the resource's profile, looks up `f` in its export map, and streams the rendered representation. Valid formats per kind are exactly the profile-declared export map keys. Core MUST NOT implement format conversion pipelines; a JSON export of the validated payload is always available without profile declaration.
 
-Search results and describe output SHOULD carry machine-readable affordances (available operations per result derived from capability flags and profile vocabulary) so callers never need provider-specific knowledge.
+Search results, Source descriptions, and describe output SHOULD carry machine-readable affordances (available operations and Actions derived from capability flags, Profile vocabulary, and Adapter bindings) so callers never need provider-specific knowledge.
+
+## 10g. Typed provider Actions
+
+Profiles MAY declare typed Actions. Each Action MUST have a stable id, input schema, output contract, effect classification (`reversible` or `irreversible`), and documentation. Action declarations MUST remain provider-independent; Source Adapters bind provider implementations to the Profile Action ids they support.
+
+`action describe <action-id>` MUST derive its input and availability from the loaded registries. `action run <action-id>` MUST require an explicit Source, validate the complete input before provider I/O, execute only when that Source's Adapter implements the Action, and return the declared normalized result with Resource Refs where applicable.
+
+An Action result that creates or changes addressable provider context SHOULD be returned as a Resource and MAY be materialized locally as an `adhoc` row. External services remain canonical. Agent reasoning, content composition, approval conversations, and multi-step workflow policy remain outside ctxindex.
+
+An irreversible Action MUST require an explicit non-interactive confirmation signal and MUST NOT be automatically retried after an ambiguous provider outcome. Milestone documents MAY ship only reversible Actions.
+
+A provider-persisted email Draft is a `communication.message` Resource produced by a reversible Action. Text composed only in an agent conversation is not a provider Draft and requires no ctxindex operation.
 
 ## 10a. Realms
 
-A realm is a user-defined organization/search scope. ctxindex MUST support multiple realms and MUST seed a `global` realm on initialization.
+A realm is a user-defined operating context and search scope, such as `personal`, `company`, or `university`. ctxindex MUST support multiple user-created realms and MUST NOT assign special semantics to a `global` realm.
 
-Every source MUST belong to exactly one realm. A source without an explicit realm assignment MUST fall into the `global` realm. A realm MAY contain sources from any provider, account, or source adapter.
+Every source MUST belong to exactly one explicitly selected existing realm. Source creation without a realm MUST fail with an actionable error. A realm MAY contain sources from any provider, account, or source adapter.
 
 Realms MUST NOT be treated as a security boundary. Credentials, grants, and account isolation MUST be enforced at the account/grant level, not by realm membership.
 
@@ -267,11 +285,11 @@ Multiple sources MAY use the same account or grant across different realms when 
 
 Every source whose adapter requires authentication MUST store an explicit `grant_id` link. Such a source MUST NOT be created without a valid provider-compatible grant. When exactly one compatible grant exists, the CLI MAY bind it automatically; when zero or multiple compatible grants exist, source creation MUST fail unless the caller identifies one explicitly. Sync and federated search MUST resolve credentials only through the source's linked grant and MUST NOT select a global "active" or most-recent grant.
 
-Search SHOULD default to all realms when no realm filter is provided. Callers SHOULD be able to filter to one or more realms. When a realm filter is provided, the `global` realm SHOULD be implicitly included unless the caller explicitly opts out via an exclusive filter.
+Search MUST consider all realms when no realm filter is provided. Callers MUST be able to filter to one or more realms, and an explicit realm filter MUST be exact: no additional realm is implicitly included.
 
 ## 10b. CLI surface and output
 
-The reference CLI SHOULD provide commands for initialization, authentication, source configuration, sync, search, status, and maintenance. The specific command set offered by a release is captured in that release's milestone document.
+The reference CLI SHOULD provide commands for initialization, authentication, realm/source configuration, sync, search, retrieval, typed Actions, status, and maintenance. The specific command set offered by a release is captured in that release's milestone document.
 
 CLI output SHOULD be token-efficient by default: compact human-readable text with one item per line and only key fields. Verbose human output and machine-readable JSON SHOULD be opt-in flags.
 
@@ -293,7 +311,7 @@ ctxindex SHOULD ship bundled skill documentation alongside the binary so agents 
 
 Bundled skill docs MUST be versioned with the ctxindex release that ships them.
 
-Agent-facing documentation of kinds, fields, filters, formats, and adapter flags MUST be derived from the loaded definitions (profiles, adapters, config schemas), not hand-maintained in parallel. Hand-written prose is limited to workflow guidance and definition-level `docs` fields.
+Agent-facing documentation of kinds, fields, filters, formats, Actions, and adapter flags MUST be derived from the loaded definitions (profiles, adapters, config schemas), not hand-maintained in parallel. Hand-written prose is limited to workflow guidance and definition-level `docs` fields.
 
 ## 10d. Module boundaries
 
@@ -393,7 +411,7 @@ The baseline supported backup procedure is: stop active syncs, then copy the SQL
 
 ctxindex MAY ship an `export` command. Any such export format MUST be either declared stable in a release document or marked unstable. Unstable export formats SHOULD NOT be relied on for cross-version restore.
 
-Schema migrations MUST keep `ctxindex.sqlite` upgradable between releases via the registered migration namespaces.
+Beginning with the first released V1 schema, core-owned migrations MUST keep `ctxindex.sqlite` upgradable between released versions. Prototype databases created before V1 have no migration guarantee, and Adapters MUST NOT register migration namespaces.
 
 ## 16. Distribution and versioning
 

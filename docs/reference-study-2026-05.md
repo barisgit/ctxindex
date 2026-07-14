@@ -1,5 +1,9 @@
 # Reference study — 2026-05
 
+> Historical prototype research. References to “V1” below mean an abandoned
+> prototype plan, not the current V1 scope. This document is non-normative.
+
+
 Status: non-normative. Authored to feed the next charter (cli-and-e2e + loopback OAuth) and to seed targeted amendments in `V1.md` / `SPEC.md` / `IMPLEMENTATION.md`. The earlier `docs/reference-study.md` stays in force for adapter-contract and indexer patterns; this study covers monorepo / env / test infrastructure.
 
 ## Cross-cutting findings

@@ -1,5 +1,10 @@
 # ctxindex v1 showcase report — cli-and-e2e
 
+> Archived prototype showcase. Any “V1” labels below refer to an abandoned
+> prototype plan, not the current V1 scope in `V1.md`. Commands and evidence are
+> retained only as implementation history.
+
+
 Charter: `8d28cb6d-7eef-4a16-b1bc-f5846176e722`  
 Worktree: `/Users/blaz/Programming_local/Projects/ctxindex/.worktrees/feature-v1-impl`  
 Generated: 2026-05-22

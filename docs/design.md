@@ -1,11 +1,12 @@
-# ctxindex Design Notes
+# ctxindex design notes
 
-This file has been split into root-level source-of-truth documents:
+Durable design truth is split by ownership:
 
-- [`../SPEC.md`](../SPEC.md) — normative behavior and adapter contract.
-- [`../IMPLEMENTATION.md`](../IMPLEMENTATION.md) — reference implementation choices, storage stack, migrations, runtime, and file layout.
-- [`../CONTEXT.md`](../CONTEXT.md) — domain language and naming rules.
-- [`design/2026-07-13-context-access-layer.md`](design/2026-07-13-context-access-layer.md) — access-layer redesign decision log and concept model.
-- [`../openspec/`](../openspec) — spec-driven change management (active change: `v2-context-access-layer`).
+- [`../CONTEXT.md`](../CONTEXT.md) — ubiquitous language and relationships.
+- [`../SPEC.md`](../SPEC.md) — normative behavior and public contracts.
+- [`../V1.md`](../V1.md) — first-release scope and vertical slices.
+- [`../IMPLEMENTATION.md`](../IMPLEMENTATION.md) — reference implementation choices.
+- [`design/2026-07-13-context-access-layer.md`](design/2026-07-13-context-access-layer.md) — accepted decision log and cross-cutting design.
+- [`../openspec/changes/v1-context-access-layer/`](../openspec/changes/v1-context-access-layer) — active capability specs and tasks.
 
-Keep future durable decisions in the smallest appropriate owner above rather than duplicating them here.
+Keep future durable decisions in the smallest appropriate owner rather than duplicating them here.

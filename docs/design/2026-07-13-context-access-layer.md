@@ -1,17 +1,18 @@
-# ctxindex redesign: personal context access layer
+# ctxindex V1 design: personal context gateway
 
-Status: draft design (pre-spec). Supersedes the product framing in `CONTEXT.md` and
-parts of `SPEC.md` §1/§3 once accepted. Decisions here were resolved in a design
-grill session on 2026-07-13; each carries its rationale and its reversibility.
+Status: accepted direction; detailed capability contracts remain in progress.
+Decisions were resolved through design grills on 2026-07-13 and 2026-07-14.
+This is the design for the first product version; prototype code and databases
+carry no migration or compatibility obligations.
 
 ## 1. Product reframe
 
-> **ctxindex is the source-of-truth interface through which agents discover,
-> retrieve, and locally materialize a person's context — mail, calendars, tasks,
-> files, and arbitrary connector domains. Indexing is one implementation
-> strategy for fast local discovery, not the product definition.**
+> **ctxindex is the local gateway through which agents discover, retrieve,
+> materialize, and perform typed Actions on a person's context — mail,
+> calendars, tasks, files, and arbitrary Extension-defined domains. Indexing is one
+> implementation strategy for fast local discovery, not the product definition.**
 
-Three core capabilities over the same configured sources:
+Four core capabilities over the same configured Sources:
 
 1. **Discover** — search indexed data fast; optionally search providers live;
    return stable refs, metadata, snippets.
@@ -20,6 +21,9 @@ Three core capabilities over the same configured sources:
    the source to be synced.
 3. **Sync** — maintain searchable local projections of selected sources with
    optional artifact retention.
+4. **Act** — execute typed, Profile-declared provider mutations through the
+   same Source, auth, validation, and identity boundary. V1 stops at reversible
+   provider-persisted email Draft create/update.
 
 Ad hoc retrieval and sync are two access modes over one source concept, not two
 products. Agent workflow policy (digest composition, triage rules, unsubscribe
@@ -28,17 +32,21 @@ safety) stays OUT of ctxindex — it lives in agent skills that call the CLI.
 Division of labor with the surrounding ecosystem:
 
 - **ctxindex**: auth, provider access, sync, search, retrieval, download/export,
-  deterministic JSON output.
+  typed provider Actions, deterministic JSON output.
 - **Agent skills** (e.g. the Hermes `context-hub` skill this replaces): workflow
   policy over the CLI.
+- **MCP**: an optional future transport/interface to ctxindex, not the context
+  model or provider runtime. V1 exposes the CLI; ten provider MCPs would remain
+  ten auth/identity/search/artifact silos, while one future ctxindex MCP could
+  expose the shared data plane.
 - **ACF** (`../agent-capability-format`): future distribution of agent-facing
   skill docs. ctxindex extension packages therefore bundle adapters/profiles
   ONLY, not skills. The existing `ctxindex skills` surface remains for bundled
   docs but is expected to be superseded by ACF emission.
 
-Explicitly out of scope (unchanged): SaaS/remote canonical store, write-back to
-providers, universal sync protocol. Newly IN scope (reverses current SPEC §1):
-dynamic loading of user extensions; export of items/threads/attachments as files.
+Explicitly out of scope: SaaS/remote canonical store, arbitrary provider
+automation, agent workflow policy, and a universal sync protocol. Typed
+Profile Actions are in scope; arbitrary Extension subcommands are not.
 
 ## 2. Decision log
 
@@ -53,68 +61,67 @@ dynamic loading of user extensions; export of items/threads/attachments as files
 | D7 | Search default | Hybrid orchestration; adapter decides per source with sync-coverage knowledge; `--local-only` / `--remote` override | PROVISIONAL — validate by dogfooding partial Gmail sync |
 | D8 | Artifacts | Managed content-addressed store with retention policy, purge, `--output` copies out | |
 | D9 | Data shape | Minimal resource envelope + profiles; arbitrary payload allowed | |
-| D10 | Profile composability | Permitted by API; v-next uses one primary profile (+ `artifact`) per resource | |
+| D10 | Profile composability | Permitted by API; V1 uses one primary Profile (+ `artifact`) per resource | |
 | D11 | Definition style | Declarative `defineExtension`/`defineAdapter`/`defineProfile` factories; typed registries internally | pi-style authoring, lume/sessionloom-style registries |
 | D12 | Unknown profile version on emit | Accept envelope-only, index degraded, warn | Matches provider-failure philosophy |
-| D13 | Storage | Six generic core tables; NO per-profile tables, NO adapter-private tables in v-next | `ctx.storage` is a future additive API |
+| D13 | Storage | Six generic core tables; NO per-profile tables, NO Adapter-private tables in V1 | `ctx.storage` is a future additive API |
 | D14 | Relations | Bidirectional edges; targets are `ctx://` ref OR natural key (lazy resolution) | Order-independent threading, cross-source joins |
 | D15 | Exports | Vocabulary slot on profiles (`format -> render`); generic core verb; no conversion pipeline | |
 | D16 | Capabilities | Const array of enum flags: `["sync", "search-remote", "retrieve", "download"]`; search MODE moves to routing | |
-| D17 | Distribution | Local paths in config + auto-discovery dir now; git later; npm deferred; possibly reuse ACF resolver | |
+| D17 | Distribution | Explicit local paths in V1; auto-discovery, git, and npm later; possibly reuse ACF resolver | Smallest loader surface first |
 | D18 | CLI dynamism | Generic verbs derive their whole argument space from registries (kinds, fields, formats, adapter flags from config schemas). NO parallel command/alias declarations. Typed subcommand registration through the registry machinery is the only future alternative (deferred) | Derive, never declare twice |
 | D19 | Docs | Definitions are self-documenting: `docs` fields, kind `aliases`, schema `.describe()` in the SDK contract from day one; `ctxindex describe` renders registry-derived docs; bundled skill docs mostly generated | Implementation deferred; contract fields not |
+| D20 | Realms | Keep user-defined operating contexts; every Source has exactly one; no `global` Realm; explicit filters are exact | Personal/company/university are real reasoning boundaries, not security boundaries |
+| D21 | Provider Actions | Profiles declare typed Actions; Adapters implement them through a Source; no arbitrary command surface | V1 ships reversible email Draft create/update only; sending deferred |
+| D22 | Release baseline | This architecture is V1; prototype code/data are disposable | No schema migration, CLI compatibility, or stored-payload upgrade machinery |
 
-## 3. Concept model (10 nouns)
+## 3. Concept model
 
-- **Ref** — `ctx://<source-id>/<opaque-suffix>`; stable locator for a resource,
-  independent of whether it is indexed. Adapter owns the suffix. If a remote
-  hit is later synced, the same ref resolves to the local row.
+- **Realm** — user-defined operating context such as personal, company, or
+  university. Every Source belongs to exactly one Realm; no filter means all
+  Realms, while an explicit filter is exact. There is no special global Realm.
+- **Source** — one configured connection instance (Account, Realm, config,
+  sync on/off) using exactly one Adapter.
+- **Extension** — distributable module bundling Profiles and Adapters via
+  `defineExtension`; it has no operations or command surface of its own.
+- **Profile** — versioned, schema-backed declaration of a domain shape plus
+  search fields, Relations, Artifacts, exports, docs, and typed Actions. It is
+  the only mechanism for domain semantics.
+- **Action** — typed provider mutation declared by a Profile and implemented
+  by an Adapter through a specific Source.
+- **Draft** — reversible provider-persisted proposed state. Text composed only
+  in an agent conversation is not a Draft until an Action saves it remotely.
+- **Adapter** — provider implementation declaring auth/config/capabilities and
+  implementing sync, remote search, retrieve, download, and supported Actions.
 - **Resource** — one unit of context (message, event, task, file, tender) as an
-  envelope + validated profile payload(s). The envelope `kind` IS the primary
-  profile id; user-facing aliases (`mail` → `communication.message`) are a
-  CLI-level alias table, not a separate concept.
-- **Profile** — versioned, schema-backed declaration of a domain shape plus the
-  vocabulary core needs (search mapping, fields, relations, artifacts, exports).
-  The ONLY mechanism for domain semantics. Canonical profiles are bundled
-  profile definitions using the same public API as extension profiles.
-- **Adapter** — connects one provider collection type; declares capabilities,
-  auth, config schema, emitted profiles; implements `sync` / `searchRemote` /
-  `retrieve` / `download` per its capability flags.
-- **Extension** — distributable module providing profiles and adapters via
-  `defineExtension`. Built-ins are extensions bundled with the binary; same
-  contract, no privileged path. Privileges are distributional only (always
-  present, loaded first, win id conflicts).
-- **Source** — one configured connection instance (account, realm, config,
-  sync on/off) using exactly one adapter.
-- **Sync run** — cursor-driven materialization of a source (existing model:
-  locks, runs, checkpoints, tombstones — unchanged).
+  envelope plus one primary Profile payload.
+- **Ref** — `ctx://<source-id>/<opaque-suffix>`; stable locator for a Resource,
+  independent of local materialization. The Adapter owns the suffix.
+- **Relation** — typed edge between Resources; its target is a Ref or natural
+  key awaiting lazy resolution.
 - **Artifact** — downloadable bytes (attachment, original record, rendered
   export) in the content-addressed store.
-- **Relation** — typed edge between resources; target may be a ref or a
-  natural key awaiting resolution.
-- **Field index** — generic typed index rows extracted from declared profile
-  fields; powers filters and aggregation.
+- **Field index** — generic typed rows extracted from Profile fields for
+  filtering and aggregation.
+- **Sync run** — cursor-driven attempt to refresh one Source's local
+  materialization.
 
 Dependency DAG:
 
-```
-Extension ─provides─> ProfileDef ─> ProfileRegistry ─vocabulary─> QueryPlanner
-    │                     ▲                                          ▲
-    └─provides─> AdapterDef (emits profiles, declares AuthSpec) ────┐│
-                      │                                             ││
-                 AdapterRegistry ─> Source (account, realm, sync?)  ││
-                      │                   │                         ││
-                      │            ┌──────┴────────┐                ││
-                      │         SyncRun         AdHocCall           ││
-                      │            └──────┬────────┘                ││
-                      └────emit────> Resource(ref, envelope,        ││
-                                     profile payloads) ────────────>┘│
-                                       │        │                    │
-                              FieldIndex+FTS  ArtifactDescriptor     │
-                              Relations         │                    │
-                                       │     ArtifactStore (CAS)     │
-                                       ▼        ▼                    │
-                    CLI: search/aggregate/get/thread/artifact/export/sync/status
+```text
+Realm ─contains─> Source ─uses─> AdapterDef <──────┐
+                         │          ▲              │
+                         │          │              │
+Extension ─bundles───────┼────> ProfileDef         │
+                         │          │ declares     │
+                         │          ▼              │
+                         │       ActionDef ─implemented by─┘
+                         │
+                         ├─ sync/search/retrieve ─> Resource + Relation + Artifact
+                         └─ action run ────────────> Resource (for example Draft)
+
+ProfileDef ─extracts─> FieldIndex + FTS + Relations + Artifact descriptors
+Core registries ─derive─> search/get/thread/export/action/describe CLI surface
 ```
 
 ## 4. Core vs vocabulary: the smart-runtime rule
@@ -122,9 +129,9 @@ Extension ─provides─> ProfileDef ─> ProfileRegistry ─vocabulary─> Quer
 **Core knows the vocabulary, never the domains.** Core never contains the word
 "mail". It implements mechanics: query planning, FTS, field indexes, relation
 traversal (both directions), artifact retention, sync locking, auth flows,
-registries, routing.
+Action validation/routing, registries, and search routing.
 
-Profile vocabulary slots (v-next, each versioned):
+Profile vocabulary slots (V1, each versioned):
 
 ```ts
 defineProfile({
@@ -149,6 +156,14 @@ defineProfile({
   exports: {
     eml: { mediaType: "message/rfc822", render: renderEml },
   },
+  actions: {
+    "communication.message.draft.create": {
+      effect: "reversible",
+      input: z.object({ to: z.array(z.string()), subject: z.string(), body: z.string() }),
+      output: { profile: "communication.message" },
+      docs: "Persist a provider Draft through an explicit mailbox Source",
+    },
+  },
 })
 ```
 
@@ -157,12 +172,15 @@ Rules:
 1. **Purity** — vocabulary functions are pure over the validated payload. No
    I/O. Anything needing I/O belongs in the adapter. Exception: `render` for
    multi-resource exports receives declared deps (e.g. "related resources by
-   relation R"), resolved by core.
+   relation R"), resolved by core. Action declarations are pure schemas and
+   metadata; their implementations belong to Adapters.
 2. **Versioned slots** — a binary ignoring an unknown slot emits a diagnostic
    and continues (same policy as D12). Old cores tolerate new vocabulary; new
    cores give old profiles more capability.
 3. **Degraded acceptance (D12)** — unknown profile id/version at emit: store
    envelope, index what the envelope carries, warn in sync run + status.
+4. **No speculative migration (D22)** — V1 records version `1`, but no payload
+   migration mechanism exists until a second real Profile version requires one.
 
 Canonical profiles bundled with the binary: `communication.message`,
 `communication.conversation` (carries the `mbox` export, whose render deps
@@ -173,7 +191,7 @@ profile API, the API is too weak.**
 
 ## 5. Storage (D13)
 
-Six generic tables replace all per-domain tables:
+V1 starts from a fresh generic schema with no per-domain tables:
 
 | Table | Contents |
 |---|---|
@@ -182,11 +200,12 @@ Six generic tables replace all per-domain tables:
 | `chunks` (+FTS) | searchable text segments |
 | `relations` | (from_resource, relation, target_ref?, target_field?, target_value?, resolved_resource_id?) |
 | `artifacts` | CAS metadata: hash, media type, size, origin ref, retention class, local path |
-| `sources` + existing sync bookkeeping | unchanged: sync_runs, sync_locks, source_sync_state, tombstones, accounts, grants, realms |
+| `sources` + sync bookkeeping | sync_runs, sync_locks, source_sync_state, tombstones, accounts, grants, user-defined realms |
 
-DELETED from the current design: `mail_messages`, `mail_bodies`,
-`mail_attachments`, per-adapter migration namespaces for canonical data,
-adapter-private tables. Escape valves until a future `ctx.storage` API: cursor
+Prototype tables such as `items`, `mail_messages`, `mail_bodies`, and
+`mail_attachments` are not part of V1. Development databases are deleted and
+recreated; no migration or compatibility code is written. Adapters have no
+private tables or migration namespaces. Escape valves until a future `ctx.storage` API: cursor
 JSON (sync state) and the artifact store (blobs).
 
 Ad hoc caching: `retrieve` results are cached into the SAME tables with
@@ -229,6 +248,12 @@ All flags boolean. Conditional types narrow the adapter definition: declaring
 `"sync"` requires the `sync` generator; omitting it forbids it. Same for
 `searchRemote`, `retrieve`, `download`.
 
+Action implementations are a separate map keyed by Profile Action id. An
+Adapter may bind only Actions declared by Profiles it supports; the registry
+rejects missing, extra, or schema-incompatible bindings. There is no standalone
+`emit` capability: operations emit normalized Resources/Relations/Artifacts
+through their capability-specific contexts.
+
 ### Auth (D5)
 
 ```ts
@@ -241,6 +266,21 @@ Core runs declarative flows, stores secrets, refreshes tokens, surfaces
 `needs_auth` (exit 10) uniformly, hands adapters a pre-authorized `ctx.fetch`.
 `custom` grants only `ctx.secrets.get/set` (namespaced); `auth list` shows it
 as custom-managed.
+
+### Realms and Sources (D20)
+
+Realms are exact user-defined operating contexts. Every Source must select one
+existing Realm; initialization seeds no `global` Realm. An unfiltered query
+spans all Realms, while `--realm company` includes only company Sources.
+Realms organize reasoning and search, not authorization.
+
+### Typed Actions (D21)
+
+Profiles declare provider-independent Action ids, input/output schemas, effect
+classification, docs, and examples. Adapters bind implementations through a
+specific Source and its existing auth context. V1 implements only reversible
+`communication.message.draft.create` and `.update`; sending and other provider
+mutations are deferred. Agent composition and approval remain workflow policy.
 
 ### Search routing (D7, provisional)
 
@@ -282,9 +322,10 @@ import { communication } from "@ctxindex/profiles";  // typed descriptors of bun
   validation of dynamically loaded definitions, type-erased `AnyAdapter` /
   `AnyProfile` surfaces inside core.
 
-Loading: auto-discovery from `~/.config/ctxindex/extensions/*.ts` and
-`*/index.ts`, plus explicit paths in config. Full trust (documented). Built-in
-extensions load first; id conflicts resolve to built-ins with a diagnostic.
+Loading: V1 accepts explicit local paths in config. Auto-discovery from
+`~/.config/ctxindex/extensions/`, git, and npm are later distribution work.
+Full trust is documented. Built-in Extensions load first; id conflicts resolve
+to built-ins with a diagnostic.
 
 Removal/absence semantics: when an extension is uninstalled or fails to load,
 its sources become `unavailable` (listed, not searchable remotely, no sync);
@@ -294,7 +335,7 @@ the profile came from the missing extension — in that case degrade to
 envelope-level behavior, D12 policy). `source remove` / `purge source` remain
 the explicit data-deletion paths; removing code never silently deletes data.
 
-Distribution (D17): local paths now; `git:` sources later; npm deferred;
+Distribution (D17): explicit local paths now; auto-discovery and `git:` later; npm deferred;
 evaluate reusing the ACF resolver (`capabilities.yml`-style fetch + lockfile)
 before building bespoke fetch logic.
 
@@ -303,7 +344,7 @@ before building bespoke fetch logic.
 ```text
 ctxindex init
 ctxindex auth add <provider> | list
-ctxindex realm add|list
+ctxindex realm add|list|remove
 ctxindex source add <adapter-id> --realm <slug> [--account ...] [--no-sync] [adapter flags]
 ctxindex source list|remove
 ctxindex sync [--source <id>] [--mode sync|resync|diff]
@@ -316,66 +357,52 @@ ctxindex thread get <ref> [--json]
 ctxindex artifact list <ref> [--json]
 ctxindex artifact download <artifact-ref> [--output <path>]
 ctxindex export <ref> --format <fmt> [--output <path>]
+ctxindex action describe <action-id> [--source <id>] [--json]
+ctxindex action run <action-id> --source <id> --input <json-or-file> [--json]
 ctxindex status [--source <id>] [--json]
 ctxindex purge index|raw|artifacts|adhoc|source <id>
-ctxindex install <path>            # later: git:..., npm:...
 ctxindex extensions list
+ctxindex describe [profile|adapter|action] [id] [--json]
 ctxindex skills list|get|path      # retained; ACF may supersede
 ctxindex secrets migrate <backend>
 ```
 
-Search results carry machine-readable affordances so agents never need
-provider knowledge: ref, kind, snippet, and available operations derived from
-adapter capabilities + profile vocabulary (`get`, `export:eml`, `download`).
+Search results and Source descriptions carry machine-readable affordances so
+agents never need provider knowledge: ref, kind, snippet, and available
+operations/Actions derived from Adapter capabilities + Profile vocabulary
+(`get`, `export:eml`, `download`, `communication.message.draft.create`).
 
 Example verb collapse: the Hermes CLI's bespoke `mail senders` becomes
 `ctxindex aggregate --field sender --kind communication.message --since 365d --top 50 --json`.
 
-## 11. Spec/docs impact
+## 11. Documentation ownership
 
-- `CONTEXT.md`: rewrite product definition (access layer, not index); redefine
-  Source (D6); add Ref, Resource, Profile, Artifact, Relation, Field index,
-  Extension; keep Account/Grant/Realm.
-- `SPEC.md`: §1 scope — remove "no dynamic third-party plugin loading" and
-  "no file export" exclusions; §3 core model — resources/profiles replace
-  item/chunk-only model (chunks remain as index detail); add ref grammar,
-  capability flags, auth kinds incl. custom bucket, routing precedence,
-  artifact store + retention, relations with natural keys, degraded
-  acceptance, vocabulary versioning + purity.
-- `IMPLEMENTATION.md`: drop mail_* tables + adapter migration namespaces; add
-  six-table storage, extension loader, SDK/profiles packages, binary
-  dynamic-import spike note.
-- `V1.md`: unaffected historically; new milestone doc (`V2.md`) should carve a
-  thin vertical slice: profiles for message/conversation + google.mailbox on
-  new storage; get/thread/artifact/export for mail; one external extension
-  (tenders) as proof.
+- `CONTEXT.md` owns the ubiquitous language and resolved relationships.
+- `SPEC.md` owns timeless normative behavior and the public Adapter/Extension contract.
+- `V1.md` owns first-release scope and vertical slices.
+- `IMPLEMENTATION.md` owns reference runtime/package/storage choices.
+- This document owns cross-cutting rationale and decisions D1–D22.
+- `openspec/changes/v1-context-access-layer/` owns active capability specs and tasks.
+
+The documents describe V1 directly. Prototype code, tables, CLI behavior, and
+local databases are not treated as a prior release and receive no migration or
+compatibility path.
 
 ## 12. Deferred (prove-we-need-it tier)
 
-- Arbitrary extension CLI subcommands (D1-C / D18): if ever needed, typed command definitions registered and validated like adapters — never string templates or alias maps.
-- `ctxindex describe` rendering + generated skill docs (D19; contract fields ship now).
-- Out-of-process / non-TS adapters.
-- npm distribution; ACF-resolver reuse decision.
-- `ctx.storage` per-extension storage API.
-- Multi-profile resources beyond primary+artifact (D10).
-- Cross-source identity/dedup; write-back; rate-limit/quota policy (warnings
-  only for now); semantic/vector search (future `embed` vocabulary slot);
-  change notifications/watch.
+- Email send and all non-email provider mutations; V1 stops at reversible email Draft create/update.
+- Arbitrary Extension CLI subcommands: if ever needed, typed command definitions registered and validated like Adapters — never string templates or alias maps.
+- Auto-discovery, git/npm Extension distribution, and ACF-resolver reuse.
+- Out-of-process / non-TypeScript Adapters.
+- `ctx.storage` per-Extension storage API.
+- Multi-profile Resources beyond one primary Profile plus Artifact descriptors.
+- Cross-source identity/deduplication.
+- Stored-payload migration machinery until a second real Profile version exists.
+- Rate-limit/quota policy beyond warning propagation; semantic/vector search; change notifications/watch.
 
 ## 13. Open questions
 
-1. Whether realms earn their place in the redesigned model or are ceremony
-   to cut before the six-table migration.
-2. Field index value typing for ranges (dates/numbers) and multi-valued
-   fields — encoding + query grammar for `--field`.
-3. Artifact retention policy shape (per-source? per-profile? global quota?)
-   and `status` disk accounting.
-3b. Stored-payload migration when a profile bumps its version (re-validate
-   lazily on read? re-index on upgrade? keep per-row profile version — chosen
-   — and re-extract fields opportunistically?).
-4. Exact `ctx://` suffix encoding rules (charset, escaping, length), and the
-   error contract for refs whose source was removed (`source_gone` vs
-   `not_found`).
-5. Whether `aggregate` needs per-field opt-in (`aggregatable: true`) to bound
-   index size, or aggregates lazily over `field_index` unconditionally.
-6. Hybrid default (D7) — revisit after dogfooding partial Gmail sync.
+1. Field-index scalar/array encoding, date/number ranges, query grammar, and whether aggregation requires explicit field opt-in.
+2. Artifact retention classes, quota scope, eviction order, and `status` disk accounting.
+3. Exact `ctx://` suffix encoding (charset, escaping, length) and the error contract for an unavailable/removed Source.
+4. Hybrid search default (D7), to revisit after dogfooding a partial Gmail sync.

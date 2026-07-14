@@ -1,12 +1,21 @@
 # Getting started with ctxindex
 
-Use ctxindex to build a local-first searchable index of your own files and provider data.
+Use ctxindex to discover, retrieve, and materialize personal context across configured Sources, organized into Realms such as `personal`, `company`, and `university`.
 
-Start with the [CLI overview](./reference/cli-overview.md) for the core command flow.
+Start with the [CLI overview](./reference/cli-overview.md).
 
-## First run
+## Core workflow
 
-1. Run `ctxindex init`.
-2. Add a source.
-3. Run `ctxindex sync`.
-4. Search with `ctxindex search <query>`.
+1. Initialize ctxindex.
+2. Create a Realm.
+3. Configure authentication when the Adapter requires it.
+4. Add a Source to that Realm.
+5. Search remotely immediately, or sync when the Source supports a local projection.
+6. Retrieve complete Resources by their stable `ctx://` Ref.
+7. Download Artifacts or export Profile-supported representations when needed.
+
+## Email Drafts
+
+The agent may compose proposed text without calling ctxindex. To persist it in a provider mailbox, invoke the loaded `communication.message.draft.create` Action through an explicit mailbox Source. Updating a provider Draft uses `communication.message.draft.update`.
+
+V1 does not send email. Sending and other consequential provider mutations are deferred.

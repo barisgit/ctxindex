@@ -1,5 +1,10 @@
 # Agent how-tos for ctxindex
 
+> These recipes drive the current disposable prototype while V1 is implemented.
+> They are harness documentation, not the target CLI contract; use `V1.md` and
+> `SPEC.md` for that.
+
+
 This page is for autonomous agents driving the real `ctxindex` CLI from a clean checkout. Run commands from the repo root unless a step says otherwise. Replace placeholder values such as `<path>` and `<query>` before running.
 
 ## Prerequisites
