@@ -68,9 +68,14 @@ Implement tasks from an OpenSpec change.
 
    For each pending task:
    - Show which task is being worked on
+   - State its observable success condition and the focused command(s) that will verify it
+   - For behavior changes, add or identify a failing test before implementation
    - Make the code changes required
    - Keep changes minimal and focused
-   - Mark task complete in the tasks file: `- [ ]` → `- [x]`
+   - Run the focused verification and every validation command named by the task
+   - If validation fails, fix and rerun; do not continue with a known failure
+   - Mark task complete in the tasks file only after validation passes: `- [ ]` → `- [x]`
+   - Treat tasks labelled **Slice gate** (or equivalent) as mandatory mid-change checkpoints; run the whole gate before entering the next slice
    - Continue to next task
 
    **Pause if:**
