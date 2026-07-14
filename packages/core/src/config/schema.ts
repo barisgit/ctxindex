@@ -10,6 +10,11 @@ export const logLevelSchema = z.enum([
 ])
 
 export const configSchema = z.object({
+  extensions: z
+    .object({
+      paths: z.array(z.string().min(1)).default([]),
+    })
+    .default({ paths: [] }),
   secrets: z.object({
     backend: z.enum(['keychain', 'file']),
     passphrase_env: z.string().min(1).optional(),
@@ -29,6 +34,7 @@ export type CtxindexConfig = z.infer<typeof configSchema>
 
 export function defaultConfig(): CtxindexConfig {
   return configSchema.parse({
+    extensions: {},
     secrets: { backend: 'keychain' },
     log: { file: {} },
   })

@@ -26,7 +26,7 @@ Status: pass — evidence: `work/slice-1-gate.txt` (typecheck, lint, 181 passing
 ### C2. Compiled ctxindex loads trusted external TypeScript Extensions
 A relocated compiled binary loads explicitly configured trusted TypeScript Extensions and their dependencies through the public seam, supplies only declared capability contexts, rejects an invalid Extension as a unit, and preserves existing Resources when an Extension disappears.
 Depends: C1
-Status: in-progress — Slice 2 is next in dependency order
+Status: pass — evidence: `work/slice-2-gate.txt` (explicit-path loading, atomic rejection, D3 relocation, Source preservation/recovery, typecheck, lint, and 190 tests passed)
 
 ### C3. Fresh generic storage enforces exact Realm and Source semantics
 A database created from empty contains only the generic V1 model; Profile-derived Resources, fields, chunks, Relations, Artifacts, and sync bookkeeping update transactionally with stable Source-scoped Refs, correct synced/ad-hoc lifecycle, explicit user-created Realms, exact filters, and no seeded `global` Realm.

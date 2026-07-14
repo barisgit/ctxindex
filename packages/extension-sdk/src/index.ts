@@ -95,13 +95,56 @@ export type AdapterAuthSpec =
   | { readonly kind: 'api-key'; readonly label: string }
   | { readonly kind: 'basic' | 'none' | 'custom' }
 
-type AdapterOperation = (...args: readonly unknown[]) => unknown
+export interface AdapterSourceContext {
+  readonly id: string
+  readonly config: unknown
+}
+
+export interface AdapterLogger {
+  trace(data: unknown, message?: string): void
+  debug(data: unknown, message?: string): void
+  info(data: unknown, message?: string): void
+  warn(data: unknown, message?: string): void
+  error(data: unknown, message?: string): void
+}
+
+interface ProviderContext {
+  readonly source: AdapterSourceContext
+  readonly fetch: typeof fetch
+  readonly logger: AdapterLogger
+}
+
+export interface SyncContext extends ProviderContext {
+  readonly cursor: unknown | null
+  readonly signal: AbortSignal
+  readonly emit: (operation: unknown) => void | Promise<void>
+}
+
+export interface SearchContext extends ProviderContext {
+  readonly query: unknown
+}
+
+export interface RetrieveContext extends ProviderContext {
+  readonly ref: string
+  readonly emitResource: (resource: unknown) => void | Promise<void>
+  readonly emitArtifact: (artifact: unknown) => void | Promise<void>
+}
+
+export interface DownloadContext extends ProviderContext {
+  readonly artifact: unknown
+  readonly write: (chunk: Uint8Array) => void | Promise<void>
+}
+
+export interface ActionContext<TInput = unknown> extends ProviderContext {
+  readonly input: TInput
+  readonly signal: AbortSignal
+}
 
 export type AdapterOperations = {
-  readonly sync?: AdapterOperation
-  readonly searchRemote?: AdapterOperation
-  readonly retrieve?: AdapterOperation
-  readonly download?: AdapterOperation
+  readonly sync?: (context: SyncContext) => unknown
+  readonly searchRemote?: (context: SearchContext) => unknown
+  readonly retrieve?: (context: RetrieveContext) => unknown
+  readonly download?: (context: DownloadContext) => unknown
 }
 
 type CapabilityOperation<
@@ -109,7 +152,7 @@ type CapabilityOperation<
   TCapability extends AdapterCapability,
   TOperation extends keyof AdapterOperations,
 > = TCapability extends TCapabilities[number]
-  ? { readonly [K in TOperation]: AdapterOperation }
+  ? { readonly [K in TOperation]: NonNullable<AdapterOperations[K]> }
   : { readonly [K in TOperation]?: never }
 
 export type AdapterOperationsFor<
@@ -119,11 +162,13 @@ export type AdapterOperationsFor<
   CapabilityOperation<TCapabilities, 'retrieve', 'retrieve'> &
   CapabilityOperation<TCapabilities, 'download', 'download'>
 
-export interface AdapterActionBinding {
+export interface AdapterActionBinding<
+  TInput extends z.ZodTypeAny = z.ZodTypeAny,
+> {
   readonly profile: ProfileReference
-  readonly input: z.ZodTypeAny
+  readonly input: TInput
   readonly output: ProfileReference
-  readonly run: (...args: readonly unknown[]) => unknown
+  readonly run: (context: ActionContext<z.infer<TInput>>) => unknown
 }
 
 export interface AdapterDefinition<
@@ -169,6 +214,13 @@ export interface ExtensionDefinition<
 
 export type AnyExtensionDefinition = ExtensionDefinition
 
+export interface ExtensionAuthoringHost {
+  readonly z: typeof import('zod').z
+  readonly defineProfile: typeof defineProfile
+  readonly defineAdapter: typeof defineAdapter
+  readonly defineExtension: typeof defineExtension
+}
+
 export function defineProfile<
   const TId extends string,
   const TVersion extends number,
@@ -185,12 +237,7 @@ export function defineAdapter<
   TConfigSchema extends z.ZodTypeAny,
   const TCapabilities extends readonly AdapterCapability[],
 >(
-  definition: AdapterDefinition<
-    TId,
-    TVersion,
-    TConfigSchema,
-    TCapabilities
-  >,
+  definition: AdapterDefinition<TId, TVersion, TConfigSchema, TCapabilities>,
 ): AdapterDefinition<TId, TVersion, TConfigSchema, TCapabilities> {
   return definition
 }

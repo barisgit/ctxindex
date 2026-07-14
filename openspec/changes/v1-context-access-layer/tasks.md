@@ -26,11 +26,11 @@ After the final task, run the `openspec-verify-change` workflow against all requ
 
 ## 2. Explicit-path Extension loading
 
-- [ ] 2.1 Add configuration for trusted explicit local Extension paths and dynamically import one external `.ts` fixture into the validated registries.
-- [ ] 2.2 Inject only capability-specific host contexts, load built-ins first, and report atomic validation/id-conflict diagnostics; verify invalid Extensions activate nothing.
-- [ ] 2.3 Integrate `scripts/spikes/d3-compiled-extension/run.sh` into CI and verify the relocated Bun 1.3.14 binary loads the external fixture and its own dependency.
-- [ ] 2.4 Preserve materialized Resources and mark Sources unavailable when a configured Extension disappears; verify no implicit data deletion.
-- [ ] 2.5 **Slice gate:** run Extension loader/invalidation tests, `./scripts/spikes/d3-compiled-extension/run.sh`, `bun run typecheck`, `bun run lint`, and `bun test`; fix every failure before proceeding.
+- [x] 2.1 Add configuration for trusted explicit local Extension paths and dynamically import one external `.ts` fixture into the validated registries.
+- [x] 2.2 Inject only capability-specific host contexts, load built-ins first, and report atomic validation/id-conflict diagnostics; verify invalid Extensions activate nothing.
+- [x] 2.3 Integrate `scripts/spikes/d3-compiled-extension/run.sh` into CI and verify the relocated Bun 1.3.14 binary loads the external fixture and its own dependency.
+- [x] 2.4 Preserve materialized Resources and mark Sources unavailable when a configured Extension disappears; verify no implicit data deletion.
+- [x] 2.5 **Slice gate:** run Extension loader/invalidation tests, `./scripts/spikes/d3-compiled-extension/run.sh`, `bun run typecheck`, `bun run lint`, and `bun test`; fix every failure before proceeding.
 
 ## 3. Generic Resource storage
 

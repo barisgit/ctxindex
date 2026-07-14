@@ -35,6 +35,7 @@ export type SyncLastStatus =
   | 'failed'
   | 'needs_auth'
   | 'disabled'
+  | 'extension_unavailable'
 
 export interface SyncResult {
   readonly runId: string

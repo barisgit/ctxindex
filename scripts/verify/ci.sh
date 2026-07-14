@@ -61,6 +61,7 @@ run_gate cli-no-business-logic bun run scripts/verify/cli-no-business-logic.ts
 run_gate cli-framework-citty bun run scripts/verify/cli-framework-citty.ts
 run_gate cli-thin-lines bun run scripts/verify/cli-thin-lines.ts "${cli_command_files[@]}"
 run_gate exports-map bun run scripts/verify/exports-map.ts
+run_gate d3-compiled-extension ./scripts/spikes/d3-compiled-extension/run.sh
 run_gate full-test-suite bash scripts/verify/full-test-suite.sh
 
 printf '\nci: all gates passed\n'

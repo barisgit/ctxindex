@@ -64,6 +64,24 @@ defineAdapter({
   actions: {},
 })
 
+defineAdapter({
+  id: 'fake.capability-contexts',
+  version: 1,
+  configSchema: z.object({}),
+  auth: { kind: 'none' },
+  profiles: [],
+  capabilities: ['retrieve'],
+  operations: {
+    retrieve: (context) => {
+      const ref: string = context.ref
+      // @ts-expect-error retrieve does not receive sync cursor access
+      context.cursor
+      return ref
+    },
+  },
+  actions: {},
+})
+
 const noteExtension = defineExtension({
   id: 'fake.notes',
   version: 1,

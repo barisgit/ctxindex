@@ -4,11 +4,11 @@
   "objective": "Implement and verify ctxindex V1 as the local personal-context gateway defined by `v1-context-access-layer`: typed definitions, trusted Extension loading, fresh generic storage, exact Realms, Gmail discovery/retrieval, threads, Artifacts/exports, reversible provider email Draft Actions, local-directory support, an external tenders proof, generated docs, and complete validation.",
   "status": "active",
   "createdAt": "2026-07-14T18:23:35.445Z",
-  "updatedAt": "2026-07-14T18:48:31.542Z",
+  "updatedAt": "2026-07-14T19:20:00.200Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
-  "nextSeq": 236,
-  "latestSourceSeq": 220,
-  "snapshotHash": "26699441bca78d63ca166520a668eec9dcc37d3c8ca0fc91da0ebeb8cb4e7322",
+  "nextSeq": 359,
+  "latestSourceSeq": 351,
+  "snapshotHash": "a558919179215505733f1b82e362ba4ac45a57fd4fc57dea2bd495035349f631",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -27,10 +27,10 @@
         "C1"
       ],
       "status": {
-        "value": "in-progress",
-        "note": "Slice 2 is next in dependency order"
+        "value": "pass",
+        "note": "evidence: `work/slice-2-gate.txt` (explicit-path loading, atomic rejection, D3 relocation, Source preservation/recovery, typecheck, lint, and 190 tests passed)"
       },
-      "statusSeq": 225
+      "statusSeq": 352
     },
     {
       "id": "C3",
