@@ -14,7 +14,7 @@
 
 - The repository is pre-alpha. Prototype code and local databases are disposable; do not add schema migration, CLI compatibility, or deprecated aliases unless a later released version creates that obligation.
 - Non-trivial behavior changes go through an OpenSpec change (`openspec new change`, then proposal → specs → design → tasks). Trivial fixes do not.
-- Apply OpenSpec tasks in dependency order. A task is complete only after its focused checks pass; every `tasks.md` Slice gate is mandatory before the next slice. Continue end to end until a real blocker, then run the final project gate and `openspec-verify-change` before archive.
+- Apply OpenSpec tasks in dependency order. A task is complete only after its focused checks pass; every `tasks.md` Slice gate is mandatory before the next slice. At a Human checkpoint, prepare isolated state and pause for user login/consent/UI verification without requesting secrets; resume and continue after explicit confirmation. Continue end to end until a real blocker, then run the final project gate and `openspec-verify-change` before archive.
 - Make the smallest independently verifiable V1 slice listed in `V1.md`; do not implement later slices speculatively.
 - Profiles define domain semantics and typed Actions; Adapters perform provider I/O; Extensions only bundle definitions.
 - Every Source belongs to one user-created Realm. There is no special `global` Realm and explicit realm filters are exact.

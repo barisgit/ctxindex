@@ -10,7 +10,9 @@ For every behavior task:
 4. run the focused test plus any checks named in the task;
 5. check the task only after all required verification passes.
 
-Every **Slice gate** is a mandatory mid-change checkpoint. On failure, fix the current slice and rerun the gate; do not continue with a known failure. Record commands and outcomes in the session summary/commit. Pause only for an unresolved design decision named in the change artifacts, an external blocker, or a contradiction that requires artifact revision — never guess.
+Every **Slice gate** is a mandatory mid-change checkpoint. On failure, fix the current slice and rerun the gate; do not continue with a known failure. Record commands and outcomes in the session summary/commit.
+
+Every **Human checkpoint** is an intentional pause, not a blocker. The agent prepares the isolated test state and exact next action, explains what access or provider mutation will occur, and pauses before login/consent. The user completes browser login/MFA or grants approval without sharing credentials. After explicit confirmation, the agent resumes, runs the bounded live acceptance check, records evidence without secrets, and continues. Human checkpoints MUST NOT be skipped or simulated. Otherwise pause only for an unresolved design decision, external blocker, or artifact contradiction — never guess.
 
 After the final task, run the `openspec-verify-change` workflow against all requirements/scenarios. The change is end-to-end complete only when all task boxes are checked, every slice/final gate passes, and verification reports no critical mismatch. Archive remains a separate explicit action.
 
@@ -50,6 +52,7 @@ After the final task, run the `openspec-verify-change` workflow against all requ
 - [ ] 4.5 Implement the planner's local-only/remote overrides, mixed-origin interleave, explain metadata, and provider-failure degradation tests.
 - [ ] 4.6 Implement Gmail `retrieve` plus generic `get <ref>` ad-hoc hydration; verify local cache reuse and synced/ad-hoc convergence.
 - [ ] 4.7 **Slice gate:** run mocked Gmail search/get integration and binary-CLI tests with sandboxed XDG state, then `bun run typecheck`, `bun run lint`, and `bun test`; no live provider traffic is permitted.
+- [ ] 4.8 **Human checkpoint — live Gmail read:** prepare an isolated persistent XDG/ctxindex test home and the exact OAuth command, then PAUSE for the user to complete browser login/MFA. After explicit confirmation, bind the chosen test mailbox to an explicit Realm/Source and run one bounded live search plus `get` on one returned Ref. Assert no provider write occurs, redact credentials/tokens from evidence, and preserve the sandbox for the later Draft checkpoint.
 
 ## 5. Thread Relations
 
@@ -74,6 +77,7 @@ After the final task, run the `openspec-verify-change` workflow against all requ
 - [ ] 7.4 Implement Gmail `communication.message.draft.update`; verify it updates only the addressed Draft through the selected Source/Grant.
 - [ ] 7.5 Add negative contract tests proving V1 exposes no send/irreversible Action and composing text alone creates no ctxindex/provider state.
 - [ ] 7.6 **Slice gate:** run registry, Action core/CLI, and mocked Gmail Draft create/update tests; assert invalid input causes zero provider I/O and no send affordance exists; then run `bun run typecheck`, `bun run lint`, and `bun test`.
+- [ ] 7.7 **Human checkpoint — live Gmail Draft:** using the authenticated sandbox from 4.8, show the user the exact mailbox Source and uniquely labelled harmless Draft payload, then PAUSE for approval. After approval, run Draft create and update (never send), return/redact-safe Ref evidence, then PAUSE for the user to verify the Draft in the provider UI and optionally delete it. Mark complete only after explicit user confirmation that create/update were visible and no message was sent.
 
 ## 8. Local-directory Adapter
 

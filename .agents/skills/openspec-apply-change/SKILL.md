@@ -76,6 +76,9 @@ Implement tasks from an OpenSpec change.
    - If validation fails, fix and rerun; do not continue with a known failure
    - Mark task complete in the tasks file only after validation passes: `- [ ]` → `- [x]`
    - Treat tasks labelled **Slice gate** (or equivalent) as mandatory mid-change checkpoints; run the whole gate before entering the next slice
+   - When a task is labelled **Human checkpoint**, prepare the isolated test state and exact next action, explain what login/access/mutation is required, and pause before it occurs
+   - Resume a Human checkpoint only after explicit user confirmation; never request passwords, session cookies, MFA codes, or secret-token output, and never simulate/skip the checkpoint
+   - After the confirmed bounded live check passes, record redacted evidence, mark the Human checkpoint complete, and continue automatically
    - Continue to next task
 
    **Pause if:**

@@ -43,4 +43,4 @@ Resolve in capability specs immediately before the owning slice:
 9. external tenders Extension proof;
 10. generated docs and end-to-end verification.
 
-OpenSpec capability specs and tasks are created per slice. The apply agent proceeds in dependency order, runs each task's focused checks, must pass every explicit Slice gate before continuing, and finishes with the full project gate plus `openspec-verify-change`. It pauses only for a real blocker or artifact contradiction; archive remains explicit.
+OpenSpec capability specs and tasks are created per slice. The apply agent proceeds in dependency order, runs each task's focused checks, and must pass every explicit Slice gate before continuing. Human checkpoints intentionally pause for user browser login/consent or provider-UI verification, preserve isolated state, and resume after explicit confirmation without exposing secrets. The change finishes with the full project gate plus `openspec-verify-change`; archive remains explicit.
