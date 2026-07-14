@@ -34,6 +34,7 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@ctxindex/extension-sdk": "workspace:*",
     "@iarna/toml": "latest",
     "@noble/ciphers": "latest",
     "@noble/hashes": "latest",

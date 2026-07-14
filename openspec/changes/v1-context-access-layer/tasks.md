@@ -18,11 +18,11 @@ After the final task, run the `openspec-verify-change` workflow against all requ
 
 ## 1. Definition factories and typed registries
 
-- [ ] 1.1 Create `packages/extension-sdk` with type-only public contracts and pure `defineProfile`, `defineAdapter`, and `defineExtension` factories; verify inferred ids/payloads and zero runtime-core imports.
-- [ ] 1.2 Implement the Profile registry with runtime schema validation, `(id, version)` duplicate detection, unknown-version degradation, and focused unit tests.
-- [ ] 1.3 Implement Adapter and Extension registries with capability/Action consistency checks and atomic Extension rejection tests.
-- [ ] 1.4 Implement registry-derived `describe` data for kinds, aliases, fields, formats, Source config, and Actions; verify a fake Profile changes the described interface without hand-maintained vocabulary.
-- [ ] 1.5 **Slice gate:** run all definition/registry tests plus `bun run typecheck`, `bun run lint`, and `bun test`; fix every failure before checking this gate.
+- [x] 1.1 Create `packages/extension-sdk` with type-only public contracts and pure `defineProfile`, `defineAdapter`, and `defineExtension` factories; verify inferred ids/payloads and zero runtime-core imports.
+- [x] 1.2 Implement the Profile registry with runtime schema validation, `(id, version)` duplicate detection, unknown-version degradation, and focused unit tests.
+- [x] 1.3 Implement Adapter and Extension registries with capability/Action consistency checks and atomic Extension rejection tests.
+- [x] 1.4 Implement registry-derived `describe` data for kinds, aliases, fields, formats, Source config, and Actions; verify a fake Profile changes the described interface without hand-maintained vocabulary.
+- [x] 1.5 **Slice gate:** run all definition/registry tests plus `bun run typecheck`, `bun run lint`, and `bun test`; fix every failure before checking this gate.
 
 ## 2. Explicit-path Extension loading
 

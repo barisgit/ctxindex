@@ -1,4 +1,7 @@
+export * from './definition-registries'
+export * from './describe'
 export * from './errors'
 export * from './handle'
+export * from './profile-registry'
 export * from './registry-core'
 export * from './types'

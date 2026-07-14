@@ -1,0 +1,163 @@
+{
+  "charterId": "20260714-182335-implement-and-verify-ctxindex-v1",
+  "schemaVersion": "file-interface",
+  "objective": "Implement and verify ctxindex V1 as the local personal-context gateway defined by `v1-context-access-layer`: typed definitions, trusted Extension loading, fresh generic storage, exact Realms, Gmail discovery/retrieval, threads, Artifacts/exports, reversible provider email Draft Actions, local-directory support, an external tenders proof, generated docs, and complete validation.",
+  "status": "active",
+  "createdAt": "2026-07-14T18:23:35.445Z",
+  "updatedAt": "2026-07-14T18:48:31.542Z",
+  "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
+  "nextSeq": 236,
+  "latestSourceSeq": 220,
+  "snapshotHash": "26699441bca78d63ca166520a668eec9dcc37d3c8ca0fc91da0ebeb8cb4e7322",
+  "criteriaSnapshot": [
+    {
+      "id": "C1",
+      "title": "Public definitions and registries drive the runtime",
+      "depends": [],
+      "status": {
+        "value": "pass",
+        "note": "evidence: `work/slice-1-gate.txt` (typecheck, lint, 181 passing tests, and compiled-extension regression passed)"
+      },
+      "statusSeq": 225
+    },
+    {
+      "id": "C2",
+      "title": "Compiled ctxindex loads trusted external TypeScript Extensions",
+      "depends": [
+        "C1"
+      ],
+      "status": {
+        "value": "in-progress",
+        "note": "Slice 2 is next in dependency order"
+      },
+      "statusSeq": 225
+    },
+    {
+      "id": "C3",
+      "title": "Fresh generic storage enforces exact Realm and Source semantics",
+      "depends": [
+        "C1"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 6
+    },
+    {
+      "id": "C4",
+      "title": "Gmail discovery and retrieval use the generic contract",
+      "depends": [
+        "C2",
+        "C3"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 6
+    },
+    {
+      "id": "C5",
+      "title": "Threads traverse generic Relations",
+      "depends": [
+        "C3",
+        "C4"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 6
+    },
+    {
+      "id": "C6",
+      "title": "Artifacts and exports are managed and observable",
+      "depends": [
+        "C3",
+        "C4"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 6
+    },
+    {
+      "id": "C7",
+      "title": "Gmail Draft Actions are typed, reversible, and cannot send",
+      "depends": [
+        "C1",
+        "C3",
+        "C4"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 6
+    },
+    {
+      "id": "C8",
+      "title": "Local directories use the same generic Resource path",
+      "depends": [
+        "C1",
+        "C3"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 6
+    },
+    {
+      "id": "C9",
+      "title": "An external tenders Extension proves the public seam",
+      "depends": [
+        "C2",
+        "C3"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 6
+    },
+    {
+      "id": "C10",
+      "title": "User and agent interfaces derive from loaded registries",
+      "depends": [
+        "C1",
+        "C7",
+        "C8",
+        "C9"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 6
+    },
+    {
+      "id": "C11",
+      "title": "Complete V1 behavior is verified end to end",
+      "depends": [
+        "C1",
+        "C2",
+        "C3",
+        "C4",
+        "C5",
+        "C6",
+        "C7",
+        "C8",
+        "C9",
+        "C10"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 6
+    }
+  ]
+}

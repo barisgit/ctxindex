@@ -1,0 +1,18 @@
+{
+  "name": "@ctxindex/extension-sdk",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsgo --noEmit -p tsconfig.json",
+    "lint": "biome check .",
+    "typecheck": "tsgo --noEmit -p tsconfig.json",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "zod": "latest"
+  }
+}

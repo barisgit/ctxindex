@@ -1,0 +1,313 @@
+$ bun run typecheck
+$ tsgo --noEmit -p tsconfig.base.json
+
+$ bun run lint
+$ biome check .
+packages/extension-sdk/src/index.ts format ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Formatter would have printed the following content:
+  
+    186 186 │     const TCapabilities extends readonly AdapterCapability[],
+    187 187 │   >(
+    188     │ - ··definition:·AdapterDefinition<
+    189     │ - ····TId,
+    190     │ - ····TVersion,
+    191     │ - ····TConfigSchema,
+    192     │ - ····TCapabilities
+    193     │ - ··>,
+        188 │ + ··definition:·AdapterDefinition<TId,·TVersion,·TConfigSchema,·TCapabilities>,
+    194 189 │   ): AdapterDefinition<TId, TVersion, TConfigSchema, TCapabilities> {
+    195 190 │     return definition
+  
+
+Checked 224 files in 111ms. No fixes applied.
+Found 1 error.
+check ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Some errors were emitted while running checks.
+  
+
+error: script "lint" exited with code 1
+
+$ bun test
+bun test v1.3.14 (0d9b296a)
+
+scripts/with-timeout.test.ts:
+(pass) exit 0 passthrough [137.46ms]
+(pass) exit 42 passthrough [23.52ms]
+(pass) timeout exits 124 [366.46ms]
+(pass) SIGINT propagates to child [48.85ms]
+(pass) TEST_WALL_TIMEOUT_SECS precedence [368.28ms]
+(pass) process group kill [5321.33ms]
+
+scripts/verify/architecture-lint.test.ts:
+(pass) thin sync command has no architecture violations [7.68ms]
+(pass) accepts a clean fixture [1.63ms]
+(pass) reports side-effect imports of banned modules [0.66ms]
+
+apps/cli/src/no-prompts.contract.test.ts:
+(pass) no-prompts contract > init: exits 0 with stdin=null [336.81ms]
+(pass) no-prompts contract > realm list: exits 0 with stdin=null [261.47ms]
+(pass) no-prompts contract > source list: exits 0 with stdin=null [265.50ms]
+(pass) no-prompts contract > status: exits 0 with stdin=null [245.82ms]
+(pass) no-prompts contract > skills list: exits 0 with stdin=null [218.71ms]
+(pass) no-prompts contract > skills path: exits 0 with stdin=null [274.05ms]
+(pass) no-prompts contract > realm add (missing slug): exits non-zero fast [309.95ms]
+(pass) no-prompts contract > source add (missing adapter-id): exits non-zero fast [260.77ms]
+(pass) no-prompts contract > source add --realm unknown: exits 2 with actionable message [259.19ms]
+(pass) no-prompts contract > source remove (missing id): exits non-zero fast [239.52ms]
+(pass) no-prompts contract > source remove (unknown id): exits 2 with actionable message [269.08ms]
+(pass) no-prompts contract > skills get (missing name): exits non-zero fast [227.30ms]
+(pass) no-prompts contract > auth (pending): exits non-zero with actionable message [252.00ms]
+(pass) no-prompts contract > sync (pending): exits non-zero with actionable message [270.29ms]
+
+apps/cli/src/main.test.ts:
+(pass) prints help successfully [3.28ms]
+
+packages/core/src/cli-init.test.ts:
+(pass) ctxindex init creates XDG layout, config, sqlite, and PRAGMAs [139.59ms]
+
+packages/adapters/src/registry.contract.test.ts:
+(pass) CTXINDEX_ADAPTER_REGISTRY > contains exactly the bundled v1 adapters [0.03ms]
+(pass) CTXINDEX_ADAPTER_REGISTRY > exposes the exact adapter migration namespaces [0.07ms]
+(pass) CTXINDEX_ADAPTER_REGISTRY > lists only google.mailbox as an OAuth2 adapter [0.21ms]
+
+packages/extension-sdk/src/factories.test.ts:
+(pass) extension SDK definition factories > return plain definitions without wrapping or mutation [0.02ms]
+(pass) extension SDK definition factories > has no runtime dependency on @ctxindex/core [0.12ms]
+
+apps/cli/src/auth/headless-google.test.ts:
+(pass) headless google auth > auth-code exchange returns tokens without browser fallback [3.17ms]
+(pass) headless google auth > missing auth-code inputs fail fast without network [0.05ms]
+
+apps/cli/src/source/realm-cli.test.ts:
+(pass) realm-cli unit: sourceAdd realm semantics > omitting realm lands source in global [2.80ms]
+(pass) realm-cli unit: sourceAdd realm semantics > unknown realm throws with exit code 2 and exact message [1.80ms]
+(pass) realm-cli unit: sourceAdd realm semantics > realm add work then source add --realm work succeeds [1.80ms]
+(pass) realm-cli integration: CLI subprocess > source add local.directory (no --realm) lands in global [265.37ms]
+(pass) realm-cli integration: CLI subprocess > source add --realm unknown exits 2 with exact message [489.52ms]
+(pass) realm-cli integration: CLI subprocess > realm add work then source add --realm work succeeds [422.00ms]
+(pass) realm-cli integration: CLI subprocess > no TTY prompt: source add with no stdin runs cleanly [329.30ms]
+
+apps/cli/src/format/grants.test.ts:
+(pass) formatGrants > json output is stable and parseable [0.26ms]
+(pass) formatGrants > json output is [] for empty input [0.02ms]
+(pass) formatGrants > empty state is clear and points to add command [0.02ms]
+(pass) formatGrants > renders label, provider, id, scopes, and expiry for a labelled grant [4.01ms]
+(pass) formatGrants > display name is shown as label when email is absent [0.42ms]
+(pass) formatGrants > placeholder google account is not shown as a label column [0.31ms]
+(pass) formatGrants > multiple scopes are shown comma-separated [0.39ms]
+(pass) formatGrants > space-separated scope string is parsed [0.34ms]
+(pass) formatGrants > expired token is labelled, not timestamped [0.20ms]
+(pass) formatGrants > null expiry renders as "no expiry" [0.20ms]
+(pass) formatGrants > non-Google scope is preserved in full [0.19ms]
+(pass) formatGrants > malformed scope JSON falls back to whitespace split [0.24ms]
+(pass) formatGrants > multiple grants are listed [0.38ms]
+(pass) formatGrantAdded > labels the grant [0.02ms]
+
+apps/cli/src/skills/skills.cli.test.ts:
+(pass) skills list shows bundled skills [120.23ms]
+(pass) skills get returns bundled markdown [156.77ms]
+(pass) skills get --inline merges referenced markdown [136.74ms]
+(pass) skills path returns an existing directory [115.24ms]
+(pass) skills --json output is parseable [221.65ms]
+
+packages/core/src/config/env-uri.test.ts:
+(pass) env:// resolves through getEnv [0.25ms]
+(pass) env: resolves through getEnv [0.06ms]
+(pass) getEnv memoized and frozen [0.09ms]
+(pass) resetEnvForTests invalidates memoized env [0.11ms]
+(pass) lowercase rejected [0.10ms]
+(pass) unset env var does not leak value [0.09ms]
+(pass) bare string rejected [1.14ms]
+(pass) invalid prefix rejected [0.04ms]
+
+packages/core/src/config/turbo-env.test.ts:
+(pass) globalDependencies present [0.31ms]
+(pass) root has no extends [0.05ms]
+(pass) per-workspace env keys [0.73ms]
+(pass) workspace lane scripts back turbo tasks [0.15ms]
+(pass) turbo dry json parses [149.71ms]
+
+packages/core/src/config/test-lanes.test.ts:
+(pass) unit lane excludes integration [0.97ms]
+(pass) e2e lane isolated [0.25ms]
+(pass) path-ignore-patterns honored [36.49ms]
+
+packages/core/src/config/env-example.test.ts:
+(pass) drift between EnvSchema and .env.example fails both directions [0.35ms]
+(pass) every .env.example key has a comment [0.11ms]
+
+packages/core/src/auth/service.test.ts:
+(pass) auth service exposes google grant operations [4.10ms]
+
+packages/core/src/auth/auth-service.test.ts:
+(pass) addGoogleGrant inserts grant + account with all secret refs [6.99ms]
+(pass) listGoogleGrants returns the inserted grant [3.30ms]
+(pass) refreshGoogleAccessToken uses per-grant client creds when env vars are unset [3.83ms]
+(pass) refreshGoogleAccessToken env var override path still works [2.65ms]
+(pass) refreshGoogleAccessToken missing creds error [2.08ms]
+(pass) refreshGoogleAccessToken handles invalid_grant [4.34ms]
+
+packages/core/src/auth/google-token-refresh.live.test.ts:
+(skip) refreshGoogleAccessToken returns a real Google access token
+
+packages/core/src/secrets/migrate.test.ts:
+(pass) secrets service migrate > migrate moves grant secret refs from keychain to file and back [2.81ms]
+
+packages/core/src/secrets/service.test.ts:
+
+packages/core/src/secrets/file.test.ts:
+(pass) file backend round-trips, lists, deletes, encrypts, and forces private mode [2513.35ms]
+(pass) file backend supports passphrase without creating a key file [505.59ms]
+(pass) file backend falls back to a generated device key file [4.92ms]
+(pass) file backend detects tampered ciphertext [794.88ms]
+
+packages/core/src/secrets/keychain.test.ts:
+(pass) KeychainBackend > wraps keytar import failure as backend_unavailable [0.30ms]
+(pass) KeychainBackend > wraps keytar runtime failure as backend_unavailable [0.10ms]
+(pass) KeychainBackend > maps missing keychain entry to not_found [0.04ms]
+
+packages/core/src/source/service.test.ts:
+
+packages/core/src/source/source-service.test.ts:
+(pass) source service > addSource resolves a provided realm slug [4.62ms]
+(pass) source service > addSource falls back to the global realm slug [1.84ms]
+(pass) source service > unknown realm slug throws unknown realm validation error [2.42ms]
+
+packages/core/src/paths/paths.test.ts:
+(pass) CTXINDEX path env vars take precedence over XDG vars [0.24ms]
+(pass) XDG path env vars are used when CTXINDEX vars are absent [0.30ms]
+(pass) home defaults are used when CTXINDEX and XDG vars are absent [0.23ms]
+
+packages/core/src/meta/agent-howtos.test.ts:
+(pass) agent-howtos doc exists [0.33ms]
+(pass) documented commands match implemented commands [0.47ms]
+(pass) no stale commands [0.17ms]
+
+packages/core/src/meta/v1-coverage.test.ts:
+(pass) each criterion maps to file [0.23ms]
+(pass) ts files contain Bun.spawn [2.54ms]
+(pass) sh files invoke ctxindex [0.82ms]
+(pass) missing test file fails [0.18ms]
+(pass) criterion 14 self reference [0.10ms]
+
+packages/core/src/storage/migrator.test.ts:
+(pass) core migrations create all expected tables [2.67ms]
+(pass) PRAGMAs match spec after migrations [13.96ms]
+(pass) FTS5 virtual tables exist and are queryable [2.74ms]
+(pass) global realm seed row is present [1.72ms]
+(pass) per-namespace migration journal tables created for all adapters [2.54ms]
+(pass) idempotent [1.87ms]
+(pass) credential columns [1.56ms]
+
+packages/core/src/storage/migrator.legacy-rows.test.ts:
+(pass) legacy grant rows tolerate nullable credential refs [1.88ms]
+
+packages/core/src/search/search-service.test.ts:
+(pass) search service > ranked results [3.68ms]
+(pass) search service > planner merges provider results with local results [4.00ms]
+(pass) search service > planner degrades to local results when provider search fails [2.29ms]
+(pass) search service > localOnly skips provider fan-out [2.22ms]
+(pass) search service > explain [1.96ms]
+
+packages/core/src/testing/sandbox.test.ts:
+(pass) run spawns binary [111.68ms]
+(pass) cleanup removes tmpDir [0.44ms]
+(pass) parallel sandboxes isolated [143.72ms]
+(pass) env does not leak [0.36ms]
+
+packages/core/src/registry/describe.test.ts:
+(pass) registry-derived describe data > a fake Profile changes kinds, vocabulary, Source config, and Actions [5.62ms]
+
+packages/core/src/registry/registry-core.test.ts:
+(pass) createCtxindexAdapterRegistry > narrows literal adapter ids through isKnownAdapter [0.23ms]
+(pass) createCtxindexAdapterRegistry > assertKnownAdapter throws a typed registry error for unknown ids [0.15ms]
+(pass) createCtxindexAdapterRegistry > getAdapter returns the typed adapter definition [0.02ms]
+(pass) createCtxindexAdapterRegistry > lists migrations and groups adapters by provider and kind [0.12ms]
+(pass) createCtxindexAdapterRegistry > reports capabilities and required OAuth scopes [0.04ms]
+(pass) createCtxindexAdapterRegistry > exposes search mode and search capability lookups [0.08ms]
+(pass) createCtxindexAdapterRegistry > createSourceAdapter rejects federated/hybrid definitions without search [0.05ms]
+(pass) createCtxindexAdapterRegistry > registerAdapter and unregisterAdapter round-trip through the overlay [0.17ms]
+
+packages/core/src/registry/profile-registry.test.ts:
+(pass) ProfileRegistry > validates dynamic definitions before registration [0.64ms]
+(pass) ProfileRegistry > rejects Action effects outside the reversible/irreversible contract [0.18ms]
+(pass) ProfileRegistry > rejects duplicate id and version pairs [0.04ms]
+(pass) ProfileRegistry > degrades unknown profile versions without throwing [0.05ms]
+
+packages/core/src/registry/definition-registries.test.ts:
+(pass) AdapterRegistry > requires a declarative auth specification [0.29ms]
+(pass) AdapterRegistry > rejects capability and operation mismatches [0.38ms]
+(pass) AdapterRegistry > accepts a supported Profile with an unbound optional Action [0.10ms]
+(pass) AdapterRegistry > rejects undeclared and schema-incompatible Actions [0.39ms]
+(pass) ExtensionRegistry > rejects an invalid Extension atomically [0.44ms]
+
+packages/core/src/sync/reauth-flow.test.ts:
+(pass) invalid_grant mid-sync → exit 10, run failed, last_status needs_auth [4.70ms]
+(pass) needs_auth code → exit 10, last_status needs_auth [2.18ms]
+(pass) cursor is NOT advanced after invalid_grant failure [2.18ms]
+(pass) after auth refresh simulation: next sync resumes from prior cursor [2.55ms]
+(pass) sync busy after reauth: second sync attempt cancelled, not corrupting needs_auth state [2.36ms]
+
+packages/core/src/sync/sync-service.test.ts:
+(pass) runSync with mock adapter applies operations and exits 0 [5.96ms]
+(pass) runSync tombstones local files missing from a completed scan [4.12ms]
+(pass) runSync does not tombstone local files when a scan fails [3.91ms]
+(pass) exit code mapping: needs_auth → 10, network → 30, invalid_arg → 40 [3.20ms]
+(pass) barrel runSync export uses sync service API [2.08ms]
+(pass) busy lock records and returns cancelled status [2.99ms]
+(pass) invalid operation schema returns invalid_arg exit 40 [3.05ms]
+(pass) nullable google mail fields are accepted by operation validation [3.64ms]
+(pass) google-style item_added canary does not double count an upserted item [2.99ms]
+(pass) lock recovery from dead pid acquires the lock [2.04ms]
+(pass) reauth path returns exit 10 with lastStatus=needs_auth [2.96ms]
+(pass) AbortSignal cancels and returns exit 130 [2.18ms]
+
+packages/core/src/sync/lock-recovery.test.ts:
+(pass) releaseStaleGlobalLock: removes lock when run is not running [2.13ms]
+(pass) runSync auto-releases stale lock and proceeds [1.81ms]
+(pass) runSync does not corrupt source_sync_state on stale lock recovery [4.12ms]
+
+packages/core/src/sync/exit-codes.test.ts:
+(pass) completed sync with errors_count > 0 exits 0 (partial success) [1.96ms]
+(pass) needs_auth error → exit 10, run failed, last_status needs_auth [2.21ms]
+(pass) rate_limited → exit 20 [2.30ms]
+(pass) network_error → exit 30 [1.74ms]
+(pass) permission_denied → exit 40, last_status disabled [1.66ms]
+(pass) cancelled → exit 130, run status cancelled [1.81ms]
+(pass) unknown error → exit 50 [2.17ms]
+(pass) sync busy (lock held by live run) → exit 50, creates cancelled run [2.78ms]
+(pass) cursor is not advanced on failure [1.69ms]
+
+packages/core/src/realm/realm-service.test.ts:
+(pass) realm service > createRealm and listRealms round trip a realm [3.34ms]
+(pass) realm service > getRealmBySlug returns the matching row [1.82ms]
+(pass) realm service > duplicate slug throws duplicate_realm_slug validation error [1.62ms]
+
+packages/core/src/realm/service.test.ts:
+
+packages/adapters/src/local-directory/walker.test.ts:
+(pass) walkDirectory > applies the V1 §1.3.1 built-in ignore globs [4.88ms]
+(pass) walkDirectory > include patterns use glob semantics, not substring matching [1.03ms]
+(pass) walkDirectory > .ctxindexignore negation can re-include a gitignored path [0.95ms]
+
+packages/adapters/src/local-directory/chunker.test.ts:
+(pass) chunkText > empty or whitespace-only text yields no chunks [0.06ms]
+(pass) chunkText > short text under the target size yields exactly one chunk [0.02ms]
+(pass) chunkText > chunk indices are contiguous starting at 0 [0.04ms]
+(pass) chunkText > long text splits into a bounded number of overlapping chunks [0.25ms]
+(pass) chunkText > consecutive chunks overlap rather than duplicate [0.02ms]
+(pass) chunkText > prefers a paragraph break over a hard split [0.02ms]
+
+1 tests skipped:
+(skip) refreshGoogleAccessToken returns a real Google access token
+
+ 181 pass
+ 1 skip
+ 0 fail
+ 699 expect() calls
+Ran 182 tests across 43 files. [17.00s]
+
+$ ./scripts/spikes/d3-compiled-extension/run.sh
+Passed: Bun 1.3.14 compiled binary loaded external TypeScript, its relative TypeScript import, and its own node_modules dependency after relocation.
