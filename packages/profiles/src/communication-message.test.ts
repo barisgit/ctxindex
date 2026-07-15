@@ -1,7 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import { readFile } from 'node:fs/promises'
 import type { InferProfilePayload } from '@ctxindex/extension-sdk'
-import { communicationMessageProfile } from './index'
+import {
+  communicationMessageDraftCreateInputSchema,
+  communicationMessageDraftUpdateInputSchema,
+  communicationMessageProfile,
+} from './index'
 
 type Equal<TLeft, TRight> =
   (<T>() => T extends TLeft ? 1 : 2) extends <T>() => T extends TRight ? 1 : 2
@@ -16,6 +20,7 @@ type _PayloadIsInferred = Assert<
     CommunicationMessagePayload,
     {
       providerMessageId: string
+      providerDraftId?: string | undefined
       threadId?: string | undefined
       conversationKey?: string | undefined
       rfcMessageId?: string | undefined
@@ -23,6 +28,8 @@ type _PayloadIsInferred = Assert<
       subject?: string | undefined
       from?: string[] | undefined
       to?: string[] | undefined
+      cc?: string[] | undefined
+      bcc?: string[] | undefined
       date?: string | undefined
       snippet?: string | undefined
       bodyText?: string | undefined
@@ -51,6 +58,8 @@ describe('communication.message Profile v1', () => {
       subject: 'Project update',
       from: ['sender@example.com'],
       to: ['recipient@example.com'],
+      cc: ['copy@example.com'],
+      bcc: ['blind@example.com'],
       date: '2026-07-14T10:30:00.000Z',
       snippet: 'The project is on track.',
       bodyText: 'The project is on track for Friday.',
@@ -66,6 +75,144 @@ describe('communication.message Profile v1', () => {
         providerOnly: true,
       }),
     ).toThrow()
+  })
+
+  test('declares the strict reversible Draft create Action and rejects header injection', () => {
+    const action =
+      communicationMessageProfile.actions?.[
+        'communication.message.draft.create'
+      ]
+
+    expect(action).toEqual({
+      effect: 'reversible',
+      input: communicationMessageDraftCreateInputSchema,
+      output: { id: 'communication.message', version: 1 },
+      docs: 'Create a Draft in the selected mailbox Source.',
+      examples: [
+        {
+          to: ['recipient@example.com'],
+          subject: 'Project update',
+          bodyText: 'The project is on track.',
+        },
+      ],
+    })
+    expect(
+      communicationMessageDraftCreateInputSchema.parse({
+        to: ['recipient@example.com'],
+        cc: [],
+        bcc: ['blind@example.com'],
+        subject: '',
+        bodyText: '',
+      }),
+    ).toEqual({
+      to: ['recipient@example.com'],
+      cc: [],
+      bcc: ['blind@example.com'],
+      subject: '',
+      bodyText: '',
+    })
+    for (const input of [
+      { to: [], subject: '', bodyText: '' },
+      {
+        to: ['recipient@example.com\r\nBcc: injected@example.com'],
+        subject: '',
+        bodyText: '',
+      },
+      {
+        to: ['recipient@example.com'],
+        cc: ['bad\nheader'],
+        subject: '',
+        bodyText: '',
+      },
+      { to: ['recipient@example.com'], subject: 'bad\rheader', bodyText: '' },
+      { to: [''], subject: '', bodyText: '' },
+      {
+        to: ['recipient@example.com'],
+        subject: '',
+        bodyText: '',
+        from: 'forbidden@example.com',
+      },
+    ]) {
+      expect(
+        communicationMessageDraftCreateInputSchema.safeParse(input).success,
+      ).toBe(false)
+    }
+    expect(Object.keys(communicationMessageProfile.actions ?? {})).toEqual([
+      'communication.message.draft.create',
+      'communication.message.draft.update',
+    ])
+  })
+
+  test('declares strict complete-replacement Draft update with a stable Ref example', () => {
+    const action =
+      communicationMessageProfile.actions?.[
+        'communication.message.draft.update'
+      ]
+
+    expect(action).toEqual({
+      effect: 'reversible',
+      input: communicationMessageDraftUpdateInputSchema,
+      output: { id: 'communication.message', version: 1 },
+      docs: 'Replace the complete content of the addressed Draft in the selected mailbox Source.',
+      examples: [
+        {
+          ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/stable-draft-id',
+          to: ['recipient@example.com'],
+          subject: 'Updated project status',
+          bodyText: 'The project is ready for review.',
+        },
+      ],
+    })
+    expect(
+      communicationMessageDraftUpdateInputSchema.parse({
+        ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/stable-draft-id',
+        to: ['recipient@example.com'],
+        subject: '',
+        bodyText: '',
+      }),
+    ).toEqual({
+      ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/stable-draft-id',
+      to: ['recipient@example.com'],
+      subject: '',
+      bodyText: '',
+    })
+    for (const input of [
+      { ref: '', to: ['recipient@example.com'], subject: '', bodyText: '' },
+      {
+        ref: 'ctx://source/draft/one',
+        to: [],
+        subject: '',
+        bodyText: '',
+      },
+      {
+        ref: 'ctx://source/draft/one',
+        to: ['bad\nrecipient'],
+        subject: '',
+        bodyText: '',
+      },
+      {
+        ref: 'ctx://source/draft/one',
+        to: ['recipient@example.com'],
+        subject: 'bad\rsubject',
+        bodyText: '',
+      },
+      {
+        ref: 'ctx://source/draft/one',
+        to: ['recipient@example.com'],
+        subject: '',
+      },
+      {
+        ref: 'ctx://source/draft/one',
+        to: ['recipient@example.com'],
+        subject: '',
+        bodyText: '',
+        draftId: 'forbidden',
+      },
+    ]) {
+      expect(
+        communicationMessageDraftUpdateInputSchema.safeParse(input).success,
+      ).toBe(false)
+    }
   })
 
   test('extracts title, occurrence date, chunks, and typed fields purely', () => {

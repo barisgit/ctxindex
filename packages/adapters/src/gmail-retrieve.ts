@@ -9,6 +9,7 @@ import type {
 } from '@ctxindex/extension-sdk'
 import { communicationMessageSchema } from '@ctxindex/profiles'
 import { parseHTML } from 'linkedom'
+import { z } from 'zod'
 import {
   type GmailMessage,
   type GmailPayload,
@@ -20,7 +21,23 @@ import {
 } from './gmail-shared'
 import { gmailApiUrl } from './google-mailbox/api'
 
-function providerId(context: RetrieveContext): string {
+interface GmailRefTarget {
+  readonly kind: 'message' | 'draft'
+  readonly id: string
+}
+
+const gmailDraftSchema = z
+  .object({
+    id: z.string().min(1),
+    message: z
+      .object({
+        id: z.string().min(1),
+      })
+      .passthrough(),
+  })
+  .passthrough()
+
+function providerTarget(context: RetrieveContext): GmailRefTarget {
   let parsed: URL
   try {
     parsed = new URL(context.ref)
@@ -47,15 +64,18 @@ function providerId(context: RetrieveContext): string {
     parsed.search ||
     parsed.hash ||
     segments.length !== 2 ||
-    segments[0] !== 'message' ||
+    (segments[0] !== 'message' && segments[0] !== 'draft') ||
     !segments[1]
   ) {
     throw new CtxindexValidationError(
       'invalid_ref',
-      `Gmail Ref "${context.ref}" must use suffix "message/<provider-id>"`,
+      `Gmail Ref "${context.ref}" must use suffix "message/<provider-id>" or "draft/<provider-id>"`,
     )
   }
-  return decodeURIComponent(segments[1])
+  return {
+    kind: segments[0],
+    id: decodeURIComponent(segments[1]),
+  }
 }
 
 function attachmentDescriptors(
@@ -120,8 +140,9 @@ function retrievedResource(
   sourceId: string,
   providerMessageId: string,
   message: GmailMessage,
+  providerDraftId?: string,
 ): RetrievedResource {
-  if (message.id !== providerMessageId) {
+  if (!providerDraftId && message.id !== providerMessageId) {
     throw new CtxindexSyncError(
       'Gmail returned a message with an unexpected id',
       'provider_bad_response',
@@ -130,6 +151,8 @@ function retrievedResource(
   const subject = gmailHeader(message, 'Subject')
   const from = gmailHeader(message, 'From')
   const to = gmailHeader(message, 'To')
+  const cc = gmailHeader(message, 'Cc')
+  const bcc = gmailHeader(message, 'Bcc')
   const rfcMessageId = normalizeGmailMessageId(
     gmailHeader(message, 'Message-ID'),
   )
@@ -137,9 +160,12 @@ function retrievedResource(
   const timestamp = gmailOccurredAt(message)
   const date = gmailHeaderDate(message)
   const body = bodyText(message.payload)
-  const attachments = attachmentDescriptors(ref, message.payload)
+  const attachments = providerDraftId
+    ? []
+    : attachmentDescriptors(ref, message.payload)
   const payload = communicationMessageSchema.parse({
     providerMessageId,
+    ...(providerDraftId ? { providerDraftId } : {}),
     ...(message.threadId ? { threadId: message.threadId } : {}),
     ...(message.threadId
       ? { conversationKey: `${sourceId.toUpperCase()}:${message.threadId}` }
@@ -149,6 +175,8 @@ function retrievedResource(
     ...(subject ? { subject } : {}),
     ...(from ? { from: [from] } : {}),
     ...(to ? { to: [to] } : {}),
+    ...(cc ? { cc: [cc] } : {}),
+    ...(bcc ? { bcc: [bcc] } : {}),
     ...(date ? { date } : {}),
     ...(message.snippet ? { snippet: message.snippet } : {}),
     ...(body !== undefined ? { bodyText: body } : {}),
@@ -169,22 +197,44 @@ function retrievedResource(
 }
 
 export async function gmailRetrieve(context: RetrieveContext): Promise<void> {
-  const id = providerId(context)
+  const target = providerTarget(context)
   const url = new URL(
-    gmailApiUrl(`/gmail/v1/users/me/messages/${encodeURIComponent(id)}`),
+    gmailApiUrl(
+      `/gmail/v1/users/me/${target.kind === 'draft' ? 'drafts' : 'messages'}/${encodeURIComponent(target.id)}`,
+    ),
   )
   url.searchParams.set('format', 'full')
-  const message = (await gmailJson(
+  const response = await gmailJson(
     await context.fetch(url, { signal: context.signal }),
-  )) as GmailMessage
+  )
+  let message: GmailMessage
+  if (target.kind === 'draft') {
+    const draft = gmailDraftSchema.safeParse(response)
+    if (!draft.success || draft.data.id !== target.id) {
+      throw new CtxindexSyncError(
+        'Gmail returned an invalid Draft response',
+        'provider_bad_response',
+        { cause: draft.success ? undefined : draft.error },
+      )
+    }
+    message = draft.data.message
+  } else {
+    message = response as GmailMessage
+  }
   const resource = retrievedResource(
     context.ref,
     context.source.id,
-    id,
+    message.id ?? '',
     message,
+    target.kind === 'draft' ? target.id : undefined,
   )
   await context.emitResource(resource)
-  for (const artifact of attachmentDescriptors(context.ref, message.payload)) {
-    await context.emitArtifact(artifact)
+  if (target.kind === 'message') {
+    for (const artifact of attachmentDescriptors(
+      context.ref,
+      message.payload,
+    )) {
+      await context.emitArtifact(artifact)
+    }
   }
 }

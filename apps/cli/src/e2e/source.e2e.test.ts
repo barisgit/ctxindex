@@ -92,16 +92,19 @@ describe('source e2e', () => {
       expect(incompatible.exitCode).toBe(2)
       expect(incompatible.stderr).toContain('compatible Google grant')
 
-      const gmailScope = 'https://www.googleapis.com/auth/gmail.readonly'
+      const gmailScopes = JSON.stringify([
+        'https://www.googleapis.com/auth/gmail.compose',
+        'https://www.googleapis.com/auth/gmail.readonly',
+      ])
       insertGoogleGrant(sandbox, {
         id: 'grant-a',
         email: 'a@example.com',
-        scopes: gmailScope,
+        scopes: gmailScopes,
       })
       insertGoogleGrant(sandbox, {
         id: 'grant-b',
         email: 'b@example.com',
-        scopes: JSON.stringify([gmailScope, 'profile']),
+        scopes: JSON.stringify([...JSON.parse(gmailScopes), 'profile']),
       })
       const ambiguous = await sandbox.run([
         'source',
@@ -117,16 +120,19 @@ describe('source e2e', () => {
 
   test('source add Gmail explicit account binds the exact compatible Grant', async () => {
     await withInitializedSandbox(async (sandbox) => {
-      const gmailScope = 'https://www.googleapis.com/auth/gmail.readonly'
+      const gmailScopes = JSON.stringify([
+        'https://www.googleapis.com/auth/gmail.compose',
+        'https://www.googleapis.com/auth/gmail.readonly',
+      ])
       insertGoogleGrant(sandbox, {
         id: 'grant-a',
         email: 'a@example.com',
-        scopes: gmailScope,
+        scopes: gmailScopes,
       })
       insertGoogleGrant(sandbox, {
         id: 'grant-b',
         email: 'b@example.com',
-        scopes: gmailScope,
+        scopes: gmailScopes,
       })
 
       const result = await sandbox.run([

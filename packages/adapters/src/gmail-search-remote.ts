@@ -23,7 +23,12 @@ interface GmailListResponse {
 }
 
 function gmailQuery(query: SearchContext['query']): string {
-  const parts = [query.text.trim()]
+  const text = query.text
+    .trim()
+    .split(/\s+/)
+    .filter((part) => part !== '-in:drafts')
+    .join(' ')
+  const parts = [text]
   for (const field of query.fields ?? []) {
     if (field.name === 'sender') parts.push(`from:${String(field.value)}`)
     if (field.name === 'unread') {
@@ -36,6 +41,7 @@ function gmailQuery(query: SearchContext['query']): string {
   if (query.until !== undefined) {
     parts.push(`before:${Math.floor(query.until / 1000) + 1}`)
   }
+  parts.push('-in:drafts')
   return parts.filter(Boolean).join(' ')
 }
 

@@ -140,6 +140,22 @@ describe('no-prompts contract', () => {
   // ---------------------------------------------------------------------------
   // Commands that require args — must fail fast (non-zero), not hang
   // ---------------------------------------------------------------------------
+  test('action describe/run: missing required input exits non-zero without prompting', async () => {
+    const { env, cleanup } = await mkSandbox()
+    try {
+      for (const args of [
+        ['action', 'describe'],
+        ['action', 'run'],
+      ]) {
+        const { exitCode, stderr } = await spawnCli(args, env, 'null')
+        expect(exitCode).not.toBe(0)
+        expect(stderr.length).toBeGreaterThan(0)
+      }
+    } finally {
+      await cleanup()
+    }
+  })
+
   test('realm add (missing slug): exits non-zero fast', async () => {
     const { env, cleanup } = await mkSandbox()
     try {

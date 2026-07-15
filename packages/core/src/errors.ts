@@ -77,6 +77,10 @@ export type CtxindexValidationErrorCode =
   | 'invalid_artifact_retention'
   | 'unsupported_export_format'
   | 'ref_source_mismatch'
+  | 'unknown_action'
+  | 'invalid_action_input'
+  | 'action_unsupported'
+  | 'confirmation_required'
 
 export class CtxindexValidationError extends CtxindexError {
   override readonly code: CtxindexValidationErrorCode

@@ -26,7 +26,8 @@
     "./thread": "./src/thread/index.ts",
     "./errors": "./src/errors.ts",
     "./ids": "./src/ids.ts",
-    "./migrations": "./src/migrations/index.ts"
+    "./migrations": "./src/migrations/index.ts",
+    "./action": "./src/action/index.ts"
   },
   "scripts": {
     "build": "tsgo --noEmit -p tsconfig.json",

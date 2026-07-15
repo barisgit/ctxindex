@@ -67,7 +67,7 @@ const adapterDefinitionSchema = z.object({
       download: functionSchema.optional(),
     })
     .strict(),
-  actions: z.record(z.string(), bindingSchema),
+  actions: z.record(z.string().min(1), bindingSchema),
   docs: z.object({ summary: z.string().min(1) }).optional(),
 })
 const extensionDefinitionSchema = z.object({
@@ -89,7 +89,22 @@ function key(reference: ProfileReference): string {
   return `${reference.id}@${reference.version}`
 }
 
+function validateActionOutputs(profiles: ProfileRegistry): void {
+  for (const profile of profiles.list()) {
+    for (const [actionId, action] of Object.entries(profile.actions ?? {})) {
+      if (!profiles.get(action.output)) {
+        throw new DefinitionRegistryError(
+          `Action ${actionId} references unknown output Profile ${key(action.output)}`,
+          'unknown_profile',
+          { actionId, outputProfile: key(action.output) },
+        )
+      }
+    }
+  }
+}
+
 function schemasMatch(left: z.ZodTypeAny, right: z.ZodTypeAny): boolean {
+  if (left === right) return true
   return (
     JSON.stringify(z.toJSONSchema(left)) ===
     JSON.stringify(z.toJSONSchema(right))
@@ -208,6 +223,7 @@ export class AdapterRegistry {
     readonly profiles: ProfileRegistry,
     adapters: readonly AnyAdapterDefinition[],
   ) {
+    validateActionOutputs(profiles)
     for (const adapter of adapters) {
       validateAdapter(profiles, adapter)
       const adapterKey = key(adapter)
@@ -303,6 +319,20 @@ function buildRegistries(extensions: readonly AnyExtensionDefinition[]): {
   const profiles = createProfileRegistry(
     extensions.flatMap((extension) => extension.profiles),
   )
+  const actionProfiles = new Map<string, AnyProfileDefinition>()
+  for (const profile of profiles.list()) {
+    for (const actionId of Object.keys(profile.actions ?? {})) {
+      const existing = actionProfiles.get(actionId)
+      if (existing) {
+        throw new DefinitionRegistryError(
+          `Action ${actionId} is declared by multiple Profiles (${key(existing)} and ${key(profile)})`,
+          'action_binding_mismatch',
+          { actionId, profiles: [key(existing), key(profile)] },
+        )
+      }
+      actionProfiles.set(actionId, profile)
+    }
+  }
   const adapters = createAdapterRegistry(
     profiles,
     extensions.flatMap((extension) => extension.adapters),

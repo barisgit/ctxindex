@@ -10,6 +10,10 @@ export interface MockGmailOptions {
   readonly listOrder?: readonly string[]
 }
 
+function recordedBody(pathname: string, body: string): string {
+  return pathname === '/token' ? '[REDACTED OAUTH FORM]' : body
+}
+
 export interface MockGmailMessage {
   readonly id: string
   readonly threadId: string
@@ -28,6 +32,11 @@ export interface MockGmailRequest {
   readonly search: string
 }
 
+export interface MockGmailRecordedRequest extends MockGmailRequest {
+  readonly authorization: string | null
+  readonly body: string
+}
+
 interface TokenCall {
   get(name: string): string | null
 }
@@ -43,7 +52,9 @@ export interface MockGmailServer {
   readonly tokenUrl: string
   readonly tokenCalls: TokenCall[]
   readRequests(): readonly MockGmailRequest[]
+  readRecordedRequests(): readonly MockGmailRecordedRequest[]
   resetRequests(): void
+  resetDraftState(): void
   setRefreshMode(mode: MockTokenMode): void
   setAuthCodeMode(mode: MockTokenMode): void
   env(
@@ -77,6 +88,24 @@ function base64Url(value: string): string {
 
 function json(body: unknown, init?: ResponseInit): Response {
   return Response.json(body, init)
+}
+
+function redactedAuthorization(request: Request): string | null {
+  const authorization = request.headers.get('authorization')
+  if (!authorization) return null
+  const scheme = authorization.split(' ', 1)[0]
+  return scheme ? `${scheme} [REDACTED]` : '[REDACTED]'
+}
+
+function draftRaw(body: string): string | undefined {
+  try {
+    const parsed = JSON.parse(body) as { message?: { raw?: unknown } }
+    return typeof parsed.message?.raw === 'string'
+      ? parsed.message.raw
+      : undefined
+  } catch {
+    return undefined
+  }
 }
 
 function fullMessage(message: MockGmailMessage): Record<string, unknown> {
@@ -139,8 +168,11 @@ export function startMockGmail(
     : messages
   const tokenCalls: TokenCall[] = []
   const requests: MockGmailRequest[] = []
+  const recordedRequests: MockGmailRecordedRequest[] = []
   let refreshMode: MockTokenMode = 'ok'
   let authCodeMode: MockTokenMode = 'ok'
+  let draftRawState: string | undefined
+  let draftMessageVersion = 0
   const accessToken = options.accessToken ?? defaultAccessToken
   const refreshToken = options.refreshToken ?? defaultRefreshToken
 
@@ -149,13 +181,19 @@ export function startMockGmail(
     port: 0,
     async fetch(request) {
       const url = new URL(request.url)
-      requests.push({
+      const body = await request.text()
+      const requestSummary = {
         method: request.method,
         pathname: url.pathname,
         search: url.search,
+      }
+      requests.push(requestSummary)
+      recordedRequests.push({
+        ...requestSummary,
+        authorization: redactedAuthorization(request),
+        body: recordedBody(url.pathname, body),
       })
       if (url.pathname === '/token') {
-        const body = await request.text()
         const params = new TokenParams(body)
         tokenCalls.push(params)
         const grantType = params.get('grant_type')
@@ -207,6 +245,49 @@ export function startMockGmail(
         })
       }
 
+      if (
+        request.method === 'POST' &&
+        url.pathname === '/gmail/v1/users/me/drafts'
+      ) {
+        const raw = draftRaw(body)
+        if (raw === undefined) {
+          return json({ error: 'invalid_request' }, { status: 400 })
+        }
+        draftRawState = raw
+        draftMessageVersion = 1
+        return json({
+          id: 'draft-1',
+          message: {
+            id: 'draft-message-1',
+            threadId: 'draft-thread-1',
+            labelIds: ['DRAFT'],
+          },
+        })
+      }
+
+      const draftMatch = url.pathname.match(
+        /^\/gmail\/v1\/users\/me\/drafts\/([^/]+)$/,
+      )
+      if (request.method === 'PUT' && draftMatch?.[1]) {
+        if (draftMatch[1] !== 'draft-1' || draftRawState === undefined) {
+          return json({ error: 'not_found' }, { status: 404 })
+        }
+        const raw = draftRaw(body)
+        if (raw === undefined) {
+          return json({ error: 'invalid_request' }, { status: 400 })
+        }
+        draftRawState = raw
+        draftMessageVersion += 1
+        return json({
+          id: 'draft-1',
+          message: {
+            id: `draft-message-${draftMessageVersion}`,
+            threadId: 'draft-thread-1',
+            labelIds: ['DRAFT'],
+          },
+        })
+      }
+
       const messageMatch = url.pathname.match(
         /^\/gmail\/v1\/users\/me\/messages\/([^/]+)$/,
       )
@@ -244,8 +325,16 @@ export function startMockGmail(
     readRequests() {
       return requests.map((request) => ({ ...request }))
     },
+    readRecordedRequests() {
+      return recordedRequests.map((request) => ({ ...request }))
+    },
     resetRequests() {
       requests.length = 0
+      recordedRequests.length = 0
+    },
+    resetDraftState() {
+      draftRawState = undefined
+      draftMessageVersion = 0
     },
     setRefreshMode(mode) {
       refreshMode = mode

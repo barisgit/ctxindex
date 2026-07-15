@@ -84,7 +84,7 @@ test('mocked Gmail remote search and cached get use stable canonical Refs', asyn
       {
         method: 'GET',
         pathname: '/gmail/v1/users/me/messages',
-        search: '?q=ctxindex+mock&maxResults=20',
+        search: '?q=ctxindex+mock+-in%3Adrafts&maxResults=20',
       },
       {
         method: 'GET',

@@ -41,6 +41,24 @@ describe('ProfileRegistry', () => {
     ).toThrow(DefinitionRegistryError)
   })
 
+  test('rejects an empty Profile Action id', () => {
+    expect(() =>
+      createProfileRegistry([
+        {
+          ...profile,
+          actions: {
+            '': {
+              effect: 'reversible',
+              input: z.object({}),
+              output: { id: 'fake.note', version: 1 },
+              docs: 'Invalid empty Action id',
+            },
+          },
+        } as never,
+      ]),
+    ).toThrow('Invalid Profile definition')
+  })
+
   test('rejects duplicate id and version pairs', () => {
     expect(() => createProfileRegistry([profile, { ...profile }])).toThrow(
       'Duplicate Profile fake.note@1',

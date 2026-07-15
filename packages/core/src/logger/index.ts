@@ -1,3 +1,5 @@
+/// <reference path="../types/pino-roll.d.ts" />
+
 import { mkdir, readdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { promisify } from 'node:util'

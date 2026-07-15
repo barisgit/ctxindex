@@ -251,17 +251,19 @@ async function persistedSecrets(sandbox: Sandbox): Promise<{
   access: string
   refresh: string
   expiresAt: number
+  scopes: string[]
 }> {
   const db = new Database(dbPath(sandbox), { readonly: true })
   try {
     const grant = db
       .prepare(
-        'SELECT access_token_ref, refresh_token_ref, expires_at FROM grants LIMIT 1',
+        'SELECT access_token_ref, refresh_token_ref, expires_at, scopes_json FROM grants LIMIT 1',
       )
       .get() as {
       access_token_ref: string
       refresh_token_ref: string
       expires_at: number
+      scopes_json: string
     }
     expect(grant).toBeTruthy()
     const store = new FileBackend({
@@ -272,6 +274,7 @@ async function persistedSecrets(sandbox: Sandbox): Promise<{
       access: await store.getSecret(grant.access_token_ref),
       refresh: await store.getSecret(grant.refresh_token_ref),
       expiresAt: grant.expires_at,
+      scopes: JSON.parse(grant.scopes_json),
     }
   } finally {
     db.close()
@@ -317,6 +320,10 @@ test('full flow persists tokens', async () => {
     expect(secrets.access).toBe(accessToken)
     expect(secrets.refresh).toBe(refreshToken)
     expect(secrets.expiresAt).toBeGreaterThan(Date.now())
+    expect(secrets.scopes).toEqual([
+      'https://www.googleapis.com/auth/gmail.compose',
+      'https://www.googleapis.com/auth/gmail.readonly',
+    ])
     expect(provider.tokenBodies).toHaveLength(1)
     const tokenBody = provider.tokenBodies[0]
     expect(tokenBody).toContain('code=loopback-code')
@@ -338,6 +345,10 @@ test('auth URL contains PKCE and state', async () => {
     })
     const authUrl = await running.waitForAuthUrl()
     const params = expectPkceAndState(authUrl)
+    expect(params.get('scope')?.split(' ')).toEqual([
+      'https://www.googleapis.com/auth/gmail.compose',
+      'https://www.googleapis.com/auth/gmail.readonly',
+    ])
 
     await visitAuthUrl(authUrl)
     const result = await running.result()

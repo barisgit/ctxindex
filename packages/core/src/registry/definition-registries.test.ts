@@ -13,6 +13,7 @@ import {
 import { createProfileRegistry } from './profile-registry'
 
 const createDraftInput = z.object({ subject: z.string() })
+const actionId = 'fake.message.draft.create'
 const messageProfile = defineProfile({
   id: 'fake.message',
   version: 1,
@@ -25,6 +26,18 @@ const messageProfile = defineProfile({
       docs: 'Create a fake draft',
     },
   },
+})
+
+test('rejects an empty Adapter Action id', () => {
+  const profiles = createProfileRegistry([messageProfile])
+  const adapter = {
+    ...validAdapter(),
+    actions: { '': validActionBinding },
+  }
+
+  expect(() => createAdapterRegistry(profiles, [adapter])).toThrow(
+    'Invalid Adapter definition',
+  )
 })
 
 test('requires routing capabilities while indexed may support remote override', () => {
@@ -64,7 +77,11 @@ const validActionBinding = {
   profile: { id: 'fake.message', version: 1 },
   input: createDraftInput,
   output: { id: 'fake.message', version: 1 },
-  run: async () => ({}),
+  run: async () => ({
+    ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/one',
+    profile: { id: 'fake.message', version: 1 },
+    payload: { subject: 'Draft' },
+  }),
 } as const
 
 function validAdapter() {
@@ -82,6 +99,50 @@ function validAdapter() {
 }
 
 describe('AdapterRegistry', () => {
+  test('rejects Profile Actions whose output Profile is not loaded', () => {
+    const invalidProfile = defineProfile({
+      ...messageProfile,
+      actions: {
+        [actionId]: {
+          effect: 'reversible',
+          input: createDraftInput,
+          output: { id: 'fake.missing', version: 1 },
+          docs: 'Invalid output Profile',
+        },
+      },
+    })
+
+    try {
+      createAdapterRegistry(createProfileRegistry([invalidProfile]), [])
+      throw new Error('expected unknown Action output rejection')
+    } catch (error) {
+      expect(error).toBeInstanceOf(DefinitionRegistryError)
+      expect(error).toMatchObject({ code: 'unknown_profile' })
+      expect(String(error)).toContain(actionId)
+      expect(String(error)).toContain('fake.missing@1')
+    }
+  })
+
+  test('rejects malformed Action bindings as invalid definitions', () => {
+    const profiles = createProfileRegistry([messageProfile])
+    for (const run of [undefined, 'not-a-function']) {
+      const adapter = {
+        ...validAdapter(),
+        actions: {
+          'fake.message.draft.create': { ...validActionBinding, run },
+        },
+      }
+
+      try {
+        createAdapterRegistry(profiles, [adapter as never])
+        throw new Error('expected malformed binding rejection')
+      } catch (error) {
+        expect(error).toBeInstanceOf(DefinitionRegistryError)
+        expect(error).toMatchObject({ code: 'invalid_definition' })
+      }
+    }
+  })
+
   test('requires a declarative auth specification', () => {
     const profiles = createProfileRegistry([messageProfile])
     const missingAuth = { ...validAdapter() } as Record<string, unknown>
@@ -138,10 +199,115 @@ describe('AdapterRegistry', () => {
     expect(() => createAdapterRegistry(profiles, [incompatible])).toThrow(
       'Incompatible input schema for Action fake.message.draft.create',
     )
+
+    const wrongProfile = {
+      ...validAdapter(),
+      actions: {
+        'fake.message.draft.create': {
+          ...validActionBinding,
+          profile: { id: 'fake.other', version: 1 },
+        },
+      },
+    }
+    expect(() => createAdapterRegistry(profiles, [wrongProfile])).toThrow(
+      'Action fake.message.draft.create is bound to the wrong Profile',
+    )
+
+    const wrongOutput = {
+      ...validAdapter(),
+      actions: {
+        'fake.message.draft.create': {
+          ...validActionBinding,
+          output: { id: 'fake.other', version: 1 },
+        },
+      },
+    }
+    expect(() => createAdapterRegistry(profiles, [wrongOutput])).toThrow(
+      'Incompatible output contract for Action fake.message.draft.create',
+    )
   })
 })
 
 describe('ExtensionRegistry', () => {
+  test('rejects an unknown Action output atomically during registration', () => {
+    const base = defineExtension({
+      id: 'base',
+      version: 1,
+      profiles: [messageProfile],
+      adapters: [validAdapter()],
+    })
+    const registry = createExtensionRegistry([base])
+    const invalidProfile = defineProfile({
+      id: 'fake.invalid-output',
+      version: 1,
+      schema: z.object({ value: z.string() }),
+      actions: {
+        'fake.invalid-output.create': {
+          effect: 'reversible',
+          input: z.object({ value: z.string() }),
+          output: { id: 'fake.missing', version: 1 },
+          docs: 'Invalid output contract',
+        },
+      },
+    })
+    const invalid = defineExtension({
+      id: 'invalid-output',
+      version: 1,
+      profiles: [invalidProfile],
+      adapters: [],
+    })
+
+    expect(() => registry.register(invalid)).toThrow(
+      'Action fake.invalid-output.create references unknown output Profile fake.missing@1',
+    )
+    expect(
+      registry.profiles.get({ id: 'fake.invalid-output', version: 1 }),
+    ).toBeUndefined()
+    expect(registry.list()).toEqual([base])
+  })
+
+  test('rejects duplicate global Action ids atomically', () => {
+    const base = defineExtension({
+      id: 'base',
+      version: 1,
+      profiles: [messageProfile],
+      adapters: [validAdapter()],
+    })
+    const registry = createExtensionRegistry([base])
+    const duplicateActionProfile = defineProfile({
+      id: 'fake.other',
+      version: 1,
+      schema: z.object({ value: z.string() }),
+      actions: {
+        'fake.message.draft.create': {
+          effect: 'reversible',
+          input: z.object({ value: z.string() }),
+          output: { id: 'fake.other', version: 1 },
+          docs: 'Duplicate bare Action id',
+        },
+      },
+    })
+    const duplicate = defineExtension({
+      id: 'duplicate',
+      version: 1,
+      profiles: [duplicateActionProfile],
+      adapters: [],
+    })
+
+    try {
+      registry.register(duplicate)
+      throw new Error('expected duplicate Action rejection')
+    } catch (error) {
+      expect(error).toBeInstanceOf(DefinitionRegistryError)
+      expect(error).toMatchObject({ code: 'action_binding_mismatch' })
+      expect(String(error)).toContain('fake.message.draft.create')
+    }
+    expect(
+      registry.profiles.get({ id: 'fake.other', version: 1 }),
+    ).toBeUndefined()
+    expect(registry.list()).toEqual([base])
+  })
+
   test('rejects an invalid Extension atomically', () => {
     const base = defineExtension({
       id: 'base',

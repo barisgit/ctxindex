@@ -28,6 +28,7 @@ export async function obtainGoogleTokens(
   p: AddArgs,
   id: string,
   secret: string,
+  scopes: readonly string[],
 ): Promise<LoopbackTokens> {
   const env = getEnv()
   if (p.fromEnv) {
@@ -51,7 +52,7 @@ export async function obtainGoogleTokens(
     p.loopback ||
     (process.stdin.isTTY === true && env.CTXINDEX_NO_BROWSER !== '1')
   )
-    return openLoopbackFlow({ clientId: id, clientSecret: secret })
+    return openLoopbackFlow({ clientId: id, clientSecret: secret, scopes })
   const note =
     env.CTXINDEX_NO_BROWSER === '1'
       ? ' (CTXINDEX_NO_BROWSER=1 disables interactive OAuth)'

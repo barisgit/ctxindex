@@ -1,5 +1,6 @@
 import { type CommandDef, defineCommand, runMain } from 'citty'
 import pkg from '../package.json' with { type: 'json' }
+import { actionCommand } from './commands/action'
 import { artifactCommand } from './commands/artifact'
 import { authCommand } from './commands/auth'
 import { exportCommand } from './commands/export'
@@ -106,6 +107,7 @@ export const rootCommand = defineCommand({
   },
   subCommands: {
     init: initCommand,
+    action: actionCommand,
     auth: authCommand,
     artifact: artifactCommand,
     purge: purgeCommand,

@@ -113,7 +113,7 @@ Natural-key Relations use string `(field, value)` targets in V1. A separate
 resolution mapping caches zero-to-many matches globally across Sources and
 Realms; the logical edge remains observable when no match exists.
 
-Artifact bytes live under the ctxindex data directory by content hash. SQLite stores metadata, origin Ref, media type, size, retention class, and path. `--output` copies bytes out without transferring store ownership.
+Artifact bytes live under the ctxindex data directory by content hash. SQLite stores a stable Artifact Ref, owning Resource, origin Ref, media type, size, fixed `cached` retention class, and relative path. V1 retains cached bytes indefinitely: only explicit `purge artifacts` removes managed bytes and cache metadata, while Resource payloads and Profile-derived descriptors remain for re-download. There is no automatic age-, quota-, or pressure-based eviction. `--output` copies bytes out without transferring store ownership.
 
 ## 8. Realms and Sources
 
@@ -138,7 +138,7 @@ communication.message.draft.create
 communication.message.draft.update
 ```
 
-Both require an explicit mailbox Source. The host validates input before provider I/O; the Adapter persists the provider Draft and returns a normalized `communication.message` Resource/Ref. A Draft is reversible provider state. Message sending and irreversible action execution are not implemented in V1.
+Both require an explicit mailbox Source. The host validates input before provider I/O; the Adapter persists the provider Draft and returns a normalized `communication.message` Resource/Ref. Gmail Draft Refs use `ctx://<source-id>/draft/<immutable-draft-id>` because Gmail replaces the embedded Message id on update. Update input addresses that Ref and supplies complete replacement recipients, subject, and body. Gmail remote message discovery excludes Draft-labelled messages to prevent a second message-id identity for the same Draft. The Gmail Adapter and OAuth Grant require `gmail.readonly` plus `gmail.compose`, but no send binding exists. A Draft is reversible provider state. Message sending and irreversible action execution are not implemented in V1.
 
 The generic CLI shape is:
 

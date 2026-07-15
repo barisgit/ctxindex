@@ -252,13 +252,20 @@ describe('oauth headless e2e', () => {
         expect(rowCount(db, 'accounts')).toBe(1)
         expect(rowCount(db, 'grants')).toBe(1)
         const grant = db
-          .prepare('SELECT access_token_ref, refresh_token_ref FROM grants')
+          .prepare(
+            'SELECT access_token_ref, refresh_token_ref, scopes_json FROM grants',
+          )
           .get() as {
           access_token_ref: string
           refresh_token_ref: string
+          scopes_json: string
         }
         expect(grant.access_token_ref).toMatch(/^keychain:ctxindex\/google\//)
         expect(grant.refresh_token_ref).toMatch(/^keychain:ctxindex\/google\//)
+        expect(JSON.parse(grant.scopes_json)).toEqual([
+          'https://www.googleapis.com/auth/gmail.compose',
+          'https://www.googleapis.com/auth/gmail.readonly',
+        ])
       } finally {
         db.close()
       }

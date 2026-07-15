@@ -1,13 +1,37 @@
-import { getGoogleAccountEmail } from '@ctxindex/core/auth'
+import { getGoogleAccountEmail, providerKeyForAuth } from '@ctxindex/core/auth'
 import { getEnv } from '@ctxindex/core/config'
+import type { ExtensionRegistry } from '@ctxindex/core/registry'
 import { type AuthArgs, authUsage, parseAuthArgs } from '../args/auth'
 import { obtainGoogleTokens, resolveAddCreds } from '../auth/add-google'
-import { GOOGLE_GMAIL_READONLY_SCOPE } from '../auth/google-loopback'
 import { openDeps } from '../deps'
 import { formatGrantAdded, formatGrants } from '../format/auth'
 import { mapErrorToExit } from '../format/exit'
 
 type AddArgs = Extract<AuthArgs, { kind: 'add' }>
+
+export function googleOAuthScopes(
+  registry: ExtensionRegistry,
+): readonly string[] {
+  const googleAdapters = registry.adapters
+    .list()
+    .filter(
+      (adapter) =>
+        adapter.auth.kind === 'oauth2' &&
+        providerKeyForAuth(adapter.auth) === 'google',
+    )
+  if (googleAdapters.length === 0) {
+    throw Object.assign(new Error('no Google OAuth Adapter is loaded'), {
+      exitCode: 2,
+    })
+  }
+  return [
+    ...new Set(
+      googleAdapters.flatMap((adapter) =>
+        adapter.auth.kind === 'oauth2' ? adapter.auth.scopes : [],
+      ),
+    ),
+  ].sort()
+}
 
 async function detectGoogleAccountEmail(token: {
   readonly refresh_token: string
@@ -37,9 +61,10 @@ async function handleAdd(p: AddArgs): Promise<number> {
   const { id, secret } = resolveAddCreds(p)
   const deps = await openDeps()
   try {
+    const scopes = googleOAuthScopes(deps.registry)
     const t = p.refreshToken
       ? { refresh_token: p.refreshToken }
-      : await obtainGoogleTokens(p, id, secret)
+      : await obtainGoogleTokens(p, id, secret, scopes)
     const accountEmail = p.label ?? (await detectGoogleAccountEmail(t))
     const { grantId } = await deps.authService.addGoogleGrant({
       clientId: id,
@@ -48,7 +73,7 @@ async function handleAdd(p: AddArgs): Promise<number> {
       ...('access_token' in t && t.access_token
         ? { accessToken: t.access_token }
         : {}),
-      scopes: JSON.stringify([GOOGLE_GMAIL_READONLY_SCOPE]),
+      scopes: JSON.stringify(scopes),
       ...('expires_at' in t ? { expiresAt: t.expires_at } : {}),
       ...(accountEmail ? { accountEmail } : {}),
     })

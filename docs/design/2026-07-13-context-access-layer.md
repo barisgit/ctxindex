@@ -59,7 +59,7 @@ Profile Actions are in scope; arbitrary Extension subcommands are not.
 | D5 | Auth ownership | Declarative specs (oauth2/api-key/basic/none) run by core + minimal namespaced secret bucket as escape hatch | OAuth refresh, `needs_auth`, exit 10 stay uniform |
 | D6 | Source concept | Source = configured connection; sync is optional per-source | One noun; `source add --no-sync` |
 | D7 | Search default | Hybrid orchestration; adapter decides per source with sync-coverage knowledge; `--local-only` / `--remote` override | PROVISIONAL — validate by dogfooding partial Gmail sync |
-| D8 | Artifacts | Managed content-addressed store with retention policy, purge, `--output` copies out | |
+| D8 | Artifacts | Managed content-addressed store; V1 has one `cached` retention class, retained until explicit purge; `--output` copies out | No automatic age, quota, or pressure eviction in V1 |
 | D9 | Data shape | Minimal resource envelope + profiles; arbitrary payload allowed | |
 | D10 | Profile composability | Permitted by API; V1 uses one primary Profile (+ `artifact`) per resource | |
 | D11 | Definition style | Declarative `defineExtension`/`defineAdapter`/`defineProfile` factories; typed registries internally | pi-style authoring, lume/sessionloom-style registries |
@@ -159,7 +159,7 @@ defineProfile({
   actions: {
     "communication.message.draft.create": {
       effect: "reversible",
-      input: z.object({ to: z.array(z.string()), subject: z.string(), body: z.string() }),
+      input: z.object({ to: z.array(z.string()), subject: z.string(), bodyText: z.string() }),
       output: { profile: "communication.message" },
       docs: "Persist a provider Draft through an explicit mailbox Source",
     },
@@ -199,7 +199,7 @@ V1 starts from a fresh generic schema with no per-domain tables:
 | `field_index` | Typed scalar rows projected from declared fields; array values occupy one ordered row per element |
 | `chunks` (+FTS) | searchable text segments |
 | `relations` + `relation_resolutions` | Logical Ref/natural-key edges plus zero-to-many cached Resource matches |
-| `artifacts` | CAS metadata: hash, media type, size, origin ref, retention class, local path |
+| `artifacts` | CAS metadata: stable Artifact Ref, owning Resource, hash, media type, size, origin Ref, fixed `cached` retention class, local path |
 | `sources` + sync bookkeeping | sync_runs, sync_locks, source_sync_state, tombstones, accounts, grants, user-defined realms |
 
 Prototype tables such as `items`, `mail_messages`, `mail_bodies`, and
@@ -319,6 +319,16 @@ classification, docs, and examples. Adapters bind implementations through a
 specific Source and its existing auth context. V1 implements only reversible
 `communication.message.draft.create` and `.update`; sending and other provider
 mutations are deferred. Agent composition and approval remain workflow policy.
+
+Gmail Draft identity uses the provider's immutable Draft id, not the embedded
+Message id (which Gmail replaces on each update):
+`ctx://<source-id>/draft/<draft-id>`. The normalized message payload may expose
+`providerDraftId`, while update input addresses the stable Draft Resource Ref
+and supplies the complete replacement recipients, subject, and body. Gmail
+remote message discovery excludes the `DRAFT` label so the mutable embedded
+Message id cannot create a second Resource identity for the same Draft. The
+Gmail Adapter and OAuth grant require both `gmail.readonly` and `gmail.compose`;
+ctxindex exposes no send binding despite the broader provider scope.
 
 ### Search routing (D7, provisional)
 
@@ -440,5 +450,4 @@ compatibility path.
 
 ## 13. Open questions
 
-1. Artifact retention classes, quota scope, eviction order, and `status` disk accounting.
-2. Hybrid search default (D7), to revisit after dogfooding a partial Gmail sync.
+1. Hybrid search default (D7), to revisit after dogfooding a partial Gmail sync.

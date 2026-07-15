@@ -1,7 +1,5 @@
 import { CtxindexSyncError } from '@ctxindex/core/errors'
 
-export const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1/users/me'
-
 export interface GmailPayload {
   readonly filename?: string
   readonly mimeType?: string

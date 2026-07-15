@@ -43,6 +43,42 @@ test('bundled communication.message enters the public registry path', () => {
       },
     ],
     sources: [],
-    actions: [],
+    actions: [
+      {
+        id: 'communication.message.draft.create',
+        profile: { id: 'communication.message', version: 1 },
+        effect: 'reversible',
+        input: expect.any(Object),
+        output: { id: 'communication.message', version: 1 },
+        docs: 'Create a Draft in the selected mailbox Source.',
+        examples: [
+          {
+            to: ['recipient@example.com'],
+            subject: 'Project update',
+            bodyText: 'The project is on track.',
+          },
+        ],
+        adapters: [],
+      },
+      {
+        id: 'communication.message.draft.update',
+        profile: { id: 'communication.message', version: 1 },
+        effect: 'reversible',
+        input: expect.any(Object),
+        output: { id: 'communication.message', version: 1 },
+        docs: 'Replace the complete content of the addressed Draft in the selected mailbox Source.',
+        examples: [
+          {
+            ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/stable-draft-id',
+            to: ['recipient@example.com'],
+            subject: 'Updated project status',
+            bodyText: 'The project is ready for review.',
+          },
+        ],
+        adapters: [],
+      },
+    ],
   })
+  const actionDescription = JSON.stringify(description.actions)
+  expect(actionDescription).not.toMatch(/gmail|provider/i)
 })

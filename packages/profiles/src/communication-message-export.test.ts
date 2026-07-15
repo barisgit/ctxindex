@@ -16,6 +16,8 @@ describe('communication.message EML export', () => {
         providerMessageId: 'provider-1',
         from: ['sender@example.com'],
         to: ['one@example.com', 'two@example.com'],
+        cc: ['copy@example.com'],
+        bcc: ['blind@example.com'],
         subject: 'Hello',
         date: '2024-01-02T03:04:05.000Z',
         rfcMessageId: '<message@example.com>',
@@ -26,6 +28,8 @@ describe('communication.message EML export', () => {
       [
         'From: sender@example.com',
         'To: one@example.com, two@example.com',
+        'Cc: copy@example.com',
+        'Bcc: blind@example.com',
         'Subject: Hello',
         'Date: Tue, 02 Jan 2024 03:04:05 GMT',
         'Message-ID: <message@example.com>',

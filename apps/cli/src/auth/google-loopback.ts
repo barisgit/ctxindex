@@ -10,9 +10,6 @@ import {
 } from '@ctxindex/core/auth'
 import { getEnv } from '@ctxindex/core/config'
 
-export const GOOGLE_GMAIL_READONLY_SCOPE =
-  'https://www.googleapis.com/auth/gmail.readonly'
-
 const defaultAuthUrl = 'https://accounts.google.com/o/oauth2/v2/auth'
 const defaultTimeoutMs = 5 * 60 * 1000
 
@@ -51,7 +48,7 @@ export interface LoopbackTokens {
 export interface LoopbackOptions {
   readonly clientId: string
   readonly clientSecret: string
-  readonly scopes?: readonly string[]
+  readonly scopes: readonly string[]
   readonly openBrowser?: (url: string) => Promise<void> | void
   readonly signal?: AbortSignal
   readonly timeoutMs?: number
@@ -242,7 +239,7 @@ export async function exchangeGoogleRefreshToken({
 export async function openLoopbackFlow({
   clientId,
   clientSecret,
-  scopes = [GOOGLE_GMAIL_READONLY_SCOPE],
+  scopes,
   openBrowser = defaultOpenBrowser,
   signal,
   timeoutMs = timeoutMsFromEnv(),

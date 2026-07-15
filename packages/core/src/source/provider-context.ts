@@ -65,6 +65,7 @@ export interface CreateSourceProviderContextInput {
   readonly authService: Pick<AuthService, 'resolveLinkedGrantAccessToken'>
   readonly logger: AdapterLogger
   readonly fetch?: SourceProviderFetch
+  readonly retryUnauthorized?: boolean
 }
 
 const SENSITIVE_CONFIG_KEYS = new Set([
@@ -233,7 +234,9 @@ export async function createSourceProviderContext(
     }
 
     const response = await send(await resolveToken(false))
-    if (response.status !== 401) return response
+    if (response.status !== 401 || input.retryUnauthorized === false) {
+      return response
+    }
     return send(await resolveToken(true))
   }) as typeof fetch
 

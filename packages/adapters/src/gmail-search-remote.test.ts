@@ -162,9 +162,10 @@ describe('Gmail searchRemote', () => {
     )
 
     expect(urls[0]?.searchParams.get('q')).toBe(
-      'project x from:alice@example.com is:unread after:1 before:3',
+      'project x from:alice@example.com is:unread after:1 before:3 -in:drafts',
     )
     expect(urls[0]?.searchParams.get('maxResults')).toBe('10')
+    expect(urls[0]?.searchParams.get('q')?.match(/-in:drafts/g)).toHaveLength(1)
     expect(
       urls.slice(1).map((url) => ({
         format: url.searchParams.get('format'),

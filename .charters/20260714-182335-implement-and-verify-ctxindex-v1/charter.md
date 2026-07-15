@@ -51,12 +51,12 @@ Status: pass — evidence: `work/slice-6-gate.txt` (Artifact CAS/download/cache/
 ### C7. Gmail Draft Actions are typed, reversible, and cannot send
 Registry-derived Action discovery and execution validate complete input before provider I/O, require an explicit Source and linked Grant, and create/update only the addressed provider Draft as a stable message Resource; no send or irreversible Action exists and composing text alone creates no state.
 Depends: C1, C3, C4
-Status: in-progress
+Status: pass — evidence: `work/slice-7-mocked-gate.txt` and `work/slice-7-live-draft.txt` (typed reversible Action contracts, zero-I/O invalid/no-send proofs, mocked binary create/update, and approved live stable-Ref Draft create/update with provider UI confirmation passed)
 
 ### C8. Local directories use the same generic Resource path
 A sandboxed local-directory Source syncs files with limits, ignores, and non-fatal skip reporting, then exposes them through the same generic search, get, Ref, and result-envelope behavior as Gmail without a domain-specific core path.
 Depends: C1, C3
-Status: pending
+Status: in-progress
 
 ### C9. An external tenders Extension proves the public seam
 A tenders Extension outside bundled packages imports only public SDK contracts, loads by explicit path through the relocated compiled binary, participates in generic operations, and leaves its Source unavailable but materialized Resources searchable after removal.

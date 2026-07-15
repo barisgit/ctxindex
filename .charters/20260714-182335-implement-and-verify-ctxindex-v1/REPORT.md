@@ -49,3 +49,12 @@
 - Retention: the sole `cached` policy retains bytes until explicit `purge artifacts`; purge removes metadata plus managed/orphan/temp/quarantine bytes while preserving Resource descriptors for re-download.
 - Export: core always provides deterministic validated-payload JSON; `communication.message` declares pure injection-safe CRLF EML rendering without embedding Artifact bytes; unsupported choices derive from the exact Profile registry entry.
 - Verification: `work/slice-6-gate.txt` records 107 focused tests, 419 passing full-suite tests with one live skip, typecheck, lint, strict OpenSpec, D3, and diff checking.
+
+## C7. Gmail Draft Actions are typed, reversible, and cannot send
+
+- Result: Passed.
+- Generic contract: public Profile Action schemas and Adapter bindings drive registry-derived describe/run behavior; core validates complete input before Source authorization or provider I/O and materializes normalized complete Action output at a stable Ref.
+- Gmail boundary: only reversible Draft create and complete-replacement update are bound. Draft identity uses the immutable provider Draft id; update preserves the Ref while replacing content and the embedded provider Message id. No send or irreversible Action exists.
+- Negative and mocked proof: invalid/header-injection input performs zero provider I/O or storage writes; the compiled binary performs exactly one mocked POST and one PUT, reuses the cached replacement, and records no send path. OAuth request recording redacts token bodies.
+- Live proof: after explicit approval, the isolated dual-scope Source performed one harmless self-addressed Draft create and one update. The user confirmed the updated Draft in Gmail and explicitly confirmed nothing was sent.
+- Verification: `work/slice-7-mocked-gate.txt` records 532 passing full-suite tests with one live-token skip plus focused, integration, typecheck, lint, D3, strict OpenSpec, and diff checks; `work/slice-7-live-draft.txt` contains redaction-safe Human-checkpoint evidence.

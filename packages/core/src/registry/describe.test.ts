@@ -59,7 +59,11 @@ const fakeAdapter = defineAdapter({
       profile: { id: 'fake.note', version: 1 },
       input: publishInput,
       output: { id: 'fake.note', version: 1 },
-      run: async () => ({}),
+      run: async () => ({
+        ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/one',
+        profile: { id: 'fake.ticket', version: 1 },
+        payload: { title: 'Draft' },
+      }),
     },
   },
   docs: { summary: 'Fake notes source' },

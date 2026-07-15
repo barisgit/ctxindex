@@ -1,4 +1,6 @@
 export {
+  communicationMessageDraftCreateInputSchema,
+  communicationMessageDraftUpdateInputSchema,
   communicationMessageExtension,
   communicationMessageProfile,
   communicationMessageSchema,

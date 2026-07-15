@@ -5,6 +5,17 @@ afterEach(() => {
   spyOn(console, 'log').mockRestore()
 })
 
+test('registers action describe and run as nested root commands', () => {
+  expect(rootCommand.subCommands).toMatchObject({
+    action: {
+      subCommands: {
+        describe: expect.any(Object),
+        run: expect.any(Object),
+      },
+    },
+  })
+})
+
 test('registers export as a root command', () => {
   expect(rootCommand.subCommands).toMatchObject({ export: expect.any(Object) })
 })

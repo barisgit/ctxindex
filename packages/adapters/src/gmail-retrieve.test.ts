@@ -84,6 +84,8 @@ function message(payload: Record<string, unknown>): Response {
         { name: 'Subject', value: 'A subject' },
         { name: 'From', value: 'Alice <alice@example.com>' },
         { name: 'To', value: 'Bob <bob@example.com>' },
+        { name: 'Cc', value: 'Copy <copy@example.com>' },
+        { name: 'Bcc', value: 'Blind <blind@example.com>' },
         { name: 'Date', value: 'Thu, 1 Jan 1970 00:00:00 GMT' },
         {
           name: 'Message-ID',
@@ -187,6 +189,8 @@ describe('Gmail retrieve', () => {
           subject: 'A subject',
           from: ['Alice <alice@example.com>'],
           to: ['Bob <bob@example.com>'],
+          cc: ['Copy <copy@example.com>'],
+          bcc: ['Blind <blind@example.com>'],
           date: '1970-01-01T00:00:00.000Z',
           snippet: 'A snippet',
           bodyText: 'Plain preferred',
@@ -282,5 +286,78 @@ describe('Gmail retrieve', () => {
 
     expect(seenSignal).toBe(controller.signal)
     expect(error).toMatchObject({ name: 'AbortError' })
+  })
+  test('retrieves an exact stable Draft Ref without advertising attachments', async () => {
+    const draftRef = `ctx://${sourceId.toUpperCase()}/draft/draft%2F1`
+    const result = await retrieve(
+      Response.json({
+        id: 'draft/1',
+        message: {
+          id: 'changing-message-id',
+          threadId: 'thread-1',
+          labelIds: ['DRAFT'],
+          payload: {
+            headers: [
+              { name: 'To', value: 'to@example.com' },
+              { name: 'Cc', value: 'cc@example.com' },
+              { name: 'Bcc', value: 'bcc@example.com' },
+              { name: 'Subject', value: 'Draft subject' },
+            ],
+            parts: [
+              {
+                filename: 'not-supported.txt',
+                mimeType: 'text/plain',
+                body: { attachmentId: 'must-not-emit', size: 3 },
+              },
+              {
+                mimeType: 'text/plain',
+                body: { data: encoded('Draft body') },
+              },
+            ],
+          },
+        },
+      }),
+      draftRef,
+    )
+
+    expect(result.urls).toHaveLength(1)
+    expect(result.urls[0]?.pathname).toEndWith('/users/me/drafts/draft%2F1')
+    expect(result.urls[0]?.searchParams.get('format')).toBe('full')
+    expect(result.artifacts).toEqual([])
+    expect(result.resources).toEqual([
+      {
+        ref: draftRef,
+        profile: { id: 'communication.message', version: 1 },
+        title: 'Draft subject',
+        occurredAt: null,
+        providerUpdatedAt: null,
+        payload: {
+          providerDraftId: 'draft/1',
+          providerMessageId: 'changing-message-id',
+          threadId: 'thread-1',
+          conversationKey: `${sourceId.toUpperCase()}:thread-1`,
+          subject: 'Draft subject',
+          to: ['to@example.com'],
+          cc: ['cc@example.com'],
+          bcc: ['bcc@example.com'],
+          bodyText: 'Draft body',
+          labels: ['DRAFT'],
+          unread: false,
+        },
+      },
+    ])
+  })
+
+  test.each([
+    [{ id: 'wrong-draft', message: { id: 'message-1' } }, 'wrong envelope'],
+    [{ id: 'draft/1' }, 'missing message'],
+  ])('rejects an invalid Draft response: %s', async (body) => {
+    const error = await retrieve(
+      Response.json(body),
+      `ctx://${sourceId.toUpperCase()}/draft/draft%2F1`,
+    ).catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(CtxindexSyncError)
+    expect(error).toMatchObject({ code: 'provider_bad_response' })
   })
 })

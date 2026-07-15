@@ -1,8 +1,19 @@
 import { describe, expect, test } from 'bun:test'
-import { CtxindexAuthError, CtxindexSyncError } from '@ctxindex/core/errors'
+import {
+  CtxindexAuthError,
+  CtxindexSyncError,
+  CtxindexValidationError,
+} from '@ctxindex/core/errors'
 import { mapErrorToExit } from './exit'
 
 describe('mapErrorToExit', () => {
+  test.each([
+    'action_unsupported',
+    'confirmation_required',
+  ] as const)('maps Action validation %s to exit 2', (code) => {
+    expect(mapErrorToExit(new CtxindexValidationError(code, code))).toBe(2)
+  })
+
   test('keeps transient auth network failures on exit 30', () => {
     expect(
       mapErrorToExit(

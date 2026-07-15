@@ -69,7 +69,9 @@ describe('headless google auth', () => {
       fromEnv: false,
     }
     const creds = resolveAddCreds(parsed)
-    const token = await obtainGoogleTokens(parsed, creds.id, creds.secret)
+    const token = await obtainGoogleTokens(parsed, creds.id, creds.secret, [
+      'scope-one',
+    ])
 
     expect(fetchedHosts).toEqual(['oauth2.googleapis.com'])
     expect(token.access_token).toBe('access-token-secret')

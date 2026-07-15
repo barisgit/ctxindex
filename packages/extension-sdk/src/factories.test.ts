@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
 import {
+  type ActionContext,
   type ArtifactDescriptor,
   type DownloadContext,
   defineAdapter,
@@ -9,6 +10,7 @@ import {
   defineProfile,
   type InferProfilePayload,
   type ResolvedArtifactDescriptor,
+  type RetrievedResource,
   type SearchRemoteResource,
   type SearchRemoteResult,
 } from './index'
@@ -117,6 +119,51 @@ const _DownloadIsAsyncCompatible: (
 ) => void | Promise<void> = async () => {}
 void resolvedDescriptor
 void _DownloadIsAsyncCompatible
+
+const actionResult: RetrievedResource = {
+  ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/note/1',
+  profile: { id: 'fake.note', version: 1 },
+  payload: { title: 'Action result', pinned: false },
+}
+
+defineAdapter({
+  id: 'fake.actions',
+  version: 1,
+  configSchema: z.object({}),
+  auth: { kind: 'none' },
+  profiles: [{ id: 'fake.note', version: 1 }],
+  routing: 'indexed',
+  capabilities: [],
+  operations: {},
+  actions: {
+    'fake.note.create': {
+      profile: { id: 'fake.note', version: 1 },
+      input: z.object({ title: z.string() }),
+      output: { id: 'fake.note', version: 1 },
+      run(context: ActionContext<{ title: string }>) {
+        const sourceId: string = context.source.id
+        const inputTitle: string = context.input.title
+        const signal: AbortSignal = context.signal
+        const fetch: typeof globalThis.fetch = context.fetch
+        const logger = context.logger
+        void sourceId
+        void inputTitle
+        void signal
+        void fetch
+        void logger
+        return actionResult
+      },
+    },
+  },
+})
+
+function assertActionContextIsCapabilitySpecific(
+  context: ActionContext<{ title: string }>,
+): void {
+  // @ts-expect-error Action contexts do not expose retrieval emission
+  context.emitResource
+}
+void assertActionContextIsCapabilitySpecific
 
 defineAdapter({
   id: 'fake.missing-operation',

@@ -75,7 +75,7 @@ const profileDefinitionSchema = z.object({
     .optional(),
   actions: z
     .record(
-      z.string(),
+      z.string().min(1),
       z.object({
         effect: z.enum(['reversible', 'irreversible']),
         input: schemaSchema,

@@ -244,7 +244,11 @@ export interface AdapterActionBinding<
   readonly profile: ProfileReference
   readonly input: TInput
   readonly output: ProfileReference
-  readonly run: (context: ActionContext<z.infer<TInput>>) => unknown
+  readonly run: {
+    bivarianceHack(
+      context: ActionContext<z.infer<TInput>>,
+    ): RetrievedResource | Promise<RetrievedResource>
+  }['bivarianceHack']
 }
 
 export interface AdapterDefinition<
@@ -253,6 +257,9 @@ export interface AdapterDefinition<
   TConfigSchema extends z.ZodTypeAny = z.ZodTypeAny,
   TCapabilities extends
     readonly AdapterCapability[] = readonly AdapterCapability[],
+  TActions extends Readonly<Record<string, AdapterActionBinding>> = Readonly<
+    Record<string, AdapterActionBinding>
+  >,
 > {
   readonly id: TId
   readonly version: TVersion
@@ -262,12 +269,18 @@ export interface AdapterDefinition<
   readonly routing: SearchRouting
   readonly capabilities: TCapabilities
   readonly operations: AdapterOperationsFor<TCapabilities>
-  readonly actions: Readonly<Record<string, AdapterActionBinding>>
+  readonly actions: TActions
   readonly docs?: { readonly summary: string }
 }
 
 export type AnyAdapterDefinition = Omit<
-  AdapterDefinition<string, number, z.ZodTypeAny, readonly []>,
+  AdapterDefinition<
+    string,
+    number,
+    z.ZodTypeAny,
+    readonly [],
+    Readonly<Record<string, AdapterActionBinding>>
+  >,
   'capabilities' | 'operations'
 > & {
   readonly capabilities: readonly AdapterCapability[]
@@ -313,9 +326,16 @@ export function defineAdapter<
   const TVersion extends number,
   TConfigSchema extends z.ZodTypeAny,
   const TCapabilities extends readonly AdapterCapability[],
+  const TActions extends Readonly<Record<string, AdapterActionBinding>>,
 >(
-  definition: AdapterDefinition<TId, TVersion, TConfigSchema, TCapabilities>,
-): AdapterDefinition<TId, TVersion, TConfigSchema, TCapabilities> {
+  definition: AdapterDefinition<
+    TId,
+    TVersion,
+    TConfigSchema,
+    TCapabilities,
+    TActions
+  >,
+): AdapterDefinition<TId, TVersion, TConfigSchema, TCapabilities, TActions> {
   return definition
 }
 

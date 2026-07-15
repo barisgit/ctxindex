@@ -71,13 +71,13 @@ After the final task, run the `openspec-verify-change` workflow against all requ
 
 ## 7. Provider Draft Actions
 
-- [ ] 7.1 Implement Action contract schemas, Adapter bindings, ActionContext construction, and pre-I/O input validation; verify declared-but-unimplemented, undeclared, and incompatible bindings fail.
-- [ ] 7.2 Implement registry-derived `action describe` and `action run` core/CLI paths with explicit Source selection and unsupported-Source errors.
-- [ ] 7.3 Implement Gmail `communication.message.draft.create`; verify the provider Draft is returned and materialized as a stable `communication.message` Ref.
-- [ ] 7.4 Implement Gmail `communication.message.draft.update`; verify it updates only the addressed Draft through the selected Source/Grant.
-- [ ] 7.5 Add negative contract tests proving V1 exposes no send/irreversible Action and composing text alone creates no ctxindex/provider state.
-- [ ] 7.6 **Slice gate:** run registry, Action core/CLI, and mocked Gmail Draft create/update tests; assert invalid input causes zero provider I/O and no send affordance exists; then run `bun run typecheck`, `bun run lint`, and `bun test`.
-- [ ] 7.7 **Human checkpoint — live Gmail Draft:** using the authenticated sandbox from 4.8, show the user the exact mailbox Source and uniquely labelled harmless Draft payload, then PAUSE for approval. After approval, run Draft create and update (never send), return/redact-safe Ref evidence, then PAUSE for the user to verify the Draft in the provider UI and optionally delete it. Mark complete only after explicit user confirmation that create/update were visible and no message was sent.
+- [x] 7.1 Implement Action contract schemas, Adapter bindings, ActionContext construction, and pre-I/O input validation; verify declared-but-unimplemented, undeclared, and incompatible bindings fail.
+- [x] 7.2 Implement registry-derived `action describe` and `action run` core/CLI paths with explicit Source selection and unsupported-Source errors.
+- [x] 7.3 Implement Gmail `communication.message.draft.create`; verify the provider Draft is returned and materialized as a stable `communication.message` Ref.
+- [x] 7.4 Implement Gmail `communication.message.draft.update`; verify it updates only the addressed Draft through the selected Source/Grant.
+- [x] 7.5 Add negative contract tests proving V1 exposes no send/irreversible Action and composing text alone creates no ctxindex/provider state.
+- [x] 7.6 **Slice gate:** run registry, Action core/CLI, and mocked Gmail Draft create/update tests; assert invalid input causes zero provider I/O and no send affordance exists; then run `bun run typecheck`, `bun run lint`, and `bun test`.
+- [x] 7.7 **Human checkpoint — live Gmail Draft:** using the authenticated sandbox from 4.8, show the user the exact mailbox Source and uniquely labelled harmless Draft payload, then PAUSE for approval. After approval, run Draft create and update (never send), return/redact-safe Ref evidence, then PAUSE for the user to verify the Draft in the provider UI and optionally delete it. Mark complete only after explicit user confirmation that create/update were visible and no message was sent.
 
 ## 8. Local-directory Adapter
 

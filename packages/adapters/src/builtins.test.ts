@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { isGrantCompatible } from '@ctxindex/core/auth'
 import {
   createExtensionRegistry,
   describeRegistry,
@@ -27,6 +28,24 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
     expect(
       registry.profiles.list().map(({ id, version }) => ({ id, version })),
     ).toEqual([{ id: 'communication.message', version: 1 }])
+    expect(
+      description.actions.map(({ id, effect, adapters }) => ({
+        id,
+        effect,
+        adapters,
+      })),
+    ).toEqual([
+      {
+        id: 'communication.message.draft.create',
+        effect: 'reversible',
+        adapters: [{ id: 'google.mailbox', version: 1 }],
+      },
+      {
+        id: 'communication.message.draft.update',
+        effect: 'reversible',
+        adapters: [{ id: 'google.mailbox', version: 1 }],
+      },
+    ])
   })
 
   test('declares canonical Gmail OAuth and strict token-free configs', () => {
@@ -40,8 +59,28 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
         authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
         tokenUrl: 'https://oauth2.googleapis.com/token',
       },
-      scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
+      scopes: [
+        'https://www.googleapis.com/auth/gmail.readonly',
+        'https://www.googleapis.com/auth/gmail.compose',
+      ],
     })
+    expect(
+      gmail &&
+        isGrantCompatible(gmail.auth, {
+          provider: 'google',
+          scopes: 'https://www.googleapis.com/auth/gmail.readonly',
+        }),
+    ).toBe(false)
+    expect(
+      gmail &&
+        isGrantCompatible(gmail.auth, {
+          provider: 'google',
+          scopes: JSON.stringify([
+            'https://www.googleapis.com/auth/gmail.compose',
+            'https://www.googleapis.com/auth/gmail.readonly',
+          ]),
+        }),
+    ).toBe(true)
     expect(
       gmail?.configSchema.safeParse({ access_token: 'malicious' }).success,
     ).toBe(false)
