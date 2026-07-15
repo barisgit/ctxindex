@@ -67,3 +67,35 @@ describe('ProfileRegistry', () => {
     ])
   })
 })
+
+test('kind lookup prefers canonical ids and reports alias collisions', () => {
+  const alphaV1 = defineProfile({
+    id: 'alpha.record',
+    version: 1,
+    schema: z.object({}),
+    docs: { summary: 'Alpha.', aliases: ['docs'] },
+  })
+  const alphaV2 = defineProfile({ ...alphaV1, version: 2 })
+  const beta = defineProfile({
+    id: 'beta.record',
+    version: 1,
+    schema: z.object({}),
+    docs: { summary: 'Beta.', aliases: ['docs'] },
+  })
+  const registry = createProfileRegistry([beta, alphaV2, alphaV1])
+
+  expect(registry.resolveKind(' alpha.record ')).toMatchObject({
+    status: 'known',
+    id: 'alpha.record',
+    profiles: [{ version: 1 }, { version: 2 }],
+  })
+  expect(registry.resolveKind(' DOCS ')).toEqual({
+    status: 'ambiguous',
+    kind: 'docs',
+    candidates: ['alpha.record', 'beta.record'],
+  })
+  expect(registry.resolveKind('missing')).toEqual({
+    status: 'unknown',
+    kind: 'missing',
+  })
+})

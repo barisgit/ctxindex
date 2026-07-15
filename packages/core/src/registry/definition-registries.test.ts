@@ -27,6 +27,39 @@ const messageProfile = defineProfile({
   },
 })
 
+test('requires routing capabilities while indexed may support remote override', () => {
+  const profiles = createProfileRegistry([messageProfile])
+  const remote = async () => ({ resources: [], warnings: [] })
+
+  expect(() =>
+    createAdapterRegistry(profiles, [
+      { ...validAdapter(), routing: 'federated' },
+    ]),
+  ).toThrow('Routing federated requires capability search-remote')
+  expect(() =>
+    createAdapterRegistry(profiles, [
+      {
+        ...validAdapter(),
+        routing: 'hybrid',
+        capabilities: ['retrieve', 'search-remote'] as const,
+        operations: {
+          ...validAdapter().operations,
+          searchRemote: remote,
+        },
+      },
+    ]),
+  ).toThrow('Routing hybrid requires capabilities sync and search-remote')
+
+  const indexedRemote = {
+    ...validAdapter(),
+    capabilities: ['retrieve', 'search-remote'] as const,
+    operations: { ...validAdapter().operations, searchRemote: remote },
+  }
+  expect(createAdapterRegistry(profiles, [indexedRemote]).list()).toEqual([
+    indexedRemote,
+  ])
+})
+
 const validActionBinding = {
   profile: { id: 'fake.message', version: 1 },
   input: createDraftInput,
@@ -41,8 +74,9 @@ function validAdapter() {
     configSchema: z.object({ account: z.string() }),
     auth: { kind: 'none' },
     profiles: [{ id: 'fake.message', version: 1 }],
+    routing: 'indexed',
     capabilities: ['retrieve'],
-    operations: { retrieve: async () => ({}) },
+    operations: { retrieve: async () => {} },
     actions: { 'fake.message.draft.create': validActionBinding },
   })
 }

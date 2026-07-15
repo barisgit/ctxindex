@@ -5,9 +5,9 @@ export const grants = sqliteTable('grants', {
   id: text('id').notNull().primaryKey(),
   accountId: text('account_id')
     .notNull()
-    .references(() => accounts.id),
+    .references(() => accounts.id, { onDelete: 'cascade' }),
   provider: text('provider').notNull(),
-  scopesJson: text('scopes_json'),
+  scopesJson: text('scopes_json').notNull(),
   clientIdRef: text('client_id_ref'),
   clientSecretRef: text('client_secret_ref'),
   accessTokenRef: text('access_token_ref'),

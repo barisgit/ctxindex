@@ -7,6 +7,7 @@ export interface MockGmailOptions {
   readonly accessToken?: string
   readonly refreshToken?: string
   readonly messages?: readonly MockGmailMessage[]
+  readonly listOrder?: readonly string[]
 }
 
 export interface MockGmailMessage {
@@ -15,7 +16,16 @@ export interface MockGmailMessage {
   readonly subject: string
   readonly body: string
   readonly historyId: string
+  readonly messageId?: string
+  readonly inReplyTo?: string
+  readonly date?: string
   readonly attachmentText?: string
+}
+
+export interface MockGmailRequest {
+  readonly method: string
+  readonly pathname: string
+  readonly search: string
 }
 
 interface TokenCall {
@@ -32,6 +42,8 @@ export interface MockGmailServer {
   readonly baseUrl: string
   readonly tokenUrl: string
   readonly tokenCalls: TokenCall[]
+  readRequests(): readonly MockGmailRequest[]
+  resetRequests(): void
   setRefreshMode(mode: MockTokenMode): void
   setAuthCodeMode(mode: MockTokenMode): void
   env(
@@ -68,6 +80,19 @@ function json(body: unknown, init?: ResponseInit): Response {
 }
 
 function fullMessage(message: MockGmailMessage): Record<string, unknown> {
+  const headers = [
+    { name: 'Subject', value: message.subject },
+    { name: 'From', value: 'sender@example.test' },
+    { name: 'To', value: 'recipient@example.test' },
+    {
+      name: 'Message-Id',
+      value: message.messageId ?? `<${message.id}@example.test>`,
+    },
+    ...(message.inReplyTo
+      ? [{ name: 'In-Reply-To', value: message.inReplyTo }]
+      : []),
+    ...(message.date ? [{ name: 'Date', value: message.date }] : []),
+  ]
   const parts: Record<string, unknown>[] = [
     {
       mimeType: 'text/plain',
@@ -89,17 +114,14 @@ function fullMessage(message: MockGmailMessage): Record<string, unknown> {
     id: message.id,
     threadId: message.threadId,
     historyId: message.historyId,
-    internalDate: String(Date.now()),
+    internalDate: String(
+      message.date === undefined ? Date.now() : Date.parse(message.date),
+    ),
     snippet: message.body.slice(0, 80),
     labelIds: ['INBOX'],
     payload: {
       mimeType: 'multipart/mixed',
-      headers: [
-        { name: 'Subject', value: message.subject },
-        { name: 'From', value: 'sender@example.test' },
-        { name: 'To', value: 'recipient@example.test' },
-        { name: 'Message-Id', value: `<${message.id}@example.test>` },
-      ],
+      headers,
       parts,
     },
   }
@@ -109,7 +131,14 @@ export function startMockGmail(
   options: MockGmailOptions = {},
 ): MockGmailServer {
   const messages = [...(options.messages ?? defaultMessages)]
+  const listedMessages = options.listOrder
+    ? options.listOrder.flatMap((id) => {
+        const message = messages.find((candidate) => candidate.id === id)
+        return message ? [message] : []
+      })
+    : messages
   const tokenCalls: TokenCall[] = []
+  const requests: MockGmailRequest[] = []
   let refreshMode: MockTokenMode = 'ok'
   let authCodeMode: MockTokenMode = 'ok'
   const accessToken = options.accessToken ?? defaultAccessToken
@@ -120,6 +149,11 @@ export function startMockGmail(
     port: 0,
     async fetch(request) {
       const url = new URL(request.url)
+      requests.push({
+        method: request.method,
+        pathname: url.pathname,
+        search: url.search,
+      })
       if (url.pathname === '/token') {
         const body = await request.text()
         const params = new TokenParams(body)
@@ -158,7 +192,7 @@ export function startMockGmail(
 
       if (url.pathname === '/gmail/v1/users/me/messages') {
         return json({
-          messages: messages.map((message) => ({
+          messages: listedMessages.map((message) => ({
             id: message.id,
             threadId: message.threadId,
           })),
@@ -207,6 +241,12 @@ export function startMockGmail(
     baseUrl,
     tokenUrl: `${baseUrl}/token`,
     tokenCalls,
+    readRequests() {
+      return requests.map((request) => ({ ...request }))
+    },
+    resetRequests() {
+      requests.length = 0
+    },
     setRefreshMode(mode) {
       refreshMode = mode
     },

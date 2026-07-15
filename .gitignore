@@ -1,5 +1,6 @@
 .worktrees/
 .ctxindex/
+.env
 .envrc
 node_modules/
 dist/

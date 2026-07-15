@@ -51,8 +51,9 @@ const fakeAdapter = defineAdapter({
   }),
   auth: { kind: 'none' },
   profiles: [{ id: 'fake.note', version: 1 }],
+  routing: 'indexed',
   capabilities: ['retrieve'],
-  operations: { retrieve: async () => ({}) },
+  operations: { retrieve: async () => {} },
   actions: {
     'fake.note.publish': {
       profile: { id: 'fake.note', version: 1 },

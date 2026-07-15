@@ -8,6 +8,29 @@ function dbPath(sandbox: Sandbox): string {
   return join(sandbox.env.CTXINDEX_DATA_HOME, 'ctxindex.sqlite')
 }
 
+function insertGoogleGrant(
+  sandbox: Sandbox,
+  input: { id: string; email: string; scopes: string },
+): void {
+  const db = new Database(dbPath(sandbox))
+  try {
+    const now = Date.now()
+    const accountId = `account-${input.id}`
+    db.prepare(
+      `INSERT INTO accounts
+         (id, provider, label, external_user_id, created_at, updated_at)
+       VALUES (?, 'google', ?, ?, ?, ?)`,
+    ).run(accountId, input.email, input.email, now, now)
+    db.prepare(
+      `INSERT INTO grants
+         (id, account_id, provider, scopes_json, created_at, updated_at)
+       VALUES (?, ?, 'google', ?, ?, ?)`,
+    ).run(input.id, accountId, input.scopes, now, now)
+  } finally {
+    db.close()
+  }
+}
+
 async function withInitializedSandbox(
   fn: (sandbox: Sandbox) => Promise<void>,
 ): Promise<void> {
@@ -16,6 +39,9 @@ async function withInitializedSandbox(
     const init = await sandbox.run(['init'])
     expect(init.stderr).toBe('')
     expect(init.exitCode).toBe(0)
+    const realm = await sandbox.run(['realm', 'add', 'global'])
+    expect(realm.stderr).toBe('')
+    expect(realm.exitCode).toBe(0)
     await fn(sandbox)
   } finally {
     await sandbox.cleanup()
@@ -31,6 +57,106 @@ function parseSourceId(stdout: string): string {
 }
 
 describe('source e2e', () => {
+  test('source add Gmail rejects token-bearing config', async () => {
+    await withInitializedSandbox(async (sandbox) => {
+      const result = await sandbox.run([
+        'source',
+        'add',
+        'google.mailbox',
+        '--realm',
+        'global',
+        '--config-json',
+        '{"access_token":"malicious-token"}',
+      ])
+
+      expect(result.exitCode).toBe(2)
+      expect(result.stderr).toContain('invalid config')
+      expect(result.stderr).not.toContain('malicious-token')
+    })
+  })
+
+  test('source add Gmail rejects incompatible and ambiguous Grants', async () => {
+    await withInitializedSandbox(async (sandbox) => {
+      insertGoogleGrant(sandbox, {
+        id: 'grant-incompatible',
+        email: 'wrong@example.com',
+        scopes: 'profile',
+      })
+      const incompatible = await sandbox.run([
+        'source',
+        'add',
+        'google.mailbox',
+        '--realm',
+        'global',
+      ])
+      expect(incompatible.exitCode).toBe(2)
+      expect(incompatible.stderr).toContain('compatible Google grant')
+
+      const gmailScope = 'https://www.googleapis.com/auth/gmail.readonly'
+      insertGoogleGrant(sandbox, {
+        id: 'grant-a',
+        email: 'a@example.com',
+        scopes: gmailScope,
+      })
+      insertGoogleGrant(sandbox, {
+        id: 'grant-b',
+        email: 'b@example.com',
+        scopes: JSON.stringify([gmailScope, 'profile']),
+      })
+      const ambiguous = await sandbox.run([
+        'source',
+        'add',
+        'google.mailbox',
+        '--realm',
+        'global',
+      ])
+      expect(ambiguous.exitCode).toBe(2)
+      expect(ambiguous.stderr).toContain('multiple compatible Google grants')
+    })
+  })
+
+  test('source add Gmail explicit account binds the exact compatible Grant', async () => {
+    await withInitializedSandbox(async (sandbox) => {
+      const gmailScope = 'https://www.googleapis.com/auth/gmail.readonly'
+      insertGoogleGrant(sandbox, {
+        id: 'grant-a',
+        email: 'a@example.com',
+        scopes: gmailScope,
+      })
+      insertGoogleGrant(sandbox, {
+        id: 'grant-b',
+        email: 'b@example.com',
+        scopes: gmailScope,
+      })
+
+      const result = await sandbox.run([
+        'source',
+        'add',
+        'google.mailbox',
+        '--realm',
+        'global',
+        '--account',
+        'b@example.com',
+      ])
+      expect(result.stderr).toBe('')
+      expect(result.exitCode).toBe(0)
+      const sourceId = parseSourceId(result.stdout)
+
+      const db = new Database(dbPath(sandbox), { readonly: true })
+      try {
+        expect(
+          db
+            .prepare(
+              'SELECT grant_id, adapter_version FROM sources WHERE id = ?',
+            )
+            .get(sourceId),
+        ).toEqual({ grant_id: 'grant-b', adapter_version: 1 })
+      } finally {
+        db.close()
+      }
+    })
+  })
+
   test('source add local.directory exits 0', async () => {
     await withInitializedSandbox(async (sandbox) => {
       const root = join(sandbox.dir, 'source-root')

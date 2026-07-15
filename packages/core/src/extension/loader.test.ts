@@ -94,21 +94,35 @@ describe('loadExtensions', () => {
     databases.push(db)
     await runMigrations(db)
     db.prepare(
-      `INSERT INTO sources (id, realm_id, adapter_id, display_name, config_json, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    ).run('source-1', 'global', 'fixture.missing', 'Missing fixture', '{}', 1)
-    db.prepare(
-      `INSERT INTO items (
-         id, source_id, realm_id, adapter_id, kind, uri, title, indexed_at, updated_at
+      `INSERT INTO sources (
+         id, realm_id, adapter_id, adapter_version, display_name, config_json,
+         sync_enabled, created_at, updated_at
        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
-      'item-1',
       'source-1',
       'global',
       'fixture.missing',
-      'fixture.note',
+      1,
+      'Missing fixture',
+      '{}',
+      1,
+      1,
+      1,
+    )
+    db.prepare(
+      `INSERT INTO resources (
+         id, ref, source_id, realm_id, profile_id, profile_version, title,
+         origin, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      'resource-1',
       'fixture:item-1',
+      'source-1',
+      'global',
+      'fixture.note',
+      1,
       'Preserved note',
+      'synced',
       1,
       1,
     )
@@ -131,7 +145,7 @@ describe('loadExtensions', () => {
         .get('source-1'),
     ).toEqual({ last_status: 'extension_unavailable' })
     expect(
-      db.prepare('SELECT title FROM items WHERE id = ?').get('item-1'),
+      db.prepare('SELECT title FROM resources WHERE id = ?').get('resource-1'),
     ).toEqual({
       title: 'Preserved note',
     })
@@ -146,14 +160,19 @@ describe('loadExtensions', () => {
     databases.push(db)
     await runMigrations(db)
     db.prepare(
-      `INSERT INTO sources (id, realm_id, adapter_id, display_name, config_json, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO sources (
+         id, realm_id, adapter_id, adapter_version, display_name, config_json,
+         sync_enabled, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       'source-returned',
       'global',
       'fixture.returned',
+      1,
       'Returned fixture',
       '{}',
+      1,
+      1,
       1,
     )
     db.prepare(
@@ -162,17 +181,19 @@ describe('loadExtensions', () => {
        ) VALUES (?, ?, ?, ?, ?)`,
     ).run('source-returned', 'extension_unavailable', null, null, 1)
     db.prepare(
-      `INSERT INTO items (
-         id, source_id, realm_id, adapter_id, kind, uri, title, indexed_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO resources (
+         id, ref, source_id, realm_id, profile_id, profile_version, title,
+         origin, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
-      'item-returned',
+      'resource-returned',
+      'fixture:item-returned',
       'source-returned',
       'global',
-      'fixture.returned',
       'fixture.note',
-      'fixture:item-returned',
+      1,
       'Still present',
+      'synced',
       1,
       1,
     )
@@ -182,6 +203,7 @@ describe('loadExtensions', () => {
       configSchema: z.object({}),
       auth: { kind: 'none' },
       profiles: [],
+      routing: 'indexed',
       capabilities: [],
       operations: {},
       actions: {},
@@ -207,7 +229,9 @@ describe('loadExtensions', () => {
         .get('source-returned'),
     ).toEqual({ last_status: 'idle' })
     expect(
-      db.prepare('SELECT title FROM items WHERE id = ?').get('item-returned'),
+      db
+        .prepare('SELECT title FROM resources WHERE id = ?')
+        .get('resource-returned'),
     ).toEqual({ title: 'Still present' })
     expect(
       db.prepare('SELECT id FROM sources WHERE id = ?').get('source-returned'),
@@ -226,14 +250,19 @@ describe('loadExtensions', () => {
     databases.push(db)
     await runMigrations(db)
     db.prepare(
-      `INSERT INTO sources (id, realm_id, adapter_id, display_name, config_json, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO sources (
+         id, realm_id, adapter_id, adapter_version, display_name, config_json,
+         sync_enabled, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       'source-builtin',
       'global',
       'fixture.builtin-adapter',
+      1,
       'Built-in fixture',
       '{}',
+      1,
+      1,
       1,
     )
     db.prepare(
@@ -247,6 +276,7 @@ describe('loadExtensions', () => {
       configSchema: z.object({}),
       auth: { kind: 'none' },
       profiles: [],
+      routing: 'indexed',
       capabilities: [],
       operations: {},
       actions: {},

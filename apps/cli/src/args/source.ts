@@ -1,5 +1,4 @@
-import { CTXINDEX_ADAPTER_REGISTRY } from '@ctxindex/adapters'
-import { hasHelpFlag, parseFlags, stringFlag } from './flags'
+import { type FlagValue, hasHelpFlag, parseFlags, stringFlag } from './flags'
 
 export type SourceArgs =
   | {
@@ -9,6 +8,7 @@ export type SourceArgs =
       readonly displayName?: string
       readonly configJson?: string
       readonly account?: string
+      readonly searchRouting?: 'indexed' | 'federated' | 'hybrid'
     }
   | {
       readonly kind: 'list'
@@ -21,7 +21,7 @@ export type SourceArgs =
   | { readonly kind: 'unknown'; readonly message: string }
 
 export const sourceUsage =
-  'source add [<adapter-id>] [--adapter <adapter-id>] [--realm <slug>] [--root|--path <path>] [--name|--display-name <name>] [--account <email|grant-id>] [--config-json <json>] | source list [--realm <slug>] [--format table|compact] [--json] | source remove <source-id>'
+  'source add [<adapter-id>] [--adapter <adapter-id>] [--realm <slug>] [--root|--path <path>] [--name|--display-name <name>] [--account <email|grant-id>] [--config-json <json>] [--search-routing indexed|federated|hybrid] | source list [--realm <slug>] [--format table|compact] [--json] | source remove <source-id>'
 
 function normalizeAdapterId(adapterId: string): string {
   return adapterId === 'local-directory' ? 'local.directory' : adapterId
@@ -29,7 +29,7 @@ function normalizeAdapterId(adapterId: string): string {
 
 function configJson(
   adapterId: string,
-  flags: Record<string, boolean | string>,
+  flags: Record<string, FlagValue>,
   positional: string[],
 ): { value?: string; message?: string } {
   const existing = stringFlag(flags, 'config-json')
@@ -59,17 +59,6 @@ function configJson(
   }
 }
 
-function validateAdapter(adapterId: string): string | undefined {
-  try {
-    const assertKnownAdapter: (value: string) => void =
-      CTXINDEX_ADAPTER_REGISTRY.assertKnownAdapter
-    assertKnownAdapter(adapterId)
-    return undefined
-  } catch (err) {
-    return err instanceof Error ? err.message : String(err)
-  }
-}
-
 export function parseSourceArgs(args: string[]): SourceArgs {
   if (hasHelpFlag(args)) return { kind: 'help' }
   const [subcommand, ...rest] = args
@@ -79,8 +68,6 @@ export function parseSourceArgs(args: string[]): SourceArgs {
     if (!rawAdapterId)
       return { kind: 'unknown', message: 'source add: missing <adapter-id>' }
     const adapterId = normalizeAdapterId(rawAdapterId)
-    const adapterError = validateAdapter(adapterId)
-    if (adapterError) return { kind: 'unknown', message: adapterError }
     const config = configJson(adapterId, flags, positional)
     if (config.message) return { kind: 'unknown', message: config.message }
     let result: Extract<SourceArgs, { kind: 'add' }> = {
@@ -95,6 +82,19 @@ export function parseSourceArgs(args: string[]): SourceArgs {
     if (config.value) result = { ...result, configJson: config.value }
     const account = stringFlag(flags, 'account')
     if (account) result = { ...result, account }
+    const searchRouting = stringFlag(flags, 'search-routing')
+    if (
+      searchRouting !== undefined &&
+      searchRouting !== 'indexed' &&
+      searchRouting !== 'federated' &&
+      searchRouting !== 'hybrid'
+    ) {
+      return {
+        kind: 'unknown',
+        message: `source add: invalid --search-routing: ${searchRouting}`,
+      }
+    }
+    if (searchRouting) result = { ...result, searchRouting }
     return result
   }
   if (subcommand === 'list') {

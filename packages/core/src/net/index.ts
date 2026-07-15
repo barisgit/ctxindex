@@ -5,6 +5,7 @@
  * for permitted provider hosts. Callers add their own response parsing and
  * error-taxonomy mapping on top.
  */
+import { CtxindexError } from '../errors'
 
 /** Declared provider hosts. Adding a non-provider host requires a SPEC change. */
 export const EGRESS_ALLOWLIST = new Set([
@@ -31,7 +32,10 @@ export function assertEgressAllowed(url: string): URL {
   ) {
     return parsed
   }
-  throw new Error(`network egress host is not allowlisted: ${parsed.hostname}`)
+  throw new CtxindexError(
+    `network egress host is not allowlisted: ${parsed.hostname}`,
+    'egress_denied',
+  )
 }
 
 /** The only sanctioned `fetch` call site. */

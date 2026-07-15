@@ -87,14 +87,31 @@ Storage areas:
 
 ```text
 resources                 envelope, primary Profile id/version, payload, origin
-field_index               typed extracted field values
+field_index               ordered rows with one native typed value column
 chunks + FTS              searchable text
-relations                 Ref/natural-key edges and lazy resolution state
+relations + resolutions   logical Ref/string-natural-key edges and zero-to-many matches
 artifacts                 content-addressed metadata and local path
 sources/sync bookkeeping  Accounts, Grants, Realms, Sources, cursors, runs, locks
 ```
 
-The exact field-index encoding is decided before schema implementation. Resource writes replace derived field/chunk projections transactionally. `synced` rows participate in deletion/tombstone semantics; `adhoc` rows are purgeable cache entries and are never tombstoned.
+`field_index` stores a ULID, Resource id, field name, declared type, ordinal,
+and exactly one typed value: TEXT for string values, REAL for numbers, or
+INTEGER for booleans and UTC-millisecond datetimes. Scalars use ordinal zero;
+array elements use contiguous ordinals. Partial typed indexes support equality,
+aggregation, and number/date ranges without casts. Resource writes replace
+derived field/chunk projections transactionally. `synced` rows participate in
+deletion/tombstone semantics; `adhoc` rows are purgeable cache entries and are
+never tombstoned.
+
+Refs are validated as `ctx://<26-character Source ULID>/<suffix>`. The encoded
+suffix is non-empty, at most 16 KiB, and uses RFC 3986 path characters plus
+uppercase percent escapes. Core preserves it byte-for-byte and never assigns
+provider meaning to it. Source availability is derived by comparing its bound
+Adapter id/version with the loaded registries; it is not a sync status.
+
+Natural-key Relations use string `(field, value)` targets in V1. A separate
+resolution mapping caches zero-to-many matches globally across Sources and
+Realms; the logical edge remains observable when no match exists.
 
 Artifact bytes live under the ctxindex data directory by content hash. SQLite stores metadata, origin Ref, media type, size, retention class, and path. `--output` copies bytes out without transferring store ownership.
 

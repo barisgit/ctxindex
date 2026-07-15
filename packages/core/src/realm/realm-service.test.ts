@@ -25,22 +25,25 @@ describe('realm service', () => {
     const created = service.createRealm({ slug: 'work' })
     const realms = service.listRealms()
 
-    expect(created.realmId).toBeString()
+    expect(created.realmId).toBe('work')
     expect(realms.map((realm) => realm.slug)).toContain('work')
     expect(realms.find((realm) => realm.slug === 'work')).toMatchObject({
       id: created.realmId,
-      is_default: 0,
+      label: null,
     })
   })
 
   test('getRealmBySlug returns the matching row', () => {
     const service = createRealmService({ db, logger })
-    const created = service.createRealm({ slug: 'personal', isDefault: true })
+    const created = service.createRealm({
+      slug: 'personal',
+      displayName: 'Personal',
+    })
 
     expect(service.getRealmBySlug('personal')).toMatchObject({
       id: created.realmId,
       slug: 'personal',
-      is_default: 1,
+      label: 'Personal',
     })
     expect(service.getRealmBySlug('missing')).toBeNull()
   })

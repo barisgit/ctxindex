@@ -38,7 +38,7 @@ test('auth service exposes google grant operations', async () => {
     })
 
     expect(typeof svc.addGoogleGrant).toBe('function')
-    expect(typeof svc.getActiveGoogleGrant).toBe('function')
+    expect(typeof svc.resolveLinkedGrantAccessToken).toBe('function')
     expect(typeof svc.listGoogleGrants).toBe('function')
     expect(typeof svc.refreshGoogleAccessToken).toBe('function')
     expect(typeof svc.exchangeGoogleAuthCode).toBe('function')

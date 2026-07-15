@@ -2,6 +2,7 @@ export {
   CtxindexAuthError,
   type CtxindexAuthErrorCode,
 } from '../errors'
+export * from './compatibility'
 export {
   assertGoogleEgressAllowed,
   GOOGLE_TOKEN_ENDPOINT,

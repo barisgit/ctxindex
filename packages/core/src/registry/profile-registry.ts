@@ -112,6 +112,19 @@ export type ProfileResolution =
       readonly version: number
     }
 
+export type KindResolution =
+  | {
+      readonly status: 'known'
+      readonly id: string
+      readonly profiles: readonly AnyProfileDefinition[]
+    }
+  | {
+      readonly status: 'ambiguous'
+      readonly kind: string
+      readonly candidates: readonly string[]
+    }
+  | { readonly status: 'unknown'; readonly kind: string }
+
 export interface ProfileRegistryOptions {
   readonly onWarning?: (warning: UnknownProfileWarning) => void
 }
@@ -150,6 +163,41 @@ export class ProfileRegistry {
 
   get(reference: ProfileReference): AnyProfileDefinition | undefined {
     return this.#profiles.get(definitionKey(reference))
+  }
+
+  resolveKind(value: string): KindResolution {
+    const kind = value.trim().toLocaleLowerCase()
+    const profiles = this.list()
+    const canonicalIds = new Set(
+      profiles
+        .map((profile) => profile.id)
+        .filter((id) => id.toLocaleLowerCase() === kind),
+    )
+    const ids =
+      canonicalIds.size > 0
+        ? canonicalIds
+        : new Set(
+            profiles
+              .filter((profile) =>
+                (profile.docs?.aliases ?? []).some(
+                  (alias) => alias.toLocaleLowerCase() === kind,
+                ),
+              )
+              .map((profile) => profile.id),
+          )
+    if (ids.size === 0) return { status: 'unknown', kind }
+    const candidates = [...ids].sort()
+    if (candidates.length > 1) {
+      return { status: 'ambiguous', kind, candidates }
+    }
+    const id = candidates[0] as string
+    return {
+      status: 'known',
+      id,
+      profiles: profiles
+        .filter((profile) => profile.id === id)
+        .sort((left, right) => left.version - right.version),
+    }
   }
 
   resolve(reference: ProfileReference): ProfileResolution {

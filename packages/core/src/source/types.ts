@@ -1,5 +1,7 @@
+import type { SearchRouting } from '@ctxindex/extension-sdk'
 import type { Logger } from '../logger'
 import type { RealmService } from '../realm'
+import type { ExtensionRegistry } from '../registry'
 import type { CtxindexDatabase } from '../storage'
 
 export interface SourceRow {
@@ -9,6 +11,7 @@ export interface SourceRow {
   readonly adapter_id: string
   readonly display_name: string | null
   readonly config_json: string | null
+  readonly search_routing?: SearchRouting | null
   readonly grant_id?: string | null
   readonly created_at: number
   readonly last_status?: string | null
@@ -23,9 +26,11 @@ export interface SourceRow {
 export interface AddSourceInput {
   readonly adapterId: string
   readonly realmSlug?: string
+  readonly adapterVersion?: number
   readonly displayName?: string
   readonly configJson?: string
   readonly grantId?: string
+  readonly searchRouting?: SearchRouting
 }
 
 export interface AddSourceResult {
@@ -51,6 +56,7 @@ export interface StatusRow {
 export interface SourceServiceDeps {
   readonly db: CtxindexDatabase
   readonly logger: Logger
+  readonly registry: ExtensionRegistry
   readonly realmService?: RealmService
 }
 
@@ -59,6 +65,5 @@ export interface SourceService {
   listSources(input?: ListSourcesInput): SourceRow[]
   findSourceById(sourceId: string): SourceRow | null
   removeSource(sourceId: string): void
-  bindGrantToSource(sourceId: string, grantId: string): void
   getStatus(input?: { sourceId?: string }): StatusRow[]
 }

@@ -3,75 +3,78 @@ import { join } from 'node:path'
 import { coreMigrations } from '../migrations/index'
 import type { CtxindexDatabase } from './db'
 
-export interface AdapterMigrations {
-  readonly namespace: string
-  readonly migrationsFolder: string
-  readonly migrationsTable: string
-}
-
-export interface MigratorOptions {
-  /** Adapter migrations applied after core, sorted by namespace. */
-  adapterMigrations?: AdapterMigrations[]
-}
-
 async function getMigrationFiles(folder: string): Promise<string[]> {
-  try {
-    const entries = await readdir(folder)
-    return entries
-      .filter((f) => f.endsWith('.sql') && !f.startsWith('_'))
-      .sort()
-  } catch {
-    return []
-  }
+  const entries = await readdir(folder)
+  return entries
+    .filter((file) => file.endsWith('.sql') && !file.startsWith('_'))
+    .sort()
 }
 
-async function applyNamespace(
-  db: CtxindexDatabase,
-  ns: AdapterMigrations,
-): Promise<void> {
+/** Run the core-owned schema on a fresh or already-current database. */
+export async function runMigrations(db: CtxindexDatabase): Promise<void> {
+  const migrationTableExists = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
+    .get(coreMigrations.migrationsTable)
+  if (migrationTableExists) {
+    const prototypeMarker = db
+      .prepare(
+        `SELECT 1 FROM "${coreMigrations.migrationsTable}" WHERE name = '0000_init.sql'`,
+      )
+      .get()
+    const v1SchemaExists = db
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'resources'",
+      )
+      .get()
+    if (prototypeMarker && !v1SchemaExists) {
+      throw new Error(
+        'Prototype database detected: ctxindex_migrations_core records 0000_init.sql but the V1 resources table is missing; delete or move this database and initialize a fresh one',
+      )
+    }
+  }
+  if (!migrationTableExists) {
+    const existingUserTable = db
+      .prepare(`
+        SELECT name FROM sqlite_master
+        WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+        LIMIT 1
+      `)
+      .get() as { name: string } | null
+    if (existingUserTable) {
+      throw new Error(
+        `V1 storage requires a fresh database; found existing table "${existingUserTable.name}"`,
+      )
+    }
+  }
   db.exec(`
-    CREATE TABLE IF NOT EXISTS "${ns.migrationsTable}" (
-      idx   INTEGER PRIMARY KEY AUTOINCREMENT,
-      name  TEXT NOT NULL UNIQUE,
+    CREATE TABLE IF NOT EXISTS "${coreMigrations.migrationsTable}" (
+      idx INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
       applied_at INTEGER NOT NULL
     )
   `)
 
-  const applied = new Set<string>(
+  const applied = new Set(
     (
-      db.prepare(`SELECT name FROM "${ns.migrationsTable}"`).all() as {
+      db
+        .prepare(`SELECT name FROM "${coreMigrations.migrationsTable}"`)
+        .all() as {
         name: string
       }[]
-    ).map((r) => r.name),
+    ).map((row) => row.name),
   )
 
-  const files = await getMigrationFiles(ns.migrationsFolder)
-
-  for (const file of files) {
+  for (const file of await getMigrationFiles(coreMigrations.migrationsFolder)) {
     if (applied.has(file)) continue
-    const sql = await readFile(join(ns.migrationsFolder, file), 'utf8')
-    db.exec(sql)
-    db.prepare(
-      `INSERT INTO "${ns.migrationsTable}" (name, applied_at) VALUES (?, ?)`,
-    ).run(file, Date.now())
-  }
-}
-
-/**
- * Run core migrations then each adapter's migrations in namespace-sort order.
- */
-export async function runMigrations(
-  db: CtxindexDatabase,
-  options: MigratorOptions = {},
-): Promise<void> {
-  // Core first
-  await applyNamespace(db, coreMigrations)
-
-  // Adapters in sorted namespace order
-  const adapters = [...(options.adapterMigrations ?? [])].sort((a, b) =>
-    a.namespace.localeCompare(b.namespace),
-  )
-  for (const am of adapters) {
-    await applyNamespace(db, am)
+    const sql = await readFile(
+      join(coreMigrations.migrationsFolder, file),
+      'utf8',
+    )
+    db.transaction(() => {
+      db.exec(sql)
+      db.prepare(
+        `INSERT INTO "${coreMigrations.migrationsTable}" (name, applied_at) VALUES (?, ?)`,
+      ).run(file, Date.now())
+    })()
   }
 }

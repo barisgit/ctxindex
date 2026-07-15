@@ -1,112 +1,137 @@
-import type {
-  ExecuteSearchInput,
-  SearchOutputFormat,
-} from '@ctxindex/core/search'
-import { type FlagValue, hasHelpFlag, parseFlags, stringFlag } from './flags'
+import {
+  type FlagValue,
+  hasHelpFlag,
+  listFlag,
+  parseFlags,
+  stringFlag,
+} from './flags'
+
+export interface ExecuteSearchInput {
+  readonly text: string
+  readonly realms?: readonly string[]
+  readonly sourceIds?: readonly string[]
+  readonly adapterId?: string
+  readonly kind?: string
+  readonly fields?: readonly { readonly name: string; readonly value: string }[]
+  readonly since?: number
+  readonly until?: number
+  readonly limit?: number
+  readonly explain?: boolean
+  readonly localOnly?: boolean
+  readonly remote?: boolean
+}
 
 export type SearchArgs =
   | {
       readonly kind: 'search'
       readonly input: ExecuteSearchInput
       readonly json: boolean
-      readonly explain: boolean
-      readonly format: SearchOutputFormat
+      readonly refs: boolean
     }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
 
 export const searchUsage =
-  'search <query> [--realm <slug>] [--provider <id>] [--adapter <id>] [--source <id>] [--mime <pattern>] [--kind <kind>] [--since <iso>] [--until <iso>] [--include-deleted] [--limit <n>] [--snippet-chars <n>] [--format legacy|refs|compact|context] [--refs] [--local-only] [--explain] [--json]'
+  'search <query> [--realm <slug>] [--adapter <id>] [--source <id>] [--kind <kind>] [--field <name=value> ...] [--since <iso>] [--until <iso>] [--limit <n>] [--local-only|--remote] [--explain] [--refs] [--json]'
 
 function parseDateFlag(
   name: string,
   value: FlagValue | undefined,
 ): { ok: true; value?: number } | { ok: false; message: string } {
   if (value === undefined || value === false) return { ok: true }
-  if (value === true)
+  const raw = Array.isArray(value) ? value.at(-1) : value
+  if (raw === true || raw === undefined)
     return { ok: false, message: `search: --${name} requires a date` }
-  const parsed = Date.parse(value)
+  const parsed = Date.parse(raw)
   return Number.isNaN(parsed)
-    ? { ok: false, message: `search: invalid --${name} date: ${value}` }
+    ? { ok: false, message: `search: invalid --${name} date: ${raw}` }
     : { ok: true, value: parsed }
 }
 
-function parsePositiveInteger(
-  name: string,
+function parseLimit(
   value: FlagValue | undefined,
 ): { ok: true; value?: number } | { ok: false; message: string } {
   if (value === undefined || value === false) return { ok: true }
-  if (value === true)
-    return { ok: false, message: `search: --${name} requires a number` }
-  const parsed = Number.parseInt(value, 10)
+  const raw = Array.isArray(value) ? value.at(-1) : value
+  if (raw === true || raw === undefined)
+    return { ok: false, message: 'search: --limit requires a number' }
+  const parsed = Number.parseInt(raw, 10)
   return Number.isFinite(parsed) && parsed >= 1
     ? { ok: true, value: parsed }
-    : { ok: false, message: `search: invalid --${name}: ${value}` }
+    : { ok: false, message: `search: invalid --limit: ${raw}` }
 }
 
-function parseFormat(
-  flags: Record<string, FlagValue>,
-): { ok: true; value: SearchOutputFormat } | { ok: false; message: string } {
-  if (flags.refs === true) return { ok: true, value: 'refs' }
-  const raw = stringFlag(flags, 'format')
-  if (!raw) return { ok: true, value: 'legacy' }
-  if (
-    raw === 'legacy' ||
-    raw === 'refs' ||
-    raw === 'compact' ||
-    raw === 'context'
-  ) {
-    return { ok: true, value: raw }
-  }
-  return { ok: false, message: `search: invalid --format: ${raw}` }
+function parseField(
+  raw: string,
+): { readonly name: string; readonly value: string } | undefined {
+  const equals = raw.indexOf('=')
+  if (equals <= 0 || equals === raw.length - 1) return undefined
+  return { name: raw.slice(0, equals), value: raw.slice(equals + 1) }
 }
 
 export function parseSearchArgs(args: string[]): SearchArgs {
   if (hasHelpFlag(args)) return { kind: 'help' }
-  const { flags, positional } = parseFlags(args)
-  const query = positional.join(' ').trim()
-  if (!query) return { kind: 'unknown', message: 'search: missing <query>' }
+  const { flags, positional } = parseFlags(args, {
+    booleanFlags: ['json', 'refs', 'explain', 'local-only', 'remote'],
+  })
+  const text = positional.join(' ').trim()
+  if (!text) return { kind: 'unknown', message: 'search: missing <query>' }
+  if (flags['local-only'] === true && flags.remote === true) {
+    return {
+      kind: 'unknown',
+      message: 'search: --local-only and --remote are mutually exclusive',
+    }
+  }
   const since = parseDateFlag('since', flags.since)
   if (!since.ok) return { kind: 'unknown', message: since.message }
   const until = parseDateFlag('until', flags.until)
   if (!until.ok) return { kind: 'unknown', message: until.message }
-  const limit = parsePositiveInteger('limit', flags.limit)
-  if (!limit.ok) return { kind: 'unknown', message: limit.message }
-  const snippetChars = parsePositiveInteger(
-    'snippet-chars',
-    flags['snippet-chars'],
-  )
-  if (!snippetChars.ok)
-    return { kind: 'unknown', message: snippetChars.message }
-  const format = parseFormat(flags)
-  if (!format.ok) return { kind: 'unknown', message: format.message }
-  let input: ExecuteSearchInput = { query }
-  const realmSlug = stringFlag(flags, 'realm')
-  const providerFilter = stringFlag(flags, 'provider')
-  const adapterFilter = stringFlag(flags, 'adapter')
-  const sourceFilter = stringFlag(flags, 'source')
-  const mimeFilter = stringFlag(flags, 'mime') ?? stringFlag(flags, 'kind')
-  if (realmSlug) input = { ...input, realmSlug }
-  if (providerFilter) input = { ...input, providerFilter }
-  if (adapterFilter) input = { ...input, adapterFilter }
-  if (sourceFilter) input = { ...input, sourceFilter }
-  if (mimeFilter) input = { ...input, mimeFilter }
-  if (since.value !== undefined) input = { ...input, since: since.value }
-  if (until.value !== undefined) input = { ...input, until: until.value }
-  if (limit.value !== undefined) input = { ...input, limit: limit.value }
-  if (snippetChars.value !== undefined) {
-    input = { ...input, snippetChars: snippetChars.value }
+  if (
+    since.value !== undefined &&
+    until.value !== undefined &&
+    since.value > until.value
+  ) {
+    return {
+      kind: 'unknown',
+      message: 'search: --since must not be after --until',
+    }
   }
-  if (flags.explain === true) input = { ...input, explain: true }
-  if (flags['local-only'] === true) input = { ...input, localOnly: true }
-  if (flags['include-deleted'] === true)
-    input = { ...input, includeDeleted: true }
-  input = { ...input, output: flags.json === true ? 'json' : 'text' }
+  const limit = parseLimit(flags.limit)
+  if (!limit.ok) return { kind: 'unknown', message: limit.message }
+  const rawFields = listFlag(flags, 'field')
+  const fields = rawFields.map(parseField)
+  if (fields.some((field) => field === undefined)) {
+    return { kind: 'unknown', message: 'search: --field requires name=value' }
+  }
+  const kind = stringFlag(flags, 'kind')
+  if (fields.length > 0 && kind === undefined) {
+    return {
+      kind: 'unknown',
+      message: 'search: --field requires --kind to select a kind',
+    }
+  }
+  const realms = listFlag(flags, 'realm')
+  const adapterId = stringFlag(flags, 'adapter')
+  const sourceIds = listFlag(flags, 'source')
   return {
     kind: 'search',
     json: flags.json === true,
-    explain: flags.explain === true,
-    format: format.value,
-    input,
+    refs: flags.refs === true,
+    input: {
+      text,
+      ...(realms.length === 0 ? {} : { realms }),
+      ...(sourceIds.length === 0 ? {} : { sourceIds }),
+      ...(adapterId === undefined ? {} : { adapterId }),
+      ...(kind === undefined ? {} : { kind }),
+      ...(fields.length === 0
+        ? {}
+        : { fields: fields as { name: string; value: string }[] }),
+      ...(since.value === undefined ? {} : { since: since.value }),
+      ...(until.value === undefined ? {} : { until: until.value }),
+      ...(limit.value === undefined ? {} : { limit: limit.value }),
+      ...(flags.explain === true ? { explain: true } : {}),
+      ...(flags['local-only'] === true ? { localOnly: true } : {}),
+      ...(flags.remote === true ? { remote: true } : {}),
+    },
   }
 }

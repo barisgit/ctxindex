@@ -120,20 +120,21 @@ export function createAuthService(deps: AuthDependencies): AuthService {
         deps.db
           .prepare(
             `INSERT INTO accounts
-               (id, realm_id, provider, display_name, email, created_at)
-             VALUES (?, 'global', 'google', ?, ?, ?)`,
+               (id, provider, label, external_user_id, created_at, updated_at)
+             VALUES (?, 'google', ?, ?, ?, ?)`,
           )
           .run(
             accountId,
             input.accountEmail ?? 'google',
             input.accountEmail ?? null,
             now,
+            now,
           )
 
         deps.db
           .prepare(
             `INSERT INTO grants
-               (id, account_id, provider, scopes, client_id_ref, client_secret_ref, access_token_ref, refresh_token_ref, expires_at, created_at, updated_at)
+               (id, account_id, provider, scopes_json, client_id_ref, client_secret_ref, access_token_ref, refresh_token_ref, expires_at, created_at, updated_at)
              VALUES (?, ?, 'google', ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
           .run(
@@ -155,23 +156,10 @@ export function createAuthService(deps: AuthDependencies): AuthService {
       return { grantId, accountId }
     },
 
-    async getActiveGoogleGrant(): Promise<GoogleGrantRow | null> {
-      const row = deps.db
-        .prepare(
-          `SELECT id, account_id, provider, scopes, access_token_ref, refresh_token_ref, client_id_ref, client_secret_ref, expires_at, created_at, updated_at
-           FROM grants
-           WHERE provider = 'google'
-           ORDER BY updated_at DESC, created_at DESC LIMIT 1`,
-        )
-        .get() as GrantSqlRow | null
-
-      return row ? toGoogleGrantRow(row) : null
-    },
-
     async getGoogleGrantById(grantId: string): Promise<GoogleGrantRow | null> {
       const row = deps.db
         .prepare(
-          `SELECT id, account_id, provider, scopes, access_token_ref, refresh_token_ref, client_id_ref, client_secret_ref, expires_at, created_at, updated_at
+          `SELECT id, account_id, provider, scopes_json AS scopes, access_token_ref, refresh_token_ref, client_id_ref, client_secret_ref, expires_at, created_at, updated_at
            FROM grants WHERE id = ? AND provider = 'google' LIMIT 1`,
         )
         .get(grantId) as GrantSqlRow | null
@@ -181,7 +169,7 @@ export function createAuthService(deps: AuthDependencies): AuthService {
     async listGoogleGrants(): Promise<GoogleGrantSummary[]> {
       const rows = deps.db
         .prepare(
-          `SELECT g.id, g.provider, g.scopes, g.expires_at, a.email AS account_email, a.display_name AS account_display_name
+          `SELECT g.id, g.provider, g.scopes_json AS scopes, g.expires_at, a.external_user_id AS account_email, a.label AS account_display_name
            FROM grants AS g
            LEFT JOIN accounts AS a ON a.id = g.account_id
            WHERE g.provider = 'google'
@@ -206,10 +194,32 @@ export function createAuthService(deps: AuthDependencies): AuthService {
       }))
     },
 
+    async resolveLinkedGrantAccessToken(
+      grantId: string,
+      options = {},
+    ): Promise<string> {
+      const grant = await this.getGoogleGrantById(grantId)
+      if (!grant) {
+        throw new CtxindexAuthError(
+          'invalid_grant',
+          'linked Grant is unavailable',
+        )
+      }
+      if (
+        !options.forceRefresh &&
+        grant.accessTokenRef &&
+        grant.expiresAt !== null &&
+        grant.expiresAt > Date.now()
+      ) {
+        return deps.store.getSecret(grant.accessTokenRef)
+      }
+      return this.refreshGoogleAccessToken(grantId)
+    },
+
     async refreshGoogleAccessToken(grantId: string): Promise<string> {
       const row = deps.db
         .prepare(
-          `SELECT id, account_id, provider, scopes, access_token_ref, refresh_token_ref, client_id_ref, client_secret_ref, expires_at, created_at, updated_at
+          `SELECT id, account_id, provider, scopes_json AS scopes, access_token_ref, refresh_token_ref, client_id_ref, client_secret_ref, expires_at, created_at, updated_at
            FROM grants
            WHERE id = ? AND provider = 'google'
            LIMIT 1`,

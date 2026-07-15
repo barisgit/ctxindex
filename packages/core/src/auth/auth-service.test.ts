@@ -107,12 +107,12 @@ function insertGrantWithRefreshOnly(
   const accountId = `acct_${now}_${Math.random()}`
   const grantId = `grant_${now}_${Math.random()}`
   db.prepare(
-    `INSERT INTO accounts (id, realm_id, provider, display_name, email, created_at)
-     VALUES (?, 'global', 'google', 'google', NULL, ?)`,
-  ).run(accountId, now)
+    `INSERT INTO accounts (id, provider, label, created_at, updated_at)
+     VALUES (?, 'google', 'google', ?, ?)`,
+  ).run(accountId, now, now)
   db.prepare(
     `INSERT INTO grants
-       (id, account_id, provider, scopes, client_id_ref, client_secret_ref, access_token_ref, refresh_token_ref, expires_at, created_at, updated_at)
+       (id, account_id, provider, scopes_json, client_id_ref, client_secret_ref, access_token_ref, refresh_token_ref, expires_at, created_at, updated_at)
      VALUES (?, ?, 'google', ?, ?, ?, NULL, ?, NULL, ?, ?)`,
   ).run(
     grantId,
@@ -150,7 +150,9 @@ test('addGoogleGrant inserts grant + account with all secret refs', async () => 
   })
 
   const account = db
-    .prepare('SELECT id, provider, email FROM accounts WHERE id = ?')
+    .prepare(
+      'SELECT id, provider, external_user_id AS email FROM accounts WHERE id = ?',
+    )
     .get(result.accountId) as {
     id: string
     provider: string
@@ -162,7 +164,7 @@ test('addGoogleGrant inserts grant + account with all secret refs', async () => 
     email: 'user@example.com',
   })
 
-  const grant = await service.getActiveGoogleGrant()
+  const grant = await service.getGoogleGrantById(result.grantId)
   expect(grant).toMatchObject({
     id: result.grantId,
     accountId: result.accountId,
@@ -211,6 +213,58 @@ test('listGoogleGrants returns the inserted grant', async () => {
   ])
 })
 
+test('resolveLinkedGrantAccessToken reads only the requested unexpired Grant', async () => {
+  const db = await freshDb()
+  const store = new MemorySecretsStore()
+  const service = createAuthService({ db, store, logger, env: getEnv() })
+  const grantA = await service.addGoogleGrant({
+    clientId: 'client-a',
+    clientSecret: 'secret-a',
+    refreshToken: 'refresh-a',
+    accessToken: 'token-a',
+    scopes: 'scope-one',
+    expiresAt: Date.now() + 60_000,
+  })
+  const grantB = await service.addGoogleGrant({
+    clientId: 'client-b',
+    clientSecret: 'secret-b',
+    refreshToken: 'refresh-b',
+    accessToken: 'token-b',
+    scopes: 'scope-one',
+    expiresAt: Date.now() + 60_000,
+  })
+
+  await expect(
+    service.resolveLinkedGrantAccessToken(grantB.grantId),
+  ).resolves.toBe('token-b')
+  expect(grantA.grantId).not.toBe(grantB.grantId)
+})
+
+test('resolveLinkedGrantAccessToken refreshes an expired linked Grant', async () => {
+  const db = await freshDb()
+  const store = new MemorySecretsStore()
+  const service = createAuthService({ db, store, logger, env: getEnv() })
+  const grant = await service.addGoogleGrant({
+    clientId: 'client-id',
+    clientSecret: 'client-secret',
+    refreshToken: 'refresh-token',
+    accessToken: 'expired-token',
+    scopes: 'scope-one',
+    expiresAt: Date.now() - 1,
+  })
+  originalFetch = globalThis.fetch
+  const calls = mockTokenFetch(200, {
+    access_token: 'fresh-token',
+    expires_in: 3600,
+    token_type: 'Bearer',
+  })
+
+  await expect(
+    service.resolveLinkedGrantAccessToken(grant.grantId),
+  ).resolves.toBe('fresh-token')
+  expect(calls).toHaveLength(1)
+})
+
 test('refreshGoogleAccessToken uses per-grant client creds when env vars are unset', async () => {
   originalFetch = globalThis.fetch
   setEnv('CTXINDEX_GMAIL_CLIENT_ID', undefined)
@@ -239,7 +293,7 @@ test('refreshGoogleAccessToken uses per-grant client creds when env vars are uns
   expect(calls).toHaveLength(1)
   expect(calls[0]?.body.get('client_id')).toBe('per-grant-client-id')
   expect(calls[0]?.body.get('client_secret')).toBe('per-grant-client-secret')
-  const grant = await service.getActiveGoogleGrant()
+  const grant = await service.getGoogleGrantById(grantId)
   expect(grant?.accessTokenRef).toBeString()
   expect(await store.getSecret(grant?.accessTokenRef ?? '')).toBe(
     'new-access-token',

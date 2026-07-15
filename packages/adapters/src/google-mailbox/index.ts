@@ -1,7 +1,11 @@
+/**
+ * @deprecated Prototype sync/search harness only. This is not a production
+ * Adapter definition and must not be imported by task 4.3 or later. Production
+ * definitions are registered through CTXINDEX_BUILTIN_EXTENSIONS.
+ */
 import {
   type AdapterAuthSpec,
   type AdapterCapabilities,
-  type AdapterMigrations,
   type AdapterSearchFunction,
   type AdapterSearchResult,
   createSourceAdapter,
@@ -27,14 +31,6 @@ export {
   OAuthTokenResponseSchema,
   safeFetch,
 } from './api'
-
-export const migrations = {
-  namespace: 'google.mailbox',
-  migrationsFolder: `${import.meta.dir}/migrations`,
-  migrationsTable: 'ctxindex_migrations_google_mailbox',
-} satisfies AdapterMigrations
-
-export const googleMailboxMigrations = migrations
 
 export const schema = {}
 export const googleMailboxSchema = schema
@@ -504,7 +500,6 @@ export const googleMailboxAdapter = createSourceAdapter('google.mailbox', {
   schema,
   configSchema,
   capabilities,
-  migrations,
   sync,
   searchMode: 'hybrid',
   search,

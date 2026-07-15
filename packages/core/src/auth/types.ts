@@ -77,9 +77,12 @@ export interface ExchangeAuthCodeInput {
 
 export interface AuthService {
   addGoogleGrant(input: AddGoogleGrantInput): Promise<AddGoogleGrantResult>
-  getActiveGoogleGrant(): Promise<GoogleGrantRow | null>
   getGoogleGrantById(grantId: string): Promise<GoogleGrantRow | null>
   listGoogleGrants(): Promise<GoogleGrantSummary[]>
+  resolveLinkedGrantAccessToken(
+    grantId: string,
+    options?: { readonly forceRefresh?: boolean },
+  ): Promise<string>
   refreshGoogleAccessToken(grantId: string): Promise<string>
   exchangeGoogleAuthCode(
     input: ExchangeAuthCodeInput,

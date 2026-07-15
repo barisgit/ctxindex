@@ -1,3 +1,4 @@
+import { CtxindexValidationError } from '@ctxindex/core/errors'
 import { defineCommand } from 'citty'
 import { parseSourceArgs, sourceUsage } from '../args/source'
 import { openDeps } from '../deps'
@@ -24,14 +25,47 @@ export async function handleSourceCommand(args: string[]): Promise<number> {
   try {
     const deps = await openDeps()
     if (parsed.kind === 'add') {
+      const adapter = deps.registry.adapters
+        .list()
+        .filter((candidate) => candidate.id === parsed.adapterId)
+        .sort((left, right) => right.version - left.version)[0]
+      if (!adapter) {
+        throw new CtxindexValidationError(
+          'invalid_filter',
+          `Unknown adapter: ${parsed.adapterId}`,
+        )
+      }
+      let config: unknown
+      try {
+        config = JSON.parse(parsed.configJson ?? '{}')
+      } catch {
+        throw new CtxindexValidationError(
+          'invalid_filter',
+          `invalid config for Adapter ${adapter.id}@${adapter.version}`,
+        )
+      }
+      const validatedConfig = adapter.configSchema.safeParse(config)
+      if (!validatedConfig.success) {
+        throw new CtxindexValidationError(
+          'invalid_filter',
+          `invalid config for Adapter ${adapter.id}@${adapter.version}`,
+        )
+      }
       const grantId = await resolveSourceGrant(
         deps.authService,
-        parsed.adapterId,
+        adapter.auth,
         parsed.account,
       )
       const { sourceId } = deps.sourceService.addSource({
-        ...parsed,
+        adapterId: parsed.adapterId,
+        adapterVersion: adapter.version,
+        ...(parsed.realmSlug ? { realmSlug: parsed.realmSlug } : {}),
+        ...(parsed.displayName ? { displayName: parsed.displayName } : {}),
+        configJson: JSON.stringify(validatedConfig.data),
         ...(grantId ? { grantId } : {}),
+        ...(parsed.searchRouting
+          ? { searchRouting: parsed.searchRouting }
+          : {}),
       })
       console.log(formatSourceAdded(sourceId))
     } else if (parsed.kind === 'list') {
@@ -69,6 +103,10 @@ export const sourceCommand = defineCommand({
           description: 'Account email or grant ID (required when ambiguous)',
         },
         'config-json': { type: 'string', description: 'Adapter config JSON' },
+        'search-routing': {
+          type: 'string',
+          description: 'indexed, federated, or hybrid routing override',
+        },
         'adapter-id': { type: 'positional', required: false },
         realm: sourceOptionArgs.realm,
       },

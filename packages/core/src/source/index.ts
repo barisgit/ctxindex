@@ -1,2 +1,5 @@
+export * from './provider-context'
+export * from './remote-search'
+export * from './retrieve'
 export * from './service'
 export * from './types'

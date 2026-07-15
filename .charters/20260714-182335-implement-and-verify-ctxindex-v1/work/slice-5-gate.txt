@@ -1,0 +1,23 @@
+ctxindex V1 Slice 5 verification — 2026-07-15
+
+Implementation evidence
+- `communication.message` projects exact Source-scoped conversation keys and normalized RFC Message-ID fields, and declares pure `conversation` and `parent` natural-key Relations.
+- Gmail metadata search and full retrieval emit those fields; search requests In-Reply-To without hydrating bodies.
+- Core thread traversal reaches a fixpoint over conversation and parent Relations in both directions, excludes tombstones, terminates cycles, and never exposes internal Resource IDs.
+- Out-of-order messages form deterministic trees. Parentless/dangling-parent conversations form flat occurredAt-ascending, null-last, Ref-tied lists.
+- Zero-to-many RFC Message-ID resolution joins threads across Sources while preserving every Source-scoped Resource Ref; same-Source parent copies are preferred, with lexical Ref fallback.
+- `thread get <ref> [--json]` is registered as a nested binary CLI command with deterministic text/JSON and SPEC exit 2 for malformed, missing, or tombstoned seeds.
+
+Automated gate
+- Mocked Gmail binary-CLI thread e2e: 1 pass, 27 assertions; child/grandchild arrived before parent; exact tree and flat fallback passed; thread calls issued zero additional provider requests.
+- Existing mocked Gmail search/get e2e: 2 pass, 26 assertions.
+- Focused thread/Relation/Profile/Gmail/CLI tests: passed.
+- `bun run typecheck`: passed.
+- `bun run lint`: passed.
+- `bun test`: 325 pass, 0 fail, 1088 assertions across 66 files.
+- D3 relocated compiled-extension regression: passed on Bun 1.3.14.
+- `git diff --check`: passed.
+- No live provider traffic was used.
+
+Accepted residual
+- D14 query-time lazy natural-key resolution refreshes cached relation_resolutions and is database-wide at current V1 scale; optimization is deferred because correctness, dangling edges, and zero-to-many resolution are verified.

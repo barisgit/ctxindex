@@ -72,6 +72,11 @@ export type CtxindexValidationErrorCode =
   | 'duplicate_realm_slug'
   | 'unknown_realm'
   | 'invalid_filter'
+  | 'invalid_ref'
+  | 'invalid_artifact_ref'
+  | 'invalid_artifact_retention'
+  | 'unsupported_export_format'
+  | 'ref_source_mismatch'
 
 export class CtxindexValidationError extends CtxindexError {
   override readonly code: CtxindexValidationErrorCode

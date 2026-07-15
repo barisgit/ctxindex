@@ -3,11 +3,7 @@ import { join } from 'node:path'
 import { configPath, writeConfig } from '../config'
 import { cacheDir, configDir, dataDir, logDir, stateDir } from '../paths'
 import { databasePath, openDatabase } from './db'
-import { type AdapterMigrations, runMigrations } from './migrator'
-
-export interface BootstrapDatabaseOptions {
-  readonly adapterMigrations?: AdapterMigrations[]
-}
+import { runMigrations } from './migrator'
 
 async function ensurePrivateDir(path: string): Promise<void> {
   await mkdir(path, { recursive: true, mode: 0o700 })
@@ -21,9 +17,7 @@ async function chmodIfExists(path: string, mode: number): Promise<void> {
   }
 }
 
-export async function bootstrapDatabase(
-  options: BootstrapDatabaseOptions = {},
-): Promise<void> {
+export async function bootstrapDatabase(): Promise<void> {
   const cfgDir = configDir()
   const datDir = dataDir()
 
@@ -47,7 +41,7 @@ export async function bootstrapDatabase(
 
   const db = await openDatabase(databasePath())
   try {
-    await runMigrations(db, options)
+    await runMigrations(db)
   } finally {
     db.close()
   }

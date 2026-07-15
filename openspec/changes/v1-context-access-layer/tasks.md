@@ -34,40 +34,40 @@ After the final task, run the `openspec-verify-change` workflow against all requ
 
 ## 3. Generic Resource storage
 
-- [ ] 3.1 Replace prototype schema definitions with the fresh core-owned Realm, Account, Grant, Source, Resource, field-index, chunk/FTS, Relation, Artifact, and Sync bookkeeping schema; initialize only fresh databases.
-- [ ] 3.2 Implement transactional Resource upsert and Profile-derived field/chunk projection with one fake Profile; verify rollback leaves no partial projections.
-- [ ] 3.3 Implement stable Source-scoped `ctx://` identity and `adhoc`/`synced` origin transitions; verify later Sync converges on the same Resource.
-- [ ] 3.4 Implement synced tombstones and ad-hoc eviction semantics; verify deleted synced Resources remain addressable but excluded by default.
-- [ ] 3.5 Implement Ref/natural-key Relation writes, lazy resolution, dangling-edge observability, and inverse traversal tests.
-- [ ] 3.6 Implement cursor/run/lock transactions so successful Sync commits Resource writes and cursor together while failure advances neither.
-- [ ] 3.7 Implement explicit Realm creation and exact Source/Realm/Grant binding; verify no `global` Realm is seeded and invalid or ambiguous bindings fail.
-- [ ] 3.8 **Slice gate:** recreate a database from empty, run generic-storage integration tests, assert no prototype/domain tables exist, then run `bun run typecheck`, `bun run lint`, and `bun test`; fix every failure before proceeding.
+- [x] 3.1 Replace prototype schema definitions with the fresh core-owned Realm, Account, Grant, Source, Resource, field-index, chunk/FTS, Relation, Artifact, and Sync bookkeeping schema; initialize only fresh databases.
+- [x] 3.2 Implement transactional Resource upsert and Profile-derived field/chunk projection with one fake Profile; verify rollback leaves no partial projections.
+- [x] 3.3 Implement stable Source-scoped `ctx://` identity and `adhoc`/`synced` origin transitions; verify later Sync converges on the same Resource.
+- [x] 3.4 Implement synced tombstones and ad-hoc eviction semantics; verify deleted synced Resources remain addressable but excluded by default.
+- [x] 3.5 Implement Ref/natural-key Relation writes, lazy resolution, dangling-edge observability, and inverse traversal tests.
+- [x] 3.6 Implement cursor/run/lock transactions so successful Sync commits Resource writes and cursor together while failure advances neither.
+- [x] 3.7 Implement explicit Realm creation and exact Source/Realm/Grant binding; verify no `global` Realm is seeded and invalid or ambiguous bindings fail.
+- [x] 3.8 **Slice gate:** recreate a database from empty, run generic-storage integration tests, assert no prototype/domain tables exist, then run `bun run typecheck`, `bun run lint`, and `bun test`; fix every failure before proceeding.
 
 ## 4. Minimal Gmail search and get
 
-- [ ] 4.1 Define the minimal `communication.message` Profile payload, typed fields, search chunks, and docs required for Gmail search/get.
-- [ ] 4.2 Rewrite Gmail auth and Source setup against declarative auth plus explicit Realm/Grant binding; verify mocked authorized HTTP uses only the linked Grant.
-- [ ] 4.3 Implement Gmail `searchRemote` returning stable envelope-level Resources and warnings; verify deterministic provider-origin results.
-- [ ] 4.4 Implement generic local FTS/typed-field search and exact Realm/Source filters using Profile-derived projections.
-- [ ] 4.5 Implement the planner's local-only/remote overrides, mixed-origin interleave, explain metadata, and provider-failure degradation tests.
-- [ ] 4.6 Implement Gmail `retrieve` plus generic `get <ref>` ad-hoc hydration; verify local cache reuse and synced/ad-hoc convergence.
-- [ ] 4.7 **Slice gate:** run mocked Gmail search/get integration and binary-CLI tests with sandboxed XDG state, then `bun run typecheck`, `bun run lint`, and `bun test`; no live provider traffic is permitted.
-- [ ] 4.8 **Human checkpoint — live Gmail read:** prepare an isolated persistent XDG/ctxindex test home and the exact OAuth command, then PAUSE for the user to complete browser login/MFA. After explicit confirmation, bind the chosen test mailbox to an explicit Realm/Source and run one bounded live search plus `get` on one returned Ref. Assert no provider write occurs, redact credentials/tokens from evidence, and preserve the sandbox for the later Draft checkpoint.
+- [x] 4.1 Define the minimal `communication.message` Profile payload, typed fields, search chunks, and docs required for Gmail search/get.
+- [x] 4.2 Rewrite Gmail auth and Source setup against declarative auth plus explicit Realm/Grant binding; verify mocked authorized HTTP uses only the linked Grant.
+- [x] 4.3 Implement Gmail `searchRemote` returning stable envelope-level Resources and warnings; verify deterministic provider-origin results.
+- [x] 4.4 Implement generic local FTS/typed-field search and exact Realm/Source filters using Profile-derived projections.
+- [x] 4.5 Implement the planner's local-only/remote overrides, mixed-origin interleave, explain metadata, and provider-failure degradation tests.
+- [x] 4.6 Implement Gmail `retrieve` plus generic `get <ref>` ad-hoc hydration; verify local cache reuse and synced/ad-hoc convergence.
+- [x] 4.7 **Slice gate:** run mocked Gmail search/get integration and binary-CLI tests with sandboxed XDG state, then `bun run typecheck`, `bun run lint`, and `bun test`; no live provider traffic is permitted.
+- [x] 4.8 **Human checkpoint — live Gmail read:** prepare an isolated persistent XDG/ctxindex test home and the exact OAuth command, then PAUSE for the user to complete browser login/MFA. After explicit confirmation, bind the chosen test mailbox to an explicit Realm/Source and run one bounded live search plus `get` on one returned Ref. Assert no provider write occurs, redact credentials/tokens from evidence, and preserve the sandbox for the later Draft checkpoint.
 
 ## 5. Thread Relations
 
-- [ ] 5.1 Add conversation-membership and parent Relation extractors to `communication.message`, including RFC message-id natural keys.
-- [ ] 5.2 Implement `thread get` as conversation union plus bidirectional parent traversal; verify out-of-order messages form a tree.
-- [ ] 5.3 Verify parentless conversations fall back to a flat date-ordered list and natural keys can join messages across Sources without identity collapse.
-- [ ] 5.4 **Slice gate:** run thread/Relation unit, integration, and binary-CLI tests plus `bun run typecheck`, `bun run lint`, and `bun test`; fix every failure before proceeding.
+- [x] 5.1 Add conversation-membership and parent Relation extractors to `communication.message`, including RFC message-id natural keys.
+- [x] 5.2 Implement `thread get` as conversation union plus bidirectional parent traversal; verify out-of-order messages form a tree.
+- [x] 5.3 Verify parentless conversations fall back to a flat date-ordered list and natural keys can join messages across Sources without identity collapse.
+- [x] 5.4 **Slice gate:** run thread/Relation unit, integration, and binary-CLI tests plus `bun run typecheck`, `bun run lint`, and `bun test`; fix every failure before proceeding.
 
 ## 6. Artifacts and export
 
-- [ ] 6.1 Implement the content-addressed Artifact byte store and metadata writer with hash deduplication and disk accounting tests.
-- [ ] 6.2 Add Gmail attachment descriptors plus lazy Adapter download; verify uncached download, cached reuse, and `--output` copy semantics.
-- [ ] 6.3 Implement explicit Artifact purge and the first retention policy chosen by the owning capability spec before this task starts.
-- [ ] 6.4 Implement generic JSON export and one Profile-declared mail export; verify unsupported formats list valid registry-derived choices.
-- [ ] 6.5 **Slice gate:** run Artifact/download/export tests including purge and disk-accounting assertions, then `bun run typecheck`, `bun run lint`, and `bun test`; fix every failure before proceeding.
+- [x] 6.1 Implement the content-addressed Artifact byte store and metadata writer with hash deduplication and disk accounting tests.
+- [x] 6.2 Add Gmail attachment descriptors plus lazy Adapter download; verify uncached download, cached reuse, and `--output` copy semantics.
+- [x] 6.3 Implement explicit Artifact purge and the first retention policy chosen by the owning capability spec before this task starts.
+- [x] 6.4 Implement generic JSON export and one Profile-declared mail export; verify unsupported formats list valid registry-derived choices.
+- [x] 6.5 **Slice gate:** run Artifact/download/export tests including purge and disk-accounting assertions, then `bun run typecheck`, `bun run lint`, and `bun test`; fix every failure before proceeding.
 
 ## 7. Provider Draft Actions
 

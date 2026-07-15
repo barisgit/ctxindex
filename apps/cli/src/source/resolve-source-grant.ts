@@ -1,29 +1,45 @@
-import { CTXINDEX_ADAPTER_REGISTRY } from '@ctxindex/adapters'
-import type { AuthService } from '@ctxindex/core/auth'
+import {
+  type AuthService,
+  isGrantCompatible,
+  providerKeyForAuth,
+} from '@ctxindex/core/auth'
 import { CtxindexValidationError } from '@ctxindex/core/errors'
+
+type AdapterAuth = Parameters<typeof isGrantCompatible>[0]
 
 export async function resolveSourceGrant(
   authService: AuthService,
-  adapterId: string,
+  auth: AdapterAuth,
   account?: string,
 ): Promise<string | undefined> {
-  const adapter = CTXINDEX_ADAPTER_REGISTRY.getAdapter(
-    adapterId as 'google.mailbox' | 'local.directory',
-  )
-  if (adapter.auth.kind === 'none') return undefined
+  if (auth.kind === 'none') return undefined
+  if (auth.kind !== 'oauth2') {
+    throw new CtxindexValidationError(
+      'invalid_filter',
+      'Adapter authentication is not supported by this command',
+    )
+  }
+  const provider = providerKeyForAuth(auth)
+  if (provider !== 'google') {
+    throw new CtxindexValidationError(
+      'invalid_filter',
+      `authorization for provider "${provider ?? 'unknown'}" is unavailable`,
+    )
+  }
 
   const grants = await authService.listGoogleGrants()
-  const matches = account
+  const selected = account
     ? grants.filter(
         (grant) => grant.id === account || grant.accountEmail === account,
       )
     : grants
+  const matches = selected.filter((grant) => isGrantCompatible(auth, grant))
   if (matches.length === 0) {
     throw new CtxindexValidationError(
       'invalid_filter',
       account
-        ? `no Google grant matches account "${account}"; run ctxindex auth list`
-        : 'google authorization required; run ctxindex auth add google',
+        ? `no compatible Google grant matches account "${account}"; run ctxindex auth list`
+        : 'no compatible Google grant available; run ctxindex auth add google',
     )
   }
   if (matches.length > 1) {
@@ -32,7 +48,7 @@ export async function resolveSourceGrant(
       .join(', ')
     throw new CtxindexValidationError(
       'invalid_filter',
-      `multiple Google grants available; choose one with --account <email|grant-id>: ${choices}`,
+      `multiple compatible Google grants available; choose one with --account <email|grant-id>: ${choices}`,
     )
   }
   return matches[0]?.id

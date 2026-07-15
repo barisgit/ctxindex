@@ -27,11 +27,6 @@ const localAdapter = createSourceAdapter('local.directory', {
     supportsRawRecords: false,
     supportsRealm: true,
   },
-  migrations: {
-    namespace: 'local.directory',
-    migrationsFolder: '/tmp/local-directory',
-    migrationsTable: 'ctxindex_migrations_local_directory',
-  },
   auth: { kind: 'none' },
   sync,
   searchMode: 'indexed',
@@ -49,11 +44,6 @@ const googleAdapter = createSourceAdapter('google.mailbox', {
     supportsAttachments: true,
     supportsRawRecords: true,
     supportsRealm: true,
-  },
-  migrations: {
-    namespace: 'google.mailbox',
-    migrationsFolder: '/tmp/google-mailbox',
-    migrationsTable: 'ctxindex_migrations_google_mailbox',
   },
   auth: {
     kind: 'oauth2',
@@ -119,13 +109,9 @@ describe('createCtxindexAdapterRegistry', () => {
     expect(adapter.auth.kind).toBe('oauth2')
   })
 
-  test('lists migrations and groups adapters by provider and kind', () => {
+  test('groups adapters by provider and kind', () => {
     const registry = makeRegistry()
 
-    expect(registry.listMigrations()).toHaveLength(2)
-    expect(
-      registry.listMigrations().map((migration) => migration.namespace),
-    ).toEqual(['local.directory', 'google.mailbox'])
     expect(
       registry.getAdaptersByProvider('google').map((adapter) => adapter.id),
     ).toEqual(['google.mailbox'])
@@ -165,7 +151,6 @@ describe('createCtxindexAdapterRegistry', () => {
         schema: {},
         configSchema: z.object({}),
         capabilities: localAdapter.capabilities,
-        migrations: localAdapter.migrations,
         auth: { kind: 'none' },
         sync,
         searchMode: 'federated',
@@ -182,7 +167,6 @@ describe('createCtxindexAdapterRegistry', () => {
       schema: {},
       configSchema: z.object({}),
       capabilities: googleAdapter.capabilities,
-      migrations: googleAdapter.migrations,
       auth: googleAdapter.auth,
       sync,
       searchMode: 'hybrid',

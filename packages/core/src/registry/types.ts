@@ -7,12 +7,6 @@ export type SourceKind = 'mailbox' | 'calendar' | 'directory' | 'tasks'
 // SPEC §10e
 export type AdapterSearchMode = 'indexed' | 'federated' | 'hybrid'
 
-export interface AdapterMigrations {
-  readonly namespace: string
-  readonly migrationsFolder: string
-  readonly migrationsTable: string
-}
-
 export interface AdapterCapabilities {
   readonly kinds: readonly [SourceKind, ...SourceKind[]]
   readonly modes: readonly [SyncMode, ...SyncMode[]]
@@ -85,7 +79,6 @@ export interface SourceAdapterDefinition<TId extends string = string> {
   readonly label: string
   readonly schema: Readonly<Record<string, unknown>>
   readonly capabilities: AdapterCapabilities
-  readonly migrations: AdapterMigrations
   readonly auth: AdapterAuthSpec
   readonly sync: SyncFunction
   readonly searchMode: AdapterSearchMode

@@ -9,6 +9,29 @@ export type ProfileReference<
   readonly version: TVersion
 }
 
+export type ProfileExportRenderResult = string | Uint8Array
+
+export type ProfileRelationTarget =
+  | { readonly ref: string }
+  | { readonly field: string; readonly value: string }
+
+export type ProfileRelationTargets =
+  | ProfileRelationTarget
+  | readonly ProfileRelationTarget[]
+  | null
+  | undefined
+
+export interface ArtifactDescriptor {
+  readonly ref: string
+  readonly filename?: string | undefined
+  readonly mediaType?: string | undefined
+  readonly byteSize?: number | undefined
+}
+
+export interface ResolvedArtifactDescriptor extends ArtifactDescriptor {
+  readonly originRef: string
+}
+
 export type FieldType =
   | 'string'
   | 'string[]'
@@ -46,9 +69,11 @@ export interface ProfileDefinition<
     readonly fields?: Readonly<Record<string, ProfileField<z.infer<TSchema>>>>
   }
   readonly relations?: Readonly<
-    Record<string, (payload: z.infer<TSchema>) => unknown>
+    Record<string, (payload: z.infer<TSchema>) => ProfileRelationTargets>
   >
-  readonly artifacts?: (payload: z.infer<TSchema>) => readonly unknown[]
+  readonly artifacts?: (
+    payload: z.infer<TSchema>,
+  ) => readonly ArtifactDescriptor[]
   readonly exports?: Readonly<
     Record<
       string,
@@ -57,7 +82,7 @@ export interface ProfileDefinition<
         readonly render: (
           payload: z.infer<TSchema>,
           dependencies?: unknown,
-        ) => unknown
+        ) => ProfileExportRenderResult
       }
     >
   >
@@ -82,6 +107,7 @@ export type AdapterCapability =
   | 'search-remote'
   | 'retrieve'
   | 'download'
+export type SearchRouting = 'indexed' | 'federated' | 'hybrid'
 
 export type AdapterAuthSpec =
   | {
@@ -120,18 +146,66 @@ export interface SyncContext extends ProviderContext {
   readonly emit: (operation: unknown) => void | Promise<void>
 }
 
+export interface SearchRemoteQuery {
+  readonly text: string
+  readonly limit: number
+  readonly since?: number
+  readonly until?: number
+  readonly fields?: readonly SearchFieldFilter[]
+}
+
+export interface SearchFieldFilter {
+  readonly name: string
+  readonly type: FieldType
+  readonly value: string | number | boolean
+}
+
+export interface SearchRemoteResource<TPayload = unknown> {
+  readonly ref: string
+  readonly profile: ProfileReference
+  readonly title?: string | null
+  readonly summary?: string | null
+  readonly occurredAt?: number | null
+  readonly providerUpdatedAt?: number | null
+  readonly payload?: TPayload
+}
+
+export interface RetrievedResource<TPayload = unknown> {
+  readonly ref: string
+  readonly profile: ProfileReference
+  readonly title?: string | null
+  readonly summary?: string | null
+  readonly occurredAt?: number | null
+  readonly providerUpdatedAt?: number | null
+  readonly payload: TPayload
+}
+
+export interface SearchRemoteWarning {
+  readonly code: string
+  readonly message: string
+  readonly ref?: string
+}
+
+export interface SearchRemoteResult {
+  readonly resources: readonly SearchRemoteResource[]
+  readonly warnings: readonly SearchRemoteWarning[]
+}
+
 export interface SearchContext extends ProviderContext {
-  readonly query: unknown
+  readonly query: SearchRemoteQuery
+  readonly signal: AbortSignal
 }
 
 export interface RetrieveContext extends ProviderContext {
   readonly ref: string
-  readonly emitResource: (resource: unknown) => void | Promise<void>
-  readonly emitArtifact: (artifact: unknown) => void | Promise<void>
+  readonly signal: AbortSignal
+  readonly emitResource: (resource: RetrievedResource) => void | Promise<void>
+  readonly emitArtifact: (artifact: ArtifactDescriptor) => void | Promise<void>
 }
 
 export interface DownloadContext extends ProviderContext {
-  readonly artifact: unknown
+  readonly artifact: ResolvedArtifactDescriptor
+  readonly signal: AbortSignal
   readonly write: (chunk: Uint8Array) => void | Promise<void>
 }
 
@@ -142,9 +216,11 @@ export interface ActionContext<TInput = unknown> extends ProviderContext {
 
 export type AdapterOperations = {
   readonly sync?: (context: SyncContext) => unknown
-  readonly searchRemote?: (context: SearchContext) => unknown
-  readonly retrieve?: (context: RetrieveContext) => unknown
-  readonly download?: (context: DownloadContext) => unknown
+  readonly searchRemote?: (
+    context: SearchContext,
+  ) => Promise<SearchRemoteResult>
+  readonly retrieve?: (context: RetrieveContext) => void | Promise<void>
+  readonly download?: (context: DownloadContext) => void | Promise<void>
 }
 
 type CapabilityOperation<
@@ -183,6 +259,7 @@ export interface AdapterDefinition<
   readonly configSchema: TConfigSchema
   readonly auth: AdapterAuthSpec
   readonly profiles: readonly ProfileReference[]
+  readonly routing: SearchRouting
   readonly capabilities: TCapabilities
   readonly operations: AdapterOperationsFor<TCapabilities>
   readonly actions: Readonly<Record<string, AdapterActionBinding>>

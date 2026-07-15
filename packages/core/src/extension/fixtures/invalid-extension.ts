@@ -12,6 +12,7 @@ export default function extension(host: ExtensionAuthoringHost) {
     configSchema: host.z.object({}),
     auth: { kind: 'none' },
     profiles: [{ id: profile.id, version: profile.version }],
+    routing: 'indexed',
     capabilities: ['retrieve'],
     operations: {} as never,
     actions: {},

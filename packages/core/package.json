@@ -8,6 +8,8 @@
     "./paths": "./src/paths.ts",
     "./config": "./src/config.ts",
     "./logger": "./src/logger.ts",
+    "./artifact": "./src/artifact/index.ts",
+    "./export": "./src/export/index.ts",
     "./auth": "./src/auth/index.ts",
     "./realm": "./src/realm/index.ts",
     "./source": "./src/source/index.ts",
@@ -21,6 +23,7 @@
     "./extension": "./src/extension/index.ts",
     "./sync": "./src/sync/index.ts",
     "./search": "./src/search/index.ts",
+    "./thread": "./src/thread/index.ts",
     "./errors": "./src/errors.ts",
     "./ids": "./src/ids.ts",
     "./migrations": "./src/migrations/index.ts"

@@ -1,0 +1,533 @@
+import { Database } from 'bun:sqlite'
+import { afterEach, describe, expect, test } from 'bun:test'
+import {
+  defineAdapter,
+  defineExtension,
+  defineProfile,
+} from '@ctxindex/extension-sdk'
+import { z } from 'zod'
+import type { AuthService } from '../auth'
+import type { Logger } from '../logger'
+import { createExtensionRegistry } from '../registry'
+import { ResourceStore } from '../resource'
+import { applyPragmas, runMigrations } from '../storage'
+import { SearchPlanner } from './planner'
+
+const ids = {
+  indexed: '01KXJZAAAAAAAAAAAAAAAAAAAA',
+  federated: '01KXJZBBBBBBBBBBBBBBBBBBBB',
+  federated2: '01KXJZBCCCCCCCCCCCCCCCCCCC',
+  hybrid: '01KXJZCCCCCCCCCCCCCCCCCCCC',
+  noWindow: '01KXJZDDDDDDDDDDDDDDDDDDDD',
+  disabled: '01KXJZEEEEEEEEEEEEEEEEEEEE',
+  failed: '01KXJZFFFFFFFFFFFFFFFFFFFF',
+  local: '01KXJZGGGGGGGGGGGGGGGGGGGG',
+  unavailable: '01KXJZHHHHHHHHHHHHHHHHHHHH',
+}
+const calls: string[] = []
+const signals: AbortSignal[] = []
+let timeoutSource: string | undefined
+let failureSource: string | undefined
+const timeoutSources = new Set<string>()
+const startedAt = new Map<string, number>()
+let barrierSource: string | undefined
+let barrierPeer: string | undefined
+let releaseBarrier: (() => void) | undefined
+
+const profile = defineProfile({
+  id: 'fake.item',
+  version: 1,
+  schema: z.object({
+    title: z.string(),
+    sender: z.array(z.string()).optional(),
+  }),
+  search: {
+    title: (payload) => payload.title,
+    chunks: (payload) => [payload.title],
+    fields: {
+      sender: { type: 'string[]', extract: (payload) => payload.sender ?? [] },
+    },
+  },
+  docs: { summary: 'Fake item', aliases: ['item'] },
+})
+
+async function remote({
+  source,
+  query,
+  signal,
+}: Parameters<
+  NonNullable<ReturnType<typeof defineAdapter>['operations']['searchRemote']>
+>[0]) {
+  calls.push(source.id)
+  signals.push(signal)
+  startedAt.set(source.id, Date.now())
+  if (source.id === barrierSource) {
+    await new Promise<void>((resolve, reject) => {
+      releaseBarrier = resolve
+      signal.addEventListener('abort', () => reject(new Error('aborted')), {
+        once: true,
+      })
+    })
+  } else if (source.id === barrierPeer) {
+    releaseBarrier?.()
+  }
+  if (source.id === failureSource) {
+    throw Object.assign(new Error('authorization expired'), {
+      code: 'auth_expired',
+    })
+  }
+  if (source.id === timeoutSource || timeoutSources.has(source.id)) {
+    await new Promise<void>((_resolve, reject) =>
+      signal.addEventListener('abort', () => reject(new Error('aborted')), {
+        once: true,
+      }),
+    )
+  }
+  return {
+    resources: [
+      {
+        ref: `ctx://${source.id}/item/local`,
+        profile: { id: 'fake.item', version: 1 },
+        title: 'duplicate',
+        payload: { title: 'duplicate', sender: ['alice@example.com'] },
+      },
+      {
+        ref: `ctx://${source.id}/item/remote`,
+        profile: { id: 'fake.item', version: 1 },
+        title: query.text,
+        payload: { title: query.text, sender: ['alice@example.com'] },
+      },
+      {
+        ref: `ctx://${source.id}/item/remote`,
+        profile: { id: 'fake.item', version: 1 },
+        title: query.text,
+        payload: { title: query.text, sender: ['alice@example.com'] },
+      },
+    ],
+    warnings: [],
+  }
+}
+
+const adapters = [
+  defineAdapter({
+    id: 'fake.indexed',
+    version: 1,
+    configSchema: z.object({}).passthrough(),
+    auth: { kind: 'none' },
+    profiles: [{ id: 'fake.item', version: 1 }],
+    routing: 'indexed',
+    capabilities: ['search-remote'],
+    operations: { searchRemote: remote },
+    actions: {},
+  }),
+  defineAdapter({
+    id: 'fake.federated',
+    version: 1,
+    configSchema: z.object({}).passthrough(),
+    auth: { kind: 'none' },
+    profiles: [{ id: 'fake.item', version: 1 }],
+    routing: 'federated',
+    capabilities: ['search-remote'],
+    operations: { searchRemote: remote },
+    actions: {},
+  }),
+  defineAdapter({
+    id: 'fake.local',
+    version: 1,
+    configSchema: z.object({}).passthrough(),
+    auth: { kind: 'none' },
+    profiles: [{ id: 'fake.item', version: 1 }],
+    routing: 'indexed',
+    capabilities: [],
+    operations: {},
+    actions: {},
+  }),
+  defineAdapter({
+    id: 'fake.hybrid',
+    version: 1,
+    configSchema: z
+      .object({ sync_window_days: z.number().optional() })
+      .passthrough(),
+    auth: { kind: 'none' },
+    profiles: [{ id: 'fake.item', version: 1 }],
+    routing: 'hybrid',
+    capabilities: ['sync', 'search-remote'],
+    operations: { sync: async () => {}, searchRemote: remote },
+    actions: {},
+  }),
+]
+const registry = createExtensionRegistry([
+  defineExtension({
+    id: 'fake.search',
+    version: 1,
+    profiles: [profile],
+    adapters,
+  }),
+])
+const logger = {
+  trace() {},
+  debug() {},
+  info() {},
+  warn() {},
+  error() {},
+} as unknown as Logger
+const dbs: Database[] = []
+
+async function database(): Promise<Database> {
+  const db = new Database(':memory:')
+  dbs.push(db)
+  applyPragmas(db)
+  await runMigrations(db)
+  db.prepare(
+    "INSERT INTO realms (id, slug, created_at) VALUES ('realm-1', 'work', 1)",
+  ).run()
+  return db
+}
+
+function addSource(
+  db: Database,
+  id: string,
+  adapter: string,
+  options: {
+    routing?: string
+    config?: object
+    enabled?: boolean
+    status?: 'idle' | 'failed'
+  } = {},
+) {
+  db.prepare(
+    `INSERT INTO sources (id, realm_id, adapter_id, adapter_version, config_json, sync_enabled, search_routing, created_at, updated_at) VALUES (?, 'realm-1', ?, 1, ?, ?, ?, 1, 1)`,
+  ).run(
+    id,
+    adapter,
+    JSON.stringify(options.config ?? {}),
+    options.enabled === false ? 0 : 1,
+    options.routing ?? null,
+  )
+  if (options.status) {
+    const runId = `run-${id}`
+    db.prepare(
+      "INSERT INTO sync_runs (id, source_id, realm_id, mode, status, started_at, completed_at) VALUES (?, ?, 'realm-1', 'full', ?, 1, 2)",
+    ).run(runId, id, options.status === 'idle' ? 'completed' : 'failed')
+    db.prepare(
+      'INSERT INTO source_sync_state (source_id, last_status, last_run_id, updated_at) VALUES (?, ?, ?, 2)',
+    ).run(id, options.status, runId)
+  }
+}
+
+function planner(db: Database) {
+  return new SearchPlanner({
+    db,
+    registry,
+    authService: {} as AuthService,
+    logger,
+  })
+}
+
+afterEach(() => {
+  calls.length = 0
+  signals.length = 0
+  timeoutSource = undefined
+  failureSource = undefined
+  timeoutSources.clear()
+  startedAt.clear()
+  barrierSource = undefined
+  barrierPeer = undefined
+  releaseBarrier = undefined
+  for (const db of dbs.splice(0)) db.close()
+})
+
+describe('SearchPlanner', () => {
+  test('preflights kind, fields, bounds, and exact selection before any provider leg', async () => {
+    const db = await database()
+    addSource(db, ids.federated, 'fake.federated')
+    const service = planner(db)
+
+    await expect(
+      service.search({
+        text: 'x',
+        fields: [{ name: 'sender', value: 'alice' }],
+      }),
+    ).rejects.toThrow('Field filters require --kind')
+    await expect(
+      service.search({ text: 'x', kind: 'missing' }),
+    ).rejects.toThrow('Unknown kind')
+    await expect(
+      service.search({ text: 'x', since: 2, until: 1 }),
+    ).rejects.toThrow('since must not be after until')
+    for (const limit of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      await expect(service.search({ text: 'x', limit })).rejects.toThrow(
+        'limit must be a positive integer',
+      )
+    }
+    await expect(
+      service.search({ text: 'x', realms: ['missing'] }),
+    ).rejects.toThrow('Unknown Realm')
+    await expect(
+      service.search({ text: 'x', sourceIds: ['missing'] }),
+    ).rejects.toThrow('Unknown Source')
+    expect(calls).toEqual([])
+  })
+
+  test('uses CLI over source over Adapter routing, warns on stale overrides, and explains decisions', async () => {
+    const db = await database()
+    addSource(db, ids.indexed, 'fake.indexed', { routing: 'federated' })
+    addSource(db, ids.federated, 'fake.federated')
+    addSource(db, ids.noWindow, 'fake.indexed', { routing: 'hybrid' })
+    const service = planner(db)
+
+    const sourceOverride = await service.search({
+      text: 'x',
+      sourceIds: [ids.indexed],
+      explain: true,
+    })
+    expect(calls).toEqual([ids.indexed])
+    expect(sourceOverride.explain?.sources[0]).toMatchObject({
+      routing: 'federated',
+      decidedBy: 'source',
+      legs: ['remote'],
+    })
+
+    calls.length = 0
+    const cliOverride = await service.search({
+      text: 'x',
+      sourceIds: [ids.federated],
+      localOnly: true,
+      explain: true,
+    })
+    expect(calls).toEqual([])
+    expect(cliOverride.explain?.sources[0]).toMatchObject({
+      routing: 'indexed',
+      decidedBy: 'cli',
+      legs: ['local'],
+    })
+
+    const stale = await service.search({
+      text: 'x',
+      sourceIds: [ids.noWindow],
+      explain: true,
+    })
+    expect(stale.warnings).toContainEqual(
+      expect.objectContaining({
+        sourceId: ids.noWindow,
+        code: 'stale_search_routing',
+      }),
+    )
+    expect(stale.explain?.sources[0]).toMatchObject({
+      routing: 'indexed',
+      decidedBy: 'adapter',
+    })
+  })
+
+  test('warns deterministically when --remote selects an unsupported Source', async () => {
+    const db = await database()
+    addSource(db, ids.local, 'fake.local')
+
+    const result = await planner(db).search({
+      text: 'x',
+      remote: true,
+      explain: true,
+    })
+
+    expect(result.results).toEqual([])
+    expect(result.warnings).toEqual([
+      {
+        sourceId: ids.local,
+        code: 'remote_search_unsupported',
+        message: `Source "${ids.local}" does not support remote search`,
+      },
+    ])
+    expect(result.explain?.sources[0]?.outcome).toBe('unsupported')
+  })
+
+  test('keeps an unavailable-Adapter Source locally searchable and degrades remote explain', async () => {
+    const db = await database()
+    addSource(db, ids.unavailable, 'missing.adapter')
+    new ResourceStore(db, registry.profiles).upsert({
+      ref: `ctx://${ids.unavailable}/item/local`,
+      sourceId: ids.unavailable,
+      profile: { id: 'fake.item', version: 1 },
+      origin: 'synced',
+      completeness: 'complete',
+      payload: { title: 'unavailable local', sender: ['alice@example.com'] },
+    })
+    const service = planner(db)
+    const filters = {
+      text: 'unavailable',
+      realms: ['work'],
+      sourceIds: [ids.unavailable],
+      adapterId: 'missing.adapter',
+      kind: 'item',
+      explain: true,
+    } as const
+
+    for (const input of [filters, { ...filters, localOnly: true }]) {
+      const result = await service.search(input)
+      expect(result.results).toHaveLength(1)
+      expect(result.results[0]).toMatchObject({
+        sourceId: ids.unavailable,
+        origin: 'local',
+      })
+      expect(result.warnings).toEqual([
+        expect.objectContaining({
+          sourceId: ids.unavailable,
+          code: 'extension_unavailable',
+        }),
+      ])
+      expect(result.explain?.sources[0]).toMatchObject({
+        decidedBy: 'unavailable',
+        legs: ['local'],
+        outcome: 'extension_unavailable',
+      })
+    }
+
+    const remote = await service.search({ ...filters, remote: true })
+    expect(remote.results).toEqual([])
+    expect(remote.warnings).toEqual([
+      expect.objectContaining({
+        sourceId: ids.unavailable,
+        code: 'extension_unavailable',
+      }),
+    ])
+    expect(remote.explain?.sources[0]).toMatchObject({
+      decidedBy: 'unavailable',
+      legs: [],
+      outcome: 'extension_unavailable',
+    })
+    expect(calls).toEqual([])
+  })
+
+  test('starts sorted provider legs concurrently with independent timeouts', async () => {
+    const db = await database()
+    addSource(db, ids.federated, 'fake.federated')
+    addSource(db, ids.federated2, 'fake.federated')
+    barrierSource = ids.federated
+    barrierPeer = ids.federated2
+
+    const barrier = await planner(db).search({ text: 'x', timeoutMs: 40 })
+    expect(calls).toEqual([ids.federated, ids.federated2])
+    expect(barrier.warnings).toEqual([])
+
+    calls.length = 0
+    barrierSource = undefined
+    barrierPeer = undefined
+    releaseBarrier = undefined
+    timeoutSources.add(ids.federated)
+    timeoutSources.add(ids.federated2)
+    const started = Date.now()
+    const timedOut = await planner(db).search({ text: 'x', timeoutMs: 40 })
+    const elapsed = Date.now() - started
+
+    expect(calls).toEqual([ids.federated, ids.federated2])
+    expect(
+      Math.abs(
+        (startedAt.get(ids.federated) ?? 0) -
+          (startedAt.get(ids.federated2) ?? 0),
+      ),
+    ).toBeLessThan(20)
+    expect(elapsed).toBeLessThan(70)
+    expect(timedOut.warnings.map((warning) => warning.code)).toEqual([
+      'timeout',
+      'timeout',
+    ])
+  })
+
+  test('requires verified hybrid coverage or includes remote', async () => {
+    const db = await database()
+    const now = 2_000_000_000_000
+    addSource(db, ids.hybrid, 'fake.hybrid', {
+      config: { sync_window_days: 7 },
+      status: 'idle',
+    })
+    addSource(db, ids.noWindow, 'fake.hybrid', { status: 'idle' })
+    addSource(db, ids.disabled, 'fake.hybrid', {
+      config: { sync_window_days: 7 },
+      enabled: false,
+      status: 'idle',
+    })
+    addSource(db, ids.failed, 'fake.hybrid', {
+      config: { sync_window_days: 7 },
+      status: 'failed',
+    })
+
+    const result = await planner(db).search({
+      text: 'x',
+      kind: 'item',
+      since: now - 1_000,
+      now,
+      explain: true,
+    })
+    expect(calls).toEqual([ids.noWindow, ids.disabled, ids.failed].sort())
+    expect(
+      result.explain?.sources.find((source) => source.sourceId === ids.hybrid)
+        ?.legs,
+    ).toEqual(['local'])
+    expect(
+      result.explain?.sources
+        .filter((source) => source.sourceId !== ids.hybrid)
+        .every((source) => source.legs.join(',') === 'local,remote'),
+    ).toBe(true)
+
+    calls.length = 0
+    await planner(db).search({ text: 'x', sourceIds: [ids.hybrid], now })
+    expect(calls).toEqual([ids.hybrid])
+  })
+
+  test('preserves local results, aborts timeout, dedupes local-first, and interleaves by origin rank', async () => {
+    const db = await database()
+    addSource(db, ids.indexed, 'fake.indexed')
+    addSource(db, ids.federated, 'fake.federated')
+    new ResourceStore(db, registry.profiles).upsert({
+      ref: `ctx://${ids.indexed}/item/local`,
+      sourceId: ids.indexed,
+      profile: { id: 'fake.item', version: 1 },
+      origin: 'synced',
+      completeness: 'complete',
+      payload: { title: 'x', sender: ['alice@example.com'] },
+    })
+    timeoutSource = ids.federated
+
+    const result = await planner(db).search({
+      text: 'x',
+      remote: false,
+      timeoutMs: 5,
+      explain: true,
+    })
+    expect(signals[0]?.aborted).toBe(true)
+    expect(result.results[0]).toMatchObject({
+      ref: `ctx://${ids.indexed}/item/local`,
+      origin: 'local',
+      originRank: 0,
+    })
+    expect(result.warnings).toContainEqual(
+      expect.objectContaining({ sourceId: ids.federated, code: 'timeout' }),
+    )
+
+    timeoutSource = undefined
+    failureSource = ids.federated
+    const failed = await planner(db).search({ text: 'x' })
+    expect(failed.results[0]).toMatchObject({ origin: 'local' })
+    expect(failed.warnings).toContainEqual(
+      expect.objectContaining({
+        sourceId: ids.federated,
+        code: 'auth_expired',
+      }),
+    )
+
+    failureSource = undefined
+    const mixed = await planner(db).search({ text: 'x', limit: 5 })
+    expect(
+      mixed.results.filter(
+        (item) => item.ref === `ctx://${ids.indexed}/item/local`,
+      ),
+    ).toHaveLength(1)
+    expect(mixed.results.map((item) => item.sourceId)).toEqual([
+      ids.indexed,
+      ids.federated,
+      ids.federated,
+    ])
+    expect(new Set(mixed.results.map((item) => item.ref)).size).toBe(
+      mixed.results.length,
+    )
+  })
+})

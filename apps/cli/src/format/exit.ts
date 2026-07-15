@@ -5,7 +5,7 @@ import {
   CtxindexValidationError,
 } from '@ctxindex/core/errors'
 import { CtxindexSecretsError } from '@ctxindex/core/secrets'
-import { mapSyncErrorToExitCode } from '@ctxindex/core/sync'
+import { mapSyncErrorCode } from '@ctxindex/core/sync'
 
 function authErrorExit(err: CtxindexAuthError): number {
   if (err.code === 'needs_auth' || err.code === 'invalid_grant') return 10
@@ -21,8 +21,9 @@ export function mapErrorToExit(err: unknown): number {
 
   if (err instanceof CtxindexAuthError) return authErrorExit(err)
   if (err instanceof CtxindexSyncError) {
+    if (err.code === 'not_found') return 2
     if (err.code === 'unknown' || err.code === 'not_implemented_yet') return 50
-    return mapSyncErrorToExitCode(err.code).exitCode
+    return mapSyncErrorCode(err.code).exitCode
   }
 
   const code = (err as { code?: string }).code
@@ -34,6 +35,7 @@ export function mapErrorToExit(err: unknown): number {
   if (code === 'cancelled') return 130
   if (code === 'SQLITE_CORRUPT' || code === 'SQLITE_NOTADB') return 30
   if (code === 'invalid_ref') return 2
+  if (code === 'unsupported_capability' || code === 'output_exists') return 2
   if (code === 'UNKNOWN_ADAPTER' || code === 'unknown_adapter') return 2
 
   if (err instanceof CtxindexNotFoundError) return 2

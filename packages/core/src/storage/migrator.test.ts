@@ -1,9 +1,5 @@
 import { Database } from 'bun:sqlite'
 import { afterEach, expect, test } from 'bun:test'
-import {
-  googleMailboxMigrations,
-  localDirectoryMigrations,
-} from '@ctxindex/adapters'
 import { applyPragmas } from './db'
 import { runMigrations } from './migrator'
 
@@ -26,6 +22,25 @@ afterEach(() => {
   }
 })
 
+test('refuses the prototype 0000 marker without the V1 schema', async () => {
+  const db = freshDb()
+  db.exec(`
+    CREATE TABLE ctxindex_migrations_core (
+      idx INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      applied_at INTEGER NOT NULL
+    );
+    INSERT INTO ctxindex_migrations_core (name, applied_at)
+    VALUES ('0000_init.sql', 1);
+    CREATE TABLE items (id TEXT PRIMARY KEY);
+  `)
+
+  await expect(runMigrations(db)).rejects.toThrow(
+    'Prototype database detected: ctxindex_migrations_core records 0000_init.sql but the V1 resources table is missing; delete or move this database and initialize a fresh one',
+  )
+  expect(tableNames(db)).not.toContain('resources')
+})
+
 function tableNames(db: Database): string[] {
   return (
     db
@@ -33,155 +48,284 @@ function tableNames(db: Database): string[] {
         "SELECT name FROM sqlite_master WHERE type IN ('table','shadow') ORDER BY name",
       )
       .all() as { name: string }[]
-  ).map((r) => r.name)
+  ).map((row) => row.name)
 }
 
-function columnNames(db: Database, table: string): string[] {
-  return (
-    db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
-  ).map((r) => r.name)
-}
-
-test('core migrations create all expected tables', async () => {
+test('fresh core migration creates only the generic V1 storage model', async () => {
   const db = freshDb()
   await runMigrations(db)
 
   const tables = tableNames(db)
-
-  const expected = [
+  for (const table of [
     'account_identities',
     'accounts',
-    'external_refs',
+    'artifacts',
+    'chunks',
+    'field_index',
     'grants',
+    'realms',
+    'relation_resolutions',
+    'relations',
+    'resources',
+    'source_sync_state',
+    'sources',
+    'sync_locks',
+    'sync_run_checkpoints',
+    'sync_runs',
+  ]) {
+    expect(tables, `expected table "${table}" to exist`).toContain(table)
+  }
+
+  for (const obsolete of [
+    'external_refs',
     'item_chunks',
     'item_relations',
     'items',
     'mail_attachments',
     'mail_bodies',
     'mail_messages',
+    'google_mailbox_state',
+    'local_directory_file_state',
     'raw_records',
-    'realms',
-    'source_sync_state',
-    'sources',
-    'sync_locks',
-    'sync_run_checkpoints',
-    'sync_runs',
     'tombstones',
-  ]
-
-  for (const t of expected) {
-    expect(tables, `expected table "${t}" to exist`).toContain(t)
+  ]) {
+    expect(
+      tables,
+      `expected prototype table "${obsolete}" to be absent`,
+    ).not.toContain(obsolete)
   }
+
+  expect(db.prepare('SELECT count(*) AS count FROM realms').get()).toEqual({
+    count: 0,
+  })
+  expect(
+    db.prepare("SELECT name, pk FROM pragma_table_info('sync_locks')").all(),
+  ).toEqual([
+    { name: 'scope', pk: 1 },
+    { name: 'run_id', pk: 0 },
+    { name: 'owner_pid', pk: 0 },
+    { name: 'acquired_at', pk: 0 },
+  ])
 })
 
-test('PRAGMAs match spec after migrations', async () => {
-  // WAL mode requires a real file; :memory: always reports 'memory'
-  const { mkdtemp, rm } = await import('node:fs/promises')
-  const { tmpdir } = await import('node:os')
-  const { join } = await import('node:path')
-  const tmp = await mkdtemp(join(tmpdir(), 'ctxindex-pragma-'))
-  const dbPath = join(tmp, 'test.sqlite')
-  const fileDb = new Database(dbPath, { create: true })
-  applyPragmas(fileDb)
-  try {
-    await runMigrations(fileDb)
-
-    const val = (pragma: string): unknown => {
-      const row = fileDb.prepare(`PRAGMA ${pragma}`).get() as Record<
-        string,
-        unknown
-      >
-      return Object.values(row)[0]
-    }
-
-    expect(val('journal_mode')).toBe('wal')
-    expect(val('foreign_keys')).toBe(1)
-    expect(Number(val('synchronous'))).toBe(1) // NORMAL = 1
-    expect(Number(val('busy_timeout'))).toBeGreaterThan(0)
-  } finally {
-    fileDb.close()
-    await rm(tmp, { recursive: true, force: true })
-  }
-})
-
-test('FTS5 virtual tables exist and are queryable', async () => {
+test('field index enforces one typed value and ordered uniqueness', async () => {
   const db = freshDb()
   await runMigrations(db)
 
-  const vtables = (
-    db
-      .prepare(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE '%_fts'",
-      )
-      .all() as { name: string }[]
-  ).map((r) => r.name)
+  db.exec("INSERT INTO realms VALUES ('personal', 'personal', NULL, 1)")
+  db.exec(
+    "INSERT INTO sources (id, realm_id, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAV', 'personal', 'fake', 1, '{}', 1, 1)",
+  )
+  db.exec(
+    "INSERT INTO resources (id, ref, source_id, realm_id, profile_id, profile_version, origin, created_at, updated_at) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAW', 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/a', '01ARZ3NDEKTSV4RRFFQ69G5FAV', 'personal', 'fake.record', 1, 'synced', 1, 1)",
+  )
 
-  expect(vtables).toContain('items_fts')
-  expect(vtables).toContain('chunks_fts')
+  const insert = db.prepare(
+    "INSERT INTO field_index (id, resource_id, field, declared_type, ordinal, value_text, value_number, value_integer) VALUES (?, '01ARZ3NDEKTSV4RRFFQ69G5FAW', 'name', 'string', 0, ?, ?, ?)",
+  )
+  expect(() =>
+    insert.run('01ARZ3NDEKTSV4RRFFQ69G5FAX', 'Ada', null, null),
+  ).not.toThrow()
+  expect(() =>
+    insert.run('01ARZ3NDEKTSV4RRFFQ69G5FAY', 'Grace', null, null),
+  ).toThrow()
+  expect(() =>
+    insert.run('01ARZ3NDEKTSV4RRFFQ69G5FAZ', 'Ada', 1, null),
+  ).toThrow()
+})
+
+test('generic FTS tables are queryable', async () => {
+  const db = freshDb()
+  await runMigrations(db)
 
   expect(() =>
-    db.prepare("SELECT * FROM items_fts WHERE items_fts MATCH 'test'").all(),
+    db
+      .prepare("SELECT * FROM resources_fts WHERE resources_fts MATCH 'test'")
+      .all(),
   ).not.toThrow()
   expect(() =>
     db.prepare("SELECT * FROM chunks_fts WHERE chunks_fts MATCH 'test'").all(),
   ).not.toThrow()
 })
 
-test('global realm seed row is present', async () => {
+test('Resource FTS retains tombstone envelopes and removes hard-deleted rows', async () => {
   const db = freshDb()
   await runMigrations(db)
+  db.exec("INSERT INTO realms VALUES ('personal', 'personal', NULL, 1)")
+  db.exec(
+    "INSERT INTO sources (id, realm_id, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES ('source', 'personal', 'fake', 1, '{}', 1, 1)",
+  )
+  db.exec(
+    "INSERT INTO resources (id, ref, source_id, realm_id, profile_id, profile_version, title, summary, origin, created_at, updated_at) VALUES ('resource', 'ctx://source/one', 'source', 'personal', 'fake.record', 1, 'Retained title', 'Retained summary', 'synced', 1, 1)",
+  )
+  db.exec(
+    "INSERT INTO chunks (id, resource_id, chunk_index, content, created_at) VALUES ('chunk', 'resource', 0, 'Removed payload text', 1)",
+  )
 
-  const realm = db
-    .prepare("SELECT * FROM realms WHERE slug = 'global'")
-    .get() as { id: string; is_default: number } | null
+  db.exec("DELETE FROM chunks WHERE resource_id = 'resource'")
+  db.exec("UPDATE resources SET deleted_at = 2 WHERE id = 'resource'")
 
-  expect(realm).not.toBeNull()
-  expect(realm?.id).toBe('global')
-  expect(realm?.is_default).toBe(1)
-})
-
-test('per-namespace migration journal tables created for all adapters', async () => {
-  const db = freshDb()
-  await runMigrations(db, {
-    adapterMigrations: [localDirectoryMigrations, googleMailboxMigrations],
-  })
-
-  const tables = tableNames(db)
-
-  expect(tables).toContain('ctxindex_migrations_core')
-  expect(tables).toContain('ctxindex_migrations_local_directory')
-  expect(tables).toContain('ctxindex_migrations_google_mailbox')
-  expect(tables).toContain('local_directory_file_state')
-  expect(tables).toContain('google_mailbox_sync_state')
-})
-
-test('idempotent', async () => {
-  const db = freshDb()
-
-  await runMigrations(db)
-  await runMigrations(db)
-
-  const applied = (
+  expect(
     db
       .prepare(
-        "SELECT name FROM ctxindex_migrations_core WHERE name = '0002_grants_client_creds.sql'",
+        "SELECT count(*) AS count FROM resources_fts WHERE resources_fts MATCH 'Retained'",
       )
-      .all() as { name: string }[]
-  ).map((r) => r.name)
+      .get(),
+  ).toEqual({ count: 1 })
+  expect(
+    db
+      .prepare(
+        "SELECT count(*) AS count FROM resources_fts WHERE resources_fts MATCH 'summary'",
+      )
+      .get(),
+  ).toEqual({ count: 1 })
+  expect(
+    db
+      .prepare(
+        "SELECT count(*) AS count FROM chunks_fts WHERE chunks_fts MATCH 'Removed'",
+      )
+      .get(),
+  ).toEqual({ count: 0 })
 
-  expect(applied).toEqual(['0002_grants_client_creds.sql'])
-
-  const columns = columnNames(db, 'grants')
-  expect(columns.filter((name) => name === 'client_id_ref')).toHaveLength(1)
-  expect(columns.filter((name) => name === 'client_secret_ref')).toHaveLength(1)
+  db.exec("DELETE FROM sources WHERE id = 'source'")
+  expect(
+    db
+      .prepare(
+        "SELECT count(*) AS count FROM resources_fts WHERE resources_fts MATCH 'Retained'",
+      )
+      .get(),
+  ).toEqual({ count: 0 })
 })
 
-test('credential columns', async () => {
+test('PRAGMAs match spec after migrations', async () => {
+  const { mkdtemp, rm } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const tmp = await mkdtemp(join(tmpdir(), 'ctxindex-pragma-'))
+  const fileDb = new Database(join(tmp, 'test.sqlite'), { create: true })
+  applyPragmas(fileDb)
+  try {
+    await runMigrations(fileDb)
+    const value = (pragma: string): unknown => {
+      const row = fileDb.prepare(`PRAGMA ${pragma}`).get() as Record<
+        string,
+        unknown
+      >
+      return Object.values(row)[0]
+    }
+    expect(value('journal_mode')).toBe('wal')
+    expect(value('foreign_keys')).toBe(1)
+    expect(Number(value('synchronous'))).toBe(1)
+    expect(Number(value('busy_timeout'))).toBeGreaterThan(0)
+  } finally {
+    fileDb.close()
+    await rm(tmp, { recursive: true, force: true })
+  }
+})
+
+test('refuses to migrate a prototype database', async () => {
+  const db = freshDb()
+  db.exec('CREATE TABLE items (id TEXT PRIMARY KEY)')
+
+  await expect(runMigrations(db)).rejects.toThrow('fresh database')
+  expect(tableNames(db)).not.toContain('resources')
+})
+
+test('fresh migration is idempotent', async () => {
   const db = freshDb()
   await runMigrations(db)
+  await runMigrations(db)
 
-  const columns = columnNames(db, 'grants')
+  expect(
+    db
+      .prepare(
+        "SELECT name FROM ctxindex_migrations_core WHERE name = '0000_init.sql'",
+      )
+      .all(),
+  ).toEqual([{ name: '0000_init.sql' }])
+})
 
-  expect(columns).toContain('client_id_ref')
-  expect(columns).toContain('client_secret_ref')
+test('fresh Artifact schema enforces ownership, stable refs, retention, and hash indexing', async () => {
+  const db = freshDb()
+  await runMigrations(db)
+  db.exec(`
+    INSERT INTO realms (id, slug, created_at) VALUES ('realm', 'test', 1);
+    INSERT INTO sources (
+      id, realm_id, adapter_id, adapter_version, config_json, created_at, updated_at
+    ) VALUES (
+      '01ARZ3NDEKTSV4RRFFQ69G5FAV', 'realm', 'fake', 1, '{}', 1, 1
+    );
+    INSERT INTO resources (
+      id, ref, source_id, realm_id, profile_id, profile_version, origin,
+      created_at, updated_at
+    ) VALUES (
+      'resource', 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item',
+      '01ARZ3NDEKTSV4RRFFQ69G5FAV', 'realm', 'fake', 1, 'synced', 1, 1
+    );
+    INSERT INTO artifacts (
+      id, ref, resource_id, origin_ref, content_hash, media_type, byte_size,
+      retention_class, local_path, created_at
+    ) VALUES (
+      'one', 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/a', 'resource',
+      'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item', 'sha256:${'a'.repeat(64)}',
+      'text/plain', 1, 'cached', 'sha256/aa/${'a'.repeat(64)}', 1
+    );
+    INSERT INTO artifacts (
+      id, ref, resource_id, origin_ref, content_hash, media_type, byte_size,
+      retention_class, local_path, created_at
+    ) VALUES (
+      'two', 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/b', 'resource',
+      'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item', 'sha256:${'a'.repeat(64)}',
+      'text/plain', 1, 'cached', 'sha256/aa/${'a'.repeat(64)}', 1
+    );
+  `)
+
+  const indexes = db.prepare("PRAGMA index_list('artifacts')").all() as Array<{
+    name: string
+    unique: number
+    origin: string
+    partial: number
+    seq: number
+  }>
+  expect(indexes).toContainEqual({
+    name: 'artifacts_content_hash_idx',
+    unique: 0,
+    origin: 'c',
+    partial: 0,
+    seq: expect.any(Number),
+  })
+  const uniqueColumns = indexes
+    .filter((index) => index.unique === 1)
+    .map((index) =>
+      (
+        db.prepare(`PRAGMA index_info('${index.name}')`).all() as Array<{
+          name: string
+        }>
+      ).map((column) => column.name),
+    )
+  expect(uniqueColumns).not.toContainEqual(['content_hash', 'local_path'])
+  expect(() =>
+    db
+      .prepare(
+        `INSERT INTO artifacts (
+        id, ref, resource_id, origin_ref, content_hash, media_type, byte_size,
+        retention_class, local_path, created_at
+      ) VALUES ('bad', 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/c', 'resource',
+        'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item', 'sha256:${'b'.repeat(64)}',
+        'text/plain', 1, 'ephemeral', 'sha256/bb/${'b'.repeat(64)}', 1)`,
+      )
+      .run(),
+  ).toThrow()
+  expect(() =>
+    db
+      .prepare(
+        `INSERT INTO artifacts (
+        id, ref, resource_id, origin_ref, content_hash, media_type, byte_size,
+        retention_class, local_path, created_at
+      ) VALUES ('bad-owner', 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/d', NULL,
+        'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item', 'sha256:${'c'.repeat(64)}',
+        'text/plain', 1, 'cached', 'sha256/cc/${'c'.repeat(64)}', 1)`,
+      )
+      .run(),
+  ).toThrow()
 })

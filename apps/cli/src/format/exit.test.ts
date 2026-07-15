@@ -1,0 +1,29 @@
+import { describe, expect, test } from 'bun:test'
+import { CtxindexAuthError, CtxindexSyncError } from '@ctxindex/core/errors'
+import { mapErrorToExit } from './exit'
+
+describe('mapErrorToExit', () => {
+  test('keeps transient auth network failures on exit 30', () => {
+    expect(
+      mapErrorToExit(
+        new CtxindexAuthError(
+          'network_error',
+          'Source Grant token resolution failed (network_error)',
+        ),
+      ),
+    ).toBe(30)
+  })
+
+  test.each([
+    ['auth_expired', 10],
+    ['permission_denied', 40],
+    ['not_found', 2],
+    ['rate_limited', 20],
+    ['provider_unavailable', 30],
+    ['provider_bad_response', 30],
+  ] as const)('maps provider taxonomy %s to exit %i', (code, exitCode) => {
+    expect(mapErrorToExit(new CtxindexSyncError('provider failed', code))).toBe(
+      exitCode,
+    )
+  })
+})

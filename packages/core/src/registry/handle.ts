@@ -2,7 +2,6 @@ import type { z } from 'zod'
 import type {
   AdapterAuthSpec,
   AdapterCapabilities,
-  AdapterMigrations,
   AdapterProvider,
   AdapterSearchFunction,
   AdapterSearchMode,
@@ -21,7 +20,6 @@ export interface CtxindexAdapterRegistryHandle<
     ...Extract<keyof TAdapters, string>[],
   ]
   readonly providers: readonly AdapterProvider[]
-  readonly namespaces: readonly string[]
 
   isKnownAdapter(v: string): v is Extract<keyof TAdapters, string>
   assertKnownAdapter(v: string): asserts v is Extract<keyof TAdapters, string>
@@ -37,11 +35,6 @@ export interface CtxindexAdapterRegistryHandle<
     provider: AdapterProvider,
   ): readonly SourceAdapterDefinition[]
   getAdaptersByKind(kind: SourceKind): readonly SourceAdapterDefinition[]
-
-  listMigrations(): readonly AdapterMigrations[]
-  getMigrations(id: Extract<keyof TAdapters, string>): AdapterMigrations
-  getNamespaceForId(id: Extract<keyof TAdapters, string>): string
-  getAdapterForNamespace(namespace: string): SourceAdapterDefinition | undefined
 
   getCapabilities(id: Extract<keyof TAdapters, string>): AdapterCapabilities
   getSupportedModes(id: Extract<keyof TAdapters, string>): readonly SyncMode[]

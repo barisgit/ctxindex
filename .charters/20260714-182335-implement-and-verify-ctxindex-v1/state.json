@@ -4,11 +4,12 @@
   "objective": "Implement and verify ctxindex V1 as the local personal-context gateway defined by `v1-context-access-layer`: typed definitions, trusted Extension loading, fresh generic storage, exact Realms, Gmail discovery/retrieval, threads, Artifacts/exports, reversible provider email Draft Actions, local-directory support, an external tenders proof, generated docs, and complete validation.",
   "status": "active",
   "createdAt": "2026-07-14T18:23:35.445Z",
-  "updatedAt": "2026-07-14T19:20:00.200Z",
+  "updatedAt": "2026-07-15T18:31:35.054Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
-  "nextSeq": 359,
-  "latestSourceSeq": 351,
-  "snapshotHash": "a558919179215505733f1b82e362ba4ac45a57fd4fc57dea2bd495035349f631",
+  "previousStatus": "active",
+  "nextSeq": 1411,
+  "latestSourceSeq": 1397,
+  "snapshotHash": "20b2ae540ee827035fed557df176fdcb73670c088830c5c06c7c775de9e1e4f4",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -39,10 +40,10 @@
         "C1"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "pass",
+        "note": "evidence: `work/slice-3-gate.txt` (fresh generic schema and prototype rejection, 51 focused storage tests, 198 passing full-suite tests with one skip, 10 integration tests, typecheck, lint, strict OpenSpec validation, and diff check passed)"
       },
-      "statusSeq": 6
+      "statusSeq": 571
     },
     {
       "id": "C4",
@@ -52,10 +53,10 @@
         "C3"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "pass",
+        "note": "evidence: `work/slice-4-gate.txt` (mocked Gmail binary search/get/cache proof and the approved isolated read-only live Gmail search/get checkpoint passed)"
       },
-      "statusSeq": 6
+      "statusSeq": 1403
     },
     {
       "id": "C5",
@@ -65,10 +66,10 @@
         "C4"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "pass",
+        "note": "evidence: `work/slice-5-gate.txt` (Relation/thread unit and binary-CLI out-of-order traversal, cross-Source joins, no provider I/O, typecheck, lint, full tests, and D3 passed)"
       },
-      "statusSeq": 6
+      "statusSeq": 1403
     },
     {
       "id": "C6",
@@ -78,10 +79,10 @@
         "C4"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "pass",
+        "note": "evidence: `work/slice-6-gate.txt` (Artifact CAS/download/cache/copy, exact retention purge and re-download, disk accounting, deterministic JSON/Profile EML export, 107 focused and 419 full-suite tests, typecheck, lint, strict OpenSpec, D3, and diff checks passed)"
       },
-      "statusSeq": 6
+      "statusSeq": 1403
     },
     {
       "id": "C7",
@@ -92,10 +93,10 @@
         "C4"
       ],
       "status": {
-        "value": "pending",
+        "value": "in-progress",
         "note": ""
       },
-      "statusSeq": 6
+      "statusSeq": 1403
     },
     {
       "id": "C8",

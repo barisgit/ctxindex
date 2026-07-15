@@ -1,4 +1,5 @@
 import { ulid } from 'ulid'
+import { isGrantCompatible, providerKeyForAuth } from '../auth'
 import { CtxindexNotFoundError, CtxindexValidationError } from '../errors'
 import type {
   AddSourceInput,
@@ -12,6 +13,111 @@ import type {
 
 interface RealmIdRow {
   readonly id: string
+}
+
+function resolveAdapter(deps: SourceServiceDeps, input: AddSourceInput) {
+  const adapter =
+    input.adapterVersion !== undefined
+      ? deps.registry.adapters.get({
+          id: input.adapterId,
+          version: input.adapterVersion,
+        })
+      : deps.registry.adapters
+          .list()
+          .filter((candidate) => candidate.id === input.adapterId)
+          .sort((left, right) => right.version - left.version)[0]
+  if (!adapter) {
+    const version =
+      input.adapterVersion !== undefined ? `@${input.adapterVersion}` : ''
+    throw new CtxindexValidationError(
+      'invalid_filter',
+      `Unknown Adapter: ${input.adapterId}${version}`,
+    )
+  }
+  return adapter
+}
+
+function validateSearchRouting(
+  routing: AddSourceInput['searchRouting'],
+  capabilities: readonly string[],
+): void {
+  if (routing === 'federated' && !capabilities.includes('search-remote')) {
+    throw new CtxindexValidationError(
+      'invalid_filter',
+      'federated search routing requires search-remote',
+    )
+  }
+  if (
+    routing === 'hybrid' &&
+    (!capabilities.includes('sync') || !capabilities.includes('search-remote'))
+  ) {
+    throw new CtxindexValidationError(
+      'invalid_filter',
+      'hybrid search routing requires sync and search-remote',
+    )
+  }
+}
+
+function resolveGrantId(
+  deps: SourceServiceDeps,
+  input: AddSourceInput,
+  auth: ReturnType<typeof resolveAdapter>['auth'],
+): string | null {
+  if (auth.kind === 'none') {
+    if (input.grantId) {
+      throw new CtxindexValidationError(
+        'invalid_filter',
+        `Adapter "${input.adapterId}" does not accept a Grant`,
+      )
+    }
+    return null
+  }
+  if (auth.kind !== 'oauth2') {
+    throw new CtxindexValidationError(
+      'invalid_filter',
+      `Adapter "${input.adapterId}" uses unsupported auth kind "${(auth as { kind: string }).kind}"`,
+    )
+  }
+
+  const grants = deps.db
+    .prepare('SELECT id, provider, scopes_json FROM grants ORDER BY id')
+    .all() as GrantRow[]
+  const compatible = grants.filter((grant) =>
+    isGrantCompatible(auth, {
+      provider: grant.provider,
+      scopes: grant.scopes_json,
+    }),
+  )
+  const provider = providerKeyForAuth(auth) ?? 'unknown'
+  if (input.grantId) {
+    const selected = grants.find((grant) => grant.id === input.grantId)
+    if (!selected || !compatible.includes(selected)) {
+      throw new CtxindexValidationError(
+        'invalid_filter',
+        `Grant "${input.grantId}" is not compatible with Adapter "${input.adapterId}" (provider "${provider}" and required scopes)`,
+      )
+    }
+    return selected.id
+  }
+  if (compatible.length === 0) {
+    throw new CtxindexValidationError(
+      'invalid_filter',
+      `No compatible Grants for Adapter "${input.adapterId}" (provider "${provider}" and required scopes); add or select one explicitly`,
+    )
+  }
+  if (compatible.length > 1) {
+    throw new CtxindexValidationError(
+      'invalid_filter',
+      `Found multiple compatible Grants for Adapter "${input.adapterId}"; select one explicitly`,
+    )
+  }
+  return compatible[0]?.id ?? null
+}
+
+interface GrantRow {
+  readonly id: string
+  readonly provider: string
+  readonly scopes_json: string
 }
 
 interface StatusDbRow {
@@ -49,7 +155,7 @@ function parseLastError(errorJson: string | null): string | null {
 }
 
 function selectSourceColumns(): string {
-  return 'id, realm_id, adapter_id, display_name, config_json, grant_id, created_at'
+  return 'id, realm_id, adapter_id, display_name, config_json, grant_id, search_routing, created_at'
 }
 
 function sourceListSelect(): string {
@@ -60,17 +166,18 @@ function sourceListSelect(): string {
                  s.display_name,
                  s.config_json,
                  s.grant_id,
+                 s.search_routing,
                  s.created_at,
                  sss.last_status,
                  sr.completed_at AS last_run_at,
                  COALESCE(sr.errors_count, 0) AS errors_count,
-                 (SELECT COUNT(*) FROM items i WHERE i.source_id = s.id AND i.deleted_at IS NULL) AS items_count,
+                 (SELECT COUNT(*) FROM resources resource WHERE resource.source_id = s.id AND resource.deleted_at IS NULL) AS items_count,
                  (SELECT COUNT(*)
-                    FROM item_chunks ic
-                    JOIN items i ON i.id = ic.item_id
-                   WHERE i.source_id = s.id AND i.deleted_at IS NULL) AS chunks_count,
-                 (SELECT i.uri FROM items i WHERE i.source_id = s.id AND i.deleted_at IS NULL ORDER BY i.uri LIMIT 1) AS sample_uri,
-                 a.email AS account_email
+                    FROM chunks c
+                    JOIN resources resource ON resource.id = c.resource_id
+                   WHERE resource.source_id = s.id AND resource.deleted_at IS NULL) AS chunks_count,
+                 (SELECT resource.ref FROM resources resource WHERE resource.source_id = s.id AND resource.deleted_at IS NULL ORDER BY resource.ref LIMIT 1) AS sample_uri,
+                 a.label AS account_email
           FROM sources s
           JOIN realms r ON r.id = s.realm_id
           LEFT JOIN source_sync_state sss ON sss.source_id = s.id
@@ -138,21 +245,35 @@ function resolveRealm(deps: SourceServiceDeps, slug: string): RealmIdRow {
 export function createSourceService(deps: SourceServiceDeps): SourceService {
   return {
     addSource(input: AddSourceInput): AddSourceResult {
-      const realm = resolveRealm(deps, input.realmSlug ?? 'global')
+      if (!input.realmSlug) {
+        throw new CtxindexValidationError(
+          'unknown_realm',
+          'Source creation requires an explicit Realm',
+        )
+      }
+      const realm = resolveRealm(deps, input.realmSlug)
+      const adapter = resolveAdapter(deps, input)
+      validateSearchRouting(input.searchRouting, adapter.capabilities)
+      const grantId = resolveGrantId(deps, input, adapter.auth)
       const sourceId = ulid()
       const now = Date.now()
       deps.db
         .prepare(
-          `INSERT INTO sources (id, realm_id, adapter_id, display_name, config_json, grant_id, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO sources (
+             id, realm_id, adapter_id, adapter_version, display_name, config_json,
+             grant_id, search_routing, created_at, updated_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           sourceId,
           realm.id,
           input.adapterId,
+          adapter.version,
           input.displayName ?? null,
-          input.configJson ?? null,
-          input.grantId ?? null,
+          input.configJson ?? '{}',
+          grantId,
+          input.searchRouting ?? null,
+          now,
           now,
         )
 
@@ -219,19 +340,6 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
       deps.logger.debug({ sourceId }, 'source removed')
     },
 
-    bindGrantToSource(sourceId: string, grantId: string): void {
-      const existing = deps.db
-        .prepare('SELECT id FROM sources WHERE id = ?')
-        .get(sourceId)
-      if (!existing) {
-        throw new CtxindexNotFoundError(`source not found: "${sourceId}"`)
-      }
-      deps.db
-        .prepare('UPDATE sources SET grant_id = ? WHERE id = ?')
-        .run(grantId, sourceId)
-      deps.logger.debug({ sourceId, grantId }, 'source grant bound')
-    },
-
     getStatus(input: { sourceId?: string } = {}): StatusRow[] {
       // SPEC §10b: a reference to an unknown source MUST fail fast, not return
       // an empty/ambiguous result. A known but never-synced source is allowed
@@ -254,7 +362,7 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
                sr.completed_at AS lastRunAt,
                sr.errors_count AS errorsCount,
                sss.cursor_json AS cursorJson,
-               sr.error_json AS errorJson
+               sr.error_summary AS errorJson
         FROM source_sync_state sss
         JOIN sources s ON s.id = sss.source_id
         JOIN realms r ON r.id = s.realm_id

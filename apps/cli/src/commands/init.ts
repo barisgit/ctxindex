@@ -1,17 +1,9 @@
-import { CTXINDEX_ADAPTER_REGISTRY } from '@ctxindex/adapters'
-import {
-  type AdapterMigrations,
-  bootstrapDatabase,
-} from '@ctxindex/core/storage'
+import { bootstrapDatabase } from '@ctxindex/core/storage'
 import { defineCommand } from 'citty'
 import { runWithExit } from '../format/exit'
 
-function adapterMigrations(): AdapterMigrations[] {
-  return CTXINDEX_ADAPTER_REGISTRY.listMigrations() as AdapterMigrations[]
-}
-
 export async function initCtxindex(): Promise<void> {
-  await bootstrapDatabase({ adapterMigrations: adapterMigrations() })
+  await bootstrapDatabase()
 }
 
 export const initCommand = defineCommand({

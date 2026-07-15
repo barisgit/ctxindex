@@ -6,4 +6,5 @@ export const accounts = sqliteTable('accounts', {
   label: text('label'),
   externalUserId: text('external_user_id'),
   createdAt: integer('created_at', { mode: 'number' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'number' }).notNull(),
 })

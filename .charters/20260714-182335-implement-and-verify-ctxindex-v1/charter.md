@@ -31,27 +31,27 @@ Status: pass — evidence: `work/slice-2-gate.txt` (explicit-path loading, atomi
 ### C3. Fresh generic storage enforces exact Realm and Source semantics
 A database created from empty contains only the generic V1 model; Profile-derived Resources, fields, chunks, Relations, Artifacts, and sync bookkeeping update transactionally with stable Source-scoped Refs, correct synced/ad-hoc lifecycle, explicit user-created Realms, exact filters, and no seeded `global` Realm.
 Depends: C1
-Status: pending
+Status: pass — evidence: `work/slice-3-gate.txt` (fresh generic schema and prototype rejection, 51 focused storage tests, 198 passing full-suite tests with one skip, 10 integration tests, typecheck, lint, strict OpenSpec validation, and diff check passed)
 
 ### C4. Gmail discovery and retrieval use the generic contract
 An explicitly Realm-bound Gmail Source can search remotely, participate in local and mixed routing with deterministic warnings and explain metadata, and retrieve/cache complete message Resources by stable Ref using only its linked Grant.
 Depends: C2, C3
-Status: pending
+Status: pass — evidence: `work/slice-4-gate.txt` (mocked Gmail binary search/get/cache proof and the approved isolated read-only live Gmail search/get checkpoint passed)
 
 ### C5. Threads traverse generic Relations
 Conversation membership and bidirectional parent Relations assemble complete reply trees despite out-of-order arrival, with flat date ordering when parent edges are absent and cross-Source natural keys joining without collapsing Resource identity.
 Depends: C3, C4
-Status: pending
+Status: pass — evidence: `work/slice-5-gate.txt` (Relation/thread unit and binary-CLI out-of-order traversal, cross-Source joins, no provider I/O, typecheck, lint, full tests, and D3 passed)
 
 ### C6. Artifacts and exports are managed and observable
 Attachment bytes download lazily into a content-addressed deduplicating store, cached access avoids provider I/O, output copies preserve managed bytes, retention and explicit purge follow the accepted policy, disk accounting is accurate, and Resources export as JSON plus Profile-declared formats.
 Depends: C3, C4
-Status: pending
+Status: pass — evidence: `work/slice-6-gate.txt` (Artifact CAS/download/cache/copy, exact retention purge and re-download, disk accounting, deterministic JSON/Profile EML export, 107 focused and 419 full-suite tests, typecheck, lint, strict OpenSpec, D3, and diff checks passed)
 
 ### C7. Gmail Draft Actions are typed, reversible, and cannot send
 Registry-derived Action discovery and execution validate complete input before provider I/O, require an explicit Source and linked Grant, and create/update only the addressed provider Draft as a stable message Resource; no send or irreversible Action exists and composing text alone creates no state.
 Depends: C1, C3, C4
-Status: pending
+Status: in-progress
 
 ### C8. Local directories use the same generic Resource path
 A sandboxed local-directory Source syncs files with limits, ignores, and non-fatal skip reporting, then exposes them through the same generic search, get, Ref, and result-envelope behavior as Gmail without a domain-specific core path.

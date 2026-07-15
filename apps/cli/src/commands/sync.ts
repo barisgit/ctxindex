@@ -1,7 +1,6 @@
 import { defineCommand } from 'citty'
 import { parseSyncArgs, syncUsage } from '../args/sync'
 import { runWithExit } from '../format/exit'
-import { runSyncCommand } from '../sync/run-sync-command'
 
 export async function handleSyncCommand(args: string[]): Promise<number> {
   const parsed = parseSyncArgs(args)
@@ -10,7 +9,10 @@ export async function handleSyncCommand(args: string[]): Promise<number> {
     console.error(`${parsed.message}. Try: ${syncUsage}`)
     return 2
   }
-  return runSyncCommand(parsed)
+  console.error(
+    'Sync is temporarily unavailable: adapter-to-Resource orchestration is not implemented. Use `ctxindex source list` to inspect configured Sources.',
+  )
+  return 2
 }
 
 export const syncCommand = defineCommand({

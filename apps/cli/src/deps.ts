@@ -1,9 +1,11 @@
-import { CTXINDEX_ADAPTER_REGISTRY } from '@ctxindex/adapters'
+import { CTXINDEX_BUILTIN_EXTENSIONS } from '@ctxindex/adapters'
+import { ArtifactService } from '@ctxindex/core/artifact'
 import { type AuthService, createAuthService } from '@ctxindex/core/auth'
 import { getEnv, type LogLevel, readConfig } from '@ctxindex/core/config'
+import { loadExtensions } from '@ctxindex/core/extension'
 import { logger as createLogger, type Logger } from '@ctxindex/core/logger'
 import { createRealmService, type RealmService } from '@ctxindex/core/realm'
-import { createSearchService, type SearchService } from '@ctxindex/core/search'
+import type { ExtensionRegistry } from '@ctxindex/core/registry'
 import {
   CtxindexSecretsError,
   createSecretsService,
@@ -17,7 +19,7 @@ import {
 } from '@ctxindex/core/secrets'
 import { createSourceService, type SourceService } from '@ctxindex/core/source'
 import type { CtxindexDatabase } from '@ctxindex/core/storage'
-import { createSyncService, type SyncService } from '@ctxindex/core/sync'
+import { createThreadService, type ThreadService } from '@ctxindex/core/thread'
 import { getDb } from './commands/db'
 
 export interface CliDeps {
@@ -27,12 +29,13 @@ export interface CliDeps {
   readonly env: ReturnType<typeof getEnv>
   readonly realmService: RealmService
   readonly sourceService: SourceService
-  readonly searchService: SearchService
   readonly secretsService: SecretsService
   readonly secretsBackend: SecretBackend
   readonly secretsStore: SecretsStore
   readonly authService: AuthService
-  readonly syncService: SyncService
+  readonly registry: ExtensionRegistry
+  readonly threadService: ThreadService
+  readonly artifactService: ArtifactService
   close(): Promise<void>
 }
 
@@ -64,7 +67,18 @@ export async function openDeps(
   const log = await createLogger(cliLogLevel ? { level: cliLogLevel } : {})
   const config = await readConfig()
   const realmService = createRealmService({ db, logger: log })
-  const sourceService = createSourceService({ db, logger: log, realmService })
+  const { registry } = await loadExtensions({
+    config,
+    builtins: CTXINDEX_BUILTIN_EXTENSIONS,
+    db,
+  })
+  const threadService = createThreadService({ db, profiles: registry.profiles })
+  const sourceService = createSourceService({
+    db,
+    logger: log,
+    realmService,
+    registry,
+  })
   const fileStore = new FileBackend(
     opts.filePassphrase === undefined
       ? { createKeyFileIfMissing: false }
@@ -85,29 +99,11 @@ export async function openDeps(
     logger: log,
     env,
   })
-  const searchService = createSearchService({
+  const artifactService = new ArtifactService({
     db,
-    logger: log,
-    registry: CTXINDEX_ADAPTER_REGISTRY,
-    async resolveSearchConfig(sourceId, adapterId, config) {
-      if (!adapterId.startsWith('google.')) return config
-      const source = sourceService.findSourceById(sourceId)
-      if (!source?.grant_id) {
-        throw new Error(`source ${sourceId} has no linked Google grant`)
-      }
-      const grant = await authService.getGoogleGrantById(source.grant_id)
-      if (!grant)
-        throw new Error(`linked Google grant not found: ${source.grant_id}`)
-      const accessToken = await authService.refreshGoogleAccessToken(grant.id)
-      return { ...config, access_token: accessToken }
-    },
-  })
-  const syncService = createSyncService({
-    db,
-    logger: log,
-    env,
+    registry,
     authService,
-    registry: CTXINDEX_ADAPTER_REGISTRY,
+    logger: log,
   })
   return {
     db,
@@ -116,12 +112,13 @@ export async function openDeps(
     env,
     realmService,
     sourceService,
-    searchService,
     secretsService,
     secretsBackend: config.secrets.backend,
     secretsStore,
     authService,
-    syncService,
+    registry,
+    threadService,
+    artifactService,
     async close() {},
   }
 }

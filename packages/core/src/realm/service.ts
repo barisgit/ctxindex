@@ -1,4 +1,3 @@
-import { ulid } from 'ulid'
 import { CtxindexValidationError } from '../errors'
 import type {
   CreateRealmInput,
@@ -33,28 +32,26 @@ export function createRealmService(deps: RealmServiceDeps): RealmService {
         )
       }
 
-      const realmId = ulid()
+      const realmId = input.slug
       deps.db
         .prepare(
-          'INSERT INTO realms (id, slug, is_default, created_at) VALUES (?, ?, ?, ?)',
+          'INSERT INTO realms (id, slug, label, created_at) VALUES (?, ?, ?, ?)',
         )
-        .run(realmId, input.slug, input.isDefault === true ? 1 : 0, Date.now())
+        .run(realmId, input.slug, input.displayName ?? null, Date.now())
       deps.logger.debug({ realmId, slug: input.slug }, 'realm created')
       return { realmId }
     },
 
     listRealms(): RealmRow[] {
       return deps.db
-        .prepare(
-          'SELECT id, slug, is_default, created_at FROM realms ORDER BY slug',
-        )
+        .prepare('SELECT id, slug, label, created_at FROM realms ORDER BY slug')
         .all() as RealmRow[]
     },
 
     getRealmBySlug(slug: string): RealmRow | null {
       return deps.db
         .prepare(
-          'SELECT id, slug, is_default, created_at FROM realms WHERE slug = ?',
+          'SELECT id, slug, label, created_at FROM realms WHERE slug = ?',
         )
         .get(slug) as RealmRow | null
     },

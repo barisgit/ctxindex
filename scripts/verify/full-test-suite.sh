@@ -30,8 +30,8 @@ if (( bun_exit != 0 )); then
   exit "$bun_exit"
 fi
 
-if (( pass_count < 109 )); then
-  echo "full-test-suite: expected at least 109 pass, got $pass_count" >&2
+if (( pass_count < 111 )); then
+  echo "full-test-suite: expected at least 111 pass, got $pass_count" >&2
   exit 1
 fi
 

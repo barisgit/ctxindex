@@ -4,14 +4,13 @@ import type { CtxindexDatabase } from '../storage'
 export interface RealmRow {
   readonly id: string
   readonly slug: string
-  readonly is_default: number
+  readonly label: string | null
   readonly created_at: number
 }
 
 export interface CreateRealmInput {
   readonly slug: string
   readonly displayName?: string
-  readonly isDefault?: boolean
 }
 
 export interface CreateRealmResult {

@@ -2,10 +2,15 @@ import { describe, expect, test } from 'bun:test'
 import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
 import {
+  type ArtifactDescriptor,
+  type DownloadContext,
   defineAdapter,
   defineExtension,
   defineProfile,
   type InferProfilePayload,
+  type ResolvedArtifactDescriptor,
+  type SearchRemoteResource,
+  type SearchRemoteResult,
 } from './index'
 
 type Equal<A, B> =
@@ -33,10 +38,85 @@ const noteAdapter = defineAdapter({
   configSchema: z.object({ root: z.string().describe('Notes root') }),
   auth: { kind: 'none' },
   profiles: [{ id: 'fake.note', version: 1 }],
+  routing: 'indexed',
   capabilities: ['retrieve'],
-  operations: { retrieve: async () => ({}) },
+  operations: { retrieve: async () => {} },
   actions: {},
 })
+
+defineAdapter({
+  id: 'fake.remote-notes',
+  version: 1,
+  configSchema: z.object({}),
+  auth: { kind: 'none' },
+  profiles: [{ id: 'fake.note', version: 1 }],
+  routing: 'federated',
+  capabilities: ['search-remote'],
+  operations: {
+    searchRemote: async (context): Promise<SearchRemoteResult> => {
+      const text: string = context.query.text
+      const limit: number = context.query.limit
+      const since: number | undefined = context.query.since
+      const until: number | undefined = context.query.until
+      const fields = context.query.fields
+      const aborted: boolean = context.signal.aborted
+      void since
+      void until
+      void fields
+      void aborted
+      return {
+        resources: [
+          {
+            ref: `ctx://${context.source.id}/note/1`,
+            profile: { id: 'fake.note', version: 1 },
+            title: text,
+            payload: { title: text, pinned: false },
+          },
+        ].slice(0, limit),
+        warnings: [],
+      }
+    },
+  },
+  actions: {},
+})
+
+defineAdapter({
+  id: 'fake.downloads',
+  version: 1,
+  configSchema: z.object({}),
+  auth: { kind: 'none' },
+  profiles: [{ id: 'fake.note', version: 1 }],
+  routing: 'indexed',
+  capabilities: ['download'],
+  operations: {
+    download: async (context) => {
+      const artifact: ResolvedArtifactDescriptor = context.artifact
+      const signal: AbortSignal = context.signal
+      await context.write(new Uint8Array())
+      void artifact
+      void signal
+    },
+  },
+  actions: {},
+})
+
+const descriptor: ArtifactDescriptor = {
+  ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/note/1/artifact/file',
+  filename: 'file.txt',
+  mediaType: 'text/plain',
+  byteSize: 4,
+}
+
+const resolvedDescriptor: ResolvedArtifactDescriptor = {
+  ...descriptor,
+  originRef: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/note/1',
+}
+
+const _DownloadIsAsyncCompatible: (
+  context: DownloadContext,
+) => void | Promise<void> = async () => {}
+void resolvedDescriptor
+void _DownloadIsAsyncCompatible
 
 defineAdapter({
   id: 'fake.missing-operation',
@@ -44,6 +124,7 @@ defineAdapter({
   configSchema: z.object({}),
   auth: { kind: 'none' },
   profiles: [],
+  routing: 'indexed',
   capabilities: ['retrieve'],
   // @ts-expect-error a declared capability requires its operation
   operations: {},
@@ -56,6 +137,7 @@ defineAdapter({
   configSchema: z.object({}),
   auth: { kind: 'none' },
   profiles: [],
+  routing: 'indexed',
   capabilities: [],
   operations: {
     // @ts-expect-error an omitted capability forbids its operation
@@ -70,13 +152,14 @@ defineAdapter({
   configSchema: z.object({}),
   auth: { kind: 'none' },
   profiles: [],
+  routing: 'indexed',
   capabilities: ['retrieve'],
   operations: {
     retrieve: (context) => {
       const ref: string = context.ref
       // @ts-expect-error retrieve does not receive sync cursor access
       context.cursor
-      return ref
+      void ref
     },
   },
   actions: {},
@@ -113,5 +196,22 @@ describe('extension SDK definition factories', () => {
     const source = await readFile(`${import.meta.dir}/index.ts`, 'utf8')
     expect(source).not.toContain("from '@ctxindex/core")
     expect(source).not.toContain('from "@ctxindex/core')
+  })
+
+  test('remote search results are typed and scoreless', () => {
+    const result = {
+      resources: [],
+      warnings: [],
+      // @ts-expect-error provider results do not expose scores
+      score: 1,
+    } satisfies SearchRemoteResult
+    const resource = {
+      ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/note/1',
+      profile: { id: 'fake.note', version: 1 },
+      // @ts-expect-error provider resources do not expose scores
+      score: 1,
+    } satisfies SearchRemoteResource
+    expect(result.resources).toEqual([])
+    expect(resource.ref).toContain('/note/1')
   })
 })

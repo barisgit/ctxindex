@@ -1,7 +1,11 @@
 import { type CommandDef, defineCommand, runMain } from 'citty'
 import pkg from '../package.json' with { type: 'json' }
+import { artifactCommand } from './commands/artifact'
 import { authCommand } from './commands/auth'
+import { exportCommand } from './commands/export'
+import { getCommand } from './commands/get'
 import { initCommand } from './commands/init'
+import { purgeCommand } from './commands/purge'
 import { realmCommand } from './commands/realm'
 import { searchCommand } from './commands/search'
 import { secretsCommand } from './commands/secrets'
@@ -9,6 +13,7 @@ import { skillsCommand } from './commands/skills'
 import { sourceCommand } from './commands/source'
 import { statusCommand } from './commands/status'
 import { syncCommand } from './commands/sync'
+import { threadCommand } from './commands/thread'
 import { setCliLogLevel } from './deps'
 import { mapErrorToExit } from './format/exit'
 
@@ -102,9 +107,14 @@ export const rootCommand = defineCommand({
   subCommands: {
     init: initCommand,
     auth: authCommand,
+    artifact: artifactCommand,
+    purge: purgeCommand,
     realm: realmCommand,
     source: sourceCommand,
     sync: syncCommand,
+    get: getCommand,
+    export: exportCommand,
+    thread: threadCommand,
     search: searchCommand,
     status: statusCommand,
     secrets: secretsCommand,

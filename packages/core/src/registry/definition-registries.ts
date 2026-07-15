@@ -55,6 +55,7 @@ const adapterDefinitionSchema = z.object({
   configSchema: schemaSchema,
   auth: authSchema,
   profiles: z.array(referenceSchema).readonly(),
+  routing: z.enum(['indexed', 'federated', 'hybrid']),
   capabilities: z
     .array(z.enum(['sync', 'search-remote', 'retrieve', 'download']))
     .readonly(),
@@ -111,6 +112,21 @@ function validateAdapter(
   if (capabilities.size !== adapter.capabilities.length) {
     throw new DefinitionRegistryError(
       `Invalid Adapter ${adapter.id}@${adapter.version}: duplicate capability`,
+      'capability_operation_mismatch',
+    )
+  }
+  if (adapter.routing === 'federated' && !capabilities.has('search-remote')) {
+    throw new DefinitionRegistryError(
+      'Routing federated requires capability search-remote',
+      'capability_operation_mismatch',
+    )
+  }
+  if (
+    adapter.routing === 'hybrid' &&
+    (!capabilities.has('sync') || !capabilities.has('search-remote'))
+  ) {
+    throw new DefinitionRegistryError(
+      'Routing hybrid requires capabilities sync and search-remote',
       'capability_operation_mismatch',
     )
   }

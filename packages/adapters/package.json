@@ -4,10 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./registry": "./src/registry.ts",
-    "./local-directory": "./src/local-directory/index.ts",
-    "./google-mailbox": "./src/google-mailbox/index.ts"
+    ".": "./src/index.ts"
   },
   "scripts": {
     "build": "tsgo --noEmit -p tsconfig.json",
@@ -20,6 +17,8 @@
   },
   "dependencies": {
     "@ctxindex/core": "workspace:*",
+    "@ctxindex/extension-sdk": "workspace:*",
+    "@ctxindex/profiles": "workspace:*",
     "drizzle-orm": "latest",
     "fdir": "latest",
     "file-type": "latest",

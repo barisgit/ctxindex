@@ -59,9 +59,9 @@ async function insertGrantWithKeychainSecrets(
   keychainStore: MemorySecretsStore,
 ): Promise<string> {
   db.prepare(
-    `INSERT INTO accounts (id, realm_id, provider, display_name, email, created_at)
-     VALUES ('account-1', 'global', 'google', 'Google', NULL, ?)`,
-  ).run(Date.now())
+    `INSERT INTO accounts (id, provider, label, created_at, updated_at)
+     VALUES ('account-1', 'google', 'Google', ?, ?)`,
+  ).run(Date.now(), Date.now())
 
   const clientSecretRef = await keychainStore.setSecret(
     'google',
@@ -76,9 +76,15 @@ async function insertGrantWithKeychainSecrets(
 
   db.prepare(
     `INSERT INTO grants
-       (id, account_id, provider, scopes, client_secret_ref, refresh_token_ref, created_at, updated_at)
-     VALUES ('grant-1', 'account-1', 'google', 'mail.read', ?, ?, ?, ?)`,
-  ).run(clientSecretRef, refreshTokenRef, Date.now(), Date.now())
+       (id, account_id, provider, scopes_json, client_secret_ref, refresh_token_ref, created_at, updated_at)
+     VALUES ('grant-1', 'account-1', 'google', ?, ?, ?, ?, ?)`,
+  ).run(
+    JSON.stringify(['mail.read']),
+    clientSecretRef,
+    refreshTokenRef,
+    Date.now(),
+    Date.now(),
+  )
 
   return refreshTokenRef
 }

@@ -196,9 +196,9 @@ V1 starts from a fresh generic schema with no per-domain tables:
 | Table | Contents |
 |---|---|
 | `resources` | ref, source_id, realm_id, primary profile id+version, title, occurred_at, updated_at, deleted_at, origin (`synced` \| `adhoc`), payload JSON |
-| `field_index` | (resource_id, field, type, value) rows from declared fields |
+| `field_index` | Typed scalar rows projected from declared fields; array values occupy one ordered row per element |
 | `chunks` (+FTS) | searchable text segments |
-| `relations` | (from_resource, relation, target_ref?, target_field?, target_value?, resolved_resource_id?) |
+| `relations` + `relation_resolutions` | Logical Ref/natural-key edges plus zero-to-many cached Resource matches |
 | `artifacts` | CAS metadata: hash, media type, size, origin ref, retention class, local path |
 | `sources` + sync bookkeeping | sync_runs, sync_locks, source_sync_state, tombstones, accounts, grants, user-defined realms |
 
@@ -207,6 +207,19 @@ Prototype tables such as `items`, `mail_messages`, `mail_bodies`, and
 recreated; no migration or compatibility code is written. Adapters have no
 private tables or migration namespaces. Escape valves until a future `ctx.storage` API: cursor
 JSON (sync state) and the artifact store (blobs).
+
+Field-index encoding is fixed for V1. Each row has a ctxindex ULID,
+`resource_id`, field name, declared field type, zero-based ordinal, and exactly
+one populated typed value column: `value_text` for `string`/`string[]`,
+`value_number` for `number`/`number[]`, or `value_integer` for `boolean` (0/1)
+and `datetime` (UTC epoch milliseconds). Scalars use ordinal `0`; arrays emit
+one row per element and preserve order. A uniqueness constraint on
+`(resource_id, field, ordinal)` and partial indexes over each typed value
+support wholesale replacement, typed equality, numeric/date ranges, and
+aggregation without casts. Every declared field is filterable and aggregatable;
+V1 CLI `--field name=value` is equality-only, while `--since`/`--until` target
+the Resource envelope's `occurred_at`. The core query model may use native
+number/datetime ranges without adding another storage encoding.
 
 Ad hoc caching: `retrieve` results are cached into the SAME tables with
 `origin: adhoc`, so `download` after `get` does not re-fetch, refs never
@@ -219,15 +232,23 @@ entries and are evicted, never tombstoned.
 
 ## 6. Relations and threading (D14)
 
-Edge targets: `ctx://` ref OR natural key `(field, value)` — e.g.
-`(internetMessageId, "<abc@x>")`. Core stores unresolved edges and resolves
-lazily: on arrival of a matching resource (via field index) or at query time.
-Dangling edges are legal and queryable as unresolved. Relations are indexed in
-both directions; "resources related to X by R" is a query primitive.
+Edge targets: `ctx://` ref OR a V1 string natural key `(field, value)` — e.g.
+`(internetMessageId, "<abc@x>")`. Core stores each logical edge once and caches
+zero-to-many matches in `relation_resolutions`; one natural key can legitimately
+match copies in several Sources. Resolution is global across Sources and Realms
+(Realms are not a security boundary), and runs lazily on matching Resource
+arrival or traversal. Tombstoned matches remain linked but are excluded by
+default; evicted matches disappear through foreign-key cascade and can resolve
+again if they return. Dangling edges remain legal and queryable as unresolved.
+Relations are indexed in both directions; "resources related to X by R" is a
+query primitive.
 
 `thread get <ref>`: union of provider `conversation` membership and `parent`
 reply-tree walk (both directions); tree when headers exist, flat fallback
-otherwise. Cross-source: shared message-ids join threads spanning mailboxes.
+otherwise. Provider conversation identifiers are Source-scoped before relation
+extraction because providers do not guarantee mailbox-global identity.
+Cross-source union comes from shared RFC message-id parent keys; zero-to-many
+resolution keeps copies in distinct Sources as distinct Resources.
 
 ## 7. Refs (D4)
 
@@ -235,6 +256,23 @@ Grammar: `ctx://<source-id>/<adapter-opaque-suffix>`. Source id routes;
 suffix is adapter-owned and opaque to core. Artifact refs extend the resource
 ref (`.../doc/razpisna.pdf`) — still adapter-owned. Provider-native URIs
 (`https://mail.google.com/...`) are envelope metadata for humans, never input.
+
+Core uses a dedicated parser rather than a generic URL parser (which would
+lowercase the authority). It validates only the routing and URI-syntax
+contract: `source-id` is the
+26-character uppercase Crockford-base32 Source ULID; the suffix is non-empty,
+at most 16 KiB as encoded UTF-8, and consists of RFC 3986 `pchar`, `/`, and
+uppercase `%HH` escapes. Adapters must percent-encode other UTF-8 bytes and
+choose a stable canonical suffix. Core never decodes, normalizes, or interprets
+the suffix and compares the complete Ref byte-for-byte; emitted Refs must carry
+the Source id of the operation context.
+
+Source availability is distinct from sync status. If the Source's Adapter is
+not loaded, listing reports `extension_unavailable`; local envelope/index reads
+continue, provider-dependent operations fail with typed
+`extension_unavailable` (sync exits 50), and remote-search origins degrade to a
+warning. Availability is derived from the loaded registries rather than stored
+as provider data, so it recovers when the Extension returns.
 
 ## 8. Capabilities, auth, routing
 
@@ -402,7 +440,5 @@ compatibility path.
 
 ## 13. Open questions
 
-1. Field-index scalar/array encoding, date/number ranges, query grammar, and whether aggregation requires explicit field opt-in.
-2. Artifact retention classes, quota scope, eviction order, and `status` disk accounting.
-3. Exact `ctx://` suffix encoding (charset, escaping, length) and the error contract for an unavailable/removed Source.
-4. Hybrid search default (D7), to revisit after dogfooding a partial Gmail sync.
+1. Artifact retention classes, quota scope, eviction order, and `status` disk accounting.
+2. Hybrid search default (D7), to revisit after dogfooding a partial Gmail sync.

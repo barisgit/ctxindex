@@ -1,20 +1,16 @@
+/**
+ * @deprecated Prototype sync harness only. This is not a production Adapter
+ * definition and must not be imported by task 4.3 or later. Production
+ * definitions are registered through CTXINDEX_BUILTIN_EXTENSIONS.
+ */
 import {
   type AdapterAuthSpec,
   type AdapterCapabilities,
-  type AdapterMigrations,
   createSourceAdapter,
   type SyncFunction,
 } from '@ctxindex/core/registry'
 import { z } from 'zod'
 import { localDirectorySync } from './sync'
-
-export const migrations = {
-  namespace: 'local.directory',
-  migrationsFolder: `${import.meta.dir}/migrations`,
-  migrationsTable: 'ctxindex_migrations_local_directory',
-} satisfies AdapterMigrations
-
-export const localDirectoryMigrations = migrations
 
 export const schema = {}
 export const localDirectorySchema = schema
@@ -53,7 +49,6 @@ export const localDirectoryAdapter = createSourceAdapter('local.directory', {
   schema,
   configSchema,
   capabilities,
-  migrations,
   auth,
   sync,
   searchMode: 'indexed',

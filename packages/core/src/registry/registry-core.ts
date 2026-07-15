@@ -1,7 +1,6 @@
 import { CtxindexRegistryError } from './errors'
 import type { CtxindexAdapterRegistryHandle } from './handle'
 import type {
-  AdapterMigrations,
   AdapterProvider,
   SourceAdapterDefinition,
   SourceKind,
@@ -12,7 +11,6 @@ type OAuth2Provider = 'google' | 'microsoft'
 
 type RegistryIndex = {
   readonly byId: ReadonlyMap<string, SourceAdapterDefinition>
-  readonly byNamespace: ReadonlyMap<string, SourceAdapterDefinition>
   readonly byProvider: ReadonlyMap<
     AdapterProvider,
     readonly SourceAdapterDefinition[]
@@ -24,8 +22,6 @@ type RegistryIndex = {
     readonly SourceAdapterDefinition[]
   >
   readonly providers: readonly AdapterProvider[]
-  readonly namespaces: readonly string[]
-  readonly migrations: readonly AdapterMigrations[]
 }
 
 function appendIndexed<K>(
@@ -55,7 +51,6 @@ function buildIndex(
   adapters: readonly SourceAdapterDefinition[],
 ): RegistryIndex {
   const byId = new Map<string, SourceAdapterDefinition>()
-  const byNamespace = new Map<string, SourceAdapterDefinition>()
   const byProvider = new Map<AdapterProvider, SourceAdapterDefinition[]>()
   const byKind = new Map<SourceKind, SourceAdapterDefinition[]>()
   const oauth2: SourceAdapterDefinition[] = []
@@ -63,7 +58,6 @@ function buildIndex(
 
   for (const adapter of adapters) {
     byId.set(adapter.id, adapter)
-    byNamespace.set(adapter.migrations.namespace, adapter)
     appendIndexed(byProvider, adapter.provider, adapter)
     for (const kind of adapter.capabilities.kinds) {
       appendIndexed(byKind, kind, adapter)
@@ -76,16 +70,11 @@ function buildIndex(
 
   return {
     byId,
-    byNamespace,
     byProvider: freezeIndexed(byProvider),
     byKind: freezeIndexed(byKind),
     oauth2: Object.freeze([...oauth2]),
     oauth2ByProvider: freezeIndexed(oauth2ByProvider),
     providers: Object.freeze([...byProvider.keys()]),
-    namespaces: Object.freeze(
-      adapters.map((adapter) => adapter.migrations.namespace),
-    ),
-    migrations: Object.freeze(adapters.map((adapter) => adapter.migrations)),
   }
 }
 
@@ -155,7 +144,6 @@ export function createCtxindexAdapterRegistry<
   const catalogIndex = buildIndex(catalogEntries)
 
   const overlay = new Map<string, SourceAdapterDefinition>()
-  const overlayByNamespace = new Map<string, SourceAdapterDefinition>()
   const overlayByProvider = new Map<
     AdapterProvider,
     SourceAdapterDefinition[]
@@ -188,7 +176,6 @@ export function createCtxindexAdapterRegistry<
   }
 
   function removeFromOverlayIndexes(adapter: SourceAdapterDefinition) {
-    overlayByNamespace.delete(adapter.migrations.namespace)
     removeIndexed(overlayByProvider, adapter.provider, adapter.id)
     for (const kind of adapter.capabilities.kinds) {
       removeIndexed(overlayByKind, kind, adapter.id)
@@ -200,7 +187,6 @@ export function createCtxindexAdapterRegistry<
   }
 
   function addToOverlayIndexes(adapter: SourceAdapterDefinition) {
-    overlayByNamespace.set(adapter.migrations.namespace, adapter)
     appendIndexed(overlayByProvider, adapter.provider, adapter)
     for (const kind of adapter.capabilities.kinds) {
       appendIndexed(overlayByKind, kind, adapter)
@@ -288,27 +274,6 @@ export function createCtxindexAdapterRegistry<
     return withOverlayRows(catalogRows, overlayByKind.get(kind) ?? [])
   }
 
-  function listMigrations(): readonly AdapterMigrations[] {
-    return Object.freeze(listAdapters().map((adapter) => adapter.migrations))
-  }
-
-  function getMigrations(id: AdapterId): AdapterMigrations {
-    return requireAdapter(id).migrations
-  }
-
-  function getNamespaceForId(id: AdapterId): string {
-    return getMigrations(id).namespace
-  }
-
-  function getAdapterForNamespace(
-    namespace: string,
-  ): SourceAdapterDefinition | undefined {
-    return (
-      overlayByNamespace.get(namespace) ??
-      catalogIndex.byNamespace.get(namespace)
-    )
-  }
-
   function getSupportedModes(id: AdapterId): readonly SyncMode[] {
     return requireAdapter(id).capabilities.modes
   }
@@ -339,7 +304,6 @@ export function createCtxindexAdapterRegistry<
     adapters: catalog,
     adapterIds,
     providers: catalogIndex.providers,
-    namespaces: catalogIndex.namespaces,
     isKnownAdapter,
     assertKnownAdapter,
     getAdapter,
@@ -349,10 +313,6 @@ export function createCtxindexAdapterRegistry<
     listAdapterIds,
     getAdaptersByProvider,
     getAdaptersByKind,
-    listMigrations,
-    getMigrations,
-    getNamespaceForId,
-    getAdapterForNamespace,
     getCapabilities: (id) => requireAdapter(id).capabilities,
     getSupportedModes,
     supportsMode: (id, mode) => getSupportedModes(id).includes(mode),

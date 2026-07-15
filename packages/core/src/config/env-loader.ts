@@ -16,7 +16,6 @@ const envShape = {
   CTXINDEX_NO_BROWSER: optionalString,
   CTXINDEX_LOOPBACK_TIMEOUT_SECS: optionalString,
   CTXINDEX_SKIP_TURBO_DRY_JSON: optionalString,
-  CTXINDEX_ADAPTER_REGISTRY: optionalString,
   CTXINDEX_GMAIL_AUTH_URL: optionalString,
   CTXINDEX_GMAIL_TOKEN_URL: optionalString,
   CTXINDEX_GMAIL_MOCK_BASE_URL: optionalString,

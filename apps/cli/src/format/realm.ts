@@ -13,12 +13,10 @@ export function formatRealms(
     const rows = realms.map((realm) => ({
       id: realm.id,
       slug: realm.slug,
-      isDefault: realm.is_default === 1,
+      label: realm.label,
       createdAt: realm.created_at,
     }))
     return JSON.stringify(rows, null, 2)
   }
-  return realms
-    .map((realm) => `${realm.slug}${realm.is_default ? ' (default)' : ''}`)
-    .join('\n')
+  return realms.map((realm) => realm.slug).join('\n')
 }

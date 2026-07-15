@@ -1,23 +1,11 @@
+export { LocalSearchExecutor } from './local-search'
+export * from './planner'
+export * from './preflight'
 export { sanitizeQuery } from './sanitize'
-export { search } from './search'
 export type {
-  ExecuteSearchInput,
-  ExecuteSearchResult,
-  ExplainRow,
-  FormatSearchResultsOptions,
-  SearchOutputFormat,
-  SearchService,
-  SearchServiceDeps,
-} from './search-service'
-export {
-  createSearchService,
-  executeSearch,
-  formatSearchResults,
-} from './search-service'
-export type {
-  ExplainInfo,
-  SearchFilters,
-  SearchOptions,
-  SearchResult,
-  SearchResultChunk,
+  LocalSearchChunk,
+  LocalSearchEvidence,
+  LocalSearchFieldFilter,
+  LocalSearchQuery,
+  LocalSearchResult,
 } from './types'

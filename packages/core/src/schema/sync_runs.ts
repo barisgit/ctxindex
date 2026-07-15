@@ -1,4 +1,5 @@
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { realms } from './realms'
 import { sources } from './sources'
 
 export const syncRuns = sqliteTable('sync_runs', {
@@ -6,21 +7,24 @@ export const syncRuns = sqliteTable('sync_runs', {
   sourceId: text('source_id')
     .notNull()
     .references(() => sources.id),
+  realmId: text('realm_id')
+    .notNull()
+    .references(() => realms.id),
   mode: text('mode').notNull(),
-  status: text('status').notNull(),
+  status: text('status', {
+    enum: ['running', 'completed', 'failed', 'cancelled'],
+  }).notNull(),
   startedAt: integer('started_at', { mode: 'number' }).notNull(),
   completedAt: integer('completed_at', { mode: 'number' }),
-  releasedAt: integer('released_at', { mode: 'number' }),
   cursorBeforeJson: text('cursor_before_json'),
   cursorAfterJson: text('cursor_after_json'),
-  itemsSeen: integer('items_seen', { mode: 'number' }).notNull().default(0),
-  itemsUpserted: integer('items_upserted', { mode: 'number' })
+  resourcesAdded: integer('resources_added', { mode: 'number' })
     .notNull()
     .default(0),
-  itemsTombstoned: integer('items_tombstoned', { mode: 'number' })
+  resourcesUpdated: integer('resources_updated', { mode: 'number' })
     .notNull()
     .default(0),
-  chunksWritten: integer('chunks_written', { mode: 'number' })
+  resourcesDeleted: integer('resources_deleted', { mode: 'number' })
     .notNull()
     .default(0),
   errorsCount: integer('errors_count', { mode: 'number' }).notNull().default(0),
