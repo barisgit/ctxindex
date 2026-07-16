@@ -6,6 +6,9 @@ export type MockTokenMode = 'ok' | 'invalid_grant'
 export interface MockGmailOptions {
   readonly accessToken?: string
   readonly refreshToken?: string
+  readonly identitySubject?: string
+  readonly identityEmail?: string
+  readonly authorizationTokens?: Readonly<Record<string, string>>
   readonly messages?: readonly MockGmailMessage[]
   readonly listOrder?: readonly string[]
 }
@@ -35,6 +38,7 @@ export interface MockGmailRequest {
 export interface MockGmailRecordedRequest extends MockGmailRequest {
   readonly authorization: string | null
   readonly body: string
+  readonly credentialLabel?: string | null
 }
 
 interface TokenCall {
@@ -175,6 +179,10 @@ export function startMockGmail(
   let draftMessageVersion = 0
   const accessToken = options.accessToken ?? defaultAccessToken
   const refreshToken = options.refreshToken ?? defaultRefreshToken
+  const identitySubject = options.identitySubject ?? 'mock-google-subject'
+  const identityEmail = options.identityEmail ?? 'mock@example.test'
+  const authorizationTokens =
+    options.authorizationTokens ?? ({ primary: accessToken } as const)
 
   const server = Bun.serve({
     hostname: '127.0.0.1',
@@ -187,11 +195,22 @@ export function startMockGmail(
         pathname: url.pathname,
         search: url.search,
       }
+      const authorization = request.headers.get('authorization')
+      const bearerToken = authorization?.startsWith('Bearer ')
+        ? authorization.slice('Bearer '.length)
+        : undefined
+      const credentialLabel =
+        Object.entries(authorizationTokens).find(
+          ([, token]) => token === bearerToken,
+        )?.[0] ?? null
       requests.push(requestSummary)
       recordedRequests.push({
         ...requestSummary,
         authorization: redactedAuthorization(request),
         body: recordedBody(url.pathname, body),
+        ...(options.authorizationTokens !== undefined
+          ? { credentialLabel }
+          : {}),
       })
       if (url.pathname === '/oauth/google/token') {
         const params = new TokenParams(body)
@@ -222,11 +241,17 @@ export function startMockGmail(
       }
 
       if (url.pathname === '/oauth/google/identity') {
+        if (credentialLabel === null)
+          return json({ error: 'invalid_token' }, { status: 401 })
         return Response.json({
-          sub: 'mock-google-subject',
-          email: 'mock@example.test',
+          sub: identitySubject,
+          email: identityEmail,
           email_verified: true,
         })
+      }
+
+      if (url.pathname.startsWith('/gmail/') && credentialLabel === null) {
+        return json({ error: 'invalid_token' }, { status: 401 })
       }
 
       if (url.pathname === '/gmail/v1/users/me/profile') {

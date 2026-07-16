@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 import { readdir } from 'node:fs/promises'
+import { CTXINDEX_BUILTIN_EXTENSIONS } from '@ctxindex/adapters'
 
 const adapterRoot = new URL('../../packages/adapters/src/', import.meta.url)
 const coreSourceRoot = new URL('../../packages/core/src/', import.meta.url)
@@ -133,6 +134,28 @@ test('production Adapter surface has no send permission, Action, or route', asyn
   expect(await sourceTree(adapterRoot)).not.toMatch(
     /Mail\.Send|gmail\.send|\/send(?:Mail)?\b|send-message/i,
   )
+
+  const adapters = CTXINDEX_BUILTIN_EXTENSIONS.flatMap(
+    (extension) => extension.adapters,
+  )
+  const declaredScopes = adapters.flatMap((adapter) =>
+    adapter.auth.kind === 'oauth2' ? adapter.auth.scopes : [],
+  )
+  expect(declaredScopes.filter((scope) => /send/i.test(scope))).toEqual([])
+
+  const actionIds = [
+    ...CTXINDEX_BUILTIN_EXTENSIONS.flatMap((extension) =>
+      extension.profiles.flatMap((profile) =>
+        Object.keys(profile.actions ?? {}),
+      ),
+    ),
+    ...adapters.flatMap((adapter) => Object.keys(adapter.actions)),
+  ]
+  expect([...new Set(actionIds)].sort()).toEqual([
+    'communication.message.draft.create',
+    'communication.message.draft.update',
+  ])
+  expect(actionIds.filter((id) => /send/i.test(id))).toEqual([])
 })
 
 test('Google Calendar production surface is read-only', async () => {
@@ -192,6 +215,31 @@ test('OAuth declarations expose bounded hosts through the public SDK', async () 
   expect(adapterContract).toContain('providerApiHosts')
   expect(adapterContract).toContain('identity')
   expect(adapterContract).toContain('provider')
+
+  const declaredHosts = new Set<string>()
+  for (const extension of CTXINDEX_BUILTIN_EXTENSIONS) {
+    for (const adapter of extension.adapters) {
+      for (const host of adapter.providerApiHosts ?? []) declaredHosts.add(host)
+      if (adapter.auth.kind !== 'oauth2') continue
+      for (const host of adapter.auth.provider.allowedHosts)
+        declaredHosts.add(host)
+      for (const endpoint of [
+        adapter.auth.provider.authorizationUrl,
+        adapter.auth.provider.tokenUrl,
+        adapter.auth.provider.identity.url,
+      ])
+        declaredHosts.add(new URL(endpoint).hostname)
+    }
+  }
+  expect([...declaredHosts].sort()).toEqual([
+    'accounts.google.com',
+    'gmail.googleapis.com',
+    'graph.microsoft.com',
+    'login.microsoftonline.com',
+    'oauth2.googleapis.com',
+    'openidconnect.googleapis.com',
+    'www.googleapis.com',
+  ])
 })
 
 test('built-in Extension root composes definitions without owning Adapter behavior', async () => {

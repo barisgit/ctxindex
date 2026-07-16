@@ -112,9 +112,9 @@
 
 ## 10. Cross-provider Product Workflow and Human Acceptance
 
-- [ ] 10.1 Add one relocated compiled CLI workflow representing personal Gmail, personal Google Calendar, work Gmail, work Outlook, work Microsoft Calendar, and a local directory across explicit Realms; prove account/source listings, all-Realm and exact-Realm search, mail/event/file get, threads, attachment cache, exports, Gmail+Outlook Draft create/update, deterministic JSON, and no send.
-- [ ] 10.2 Strengthen global network/redaction/security gates to discover every production provider request helper/test, require only approved Google/Microsoft hosts and loopback mocks, forbid direct fetch, scan scopes/Action ids/routes for send, preserve canary redaction, and prove malformed commands perform zero auth/network/storage.
-- [ ] 10.3 Update generated describe/help, bundled skills, `docs/AGENT-HOWTOS.md`, `.env.example`, packaging notes, command inventory, architecture/dependency manifests, recursive test gates, and codemaps without duplicating registry/provider truth.
+- [x] 10.1 Add one relocated compiled CLI workflow representing personal Gmail, personal Google Calendar, work Gmail, work Outlook, work Microsoft Calendar, and a local directory across explicit Realms; prove account/source listings, all-Realm and exact-Realm search, mail/event/file get, threads, attachment cache, exports, Gmail+Outlook Draft create/update, deterministic JSON, and no send.
+- [x] 10.2 Strengthen global network/redaction/security gates to discover every production provider request helper/test, require only approved Google/Microsoft hosts and loopback mocks, forbid direct fetch, scan scopes/Action ids/routes for send, preserve canary redaction, and prove malformed commands perform zero auth/network/storage.
+- [x] 10.3 Update generated describe/help, bundled skills, `docs/AGENT-HOWTOS.md`, `.env.example`, packaging notes, command inventory, architecture/dependency manifests, recursive test gates, and codemaps without duplicating registry/provider truth.
 
 ### Human checkpoint: Microsoft mail, calendar, and Draft
 

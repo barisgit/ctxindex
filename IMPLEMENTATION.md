@@ -81,6 +81,15 @@ actions        map Profile Action ids to provider implementations
 
 There is no standalone `emit` capability. Sync, retrieval, remote search, and Actions return or emit normalized operations through their contexts. Declaring an operation without an implementation, or implementing one without declaring support, is a registry validation error.
 
+Built-in calendar Adapters use indexed sync plus exact Ref retrieval and expose
+no Actions. Each Source selects one calendar and rolling window. Google stores
+an opaque sync token after a complete bounded scan; Microsoft uses a final
+opaque delta link for the default calendar and complete paged scans for named
+calendars. Both retain a Source-local manifest so only explicit removals or a
+completed reconciliation can delete local Resources. Provider response and
+cursor rules remain in their Adapter modules; the shared calendar Profile owns
+event semantics.
+
 ## 7. Storage
 
 SQLite + Drizzle remains the local storage stack. V1 creates a fresh core schema; no adapter owns migrations or tables.

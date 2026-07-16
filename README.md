@@ -11,7 +11,7 @@ Agent ───── CLI ────> ctxindex ──> Sources ──> provide
                          └── Resources / Refs / Relations / Artifacts
 ```
 
-V1 is under active development. The code currently in the repository is disposable prototype scaffolding; it is not an earlier released version and receives no schema or CLI compatibility treatment. The target is tracked in `openspec/changes/v1-context-access-layer/`.
+V1 is under active development. The code currently in the repository is disposable pre-release implementation; it is not an earlier released version and receives no schema or CLI compatibility treatment. Product scope is owned by `V1.md`; use `openspec list` for the authoritative active-change inventory.
 
 ## Development
 
@@ -23,6 +23,15 @@ bun run cli --help
 ```
 
 There is no `bun link` development path. Both commands dispatch to `apps/cli/bin/ctxindex.mjs`.
+
+## Packaging
+
+The release shape is one executable compiled with the repository-pinned Bun
+version. Bundled workflow skills and canonical migrations are embedded;
+trusted external Extensions remain explicit files loaded from configured paths.
+Relocation of the compiled executable, bundled skills, and external Extension
+loading are repository gate scenarios rather than alternate installation
+paths.
 
 ## Documentation map
 

@@ -3,6 +3,7 @@
 ctxindex exposes uniform verbs over loaded Profiles and Adapters:
 
 ```text
+init                         initialize local state
 realm / auth / account / source  configure and inspect access
 secrets                    inspect or switch the secret backend
 sync / search             discover context
@@ -11,6 +12,7 @@ artifact / export         materialize bytes
 action describe / run     execute typed provider Actions
 status / purge            inspect and maintain local state
 extensions / describe     inspect loaded definitions
+skills                     inspect bundled workflow guidance
 ```
 
 Every Source belongs to exactly one Realm. Omitting a realm filter searches all Realms; an explicit filter is exact.

@@ -14,13 +14,20 @@ Start with the [CLI overview](./reference/cli-overview.md).
 6. Retrieve complete Resources by their stable `ctx://` Ref.
 7. Download Artifacts or export Profile-supported representations when needed.
 
+An unscoped search spans all configured Accounts and unauthenticated Sources.
+Use an explicit Realm filter to keep personal and work retrieval exact. Inspect
+`account list` and `source list` rather than inferring provider identity from a
+Source label.
+
 ## Calendar events
 
 Calendar Sources are indexed: synchronize the selected calendar, search with
 the generated event alias, then retrieve complete events by their stable
-Source-scoped Ref. One compatible Grant can be shared by mailbox and calendar
-Sources for the same Account. Inspect the Adapter definition for generated
-configuration flags and exact scopes.
+Source-scoped Ref.
+One compatible Grant can be shared by mailbox and calendar Sources for the same
+provider Account. Different provider Accounts remain separate even when their
+labels overlap. Inspect the Adapter definition for generated configuration
+flags and exact scopes.
 
 Calendar Adapters are read-only and expose no mutation Actions.
 

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const repoRoot = resolve(fileURLToPath(new URL('../../', import.meta.url)))
 const docPath = join(repoRoot, 'docs/AGENT-HOWTOS.md')
+const cliOverviewPath = join(repoRoot, 'skills/reference/cli-overview.md')
 const cliMainPath = join(repoRoot, 'apps/cli/src/main.ts')
 
 interface CtxindexInvocation {
@@ -18,6 +19,10 @@ async function readDoc(): Promise<string> {
 
 async function readCliMain(): Promise<string> {
   return readFile(cliMainPath, 'utf8')
+}
+
+async function readCliOverview(): Promise<string> {
+  return readFile(cliOverviewPath, 'utf8')
 }
 
 function fencedCodeBlocks(markdown: string): string[] {
@@ -100,6 +105,19 @@ test('no stale commands', async () => {
   )
 
   expect(stale).toEqual([])
+})
+
+test('bundled CLI overview inventories every root command', async () => {
+  const [overview, mainSource] = await Promise.all([
+    readCliOverview(),
+    readCliMain(),
+  ])
+  const inventory = fencedCodeBlocks(overview).join('\n')
+  for (const command of implementedCommands(mainSource)) {
+    expect(inventory).toMatch(
+      new RegExp(`(^|[\\s/])${command}(?=$|[\\s/])`, 'm'),
+    )
+  }
 })
 
 test('OAuth guidance derives provider vocabulary from describe output', async () => {

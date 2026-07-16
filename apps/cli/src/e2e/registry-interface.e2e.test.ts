@@ -166,6 +166,61 @@ test('interpreted registry interface follows an explicit external Extension', as
       },
     })
 
+    const microsoftMailbox = await run([
+      'describe',
+      'adapter',
+      'microsoft.mailbox',
+      '--json',
+    ])
+    expect(microsoftMailbox.exitCode, microsoftMailbox.stderr).toBe(0)
+    expect(JSON.parse(microsoftMailbox.stdout)).toMatchObject({
+      id: 'microsoft.mailbox',
+      routing: 'federated',
+      auth: {
+        kind: 'oauth2',
+        scopes: ['Mail.ReadWrite'],
+        provider: {
+          id: 'microsoft',
+          authorizationUrl:
+            'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+          tokenUrl:
+            'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+          baseScopes: ['openid', 'offline_access', 'User.Read'],
+          environment: {
+            clientId: 'CTXINDEX_MICROSOFT_CLIENT_ID',
+            refreshToken: 'CTXINDEX_MICROSOFT_REFRESH_TOKEN',
+          },
+        },
+      },
+      providerApiHosts: ['graph.microsoft.com'],
+      capabilities: ['download', 'retrieve', 'search-remote'],
+    })
+    expect(microsoftMailbox.stdout).not.toMatch(/Mail\.Send|sendMail/)
+
+    const microsoftCalendar = await run([
+      'describe',
+      'adapter',
+      'microsoft.calendar',
+      '--json',
+    ])
+    expect(microsoftCalendar.exitCode, microsoftCalendar.stderr).toBe(0)
+    expect(JSON.parse(microsoftCalendar.stdout)).toMatchObject({
+      id: 'microsoft.calendar',
+      routing: 'indexed',
+      profiles: [{ id: 'calendar.event', version: 1 }],
+      auth: { kind: 'oauth2', scopes: ['Calendars.Read'] },
+      providerApiHosts: ['graph.microsoft.com'],
+      capabilities: ['retrieve', 'sync'],
+      configOptions: [
+        expect.objectContaining({ flag: '--config-calendar-id' }),
+        expect.objectContaining({ flag: '--config-future-days' }),
+        expect.objectContaining({ flag: '--config-past-days' }),
+      ],
+    })
+    expect(microsoftCalendar.stdout).not.toMatch(
+      /Calendars\.ReadWrite|Mail\.Send|sendMail/,
+    )
+
     const profileMarkdown = await run([
       'describe',
       'profile',

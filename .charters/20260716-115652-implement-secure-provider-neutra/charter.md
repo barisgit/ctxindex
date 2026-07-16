@@ -79,17 +79,17 @@ Status: pass — provider-owned default v1.0 delta and named-calendar complete s
 ### C12. Provider egress and secrets remain bounded
 Automated gates prove Google operations contact only Google hosts, Microsoft operations only approved identity/Graph hosts, local Sources make no network requests, mutation routes never include send, logs/diagnostics redact credentials, and malformed input performs zero auth/provider/storage work.
 Depends: C6, C9, C10, C11
-Status: in-progress — Google/Microsoft identity, mail/calendar reads, and Outlook Drafts pass declared-host, loopback-only mock, redaction, canonical malformed-input zero-I/O, one-shot mutation, and no-send gates; Slice 10 still owns the final recursive global hardening; see `work/slice-7-microsoft-mail-gate.md`, `work/slice-8-outlook-draft-gate.md`, and `work/slice-9-microsoft-calendar-gate.md`
+Status: pass — recursive request-helper discovery, exact provider/mock host ownership, alternate-client rejection, generic redaction, malformed-command zero-side-effect, per-Account bearer isolation, one-shot Draft mutation, and no-send scopes/Actions/routes pass; see `work/slice-10-product-workflow-gate.md`
 
 ### C13. Multi-account workflow is useful end to end
 A real compiled CLI in isolated state can represent personal Gmail, personal Google Calendar, work Gmail, work Outlook, and work Microsoft Calendar as explicitly named Sources in chosen Realms; list Accounts/Sources; search all or an exact Realm; retrieve mail/events/attachments; and create/update one Outlook Draft through generic commands.
 Depends: C4, C6, C9, C10, C11
-Status: in-progress — compiled workflows now add named Microsoft Calendar beside Google Calendar and Outlook across exact Realms with Account inventory, isolated overlapping event ids, search/get/update/delete/window behavior, threads/exports/attachment cache, and reversible Drafts; Slice 10 still owns one relocated all-product workflow
+Status: pass — one relocated compiled executable proves three Accounts, exact shared/separate Grants, six named provider/filesystem Sources across personal/work/files Realms, deterministic inventories/search, generic retrieval/thread/cache/export, and Gmail plus Outlook Draft create/update without send; see `work/slice-10-product-workflow-gate.md`
 
 ### C14. Generated interface and agent guidance remain authoritative
 Registry-derived `describe`, help, bundled skills, and workflow documentation expose the new Profiles, Adapters, configuration, scopes, Actions, and Account/secrets commands without parallel hand-maintained provider vocabularies or interactive credential prompts.
 Depends: C2, C4, C6, C9, C10, C11
-Status: in-progress — registry-derived interfaces now expose Microsoft OAuth/mailbox/calendar and exact read-only Calendar plus reversible Draft declarations through generic commands without provider-specific CLI/core paths; Slice 10 still owns final generated guidance and package verification
+Status: pass — generated describe/help, registry-derived skills/guidance, complete root-command inventory, environment schema, compiled packaging notes, architecture/dependency manifests, and recursive tests expose the product without duplicating provider vocabulary or accepting literal credentials; see `work/slice-10-product-workflow-gate.md`
 
 ### C15. Mocked, live, packaging, and regression gates pass
 Focused tests, integration/e2e suites, compiled/relocated binary checks, D3 external Extension proof, typecheck, lint, dependency/architecture checks, strict OpenSpec validation, drift/cartography, independent review, fresh-context QA, and explicit Human Google/Microsoft checkpoints all pass on the final snapshot with no unapproved live traffic.

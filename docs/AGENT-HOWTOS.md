@@ -86,17 +86,19 @@ bun cli account list --json
 
 After authorization, use `account list` to choose a safe local Account or Grant id, then use the loaded Adapter's generated Source options to add it to the intended Realm. Do not run live provider tests from the general automated lane. Accepted live checks use the isolated Human checkpoint procedure and redacted evidence under the active charter.
 
-Select every compatible Google Adapter needed by the intended Sources in one
-authorization request so the Account can share one exact Grant. Google Calendar
-is indexed and read-only: synchronize it before local event searches, and do
-not invent Calendar Actions that are absent from `describe`.
+Select every compatible Adapter for one provider Account in one authorization
+request when the intended Sources should share one exact Grant. Calendar
+Adapters are indexed and read-only: synchronize them before local event
+searches, and do not invent Actions that are absent from `describe`. Keep
+personal and work Sources in explicit separate Realms; an unscoped search spans
+both, while an explicit Realm filter is exact.
 
 ```sh
 bun cli auth add <provider-id> --adapter <mailbox-adapter-id> --adapter <calendar-adapter-id> --loopback
 bun cli account list --json
-bun cli source add <calendar-adapter-id> --realm personal --account <grant-id> --name 'Personal Calendar' <generated-calendar-options>
+bun cli source add <calendar-adapter-id> --realm <realm> --account <grant-id> --name '<calendar-name>' <generated-calendar-options>
 bun cli sync --source <calendar-source-id> --json
-bun cli search '<query>' --kind <event-profile-id-or-alias> --realm personal --json
+bun cli search '<query>' --kind <event-profile-id-or-alias> --realm <realm> --json
 bun cli get <ctx-calendar-event-ref> --json
 ```
 
