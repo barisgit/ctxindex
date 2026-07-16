@@ -32,4 +32,4 @@
 
 - [x] 6.1 Run drift-sweep and incremental cartography over the settled tree; update only demonstrated stale documentation and affected codemaps.
 - [x] 6.2 Independently review Module depth, ownership, public-seam stability, dependency direction, test locality, and absence of cosmetic fragmentation; resolve every important finding.
-- [ ] 6.3 Run the final complete CI/QA gate on the reviewed snapshot, verify the OpenSpec change semantically, curate charter evidence, and leave the change active for explicit archive.
+- [x] 6.3 Run the final complete CI/QA gate on the reviewed snapshot, verify the OpenSpec change semantically, curate charter evidence, and leave the change active for explicit archive.
