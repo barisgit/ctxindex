@@ -26,6 +26,7 @@
     "./thread": "./src/thread/index.ts",
     "./errors": "./src/errors.ts",
     "./ids": "./src/ids.ts",
+    "./ref": "./src/ref/index.ts",
     "./migrations": "./src/migrations/index.ts",
     "./action": "./src/action/index.ts"
   },

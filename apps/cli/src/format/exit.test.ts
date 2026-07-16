@@ -25,6 +25,10 @@ describe('mapErrorToExit', () => {
     ).toBe(30)
   })
 
+  test('maps an unavailable Extension Adapter to other sync failure', () => {
+    expect(mapErrorToExit({ code: 'adapter_unavailable' })).toBe(50)
+  })
+
   test.each([
     ['auth_expired', 10],
     ['permission_denied', 40],

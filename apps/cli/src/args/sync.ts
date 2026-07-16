@@ -1,4 +1,4 @@
-import type { SyncMode } from '@ctxindex/core/registry'
+import type { SyncMode } from '@ctxindex/extension-sdk'
 import { hasHelpFlag, parseFlags, stringFlag } from './flags'
 
 export type SyncArgs =

@@ -13,6 +13,7 @@ import {
   type RetrievedResource,
   type SearchRemoteResource,
   type SearchRemoteResult,
+  type SyncEmission,
 } from './index'
 
 type Equal<A, B> =
@@ -119,6 +120,50 @@ const _DownloadIsAsyncCompatible: (
 ) => void | Promise<void> = async () => {}
 void resolvedDescriptor
 void _DownloadIsAsyncCompatible
+
+defineAdapter({
+  id: 'fake.sync',
+  version: 1,
+  configSchema: z.object({}),
+  auth: { kind: 'none' },
+  profiles: [{ id: 'fake.note', version: 1 }],
+  routing: 'indexed',
+  capabilities: ['sync'],
+  operations: {
+    sync: async (context) => {
+      const mode: 'sync' | 'resync' | 'diff' = context.mode
+      const emission: SyncEmission = {
+        type: 'upsertResource',
+        resource: {
+          ref: `ctx://${context.source.id}/note/1`,
+          profile: { id: 'fake.note', version: 1 },
+          completeness: 'complete',
+          payload: { title: 'Synced', pinned: false },
+        },
+      }
+      await context.emit(emission)
+      // @ts-expect-error sync only accepts the public generic emission union
+      await context.emit({ type: 'upsertItem', itemId: 'legacy' })
+      void mode
+    },
+  },
+  actions: {},
+})
+
+defineAdapter({
+  id: 'fake.sync-return',
+  version: 1,
+  configSchema: z.object({}),
+  auth: { kind: 'none' },
+  profiles: [],
+  routing: 'indexed',
+  capabilities: ['sync'],
+  operations: {
+    // @ts-expect-error sync operations do not return result objects
+    sync: async () => ({ legacy: true }),
+  },
+  actions: {},
+})
 
 const actionResult: RetrievedResource = {
   ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/note/1',

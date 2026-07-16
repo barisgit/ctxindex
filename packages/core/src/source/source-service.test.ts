@@ -41,7 +41,7 @@ const registry = createExtensionRegistry([
       defineAdapter({
         id: 'local.directory',
         version: 1,
-        configSchema: z.object({ root: z.string().optional() }).strict(),
+        configSchema: z.object({ root_path: z.string().min(1) }).strict(),
         auth: { kind: 'none' },
         profiles: [],
         routing: 'indexed',
@@ -59,6 +59,26 @@ beforeEach(async () => {
   await runMigrations(db)
 })
 
+test('addSource validates config against the selected Adapter', () => {
+  const realmService = createRealmService({ db, logger })
+  realmService.createRealm({ slug: 'work' })
+  const service = createSourceService({ db, logger, realmService, registry })
+
+  expect(() =>
+    service.addSource({
+      adapterId: 'local.directory',
+      realmSlug: 'work',
+    }),
+  ).toThrow(expect.objectContaining({ code: 'invalid_source_config' }))
+  expect(() =>
+    service.addSource({
+      adapterId: 'local.directory',
+      realmSlug: 'work',
+      configJson: 'not-json',
+    }),
+  ).toThrow(expect.objectContaining({ code: 'invalid_source_config' }))
+})
+
 test('stores only routing overrides compatible with Adapter capabilities', () => {
   const realmService = createRealmService({ db, logger })
   realmService.createRealm({ slug: 'work' })
@@ -69,6 +89,7 @@ test('stores only routing overrides compatible with Adapter capabilities', () =>
       adapterId: 'local.directory',
       realmSlug: 'work',
       searchRouting: 'federated',
+      configJson: '{"root_path":"/tmp"}',
     }),
   ).toThrow('federated search routing requires search-remote')
   expect(() =>
@@ -83,6 +104,7 @@ test('stores only routing overrides compatible with Adapter capabilities', () =>
     adapterId: 'local.directory',
     realmSlug: 'work',
     searchRouting: 'indexed',
+    configJson: '{"root_path":"/tmp"}',
   })
   expect(service.findSourceById(added.sourceId)?.search_routing).toBe('indexed')
   expect(service.listSources()[0]?.search_routing).toBe('indexed')
@@ -105,7 +127,7 @@ describe('source service', () => {
     const added = service.addSource({
       adapterId: 'local.directory',
       realmSlug: 'work',
-      configJson: '{"root":"/tmp"}',
+      configJson: '{"root_path":"/tmp"}',
     })
 
     expect(added.realmId).toBe(realm.realmId)
@@ -114,7 +136,7 @@ describe('source service', () => {
         id: added.sourceId,
         realm_id: realm.realmId,
         adapter_id: 'local.directory',
-        config_json: '{"root":"/tmp"}',
+        config_json: '{"root_path":"/tmp"}',
       },
     ])
   })
@@ -241,13 +263,18 @@ describe('source service', () => {
     realmService.createRealm({ slug: 'work' })
     const service = createSourceService({ db, logger, realmService, registry })
     expect(() =>
-      service.addSource({ adapterId: 'local.directory', realmSlug: 'work' }),
+      service.addSource({
+        adapterId: 'local.directory',
+        realmSlug: 'work',
+        configJson: '{"root_path":"/tmp"}',
+      }),
     ).not.toThrow()
     expect(() =>
       service.addSource({
         adapterId: 'local.directory',
         realmSlug: 'work',
         grantId: 'grant-any',
+        configJson: '{"root_path":"/tmp"}',
       }),
     ).toThrow('does not accept a Grant')
   })

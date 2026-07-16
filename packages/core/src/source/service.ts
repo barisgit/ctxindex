@@ -1,6 +1,10 @@
 import { ulid } from 'ulid'
 import { isGrantCompatible, providerKeyForAuth } from '../auth'
-import { CtxindexNotFoundError, CtxindexValidationError } from '../errors'
+import {
+  CtxindexError,
+  CtxindexNotFoundError,
+  CtxindexValidationError,
+} from '../errors'
 import type {
   AddSourceInput,
   AddSourceResult,
@@ -155,7 +159,7 @@ function parseLastError(errorJson: string | null): string | null {
 }
 
 function selectSourceColumns(): string {
-  return 'id, realm_id, adapter_id, display_name, config_json, grant_id, search_routing, created_at'
+  return 'id, realm_id, adapter_id, adapter_version, display_name, config_json, sync_enabled, grant_id, search_routing, created_at'
 }
 
 function sourceListSelect(): string {
@@ -163,8 +167,10 @@ function sourceListSelect(): string {
                  s.realm_id,
                  r.slug AS realm_slug,
                  s.adapter_id,
+                 s.adapter_version,
                  s.display_name,
                  s.config_json,
+                 s.sync_enabled,
                  s.grant_id,
                  s.search_routing,
                  s.created_at,
@@ -255,6 +261,24 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
       const adapter = resolveAdapter(deps, input)
       validateSearchRouting(input.searchRouting, adapter.capabilities)
       const grantId = resolveGrantId(deps, input, adapter.auth)
+      let config: unknown
+      try {
+        config = JSON.parse(input.configJson ?? '{}')
+      } catch (cause) {
+        throw new CtxindexError(
+          'Source config is invalid',
+          'invalid_source_config',
+          { cause },
+        )
+      }
+      const parsedConfig = adapter.configSchema.safeParse(config)
+      if (!parsedConfig.success) {
+        throw new CtxindexError(
+          'Source config is invalid',
+          'invalid_source_config',
+          { cause: parsedConfig.error },
+        )
+      }
       const sourceId = ulid()
       const now = Date.now()
       deps.db
@@ -270,7 +294,7 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
           input.adapterId,
           adapter.version,
           input.displayName ?? null,
-          input.configJson ?? '{}',
+          JSON.stringify(parsedConfig.data),
           grantId,
           input.searchRouting ?? null,
           now,

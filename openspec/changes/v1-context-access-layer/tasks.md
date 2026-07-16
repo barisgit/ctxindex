@@ -81,10 +81,10 @@ After the final task, run the `openspec-verify-change` workflow against all requ
 
 ## 8. Local-directory Adapter
 
-- [ ] 8.1 Define the minimal file Profile vocabulary needed by `local.directory` and bind it through the same public registries.
-- [ ] 8.2 Rewrite local-directory Sync against generic Resources, safety limits, ignores, and non-fatal skip reporting; verify one sandboxed root end to end.
-- [ ] 8.3 Verify local files use the same generic search/get/Ref envelope as Gmail with no domain-specific core path.
-- [ ] 8.4 **Slice gate:** run sandboxed local-directory sync/search/get integration and binary-CLI tests plus `bun run typecheck`, `bun run lint`, and `bun test`; fix every failure before proceeding.
+- [x] 8.1 Define the minimal file Profile vocabulary needed by `local.directory` and bind it through the same public registries.
+- [x] 8.2 Rewrite local-directory Sync against generic Resources, safety limits, ignores, and non-fatal skip reporting; verify one sandboxed root end to end.
+- [x] 8.3 Verify local files use the same generic search/get/Ref envelope as Gmail with no domain-specific core path.
+- [x] 8.4 **Slice gate:** run sandboxed local-directory sync/search/get integration and binary-CLI tests plus `bun run typecheck`, `bun run lint`, and `bun test`; fix every failure before proceeding.
 
 ## 9. External tenders Extension proof
 

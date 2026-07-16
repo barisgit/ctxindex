@@ -1,150 +1,221 @@
-import { readFile } from 'node:fs/promises'
-import { getEnv } from '@ctxindex/core/config'
-import type { SyncContext, SyncFunction } from '@ctxindex/core/registry'
-import { ulid } from 'ulid'
-import { chunkText } from './chunker'
-import { sha256Hex } from './hash'
-import { detectMime } from './mime'
-import { walkDirectory } from './walker'
+import { posix } from 'node:path'
+import type {
+  SyncContext,
+  SyncEmission,
+  SyncedResource,
+} from '@ctxindex/extension-sdk'
+import { z } from 'zod'
+import {
+  DEFAULT_SIZE_CAP_BYTES,
+  localDirectorySourceConfigSchema,
+} from './config'
+import { compareCodePoints } from './order'
+import { type ReadLocalFileResult, readLocalFile } from './reader'
+import { localDirectoryRef } from './ref'
+import { type WalkResult, walkDirectory } from './walker'
 
-const SIZE_CAP_BYTES = 2 * 1024 * 1024 // 2 MiB default
+const manifestRecordSchema = z
+  .object({
+    path: z
+      .string()
+      .min(1)
+      .refine(
+        (path) =>
+          !path.startsWith('/') &&
+          !path.includes('\\') &&
+          path
+            .split('/')
+            .every((part) => part !== '' && part !== '.' && part !== '..'),
+      ),
+    contentHash: z.string().regex(/^sha256:[0-9a-f]{64}$/),
+    byteSize: z.number().int().nonnegative(),
+    modifiedAt: z.string().datetime(),
+  })
+  .strict()
 
-async function sleep(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms))
+const cursorSchema = z
+  .object({
+    version: z.literal(1),
+    files: z.array(manifestRecordSchema),
+  })
+  .strict()
+  .refine(
+    (cursor) =>
+      cursor.files.every((record, index) => {
+        const previous = cursor.files[index - 1]
+        return (
+          previous === undefined ||
+          compareCodePoints(previous.path, record.path) < 0
+        )
+      }),
+    'manifest must be sorted with unique paths',
+  )
+
+type ManifestRecord = z.infer<typeof manifestRecordSchema>
+
+interface PendingWarning {
+  readonly path?: string
+  readonly emission: Extract<SyncEmission, { type: 'warning' }>
 }
 
-function testSyncDelayMs(): number {
-  if (process.env.NODE_ENV === 'production') return 0
-  const raw = getEnv().CTXINDEX_TEST_SYNC_DELAY_MS
-  if (!raw) return 0
-  const value = Number(raw)
-  return Number.isFinite(value) && value > 0 ? value : 0
+function pathIsUncertain(path: string, prefixes: readonly string[]): boolean {
+  return prefixes.some(
+    (prefix) =>
+      prefix === '' || path === prefix || path.startsWith(`${prefix}/`),
+  )
 }
 
-export interface LocalDirectoryConfig {
-  root_path: string
-  include?: string[]
-  exclude?: string[]
-  size_cap_bytes?: number
+function unchanged(left: ManifestRecord, right: ManifestRecord): boolean {
+  return (
+    left.path === right.path &&
+    left.contentHash === right.contentHash &&
+    left.byteSize === right.byteSize &&
+    left.modifiedAt === right.modifiedAt
+  )
 }
 
-export const localDirectorySync: SyncFunction =
-  async function* localDirectorySync(ctx: SyncContext) {
-    const config =
-      ctx.cursor !== null
-        ? ((ctx.cursor as { config?: LocalDirectoryConfig }).config ??
-          ({} as LocalDirectoryConfig))
-        : ({} as LocalDirectoryConfig)
+export async function localDirectorySync(context: SyncContext): Promise<void> {
+  if (context.signal.aborted) return
+  const config = localDirectorySourceConfigSchema.parse(context.source.config)
+  const sizeCapBytes = config.size_cap_bytes ?? DEFAULT_SIZE_CAP_BYTES
+  const parsedCursor = cursorSchema.safeParse(context.cursor)
+  const cursorWasInvalid = context.cursor !== null && !parsedCursor.success
+  const previousFiles = parsedCursor.success ? parsedCursor.data.files : []
+  const previousByPath = new Map(
+    previousFiles.map((record) => [record.path, record]),
+  )
+  const warnings: PendingWarning[] = []
+  if (cursorWasInvalid) {
+    warnings.push({
+      emission: {
+        type: 'warning',
+        code: 'invalid_cursor',
+        message: 'Ignored invalid local.directory cursor',
+      },
+    })
+  }
 
-    // Config comes through the source record's config_json
-    // In tests, we pass root_path via a special field in the logger context
-    const rootPath: string =
-      (ctx as unknown as { rootPath?: string }).rootPath ??
-      config.root_path ??
-      '.'
+  let walk: WalkResult
+  try {
+    walk = await walkDirectory(config.root_path, {
+      ...(config.include ? { include: config.include } : {}),
+      ...(config.exclude ? { exclude: config.exclude } : {}),
+      signal: context.signal,
+    })
+  } catch (cause) {
+    if (context.signal.aborted) return
+    throw cause
+  }
+  if (context.signal.aborted) return
 
-    const sizeCap = config.size_cap_bytes ?? SIZE_CAP_BYTES
+  for (const warning of walk.warnings) {
+    warnings.push({
+      path: warning.path,
+      emission: {
+        type: 'warning',
+        code: warning.code,
+        message: warning.message,
+      },
+    })
+  }
 
-    const walkOpts: { include?: string[]; exclude?: string[] } = {}
-    if (config.include) walkOpts.include = config.include
-    if (config.exclude) walkOpts.exclude = config.exclude
-    let entries: Awaited<ReturnType<typeof walkDirectory>>
+  const manifest = new Map<string, ManifestRecord>()
+  const upserts: SyncedResource[] = []
+  const uncertainPrefixes = [...walk.uncertainPrefixes]
+
+  for (const entry of walk.entries) {
+    if (context.signal.aborted) return
+    let read: ReadLocalFileResult
     try {
-      entries = await walkDirectory(rootPath, walkOpts)
-    } catch (err) {
-      yield {
-        type: 'error',
-        message: `walk error: ${rootPath}: ${String(err)}`,
-        path: rootPath,
-      }
-      return
+      read = await readLocalFile(entry, sizeCapBytes, context.signal)
+    } catch (cause) {
+      if (context.signal.aborted) return
+      throw cause
     }
-    const delayMs = testSyncDelayMs()
-    if (delayMs > 0) await sleep(delayMs)
-
-    for (const entry of entries) {
-      if (ctx.signal.aborted) {
-        yield { type: 'cancelled' }
-        return
+    if (read.status === 'warning') {
+      warnings.push({
+        path: read.warning.path,
+        emission: {
+          type: 'warning',
+          code: read.warning.code,
+          message: read.warning.message,
+          ref: localDirectoryRef(context.source.id, entry.relativePath),
+        },
+      })
+      if (
+        read.warning.code === 'stat_failed' ||
+        read.warning.code === 'read_failed'
+      ) {
+        uncertainPrefixes.push(entry.relativePath)
       }
-
-      // Skip oversize files
-      if (entry.size > sizeCap) {
-        yield {
-          type: 'error',
-          message: `file too large (${entry.size} bytes): ${entry.relativePath}`,
-          path: entry.relativePath,
-        }
-        continue
-      }
-
-      // Detect MIME
-      const mimeResult = await detectMime(entry.absolutePath)
-      if (mimeResult.isBinary) {
-        yield {
-          type: 'error',
-          message: `binary file skipped: ${entry.relativePath}`,
-          path: entry.relativePath,
-        }
-        continue
-      }
-
-      // Read content
-      let content: string
-      try {
-        content = await readFile(entry.absolutePath, 'utf8')
-      } catch (err) {
-        yield {
-          type: 'error',
-          message: `read error: ${entry.relativePath}: ${String(err)}`,
-          path: entry.relativePath,
-        }
-        continue
-      }
-
-      const contentHash = await sha256Hex(content)
-      const itemId = ulid()
-
-      yield {
-        type: 'upsertItem',
-        itemId,
-        sourceId: ctx.sourceId,
-        uri: `file://${entry.absolutePath}`,
-        title: entry.relativePath.split('/').pop() ?? entry.relativePath,
-        kind: 'file',
-        contentHash,
-        byteSize: entry.size,
-        indexedAt: Date.now(),
-        mtime: entry.mtime,
-        relativePath: entry.relativePath,
-      }
-
-      // Chunk and emit
-      const chunks = chunkText(content)
-      for (const chunk of chunks) {
-        yield {
-          type: 'upsertChunk',
-          chunkId: ulid(),
-          itemId,
-          chunkIndex: chunk.index,
-          content: chunk.content,
-        }
-      }
-
-      // Checkpoint every 100 files
-      if (entries.indexOf(entry) % 100 === 99) {
-        yield {
-          type: 'checkpoint',
-          cursor: JSON.stringify({
-            mtime: entry.mtime,
-            path: entry.relativePath,
-          }),
-        }
-      }
+      continue
     }
 
-    yield {
-      type: 'setCursor',
-      cursor: JSON.stringify({ completedAt: Date.now() }),
+    const record: ManifestRecord = {
+      path: entry.relativePath,
+      contentHash: read.contentHash,
+      byteSize: read.byteSize,
+      modifiedAt: read.modifiedAt,
+    }
+    manifest.set(record.path, record)
+    const previous = previousByPath.get(record.path)
+    if (context.mode !== 'resync' && previous && unchanged(previous, record)) {
+      continue
+    }
+    upserts.push({
+      ref: localDirectoryRef(context.source.id, entry.relativePath),
+      profile: { id: 'file', version: 1 },
+      completeness: 'complete',
+      payload: {
+        path: entry.relativePath,
+        name: posix.basename(entry.relativePath),
+        mediaType: read.mediaType,
+        byteSize: read.byteSize,
+        modifiedAt: read.modifiedAt,
+        contentHash: read.contentHash,
+        text: read.text,
+      },
+    })
+  }
+
+  for (const previous of previousFiles) {
+    if (
+      !manifest.has(previous.path) &&
+      pathIsUncertain(previous.path, uncertainPrefixes)
+    ) {
+      manifest.set(previous.path, previous)
     }
   }
+
+  warnings.sort(
+    (left, right) =>
+      compareCodePoints(left.path ?? '', right.path ?? '') ||
+      compareCodePoints(left.emission.code, right.emission.code),
+  )
+  for (const warning of warnings) {
+    if (context.signal.aborted) return
+    await context.emit(warning.emission)
+  }
+  for (const resource of upserts) {
+    if (context.signal.aborted) return
+    await context.emit({ type: 'upsertResource', resource })
+  }
+  if (!cursorWasInvalid) {
+    const removals = previousFiles
+      .filter((previous) => !manifest.has(previous.path))
+      .sort((left, right) => compareCodePoints(left.path, right.path))
+    for (const previous of removals) {
+      if (context.signal.aborted) return
+      await context.emit({
+        type: 'removeResource',
+        ref: localDirectoryRef(context.source.id, previous.path),
+      })
+    }
+  }
+
+  const files = [...manifest.values()].sort((left, right) =>
+    compareCodePoints(left.path, right.path),
+  )
+  if (context.signal.aborted) return
+  await context.emit({ type: 'checkpoint', cursor: { version: 1, files } })
+}

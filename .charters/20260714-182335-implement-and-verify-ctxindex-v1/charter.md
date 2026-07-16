@@ -56,12 +56,12 @@ Status: pass — evidence: `work/slice-7-mocked-gate.txt` and `work/slice-7-live
 ### C8. Local directories use the same generic Resource path
 A sandboxed local-directory Source syncs files with limits, ignores, and non-fatal skip reporting, then exposes them through the same generic search, get, Ref, and result-envelope behavior as Gmail without a domain-specific core path.
 Depends: C1, C3
-Status: in-progress
+Status: pass — evidence: `work/slice-8-gate.txt` (generic local-directory sync/search/get, stable Refs and tombstones, ignored/binary/oversize warnings, zero egress, fresh schema boundaries, D3, typecheck, lint, 592 passing full-suite tests with one live skip, strict OpenSpec, and diff checks passed)
 
 ### C9. An external tenders Extension proves the public seam
 A tenders Extension outside bundled packages imports only public SDK contracts, loads by explicit path through the relocated compiled binary, participates in generic operations, and leaves its Source unavailable but materialized Resources searchable after removal.
 Depends: C2, C3
-Status: pending
+Status: in-progress
 
 ### C10. User and agent interfaces derive from loaded registries
 CLI help, `ctxindex describe`, Action affordances, supported kinds, aliases, fields, formats, Source configuration, and agent reference material are generated from loaded definitions with no parallel hand-maintained vocabulary and no required interactive prompts.

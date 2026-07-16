@@ -58,3 +58,11 @@
 - Negative and mocked proof: invalid/header-injection input performs zero provider I/O or storage writes; the compiled binary performs exactly one mocked POST and one PUT, reuses the cached replacement, and records no send path. OAuth request recording redacts token bodies.
 - Live proof: after explicit approval, the isolated dual-scope Source performed one harmless self-addressed Draft create and one update. The user confirmed the updated Draft in Gmail and explicitly confirmed nothing was sent.
 - Verification: `work/slice-7-mocked-gate.txt` records 532 passing full-suite tests with one live-token skip plus focused, integration, typecheck, lint, D3, strict OpenSpec, and diff checks; `work/slice-7-live-draft.txt` contains redaction-safe Human-checkpoint evidence.
+
+## C8. Local directories use the same generic Resource path
+
+- Result: Passed.
+- Profile and Adapter: the public `file@1` Profile owns strict vocabulary, typed fields, search projection, and bounded chunking; `local.directory` binds it through the public registry and emits complete generic sync Resources.
+- Safety and identity: deterministic ignore handling, bounded no-follow reads, binary/oversize/race/path warnings, strict cursor ordering, and stable `ctx://<SOURCE>/file/<encoded-path>` identity cover unchanged, modification, rename, deletion, and transient uncertainty without leaking absolute paths.
+- Generic path: the CLI invokes public core sync orchestration; binary tests prove the same search/get/StoredResource envelope as Gmail, no local-directory imports in generic CLI/core paths, no provider egress, and no domain-specific tables.
+- Verification: `work/slice-8-gate.txt` records local integration and binary CLI gates, D3 relocation, typecheck, lint, 592 passing full-suite tests with one live-provider skip, strict OpenSpec validation, and diff checking.

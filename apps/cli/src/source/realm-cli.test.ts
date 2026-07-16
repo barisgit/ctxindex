@@ -94,6 +94,7 @@ describe('realm-cli unit: sourceAdd realm semantics', () => {
     const { sourceId } = sourceService.addSource({
       adapterId: 'local.directory',
       realmSlug: 'work',
+      configJson: '{"root_path":"/tmp"}',
     })
     const row = db
       .prepare(
@@ -141,7 +142,7 @@ describe('realm-cli integration: CLI subprocess', () => {
     const { env, cleanup } = await mkSandbox()
     try {
       const { exitCode, stdout, stderr } = await spawnCli(
-        ['source', 'add', 'local.directory'],
+        ['source', 'add', 'local.directory', '--root', '/tmp'],
         env,
       )
       expect(exitCode).toBe(2)
@@ -156,7 +157,15 @@ describe('realm-cli integration: CLI subprocess', () => {
     const { env, cleanup } = await mkSandbox()
     try {
       const { exitCode, stderr } = await spawnCli(
-        ['source', 'add', 'local.directory', '--realm', 'unknown'],
+        [
+          'source',
+          'add',
+          'local.directory',
+          '--realm',
+          'unknown',
+          '--root',
+          '/tmp',
+        ],
         env,
       )
       expect(exitCode).toBe(2)
@@ -175,7 +184,15 @@ describe('realm-cli integration: CLI subprocess', () => {
       expect(addRealm.exitCode).toBe(0)
 
       const addSource = await spawnCli(
-        ['source', 'add', 'local.directory', '--realm', 'work'],
+        [
+          'source',
+          'add',
+          'local.directory',
+          '--realm',
+          'work',
+          '--root',
+          '/tmp',
+        ],
         env,
       )
       expect(addSource.stderr).toBe('')
@@ -199,6 +216,8 @@ describe('realm-cli integration: CLI subprocess', () => {
           'local.directory',
           '--realm',
           'work',
+          '--root',
+          '/tmp',
         ],
         {
           cwd: repoRoot,

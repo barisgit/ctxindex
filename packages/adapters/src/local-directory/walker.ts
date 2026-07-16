@@ -1,9 +1,11 @@
-import { readFile, stat } from 'node:fs/promises'
-import { join, relative } from 'node:path'
-import { fdir } from 'fdir'
+import type { Stats } from 'node:fs'
+import { lstat, readdir, readFile, realpath, stat } from 'node:fs/promises'
+import { join, sep } from 'node:path'
 import ignore from 'ignore'
+import { compareCodePoints } from './order'
+import { normalizeRelativePath } from './ref'
 
-/** Built-in default ignore globs, verbatim from V1.md §1.3.1. */
+/** Built-in default ignore globs owned by SPEC §5. */
 const BUILTIN_IGNORES = [
   '.git/',
   'node_modules/',
@@ -33,78 +35,238 @@ const BUILTIN_IGNORES = [
 ]
 
 export interface WalkerEntry {
-  absolutePath: string
-  relativePath: string
-  mtime: number
-  size: number
+  readonly absolutePath: string
+  readonly relativePath: string
+  readonly mtime: number
+  readonly size: number
+}
+
+export interface WalkerWarning {
+  readonly code:
+    | 'symlink_skipped'
+    | 'stat_failed'
+    | 'traversal_failed'
+    | 'ignore_read_failed'
+    | 'path_escape_skipped'
+    | 'invalid_path_skipped'
+  readonly message: string
+  readonly path: string
+}
+
+export interface WalkResult {
+  readonly entries: readonly WalkerEntry[]
+  readonly warnings: readonly WalkerWarning[]
+  readonly uncertainPrefixes: readonly string[]
+}
+
+function isMissing(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: unknown }).code === 'ENOENT'
+  )
+}
+
+function checkCancelled(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw (
+      signal.reason ??
+      new DOMException('The operation was aborted', 'AbortError')
+    )
+  }
 }
 
 export async function walkDirectory(
   rootPath: string,
-  extra?: { include?: string[]; exclude?: string[] },
-): Promise<WalkerEntry[]> {
-  const ig = ignore()
-  ig.add(BUILTIN_IGNORES)
-
-  // Load .gitignore at root
+  extra?: {
+    readonly include?: readonly string[]
+    readonly exclude?: readonly string[]
+    readonly signal?: AbortSignal
+  },
+): Promise<WalkResult> {
+  checkCancelled(extra?.signal)
+  let canonicalRoot: string
   try {
-    const gitignoreContent = await readFile(
-      join(rootPath, '.gitignore'),
-      'utf8',
-    )
-    ig.add(gitignoreContent)
+    canonicalRoot = await realpath(rootPath)
+  } catch (error) {
+    if (isMissing(error)) {
+      throw new Error('local.directory root_path does not exist')
+    }
+    throw new Error('local.directory root_path could not be inspected')
+  }
+  let rootStat: Stats
+  try {
+    rootStat = await stat(canonicalRoot)
   } catch {
-    // No .gitignore — fine
+    throw new Error('local.directory root_path could not be inspected')
+  }
+  if (!rootStat.isDirectory()) {
+    throw new Error('local.directory root_path must be a directory')
   }
 
-  // Load .ctxindexignore at root
-  try {
-    const ctxIgnoreContent = await readFile(
-      join(rootPath, '.ctxindexignore'),
-      'utf8',
-    )
-    ig.add(ctxIgnoreContent)
-  } catch {
-    // No .ctxindexignore — fine
-  }
+  const matcher = ignore().add(BUILTIN_IGNORES)
+  const warnings: WalkerWarning[] = []
+  const uncertainPrefixes: string[] = []
 
-  if (extra?.exclude) ig.add(extra.exclude)
-
-  // Per-source include globs use gitignore/glob semantics (SPEC §5), not a raw
-  // substring match: a path is kept only if it matches an include pattern.
-  const includeMatcher =
-    extra?.include && extra.include.length > 0
-      ? ignore().add(extra.include)
-      : null
-
-  const allFiles = await new fdir()
-    .withFullPaths()
-    .withErrors()
-    .crawl(rootPath)
-    .withPromise()
-
-  const entries: WalkerEntry[] = []
-
-  for (const absPath of allFiles as string[]) {
-    const rel = relative(rootPath, absPath)
-    if (ig.ignores(rel)) continue
-
-    // include filter (glob semantics)
-    if (includeMatcher && !includeMatcher.ignores(rel)) continue
-
+  async function addIgnoreFile(
+    name: '.gitignore' | '.ctxindexignore',
+  ): Promise<void> {
     try {
-      const st = await stat(absPath)
-      if (!st.isFile()) continue
-      entries.push({
-        absolutePath: absPath,
-        relativePath: rel,
-        mtime: st.mtimeMs,
-        size: st.size,
-      })
-    } catch {
-      // stat failed — skip
+      matcher.add(await readFile(join(canonicalRoot, name), 'utf8'))
+    } catch (error) {
+      if (!isMissing(error)) {
+        warnings.push({
+          code: 'ignore_read_failed',
+          message: `Could not read ignore rules: ${name}`,
+          path: name,
+        })
+        uncertainPrefixes.push('')
+      }
     }
   }
 
-  return entries
+  await addIgnoreFile('.gitignore')
+  if (extra?.exclude) matcher.add([...extra.exclude])
+  await addIgnoreFile('.ctxindexignore')
+  const includeMatcher = extra?.include
+    ? ignore().add([...extra.include])
+    : null
+  const entries: WalkerEntry[] = []
+
+  function insideRoot(path: string): boolean {
+    return path === canonicalRoot || path.startsWith(`${canonicalRoot}${sep}`)
+  }
+
+  async function visit(
+    directory: string,
+    relativeDirectory: string,
+  ): Promise<void> {
+    checkCancelled(extra?.signal)
+    let names: string[]
+    try {
+      names = await readdir(directory)
+    } catch {
+      const path = relativeDirectory || '.'
+      warnings.push({
+        code: 'traversal_failed',
+        message: `Could not traverse directory: ${path}`,
+        path,
+      })
+      uncertainPrefixes.push(relativeDirectory)
+      return
+    }
+
+    for (const name of names.sort(compareCodePoints)) {
+      checkCancelled(extra?.signal)
+      const candidatePath = relativeDirectory
+        ? `${relativeDirectory}/${name}`
+        : name
+      if (name.includes('\\')) {
+        warnings.push({
+          code: 'invalid_path_skipped',
+          message: 'Skipped non-POSIX filename',
+          path: candidatePath,
+        })
+        continue
+      }
+      const relativePath = normalizeRelativePath(candidatePath)
+      const absolutePath = join(directory, name)
+      let metadata: Stats
+      try {
+        metadata = await lstat(absolutePath)
+      } catch {
+        warnings.push({
+          code: 'stat_failed',
+          message: `Could not inspect path: ${relativePath}`,
+          path: relativePath,
+        })
+        uncertainPrefixes.push(relativePath)
+        continue
+      }
+
+      if (metadata.isSymbolicLink()) {
+        warnings.push({
+          code: 'symlink_skipped',
+          message: `Skipped symbolic link: ${relativePath}`,
+          path: relativePath,
+        })
+        continue
+      }
+      if (!metadata.isDirectory() && !metadata.isFile()) continue
+
+      if (
+        metadata.isDirectory() &&
+        (matcher.ignores(relativePath) || matcher.ignores(`${relativePath}/`))
+      ) {
+        continue
+      }
+
+      let canonicalPath: string
+      try {
+        canonicalPath = await realpath(absolutePath)
+      } catch {
+        warnings.push({
+          code: 'stat_failed',
+          message: `Could not inspect path: ${relativePath}`,
+          path: relativePath,
+        })
+        uncertainPrefixes.push(relativePath)
+        continue
+      }
+      if (!insideRoot(canonicalPath)) {
+        warnings.push({
+          code: 'path_escape_skipped',
+          message: `Skipped path outside root: ${relativePath}`,
+          path: relativePath,
+        })
+        continue
+      }
+
+      if (metadata.isDirectory()) {
+        await visit(canonicalPath, relativePath)
+        continue
+      }
+      if (
+        relativePath === '.gitignore' ||
+        relativePath === '.ctxindexignore' ||
+        matcher.ignores(relativePath) ||
+        (includeMatcher && !includeMatcher.ignores(relativePath))
+      ) {
+        continue
+      }
+
+      let current: Stats
+      try {
+        current = await stat(canonicalPath)
+      } catch {
+        warnings.push({
+          code: 'stat_failed',
+          message: `Could not inspect path: ${relativePath}`,
+          path: relativePath,
+        })
+        uncertainPrefixes.push(relativePath)
+        continue
+      }
+      if (!current.isFile()) continue
+      entries.push({
+        absolutePath: canonicalPath,
+        relativePath,
+        mtime: current.mtimeMs,
+        size: current.size,
+      })
+    }
+  }
+
+  await visit(canonicalRoot, '')
+  entries.sort((left, right) =>
+    compareCodePoints(left.relativePath, right.relativePath),
+  )
+  warnings.sort(
+    (left, right) =>
+      compareCodePoints(left.path, right.path) ||
+      compareCodePoints(left.code, right.code),
+  )
+  uncertainPrefixes.sort(compareCodePoints)
+  return { entries, warnings, uncertainPrefixes }
 }

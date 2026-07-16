@@ -1,5 +1,6 @@
 import { Database } from 'bun:sqlite'
 import { expect, test } from 'bun:test'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createSandbox, type Sandbox } from '@ctxindex/core/testing'
 
@@ -23,6 +24,8 @@ async function initSandbox(): Promise<Sandbox> {
   const init = await sandbox.run(['init'])
   expect(init.exitCode).toBe(0)
   expect(init.stderr).toBe('')
+  const realm = await sandbox.run(['realm', 'add', 'work'])
+  expect(realm.exitCode, realm.stderr).toBe(0)
   return sandbox
 }
 
@@ -32,63 +35,38 @@ function parseSourceId(stdout: string): string {
   return match[1]
 }
 
-async function addSource(sandbox: Sandbox): Promise<string> {
-  const result = await sandbox.run(['source', 'add', 'local.directory'])
-  expect(result.exitCode).toBe(0)
+async function addSource(
+  sandbox: Sandbox,
+  name: string = crypto.randomUUID(),
+): Promise<string> {
+  const root = join(sandbox.dir, name)
+  await mkdir(root, { recursive: true })
+  await writeFile(join(root, 'note.txt'), `status fixture ${name}\n`)
+  const result = await sandbox.run([
+    'source',
+    'add',
+    'local.directory',
+    '--realm',
+    'work',
+    '--root',
+    root,
+  ])
+  expect(result.exitCode, result.stderr).toBe(0)
   expect(result.stderr).toBe('')
   return parseSourceId(result.stdout)
 }
 
-function seedSyncState(
-  sandbox: Sandbox,
-  sourceId: string,
-  lastStatus = 'completed',
-): void {
-  const now = Date.now()
-  const runId = `run-${sourceId}-${lastStatus}`
-  const errorsCount = lastStatus === 'completed' ? 0 : 1
+async function syncSource(sandbox: Sandbox, sourceId: string): Promise<void> {
+  const result = await sandbox.run(['sync', '--source', sourceId, '--json'])
+  expect(result.exitCode, result.stderr).toBe(0)
+}
+
+function markAdapterUnavailable(sandbox: Sandbox, sourceId: string): void {
   const db = new Database(dbPath(sandbox))
   try {
-    const source = db
-      .prepare('SELECT realm_id FROM sources WHERE id = ?')
-      .get(sourceId) as { realm_id: string } | null
-    if (!source) throw new Error(`source not found: ${sourceId}`)
-
     db.prepare(
-      `INSERT OR REPLACE INTO sync_runs (
-        id,
-        source_id,
-        realm_id,
-        mode,
-        status,
-        started_at,
-        completed_at,
-        items_added,
-        items_updated,
-        items_deleted,
-        errors_count,
-        error_json
-      ) VALUES (?, ?, ?, 'sync', ?, ?, ?, 1, 0, 0, ?, ?)`,
-    ).run(
-      runId,
-      sourceId,
-      source.realm_id,
-      lastStatus === 'completed' ? 'completed' : 'failed',
-      now - 1000,
-      now,
-      errorsCount,
-      lastStatus === 'completed' ? null : JSON.stringify({ code: lastStatus }),
-    )
-
-    db.prepare(
-      `INSERT OR REPLACE INTO source_sync_state (
-        source_id,
-        last_status,
-        last_run_id,
-        cursor_json,
-        updated_at
-      ) VALUES (?, ?, ?, ?, ?)`,
-    ).run(sourceId, lastStatus, runId, JSON.stringify({ page: 1 }), now)
+      "UPDATE sources SET adapter_id = 'missing.adapter', adapter_version = 1 WHERE id = ?",
+    ).run(sourceId)
   } finally {
     db.close()
   }
@@ -99,7 +77,7 @@ function syncRunErrorCount(sandbox: Sandbox, sourceId: string): number {
   try {
     const row = db
       .prepare(
-        'SELECT errors_count AS errorsCount FROM sync_runs WHERE source_id = ?',
+        'SELECT errors_count AS errorsCount FROM sync_runs WHERE source_id = ? ORDER BY started_at DESC LIMIT 1',
       )
       .get(sourceId) as { errorsCount: number }
     return row.errorsCount
@@ -124,11 +102,11 @@ function parseStatusRows(stdout: string): StatusRow[] {
   return JSON.parse(stdout) as StatusRow[]
 }
 
-test('text output renders', async () => {
+test('text output renders real completed local sync state', async () => {
   const sandbox = await initSandbox()
   try {
     const sourceId = await addSource(sandbox)
-    seedSyncState(sandbox, sourceId)
+    await syncSource(sandbox, sourceId)
 
     const result = await sandbox.run(['status'])
 
@@ -136,66 +114,74 @@ test('text output renders', async () => {
     expect(result.stderr).toBe('')
     expect(result.stdout).toContain(sourceId)
     expect(result.stdout).toContain('local.directory')
-    expect(result.stdout).toContain('global')
-    expect(result.stdout).toContain('completed')
+    expect(result.stdout).toContain('work')
+    expect(result.stdout).toContain('idle')
   } finally {
     await sandbox.cleanup()
   }
 })
 
-test('compact output includes error summary', async () => {
+test('compact output includes a real unavailable-Adapter failure summary', async () => {
   const sandbox = await initSandbox()
   try {
     const sourceId = await addSource(sandbox)
-    seedSyncState(sandbox, sourceId, 'failed')
+    markAdapterUnavailable(sandbox, sourceId)
+    const sync = await sandbox.run(['sync', '--source', sourceId])
+    expect(sync.exitCode).toBe(50)
 
     const result = await sandbox.run(['status', '--format', 'compact'])
 
     expect(result.exitCode).toBe(0)
     expect(result.stderr).toBe('')
     expect(result.stdout).toContain(sourceId)
-    expect(result.stdout).toContain('adapter=local.directory')
-    expect(result.stdout).toContain('status=failed')
-    expect(result.stdout).toContain('errors=1')
-    expect(result.stdout).toContain('error=failed')
+    expect(result.stdout).toContain('adapter=missing.adapter')
+    expect(result.stdout).toContain('status=extension_unavailable')
+    expect(result.stdout).toContain('errors=0')
+    expect(result.stdout).toContain(
+      'error=Source_Adapter_definition_is_unavailable',
+    )
   } finally {
     await sandbox.cleanup()
   }
 })
 
-test('json output parses', async () => {
+test('json output reflects the generic cursor from a real sync', async () => {
   const sandbox = await initSandbox()
   try {
     const sourceId = await addSource(sandbox)
-    seedSyncState(sandbox, sourceId)
+    await syncSource(sandbox, sourceId)
 
     const result = await sandbox.run(['status', '--json'])
 
     expect(result.exitCode).toBe(0)
     expect(result.stderr).toBe('')
-
     const rows = parseStatusRows(result.stdout)
-    expect(rows.length).toBe(1)
-    expect(rows[0]?.sourceId).toBe(sourceId)
-    expect(rows[0]?.adapterId).toBe('local.directory')
-    expect(rows[0]?.realmSlug).toBe('global')
-    expect(rows[0]?.lastStatus).toBe('completed')
-    expect(typeof rows[0]?.lastRunAt).toBe('number')
-    expect(rows[0]?.errorsCount).toBe(0)
-    expect(rows[0]?.lastError).toBeNull()
-    expect(rows[0]?.cursor).toEqual({ page: 1 })
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      sourceId,
+      adapterId: 'local.directory',
+      realmSlug: 'work',
+      lastStatus: 'idle',
+      lastRunAt: expect.any(Number),
+      errorsCount: 0,
+      lastError: null,
+      cursor: {
+        version: 1,
+        files: [expect.objectContaining({ path: 'note.txt' })],
+      },
+    })
   } finally {
     await sandbox.cleanup()
   }
 })
 
-test('counts match SQLite', async () => {
+test('counts match fresh-schema SQLite state', async () => {
   const sandbox = await initSandbox()
   try {
-    const firstSourceId = await addSource(sandbox)
-    const secondSourceId = await addSource(sandbox)
-    seedSyncState(sandbox, firstSourceId)
-    seedSyncState(sandbox, secondSourceId)
+    const firstSourceId = await addSource(sandbox, 'first')
+    const secondSourceId = await addSource(sandbox, 'second')
+    await syncSource(sandbox, firstSourceId)
+    await syncSource(sandbox, secondSourceId)
 
     const result = await sandbox.run(['status', '--json'])
     const rows = parseStatusRows(result.stdout)
@@ -219,7 +205,6 @@ test('unknown source id fails fast with exit 2', async () => {
   try {
     const result = await sandbox.run(['status', '--source', 'no-such-source'])
 
-    // SPEC §10b: a reference to an unknown source MUST fail fast, not exit 0.
     expect(result.exitCode).toBe(2)
     expect(result.stderr).toContain('no-such-source')
   } finally {
@@ -240,18 +225,19 @@ test('no sources still exits 0', async () => {
   }
 })
 
-test('reports last_status after failed sync', async () => {
+test('reports extension_unavailable after an unavailable Adapter sync', async () => {
   const sandbox = await initSandbox()
   try {
     const sourceId = await addSource(sandbox)
-    seedSyncState(sandbox, sourceId, 'needs_auth')
+    markAdapterUnavailable(sandbox, sourceId)
+    const sync = await sandbox.run(['sync', '--source', sourceId, '--json'])
+    expect(sync.exitCode).toBe(50)
 
-    const result = await sandbox.run(['status', '--json'])
-    const rows = parseStatusRows(result.stdout)
-
-    expect(result.exitCode).toBe(0)
+    const rows = parseStatusRows(
+      (await sandbox.run(['status', '--json'])).stdout,
+    )
     expect(rows[0]?.sourceId).toBe(sourceId)
-    expect(rows[0]?.lastStatus).toBe('needs_auth')
+    expect(rows[0]?.lastStatus).toBe('extension_unavailable')
   } finally {
     await sandbox.cleanup()
   }

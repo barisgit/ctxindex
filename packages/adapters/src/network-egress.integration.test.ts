@@ -3,8 +3,9 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { SyncContext } from '@ctxindex/core/registry'
+import type { SyncContext as PublicSyncContext } from '@ctxindex/extension-sdk'
+import { localDirectoryAdapterDefinition } from './builtins'
 import { googleMailboxAdapter } from './google-mailbox'
-import { localDirectoryAdapter } from './local-directory'
 
 const ALLOWLIST = new Set([
   'oauth2.googleapis.com',
@@ -79,17 +80,24 @@ describe('VAL-NETWORK-EGRESS runtime interceptor', () => {
     try {
       await writeFile(join(tmpDir, 'note.md'), '# egress fixture\n')
       const localCtx = {
-        sourceId: 'src-local',
-        runId: 'run-local',
+        source: {
+          id: '01KXHBNECDAH1T4MJ38X88EPFJ',
+          config: { root_path: tmpDir },
+        },
+        fetch: globalThis.fetch,
         mode: 'sync',
         cursor: null,
-        logger: testLogger(),
+        logger: {
+          trace() {},
+          debug() {},
+          info() {},
+          warn() {},
+          error() {},
+        },
         signal: new AbortController().signal,
-        rootPath: tmpDir,
-      } satisfies SyncContext & { rootPath: string }
-      for await (const _op of localDirectoryAdapter.sync(localCtx)) {
-        // Consume the local adapter; it must not call fetch.
-      }
+        emit() {},
+      } satisfies PublicSyncContext
+      await localDirectoryAdapterDefinition.operations.sync(localCtx)
 
       const googleCtx = {
         sourceId: 'src-google',

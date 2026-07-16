@@ -9,8 +9,10 @@ export interface SourceRow {
   readonly realm_id: string
   readonly realm_slug?: string
   readonly adapter_id: string
+  readonly adapter_version: number
   readonly display_name: string | null
   readonly config_json: string | null
+  readonly sync_enabled: boolean
   readonly search_routing?: SearchRouting | null
   readonly grant_id?: string | null
   readonly created_at: number

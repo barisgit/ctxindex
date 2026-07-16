@@ -309,25 +309,21 @@ describe('getSourceResource', () => {
     const registry = registryWith((context) => emitComplete(context))
     const hydrated = await getSourceResource(input(db, registry))
 
-    await new SyncCoordinator(db, registry.profiles).execute({
-      sourceId,
-      mode: 'sync',
-      cursorAfter: null,
-      operations: [
-        {
+    await new SyncCoordinator(db, registry.profiles).run(
+      { sourceId, mode: 'sync', signal: new AbortController().signal },
+      async ({ emit }) => {
+        await emit({
           type: 'upsertResource',
           resource: {
             ref,
-            sourceId,
             profile: { id: 'fake.item', version: 1 },
-            origin: 'synced',
             completeness: 'partial',
             providerUpdatedAt: 456,
             payload: { text: 'sync envelope' },
           },
-        },
-      ],
-    })
+        })
+      },
+    )
 
     expect(new ResourceStore(db, registry.profiles).get(ref)).toMatchObject({
       origin: 'synced',
@@ -340,24 +336,20 @@ describe('getSourceResource', () => {
   test('converges partial sync then get into complete synced content', async () => {
     const db = await freshDb()
     const registry = registryWith((context) => emitComplete(context))
-    await new SyncCoordinator(db, registry.profiles).execute({
-      sourceId,
-      mode: 'sync',
-      cursorAfter: null,
-      operations: [
-        {
+    await new SyncCoordinator(db, registry.profiles).run(
+      { sourceId, mode: 'sync', signal: new AbortController().signal },
+      async ({ emit }) => {
+        await emit({
           type: 'upsertResource',
           resource: {
             ref,
-            sourceId,
             profile: { id: 'fake.item', version: 1 },
-            origin: 'synced',
             completeness: 'partial',
             payload: { text: 'sync partial' },
           },
-        },
-      ],
-    })
+        })
+      },
+    )
 
     const result = await getSourceResource(input(db, registry))
 

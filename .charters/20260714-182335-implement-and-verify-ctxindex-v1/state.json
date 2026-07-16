@@ -4,12 +4,12 @@
   "objective": "Implement and verify ctxindex V1 as the local personal-context gateway defined by `v1-context-access-layer`: typed definitions, trusted Extension loading, fresh generic storage, exact Realms, Gmail discovery/retrieval, threads, Artifacts/exports, reversible provider email Draft Actions, local-directory support, an external tenders proof, generated docs, and complete validation.",
   "status": "active",
   "createdAt": "2026-07-14T18:23:35.445Z",
-  "updatedAt": "2026-07-15T22:02:59.730Z",
+  "updatedAt": "2026-07-16T00:42:05.539Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
   "previousStatus": "active",
-  "nextSeq": 1806,
-  "latestSourceSeq": 1803,
-  "snapshotHash": "e5a116dc849402b486a44946a4a30cb3cbeac50a8e2c83b3a87687227f114e7c",
+  "nextSeq": 2141,
+  "latestSourceSeq": 2139,
+  "snapshotHash": "30ab20a15586795adc3520e8a881d7febc6116ef5d5a043d2033380c3eafbfe6",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -106,10 +106,10 @@
         "C3"
       ],
       "status": {
-        "value": "in-progress",
-        "note": ""
+        "value": "pass",
+        "note": "evidence: `work/slice-8-gate.txt` (generic local-directory sync/search/get, stable Refs and tombstones, ignored/binary/oversize warnings, zero egress, fresh schema boundaries, D3, typecheck, lint, 592 passing full-suite tests with one live skip, strict OpenSpec, and diff checks passed)"
       },
-      "statusSeq": 1802
+      "statusSeq": 2133
     },
     {
       "id": "C9",
@@ -119,10 +119,10 @@
         "C3"
       ],
       "status": {
-        "value": "pending",
+        "value": "in-progress",
         "note": ""
       },
-      "statusSeq": 6
+      "statusSeq": 2133
     },
     {
       "id": "C10",

@@ -23,11 +23,43 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
         version: 1,
         capabilities: ['search-remote', 'retrieve', 'download'],
       },
-      { id: 'local.directory', version: 1, capabilities: [] },
+      { id: 'local.directory', version: 1, capabilities: ['sync'] },
     ])
     expect(
       registry.profiles.list().map(({ id, version }) => ({ id, version })),
-    ).toEqual([{ id: 'communication.message', version: 1 }])
+    ).toEqual([
+      { id: 'communication.message', version: 1 },
+      { id: 'file', version: 1 },
+    ])
+    const fileKind = description.kinds.find(({ id }) => id === 'file')
+    expect(
+      fileKind && {
+        id: fileKind.id,
+        version: fileKind.version,
+        summary: fileKind.summary,
+        aliases: fileKind.aliases,
+        fields: fileKind.fields.map(({ name, type }) => ({ name, type })),
+        formats: fileKind.formats,
+      },
+    ).toEqual({
+      id: 'file',
+      version: 1,
+      summary: 'An extracted local file.',
+      aliases: ['files'],
+      fields: [
+        { name: 'path', type: 'string' },
+        { name: 'name', type: 'string' },
+        { name: 'extension', type: 'string' },
+        { name: 'mediaType', type: 'string' },
+        { name: 'size', type: 'number' },
+        { name: 'modifiedAt', type: 'datetime' },
+        { name: 'contentHash', type: 'string' },
+      ],
+      formats: [],
+    })
+    expect(
+      description.sources.find(({ id }) => id === 'local.directory')?.profiles,
+    ).toEqual([{ id: 'file', version: 1 }])
     expect(
       description.actions.map(({ id, effect, adapters }) => ({
         id,
@@ -85,9 +117,27 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
       gmail?.configSchema.safeParse({ access_token: 'malicious' }).success,
     ).toBe(false)
     expect(local?.auth).toEqual({ kind: 'none' })
+    expect(local?.routing).toBe('indexed')
+    expect(local?.capabilities).toEqual(['sync'])
+    expect(Object.keys(local?.operations ?? {})).toEqual(['sync'])
+    expect(local?.configSchema.safeParse({}).success).toBe(false)
+    expect(
+      local?.configSchema.safeParse({ root_path: 'relative' }).success,
+    ).toBe(false)
+    expect(
+      local?.configSchema.safeParse({ root_path: '/tmp', include: [] }).success,
+    ).toBe(false)
+    expect(
+      local?.configSchema.safeParse({ root_path: '/tmp', exclude: [''] })
+        .success,
+    ).toBe(false)
+    expect(
+      local?.configSchema.safeParse({ root_path: '/tmp', size_cap_bytes: 0 })
+        .success,
+    ).toBe(false)
     expect(
       local?.configSchema.safeParse({
-        root_path: '.',
+        root_path: '/tmp',
         access_token: 'malicious',
       }).success,
     ).toBe(false)

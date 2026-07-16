@@ -36,6 +36,8 @@ export function mapErrorToExit(err: unknown): number {
   if (code === 'SQLITE_CORRUPT' || code === 'SQLITE_NOTADB') return 30
   if (code === 'invalid_ref') return 2
   if (code === 'unsupported_capability' || code === 'output_exists') return 2
+  if (code === 'sync_unsupported') return 2
+  if (code === 'adapter_unavailable') return 50
   if (code === 'UNKNOWN_ADAPTER' || code === 'unknown_adapter') return 2
 
   if (err instanceof CtxindexNotFoundError) return 2

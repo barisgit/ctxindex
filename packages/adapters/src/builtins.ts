@@ -3,12 +3,15 @@ import {
   communicationMessageDraftCreateInputSchema,
   communicationMessageDraftUpdateInputSchema,
   communicationMessageProfile,
+  fileProfile,
 } from '@ctxindex/profiles'
 import { z } from 'zod'
 import { gmailDownload } from './gmail-download'
 import { gmailDraftCreate, gmailDraftUpdate } from './gmail-draft'
 import { gmailRetrieve } from './gmail-retrieve'
 import { gmailSearchRemote } from './gmail-search-remote'
+import { localDirectorySourceConfigSchema } from './local-directory/config'
+import { localDirectorySync } from './local-directory/sync'
 
 export const gmailSourceConfigSchema = z
   .object({
@@ -19,14 +22,7 @@ export const gmailSourceConfigSchema = z
   })
   .strict()
 
-export const localDirectorySourceConfigSchema = z
-  .object({
-    root_path: z.string().optional(),
-    include: z.array(z.string()).optional(),
-    exclude: z.array(z.string()).optional(),
-    size_cap_bytes: z.number().optional(),
-  })
-  .strict()
+export { localDirectorySourceConfigSchema } from './local-directory/config'
 
 export const gmailAdapterDefinition = defineAdapter({
   id: 'google.mailbox',
@@ -73,10 +69,10 @@ export const localDirectoryAdapterDefinition = defineAdapter({
   version: 1,
   configSchema: localDirectorySourceConfigSchema,
   auth: { kind: 'none' },
-  profiles: [],
+  profiles: [{ id: 'file', version: 1 }],
   routing: 'indexed',
-  capabilities: [],
-  operations: {},
+  capabilities: ['sync'],
+  operations: { sync: localDirectorySync },
   actions: {},
   docs: { summary: 'Local directory' },
 })
@@ -84,7 +80,7 @@ export const localDirectoryAdapterDefinition = defineAdapter({
 export const ctxindexBuiltinExtension = defineExtension({
   id: 'ctxindex.builtins',
   version: 1,
-  profiles: [communicationMessageProfile],
+  profiles: [communicationMessageProfile, fileProfile],
   adapters: [gmailAdapterDefinition, localDirectoryAdapterDefinition],
   docs: { summary: 'Bundled ctxindex definitions.' },
 })

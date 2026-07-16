@@ -140,10 +140,29 @@ interface ProviderContext {
   readonly logger: AdapterLogger
 }
 
+export type SyncMode = 'sync' | 'resync' | 'diff'
+
+export interface SyncedResource<TPayload = unknown>
+  extends RetrievedResource<TPayload> {
+  readonly completeness: 'partial' | 'complete'
+}
+
+export type SyncEmission =
+  | { readonly type: 'upsertResource'; readonly resource: SyncedResource }
+  | { readonly type: 'removeResource'; readonly ref: string }
+  | { readonly type: 'checkpoint'; readonly cursor: unknown }
+  | {
+      readonly type: 'warning'
+      readonly code: string
+      readonly message: string
+      readonly ref?: string
+    }
+
 export interface SyncContext extends ProviderContext {
   readonly cursor: unknown | null
+  readonly mode: SyncMode
   readonly signal: AbortSignal
-  readonly emit: (operation: unknown) => void | Promise<void>
+  readonly emit: (operation: SyncEmission) => void | Promise<void>
 }
 
 export interface SearchRemoteQuery {
@@ -215,7 +234,7 @@ export interface ActionContext<TInput = unknown> extends ProviderContext {
 }
 
 export type AdapterOperations = {
-  readonly sync?: (context: SyncContext) => unknown
+  readonly sync?: (context: SyncContext) => void | Promise<void>
   readonly searchRemote?: (
     context: SearchContext,
   ) => Promise<SearchRemoteResult>

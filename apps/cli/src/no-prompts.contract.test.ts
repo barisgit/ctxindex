@@ -186,7 +186,15 @@ describe('no-prompts contract', () => {
     const { env, cleanup } = await mkSandbox()
     try {
       const { exitCode, stderr } = await spawnCli(
-        ['source', 'add', 'local.directory', '--realm', 'unknown'],
+        [
+          'source',
+          'add',
+          'local.directory',
+          '--realm',
+          'unknown',
+          '--root',
+          '/tmp',
+        ],
         env,
         'null',
       )
@@ -261,12 +269,12 @@ describe('no-prompts contract', () => {
     }
   })
 
-  test('sync (pending): exits non-zero with actionable message', async () => {
+  test('sync: no Sources exits 0 without prompting', async () => {
     const { env, cleanup } = await mkSandbox()
     try {
       const { exitCode, stderr } = await spawnCli(['sync'], env, 'null')
-      expect(exitCode).not.toBe(0)
-      expect(stderr.length).toBeGreaterThan(0)
+      expect(exitCode).toBe(0)
+      expect(stderr).toBe('')
     } finally {
       await cleanup()
     }

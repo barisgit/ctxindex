@@ -403,17 +403,16 @@ describe('source e2e', () => {
               c: number
             }
           ).c
-        // Single-source sandbox: removing the source must purge every core and
-        // adapter-owned table that held its index data (FTS triggers clean the
-        // shadow tables on the item/chunk deletes).
+        // Single-source sandbox: removing the source purges its generic
+        // Resource projections and Sync bookkeeping.
         for (const table of [
           'sources',
-          'items',
-          'item_chunks',
-          'external_refs',
+          'resources',
+          'chunks',
+          'field_index',
+          'relations',
           'sync_runs',
           'source_sync_state',
-          'local_directory_file_state',
         ]) {
           expect(total(table), `${table} should be empty after remove`).toBe(0)
         }
