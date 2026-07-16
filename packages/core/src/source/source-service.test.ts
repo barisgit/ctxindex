@@ -410,6 +410,171 @@ describe('source service', () => {
     ).toThrow('does not accept a Grant')
   })
 
+  test('removeSource cascades every generic Source-owned row and preserves another Source', () => {
+    const realmService = createRealmService({ db, logger })
+    const realm = realmService.createRealm({ slug: 'work' })
+    const service = createSourceService({ db, logger, realmService, registry })
+    const target = service.addSource({
+      adapterId: 'local.directory',
+      realmSlug: 'work',
+      configJson: '{"root_path":"/tmp/target"}',
+    })
+    const survivor = service.addSource({
+      adapterId: 'local.directory',
+      realmSlug: 'work',
+      configJson: '{"root_path":"/tmp/survivor"}',
+    })
+
+    function seedGraph(sourceId: string, suffix: 'target' | 'survivor') {
+      const resourceId = `resource-${suffix}`
+      const ref = `ctx://${sourceId}/file/${suffix}`
+      const runId = `run-${suffix}`
+      const ids = {
+        resource: resourceId,
+        field: `field-${suffix}`,
+        chunk: `chunk-${suffix}`,
+        relation: `relation-${suffix}`,
+        artifact: `artifact-${suffix}`,
+        run: runId,
+        checkpoint: `checkpoint-${suffix}`,
+        lock: `lock-${suffix}`,
+      }
+      db.prepare(
+        `INSERT INTO resources
+           (id, ref, source_id, realm_id, profile_id, profile_version, title,
+            origin, payload_json, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'file', 1, ?, 'synced', '{}', 1, 1)`,
+      ).run(ids.resource, ref, sourceId, realm.realmId, `${suffix}needle`)
+      db.prepare(
+        `INSERT INTO field_index
+           (id, resource_id, field, declared_type, ordinal, value_text)
+         VALUES (?, ?, 'path', 'string', 0, ?)`,
+      ).run(ids.field, ids.resource, suffix)
+      db.prepare(
+        `INSERT INTO chunks (id, resource_id, chunk_index, content, created_at)
+         VALUES (?, ?, 0, ?, 1)`,
+      ).run(ids.chunk, ids.resource, `${suffix}chunk`)
+      db.prepare(
+        `INSERT INTO relations
+           (id, source_resource_id, relation, target_ref, created_at)
+         VALUES (?, ?, 'related', ?, 1)`,
+      ).run(ids.relation, ids.resource, ref)
+      db.prepare(
+        `INSERT INTO relation_resolutions
+           (relation_id, target_resource_id, resolved_at)
+         VALUES (?, ?, 1)`,
+      ).run(ids.relation, ids.resource)
+      db.prepare(
+        `INSERT INTO artifacts
+           (id, ref, resource_id, origin_ref, content_hash, media_type,
+            byte_size, retention_class, local_path, created_at)
+         VALUES (?, ?, ?, ?, ?, 'text/plain', 1, 'cached', ?, 1)`,
+      ).run(
+        ids.artifact,
+        `${ref}/artifact/data`,
+        ids.resource,
+        ref,
+        `sha256:${(suffix === 'target' ? 'a' : 'b').repeat(64)}`,
+        `/tmp/${ids.artifact}`,
+      )
+      db.prepare(
+        `INSERT INTO sync_runs
+           (id, source_id, realm_id, mode, status, started_at)
+         VALUES (?, ?, ?, 'sync', 'completed', 1)`,
+      ).run(ids.run, sourceId, realm.realmId)
+      db.prepare(
+        `INSERT INTO source_sync_state
+           (source_id, last_status, last_run_id, cursor_json, updated_at)
+         VALUES (?, 'idle', ?, '{}', 1)`,
+      ).run(sourceId, ids.run)
+      db.prepare(
+        `INSERT INTO sync_run_checkpoints
+           (id, run_id, cursor_json, recorded_at)
+         VALUES (?, ?, '{}', 1)`,
+      ).run(ids.checkpoint, ids.run)
+      db.prepare(
+        `INSERT INTO sync_locks (scope, run_id, owner_pid, acquired_at)
+         VALUES (?, ?, 1, 1)`,
+      ).run(ids.lock, ids.run)
+      return ids
+    }
+
+    const targetIds = seedGraph(target.sourceId, 'target')
+    const survivorIds = seedGraph(survivor.sourceId, 'survivor')
+
+    service.removeSource(target.sourceId)
+
+    const rows = [
+      ['sources', 'id', target.sourceId, survivor.sourceId],
+      ['resources', 'id', targetIds.resource, survivorIds.resource],
+      ['field_index', 'id', targetIds.field, survivorIds.field],
+      ['chunks', 'id', targetIds.chunk, survivorIds.chunk],
+      ['relations', 'id', targetIds.relation, survivorIds.relation],
+      ['artifacts', 'id', targetIds.artifact, survivorIds.artifact],
+      ['source_sync_state', 'source_id', target.sourceId, survivor.sourceId],
+      ['sync_runs', 'id', targetIds.run, survivorIds.run],
+      [
+        'sync_run_checkpoints',
+        'id',
+        targetIds.checkpoint,
+        survivorIds.checkpoint,
+      ],
+      ['sync_locks', 'scope', targetIds.lock, survivorIds.lock],
+    ] as const
+    for (const [table, column, removed, kept] of rows) {
+      expect(
+        db.prepare(`SELECT 1 FROM ${table} WHERE ${column} = ?`).get(removed),
+        `${table} target row`,
+      ).toBeNull()
+      expect(
+        db.prepare(`SELECT 1 FROM ${table} WHERE ${column} = ?`).get(kept),
+        `${table} survivor row`,
+      ).not.toBeNull()
+    }
+    expect(
+      db
+        .prepare('SELECT 1 FROM relation_resolutions WHERE relation_id = ?')
+        .get(targetIds.relation),
+    ).toBeNull()
+    expect(
+      db
+        .prepare('SELECT 1 FROM relation_resolutions WHERE relation_id = ?')
+        .get(survivorIds.relation),
+    ).not.toBeNull()
+    expect(
+      db
+        .prepare(
+          "SELECT count(*) AS count FROM resources_fts WHERE resources_fts MATCH 'targetneedle'",
+        )
+        .get(),
+    ).toEqual({ count: 0 })
+    expect(
+      db
+        .prepare(
+          "SELECT count(*) AS count FROM resources_fts WHERE resources_fts MATCH 'survivorneedle'",
+        )
+        .get(),
+    ).toEqual({ count: 1 })
+    expect(
+      db
+        .prepare(
+          "SELECT count(*) AS count FROM chunks_fts WHERE chunks_fts MATCH 'targetchunk'",
+        )
+        .get(),
+    ).toEqual({ count: 0 })
+    expect(
+      db
+        .prepare(
+          "SELECT count(*) AS count FROM chunks_fts WHERE chunks_fts MATCH 'survivorchunk'",
+        )
+        .get(),
+    ).toEqual({ count: 1 })
+    expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([])
+    expect(db.prepare('SELECT count(*) AS count FROM realms').get()).toEqual({
+      count: 1,
+    })
+  })
+
   test('rejects an unknown Adapter', () => {
     const realmService = createRealmService({ db, logger })
     realmService.createRealm({ slug: 'work' })

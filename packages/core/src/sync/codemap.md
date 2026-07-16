@@ -10,7 +10,7 @@ Coordinates transactional Source synchronization: validates Adapter emissions, s
 - `parseSyncEmission()` is a strict Zod boundary for current `SyncEmission` variants (`upsertResource`, `removeResource`, `checkpoint`, `warning`) and JSON-safe cursors.
 - Emissions are buffered and validated before application; `diff` mode uses a sentinel rollback transaction to exercise writes without persisting them.
 - `sync_locks` provides global mutual exclusion, including stale-lock recovery via process liveness; bounded warning/error summaries prevent unbounded persistence.
-- `operations.ts` separately exports a permissive legacy `SyncOperationSchema` union; it is not re-exported by `sync/index.ts` or used by `SyncCoordinator`.
+- The only accepted operation contract is the current strict SDK `SyncEmission` union parsed by `emission.ts`; no prototype item/mail operation path remains.
 
 ## Data & control flow
 

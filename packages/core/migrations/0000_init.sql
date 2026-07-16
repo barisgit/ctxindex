@@ -155,7 +155,7 @@ CREATE TABLE source_sync_state (
 
 CREATE TABLE sync_runs (
   id TEXT NOT NULL PRIMARY KEY,
-  source_id TEXT NOT NULL REFERENCES sources(id),
+  source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
   realm_id TEXT NOT NULL REFERENCES realms(id),
   mode TEXT NOT NULL,
   status TEXT NOT NULL CHECK(status IN ('running', 'completed', 'failed', 'cancelled')),

@@ -53,19 +53,19 @@ Status: pass — projection/schema/text/Markdown Modules and exact output gates 
 ### C6. Core contains no forbidden prototype storage path
 
 The legacy prototype sync-operation contract is absent. Source removal relies on the generic core schema's declared cascades and demonstrably removes every Source-owned generic row while preserving unrelated Sources, with no dynamic support for Adapter-owned tables forbidden by `SPEC.md` §§3b and 8.
-Status: in-progress — starting OpenSpec Slice 4 with generic Source-cascade and prototype-removal contracts
+Status: pass — generic Source graph/FTS cascade and unrelated-Source preservation contract; prototype sync union and dynamic Adapter-table sweep removed
 
 ### C7. Core infrastructure Modules expose one clear Interface
 
 Logger redaction and rotation/compression implementation have private owned Modules behind the existing logger Interface. Secrets and core capability entrypoints have one canonical implementation location without empty or redundant root shims, while declared package subpaths remain stable.
 Depends: C6
-Status: pending
+Status: pass — logger redaction/rotation owners, canonical Secrets Interface, direct capability subpaths, and root-shim removal verified by focused contracts
 
 ### C8. Dependency direction and manifests are truthful
 
 Workspace package imports follow the intended SDK -> Profiles/core/Adapters -> CLI direction through public seams. Every direct runtime dependency is demonstrably imported by that package's source or tests; moved/deleted prototype dependencies and lockfile entries are pruned by a repeatable verification gate.
 Depends: C3, C7
-Status: pending
+Status: in-progress — starting OpenSpec Slice 5 with executable workspace dependency-direction and manifest contracts
 
 ### C9. V1 behavior and safety contracts are unchanged
 

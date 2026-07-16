@@ -1,5 +1,8 @@
 import { Database } from 'bun:sqlite'
 import { afterEach, expect, test } from 'bun:test'
+import { getTableConfig } from 'drizzle-orm/sqlite-core'
+import { sources } from '../schema/sources'
+import { syncRuns } from '../schema/sync_runs'
 import { applyPragmas } from './db'
 import { runMigrations } from './migrator'
 
@@ -344,4 +347,30 @@ test('fresh Artifact schema enforces ownership, stable refs, retention, and hash
       )
       .run(),
   ).toThrow()
+})
+
+test('canonical schema and migration agree on Source-owned sync-run cascade', async () => {
+  const db = freshDb()
+  await runMigrations(db)
+
+  const migrationForeignKey = (
+    db.prepare('PRAGMA foreign_key_list(sync_runs)').all() as Array<{
+      from: string
+      table: string
+      to: string
+      on_delete: string
+    }>
+  ).find((foreignKey) => foreignKey.from === 'source_id')
+  expect(migrationForeignKey).toMatchObject({
+    table: 'sources',
+    to: 'id',
+    on_delete: 'CASCADE',
+  })
+
+  const schemaForeignKey = getTableConfig(syncRuns).foreignKeys.find(
+    (foreignKey) => foreignKey.reference().columns[0]?.name === 'source_id',
+  )
+  expect(schemaForeignKey?.onDelete).toBe('cascade')
+  expect(schemaForeignKey?.reference().foreignColumns[0]?.name).toBe('id')
+  expect(schemaForeignKey?.reference().foreignTable).toBe(sources)
 })

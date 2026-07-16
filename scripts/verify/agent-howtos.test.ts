@@ -3,9 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const repoRoot = resolve(
-  fileURLToPath(new URL('../../../../', import.meta.url)),
-)
+const repoRoot = resolve(fileURLToPath(new URL('../../', import.meta.url)))
 const docPath = join(repoRoot, 'docs/AGENT-HOWTOS.md')
 const cliMainPath = join(repoRoot, 'apps/cli/src/main.ts')
 

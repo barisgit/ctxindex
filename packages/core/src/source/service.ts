@@ -212,47 +212,6 @@ function sourceListSelect(): string {
           LEFT JOIN accounts a ON a.id = g.account_id`
 }
 
-/** Upper bound on cascade-sweep passes (max FK chain depth is a small constant). */
-const MAX_CASCADE_PASSES = 50
-
-interface ForeignKeyEdge {
-  readonly table: string
-  readonly column: string
-  readonly refTable: string
-  readonly refColumn: string
-}
-
-/**
- * Discovers every foreign-key edge in user tables (core + adapter-owned),
- * skipping SQLite internals, FTS shadow tables, and migration bookkeeping.
- * Used to cascade-delete FK-orphaned rows without hardcoding table names.
- */
-function collectForeignKeyEdges(db: SourceServiceDeps['db']): ForeignKeyEdge[] {
-  const tables = db
-    .prepare(
-      `SELECT name FROM sqlite_master
-       WHERE type = 'table'
-         AND name NOT LIKE 'sqlite_%'
-         AND name NOT LIKE '%_fts%'
-         AND name NOT LIKE 'ctxindex_migrations_%'`,
-    )
-    .all() as { name: string }[]
-  return tables.flatMap(({ name }) =>
-    (
-      db.prepare(`PRAGMA foreign_key_list("${name}")`).all() as {
-        table: string
-        from: string
-        to: string
-      }[]
-    ).map((fk) => ({
-      table: name,
-      column: fk.from,
-      refTable: fk.table,
-      refColumn: fk.to,
-    })),
-  )
-}
-
 function resolveRealm(deps: SourceServiceDeps, slug: string): RealmIdRow {
   const realm =
     deps.realmService?.getRealmBySlug(slug) ??
@@ -360,30 +319,9 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
       if (!existing) {
         throw new CtxindexNotFoundError(`source not found: "${sourceId}"`)
       }
-      // Removing a source purges its index footprint (SPEC §6: extracted text /
-      // chunks / metadata are rebuildable from the canonical source). The index
-      // spans core tables plus adapter-owned tables (SPEC §8), so rather than
-      // hardcode adapter table names in core we delete the source row, then
-      // sweep FK-orphaned rows to a fixed point with foreign keys deferred.
-      const cascade = collectForeignKeyEdges(deps.db)
-      const remove = deps.db.transaction(() => {
-        deps.db.prepare('PRAGMA defer_foreign_keys = ON').run()
-        deps.db.prepare('DELETE FROM sources WHERE id = ?').run(sourceId)
-        for (let pass = 0; pass < MAX_CASCADE_PASSES; pass++) {
-          let removed = 0
-          for (const edge of cascade) {
-            removed += deps.db
-              .prepare(
-                `DELETE FROM "${edge.table}"
-                 WHERE "${edge.column}" IS NOT NULL
-                   AND "${edge.column}" NOT IN (SELECT "${edge.refColumn}" FROM "${edge.refTable}")`,
-              )
-              .run().changes
-          }
-          if (removed === 0) break
-        }
-      })
-      remove()
+      // Source-owned generic rows are declared with ON DELETE CASCADE in the
+      // canonical schema. Adapters never own storage tables (SPEC §§3b, 8).
+      deps.db.prepare('DELETE FROM sources WHERE id = ?').run(sourceId)
       deps.logger.debug({ sourceId }, 'source removed')
     },
 

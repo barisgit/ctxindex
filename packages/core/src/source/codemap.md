@@ -17,7 +17,7 @@ Owns Source lifecycle and the Adapter execution boundary for sync, remote search
 2. Provider operations call `createSourceProviderContext()`, which loads Source/Grant rows, resolves the Adapter registry entry and token, then invokes the Adapter with sanitized config and controlled fetch.
 3. `searchSourceRemote()` verifies provider results against time/typed field filters, stores verified partial Resources as `adhoc`, and returns warnings.
 4. `getSourceResource()` returns cached deleted/hydrated data or `retrieveSourceResource()` enforces exactly one matching payload-bearing Resource and stores it complete; `syncSource()` drives Adapter sync through `SyncCoordinator`.
-5. `removeSource()` deletes the Source and fixed-point sweeps foreign-key orphans, including adapter-owned tables, inside a deferred-FK transaction.
+5. `removeSource()` deletes one Source; canonical generic-table `ON DELETE CASCADE` declarations remove its Resources, fields, chunks, Relations/resolutions, Artifacts, sync state/runs/checkpoints/locks, and FTS index rows while unrelated Sources remain intact.
 
 ## Integration points
 

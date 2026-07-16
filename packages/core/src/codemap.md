@@ -6,7 +6,7 @@ Implements ctxindex's core domain and application layer: extension definition re
 
 ## Design/patterns
 
-- Capability folders expose leaf barrels, while `index.ts` composes the primary API and root shims such as `config.ts`, `storage.ts`, `registry.ts`, and `search.ts` support package subpath exports.
+- Capability folders expose canonical `index.ts` Interfaces; the root `index.ts` composes the primary API and package subpaths target those capability indexes directly without root shims.
 - Profiles and Adapters from `@ctxindex/extension-sdk` form the strategy/plugin boundary: `extension/loader.ts` loads definitions, `registry/` validates and indexes them, Profiles own payload semantics, and Adapters own provider I/O.
 - Factory-built application services (`createRealmService()`, `createSourceService()`, `createThreadService()`) and repositories (`ResourceStore`, `RelationStore`, `ArtifactStore`) receive explicit database, registry, auth, and logger dependencies.
 - SQLite is the system of record: `schema/` defines tables, `storage/` opens and bootstraps databases, and `sync/` applies validated Adapter emissions transactionally. Zod guards configuration, extension, provider, and payload boundaries.

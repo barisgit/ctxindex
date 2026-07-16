@@ -12,7 +12,7 @@ Contains executable static and runtime verification gates for CLI layering, fram
 - `cli-thin-lines.ts` discovers every production `apps/cli/src/commands/*.ts` file by rule and enforces the 80-line nonblank, non-import budget; optional explicit paths remain available for focused invocation.
 - `env-loader.ts` enforces centralized `CTXINDEX_`/`XDG_` reads and injects a temporary synthetic violation to prove the audit detects failures.
 - `exports-map.ts` validates required `@ctxindex/core` subpath declarations, target files, runtime resolution, and absence of deep core imports.
-- `no-prompts-static.ts` rejects prompt libraries and direct stdin/readline use in production CLI TypeScript.
+- `no-prompts-static.ts` rejects prompt libraries and direct stdin/readline use in production CLI TypeScript; `agent-howtos.test.ts` verifies repository-owned agent guidance against the real CLI command surface.
 
 ## Flow
 

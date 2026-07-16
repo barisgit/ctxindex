@@ -17,10 +17,10 @@
 
 ## 4. Core prototype and locality cleanup
 
-- [ ] 4.1 Add a focused Source-removal contract over every generic Source-owned table, then delete the unused prototype sync-operation union and the dynamic Adapter-table sweep forbidden by `SPEC.md` §§3b and 8.
-- [ ] 4.2 Extract logger redaction and rotation/compression implementation behind private Modules while preserving the current logger Interface, timing, file behavior, and redaction tests.
-- [ ] 4.3 Consolidate Secrets exports into its capability index, point core package subpaths directly at capability indexes, remove redundant root shims, and relocate the orphan agent-howto meta-test to repository verification.
-- [ ] 4.4 Pass core focused tests, canonical migration/schema drift checks, typecheck, lint, full unit tests, and diff checking before the next slice.
+- [x] 4.1 Add a focused Source-removal contract over every generic Source-owned table, then delete the unused prototype sync-operation union and the dynamic Adapter-table sweep forbidden by `SPEC.md` §§3b and 8.
+- [x] 4.2 Extract logger redaction and rotation/compression implementation behind private Modules while preserving the current logger Interface, timing, file behavior, and redaction tests.
+- [x] 4.3 Consolidate Secrets exports into its capability index, point core package subpaths directly at capability indexes, remove redundant root shims, and relocate the orphan agent-howto meta-test to repository verification.
+- [x] 4.4 Pass core focused tests, canonical migration/schema drift checks, typecheck, lint, full unit tests, and diff checking before the next slice.
 
 ## 5. Durable dependency and documentation health
 

@@ -6,7 +6,7 @@ export const syncRuns = sqliteTable('sync_runs', {
   id: text('id').notNull().primaryKey(),
   sourceId: text('source_id')
     .notNull()
-    .references(() => sources.id),
+    .references(() => sources.id, { onDelete: 'cascade' }),
   realmId: text('realm_id')
     .notNull()
     .references(() => realms.id),

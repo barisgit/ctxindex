@@ -23,4 +23,4 @@ Provides opaque secret-reference syntax, interchangeable encrypted-file and OS-k
 - Uses `packages/core/src/config/env-loader.ts` for passphrase/mock settings and `packages/core/src/paths/` for `secrets.box`/`secret.key` locations.
 - `service.ts` updates `grants` through `CtxindexDatabase`; `packages/core/src/auth/` resolves those stored refs.
 - `apps/cli/src/deps.ts` constructs stores/services, while `apps/cli/src/commands/secrets.ts` invokes availability and migration behavior.
-- `index.ts` exports service APIs and `loadSecretsStore()` through `@ctxindex/core/secrets`.
+- `index.ts` is the sole capability Interface, exporting file/keychain stores, opaque ref/error types, service APIs, and `loadSecretsStore()` through `@ctxindex/core/secrets`.
