@@ -47,10 +47,38 @@ test('built-in Source Adapter implementation is owned by provider modules', asyn
   expect(googleFiles).toContain('config.ts')
   expect(googleFiles).toContain('definition.ts')
 
+  const googleCalendarFiles = (
+    await readdir(new URL('google-calendar/', adapterRoot))
+  )
+    .filter(isProductionTypeScript)
+    .sort()
+  expect(googleCalendarFiles).toEqual(
+    expect.arrayContaining([
+      'config.ts',
+      'definition.ts',
+      'event.ts',
+      'response.ts',
+      'retrieve.ts',
+      'sync.ts',
+      'url.ts',
+    ]),
+  )
+  const builtins = await Bun.file(new URL('builtins.ts', adapterRoot)).text()
+  expect(builtins).toContain("from './google-calendar/definition'")
+
   const localFiles = (await readdir(new URL('local-directory/', adapterRoot)))
     .filter(isProductionTypeScript)
     .sort()
   expect(localFiles).toContain('definition.ts')
+})
+
+test('Google Calendar production surface is read-only', async () => {
+  const source = await sourceTree(new URL('google-calendar/', adapterRoot))
+  expect(source).toContain('calendar.events.readonly')
+  expect(source.replaceAll('calendar.events.readonly', '')).not.toContain(
+    'calendar.events',
+  )
+  expect(source).not.toMatch(/\b(?:POST|PATCH|PUT|DELETE)\b/)
 })
 
 test('calendar vocabulary is Profile-owned and bundled declaratively', async () => {

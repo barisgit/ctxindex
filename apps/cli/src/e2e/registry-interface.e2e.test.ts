@@ -131,7 +131,7 @@ test('interpreted registry interface follows an explicit external Extension', as
 
     const markdown = await run(['describe', '--format', 'markdown'])
     expect(markdown.exitCode, markdown.stderr).toBe(0)
-    expect(markdown.stdout).toContain('## Profiles (3)')
+    expect(markdown.stdout).toContain('## Profiles (4)')
     expect(markdown.stdout).toContain('`enarocanje.tender@1`')
     expect(markdown.stdout).not.toContain('`reference` (string)')
 

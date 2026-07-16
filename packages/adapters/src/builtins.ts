@@ -4,6 +4,7 @@ import {
   communicationMessageProfile,
   fileProfile,
 } from '@ctxindex/profiles'
+import { googleCalendarAdapterDefinition } from './google-calendar/definition'
 import { gmailAdapterDefinition } from './google-mailbox/definition'
 import { localDirectoryAdapterDefinition } from './local-directory/definition'
 
@@ -11,7 +12,11 @@ export const ctxindexBuiltinExtension = defineExtension({
   id: 'ctxindex.builtins',
   version: 1,
   profiles: [calendarEventProfile, communicationMessageProfile, fileProfile],
-  adapters: [gmailAdapterDefinition, localDirectoryAdapterDefinition],
+  adapters: [
+    googleCalendarAdapterDefinition,
+    gmailAdapterDefinition,
+    localDirectoryAdapterDefinition,
+  ],
   docs: { summary: 'Bundled ctxindex definitions.' },
 })
 

@@ -57,16 +57,16 @@
 
 ## 6. Google Calendar Adapter
 
-- [ ] 6.1 Add an owned `google-calendar` module, strict generated config (`calendar_id`, positive past/future days), shared Google provider declaration, narrow read scope, indexed sync/retrieve capabilities, built-in registration, and stateful loopback Calendar mock without write routes.
-- [ ] 6.2 Implement/test strict Google event/page schemas, timed/all-day/attendee/organizer/recurrence normalization, HTML-safe text handling, stable event/series Refs, deterministic warnings, and provider error taxonomy.
-- [ ] 6.3 Implement one-page then multi-page full sync tracer tests with anchored window, expanded instances, deleted visibility, code-point-sorted emissions/manifest, final-token-only checkpoint, cancellation, and no cursor advance on partial failure.
-- [ ] 6.4 Implement/test incremental token sync, paged changes, deletion tombstones, invalid-cursor and HTTP 410 bounded full reconciliation, config/monthly window roll, resync/diff behavior, and no guessed removals after uncertainty.
-- [ ] 6.5 Implement/test canonical same-Source retrieval, selected-calendar confinement, complete generic Resource emission, 404/bad-response taxonomy, exact linked Grant, bounded 401 retry, and cross-provider/foreign Ref zero I/O.
-- [ ] 6.6 Add a real binary sandbox proving one Account/Grant with named Gmail and Google Calendar Sources, exact scopes, calendar sync→search/get, unchanged incremental sync, update/delete/window reconciliation, exact Realm filtering, account/source inventory, and no Calendar mutation/Google cross-service egress.
+- [x] 6.1 Add an owned `google-calendar` module, strict generated config (`calendar_id`, positive past/future days), shared Google provider declaration, narrow read scope, indexed sync/retrieve capabilities, built-in registration, and stateful loopback Calendar mock without write routes.
+- [x] 6.2 Implement/test strict Google event/page schemas, timed/all-day/attendee/organizer/recurrence normalization, HTML-safe text handling, stable event/series Refs, deterministic warnings, and provider error taxonomy.
+- [x] 6.3 Implement one-page then multi-page full sync tracer tests with anchored window, expanded instances, deleted visibility, code-point-sorted emissions/manifest, final-token-only checkpoint, cancellation, and no cursor advance on partial failure.
+- [x] 6.4 Implement/test incremental token sync, paged changes, deletion tombstones, invalid-cursor and HTTP 410 bounded full reconciliation, config/monthly window roll, resync/diff behavior, and no guessed removals after uncertainty.
+- [x] 6.5 Implement/test canonical same-Source retrieval, selected-calendar confinement, complete generic Resource emission, 404/bad-response taxonomy, exact linked Grant, bounded 401 retry, and cross-provider/foreign Ref zero I/O.
+- [x] 6.6 Add a real binary sandbox proving one Account/Grant with named Gmail and Google Calendar Sources, exact scopes, calendar sync→search/get, unchanged incremental sync, update/delete/window reconciliation, exact Realm filtering, account/source inventory, and no Calendar mutation/Google cross-service egress.
 
 ### Slice 6 mocked gate
 
-- [ ] 6.7 Run Google Calendar/Profile/Auth/Sync focused and integration/e2e tests, provider egress/no-write gates, D3, typecheck/lint/architecture/dependency/full suites, strict OpenSpec/diff; obtain independent review and save `work/slice-6-google-calendar-mocked-gate.md`.
+- [x] 6.7 Run Google Calendar/Profile/Auth/Sync focused and integration/e2e tests, provider egress/no-write gates, D3, typecheck/lint/architecture/dependency/full suites, strict OpenSpec/diff; obtain independent review and save `work/slice-6-google-calendar-mocked-gate.md`.
 
 ### Human checkpoint: Google mailbox and calendar
 

@@ -22,9 +22,9 @@ Contains the reusable workspace libraries that define ctxindex's domain/runtime 
 | Package | Integration role | Detailed map |
 | --- | --- | --- |
 | `packages/extension-sdk/` | Shared contracts for definitions, contexts, emissions, and operations. | `packages/extension-sdk/codemap.md` |
-| `packages/profiles/` | Built-in `communication.message@1` and `file@1` vocabularies. | `packages/profiles/codemap.md` |
-| `packages/adapters/` | Built-in Gmail and local-directory provider integrations. | `packages/adapters/codemap.md` |
+| `packages/profiles/` | Built-in provider-neutral calendar-event, communication-message, and file vocabularies. | `packages/profiles/codemap.md` |
+| `packages/adapters/` | Built-in Google Calendar, Gmail, and local-directory integrations. | `packages/adapters/codemap.md` |
 | `packages/core/` | Application services, registries, SQLite storage/schema, sync/search/action pipelines, and runtime infrastructure exported by `packages/core/src/index.ts` and subpath exports. | `packages/core/src/*/codemap.md` |
 
 - `apps/cli/` is the primary workspace consumer of core services and registered definitions; external extensions also consume the SDK.
-- Third-party boundaries include Zod, Drizzle/Bun SQLite, Google OAuth/Gmail, Node filesystem/keychain APIs, and logging/parsing utilities declared by each package manifest.
+- Third-party boundaries include Zod, Drizzle/Bun SQLite, Google OAuth/Gmail/Calendar, Node filesystem/keychain APIs, and logging/parsing utilities declared by each package manifest.

@@ -7,7 +7,7 @@ import {
 import { CTXINDEX_BUILTIN_EXTENSIONS } from './index'
 
 describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
-  test('describes declarative Gmail and local Source definitions', () => {
+  test('describes declarative Google Calendar, Gmail, and local Source definitions', () => {
     const registry = createExtensionRegistry(CTXINDEX_BUILTIN_EXTENSIONS)
     const description = describeRegistry(registry)
 
@@ -18,6 +18,11 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
         capabilities,
       })),
     ).toEqual([
+      {
+        id: 'google.calendar',
+        version: 1,
+        capabilities: ['retrieve', 'sync'],
+      },
       {
         id: 'google.mailbox',
         version: 1,
@@ -85,6 +90,9 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
       formats: [],
     })
     expect(
+      description.sources.find(({ id }) => id === 'google.calendar')?.profiles,
+    ).toEqual([{ id: 'calendar.event', version: 1 }])
+    expect(
       description.sources.find(({ id }) => id === 'local.directory')?.profiles,
     ).toEqual([{ id: 'file', version: 1 }])
     expect(
@@ -107,8 +115,12 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
     ])
   })
 
-  test('declares canonical Gmail OAuth and strict token-free configs', () => {
+  test('declares canonical Google OAuth and strict token-free configs', () => {
     const registry = createExtensionRegistry(CTXINDEX_BUILTIN_EXTENSIONS)
+    const calendar = registry.adapters.get({
+      id: 'google.calendar',
+      version: 1,
+    })
     const gmail = registry.adapters.get({ id: 'google.mailbox', version: 1 })
     const local = registry.adapters.get({ id: 'local.directory', version: 1 })
 
@@ -159,6 +171,19 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
       ],
     })
     expect(gmail?.providerApiHosts).toEqual(['gmail.googleapis.com'])
+    expect(calendar?.auth).toMatchObject({
+      kind: 'oauth2',
+      provider: { id: 'google' },
+      scopes: ['https://www.googleapis.com/auth/calendar.events.readonly'],
+    })
+    expect(calendar?.providerApiHosts).toEqual(['www.googleapis.com'])
+    expect(calendar?.capabilities).toEqual(['sync', 'retrieve'])
+    expect(Object.keys(calendar?.actions ?? {})).toEqual([])
+    expect(calendar?.configSchema.parse({})).toEqual({
+      calendar_id: 'primary',
+      past_days: 365,
+      future_days: 730,
+    })
     expect(
       gmail &&
         isGrantCompatible(gmail.auth, {

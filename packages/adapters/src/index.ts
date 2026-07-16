@@ -1,4 +1,6 @@
 export * from './builtins'
+export { googleCalendarSourceConfigSchema } from './google-calendar/config'
+export { googleCalendarAdapterDefinition } from './google-calendar/definition'
 export { gmailSourceConfigSchema } from './google-mailbox/config'
 export { gmailAdapterDefinition } from './google-mailbox/definition'
 export { googleOAuthProvider } from './google-oauth-provider'

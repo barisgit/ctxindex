@@ -8,7 +8,7 @@ Packages ctxindex's built-in provider integration layer, exposing production Ada
 
 - Thin package facade: `package.json` maps the sole export `.` to `src/index.ts`, which re-exports the built-in composition root, individual Adapter definitions, and the reusable Google OAuth provider declaration.
 - Provider I/O is isolated behind SDK operation contracts rather than embedded in core services or Profiles.
-- Detailed implementation maps: `packages/adapters/src/codemap.md`, `packages/adapters/src/google-mailbox/codemap.md`, and `packages/adapters/src/local-directory/codemap.md`.
+- Detailed implementation maps: `packages/adapters/src/codemap.md`, `packages/adapters/src/google-calendar/codemap.md`, `packages/adapters/src/google-mailbox/codemap.md`, and `packages/adapters/src/local-directory/codemap.md`.
 
 ## Data & control flow
 

@@ -4,11 +4,11 @@
   "objective": "Implement secure provider-neutral Accounts and Grants, repair secrets backend operations, and add production Google Calendar plus Microsoft Graph mail/calendar Adapters with read access and reversible Draft create/update only, verified through isolated mocked and explicit Human OAuth checkpoints without any send capability.",
   "status": "active",
   "createdAt": "2026-07-16T11:56:52.401Z",
-  "updatedAt": "2026-07-16T16:14:55.753Z",
+  "updatedAt": "2026-07-16T17:06:08.381Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
-  "nextSeq": 1765,
-  "latestSourceSeq": 1756,
-  "snapshotHash": "4648382785663f0aeac952027cfb822bb0289224df7693a495831d4f863cd04a",
+  "nextSeq": 2026,
+  "latestSourceSeq": 2017,
+  "snapshotHash": "c6fafcb18ceeec547495009ad22ae5cf07091f210435d59819f6df92023be4c2",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -77,10 +77,10 @@
         "C5"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "pass",
+        "note": "mocked full/incremental sync, paging, cancellation/tombstone, newly anchored recovery/reconciliation, retrieve/search/get, exact shared Grant/scopes/Realms, GET-only egress, and the real compiled workflow pass; see `work/slice-6-google-calendar-mocked-gate.md`"
       },
-      "statusSeq": 8
+      "statusSeq": 2000
     },
     {
       "id": "C7",
@@ -89,10 +89,10 @@
         "C6"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "in-progress",
+        "note": "mocked gate passes; fresh ignored live checkpoint state and explicit user browser/consent approval remain required"
       },
-      "statusSeq": 8
+      "statusSeq": 2000
     },
     {
       "id": "C8",

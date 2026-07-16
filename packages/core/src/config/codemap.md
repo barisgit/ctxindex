@@ -6,7 +6,7 @@ Owns runtime environment capture, TOML configuration persistence, schema validat
 
 ## Design
 
-- `env-loader.ts` defines `EnvSchema`, including provider-neutral OAuth mock routing and Google provider credential names, snapshots `process.env` through memoized `getEnv()`, and exposes guarded `readEnvironmentVariable()` for provider-declared `CTXINDEX_*` keys.
+- `env-loader.ts` defines `EnvSchema`, including provider-neutral OAuth routing, Google credential names, and loopback-only Gmail/Google Calendar test bases; it snapshots `process.env` through memoized `getEnv()` and exposes guarded `readEnvironmentVariable()` for provider-declared `CTXINDEX_*` keys.
 - `schema.ts` uses Zod as the canonical `CtxindexConfig` contract, requires `secrets.backend` to be `keychain` or `file`, and constructs the keychain default through `defaultConfig()`; fresh initialization may persist file after an explicit failed Keychain probe.
 - `env-uri.ts` treats `env:`, `keychain:`, and `file:` values as secret references; `parseEnvUri()` and `resolveEnvUri()` emit typed `CtxindexConfigError`s.
 - `io.ts` is the repository boundary: TOML parsing on read and atomic temp-file/rename writes with restrictive permissions.

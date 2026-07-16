@@ -49,12 +49,12 @@ Status: pass — strict Profile, bounded projections, exact Source-scoped Refs/s
 ### C6. Google Calendar is a complete read Source Adapter
 A configured Google Calendar Source uses exact selected scopes and supports deterministic incremental sync, pagination, tombstones, invalid-cursor recovery, retrieval, stable Source-scoped Refs, and generic search/get over selected calendars with no calendar mutation capability.
 Depends: C3, C5
-Status: pending
+Status: pass — mocked full/incremental sync, paging, cancellation/tombstone, newly anchored recovery/reconciliation, retrieve/search/get, exact shared Grant/scopes/Realms, GET-only egress, and the real compiled workflow pass; see `work/slice-6-google-calendar-mocked-gate.md`
 
 ### C7. Google multi-Source consent works live
 At an explicit Human checkpoint, one approved Google Account can authorize the exact requested mailbox/calendar scopes, reuse one compatible Grant across named mailbox and calendar Sources, and expose the exact approved harmless live mailbox and calendar search/get evidence without leaking credentials or mutating provider state.
 Depends: C6
-Status: pending
+Status: in-progress — mocked gate passes; fresh ignored live checkpoint state and explicit user browser/consent approval remain required
 
 ### C8. Microsoft authorization supports personal and work Accounts
 The Microsoft identity flow supports approved Outlook.com and Microsoft 365 Accounts through authorization code with PKCE/loopback semantics, exact Adapter-selected delegated scopes, refresh, stable external identity, deterministic errors, and no broader permissions than loaded selected Sources require.

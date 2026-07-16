@@ -51,16 +51,16 @@ required_paths=(
   'packages/core/src/exit-codes.test.ts'
 )
 
-found_gmail_tests=0
+found_adapter_tests=0
 while IFS= read -r path; do
   required_paths+=("$path")
-  found_gmail_tests=1
+  found_adapter_tests=1
 done < <(
-  find packages/adapters/src/google-mailbox -type f -name '*.test.ts' | sort
+  find packages/adapters/src -type f -name '*.test.ts' | sort
 )
 
-if (( found_gmail_tests == 0 )); then
-  echo 'full-test-suite: missing required Gmail Adapter tests' >&2
+if (( found_adapter_tests == 0 )); then
+  echo 'full-test-suite: missing required Adapter tests' >&2
   exit 1
 fi
 

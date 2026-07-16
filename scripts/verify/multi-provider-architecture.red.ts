@@ -53,21 +53,14 @@ async function directoryNames(root: URL): Promise<string[]> {
     .sort()
 }
 
-test('provider behavior is owned by explicit Adapter modules', async () => {
-  expect(await directoryNames(adapterRoot)).toEqual([
-    'google-calendar',
-    'google-mailbox',
-    'local-directory',
-    'microsoft',
-  ])
+test('Microsoft provider behavior is owned by explicit Adapter modules', async () => {
+  expect(await directoryNames(adapterRoot)).toContain('microsoft')
   expect(await directoryNames(new URL('microsoft/', adapterRoot))).toEqual([
     'calendar',
     'mailbox',
   ])
 
   const builtins = await Bun.file(new URL('builtins.ts', adapterRoot)).text()
-  expect(builtins).toContain("from './google-calendar/definition'")
-  expect(builtins).toContain("from './google-mailbox/definition'")
   expect(builtins).toContain("from './microsoft/calendar/definition'")
   expect(builtins).toContain("from './microsoft/mailbox/definition'")
 })

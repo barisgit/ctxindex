@@ -86,6 +86,20 @@ bun cli account list --json
 
 After authorization, use `account list` to choose a safe local Account or Grant id, then use the loaded Adapter's generated Source options to add it to the intended Realm. Do not run live provider tests from the general automated lane. Accepted live checks use the isolated Human checkpoint procedure and redacted evidence under the active charter.
 
+Select every compatible Google Adapter needed by the intended Sources in one
+authorization request so the Account can share one exact Grant. Google Calendar
+is indexed and read-only: synchronize it before local event searches, and do
+not invent Calendar Actions that are absent from `describe`.
+
+```sh
+bun cli auth add <provider-id> --adapter <mailbox-adapter-id> --adapter <calendar-adapter-id> --loopback
+bun cli account list --json
+bun cli source add <calendar-adapter-id> --realm personal --account <grant-id> --name 'Personal Calendar' <generated-calendar-options>
+bun cli sync --source <calendar-source-id> --json
+bun cli search '<query>' --kind <event-profile-id-or-alias> --realm personal --json
+bun cli get <ctx-calendar-event-ref> --json
+```
+
 Mocked provider coverage is implemented by the CLI e2e tests for search/get, Draft Actions, and network egress. Those tests supply loopback-only endpoints and synthetic credentials; never substitute real credentials into that lane.
 
 ## Verification

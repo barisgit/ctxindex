@@ -27,7 +27,7 @@ CLI argv enters `apps/cli/bin/ctxindex.mjs`, is parsed and dispatched by `apps/c
 
 - Root orchestration: Bun workspaces and Turbo tasks declared in `package.json`; CI freezes the lockfile, builds every workspace, and validates direct dependency use/direction from discovered imports.
 - Local persistence/runtime: core storage, schema, configuration, secrets, logging, and network boundaries under `packages/core/src/`.
-- External systems: provider and filesystem access implemented under `packages/adapters/src/`.
+- External systems: Gmail, Google Calendar, and filesystem access implemented under `packages/adapters/src/`.
 - Public extension boundary: `packages/extension-sdk/src/index.ts`, demonstrated by `examples/`.
 
 ## Directory map
