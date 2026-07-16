@@ -13,10 +13,10 @@ Presentation and process-exit adapter layer for converting domain/CLI values int
 
 ## Data & control flow
 
-Handlers pass domain rows/descriptions to a focused formatter: `auth.ts` formats grants, `realm.ts` realms, `source.ts` sources, `status.ts` status rows, `registry.ts` registry/extension descriptions, `skills.ts` skill records/documents, and `secrets.ts` migration results. The formatter returns a string for the handler to print. Handler failures flow through `mapErrorToExit` or `runWithExit` to stderr and `process.exitCode`.
+Handlers pass domain rows/descriptions to focused formatters: `action.ts` Actions, `artifact.ts` Artifacts, `auth.ts` grants, `realm.ts` Realms, `source.ts` Sources, `status.ts` status rows, `registry.ts` registry descriptions, `extensions.ts` Extension listings, `skills.ts` skill records/documents, and `secrets.ts` migration results. The formatter returns a string for the handler to print. Handler failures flow through `mapErrorToExit` or `runWithExit` to stderr and `process.exitCode`.
 
 ## Integration points
 
 - Consumed by `apps/cli/src/main.ts`, modules under `apps/cli/src/commands/`, and handlers under `apps/cli/src/auth/`, `source/`, and `sync/`.
 - Inputs come from `@ctxindex/core/errors`, `/realm`, `/registry`, `/secrets`, `/source`, and `/sync`, plus skill types from `apps/cli/src/skills/loader.ts`.
-- `registry.ts` exposes deterministic compact/detail/full registry projections, structural Action JSON-Schema rendering with local fallback fragments, exact JSON values, and Extension listings for describe/extensions commands.
+- `registry.ts` is a stable facade over `registry-projection.ts`, shared structural `registry-schema.ts`, and independent `registry-text.ts`/`registry-markdown.ts` renderers; `extensions.ts` owns deterministic Extension listings.

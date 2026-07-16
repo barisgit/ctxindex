@@ -7,7 +7,7 @@ Defines the citty command tree and thin per-verb handlers that connect parsing, 
 ## Design / patterns
 
 - Each command exports a `defineCommand` descriptor; compound verbs expose nested `subCommands`.
-- `handle*Command(args)` functions parse discriminated argv results, open dependencies, delegate domain work, format output, and return numeric exit codes.
+- Small `handle*Command(args)` functions may perform bounded orchestration; multi-step Action, Artifact, auth, source, and sync workflows delegate to owned handler Modules.
 - `runWithExit` adapts handlers to citty and `mapErrorToExit` centralizes thrown-error translation.
 - Optional dependency factories on handlers support substitution without moving business logic into the CLI layer.
 - `db.ts` alone retains module state: `getDb()` lazily opens and migrates a shared database handle.
@@ -16,11 +16,11 @@ Defines the citty command tree and thin per-verb handlers that connect parsing, 
 
 `apps/cli/src/main.ts` registers command descriptors, citty invokes a command `run`, and the command forwards argv to its handler. The handler calls a parser in `../args/`, opens `../deps.ts` or a focused service, invokes `@ctxindex/core/*`, renders through `../format/`, closes resources, and returns an exit code consumed by `runWithExit`.
 
-Delegating adapters are `auth.ts` to `auth/handle-auth-command.ts`, `source.ts` to `source/handle-source-command.ts`, and `sync.ts` to `sync/runner.ts`.
+Delegating adapters include `action.ts` to `action/handle-action-command.ts`, `artifact.ts` to `artifact/handle-artifact-command.ts`, `auth.ts` to `auth/handle-auth-command.ts`, `source.ts` to `source/handle-source-command.ts`, and `sync.ts` to `sync/runner.ts`.
 
 ## Integration points
 
-- `action.ts`: `describeAction`, `runAction`; `artifact.ts`/`purge.ts`: `ArtifactService`; `export.ts`: `exportSourceResource`.
+- `action.ts` and `artifact.ts` are Citty-only declaration adapters; `purge.ts` uses `ArtifactService`; `export.ts` uses `exportSourceResource`.
 - `describe.ts`: loads definitions and routes compact indexes, exact-id detail, or explicit full snapshots through registry formatters; `extensions.ts`: loaded Extension listings; `get.ts`: `getSourceResource`; `search.ts`: `SearchPlanner`.
 - `realm.ts`: `realmService`; `status.ts`: `sourceService`; `thread.ts`: `ThreadService`; `secrets.ts`: secrets/config services.
 - `skills.ts`: `resolveBundledSkills`, `listSkills`, and `getSkillContent`; `init.ts`/`db.ts`: core storage bootstrap/open/migration functions.

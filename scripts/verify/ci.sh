@@ -7,20 +7,6 @@ cd "$ROOT_DIR"
 PATH="$ROOT_DIR/node_modules/.bin:$PATH"
 START_SECONDS="$SECONDS"
 
-cli_command_files=(
-  apps/cli/src/commands/auth.ts
-  apps/cli/src/commands/describe.ts
-  apps/cli/src/commands/extensions.ts
-  apps/cli/src/commands/sync.ts
-  apps/cli/src/commands/realm.ts
-  apps/cli/src/commands/source.ts
-  apps/cli/src/commands/search.ts
-  apps/cli/src/commands/status.ts
-  apps/cli/src/commands/secrets.ts
-  apps/cli/src/commands/skills.ts
-  apps/cli/src/commands/init.ts
-)
-
 run_gate() {
   local gate="$1"
   shift
@@ -61,7 +47,7 @@ run_gate typecheck tsgo --noEmit -p tsconfig.base.json
 run_gate architecture-lint bun run scripts/verify/architecture-lint.ts
 run_gate cli-no-business-logic bun run scripts/verify/cli-no-business-logic.ts
 run_gate cli-framework-citty bun run scripts/verify/cli-framework-citty.ts
-run_gate cli-thin-lines bun run scripts/verify/cli-thin-lines.ts "${cli_command_files[@]}"
+run_gate cli-thin-lines bun run scripts/verify/cli-thin-lines.ts
 run_gate exports-map bun run scripts/verify/exports-map.ts
 run_gate d3-compiled-extension ./scripts/spikes/d3-compiled-extension/run.sh
 run_gate full-test-suite bash scripts/verify/full-test-suite.sh

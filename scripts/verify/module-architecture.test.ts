@@ -64,3 +64,25 @@ test('public Extension SDK is a stable barrel over core-independent modules', as
   const publicIndex = await Bun.file(new URL('index.ts', sdkRoot)).text()
   expect(publicIndex).not.toMatch(/export (?:interface|function|class|const)\b/)
 })
+
+const formatRoot = new URL('../../apps/cli/src/format/', import.meta.url)
+
+test('registry presentation is split behind a declaration-free facade', async () => {
+  const productionFiles = (await readdir(formatRoot, { withFileTypes: true }))
+    .filter((entry) => entry.isFile() && isProductionTypeScript(entry.name))
+    .map((entry) => entry.name)
+
+  expect(productionFiles).toEqual(
+    expect.arrayContaining([
+      'registry-markdown.ts',
+      'registry-projection.ts',
+      'registry-schema.ts',
+      'registry-text.ts',
+      'registry.ts',
+    ]),
+  )
+
+  const facade = await Bun.file(new URL('registry.ts', formatRoot)).text()
+  expect(facade).not.toMatch(/^(?:export )?(?:async )?function\b/m)
+  expect(facade.split('\n').length).toBeLessThanOrEqual(40)
+})

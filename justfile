@@ -81,7 +81,7 @@ cli-framework-citty:
     bun run scripts/verify/cli-framework-citty.ts
 
 cli-thin-lines:
-    bun run scripts/verify/cli-thin-lines.ts apps/cli/src/commands/auth.ts apps/cli/src/commands/sync.ts apps/cli/src/commands/realm.ts apps/cli/src/commands/source.ts apps/cli/src/commands/search.ts apps/cli/src/commands/status.ts apps/cli/src/commands/secrets.ts apps/cli/src/commands/skills.ts apps/cli/src/commands/init.ts
+    bun run scripts/verify/cli-thin-lines.ts
 
 exports-map:
     bun run scripts/verify/exports-map.ts

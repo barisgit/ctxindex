@@ -43,6 +43,17 @@ describe('parseActionArgs', () => {
         confirmIrreversible: false,
       },
     ],
+    [
+      ['run', id, '--source', '-source', '--input', '-input.json'],
+      {
+        kind: 'run',
+        actionId: id,
+        sourceId: '-source',
+        input: '-input.json',
+        json: false,
+        confirmIrreversible: false,
+      },
+    ],
   ])('parses strict action arguments', (args, expected) => {
     expect(parseActionArgs(args)).toEqual(expected as ActionArgs)
   })

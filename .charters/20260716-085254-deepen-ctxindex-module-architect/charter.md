@@ -42,18 +42,18 @@ Status: pass — exact 43-symbol surface, private SDK Modules, external Extensio
 
 Every production Citty command file is automatically discovered by the thin-command gate and delegates parsing/workflow/presentation to owned Modules. Action and Artifact no longer hide full workflows in command declarations, and progressive registry help/detail/JSON output remains unchanged.
 Depends: C3
-Status: pending
+Status: pass — Action/Artifact workflow owners and automatic 18-command thin gate evidenced in work/slice-3-cli-presentation-gate.md
 
 ### C5. Registry presentation has explicit private seams
 
 Registry selection/projection, JSON-Schema detail rendering, text rendering, and Markdown rendering are separate private Modules behind the existing formatter Interface. Requiredness, constraints, local schema fallbacks, examples, JSON cardinality, and deterministic order remain covered.
 Depends: C3
-Status: in-progress — starting OpenSpec Slice 3 with registry formatter seam contracts
+Status: pass — projection/schema/text/Markdown Modules and exact output gates evidenced in work/slice-3-cli-presentation-gate.md
 
 ### C6. Core contains no forbidden prototype storage path
 
 The legacy prototype sync-operation contract is absent. Source removal relies on the generic core schema's declared cascades and demonstrably removes every Source-owned generic row while preserving unrelated Sources, with no dynamic support for Adapter-owned tables forbidden by `SPEC.md` §§3b and 8.
-Status: pending
+Status: in-progress — starting OpenSpec Slice 4 with generic Source-cascade and prototype-removal contracts
 
 ### C7. Core infrastructure Modules expose one clear Interface
 

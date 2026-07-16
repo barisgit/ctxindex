@@ -29,7 +29,6 @@ import { getDb } from './commands/db'
 
 export interface CliDeps {
   readonly db: CtxindexDatabase
-  readonly store: SecretsStore
   readonly logger: Logger
   readonly env: ReturnType<typeof getEnv>
   readonly realmService: RealmService
@@ -121,7 +120,6 @@ export async function openDeps(
   })
   return {
     db,
-    store: secretsStore,
     logger: log,
     env,
     realmService,

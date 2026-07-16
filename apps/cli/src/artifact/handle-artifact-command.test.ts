@@ -5,9 +5,8 @@ import {
   formatArtifactDownloadText,
   formatArtifactListJson,
   formatArtifactListText,
-  handleArtifactDownloadCommand,
-  handleArtifactListCommand,
-} from './artifact'
+} from '../format/artifact'
+import { handleArtifactCommand } from './handle-artifact-command'
 
 const originRef = 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/one'
 const artifactRef = `${originRef}/attachment/file`
@@ -67,10 +66,12 @@ describe('artifact command output and handlers', () => {
     const open = async () => ({ artifactService: service, async close() {} })
     const log = spyOn(console, 'log').mockImplementation(() => {})
 
-    expect(await handleArtifactListCommand([originRef, '--json'], open)).toBe(0)
     expect(
-      await handleArtifactDownloadCommand(
-        [artifactRef, '--output', '/tmp/file.bin'],
+      await handleArtifactCommand(['list', originRef, '--json'], open),
+    ).toBe(0)
+    expect(
+      await handleArtifactCommand(
+        ['download', artifactRef, '--output', '/tmp/file.bin'],
         open,
       ),
     ).toBe(0)
@@ -93,7 +94,7 @@ describe('artifact command output and handlers', () => {
       throw new Error('must not open')
     }
     const error = spyOn(console, 'error').mockImplementation(() => {})
-    expect(await handleArtifactDownloadCommand([], open as never)).toBe(2)
+    expect(await handleArtifactCommand(['download'], open as never)).toBe(2)
     expect(opened).toBe(false)
     error.mockRestore()
   })

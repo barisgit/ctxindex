@@ -4,11 +4,11 @@
   "objective": "Deepen ctxindex module architecture across Adapters, Profiles, the public Extension SDK, CLI, and core by restoring domain ownership/locality, deleting dead prototype code and unused dependencies, and adding durable architecture verification while preserving all V1 public behavior, storage, provider I/O, package exports, and exit codes.",
   "status": "active",
   "createdAt": "2026-07-16T08:52:54.604Z",
-  "updatedAt": "2026-07-16T09:52:35.490Z",
+  "updatedAt": "2026-07-16T10:25:34.752Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
-  "nextSeq": 306,
-  "latestSourceSeq": 301,
-  "snapshotHash": "9928f3994116522780836fc114172e1f733d17a0778f61eecae69d5e72c314f3",
+  "nextSeq": 966,
+  "latestSourceSeq": 961,
+  "snapshotHash": "f0db7441a75e78c8d8d945c114435212b99cc561e39302b990abdd5449ff3548",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -51,10 +51,10 @@
         "C3"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "pass",
+        "note": "Action/Artifact workflow owners and automatic 18-command thin gate evidenced in work/slice-3-cli-presentation-gate.md"
       },
-      "statusSeq": 4
+      "statusSeq": 959
     },
     {
       "id": "C5",
@@ -63,20 +63,20 @@
         "C3"
       ],
       "status": {
-        "value": "in-progress",
-        "note": "starting OpenSpec Slice 3 with registry formatter seam contracts"
+        "value": "pass",
+        "note": "projection/schema/text/Markdown Modules and exact output gates evidenced in work/slice-3-cli-presentation-gate.md"
       },
-      "statusSeq": 299
+      "statusSeq": 959
     },
     {
       "id": "C6",
       "title": "Core contains no forbidden prototype storage path",
       "depends": [],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "in-progress",
+        "note": "starting OpenSpec Slice 4 with generic Source-cascade and prototype-removal contracts"
       },
-      "statusSeq": 4
+      "statusSeq": 959
     },
     {
       "id": "C7",

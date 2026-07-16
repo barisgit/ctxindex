@@ -12,14 +12,13 @@ import {
   CtxindexError,
   CtxindexValidationError,
 } from '@ctxindex/core/errors'
+import { formatActionDescribeText, formatActionRunText } from '../format/action'
 import {
   type ActionDeps,
   type ActionServices,
-  formatActionDescribeText,
-  formatActionRunText,
   handleActionCommand,
   parseActionInput,
-} from './action'
+} from './handle-action-command'
 
 const actionId = 'fake.note.create'
 const sourceId = 'source-a'

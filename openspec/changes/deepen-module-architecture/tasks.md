@@ -11,9 +11,9 @@
 
 ## 3. Thin CLI and presentation Modules
 
-- [ ] 3.1 Split registry projection, JSON-Schema detail rendering, text rendering, and Markdown rendering behind the existing formatter Interface while preserving progressive describe/help output and JSON cardinality.
-- [ ] 3.2 Move Action and Artifact workflows out of Citty command declarations, replace behavior-equivalent bespoke flag loops with shared parsing, and remove the unused duplicate SecretsStore dependency field.
-- [ ] 3.3 Make thin-command verification discover every production command automatically, add its failing omission/oversize contracts first, and pass focused CLI tests, registry/source/action/artifact e2e tests, typecheck, lint, and diff checking before the next slice.
+- [x] 3.1 Split registry projection, JSON-Schema detail rendering, text rendering, and Markdown rendering behind the existing formatter Interface while preserving progressive describe/help output and JSON cardinality.
+- [x] 3.2 Move Action and Artifact workflows out of Citty command declarations, replace behavior-equivalent bespoke flag loops with shared parsing, and remove the unused duplicate SecretsStore dependency field.
+- [x] 3.3 Make thin-command verification discover every production command automatically, add its failing omission/oversize contracts first, and pass focused CLI tests, registry/source/action/artifact e2e tests, typecheck, lint, and diff checking before the next slice.
 
 ## 4. Core prototype and locality cleanup
 
