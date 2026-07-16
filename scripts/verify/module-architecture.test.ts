@@ -76,6 +76,7 @@ test('built-in Source Adapter implementation is owned by provider modules', asyn
       'config.ts',
       'definition.ts',
       'download.ts',
+      'draft.ts',
       'message.ts',
       'ref.ts',
       'retrieve.ts',

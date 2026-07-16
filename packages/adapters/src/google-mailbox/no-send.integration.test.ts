@@ -112,9 +112,19 @@ describe('V1 Draft Action negative contract', () => {
     expect(profileActionIds).toEqual(actionIds)
     expect(describedActionIds).toEqual(actionIds)
     expect(describedActionIds).toEqual([...describedActionIds].sort())
-    expect(adapterBindings).toEqual(
-      actionIds.map((id) => ({ adapter: 'google.mailbox', id })),
-    )
+    expect(adapterBindings).toEqual([
+      ...actionIds.map((id) => ({ adapter: 'google.mailbox', id })),
+      ...actionIds.map((id) => ({ adapter: 'microsoft.mailbox', id })),
+    ])
+    const microsoftMailbox = registry.adapters.get({
+      id: 'microsoft.mailbox',
+      version: 1,
+    })
+    expect(microsoftMailbox?.auth).toMatchObject({
+      kind: 'oauth2',
+      scopes: ['Mail.ReadWrite'],
+    })
+    expect(JSON.stringify(microsoftMailbox)).not.toContain('Mail.Send')
     expect(description.actions.map((action) => action.effect)).toEqual([
       'reversible',
       'reversible',

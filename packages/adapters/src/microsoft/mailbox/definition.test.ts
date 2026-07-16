@@ -4,7 +4,7 @@ import { microsoftMailboxSourceConfigSchema } from './config'
 import { microsoftMailboxAdapterDefinition } from './definition'
 
 describe('Microsoft mailbox definition', () => {
-  test('uses the shared provider and exposes read operations without premature mutations', () => {
+  test('uses the shared provider and exposes reads plus exactly the reversible Draft Actions', () => {
     expect(microsoftMailboxAdapterDefinition).toMatchObject({
       id: 'microsoft.mailbox',
       version: 1,
@@ -17,8 +17,14 @@ describe('Microsoft mailbox definition', () => {
       profiles: [{ id: 'communication.message', version: 1 }],
       routing: 'federated',
       capabilities: ['search-remote', 'retrieve', 'download'],
-      actions: {},
     })
+    expect(Object.keys(microsoftMailboxAdapterDefinition.actions)).toEqual([
+      'communication.message.draft.create',
+      'communication.message.draft.update',
+    ])
+    expect(JSON.stringify(microsoftMailboxAdapterDefinition)).not.toMatch(
+      /Mail\.Send|message\.send|\/send/i,
+    )
   })
 
   test('accepts only the empty strict source config', () => {

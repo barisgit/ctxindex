@@ -7,7 +7,7 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 ## Design / patterns
 
 - Bun/Turborepo monorepo split into a user-facing application (`apps/`), reusable runtime and contract packages (`packages/`), external authoring examples (`examples/`), and repository tooling (`scripts/`).
-- Layered boundaries keep CLI presentation separate from provider-neutral core services and Profiles, while Adapters own Google, Microsoft Graph, and filesystem I/O.
+- Layered boundaries keep CLI presentation separate from provider-neutral core services and Profiles: the communication Profile owns shared Draft Action contracts, while Adapters own provider-specific Google, Microsoft Graph, and filesystem I/O.
 - Extensions bundle declarative Profiles and Source Adapters; core registries validate definitions and OAuth provider declarations before workflows dispatch operations and persist local state.
 - Secret persistence and central typed environment capture provide provider credentials without moving provider-specific transport logic into core.
 
@@ -21,7 +21,7 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 
 ## Data & control flow
 
-CLI input is parsed and dispatched by `apps/cli/` into core services. Core loads Profile, Adapter, and OAuth declarations, constrains authenticated provider contexts, validates outputs, and coordinates search, retrieval, Artifact download, Actions, sync, persistence, and typed secrets. Google APIs, Microsoft Graph, or the local filesystem remain behind Adapter operation contracts; results return through CLI formatters with stable process statuses.
+CLI input is parsed and dispatched by `apps/cli/` into core services. Core loads Profile, Adapter, and OAuth declarations, constrains authenticated provider contexts, validates outputs, and coordinates search, retrieval, Artifact download, Actions, sync, persistence, and typed secrets. Gmail and Microsoft Graph Outlook Adapters implement the shared reversible Draft create/update Actions as one provider mutation that returns and materializes a canonical Draft Resource; sending remains outside the Action surface. Google APIs, Microsoft Graph, or the local filesystem remain behind Adapter operation contracts; results return through CLI formatters with stable process statuses. Stateful provider mocks exercise the complete Outlook create/update and cached read/export flow at CLI e2e scope.
 
 ## Integration points
 

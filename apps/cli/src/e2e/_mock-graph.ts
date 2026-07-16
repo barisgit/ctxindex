@@ -36,6 +36,8 @@ export interface MockGraphMessage {
   readonly body: string
   readonly from: { readonly name?: string; readonly address: string }
   readonly to: readonly { readonly name?: string; readonly address: string }[]
+  readonly cc?: readonly { readonly name?: string; readonly address: string }[]
+  readonly bcc?: readonly { readonly name?: string; readonly address: string }[]
   readonly receivedDateTime: string
   readonly lastModifiedDateTime: string
   readonly isRead?: boolean
@@ -55,6 +57,7 @@ export interface MockGraphServer {
     extra?: Record<string, string | undefined>,
   ): Record<string, string | undefined>
   readRequests(): readonly MockGraphRequest[]
+  readMessages(): readonly MockGraphMessage[]
   resetRequests(): void
   setIdentity(kind: MockMicrosoftIdentityKind): void
   setTokenMode(mode: MockMicrosoftTokenMode): void
@@ -127,8 +130,18 @@ function graphMessage(message: MockGraphMessage) {
         address: recipient.address,
       },
     })),
-    ccRecipients: [],
-    bccRecipients: [],
+    ccRecipients: (message.cc ?? []).map((recipient) => ({
+      emailAddress: {
+        ...(recipient.name ? { name: recipient.name } : {}),
+        address: recipient.address,
+      },
+    })),
+    bccRecipients: (message.bcc ?? []).map((recipient) => ({
+      emailAddress: {
+        ...(recipient.name ? { name: recipient.name } : {}),
+        address: recipient.address,
+      },
+    })),
     receivedDateTime: message.receivedDateTime,
     sentDateTime: message.receivedDateTime,
     lastModifiedDateTime: message.lastModifiedDateTime,
@@ -161,6 +174,7 @@ export function startMockGraph(
   let rotation = 0
   let messages = [...(options.messages ?? [])]
   let graphStatus: number | undefined
+  let draftSequence = 0
 
   const server = Bun.serve({
     hostname: '127.0.0.1',
@@ -234,6 +248,74 @@ export function startMockGraph(
         }
       }
 
+      if (url.pathname === '/v1.0/me/messages' && request.method === 'POST') {
+        let input: {
+          subject: string
+          body: { contentType: string; content: string }
+          toRecipients: Array<{
+            emailAddress: { name?: string; address: string }
+          }>
+          ccRecipients: Array<{
+            emailAddress: { name?: string; address: string }
+          }>
+          bccRecipients: Array<{
+            emailAddress: { name?: string; address: string }
+          }>
+        }
+        try {
+          input = JSON.parse(body)
+        } catch {
+          return Response.json({ error: 'invalid_json' }, { status: 400 })
+        }
+        const lists = [
+          input.toRecipients,
+          input.ccRecipients,
+          input.bccRecipients,
+        ]
+        if (
+          typeof input.subject !== 'string' ||
+          input.body?.contentType !== 'Text' ||
+          typeof input.body.content !== 'string' ||
+          !lists.every(
+            (list) =>
+              Array.isArray(list) &&
+              list.every(
+                (recipient) =>
+                  typeof recipient?.emailAddress?.address === 'string',
+              ),
+          )
+        )
+          return Response.json({ error: 'invalid_draft' }, { status: 400 })
+        draftSequence += 1
+        const created: MockGraphMessage = {
+          id: `outlook-draft-${draftSequence}`,
+          conversationId: `outlook-draft-conversation-${draftSequence}`,
+          internetMessageId: `<outlook-draft-${draftSequence}@example.test>`,
+          subject: input.subject,
+          bodyPreview: input.body.content,
+          body: input.body.content,
+          from: { address: 'work@example.test' },
+          to: input.toRecipients.map(({ emailAddress }) => ({
+            ...(emailAddress.name ? { name: emailAddress.name } : {}),
+            address: emailAddress.address,
+          })),
+          cc: input.ccRecipients.map(({ emailAddress }) => ({
+            ...(emailAddress.name ? { name: emailAddress.name } : {}),
+            address: emailAddress.address,
+          })),
+          bcc: input.bccRecipients.map(({ emailAddress }) => ({
+            ...(emailAddress.name ? { name: emailAddress.name } : {}),
+            address: emailAddress.address,
+          })),
+          receivedDateTime: '2026-07-16T12:00:00.000Z',
+          lastModifiedDateTime: '2026-07-16T12:00:00.000Z',
+          isRead: true,
+          isDraft: true,
+        }
+        messages.push(created)
+        return Response.json(graphMessage(created), { status: 201 })
+      }
+
       if (url.pathname === '/v1.0/me/messages' && request.method === 'GET') {
         return Response.json({ value: messages.map(graphMessage) })
       }
@@ -278,6 +360,67 @@ export function startMockGraph(
       const messageMatch = url.pathname.match(
         /^\/v1\.0\/me\/messages\/([^/]+)$/,
       )
+      if (messageMatch?.[1] && request.method === 'PATCH') {
+        const id = decodeURIComponent(messageMatch[1])
+        const index = messages.findIndex((candidate) => candidate.id === id)
+        if (index < 0 || !messages[index]?.isDraft)
+          return Response.json({ error: 'not_found' }, { status: 404 })
+        let input: {
+          subject: string
+          body: { contentType: string; content: string }
+          toRecipients: Array<{
+            emailAddress: { name?: string; address: string }
+          }>
+          ccRecipients: Array<{
+            emailAddress: { name?: string; address: string }
+          }>
+          bccRecipients: Array<{
+            emailAddress: { name?: string; address: string }
+          }>
+        }
+        try {
+          input = JSON.parse(body)
+        } catch {
+          return Response.json({ error: 'invalid_json' }, { status: 400 })
+        }
+        const previous = messages[index]
+        if (
+          !previous ||
+          typeof input.subject !== 'string' ||
+          input.body?.contentType !== 'Text' ||
+          typeof input.body.content !== 'string' ||
+          ![input.toRecipients, input.ccRecipients, input.bccRecipients].every(
+            (list) =>
+              Array.isArray(list) &&
+              list.every(
+                (recipient) =>
+                  typeof recipient?.emailAddress?.address === 'string',
+              ),
+          )
+        )
+          return Response.json({ error: 'invalid_draft' }, { status: 400 })
+        const updated: MockGraphMessage = {
+          ...previous,
+          subject: input.subject,
+          bodyPreview: input.body.content,
+          body: input.body.content,
+          to: input.toRecipients.map(({ emailAddress }) => ({
+            ...(emailAddress.name ? { name: emailAddress.name } : {}),
+            address: emailAddress.address,
+          })),
+          cc: input.ccRecipients.map(({ emailAddress }) => ({
+            ...(emailAddress.name ? { name: emailAddress.name } : {}),
+            address: emailAddress.address,
+          })),
+          bcc: input.bccRecipients.map(({ emailAddress }) => ({
+            ...(emailAddress.name ? { name: emailAddress.name } : {}),
+            address: emailAddress.address,
+          })),
+          lastModifiedDateTime: '2026-07-16T12:01:00.000Z',
+        }
+        messages[index] = updated
+        return Response.json(graphMessage(updated))
+      }
       if (messageMatch?.[1] && request.method === 'GET') {
         if (
           !request.headers
@@ -315,6 +458,9 @@ export function startMockGraph(
     },
     readRequests() {
       return requests.map((request) => ({ ...request }))
+    },
+    readMessages() {
+      return messages.map((message) => ({ ...message }))
     },
     resetRequests() {
       requests.length = 0

@@ -8,12 +8,12 @@ Contains reusable workspace libraries defining ctxindex's provider-neutral domai
 
 - Layered packages: `extension-sdk` defines contracts; `profiles` supplies declarative domain vocabularies; `adapters` performs provider/filesystem I/O; `core` validates definitions and owns services, persistence, orchestration, configuration, search, and typed secret routing.
 - Explicit TypeScript export maps and repository verification enforce package dependency direction and truthful direct manifests.
-- Provider composition remains outside core: adapters bundle Google Calendar, Gmail, Microsoft Outlook mailbox, and local-directory definitions against provider-neutral SDK/Profile contracts.
+- Provider composition remains outside core: adapters bundle Google Calendar, Gmail, Microsoft Outlook mailbox, and local-directory definitions against provider-neutral SDK/Profile contracts; Gmail and Outlook implement the communication Profile's shared reversible Draft create/update Actions.
 
 ## Data & control flow
 
 1. Profiles and Adapters are authored against `@ctxindex/extension-sdk` and bundled as Extensions.
-2. Core loads and validates definitions and Google/Microsoft OAuth declarations, then dispatches source, auth, search, sync, retrieval, Artifact, and Action operations through SDK contexts.
+2. Core loads and validates definitions and Google/Microsoft OAuth declarations, then dispatches source, auth, search, sync, retrieval, Artifact, and Action operations through SDK contexts; provider-owned Draft handlers perform one create or update mutation and return canonical Resources without exposing send.
 3. Adapter outputs flow through core validation and resource/relation/artifact/search services into SQLite where workflows require local persistence.
 4. Core configuration, secrets, paths, networking, logging, and migrations surround those workflows; central environment keys supply provider credentials and guarded test routing.
 

@@ -69,7 +69,7 @@ Status: pass — provider-owned Outlook discovery/retrieve/attachments pass full
 ### C10. Outlook Drafts are reversible and never sent
 The existing provider-neutral Draft create/update Actions bind to Microsoft mailbox Sources, request `Mail.ReadWrite` but never `Mail.Send`, perform one non-retried provider mutation per invocation, preserve a stable Draft Ref across update, validate complete replacement input before I/O, and expose no send Action or endpoint.
 Depends: C9
-Status: pending
+Status: pass — mocked Graph and compiled CLI paths prove strict pre-egress validation, exactly one non-retried POST/PATCH, immutable canonical Draft Ref reuse, complete replacement/clearing, generic local materialization, exact reversible Action bindings, `Mail.ReadWrite` without `Mail.Send`, and zero send routes; see `work/slice-8-outlook-draft-gate.md`
 
 ### C11. Microsoft Calendar is a complete read Source Adapter
 A Microsoft Calendar Source emits the same `calendar.event@1` Resources as Google through incremental delta sync/retrieval with stable IDs, tombstones, recurrence/time-zone fidelity, selected calendar configuration, and no calendar mutation capability.
@@ -79,19 +79,19 @@ Status: pending
 ### C12. Provider egress and secrets remain bounded
 Automated gates prove Google operations contact only Google hosts, Microsoft operations only approved identity/Graph hosts, local Sources make no network requests, mutation routes never include send, logs/diagnostics redact credentials, and malformed input performs zero auth/provider/storage work.
 Depends: C6, C9, C10, C11
-Status: in-progress — Google and Microsoft identity/mail reads now pass declared-host, loopback-only mock, redaction, canonical malformed-input zero-I/O, and no-send gates; Outlook Draft and Microsoft Calendar mutation/egress proofs remain in Slices 8–9; see `work/slice-7-microsoft-mail-gate.md`
+Status: in-progress — Google/Microsoft identity and reads plus Outlook Drafts now pass declared-host, loopback-only mock, redaction, canonical malformed-input zero-I/O, one-shot mutation, and no-send gates; Microsoft Calendar remains in Slice 9; see `work/slice-7-microsoft-mail-gate.md` and `work/slice-8-outlook-draft-gate.md`
 
 ### C13. Multi-account workflow is useful end to end
 A real compiled CLI in isolated state can represent personal Gmail, personal Google Calendar, work Gmail, work Outlook, and work Microsoft Calendar as explicitly named Sources in chosen Realms; list Accounts/Sources; search all or an exact Realm; retrieve mail/events/attachments; and create/update one Outlook Draft through generic commands.
 Depends: C4, C6, C9, C10, C11
-Status: in-progress — compiled workflows now prove named Google mailbox/calendar and Microsoft Outlook Sources across exact Realms with Account inventory, mail/event search/get, Outlook thread/export/attachment cache; Microsoft Calendar and Outlook Draft steps remain
+Status: in-progress — compiled workflows now prove named Google mailbox/calendar and Microsoft Outlook Sources across exact Realms with Account inventory, mail/event search/get, Outlook thread/export/attachment cache, and Outlook Draft create/update/cached get/export; Microsoft Calendar remains
 
 ### C14. Generated interface and agent guidance remain authoritative
 Registry-derived `describe`, help, bundled skills, and workflow documentation expose the new Profiles, Adapters, configuration, scopes, Actions, and Account/secrets commands without parallel hand-maintained provider vocabularies or interactive credential prompts.
 Depends: C2, C4, C6, C9, C10, C11
-Status: in-progress — registry-derived interfaces now expose Microsoft OAuth/mailbox declarations and generic commands without provider-specific CLI/core paths; final Draft/Calendar declarations and generated guidance verification remain
+Status: in-progress — registry-derived interfaces now expose Microsoft OAuth/mailbox and exact shared Draft Action declarations through generic commands without provider-specific CLI/core paths; Microsoft Calendar declarations and final generated guidance verification remain
 
 ### C15. Mocked, live, packaging, and regression gates pass
 Focused tests, integration/e2e suites, compiled/relocated binary checks, D3 external Extension proof, typecheck, lint, dependency/architecture checks, strict OpenSpec validation, drift/cartography, independent review, fresh-context QA, and explicit Human Google/Microsoft checkpoints all pass on the final snapshot with no unapproved live traffic.
 Depends: C7, C12, C13, C14
-Status: in-progress — Slice 7 focused/full/compiled/D3/strict/review gates pass 896/0 with redacted evidence; Microsoft Draft, Calendar, live Human checkpoint, final drift, and fresh-context QA remain
+Status: in-progress — Slice 8 focused/full/compiled/D3/strict/review gates pass 913/0 with redacted evidence and 0 critical/important review findings; Microsoft Calendar, live Human checkpoint, final drift, and fresh-context QA remain; see `work/slice-8-outlook-draft-gate.md`

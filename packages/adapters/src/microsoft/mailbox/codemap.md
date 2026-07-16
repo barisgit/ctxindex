@@ -2,14 +2,15 @@
 
 ## Responsibility
 
-Implements the read-only, federated `microsoft.mailbox@1` Adapter for Outlook messages and file attachments through Microsoft Graph.
+Implements the federated `microsoft.mailbox@1` Adapter for Outlook message search/retrieval, file attachment download, and reversible Draft create/update through Microsoft Graph.
 
 ## Design/patterns
 
-- `definition.ts` binds strict empty Source configuration, shared Microsoft OAuth with `Mail.ReadWrite`, `communication.message@1`, Graph host authority, and `search-remote`, `retrieve`, and `download` operations; Actions are intentionally empty.
+- `definition.ts` binds strict empty Source configuration, shared Microsoft OAuth with `Mail.ReadWrite`, `communication.message@1`, Graph host authority, `search-remote`/`retrieve`/`download` operations, and the Profile-owned `communication.message.draft.create` and `.update` schemas to provider handlers.
 - `transport.ts` is the Graph transport boundary: canonical v1.0 URL construction, immutable-ID and text-body `Prefer` headers, typed HTTP/JSON error translation with retry metadata, and same-origin/path validation for provider `@odata.nextLink` values. A development-only `CTXINDEX_GRAPH_MOCK_BASE_URL` accepts only a bare `127.0.0.1` origin.
 - `message.ts` validates Graph DTOs and normalizes addresses, headers, timestamps, conversation identity, labels, read state, body text, and Artifact descriptors into `communication.message@1` resources.
-- `ref.ts` enforces canonical same-Source `ctx://<SOURCE>/message/<immutable-id>` and child `/attachment/<id>` Refs before provider I/O.
+- `draft.ts` validates shared complete-replacement Action inputs and Graph recipient syntax, maps text content and recipients to Graph, performs one `POST /me/messages` or `PATCH /me/messages/<id>`, validates the complete Draft response, and normalizes it through the communication resource path. There is no send handler or follow-up request.
+- `ref.ts` enforces canonical same-Source `ctx://<SOURCE>/message/<immutable-id>`, `ctx://<SOURCE>/draft/<immutable-id>`, and child `/attachment/<id>` Refs before provider I/O; Draft IDs must be canonically percent-encoded immutable IDs.
 
 ## Data & control flow
 
@@ -17,9 +18,10 @@ Implements the read-only, federated `microsoft.mailbox@1` Adapter for Outlook me
 2. `microsoftMailboxRetrieve()` validates the Ref, fetches the exact immutable-ID message while requesting a text body, rejects draft or mismatched responses, and normalizes it into one retrieved communication resource.
 3. When Graph reports attachments, retrieval pages through at most ten metadata pages, emits descriptors only for safe downloadable `fileAttachment` objects, warns on unsupported attachment kinds, then emits the resource followed by its Artifacts.
 4. `microsoftMailboxDownload()` validates Artifact ownership and descriptor metadata, requests the attachment `$value`, streams exact bytes through `DownloadContext.write`, and rejects size or media-type mismatches.
+5. `microsoftDraftCreate()` maps a complete shared Draft input to one Graph create request; `microsoftDraftUpdate()` first validates the canonical same-Source Draft Ref and maps the complete replacement to one Graph patch. Both require immutable-ID/text-body preferences, reject non-Draft or mismatched responses, and return the canonical Draft Resource for core to materialize without sending.
 
 ## Integration points
 
-- Registered by `packages/adapters/src/builtins.ts` and exported through `packages/adapters/src/index.ts`; core source/search/retrieve/artifact services invoke it through Extension SDK contexts.
+- Registered by `packages/adapters/src/builtins.ts` and exported through `packages/adapters/src/index.ts`; core source/search/retrieve/artifact and Action services invoke it through Extension SDK contexts.
 - Depends on `@ctxindex/core/config` and `@ctxindex/core/errors`, `@ctxindex/extension-sdk`, `@ctxindex/profiles`, Zod, and the shared `microsoftOAuthProvider`.
 - External boundary: `https://graph.microsoft.com/v1.0/`, constrained to declared host `graph.microsoft.com` by the Adapter definition and provider execution context.

@@ -5,10 +5,31 @@ import { join } from 'node:path'
 import { createSandbox, type Sandbox } from '@ctxindex/core/testing'
 import { type MockGraphMessage, startMockGraph } from './_mock-graph'
 
+const createDraftActionId = 'communication.message.draft.create'
+const updateDraftActionId = 'communication.message.draft.update'
+
 function parseSourceId(stdout: string): string {
   const match = /^source added: (.+)$/m.exec(stdout)
   if (!match?.[1]) throw new Error(`Could not parse Source id from: ${stdout}`)
   return match[1]
+}
+
+function draftResourceCount(sandbox: Sandbox): number {
+  const database = new Database(
+    join(sandbox.env.CTXINDEX_DATA_HOME, 'ctxindex.sqlite'),
+    { readonly: true },
+  )
+  try {
+    return (
+      database
+        .query(
+          "SELECT COUNT(*) AS count FROM resources WHERE ref LIKE '%/draft/%'",
+        )
+        .get() as { count: number }
+    ).count
+  } finally {
+    database.close()
+  }
 }
 
 function grantScopes(sandbox: Sandbox): string[] {
@@ -303,6 +324,176 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
       bodyText: 'The complete reply body.',
     })
     expect(graph.readRequests()).toHaveLength(beforeExports)
+
+    graph.resetRequests()
+    expect(draftResourceCount(sandbox)).toBe(0)
+    const invalidDraft = await sandbox.run(
+      [
+        'action',
+        'run',
+        createDraftActionId,
+        '--source',
+        workSourceId,
+        '--input',
+        JSON.stringify({
+          to: ['victim@example.test\r\nBcc: injected@example.test'],
+          subject: 'Invalid',
+          bodyText: 'Must not persist',
+        }),
+        '--json',
+      ],
+      { env },
+    )
+    expect(invalidDraft.exitCode).toBe(2)
+    expect(invalidDraft.stderr).toContain('Invalid input for Action')
+    expect(graph.readRequests()).toEqual([])
+    expect(draftResourceCount(sandbox)).toBe(0)
+
+    const createInput = {
+      to: ['Recipient <recipient@example.test>'],
+      cc: ['copy@example.test'],
+      subject: 'Outlook Draft original',
+      bodyText: 'Original Outlook Draft body.',
+    }
+    const createdDraft = await sandbox.run(
+      [
+        'action',
+        'run',
+        createDraftActionId,
+        '--source',
+        workSourceId,
+        '--input',
+        JSON.stringify(createInput),
+        '--json',
+      ],
+      { env },
+    )
+    expect(createdDraft.exitCode, createdDraft.stderr).toBe(0)
+    const draftRef = `ctx://${authority}/draft/outlook-draft-1`
+    expect(JSON.parse(createdDraft.stdout)).toMatchObject({
+      resource: {
+        ref: draftRef,
+        sourceId: workSourceId,
+        origin: 'adhoc',
+        title: createInput.subject,
+        payload: {
+          providerDraftId: 'outlook-draft-1',
+          providerMessageId: 'outlook-draft-1',
+          to: createInput.to,
+          cc: createInput.cc,
+          bcc: [],
+          subject: createInput.subject,
+          bodyText: createInput.bodyText,
+        },
+      },
+      warnings: [],
+    })
+    expect(draftResourceCount(sandbox)).toBe(1)
+
+    const updateInput = {
+      ref: draftRef,
+      to: ['replacement@example.test'],
+      subject: '',
+      bodyText: 'Replacement Outlook Draft body.',
+    }
+    const updatedDraft = await sandbox.run(
+      [
+        'action',
+        'run',
+        updateDraftActionId,
+        '--source',
+        workSourceId,
+        '--input',
+        JSON.stringify(updateInput),
+        '--json',
+      ],
+      { env },
+    )
+    expect(updatedDraft.exitCode, updatedDraft.stderr).toBe(0)
+    const updatedDraftJson = JSON.parse(updatedDraft.stdout)
+    expect(updatedDraftJson).toMatchObject({
+      resource: {
+        ref: draftRef,
+        sourceId: workSourceId,
+        title: '',
+        payload: {
+          providerDraftId: 'outlook-draft-1',
+          providerMessageId: 'outlook-draft-1',
+          to: updateInput.to,
+          cc: [],
+          bcc: [],
+          subject: '',
+          bodyText: updateInput.bodyText,
+        },
+      },
+      warnings: [],
+    })
+    expect(updatedDraftJson.resource.payload).not.toMatchObject({
+      subject: createInput.subject,
+      bodyText: createInput.bodyText,
+    })
+    expect(draftResourceCount(sandbox)).toBe(1)
+    const mutationRequests = graph.readRequests()
+    expect(
+      mutationRequests.map(({ method, pathname }) => ({ method, pathname })),
+    ).toEqual([
+      { method: 'POST', pathname: '/v1.0/me/messages' },
+      {
+        method: 'PATCH',
+        pathname: '/v1.0/me/messages/outlook-draft-1',
+      },
+    ])
+    expect(
+      mutationRequests.every(
+        ({ pathname, prefer }) =>
+          !pathname.includes('/send') &&
+          prefer?.includes('IdType="ImmutableId"') === true &&
+          prefer.includes('outlook.body-content-type="text"'),
+      ),
+    ).toBe(true)
+
+    graph.resetRequests()
+    const cachedDraft = await sandbox.run(['get', draftRef, '--json'], { env })
+    expect(cachedDraft.exitCode, cachedDraft.stderr).toBe(0)
+    expect(JSON.parse(cachedDraft.stdout)).toMatchObject({
+      resource: {
+        ref: draftRef,
+        payload: {
+          to: updateInput.to,
+          cc: [],
+          bcc: [],
+          subject: '',
+          bodyText: updateInput.bodyText,
+        },
+      },
+      warnings: [],
+    })
+    const draftExport = await sandbox.run(
+      ['export', draftRef, '--format', 'json'],
+      { env },
+    )
+    expect(draftExport.exitCode, draftExport.stderr).toBe(0)
+    expect(JSON.parse(draftExport.stdout)).toMatchObject({
+      providerDraftId: 'outlook-draft-1',
+      subject: '',
+      bodyText: updateInput.bodyText,
+    })
+    const unknownSend = await sandbox.run(
+      [
+        'action',
+        'run',
+        'communication.message.draft.send',
+        '--source',
+        workSourceId,
+        '--input',
+        '{}',
+        '--json',
+      ],
+      { env },
+    )
+    expect(unknownSend.exitCode).toBe(2)
+    expect(unknownSend.stderr).toContain('Unknown Action')
+    expect(graph.readRequests()).toEqual([])
 
     graph.resetRequests()
     graph.setGraphStatus(503)

@@ -4,6 +4,51 @@ function authority(ref: string): string | undefined {
   return /^ctx:\/\/([^/?#]+)/.exec(ref)?.[1]
 }
 
+export function parseDraftRef(ref: string, sourceId: string): string {
+  let parsed: URL
+  try {
+    parsed = new URL(ref)
+  } catch (cause) {
+    throw new CtxindexValidationError('invalid_ref', `Invalid Ref "${ref}"`, {
+      cause,
+    })
+  }
+  if (authority(ref) !== sourceId.toUpperCase() || parsed.protocol !== 'ctx:') {
+    throw new CtxindexValidationError(
+      'ref_source_mismatch',
+      `Ref "${ref}" does not belong to Source "${sourceId}"`,
+    )
+  }
+  const segments = parsed.pathname.split('/').filter(Boolean)
+  if (
+    parsed.search ||
+    parsed.hash ||
+    segments.length !== 2 ||
+    segments[0] !== 'draft'
+  ) {
+    throw new CtxindexValidationError(
+      'invalid_ref',
+      `Microsoft Draft Ref "${ref}" must use suffix "draft/<immutable-id>"`,
+    )
+  }
+  try {
+    const id = decodeURIComponent(segments[1] ?? '')
+    if (
+      !id ||
+      encodeURIComponent(id) !== segments[1] ||
+      parsed.pathname !== `/draft/${segments[1]}`
+    )
+      throw new Error('non-canonical immutable Draft id')
+    return id
+  } catch (cause) {
+    throw new CtxindexValidationError(
+      'invalid_ref',
+      `Invalid Microsoft Draft Ref "${ref}"`,
+      { cause },
+    )
+  }
+}
+
 export function parseMessageRef(ref: string, sourceId: string): string {
   let parsed: URL
   try {

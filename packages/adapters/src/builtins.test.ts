@@ -110,12 +110,18 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
       {
         id: 'communication.message.draft.create',
         effect: 'reversible',
-        adapters: [{ id: 'google.mailbox', version: 1 }],
+        adapters: [
+          { id: 'google.mailbox', version: 1 },
+          { id: 'microsoft.mailbox', version: 1 },
+        ],
       },
       {
         id: 'communication.message.draft.update',
         effect: 'reversible',
-        adapters: [{ id: 'google.mailbox', version: 1 }],
+        adapters: [
+          { id: 'google.mailbox', version: 1 },
+          { id: 'microsoft.mailbox', version: 1 },
+        ],
       },
     ])
   })
@@ -224,7 +230,10 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
       'retrieve',
       'download',
     ])
-    expect(Object.keys(microsoft?.actions ?? {})).toEqual([])
+    expect(Object.keys(microsoft?.actions ?? {})).toEqual([
+      'communication.message.draft.create',
+      'communication.message.draft.update',
+    ])
     expect(microsoft?.configSchema.safeParse({}).success).toBe(true)
     expect(
       microsoft?.configSchema.safeParse({ access_token: 'malicious' }).success,

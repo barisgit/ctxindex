@@ -1,7 +1,12 @@
 import { defineAdapter } from '@ctxindex/extension-sdk'
+import {
+  communicationMessageDraftCreateInputSchema,
+  communicationMessageDraftUpdateInputSchema,
+} from '@ctxindex/profiles'
 import { microsoftOAuthProvider } from '../provider'
 import { microsoftMailboxSourceConfigSchema } from './config'
 import { microsoftMailboxDownload } from './download'
+import { microsoftDraftCreate, microsoftDraftUpdate } from './draft'
 import { microsoftMailboxRetrieve } from './retrieve'
 import { microsoftMailboxSearchRemote } from './search-remote'
 
@@ -23,6 +28,19 @@ export const microsoftMailboxAdapterDefinition = defineAdapter({
     retrieve: microsoftMailboxRetrieve,
     download: microsoftMailboxDownload,
   },
-  actions: {},
+  actions: {
+    'communication.message.draft.create': {
+      profile: { id: 'communication.message', version: 1 },
+      input: communicationMessageDraftCreateInputSchema,
+      output: { id: 'communication.message', version: 1 },
+      run: microsoftDraftCreate,
+    },
+    'communication.message.draft.update': {
+      profile: { id: 'communication.message', version: 1 },
+      input: communicationMessageDraftUpdateInputSchema,
+      output: { id: 'communication.message', version: 1 },
+      run: microsoftDraftUpdate,
+    },
+  },
   docs: { summary: 'Microsoft Outlook mailbox' },
 })

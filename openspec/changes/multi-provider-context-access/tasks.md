@@ -88,15 +88,15 @@
 
 ## 8. Outlook Draft Actions
 
-- [ ] 8.1 Add red direct/`runAction` tests for Outlook Draft create: complete input validation before I/O, exactly one Graph `POST /me/messages`, immutable-id response, stable canonical Draft Ref, complete normalized Resource, one local materialization, and no retry/follow-up mutation.
-- [ ] 8.2 Implement Draft create behind the existing communication Action binding and add provider error/response/recipient/body replacement tests including non-ASCII text and header-injection rejection.
-- [ ] 8.3 Add red direct/`runAction` tests for update: exact uppercase Source authority/raw canonical Ref prevalidation, one `PATCH /me/messages/{id}`, explicit complete replacement/clearing of to/cc/bcc/subject/text, same immutable Draft Ref, absent-local materialization, and zero I/O for foreign/non-Draft refs.
-- [ ] 8.4 Implement Draft update and stateful mock create→update; add negative registry/describe/unknown-send tests locking exactly the two reversible Actions, `Mail.ReadWrite` present, `Mail.Send` absent, mutation methods exactly POST/PATCH, and no `/send` route.
-- [ ] 8.5 Add real binary Outlook Draft e2e covering invalid input zero requests/resources, one create, one update, stable Ref/full replacement/cached get, account/source inventory, export, and unknown send zero requests.
+- [x] 8.1 Add red direct/`runAction` tests for Outlook Draft create: complete input validation before I/O, exactly one Graph `POST /me/messages`, immutable-id response, stable canonical Draft Ref, complete normalized Resource, one local materialization, and no retry/follow-up mutation.
+- [x] 8.2 Implement Draft create behind the existing communication Action binding and add provider error/response/recipient/body replacement tests including non-ASCII text and header-injection rejection.
+- [x] 8.3 Add red direct/`runAction` tests for update: exact uppercase Source authority/raw canonical Ref prevalidation, one `PATCH /me/messages/{id}`, explicit complete replacement/clearing of to/cc/bcc/subject/text, same immutable Draft Ref, absent-local materialization, and zero I/O for foreign/non-Draft refs.
+- [x] 8.4 Implement Draft update and stateful mock create→update; add negative registry/describe/unknown-send tests locking exactly the two reversible Actions, `Mail.ReadWrite` present, `Mail.Send` absent, mutation methods exactly POST/PATCH, and no `/send` route.
+- [x] 8.5 Add real binary Outlook Draft e2e covering invalid input zero requests/resources, one create, one update, stable Ref/full replacement/cached get, account/source inventory, export, and unknown send zero requests.
 
 ### Slice 8 gate
 
-- [ ] 8.6 Run all Action/Profile/Microsoft Draft focused, integration/e2e, no-send/egress, D3, typecheck/lint/architecture/dependency/full suites, strict OpenSpec/diff; obtain adversarial mutation/security review and save `work/slice-8-outlook-draft-gate.md`.
+- [x] 8.6 Run all Action/Profile/Microsoft Draft focused, integration/e2e, no-send/egress, D3, typecheck/lint/architecture/dependency/full suites, strict OpenSpec/diff; obtain adversarial mutation/security review and save `work/slice-8-outlook-draft-gate.md`.
 
 ## 9. Microsoft Calendar Adapter
 
