@@ -1,7 +1,7 @@
 # Google mailbox + Calendar Human checkpoint — live partial evidence
 
 Date: 2026-07-16
-State: Gmail read proof complete; paused before a second Calendar-window expansion.
+State: complete.
 
 ## Observed
 
@@ -13,11 +13,14 @@ State: Gmail read proof complete; paused before a second Calendar-window expansi
 - One live Calendar sync completed successfully with zero warnings/errors and zero events in that bounded window.
 - After explicit user approval, the Calendar Source was replaced with the same name/calendar/Grant and a 30-day past / 30-day future window. That read completed but produced zero Resources and one bounded `google_calendar_unsupported_event` warning.
 - The approved Gmail `newer_than:7d` remote search returned three provider results at the explicit limit and a truncation warning. `get` on at most one result returned a complete `communication.message@1` shape with no warning. Only structural keys/counts were observed; content was not copied into evidence.
+- Under the user's explicit blanket approval to continue read-only verification, the final primary-Calendar Source used a one-year past / one-year future window. Sync completed with two supported Resources and six bounded unsupported-event warnings.
+- Local Calendar search for the approved broad term returned one `calendar.event@1` from the exact Source. `get` returned one complete synced Google timed-event shape with title/status/provider identity fields present and no warning; no values were copied into evidence.
+- Final inventory structurally confirms one Google Account, one Grant, and exactly the named mailbox/calendar Sources in Realm `google-checkpoint`, both linked to that Grant.
 
 ## Privacy and mutation boundary
 
 Raw account/provider output remains only in ignored mode-0600 checkpoint files. This evidence retains no email address, subject, provider id, local Account/Grant/Source id, OAuth URL/state/code, token, event/message content, attendee, or title. No Action, Draft, send, Calendar mutation, attachment, or export command ran.
 
-## Pause reason
+## Result
 
-Neither the approved eight-day nor 60-day Calendar window produced a supported event Ref, so Calendar local search/get cannot yet run. Per the approved plan, the read will not be widened again automatically. Await explicit approval to replace the Calendar Source with a one-year past / one-year future window. Gmail search/get is complete and will not be repeated.
+The live checkpoint passes. One compatible Grant supports both named Sources; Calendar sync/search/get and bounded Gmail remote search/get succeeded through generic commands. The only provider mutations were OAuth authorization/token operations explicitly approved by the user. No ctxindex Action, Draft, send, Calendar write, attachment download, or export ran.

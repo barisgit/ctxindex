@@ -24,37 +24,37 @@ Out of scope: sending mail, calendar mutations, on-premises Exchange, arbitrary 
 
 ### C1. Normative scope and domain language are coherent
 The milestone, OpenSpec artifacts, and domain documents define provider-neutral Accounts, Grants, calendar Resources, secrets behavior, Microsoft Graph scope, and mutation limits without duplicating or contradicting the timeless specification.
-Status: pass — reverified 2026-07-16 after checkpoint preparation/env-key inspection: strict change/all OpenSpec validation and final CI pass with the accepted scope/design; see `work/slice-1-contract-gate.md` and `work/slice-6-google-calendar-mocked-gate.md`
+Status: pass — reverified 2026-07-16 after completed live Google checkpoint: strict change/all OpenSpec validation and final CI pass with the accepted scope/design; see `work/slice-1-contract-gate.md` and `work/slice-6-google-calendar-mocked-gate.md`
 
 ### C2. Secret backend operation is explicit and safe
 The CLI can report the active backend without exposing secret values and explicitly switch between OS Keychain and encrypted file storage. It never silently falls back, never accepts passphrases in argv, does not strand references if a switch fails, and persists the selected backend only after successful movement.
 Depends: C1
-Status: pass — reverified 2026-07-16 after checkpoint preparation/env-key inspection: final CI/full suite retain explicit typed backends, no fallback/literal-secret CLI, and crash-safe switching; see `work/slice-2-secrets-gate.md`
+Status: pass — reverified 2026-07-16 after completed live Google checkpoint: final CI/full suite retain explicit typed backends, no fallback/literal-secret CLI, and crash-safe switching; see `work/slice-2-secrets-gate.md`
 
 ### C3. Accounts and Grants are provider-neutral and deduplicated
 Google and Microsoft authorization resolve a stable external identity, upsert exactly one Account per provider identity, retain explicit Grants and scope sets, and allow multiple Sources to reuse a compatible Grant without duplicate Accounts.
 Depends: C1, C2
-Status: in-progress — live Google checkpoint now proves one stable Account, one exact compatible Grant, and two named Sources sharing it without broader scopes; Microsoft subject proof remains in its provider slice; see `work/google-human-checkpoint-live.md`
+Status: in-progress — completed live Google checkpoint proves one stable Account, one exact compatible Grant, and two named Sources sharing it without broader scopes; Microsoft personal/work subject proof remains in Slice 7; see `work/google-human-checkpoint-live.md`
 
 ### C4. Agents can inspect configured Accounts and Sources
 A deterministic `account list` interface exposes safe nested Account, Grant, scope, Realm, and Source information in readable and JSON forms, while `source list` remains the canonical inventory including unauthenticated Sources. No secret material is rendered or logged.
 Depends: C3
-Status: pass — reverified 2026-07-16 after checkpoint preparation/env-key inspection: compiled Google workflow lists one Account/Grant and three named Realm/Source bindings with exact scopes and no subject/secret output; see `work/slice-6-google-calendar-mocked-gate.md`
+Status: pass — reverified 2026-07-16 after completed live Google checkpoint: compiled and live inventories list one Account/Grant with named Realm/Source bindings, exact scopes, and no subject/secret evidence; see `work/slice-6-google-calendar-mocked-gate.md` and `work/google-human-checkpoint-live.md`
 
 ### C5. Calendar events use one provider-neutral Profile
 A strict `calendar.event@1` Profile represents timed and all-day events, organizers, attendees, recurrence, status, location, description, provider calendar identity, typed fields, chunks, and stable relations without provider-specific core/storage paths.
 Depends: C1
-Status: pass — reverified 2026-07-16 after checkpoint preparation/env-key inspection: strict Profile tests, provider-neutral integration, Calendar Adapter tests, and full suite pass exact Refs/relations and generic storage/search/get; see `work/slice-5-calendar-profile-gate.md` and `work/slice-6-google-calendar-mocked-gate.md`
+Status: pass — reverified 2026-07-16 after completed live Google checkpoint: strict Profile/integration/Adapter/full tests plus one live generic Calendar search/get pass exact Refs and generic paths; see `work/slice-5-calendar-profile-gate.md`, `work/slice-6-google-calendar-mocked-gate.md`, and `work/google-human-checkpoint-live.md`
 
 ### C6. Google Calendar is a complete read Source Adapter
 A configured Google Calendar Source uses exact selected scopes and supports deterministic incremental sync, pagination, tombstones, invalid-cursor recovery, retrieval, stable Source-scoped Refs, and generic search/get over selected calendars with no calendar mutation capability.
 Depends: C3, C5
-Status: pass — reverified 2026-07-16 after checkpoint preparation/env-key inspection: final CI, 862-test suite, focused Calendar tests, compiled workflow, and two independent approvals prove sync/reconciliation/retrieve, exact Grant/scopes/Realms, and GET-only egress; see `work/slice-6-google-calendar-mocked-gate.md`
+Status: pass — reverified 2026-07-16 after completed live Google checkpoint: final CI/mocked suites/reviews and approved live sync/search/get prove reconciliation/retrieve, exact Grant/scopes/Realms, and read-only egress; see `work/slice-6-google-calendar-mocked-gate.md` and `work/google-human-checkpoint-live.md`
 
 ### C7. Google multi-Source consent works live
 At an explicit Human checkpoint, one approved Google Account can authorize the exact requested mailbox/calendar scopes, reuse one compatible Grant across named mailbox and calendar Sources, and expose the exact approved harmless live mailbox and calendar search/get evidence without leaking credentials or mutating provider state.
 Depends: C6
-Status: blocked — consent, exact Account/Grant/Sources, and bounded Gmail search/get pass; approved 8-day and 60-day Calendar reads produced no supported Ref, so Calendar search/get awaits explicit one-year-window approval; see `work/google-human-checkpoint-live.md`
+Status: pass — user explicitly approved and completed consent; one compatible Grant and named mailbox/calendar Sources pass exact inventory, bounded Gmail search/get and Calendar sync/search/get, with redacted evidence and no ctxindex provider mutation; see `work/google-human-checkpoint-live.md`
 
 ### C8. Microsoft authorization supports personal and work Accounts
 The Microsoft identity flow supports approved Outlook.com and Microsoft 365 Accounts through authorization code with PKCE/loopback semantics, exact Adapter-selected delegated scopes, refresh, stable external identity, deterministic errors, and no broader permissions than loaded selected Sources require.

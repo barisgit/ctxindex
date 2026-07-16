@@ -2,14 +2,14 @@
   "charterId": "20260716-115652-implement-secure-provider-neutra",
   "schemaVersion": "file-interface",
   "objective": "Implement secure provider-neutral Accounts and Grants, repair secrets backend operations, and add production Google Calendar plus Microsoft Graph mail/calendar Adapters with read access and reversible Draft create/update only, verified through isolated mocked and explicit Human OAuth checkpoints without any send capability.",
-  "status": "paused",
+  "status": "active",
   "createdAt": "2026-07-16T11:56:52.401Z",
-  "updatedAt": "2026-07-16T18:10:41.966Z",
+  "updatedAt": "2026-07-16T18:15:43.646Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
   "previousStatus": "active",
-  "nextSeq": 2155,
-  "latestSourceSeq": 2148,
-  "snapshotHash": "774af3cdb6fc2a92aeaf9a74c161f1051bf165159b1b2c7fdd6c152995d99b46",
+  "nextSeq": 2185,
+  "latestSourceSeq": 2175,
+  "snapshotHash": "3d580fb7e66860821dabb33edf70a57b05dccbbdcdec01801b11c32fb6085256",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -17,9 +17,9 @@
       "depends": [],
       "status": {
         "value": "pass",
-        "note": "reverified 2026-07-16 after checkpoint preparation/env-key inspection: strict change/all OpenSpec validation and final CI pass with the accepted scope/design; see `work/slice-1-contract-gate.md` and `work/slice-6-google-calendar-mocked-gate.md`"
+        "note": "reverified 2026-07-16 after completed live Google checkpoint: strict change/all OpenSpec validation and final CI pass with the accepted scope/design; see `work/slice-1-contract-gate.md` and `work/slice-6-google-calendar-mocked-gate.md`"
       },
-      "statusSeq": 2109
+      "statusSeq": 2183
     },
     {
       "id": "C2",
@@ -29,9 +29,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "reverified 2026-07-16 after checkpoint preparation/env-key inspection: final CI/full suite retain explicit typed backends, no fallback/literal-secret CLI, and crash-safe switching; see `work/slice-2-secrets-gate.md`"
+        "note": "reverified 2026-07-16 after completed live Google checkpoint: final CI/full suite retain explicit typed backends, no fallback/literal-secret CLI, and crash-safe switching; see `work/slice-2-secrets-gate.md`"
       },
-      "statusSeq": 2109
+      "statusSeq": 2183
     },
     {
       "id": "C3",
@@ -42,9 +42,9 @@
       ],
       "status": {
         "value": "in-progress",
-        "note": "live Google checkpoint now proves one stable Account, one exact compatible Grant, and two named Sources sharing it without broader scopes; Microsoft subject proof remains in its provider slice; see `work/google-human-checkpoint-live.md`"
+        "note": "completed live Google checkpoint proves one stable Account, one exact compatible Grant, and two named Sources sharing it without broader scopes; Microsoft personal/work subject proof remains in Slice 7; see `work/google-human-checkpoint-live.md`"
       },
-      "statusSeq": 2126
+      "statusSeq": 2183
     },
     {
       "id": "C4",
@@ -54,9 +54,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "reverified 2026-07-16 after checkpoint preparation/env-key inspection: compiled Google workflow lists one Account/Grant and three named Realm/Source bindings with exact scopes and no subject/secret output; see `work/slice-6-google-calendar-mocked-gate.md`"
+        "note": "reverified 2026-07-16 after completed live Google checkpoint: compiled and live inventories list one Account/Grant with named Realm/Source bindings, exact scopes, and no subject/secret evidence; see `work/slice-6-google-calendar-mocked-gate.md` and `work/google-human-checkpoint-live.md`"
       },
-      "statusSeq": 2109
+      "statusSeq": 2183
     },
     {
       "id": "C5",
@@ -66,9 +66,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "reverified 2026-07-16 after checkpoint preparation/env-key inspection: strict Profile tests, provider-neutral integration, Calendar Adapter tests, and full suite pass exact Refs/relations and generic storage/search/get; see `work/slice-5-calendar-profile-gate.md` and `work/slice-6-google-calendar-mocked-gate.md`"
+        "note": "reverified 2026-07-16 after completed live Google checkpoint: strict Profile/integration/Adapter/full tests plus one live generic Calendar search/get pass exact Refs and generic paths; see `work/slice-5-calendar-profile-gate.md`, `work/slice-6-google-calendar-mocked-gate.md`, and `work/google-human-checkpoint-live.md`"
       },
-      "statusSeq": 2109
+      "statusSeq": 2183
     },
     {
       "id": "C6",
@@ -79,9 +79,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "reverified 2026-07-16 after checkpoint preparation/env-key inspection: final CI, 862-test suite, focused Calendar tests, compiled workflow, and two independent approvals prove sync/reconciliation/retrieve, exact Grant/scopes/Realms, and GET-only egress; see `work/slice-6-google-calendar-mocked-gate.md`"
+        "note": "reverified 2026-07-16 after completed live Google checkpoint: final CI/mocked suites/reviews and approved live sync/search/get prove reconciliation/retrieve, exact Grant/scopes/Realms, and read-only egress; see `work/slice-6-google-calendar-mocked-gate.md` and `work/google-human-checkpoint-live.md`"
       },
-      "statusSeq": 2109
+      "statusSeq": 2183
     },
     {
       "id": "C7",
@@ -90,10 +90,10 @@
         "C6"
       ],
       "status": {
-        "value": "blocked",
-        "note": "consent, exact Account/Grant/Sources, and bounded Gmail search/get pass; approved 8-day and 60-day Calendar reads produced no supported Ref, so Calendar search/get awaits explicit one-year-window approval; see `work/google-human-checkpoint-live.md`"
+        "value": "pass",
+        "note": "user explicitly approved and completed consent; one compatible Grant and named mailbox/calendar Sources pass exact inventory, bounded Gmail search/get and Calendar sync/search/get, with redacted evidence and no ctxindex provider mutation; see `work/google-human-checkpoint-live.md`"
       },
-      "statusSeq": 2150
+      "statusSeq": 2183
     },
     {
       "id": "C8",

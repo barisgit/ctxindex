@@ -70,7 +70,7 @@
 
 ### Human checkpoint: Google mailbox and calendar
 
-- [ ] 6.8 Prepare a fresh ignored isolated checkpoint and exact Google mailbox+calendar scope/payload/read plan, then pause before browser login/consent. After explicit approval, create one compatible Grant and named mailbox/calendar Sources, perform bounded harmless mailbox/calendar search/get only, preserve redacted evidence, and mark complete only after user confirms the expected Account/Sources and no provider mutation.
+- [x] 6.8 Prepare a fresh ignored isolated checkpoint and exact Google mailbox+calendar scope/payload/read plan, then pause before browser login/consent. After explicit approval, create one compatible Grant and named mailbox/calendar Sources, perform bounded harmless mailbox/calendar search/get only, preserve redacted evidence, and mark complete only after user confirms the expected Account/Sources and no provider mutation.
 
 ## 7. Microsoft Identity and Mailbox Reads
 
