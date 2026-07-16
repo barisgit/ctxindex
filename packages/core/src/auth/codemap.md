@@ -21,7 +21,7 @@ Owns provider-neutral OAuth authorization, Grant lifecycle, token exchange/refre
 
 ## Integration points
 
-- Provider declarations and Adapter auth contracts come from `@ctxindex/extension-sdk` through `packages/core/src/registry/`; Google supplies its declaration from `packages/adapters/src/google-oauth-provider.ts`.
+- Provider declarations and Adapter auth contracts come from `@ctxindex/extension-sdk` through `packages/core/src/registry/`; built-ins supply Google and Microsoft declarations from `packages/adapters/src/google-oauth-provider.ts` and `packages/adapters/src/microsoft/provider.ts`.
 - Account persistence is delegated to `packages/core/src/account/`; secrets/config/logging/storage dependencies are supplied by their core capabilities.
 - OAuth and provider API requests use `packages/core/src/net/egressFetch` with declaration-specific host lists.
 - `packages/core/src/source/provider-context.ts`, CLI auth/source workflows, and provider-facing services consume the public `@ctxindex/core/auth` surface.

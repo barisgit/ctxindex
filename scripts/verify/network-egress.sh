@@ -26,7 +26,7 @@ grep -RInE \
   "https?://[^'\" )]+" \
   . \
   | grep -vE "($ALLOWLIST_PATTERN)" \
-  | grep -vE "packages/core/src/auth/loopback.ts:.*http://127\.0\.0\.1" \
+  | grep -vE "packages/core/src/auth/loopback.ts:.*http://localhost" \
   >> "$violations" || true
 
 # fetch() is only allowed inside the single core egress chokepoint; every other

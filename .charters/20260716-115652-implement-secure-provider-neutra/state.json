@@ -2,14 +2,16 @@
   "charterId": "20260716-115652-implement-secure-provider-neutra",
   "schemaVersion": "file-interface",
   "objective": "Implement secure provider-neutral Accounts and Grants, repair secrets backend operations, and add production Google Calendar plus Microsoft Graph mail/calendar Adapters with read access and reversible Draft create/update only, verified through isolated mocked and explicit Human OAuth checkpoints without any send capability.",
-  "status": "active",
+  "status": "completed",
   "createdAt": "2026-07-16T11:56:52.401Z",
-  "updatedAt": "2026-07-16T20:10:11.179Z",
+  "updatedAt": "2026-07-16T22:48:24.164Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
   "previousStatus": "active",
-  "nextSeq": 3174,
-  "latestSourceSeq": 3167,
-  "snapshotHash": "b2ff26ec7a96166e2483832128900d028449a6f0e1b12b73119f70fcbb92d431",
+  "completedAt": "2026-07-16T22:40:48.523Z",
+  "completionNote": "V1.1 complete: final automated, live, review, QA, verification, synchronization, and documentation gates passed. OpenSpec change intentionally left active and unarchived.",
+  "nextSeq": 4043,
+  "latestSourceSeq": 4029,
+  "snapshotHash": "e98d9b304ca270027dc3ff5535c00e11a5836d4648f0696974e50cb388de33fd",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -17,9 +19,9 @@
       "depends": [],
       "status": {
         "value": "pass",
-        "note": "reverified 2026-07-16 after completed live Google checkpoint: strict change/all OpenSpec validation and final CI pass with the accepted scope/design; see `work/slice-1-contract-gate.md` and `work/slice-6-google-calendar-mocked-gate.md`"
+        "note": "reverified 2026-07-16 on the settled snapshot: strict OpenSpec validation, drift sweep, final independent reviews, and synchronized main specs are coherent; see `work/final-drift-sweep.md`, `work/final-independent-reviews.md`, `work/final-openspec-verification.md`, and `work/final-openspec-sync.md`"
       },
-      "statusSeq": 2183
+      "statusSeq": 4042
     },
     {
       "id": "C2",
@@ -29,9 +31,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "reverified 2026-07-16 after completed live Google checkpoint: final CI/full suite retain explicit typed backends, no fallback/literal-secret CLI, and crash-safe switching; see `work/slice-2-secrets-gate.md`"
+        "note": "reverified 2026-07-16 on the settled snapshot: explicit typed backends, no fallback or argv secret input, crash-safe switching, and black-box backend workflows pass; see `work/slice-2-secrets-gate.md`, `work/final-automated-gate.md`, and `work/final-black-box-qa.md`"
       },
-      "statusSeq": 2183
+      "statusSeq": 4042
     },
     {
       "id": "C3",
@@ -42,9 +44,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "live Google evidence plus Slice 7 Microsoft personal/work fixtures prove stable provider subjects, exact granted scopes, Account reuse, distinct identity separation, refresh rotation, and shared named Sources without broader permissions; see `work/google-human-checkpoint-live.md` and `work/slice-7-microsoft-mail-gate.md`"
+        "note": "reverified 2026-07-16 on the settled snapshot: provider-neutral identity, Account reuse, exact Grants, refresh rotation, shared Sources, and both live providers are proven; see `work/slice-7-microsoft-mail-gate.md`, `work/google-human-checkpoint-live.md`, and `work/microsoft-human-checkpoint-live.md`"
       },
-      "statusSeq": 2521
+      "statusSeq": 4042
     },
     {
       "id": "C4",
@@ -54,9 +56,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "reverified 2026-07-16 after completed live Google checkpoint: compiled and live inventories list one Account/Grant with named Realm/Source bindings, exact scopes, and no subject/secret evidence; see `work/slice-6-google-calendar-mocked-gate.md` and `work/google-human-checkpoint-live.md`"
+        "note": "reverified 2026-07-16 on the settled snapshot: deterministic Account/Grant/Source/Realm inventory remains credential-safe in compiled, black-box, and live evidence; see `work/slice-10-product-workflow-gate.md`, `work/final-black-box-qa.md`, and both live checkpoint reports"
       },
-      "statusSeq": 2183
+      "statusSeq": 4042
     },
     {
       "id": "C5",
@@ -66,9 +68,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "reverified 2026-07-16 after completed live Google checkpoint: strict Profile/integration/Adapter/full tests plus one live generic Calendar search/get pass exact Refs and generic paths; see `work/slice-5-calendar-profile-gate.md`, `work/slice-6-google-calendar-mocked-gate.md`, and `work/google-human-checkpoint-live.md`"
+        "note": "reverified 2026-07-16 on the settled snapshot: one strict provider-neutral Calendar Profile drives Google and Microsoft sync, search, and retrieval; see `work/slice-5-calendar-profile-gate.md`, `work/slice-9-microsoft-calendar-gate.md`, and `work/final-openspec-verification.md`"
       },
-      "statusSeq": 2183
+      "statusSeq": 4042
     },
     {
       "id": "C6",
@@ -79,9 +81,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "reverified 2026-07-16 after completed live Google checkpoint: final CI/mocked suites/reviews and approved live sync/search/get prove reconciliation/retrieve, exact Grant/scopes/Realms, and read-only egress; see `work/slice-6-google-calendar-mocked-gate.md` and `work/google-human-checkpoint-live.md`"
+        "note": "reverified 2026-07-16 on the settled snapshot: Google Calendar paging, reconciliation, retrieval, exact scopes, bounded egress, and live reads pass; see `work/slice-6-google-calendar-mocked-gate.md`, `work/google-human-checkpoint-live.md`, and `work/final-black-box-qa.md`"
       },
-      "statusSeq": 2183
+      "statusSeq": 4042
     },
     {
       "id": "C7",
@@ -91,9 +93,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "user explicitly approved and completed consent; one compatible Grant and named mailbox/calendar Sources pass exact inventory, bounded Gmail search/get and Calendar sync/search/get, with redacted evidence and no ctxindex provider mutation; see `work/google-human-checkpoint-live.md`"
+        "note": "reverified 2026-07-16 on the settled snapshot: the approved Google checkpoint used one compatible Grant across named mailbox/calendar Sources with bounded reads and no provider mutation; see `work/google-human-checkpoint-live.md`"
       },
-      "statusSeq": 2183
+      "statusSeq": 4042
     },
     {
       "id": "C8",
@@ -104,9 +106,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "Microsoft common/public S256 provider metadata and the real core OAuth path pass personal/work fixtures, stable Graph `/me` subject reuse, exact granted scopes, repeated persisted refresh rotation, malformed cleanup, and bounded identity/Graph hosts; see `work/slice-7-microsoft-mail-gate.md`"
+        "note": "reverified 2026-07-16 on the settled snapshot: Microsoft common/public S256 auth supports personal/work identity, exact scopes, safe refresh rotation, and bounded hosts; see `work/slice-7-microsoft-mail-gate.md` and `work/final-openspec-verification.md`"
       },
-      "statusSeq": 2521
+      "statusSeq": 4042
     },
     {
       "id": "C9",
@@ -116,9 +118,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "provider-owned Outlook discovery/retrieve/attachments pass fully quoted bounded KQL, immutable-ID Refs, complete text normalization, generic Relations/thread/materialization/exports, exact cached bytes, degradation, and provider-neutral core/CLI gates; see `work/slice-7-microsoft-mail-gate.md`"
+        "note": "reverified 2026-07-16 on the settled snapshot: Outlook discovery, complete retrieval, Relations, immutable Refs, artifacts, cache, and exports pass generic paths; see `work/slice-7-microsoft-mail-gate.md`, `work/final-automated-gate.md`, and `work/final-black-box-qa.md`"
       },
-      "statusSeq": 2521
+      "statusSeq": 4042
     },
     {
       "id": "C10",
@@ -128,9 +130,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "mocked Graph and compiled CLI paths prove strict pre-egress validation, exactly one non-retried POST/PATCH, immutable canonical Draft Ref reuse, complete replacement/clearing, generic local materialization, exact reversible Action bindings, `Mail.ReadWrite` without `Mail.Send`, and zero send routes; see `work/slice-8-outlook-draft-gate.md`"
+        "note": "reverified 2026-07-16 on the settled snapshot: Gmail and Outlook Draft create/update remain reversible one-shot mutations with no send scope, Action, or route; see `work/slice-8-outlook-draft-gate.md`, `work/microsoft-human-checkpoint-live.md`, and `work/final-independent-reviews.md`"
       },
-      "statusSeq": 2780
+      "statusSeq": 4042
     },
     {
       "id": "C11",
@@ -141,9 +143,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "provider-owned default v1.0 delta and named-calendar complete scans, exact Source-scoped retrieval, cross-provider Realm/search/get/window isolation, `Calendars.Read`, and no beta/write routes pass focused/full/compiled gates and independent review; see `work/slice-9-microsoft-calendar-gate.md`"
+        "note": "reverified 2026-07-16 on the settled snapshot: stable Microsoft Calendar delta/named scans, retrieval, exact Realms, bounded read scope, and no write route pass; see `work/slice-9-microsoft-calendar-gate.md`, `work/microsoft-human-checkpoint-live.md`, and `work/final-openspec-verification.md`"
       },
-      "statusSeq": 3131
+      "statusSeq": 4042
     },
     {
       "id": "C12",
@@ -155,10 +157,10 @@
         "C11"
       ],
       "status": {
-        "value": "in-progress",
-        "note": "Google/Microsoft identity, mail/calendar reads, and Outlook Drafts pass declared-host, loopback-only mock, redaction, canonical malformed-input zero-I/O, one-shot mutation, and no-send gates; Slice 10 still owns the final recursive global hardening; see `work/slice-7-microsoft-mail-gate.md`, `work/slice-8-outlook-draft-gate.md`, and `work/slice-9-microsoft-calendar-gate.md`"
+        "value": "pass",
+        "note": "reverified 2026-07-16 on the settled snapshot: exact host/mock ownership, redirect and loopback confinement, redaction, per-Account bearer isolation, malformed zero-side-effect, and no-send gates pass; see `work/final-automated-gate.md`, `work/final-drift-sweep.md`, and `work/final-independent-reviews.md`"
       },
-      "statusSeq": 3131
+      "statusSeq": 4042
     },
     {
       "id": "C13",
@@ -171,10 +173,10 @@
         "C11"
       ],
       "status": {
-        "value": "in-progress",
-        "note": "compiled workflows now add named Microsoft Calendar beside Google Calendar and Outlook across exact Realms with Account inventory, isolated overlapping event ids, search/get/update/delete/window behavior, threads/exports/attachment cache, and reversible Drafts; Slice 10 still owns one relocated all-product workflow"
+        "value": "pass",
+        "note": "reverified 2026-07-16 on the settled snapshot: the relocated binary and fresh black-box QA prove multi-Account, multi-Realm mail/calendar/files workflows, artifacts/exports, and reversible Drafts; see `work/slice-10-product-workflow-gate.md` and `work/final-black-box-qa.md`"
       },
-      "statusSeq": 3131
+      "statusSeq": 4042
     },
     {
       "id": "C14",
@@ -188,10 +190,10 @@
         "C11"
       ],
       "status": {
-        "value": "in-progress",
-        "note": "registry-derived interfaces now expose Microsoft OAuth/mailbox/calendar and exact read-only Calendar plus reversible Draft declarations through generic commands without provider-specific CLI/core paths; Slice 10 still owns final generated guidance and package verification"
+        "value": "pass",
+        "note": "reverified 2026-07-16 on the settled snapshot: generated registries/help, agent guidance, environment schema, packaging, architecture manifests, and synchronized capability specs are authoritative; see `work/final-drift-sweep.md`, `work/final-openspec-sync.md`, and `work/final-black-box-qa.md`"
       },
-      "statusSeq": 3131
+      "statusSeq": 4042
     },
     {
       "id": "C15",
@@ -203,10 +205,10 @@
         "C14"
       ],
       "status": {
-        "value": "in-progress",
-        "note": "Slice 9 Microsoft/Google calendar focused/full/compiled/D3/strict gates and corrected independent reviews pass with no remaining critical/important findings; the live Microsoft Human checkpoint, final drift, and fresh-context QA remain; see `work/slice-9-microsoft-calendar-gate.md`"
+        "value": "pass",
+        "note": "final settled 2026-07-16 evidence includes 12/12 CI gates with 945 tests, clean drift/cartography, two independent reviews with no critical/important findings, ten first-run black-box workflows plus Bun 1.3.14 D3, approved redacted Google/Microsoft checkpoints, 33/33 verified delta requirement headings, and ten synchronized main specs; see `work/final-automated-gate.md`, `work/final-drift-sweep.md`, `work/final-independent-reviews.md`, `work/final-black-box-qa.md`, `work/final-openspec-verification.md`, and `work/final-openspec-sync.md`"
       },
-      "statusSeq": 3131
+      "statusSeq": 4042
     }
   ]
 }

@@ -67,7 +67,10 @@ export async function openOAuthLoopback(input: {
   const codeVerifier = randomToken()
   const server = createServer()
   const port = await listen(server)
-  const redirectUri = `http://127.0.0.1:${port}${callbackPath}`
+  // Entra ignores ephemeral ports only for the literal localhost host. Keep
+  // the listener pinned to IPv4 loopback while advertising the portable
+  // native-app redirect URI required by providers using that matching rule.
+  const redirectUri = `http://localhost:${port}${callbackPath}`
   const authorization = new URL(input.authorizationEndpoint)
   for (const [name, value] of Object.entries(
     input.provider.fixedAuthorizationParams ?? {},
@@ -118,13 +121,34 @@ export async function openOAuthLoopback(input: {
         )
         return
       }
-      if (url.searchParams.get('error') === 'access_denied') {
+      const providerError = url.searchParams.get('error')
+      if (providerError === 'access_denied') {
         response.writeHead(400, { 'content-type': 'text/plain' })
         response.end('authorization denied')
         finish(
           new CtxindexAuthError(
             'authorization_denied',
             'OAuth authorization failed: authorization_denied',
+          ),
+        )
+        return
+      }
+      if (providerError) {
+        const safeError = /^[A-Za-z0-9._-]{1,64}$/.test(providerError)
+          ? providerError
+          : 'unknown_error'
+        const providerCode = url.searchParams
+          .get('error_description')
+          ?.match(/\b[A-Z]{2,12}\d{3,10}\b/)?.[0]
+        const diagnostic = providerCode
+          ? `${safeError} (${providerCode})`
+          : safeError
+        response.writeHead(400, { 'content-type': 'text/plain' })
+        response.end(`authorization failed: ${diagnostic}`)
+        finish(
+          new CtxindexAuthError(
+            'oauth_failed',
+            `OAuth authorization failed: ${diagnostic}`,
           ),
         )
         return

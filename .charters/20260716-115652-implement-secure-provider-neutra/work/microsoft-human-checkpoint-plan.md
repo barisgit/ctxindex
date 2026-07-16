@@ -18,12 +18,12 @@ Create or reuse one public Microsoft Entra application with:
 
 - supported account types: organizational directories plus personal Microsoft Accounts, matching the declared `/common` authority;
 - Mobile and desktop applications/public-client platform;
-- loopback redirect `http://127.0.0.1/callback`; ctxindex adds an ephemeral port at runtime while preserving the registered `/callback` path;
+- loopback redirect `http://localhost/oauth/callback`; ctxindex adds an ephemeral port at runtime, which Entra ignores for `localhost`, while preserving the registered `/oauth/callback` path;
 - public client flows enabled;
 - no client secret, certificate, or application permission;
 - Microsoft Graph delegated permissions only: `User.Read`, `Mail.ReadWrite`, and `Calendars.Read`.
 
-The authorization request adds declared `openid` and `offline_access`. `Mail.Send`, `Calendars.ReadWrite`, application permissions, send routes, and Calendar mutation permissions are forbidden. Tenant policy may require administrator approval; stop and record that as a blocker rather than broadening permissions.
+The authorization request adds declared `openid` and `offline_access` and MUST NOT request `Mail.Send` or `Calendars.ReadWrite`. The current Calendar Adapter exposes no mutation permission, Action, or route. A reused external public client may nevertheless return cumulative scopes previously consented for that client; if the user explicitly accepts that external overgrant, record the exact granted scope names and prove no write route is invoked rather than misreporting them as requested scopes. Tenant policy may require administrator approval; stop and record that as a blocker rather than broadening the ctxindex request.
 
 Registration references:
 
