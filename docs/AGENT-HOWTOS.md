@@ -10,10 +10,10 @@ Run from the repository root. The supported development invocation is `bun cli` 
 bun install
 bash scripts/verify/cli.sh
 bun cli extensions list
-bun cli describe --format markdown
+bun cli describe
 ```
 
-The generated description is authoritative for Profile IDs and aliases, field types, export formats, Adapter IDs and configuration flags, and Action schemas.
+The compact generated index is authoritative for loaded definition IDs. Inspect one definition with `bun cli describe <profile|adapter|action> <id> --json`; request `bun cli describe --full --format markdown` only when a complete snapshot is needed. Detail output owns aliases, field types, export formats, Adapter configuration flags, and Action schemas.
 
 ## Fresh isolated state
 

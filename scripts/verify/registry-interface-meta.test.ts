@@ -33,7 +33,10 @@ test('workflow skills point to runtime vocabulary instead of declaring it', asyn
     }
   }
   for (const term of forbidden) expect(prose).not.toContain(`\`${term}\``)
-  expect(prose).toContain('ctxindex describe --format markdown')
+  expect(prose).toContain(
+    'ctxindex describe <profile|adapter|action> <id> --json',
+  )
+  expect(prose).toContain('ctxindex describe --full --format markdown')
   expect(prose).toContain('ctxindex extensions list')
   expect(prose).not.toContain('--config-root-path')
 })

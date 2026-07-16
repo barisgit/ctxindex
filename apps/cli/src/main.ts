@@ -17,13 +17,41 @@ import { sourceCommand } from './commands/source'
 import { statusCommand } from './commands/status'
 import { syncCommand } from './commands/sync'
 import { threadCommand } from './commands/thread'
-import { loadCliDefinitions, printExtensionDiagnostics } from './definitions'
 import { setCliLogLevel } from './deps'
 import { mapErrorToExit } from './format/exit'
-import { formatRegistryText } from './format/registry'
 
 const LOG_LEVELS = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'] as const
 type LogLevelName = (typeof LOG_LEVELS)[number]
+
+// Keep custom help sections on the same color policy as citty's renderer.
+const noColor =
+  process.env.NO_COLOR === '1' ||
+  process.env.TERM === 'dumb' ||
+  process.env.TEST !== undefined ||
+  process.env.CI !== undefined
+const ansi = (open: number, close: number, value: string): string =>
+  noColor ? value : `\u001B[${open}m${value}\u001B[${close}m`
+const bold = (value: string) => ansi(1, 22, value)
+const underline = (value: string) => ansi(4, 24, value)
+const cyan = (value: string) => ansi(36, 39, value)
+
+function formatInterfaceUsage(): string {
+  const rows: readonly [string, string][] = [
+    ['ctxindex describe', 'List loaded definitions.'],
+    ['ctxindex describe <type> <id>', 'Show one full definition.'],
+    ['ctxindex describe <type> <id> --json', 'Return exact definition JSON.'],
+    ['ctxindex describe --full [--json]', 'Return the full snapshot.'],
+  ]
+  const width = Math.max(...rows.map(([command]) => command.length))
+  return [
+    underline(bold('INTERFACE')),
+    '',
+    ...rows.map(
+      ([command, description]) =>
+        `  ${cyan(command.padStart(width))}  ${description}`,
+    ),
+  ].join('\n')
+}
 
 function isLogLevelName(value: string): value is LogLevelName {
   return (LOG_LEVELS as readonly string[]).includes(value)
@@ -147,11 +175,7 @@ export async function runCli(args: string[]): Promise<number> {
       rawArgs: rest.length === 0 ? ['--help'] : rest,
       showUsage: async (command, parent) => {
         await showUsage(command, parent)
-        const definitions = await loadCliDefinitions()
-        printExtensionDiagnostics(definitions.diagnostics)
-        console.log(
-          `\nLoaded interface:\n${formatRegistryText(definitions.description)}`,
-        )
+        console.log(`\n${formatInterfaceUsage()}`)
       },
     })
   } finally {

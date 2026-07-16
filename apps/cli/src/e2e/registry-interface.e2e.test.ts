@@ -53,6 +53,18 @@ test('interpreted registry interface follows an explicit external Extension', as
     expect(registry.sources).toContainEqual(
       expect.objectContaining({ id: 'enarocanje.fixture' }),
     )
+    expect(registry.kinds[0]).not.toHaveProperty('fields')
+    expect(registry.sources[0]).not.toHaveProperty('config')
+    expect(registry.actions[0]).not.toHaveProperty('input')
+
+    const fullRegistry = await run(['describe', '--full', '--json'])
+    expect(fullRegistry.exitCode, fullRegistry.stderr).toBe(0)
+    expect(JSON.parse(fullRegistry.stdout).kinds).toContainEqual(
+      expect.objectContaining({
+        id: 'enarocanje.tender',
+        fields: expect.any(Array),
+      }),
+    )
 
     const selectedProfile = await run([
       'describe',
@@ -60,9 +72,12 @@ test('interpreted registry interface follows an explicit external Extension', as
       'enarocanje.tender',
       '--json',
     ])
-    expect(JSON.parse(selectedProfile.stdout)).toEqual([
-      expect.objectContaining({ id: 'enarocanje.tender' }),
-    ])
+    expect(JSON.parse(selectedProfile.stdout)).toEqual(
+      expect.objectContaining({
+        id: 'enarocanje.tender',
+        fields: expect.any(Array),
+      }),
+    )
     const unknownSelector = await run(['describe', 'kind'])
     expect(unknownSelector.exitCode).toBe(2)
     expect(unknownSelector.stderr).toContain('unknown selector')
@@ -71,17 +86,71 @@ test('interpreted registry interface follows an explicit external Extension', as
     expect(unknown.stderr).toContain('unknown adapter id')
     const text = await run(['describe', 'action'])
     expect(text.exitCode, text.stderr).toBe(0)
-    expect(text.stdout).toContain('ACTION communication.message.draft.create')
+    expect(text.stdout).toContain('ACTIONS (2)')
+    expect(text.stdout).toContain('communication.message.draft.create')
+    expect(text.stdout).not.toContain('input:')
+
+    const actionDetail = await run([
+      'describe',
+      'action',
+      'communication.message.draft.create',
+    ])
+    expect(actionDetail.exitCode, actionDetail.stderr).toBe(0)
+    expect(actionDetail.stdout).toContain(
+      '  input:\n    to <string[]> required',
+    )
+    expect(actionDetail.stdout).toContain('      min items: 1')
+    expect(actionDetail.stdout).toContain(
+      '      items: <string>; min length: 1; pattern:',
+    )
+    expect(actionDetail.stdout).toContain('    subject <string> required')
+    expect(actionDetail.stdout).toContain(
+      '    additional properties: not allowed',
+    )
+    expect(actionDetail.stdout).not.toContain('input: {"$schema"')
+
+    const actionJson = await run([
+      'describe',
+      'action',
+      'communication.message.draft.create',
+      '--json',
+    ])
+    expect(actionJson.exitCode, actionJson.stderr).toBe(0)
+    expect(JSON.parse(actionJson.stdout)).toMatchObject({
+      id: 'communication.message.draft.create',
+      input: {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        properties: {
+          to: { type: 'array', minItems: 1 },
+          subject: { type: 'string' },
+        },
+        required: ['to', 'subject', 'bodyText'],
+        additionalProperties: false,
+      },
+    })
 
     const markdown = await run(['describe', '--format', 'markdown'])
     expect(markdown.exitCode, markdown.stderr).toBe(0)
-    expect(markdown.stdout).toContain('### enarocanje.tender@1')
-    expect(markdown.stdout).toContain('`reference` (string)')
+    expect(markdown.stdout).toContain('## Profiles (3)')
+    expect(markdown.stdout).toContain('`enarocanje.tender@1`')
+    expect(markdown.stdout).not.toContain('`reference` (string)')
+
+    const profileMarkdown = await run([
+      'describe',
+      'profile',
+      'enarocanje.tender',
+      '--format',
+      'markdown',
+    ])
+    expect(profileMarkdown.exitCode, profileMarkdown.stderr).toBe(0)
+    expect(profileMarkdown.stdout).toContain('### enarocanje.tender@1')
+    expect(profileMarkdown.stdout).toContain('`reference` (string)')
 
     const help = await run([])
     expect(help.exitCode, help.stderr).toBe(0)
-    expect(help.stdout).toContain('enarocanje.tender@1')
-    expect(help.stdout).toContain('aliases: tenders')
+    expect(help.stdout).toContain('INTERFACE')
+    expect(help.stdout).toContain('ctxindex describe <type> <id> --json')
+    expect(help.stdout).not.toContain('enarocanje.tender@1')
 
     for (const args of [
       ['search', '--help'],
@@ -92,8 +161,12 @@ test('interpreted registry interface follows an explicit external Extension', as
     ]) {
       const commandHelp = await run(args)
       expect(commandHelp.exitCode, commandHelp.stderr).toBe(0)
-      expect(commandHelp.stdout).toContain('Loaded interface:')
-      expect(commandHelp.stdout).toContain('enarocanje.tender@1')
+      expect(commandHelp.stdout).toContain('INTERFACE')
+      expect(commandHelp.stdout).toContain(
+        'ctxindex describe <type> <id> --json',
+      )
+      expect(commandHelp.stdout).not.toContain('Loaded interface:')
+      expect(commandHelp.stdout).not.toContain('enarocanje.tender@1')
     }
 
     const extensions = await run(['extensions', 'list', '--json'])
@@ -109,6 +182,10 @@ test('interpreted registry interface follows an explicit external Extension', as
     const builtInHelp = await run(['source', 'add', '--help'])
     expect(builtInHelp.exitCode, builtInHelp.stderr).toBe(0)
     expect(builtInHelp.stdout).toContain('--config-root-path')
+    expect(builtInHelp.stdout).toContain('ctxindex describe <type> <id>')
+    const localDetail = await run(['describe', 'adapter', 'local.directory'])
+    expect(localDetail.exitCode, localDetail.stderr).toBe(0)
+    expect(localDetail.stdout).toContain('--config-root-path')
 
     await writeFile(
       join(configDir, 'ctxindex', 'config.toml'),
@@ -116,8 +193,12 @@ test('interpreted registry interface follows an explicit external Extension', as
     )
     const degradedHelp = await run(['--help'])
     expect(degradedHelp.exitCode).toBe(0)
-    expect(degradedHelp.stderr).toContain('missing.ts')
-    expect(degradedHelp.stdout).toContain('enarocanje.tender@1')
+    expect(degradedHelp.stderr).toBe('')
+    expect(degradedHelp.stdout).not.toContain('enarocanje.tender@1')
+    const degradedDescribe = await run(['describe'])
+    expect(degradedDescribe.exitCode).toBe(0)
+    expect(degradedDescribe.stderr).toContain('missing.ts')
+    expect(degradedDescribe.stdout).toContain('enarocanje.tender@1')
   } finally {
     await rm(root, { recursive: true, force: true })
   }

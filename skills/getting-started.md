@@ -16,6 +16,6 @@ Start with the [CLI overview](./reference/cli-overview.md).
 
 ## Email Drafts
 
-The agent may compose proposed text without calling ctxindex. Before persisting a provider Draft, inspect the loaded reversible Actions with `ctxindex describe --format markdown` and invoke the applicable Action through an explicit mailbox Source.
+The agent may compose proposed text without calling ctxindex. Before persisting a provider Draft, list loaded reversible Actions with `ctxindex describe action`, inspect the applicable definition with `ctxindex describe action <action-id> --json`, and invoke it through an explicit mailbox Source.
 
 V1 does not send email. Sending and other consequential provider mutations are deferred.

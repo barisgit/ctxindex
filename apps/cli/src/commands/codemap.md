@@ -21,7 +21,7 @@ Delegating adapters are `auth.ts` to `auth/handle-auth-command.ts`, `source.ts` 
 ## Integration points
 
 - `action.ts`: `describeAction`, `runAction`; `artifact.ts`/`purge.ts`: `ArtifactService`; `export.ts`: `exportSourceResource`.
-- `describe.ts`/`extensions.ts`: `loadCliDefinitions` and registry formatters; `get.ts`: `getSourceResource`; `search.ts`: `SearchPlanner`.
+- `describe.ts`: loads definitions and routes compact indexes, exact-id detail, or explicit full snapshots through registry formatters; `extensions.ts`: loaded Extension listings; `get.ts`: `getSourceResource`; `search.ts`: `SearchPlanner`.
 - `realm.ts`: `realmService`; `status.ts`: `sourceService`; `thread.ts`: `ThreadService`; `secrets.ts`: secrets/config services.
 - `skills.ts`: `resolveBundledSkills`, `listSkills`, and `getSkillContent`; `init.ts`/`db.ts`: core storage bootstrap/open/migration functions.
 - All command descriptors are consumed by `apps/cli/src/main.ts`; shared wiring lives in `apps/cli/src/deps.ts`, `definitions.ts`, `args/`, and `format/`.

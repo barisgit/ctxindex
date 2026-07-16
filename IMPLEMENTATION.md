@@ -151,7 +151,7 @@ No bespoke `mail draft` command is maintained in parallel.
 
 ## 11. CLI derivation
 
-The loaded registries determine valid kinds/aliases, field names and parsers, Source configuration flags, export formats, and Actions. `ctxindex describe` exposes the same machine-readable facts used to build CLI help and agent docs.
+The loaded registries determine valid kinds/aliases, field names and parsers, Source configuration flags, export formats, and Actions. `ctxindex describe` exposes a compact generated index, selector-only forms narrow that index, exact-id forms expose full readable or JSON detail, and explicit `--full` requests the complete snapshot. Citty help points to this interface instead of appending all loaded definitions.
 
 All required input is non-interactive. OAuth may open a browser but has a headless authorization-code path. Human text goes to stderr when structured output is requested; JSON data goes to stdout.
 

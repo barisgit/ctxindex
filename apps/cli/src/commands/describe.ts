@@ -28,13 +28,18 @@ export async function handleDescribeCommand(args: string[]): Promise<number> {
       console.error(`describe: unknown ${parsed.selector} id "${parsed.id}"`)
       return 2
     }
+    const view = parsed.id ? 'detail' : parsed.full ? 'full' : 'compact'
     if (parsed.format === 'json')
       console.log(
-        JSON.stringify(registryJsonValue(selected, parsed.selector), null, 2),
+        JSON.stringify(
+          registryJsonValue(selected, parsed.selector, view),
+          null,
+          2,
+        ),
       )
     else if (parsed.format === 'markdown')
-      console.log(formatRegistryMarkdown(selected))
-    else console.log(formatRegistryText(selected))
+      console.log(formatRegistryMarkdown(selected, view))
+    else console.log(formatRegistryText(selected, view))
     return 0
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))
@@ -52,6 +57,7 @@ export const describeCommand = defineCommand({
     id: { type: 'positional', required: false },
     format: { type: 'string', description: 'text, markdown, or json' },
     json: { type: 'boolean', description: 'Print pure JSON' },
+    full: { type: 'boolean', description: 'Show every matched definition' },
   },
   run: ({ rawArgs }) => runWithExit(() => handleDescribeCommand(rawArgs)),
 })

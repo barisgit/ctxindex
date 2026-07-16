@@ -19,4 +19,4 @@ Handlers pass domain rows/descriptions to a focused formatter: `auth.ts` formats
 
 - Consumed by `apps/cli/src/main.ts`, modules under `apps/cli/src/commands/`, and handlers under `apps/cli/src/auth/`, `source/`, and `sync/`.
 - Inputs come from `@ctxindex/core/errors`, `/realm`, `/registry`, `/secrets`, `/source`, and `/sync`, plus skill types from `apps/cli/src/skills/loader.ts`.
-- `registry.ts` exposes `filterRegistryDescription`, `registryJsonValue`, `formatRegistryText`, `formatRegistryMarkdown`, and `formatExtensions` for describe/extensions commands.
+- `registry.ts` exposes deterministic compact/detail/full registry projections, structural Action JSON-Schema rendering with local fallback fragments, exact JSON values, and Extension listings for describe/extensions commands.

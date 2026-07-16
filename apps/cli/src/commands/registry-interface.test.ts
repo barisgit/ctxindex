@@ -48,7 +48,33 @@ const description: RegistryDescription = {
       id: 'fake.run',
       profile: { id: 'fake.kind', version: 1 },
       effect: 'reversible',
-      input: { type: 'object' },
+      input: {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object',
+        properties: {
+          to: {
+            type: 'array',
+            minItems: 1,
+            items: {
+              type: 'string',
+              minLength: 1,
+              pattern: '^[^\\r\\n]*$',
+            },
+          },
+          subject: { type: 'string', pattern: '^[^\\r\\n]*$' },
+          priority: {
+            type: 'integer',
+            minimum: 1,
+            maximum: 5,
+            default: 3,
+          },
+          advanced: {
+            allOf: [{ type: 'string', minLength: 2 }],
+          },
+        },
+        required: ['to', 'subject'],
+        additionalProperties: false,
+      },
       output: { id: 'fake.kind', version: 1 },
       docs: 'Run it',
       examples: [{ title: 'Example' }],
@@ -66,10 +92,18 @@ describe('describe interface', () => {
       selector: 'profile',
       id: 'fake.kind',
       format: 'markdown',
+      full: false,
     })
     expect(parseDescribeArgs(['--json'])).toEqual({
       kind: 'describe',
       format: 'json',
+      full: false,
+    })
+    expect(parseDescribeArgs(['action', '--full', '--json'])).toEqual({
+      kind: 'describe',
+      selector: 'action',
+      format: 'json',
+      full: true,
     })
     expect(parseDescribeArgs(['unknown'])).toMatchObject({ kind: 'unknown' })
     expect(parseDescribeArgs(['--format', 'yaml'])).toMatchObject({
@@ -80,9 +114,16 @@ describe('describe interface', () => {
     expect(parseDescribeArgs(['--json=false'])).toMatchObject({
       kind: 'unknown',
     })
+    expect(parseDescribeArgs(['action', 'fake.run', '--full'])).toMatchObject({
+      kind: 'unknown',
+      message: 'describe: --full is redundant with an exact id',
+    })
+    expect(parseDescribeArgs(['--full=false'])).toMatchObject({
+      kind: 'unknown',
+    })
   })
 
-  test('filters exact ids and renders text, Markdown, and JSON data', () => {
+  test('filters exact ids and renders full text, Markdown, and JSON data', () => {
     const selected = filterRegistryDescription(
       description,
       'adapter',
@@ -90,28 +131,116 @@ describe('describe interface', () => {
     )
     expect(selected).toBeDefined()
     if (!selected) throw new Error('expected selected Adapter')
-    expect(registryJsonValue(selected, 'adapter')).toEqual(description.sources)
+    expect(registryJsonValue(selected, 'adapter', 'full')).toEqual(
+      description.sources,
+    )
     expect(
       filterRegistryDescription(description, 'profile', 'missing'),
     ).toBeUndefined()
-    expect(formatRegistryText(description)).toContain(
+    expect(formatRegistryText(description, 'full')).toContain(
       '--config-root-path <string> required',
     )
-    const text = formatRegistryText(description)
+    const text = formatRegistryText(description, 'full')
     expect(text).toContain('A fake profile')
     expect(text).toContain('title <string> - Display title')
     expect(text).toContain('markdown (text/markdown)')
     expect(text).toContain('A fake adapter')
     expect(text).toContain('Root path; default: "/notes"')
     expect(text).toContain('Run it')
-    expect(text).toContain('examples: [{"title":"Example"}]')
-    const markdown = formatRegistryMarkdown(description)
+    expect(text).toContain('  input:')
+    expect(text).toContain('    to <string[]> required')
+    expect(text).toContain('      min items: 1')
+    expect(text).toContain(
+      '      items: <string>; min length: 1; pattern: "^[^\\\\r\\\\n]*$"',
+    )
+    expect(text).toContain('    subject <string> required')
+    expect(text).toContain('    priority <integer>')
+    expect(text).toContain('      minimum: 1')
+    expect(text).toContain('      maximum: 5')
+    expect(text).toContain('      default: 3')
+    expect(text).toContain(
+      '      schema fragment: {"allOf":[{"type":"string","minLength":2}]}',
+    )
+    expect(text).toContain('    additional properties: not allowed')
+    expect(text).not.toContain('input: {"$schema"')
+    expect(text).toContain('  examples:\n    [\n      {')
+    expect(text).toContain('  auth: none')
+    expect(text).not.toContain('auth: {"kind":"none"}')
+    const markdown = formatRegistryMarkdown(description, 'full')
     expect(markdown).toContain('# ctxindex Registry')
     expect(markdown).toContain('`title` (string)')
     expect(markdown).toContain('Display title')
     expect(markdown).toContain('--config-root-path')
     expect(markdown).toContain('Adapter bindings: fake.adapter@1')
-    expect(markdown).toContain('Examples: `[{"title":"Example"}]`')
+    expect(markdown).toContain('| `to` | `string[]` | yes |')
+    expect(markdown).toContain('| `priority` | `integer` | no |')
+    expect(markdown).toContain(
+      'schema fragment: {"allOf":[{"type":"string","minLength":2}]}',
+    )
+    expect(markdown).toContain('Additional properties are not allowed.')
+    expect(markdown).not.toContain('Input: `{"$schema"')
+    expect(markdown).toContain('```json\n[')
+    expect(markdown).toContain('- Auth: none')
+  })
+
+  test('projects compact lists, exact detail, and explicit full snapshots', () => {
+    expect(registryJsonValue(description, undefined, 'compact')).toEqual({
+      kinds: [
+        {
+          id: 'fake.kind',
+          version: 1,
+          summary: 'A fake profile',
+          aliases: ['fake'],
+        },
+      ],
+      sources: [
+        {
+          id: 'fake.adapter',
+          version: 1,
+          summary: 'A fake adapter',
+          routing: 'indexed',
+          capabilities: ['retrieve'],
+        },
+      ],
+      actions: [
+        {
+          id: 'fake.run',
+          profile: { id: 'fake.kind', version: 1 },
+          effect: 'reversible',
+          output: { id: 'fake.kind', version: 1 },
+          adapters: [{ id: 'fake.adapter', version: 1 }],
+        },
+      ],
+    })
+    const selectedAction = filterRegistryDescription(
+      description,
+      'action',
+      'fake.run',
+    )
+    expect(selectedAction).toBeDefined()
+    if (!selectedAction) throw new Error('expected selected Action')
+    expect(registryJsonValue(selectedAction, 'action', 'detail')).toEqual(
+      description.actions[0],
+    )
+    const selectedMarkdown = formatRegistryMarkdown(selectedAction, 'detail')
+    expect(selectedMarkdown).toContain('## Actions')
+    expect(selectedMarkdown).not.toContain('## Profiles')
+    expect(selectedMarkdown).not.toContain('## Adapters')
+    expect(registryJsonValue(description, undefined, 'full')).toEqual(
+      description,
+    )
+
+    const compactText = formatRegistryText(description, 'compact')
+    expect(compactText).toContain('PROFILES (1)')
+    expect(compactText).toContain('fake.kind@1 - A fake profile')
+    expect(compactText).not.toContain('field title')
+    expect(compactText).toContain(
+      'Use `ctxindex describe <profile|adapter|action> <id>` for full details.',
+    )
+    const compactMarkdown = formatRegistryMarkdown(description, 'compact')
+    expect(compactMarkdown).toContain('## Profiles (1)')
+    expect(compactMarkdown).toContain('- `fake.kind@1` — A fake profile')
+    expect(compactMarkdown).not.toContain('Fields:')
   })
 })
 
