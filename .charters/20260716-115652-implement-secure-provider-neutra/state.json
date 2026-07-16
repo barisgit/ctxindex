@@ -4,12 +4,12 @@
   "objective": "Implement secure provider-neutral Accounts and Grants, repair secrets backend operations, and add production Google Calendar plus Microsoft Graph mail/calendar Adapters with read access and reversible Draft create/update only, verified through isolated mocked and explicit Human OAuth checkpoints without any send capability.",
   "status": "active",
   "createdAt": "2026-07-16T11:56:52.401Z",
-  "updatedAt": "2026-07-16T18:15:43.646Z",
+  "updatedAt": "2026-07-16T18:56:32.600Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
   "previousStatus": "active",
-  "nextSeq": 2185,
-  "latestSourceSeq": 2175,
-  "snapshotHash": "3d580fb7e66860821dabb33edf70a57b05dccbbdcdec01801b11c32fb6085256",
+  "nextSeq": 2550,
+  "latestSourceSeq": 2539,
+  "snapshotHash": "7f18f403f8a863303ba92a263535201bdd604ab4e4ca026623fd72fcbc080b30",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -41,10 +41,10 @@
         "C2"
       ],
       "status": {
-        "value": "in-progress",
-        "note": "completed live Google checkpoint proves one stable Account, one exact compatible Grant, and two named Sources sharing it without broader scopes; Microsoft personal/work subject proof remains in Slice 7; see `work/google-human-checkpoint-live.md`"
+        "value": "pass",
+        "note": "live Google evidence plus Slice 7 Microsoft personal/work fixtures prove stable provider subjects, exact granted scopes, Account reuse, distinct identity separation, refresh rotation, and shared named Sources without broader permissions; see `work/google-human-checkpoint-live.md` and `work/slice-7-microsoft-mail-gate.md`"
       },
-      "statusSeq": 2183
+      "statusSeq": 2521
     },
     {
       "id": "C4",
@@ -103,10 +103,10 @@
         "C3"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "pass",
+        "note": "Microsoft common/public S256 provider metadata and the real core OAuth path pass personal/work fixtures, stable Graph `/me` subject reuse, exact granted scopes, repeated persisted refresh rotation, malformed cleanup, and bounded identity/Graph hosts; see `work/slice-7-microsoft-mail-gate.md`"
       },
-      "statusSeq": 2109
+      "statusSeq": 2521
     },
     {
       "id": "C9",
@@ -115,10 +115,10 @@
         "C8"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "pass",
+        "note": "provider-owned Outlook discovery/retrieve/attachments pass fully quoted bounded KQL, immutable-ID Refs, complete text normalization, generic Relations/thread/materialization/exports, exact cached bytes, degradation, and provider-neutral core/CLI gates; see `work/slice-7-microsoft-mail-gate.md`"
       },
-      "statusSeq": 2109
+      "statusSeq": 2521
     },
     {
       "id": "C10",
@@ -155,10 +155,10 @@
         "C11"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "in-progress",
+        "note": "Google and Microsoft identity/mail reads now pass declared-host, loopback-only mock, redaction, canonical malformed-input zero-I/O, and no-send gates; Outlook Draft and Microsoft Calendar mutation/egress proofs remain in Slices 8–9; see `work/slice-7-microsoft-mail-gate.md`"
       },
-      "statusSeq": 2109
+      "statusSeq": 2521
     },
     {
       "id": "C13",
@@ -171,10 +171,10 @@
         "C11"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "in-progress",
+        "note": "compiled workflows now prove named Google mailbox/calendar and Microsoft Outlook Sources across exact Realms with Account inventory, mail/event search/get, Outlook thread/export/attachment cache; Microsoft Calendar and Outlook Draft steps remain"
       },
-      "statusSeq": 2109
+      "statusSeq": 2521
     },
     {
       "id": "C14",
@@ -188,10 +188,10 @@
         "C11"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "in-progress",
+        "note": "registry-derived interfaces now expose Microsoft OAuth/mailbox declarations and generic commands without provider-specific CLI/core paths; final Draft/Calendar declarations and generated guidance verification remain"
       },
-      "statusSeq": 2109
+      "statusSeq": 2521
     },
     {
       "id": "C15",
@@ -203,10 +203,10 @@
         "C14"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "in-progress",
+        "note": "Slice 7 focused/full/compiled/D3/strict/review gates pass 896/0 with redacted evidence; Microsoft Draft, Calendar, live Human checkpoint, final drift, and fresh-context QA remain"
       },
-      "statusSeq": 2109
+      "statusSeq": 2521
     }
   ]
 }

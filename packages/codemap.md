@@ -2,29 +2,28 @@
 
 ## Responsibility
 
-Contains the reusable workspace libraries that define ctxindex's domain/runtime services, extension contract, provider-neutral Profiles, and built-in provider Adapters.
+Contains reusable workspace libraries defining ctxindex's provider-neutral domain/runtime services, extension contract, Profiles, and built-in Google, Microsoft, and filesystem Adapters.
 
 ## Design/patterns
 
-- Layered packages: `extension-sdk` defines contracts; `profiles` supplies declarative domain vocabularies; `adapters` performs provider/filesystem I/O; `core` validates definitions and owns application services, persistence, orchestration, configuration, search, and typed file/Keychain secret routing.
-- Package boundaries are explicit TypeScript export maps in each `packages/*/package.json`; the root `package.json` includes `packages/*` as Bun workspaces, and repository verification derives imports to enforce downward dependency direction and truthful direct manifests.
-- Detailed maps: `packages/extension-sdk/codemap.md`, `packages/profiles/codemap.md`, `packages/adapters/codemap.md`. Core's completed subsystem maps live under `packages/core/src/*/codemap.md`.
+- Layered packages: `extension-sdk` defines contracts; `profiles` supplies declarative domain vocabularies; `adapters` performs provider/filesystem I/O; `core` validates definitions and owns services, persistence, orchestration, configuration, search, and typed secret routing.
+- Explicit TypeScript export maps and repository verification enforce package dependency direction and truthful direct manifests.
+- Provider composition remains outside core: adapters bundle Google Calendar, Gmail, Microsoft Outlook mailbox, and local-directory definitions against provider-neutral SDK/Profile contracts.
 
 ## Data & control flow
 
 1. Profiles and Adapters are authored against `@ctxindex/extension-sdk` and bundled as Extensions.
-2. Core extension/registry services load and validate definitions, then source/search/sync/action services dispatch Adapter operations through SDK contexts.
-3. Adapter outputs are validated against Profile schemas and flow through core resource, relation, artifact, export, thread, and search services into the Drizzle/Bun SQLite storage model.
-4. Core configuration, paths, secrets, auth, network egress, logging, and migrations provide the runtime infrastructure around those workflows.
+2. Core loads and validates definitions and Google/Microsoft OAuth declarations, then dispatches source, auth, search, sync, retrieval, Artifact, and Action operations through SDK contexts.
+3. Adapter outputs flow through core validation and resource/relation/artifact/search services into SQLite where workflows require local persistence.
+4. Core configuration, secrets, paths, networking, logging, and migrations surround those workflows; central environment keys supply provider credentials and guarded test routing.
 
 ## Integration points
 
 | Package | Integration role | Detailed map |
 | --- | --- | --- |
 | `packages/extension-sdk/` | Shared contracts for definitions, contexts, emissions, and operations. | `packages/extension-sdk/codemap.md` |
-| `packages/profiles/` | Built-in provider-neutral calendar-event, communication-message, and file vocabularies. | `packages/profiles/codemap.md` |
-| `packages/adapters/` | Built-in Google Calendar, Gmail, and local-directory integrations. | `packages/adapters/codemap.md` |
-| `packages/core/` | Application services, registries, SQLite storage/schema, sync/search/action pipelines, and runtime infrastructure exported by `packages/core/src/index.ts` and subpath exports. | `packages/core/src/*/codemap.md` |
+| `packages/profiles/` | Provider-neutral calendar-event, communication-message, and file vocabularies. | `packages/profiles/codemap.md` |
+| `packages/adapters/` | Built-in Google, Microsoft, and local-directory provider integrations. | `packages/adapters/codemap.md` |
+| `packages/core/` | Provider-neutral services, registries, SQLite storage/schema, operation pipelines, and runtime infrastructure. | `packages/core/codemap.md` |
 
-- `apps/cli/` is the primary workspace consumer of core services and registered definitions; external extensions also consume the SDK.
-- Third-party boundaries include Zod, Drizzle/Bun SQLite, Google OAuth/Gmail/Calendar, Node filesystem/keychain APIs, and logging/parsing utilities declared by each package manifest.
+- `apps/cli/` is the primary workspace consumer; external extensions consume the SDK boundary.

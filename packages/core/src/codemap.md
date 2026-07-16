@@ -2,28 +2,25 @@
 
 ## Responsibility
 
-Implements ctxindex's core domain and application layer: extension definition registration, Realm/Source lifecycle, authenticated provider operations, Resource/Relation persistence, sync/search/retrieval, Actions, exports, Artifacts, threads, and shared runtime infrastructure.
+Implements ctxindex's provider-neutral domain and application layer: extension registration, Realm/Source lifecycle, authenticated provider operations, Resource/Relation persistence, sync/search/retrieval, Actions, exports, Artifacts, threads, and shared runtime infrastructure.
 
 ## Design/patterns
 
-- Capability folders expose canonical `index.ts` Interfaces; the root `index.ts` composes the primary API and package subpaths target those capability indexes directly without root shims.
-- Profiles and Adapters from `@ctxindex/extension-sdk` form the strategy/plugin boundary: `extension/loader.ts` loads definitions, `registry/` validates and indexes Profiles, Adapters, and provider-neutral OAuth declarations, Profiles own payload semantics, and Adapters own provider I/O plus API-host authority.
-- Factory-built application services (`createRealmService()`, `createSourceService()`, `createThreadService()`) and repositories (`ResourceStore`, `RelationStore`, `ArtifactStore`) receive explicit database, registry, auth, and logger dependencies.
-- SQLite is the system of record: `schema/` defines tables, `storage/` opens and bootstraps databases, and `sync/` applies validated Adapter emissions transactionally. Zod guards configuration, extension, provider, and payload boundaries.
-- Cross-cutting contracts are centralized in `errors.ts` (`CtxindexError` hierarchy), `exit-codes.ts` (`mapSyncErrorCode()`), `ids.ts` (`newId()`), `ref/` (`parseRef()`), plus `config/`, `paths/`, `logger/`, `net/`, and `secrets/`; the latter routes typed refs without fallback and switches backends with copy/verify/reference-commit/config-commit/cleanup ordering.
+- Capability folders expose canonical `index.ts` interfaces; the root barrel and package subpaths publish those seams without provider-specific business logic.
+- Profiles and Adapters form the strategy/plugin boundary: registries validate definitions and OAuth declarations, Profiles own payload semantics, and Adapters own provider I/O and API-host authority. Built-in Google and Microsoft implementations enter only through composition.
+- Factory-built services and repositories receive explicit database, registry, auth, and logger dependencies; SQLite schema/storage plus transactional sync remain the local system of record.
+- Cross-cutting contracts are centralized in errors, exit codes, IDs, Refs, configuration, paths, logging, networking, and typed secret routing. `config/` centrally types Google/Microsoft credential and loopback test environment keys.
 
 ## Data & control flow
 
-1. `config/readConfig()` and `paths/` resolve runtime state; on first initialization `secrets/initialize.ts` probes Keychain, falls back to file only during selection, and persists the choice before `storage/bootstrapDatabase()` creates directories, opens SQLite, and applies migrations.
-2. `extension/loadExtensions()` builds an `ExtensionRegistry`; `account/` and `auth/` establish provider-neutral Account identity and Grant state, while Realm and `source/createSourceService()` operations establish ownership and Adapter coordinates used by later calls.
-3. Source sync runs `source/syncSource()` into `SyncCoordinator.run()`, which validates emissions, writes Resources through `ResourceStore`, resolves Relations through `RelationStore`, and advances durable sync state.
-4. Reads and commands enter through `SearchPlanner`, `getSourceResource()`, `runAction()`, `exportSourceResource()`, `ArtifactService`, or `ThreadService`; these resolve registry definitions, invoke Adapter operations through `createSourceProviderContext()` when needed, and return validated domain results and warnings.
-5. Failures cross module boundaries as typed errors from `errors.ts`; sync terminal failures are normalized to stable process outcomes by `mapSyncErrorCode()`.
+1. Configuration/paths resolve runtime state, secrets select and persist a backend, and storage bootstraps SQLite and migrations.
+2. Extension loading builds registries; account/auth establish provider-neutral Account identities and Grants for provider declarations such as Google or Microsoft, while Realm/Source services establish ownership and Adapter coordinates.
+3. Source sync validates Adapter emissions transactionally; search, retrieval, Artifact download, Actions, exports, and threads resolve registered definitions and invoke provider operations through constrained provider contexts.
+4. Adapter results return as validated resources, relations, artifacts, warnings, checkpoints, or Action outputs; typed core errors map failures across module and process boundaries.
 
 ## Integration points
 
-- Public package surface: `packages/core/src/index.ts` and the subpath barrels referenced by `packages/core/package.json`.
-- Provider contracts and definitions: `packages/extension-sdk/src/index.ts`, `packages/profiles/src/`, and concrete definitions in `packages/adapters/src/`.
-- Application composition and consumers: `apps/cli/src/deps.ts`, CLI command handlers, and `apps/cli/src/sync/runner.ts`.
-- Persistence boundary: `packages/core/src/schema/`, `packages/core/src/storage/`, and stores under `resource/`, `relation/`, and `artifact/`.
-- Detailed capability maps live in each populated child `codemap.md`, including `account/`, `auth/`, `source/`, `sync/`, `search/`, `registry/`, and infrastructure folders; private cross-capability helpers are mapped under `internal/`.
+- Public surface: `packages/core/src/index.ts` and capability subpaths in `packages/core/package.json`.
+- Definitions/contracts: `packages/extension-sdk/src/`, provider-neutral Profiles, and built-in Google, Microsoft, and filesystem Adapters under `packages/adapters/src/`.
+- Application composition: `apps/cli/src/deps.ts`, command handlers, and sync runner.
+- Detailed capability maps live in populated child `codemap.md` files, including auth, config, registry, source, search, sync, artifact, and persistence infrastructure.

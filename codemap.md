@@ -7,27 +7,27 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 ## Design / patterns
 
 - Bun/Turborepo monorepo split into a user-facing application (`apps/`), reusable runtime and contract packages (`packages/`), external authoring examples (`examples/`), and repository tooling (`scripts/`).
-- Layered boundaries keep CLI parsing and presentation separate from core application services, provider-neutral Profile contracts, and provider/filesystem Adapter I/O.
-- Extensions bundle declarative Profiles and Source Adapters; core registries validate those definitions before service workflows dispatch operations and persist local state.
-- Secret persistence is selected explicitly: a typed vault routes existing references to file or Keychain backends without fallback, while a crash-safe manager owns backend changes.
+- Layered boundaries keep CLI presentation separate from provider-neutral core services and Profiles, while Adapters own Google, Microsoft Graph, and filesystem I/O.
+- Extensions bundle declarative Profiles and Source Adapters; core registries validate definitions and OAuth provider declarations before workflows dispatch operations and persist local state.
+- Secret persistence and central typed environment capture provide provider credentials without moving provider-specific transport logic into core.
 
 ## Entry points
 
-- `package.json` — workspace manifest and root commands; `bun cli` invokes the application, while `build`, `typecheck`, `test`, and `ci` compose repository gates.
-- `apps/cli/bin/ctxindex.mjs` — executable shim that forwards argv to `apps/cli/src/main.ts#runCli` and assigns the returned exit code.
-- `packages/core/src/index.ts` — primary core package export surface for domain services and runtime infrastructure.
-- `packages/extension-sdk/src/index.ts` — public authoring/runtime contract for Profiles, Source Adapters, and Extensions.
-- `packages/profiles/src/index.ts` and `packages/adapters/src/index.ts` — bundled definition and provider-integration export surfaces.
+- `package.json` — workspace manifest and root commands; `bun cli` invokes the application, while build/typecheck/test/CI compose repository gates.
+- `apps/cli/bin/ctxindex.mjs` — executable shim forwarding argv to `runCli` and assigning its exit code.
+- `packages/core/src/index.ts` — core domain services and runtime infrastructure export surface.
+- `packages/extension-sdk/src/index.ts` — public Profile, Adapter, Extension, OAuth, and operation contracts.
+- `packages/profiles/src/index.ts` and `packages/adapters/src/index.ts` — built-in semantic definitions and Google/Microsoft/filesystem integrations.
 
 ## Data & control flow
 
-CLI argv enters `apps/cli/bin/ctxindex.mjs`, is parsed and dispatched by `apps/cli/src/`, and reaches services exported by `packages/core/`. Core loads Profile and Adapter definitions from the package registry, invokes provider operations through the Extension SDK contracts, validates emitted data, and coordinates search, retrieval, Actions, sync, local persistence, and typed secret storage. Results return through CLI formatters to terminal output and a stable process status.
+CLI input is parsed and dispatched by `apps/cli/` into core services. Core loads Profile, Adapter, and OAuth declarations, constrains authenticated provider contexts, validates outputs, and coordinates search, retrieval, Artifact download, Actions, sync, persistence, and typed secrets. Google APIs, Microsoft Graph, or the local filesystem remain behind Adapter operation contracts; results return through CLI formatters with stable process statuses.
 
 ## Integration points
 
-- Root orchestration: Bun workspaces and Turbo tasks declared in `package.json`; CI freezes the lockfile, builds every workspace, and validates direct dependency use/direction from discovered imports.
-- Local persistence/runtime: core storage, schema, configuration, secrets, logging, and network boundaries under `packages/core/src/`.
-- External systems: Gmail, Google Calendar, and filesystem access implemented under `packages/adapters/src/`.
+- Root orchestration: Bun workspaces and Turbo tasks in `package.json`; repository gates enforce dependency and architecture boundaries.
+- Runtime: core storage, schema, configuration, secrets, logging, networking, auth, and operation services under `packages/core/src/`.
+- External systems: Google OAuth/Gmail/Calendar, Microsoft OAuth/Graph Outlook mailbox, and filesystem access under `packages/adapters/src/`.
 - Public extension boundary: `packages/extension-sdk/src/index.ts`, demonstrated by `examples/`.
 
 ## Directory map
@@ -35,6 +35,6 @@ CLI argv enters `apps/cli/bin/ctxindex.mjs`, is parsed and dispatched by `apps/c
 | Directory | Responsibility | Detailed map |
 | --- | --- | --- |
 | `apps/` | Deployable application workspaces, currently the Bun-based `ctxindex` CLI. | [`apps/codemap.md`](apps/codemap.md) |
-| `packages/` | Reusable core runtime, extension contract, provider-neutral Profiles, and built-in Adapters. | [`packages/codemap.md`](packages/codemap.md) |
-| `examples/` | Self-contained external Extension examples using only the public authoring boundary. | [`examples/codemap.md`](examples/codemap.md) |
+| `packages/` | Core runtime, extension contract, provider-neutral Profiles, and built-in Google/Microsoft/filesystem Adapters. | [`packages/codemap.md`](packages/codemap.md) |
+| `examples/` | External Extension examples using only the public authoring boundary. | [`examples/codemap.md`](examples/codemap.md) |
 | `scripts/` | Repository policy gates, isolated implementation spikes, and bounded command tooling. | [`scripts/codemap.md`](scripts/codemap.md) |

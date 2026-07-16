@@ -7,7 +7,7 @@ import {
 import { CTXINDEX_BUILTIN_EXTENSIONS } from './index'
 
 describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
-  test('describes declarative Google Calendar, Gmail, and local Source definitions', () => {
+  test('describes declarative Google, Microsoft, and local Source definitions', () => {
     const registry = createExtensionRegistry(CTXINDEX_BUILTIN_EXTENSIONS)
     const description = describeRegistry(registry)
 
@@ -29,6 +29,11 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
         capabilities: ['download', 'retrieve', 'search-remote'],
       },
       { id: 'local.directory', version: 1, capabilities: ['sync'] },
+      {
+        id: 'microsoft.mailbox',
+        version: 1,
+        capabilities: ['download', 'retrieve', 'search-remote'],
+      },
     ])
     expect(
       registry.profiles.list().map(({ id, version }) => ({ id, version })),
@@ -123,6 +128,10 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
     })
     const gmail = registry.adapters.get({ id: 'google.mailbox', version: 1 })
     const local = registry.adapters.get({ id: 'local.directory', version: 1 })
+    const microsoft = registry.adapters.get({
+      id: 'microsoft.mailbox',
+      version: 1,
+    })
 
     expect(gmail?.auth).toEqual({
       kind: 'oauth2',
@@ -203,6 +212,22 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
     ).toBe(true)
     expect(
       gmail?.configSchema.safeParse({ access_token: 'malicious' }).success,
+    ).toBe(false)
+    expect(microsoft?.auth).toMatchObject({
+      kind: 'oauth2',
+      provider: { id: 'microsoft' },
+      scopes: ['Mail.ReadWrite'],
+    })
+    expect(microsoft?.providerApiHosts).toEqual(['graph.microsoft.com'])
+    expect(microsoft?.capabilities).toEqual([
+      'search-remote',
+      'retrieve',
+      'download',
+    ])
+    expect(Object.keys(microsoft?.actions ?? {})).toEqual([])
+    expect(microsoft?.configSchema.safeParse({}).success).toBe(true)
+    expect(
+      microsoft?.configSchema.safeParse({ access_token: 'malicious' }).success,
     ).toBe(false)
     expect(local?.auth).toEqual({ kind: 'none' })
     expect(local?.routing).toBe('indexed')

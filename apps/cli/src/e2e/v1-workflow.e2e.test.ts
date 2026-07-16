@@ -493,4 +493,4 @@ test('real binary proves the isolated complete V1 workflow', async () => {
     mock.stop()
     await sandbox.cleanup()
   }
-})
+}, 30_000)

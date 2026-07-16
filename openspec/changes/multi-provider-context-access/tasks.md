@@ -74,17 +74,17 @@
 
 ## 7. Microsoft Identity and Mailbox Reads
 
-- [ ] 7.1 Add central Microsoft environment/loopback configuration, shared declarative provider metadata for `common` personal+organizational auth, S256 PKCE/public-client mode, exact base scopes/hosts, token+identity schemas, and stateful mock token refresh/rotation/Graph identity endpoints.
-- [ ] 7.2 Prove the same core OAuth flow authorizes Microsoft personal/work fixture identities, reuses stable Accounts, stores exact selected scopes, rotates refresh tokens safely, rejects malformed/insufficient responses with cleanup, and never contacts Google hosts.
-- [ ] 7.3 Add provider-owned `microsoft/mailbox` definition/config/transport modules with `communication.message@1`, `Mail.ReadWrite`, federated search/retrieve/download, Draft bindings, immutable-id/text-body preference headers, and no Microsoft SDK dependency.
-- [ ] 7.4 Implement/test bounded Graph message `$search`/KQL translation for supported text/time/typed fields, strict escaping/paging/response schemas, client-side Draft exclusion (because Graph `$search` cannot combine with `$filter`), immutable stable Refs, deterministic normalization/warnings, and provider error/rate-limit taxonomy.
-- [ ] 7.5 Implement/test complete message retrieval, text body/address/header normalization, conversation/RFC Relations, immutable identity across simulated folder moves, canonical Ref validation, 404/bad-response behavior, and generic materialization/thread traversal.
-- [ ] 7.6 Implement/test attachment metadata pagination and managed Artifact descriptors, file `$value` streaming/cache reuse, immutable attachment ids, unsupported attachment warnings, size/media/name validation, and malformed/foreign Artifact zero I/O.
-- [ ] 7.7 Add compiled CLI e2e for Microsoft auth/account inventory, Outlook remote search/get/thread, attachment miss/hit/exact bytes, EML+JSON export, Realm isolation, provider degradation, and no provider-specific CLI/core path.
+- [x] 7.1 Add central Microsoft environment/loopback configuration, shared declarative provider metadata for `common` personal+organizational auth, S256 PKCE/public-client mode, exact base scopes/hosts, token+identity schemas, and stateful mock token refresh/rotation/Graph identity endpoints.
+- [x] 7.2 Prove the same core OAuth flow authorizes Microsoft personal/work fixture identities, reuses stable Accounts, stores exact selected scopes, rotates refresh tokens safely, rejects malformed/insufficient responses with cleanup, and never contacts Google hosts.
+- [x] 7.3 Add provider-owned `microsoft/mailbox` definition/config/transport modules with `communication.message@1`, `Mail.ReadWrite` reserved for Slice 8 Draft bindings, federated search/retrieve/download, immutable-id/text-body preference headers, and no Microsoft SDK dependency.
+- [x] 7.4 Implement/test bounded Graph message `$search`/KQL translation for supported text/time/typed fields, strict escaping/paging/response schemas, client-side Draft exclusion (because Graph `$search` cannot combine with `$filter`), immutable stable Refs, deterministic normalization/warnings, and provider error/rate-limit taxonomy.
+- [x] 7.5 Implement/test complete message retrieval, text body/address/header normalization, conversation/RFC Relations, immutable identity across simulated folder moves, canonical Ref validation, 404/bad-response behavior, and generic materialization/thread traversal.
+- [x] 7.6 Implement/test attachment metadata pagination and managed Artifact descriptors, file `$value` streaming/cache reuse, immutable attachment ids, unsupported attachment warnings, size/media/name validation, and malformed/foreign Artifact zero I/O.
+- [x] 7.7 Add compiled CLI e2e for Microsoft auth/account inventory, Outlook remote search/get/thread, attachment miss/hit/exact bytes, EML+JSON export, Realm isolation, provider degradation, and no provider-specific CLI/core path.
 
 ### Slice 7 gate
 
-- [ ] 7.8 Run Microsoft auth/mail/retrieval/artifact focused and integration/e2e tests, provider/network gates, typecheck/lint/architecture/dependency/full suites, strict OpenSpec/diff; independently review Graph/API/schema/identity fidelity and save `work/slice-7-microsoft-mail-gate.md`.
+- [x] 7.8 Run Microsoft auth/mail/retrieval/artifact focused and integration/e2e tests, provider/network gates, typecheck/lint/architecture/dependency/full suites, strict OpenSpec/diff; independently review Graph/API/schema/identity fidelity and save `work/slice-7-microsoft-mail-gate.md`.
 
 ## 8. Outlook Draft Actions
 

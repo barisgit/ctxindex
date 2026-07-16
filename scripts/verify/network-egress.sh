@@ -8,6 +8,8 @@ ALLOWLIST=(
   "openidconnect.googleapis.com"
   "gmail.googleapis.com"
   "www.googleapis.com"
+  "login.microsoftonline.com"
+  "graph.microsoft.com"
 )
 
 ALLOWLIST_PATTERN=$(IFS='|'; echo "${ALLOWLIST[*]}")
@@ -28,7 +30,7 @@ grep -RInE \
   >> "$violations" || true
 
 # fetch() is only allowed inside the single core egress chokepoint; every other
-# caller (core auth, gmail adapter) routes through egressFetch.
+# caller (core auth and provider Adapters) routes through egressFetch.
 grep -RInE \
   --include='*.ts' \
   --exclude='*.test.ts' \

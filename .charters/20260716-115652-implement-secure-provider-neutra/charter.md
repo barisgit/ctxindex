@@ -34,7 +34,7 @@ Status: pass — reverified 2026-07-16 after completed live Google checkpoint: f
 ### C3. Accounts and Grants are provider-neutral and deduplicated
 Google and Microsoft authorization resolve a stable external identity, upsert exactly one Account per provider identity, retain explicit Grants and scope sets, and allow multiple Sources to reuse a compatible Grant without duplicate Accounts.
 Depends: C1, C2
-Status: in-progress — completed live Google checkpoint proves one stable Account, one exact compatible Grant, and two named Sources sharing it without broader scopes; Microsoft personal/work subject proof remains in Slice 7; see `work/google-human-checkpoint-live.md`
+Status: pass — live Google evidence plus Slice 7 Microsoft personal/work fixtures prove stable provider subjects, exact granted scopes, Account reuse, distinct identity separation, refresh rotation, and shared named Sources without broader permissions; see `work/google-human-checkpoint-live.md` and `work/slice-7-microsoft-mail-gate.md`
 
 ### C4. Agents can inspect configured Accounts and Sources
 A deterministic `account list` interface exposes safe nested Account, Grant, scope, Realm, and Source information in readable and JSON forms, while `source list` remains the canonical inventory including unauthenticated Sources. No secret material is rendered or logged.
@@ -59,12 +59,12 @@ Status: pass — user explicitly approved and completed consent; one compatible 
 ### C8. Microsoft authorization supports personal and work Accounts
 The Microsoft identity flow supports approved Outlook.com and Microsoft 365 Accounts through authorization code with PKCE/loopback semantics, exact Adapter-selected delegated scopes, refresh, stable external identity, deterministic errors, and no broader permissions than loaded selected Sources require.
 Depends: C2, C3
-Status: pending
+Status: pass — Microsoft common/public S256 provider metadata and the real core OAuth path pass personal/work fixtures, stable Graph `/me` subject reuse, exact granted scopes, repeated persisted refresh rotation, malformed cleanup, and bounded identity/Graph hosts; see `work/slice-7-microsoft-mail-gate.md`
 
 ### C9. Outlook mail uses the communication Profile
 The Microsoft mailbox Adapter supports provider-side discovery, complete retrieval, conversation relations, attachments and exports through the existing `communication.message@1` contract, stable immutable provider IDs, deterministic pagination/errors, and generic materialization with no provider-specific core path.
 Depends: C8
-Status: pending
+Status: pass — provider-owned Outlook discovery/retrieve/attachments pass fully quoted bounded KQL, immutable-ID Refs, complete text normalization, generic Relations/thread/materialization/exports, exact cached bytes, degradation, and provider-neutral core/CLI gates; see `work/slice-7-microsoft-mail-gate.md`
 
 ### C10. Outlook Drafts are reversible and never sent
 The existing provider-neutral Draft create/update Actions bind to Microsoft mailbox Sources, request `Mail.ReadWrite` but never `Mail.Send`, perform one non-retried provider mutation per invocation, preserve a stable Draft Ref across update, validate complete replacement input before I/O, and expose no send Action or endpoint.
@@ -79,19 +79,19 @@ Status: pending
 ### C12. Provider egress and secrets remain bounded
 Automated gates prove Google operations contact only Google hosts, Microsoft operations only approved identity/Graph hosts, local Sources make no network requests, mutation routes never include send, logs/diagnostics redact credentials, and malformed input performs zero auth/provider/storage work.
 Depends: C6, C9, C10, C11
-Status: pending
+Status: in-progress — Google and Microsoft identity/mail reads now pass declared-host, loopback-only mock, redaction, canonical malformed-input zero-I/O, and no-send gates; Outlook Draft and Microsoft Calendar mutation/egress proofs remain in Slices 8–9; see `work/slice-7-microsoft-mail-gate.md`
 
 ### C13. Multi-account workflow is useful end to end
 A real compiled CLI in isolated state can represent personal Gmail, personal Google Calendar, work Gmail, work Outlook, and work Microsoft Calendar as explicitly named Sources in chosen Realms; list Accounts/Sources; search all or an exact Realm; retrieve mail/events/attachments; and create/update one Outlook Draft through generic commands.
 Depends: C4, C6, C9, C10, C11
-Status: pending
+Status: in-progress — compiled workflows now prove named Google mailbox/calendar and Microsoft Outlook Sources across exact Realms with Account inventory, mail/event search/get, Outlook thread/export/attachment cache; Microsoft Calendar and Outlook Draft steps remain
 
 ### C14. Generated interface and agent guidance remain authoritative
 Registry-derived `describe`, help, bundled skills, and workflow documentation expose the new Profiles, Adapters, configuration, scopes, Actions, and Account/secrets commands without parallel hand-maintained provider vocabularies or interactive credential prompts.
 Depends: C2, C4, C6, C9, C10, C11
-Status: pending
+Status: in-progress — registry-derived interfaces now expose Microsoft OAuth/mailbox declarations and generic commands without provider-specific CLI/core paths; final Draft/Calendar declarations and generated guidance verification remain
 
 ### C15. Mocked, live, packaging, and regression gates pass
 Focused tests, integration/e2e suites, compiled/relocated binary checks, D3 external Extension proof, typecheck, lint, dependency/architecture checks, strict OpenSpec validation, drift/cartography, independent review, fresh-context QA, and explicit Human Google/Microsoft checkpoints all pass on the final snapshot with no unapproved live traffic.
 Depends: C7, C12, C13, C14
-Status: pending
+Status: in-progress — Slice 7 focused/full/compiled/D3/strict/review gates pass 896/0 with redacted evidence; Microsoft Draft, Calendar, live Human checkpoint, final drift, and fresh-context QA remain

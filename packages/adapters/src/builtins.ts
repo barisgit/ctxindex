@@ -7,6 +7,7 @@ import {
 import { googleCalendarAdapterDefinition } from './google-calendar/definition'
 import { gmailAdapterDefinition } from './google-mailbox/definition'
 import { localDirectoryAdapterDefinition } from './local-directory/definition'
+import { microsoftMailboxAdapterDefinition } from './microsoft/mailbox/definition'
 
 export const ctxindexBuiltinExtension = defineExtension({
   id: 'ctxindex.builtins',
@@ -16,6 +17,7 @@ export const ctxindexBuiltinExtension = defineExtension({
     googleCalendarAdapterDefinition,
     gmailAdapterDefinition,
     localDirectoryAdapterDefinition,
+    microsoftMailboxAdapterDefinition,
   ],
   docs: { summary: 'Bundled ctxindex definitions.' },
 })

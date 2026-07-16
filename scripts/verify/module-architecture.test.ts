@@ -66,10 +66,38 @@ test('built-in Source Adapter implementation is owned by provider modules', asyn
   const builtins = await Bun.file(new URL('builtins.ts', adapterRoot)).text()
   expect(builtins).toContain("from './google-calendar/definition'")
 
+  const microsoftMailboxFiles = (
+    await readdir(new URL('microsoft/mailbox/', adapterRoot))
+  )
+    .filter(isProductionTypeScript)
+    .sort()
+  expect(microsoftMailboxFiles).toEqual(
+    expect.arrayContaining([
+      'config.ts',
+      'definition.ts',
+      'download.ts',
+      'message.ts',
+      'ref.ts',
+      'retrieve.ts',
+      'search-remote.ts',
+      'transport.ts',
+    ]),
+  )
+  expect(builtins).toContain("from './microsoft/mailbox/definition'")
+
   const localFiles = (await readdir(new URL('local-directory/', adapterRoot)))
     .filter(isProductionTypeScript)
     .sort()
   expect(localFiles).toContain('definition.ts')
+})
+
+test('Microsoft mailbox production surface has no send permission or route', async () => {
+  const source = await sourceTree(new URL('microsoft/mailbox/', adapterRoot))
+  expect(source).toContain('Mail.ReadWrite')
+  expect(source).not.toMatch(/Mail\.Send|\/send(?:Mail)?\b|send-message/i)
+  expect(source).not.toMatch(/@microsoft\/|microsoft-graph-client/i)
+  expect(await sourceTree(coreSourceRoot)).not.toContain('microsoft.mailbox')
+  expect(await sourceTree(cliRoot)).not.toContain('microsoft.mailbox')
 })
 
 test('Google Calendar production surface is read-only', async () => {
