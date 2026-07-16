@@ -16,12 +16,11 @@ const envShape = {
   CTXINDEX_NO_BROWSER: optionalString,
   CTXINDEX_LOOPBACK_TIMEOUT_SECS: optionalString,
   CTXINDEX_SKIP_TURBO_DRY_JSON: optionalString,
-  CTXINDEX_GMAIL_AUTH_URL: optionalString,
-  CTXINDEX_GMAIL_TOKEN_URL: optionalString,
+  CTXINDEX_OAUTH_MOCK_BASE_URL: optionalString,
+  CTXINDEX_GOOGLE_CLIENT_ID: optionalString,
+  CTXINDEX_GOOGLE_CLIENT_SECRET: optionalString,
+  CTXINDEX_GOOGLE_REFRESH_TOKEN: optionalString,
   CTXINDEX_GMAIL_MOCK_BASE_URL: optionalString,
-  CTXINDEX_GMAIL_CLIENT_ID: optionalString,
-  CTXINDEX_GMAIL_CLIENT_SECRET: optionalString,
-  CTXINDEX_GMAIL_REFRESH_TOKEN: optionalString,
   CTXINDEX_TEST_LOG_ROTATE_BYTES: optionalString,
   CTXINDEX_TEST_LOG_SPAM_BYTES: optionalString,
   CTXINDEX_TEST_SYNC_DELAY_MS: optionalString,
@@ -45,6 +44,11 @@ let memoizedEnv: Env | undefined
 export function getEnv(): Env {
   memoizedEnv ??= Object.freeze(EnvSchema.parse(process.env))
   return memoizedEnv
+}
+
+export function readEnvironmentVariable(name: string): string | undefined {
+  if (!/^CTXINDEX_[A-Z0-9_]+$/.test(name)) return undefined
+  return getEnv()[name]
 }
 
 export function resetEnvForTests(): void {

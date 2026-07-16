@@ -1,6 +1,6 @@
-export function compareStrings(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0
-}
+import { compareUnicodeCodePoints } from '../internal/code-point-order'
+
+export const compareStrings = compareUnicodeCodePoints
 
 export function compareReferences(
   left: { readonly id: string; readonly version: number },

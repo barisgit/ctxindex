@@ -2,26 +2,23 @@
 
 ## Responsibility
 
-Orchestrates CLI Google OAuth grant creation and listing, including credential resolution, token acquisition, account detection, and persistence.
+Orchestrates provider-neutral OAuth Grant creation from validated CLI input while leaving OAuth protocol behavior in core.
 
 ## Design / patterns
 
-- `handleAuthCommand` dispatches the `AuthArgs.kind` union and scopes `openDeps()` resources with `finally` cleanup.
-- `resolveAddCreds` and `obtainGoogleTokens` in `add-google.ts` select explicit, environment, auth-code, refresh-token, or loopback flows.
-- `openLoopbackFlow` in `google-loopback.ts` implements localhost callback OAuth with state validation and PKCE S256; browser opening is injectable.
-- CLI `CtxindexAuthError` values and `mapCoreAuthError` translate flow/core failures into stable exit codes.
+- `handleAuthCommand` parses the `AuthArgs.kind` union, maps failures to stable exit codes, and scopes loaded definitions/runtime dependencies with `finally` cleanup.
+- `handleAdd` pre-validates the provider plus repeated Adapter selection, then delegates authorization to core `authorizeProvider()`.
+- The CLI supplies only an authorization-URL emitter; core owns loopback PKCE, token/identity requests, scope validation, and Grant persistence.
 
 ## Data & control flow
 
-1. `handleAuthCommand(args)` calls `parseAuthArgs`.
-2. `list` opens dependencies, calls `authService.listGoogleGrants()`, and renders `formatGrants`.
-3. `add` resolves client credentials and adapter scopes via `googleOAuthScopes(registry)`.
-4. `obtainGoogleTokens` either accepts/exchanges a refresh token, exchanges an auth code, or runs `openLoopbackFlow` and exchanges its callback code.
-5. `detectGoogleAccountEmail` optionally resolves identity, then `authService.addGoogleGrant` persists the grant and `formatGrantAdded` renders success.
+1. `handleAuthCommand(args)` calls `parseAuthArgs` and accepts only `auth add <provider> --adapter <id>...` with exactly one of `--loopback` or `--from-env`.
+2. `loadAuthDefinitionDeps()` loads config and the Extension registry; `resolveOAuthSelection()` rejects unknown, duplicate, ambiguous, non-OAuth, or cross-provider Adapter selections before database initialization.
+3. `openDeps()` builds the Auth service against the same definitions, and `authorizeProvider()` runs the selected OAuth flow.
+4. The handler prints the authorization URL when needed and renders the persisted Grant ID with `formatGrantAdded()`.
 
 ## Integration points
 
 - Called by `apps/cli/src/commands/auth.ts`; parsed by `apps/cli/src/args/auth.ts`.
-- Uses `openDeps` from `apps/cli/src/deps.ts` and formatters in `apps/cli/src/format/auth.ts` plus `format/exit.ts`.
-- Uses `@ctxindex/core/auth` for token requests, account lookup, auth-provider keys, and `AuthService`; uses `@ctxindex/core/config` for `CTXINDEX_*` environment values.
-- `google-loopback.ts` integrates with a localhost `node:net` server and `Bun.spawn` browser launch commands.
+- Uses `loadAuthDefinitionDeps`/`openDeps` from `apps/cli/src/deps.ts` and format/error adapters under `apps/cli/src/format/`.
+- Uses `resolveOAuthSelection()` and `authorizeProvider()` from `@ctxindex/core/auth`; loaded OAuth declarations originate in Adapter definitions.

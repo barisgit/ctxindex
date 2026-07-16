@@ -1,80 +1,69 @@
-import { hasHelpFlag, parseFlags, stringFlag } from './flags'
+import { hasHelpFlag, listFlag, parseFlags, stringFlag } from './flags'
 
 export type AuthArgs =
   | {
       readonly kind: 'add'
       readonly provider: string
+      readonly adapterIds: readonly string[]
       readonly clientId?: string
-      readonly clientSecret?: string
-      readonly authCode?: string
-      readonly refreshToken?: string
       readonly label?: string
-      readonly loopback: boolean
-      readonly fromEnv: boolean
+      readonly mode: 'loopback' | 'from-env'
     }
-  | { readonly kind: 'list'; readonly json: boolean }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
-
 export const authUsage =
-  'auth add google (--from-env | --client-id <id> --client-secret <secret> [--auth-code <code> | --refresh-token <token> | --loopback]) | auth list [--json]'
-
+  'auth add <provider> --adapter <id>... (--loopback|--from-env) [--client-id <public-id>] [--label <label>]'
 export function parseAuthArgs(args: string[]): AuthArgs {
   if (hasHelpFlag(args)) return { kind: 'help' }
-  const [subcommand, ...rest] = args
-  if (subcommand === 'list') {
-    const { flags } = parseFlags(rest)
-    return { kind: 'list', json: flags.json === true }
-  }
-  if (subcommand !== 'add') {
+  const [subcommand, provider, ...rest] = args
+  if (subcommand !== 'add')
     return {
       kind: 'unknown',
       message: `auth: unknown subcommand "${subcommand ?? ''}"`,
     }
-  }
-  const [provider, ...flagArgs] = rest
-  if (!provider)
+  if (!provider || provider.startsWith('-'))
     return { kind: 'unknown', message: 'auth add: missing <provider>' }
-  const { flags } = parseFlags(flagArgs)
-  for (const key of Object.keys(flags)) {
-    if (
-      key !== 'client-id' &&
-      key !== 'client-secret' &&
-      key !== 'auth-code' &&
-      key !== 'refresh-token' &&
-      key !== 'label' &&
-      key !== 'loopback' &&
-      key !== 'from-env'
-    ) {
-      return { kind: 'unknown', message: `auth add: unknown option --${key}` }
-    }
-  }
-  const clientId = stringFlag(flags, 'client-id')
-  const clientSecret = stringFlag(flags, 'client-secret')
-  const authCode = stringFlag(flags, 'auth-code')
-  const refreshToken = stringFlag(flags, 'refresh-token')
-  const label = stringFlag(flags, 'label')
-  const directFlowCount = [
-    authCode !== undefined,
-    refreshToken !== undefined,
-    flags.loopback === true,
-  ].filter(Boolean).length
-  if (directFlowCount > 1) {
+  const parsed = parseFlags(rest, { booleanFlags: ['loopback', 'from-env'] })
+  if (parsed.positional.length > 0)
     return {
       kind: 'unknown',
-      message:
-        'auth add google: choose only one of --auth-code, --refresh-token, or --loopback',
+      message: `auth add: unexpected argument "${parsed.positional[0]}"`,
     }
-  }
+  for (const key of Object.keys(parsed.flags))
+    if (
+      !['adapter', 'loopback', 'from-env', 'client-id', 'label'].includes(key)
+    )
+      return { kind: 'unknown', message: `auth add: unknown option --${key}` }
+  const adapterIds = listFlag(parsed.flags, 'adapter')
+  if (adapterIds.length === 0)
+    return {
+      kind: 'unknown',
+      message: 'auth add: at least one --adapter <id> is required',
+    }
+  const modes = [
+    parsed.flags.loopback === true,
+    parsed.flags['from-env'] === true,
+  ].filter(Boolean).length
+  if (modes !== 1)
+    return {
+      kind: 'unknown',
+      message: 'auth add: choose exactly one of --loopback or --from-env',
+    }
+  const clientId = stringFlag(parsed.flags, 'client-id')
+  const label = stringFlag(parsed.flags, 'label')
+  if (parsed.flags['client-id'] !== undefined && !clientId)
+    return {
+      kind: 'unknown',
+      message: 'auth add: --client-id requires a value',
+    }
+  if (parsed.flags.label !== undefined && !label)
+    return { kind: 'unknown', message: 'auth add: --label requires a value' }
   return {
     kind: 'add',
     provider,
-    ...(clientId !== undefined ? { clientId } : {}),
-    ...(clientSecret !== undefined ? { clientSecret } : {}),
-    ...(authCode !== undefined ? { authCode } : {}),
-    ...(refreshToken !== undefined ? { refreshToken } : {}),
-    ...(label !== undefined ? { label } : {}),
-    loopback: flags.loopback === true,
-    fromEnv: flags['from-env'] === true,
+    adapterIds,
+    ...(clientId ? { clientId } : {}),
+    ...(label ? { label } : {}),
+    mode: parsed.flags.loopback === true ? 'loopback' : 'from-env',
   }
 }

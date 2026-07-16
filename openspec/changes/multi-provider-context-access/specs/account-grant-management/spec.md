@@ -3,6 +3,8 @@
 ### Requirement: OAuth authorization derives from selected Adapters
 `auth add <provider>` SHALL require one or more loaded OAuth Adapter selections, validate that every selection declares the requested provider, and request the strict sorted union of only those Adapters' scopes plus the provider identity/refresh scopes required by the declarative OAuth flow. Authorization MUST NOT derive scopes from unrelated loaded Adapters.
 
+When a successful initial token response includes `scope`, every selected Adapter operation scope MUST be present using case-sensitive comparison; declared provider identity/refresh scopes MAY be absent from that response where the provider does not echo them. If `scope` is absent, the requested set is the granted set under the OAuth response contract. A refresh response without `scope` preserves the Grant's prior normalized scopes.
+
 #### Scenario: Gmail and Calendar are authorized together
 - **WHEN** a caller selects `google.mailbox` and `google.calendar`
 - **THEN** consent requests exactly the deduplicated scopes required by those two Adapters and provider identity, and the resulting Grant can bind Sources for both

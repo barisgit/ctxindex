@@ -90,7 +90,7 @@ describe('source e2e', () => {
         'global',
       ])
       expect(incompatible.exitCode).toBe(2)
-      expect(incompatible.stderr).toContain('compatible Google grant')
+      expect(incompatible.stderr).toContain('compatible Grant')
 
       const gmailScopes = JSON.stringify([
         'https://www.googleapis.com/auth/gmail.compose',
@@ -114,11 +114,11 @@ describe('source e2e', () => {
         'global',
       ])
       expect(ambiguous.exitCode).toBe(2)
-      expect(ambiguous.stderr).toContain('multiple compatible Google grants')
+      expect(ambiguous.stderr).toContain('multiple compatible Grants')
     })
   })
 
-  test('source add Gmail explicit account binds the exact compatible Grant', async () => {
+  test('source add Gmail explicit Account id binds the exact compatible Grant', async () => {
     await withInitializedSandbox(async (sandbox) => {
       const gmailScopes = JSON.stringify([
         'https://www.googleapis.com/auth/gmail.compose',
@@ -142,7 +142,7 @@ describe('source e2e', () => {
         '--realm',
         'global',
         '--account',
-        'b@example.com',
+        'account-grant-b',
       ])
       expect(result.stderr).toBe('')
       expect(result.exitCode).toBe(0)

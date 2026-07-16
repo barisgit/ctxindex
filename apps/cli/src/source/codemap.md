@@ -24,4 +24,4 @@ Orchestrates CLI Source add, list, and remove operations, including adapter-conf
 - Called by `apps/cli/src/commands/source.ts`; uses parsing from `apps/cli/src/args/source.ts`.
 - Uses `loadCliDefinitions` in `apps/cli/src/definitions.ts`, `openDeps` in `deps.ts`, source formatters, and `format/exit.ts`.
 - Uses registry adapter descriptions/config schemas and `SourceService` through CLI dependencies.
-- `resolve-source-grant.ts` uses `AuthService`, `isGrantCompatible`, and `providerKeyForAuth` from `@ctxindex/core/auth`.
+- `resolve-source-grant.ts` uses `AuthService`, `isGrantCompatible`, and `providerIdForAuth` from `@ctxindex/core/auth`; `--account` accepts an Account ID or Grant ID.

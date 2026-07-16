@@ -8,7 +8,7 @@ Implements the `@ctxindex/cli` application layer: defines the citty command surf
 
 - `main.ts` is the composition root and command registry; `rootCommand` binds the descriptors from `commands/`, `runCli` adapts citty's process behavior to a returned numeric exit code, and its static `INTERFACE` help block points agents to progressive registry discovery without activating Extensions.
 - `args/` is a pure parsing layer built around discriminated unions; `commands/` contains thin Citty declarations/adapters; `action/` and `artifact/` own their multi-step workflows; `format/` contains presentation and error-to-exit adapters.
-- `deps.ts` is the dependency-composition boundary. A shared secret runtime constructs both concrete backends, the typed `SecretVault`, and `SecretBackendManager`; `openDeps` injects the vault into auth, while `openSecretDeps` exposes only backend management to the light secrets command.
+- `deps.ts` is the dependency-composition boundary. A shared secret runtime constructs both concrete backends, the typed `SecretVault`, and `SecretBackendManager`; `loadAuthDefinitionDeps` loads provider declarations before auth validation, `openDeps` injects the loaded Adapter registry and vault into auth, and `openSecretDeps` exposes only backend management to the light secrets command.
 - `definitions.ts` centralizes config and extension loading through `loadCliDefinitions`; `action/`, `artifact/`, `auth/`, `source/`, and `sync/` isolate multi-step workflows, while `skills/` abstracts filesystem versus embedded skill content.
 
 ## Data & control flow

@@ -9,11 +9,10 @@ Presentation and process-exit adapter layer for converting domain/CLI values int
 - Formatters are pure string builders; callers own stdout. `exit.ts` is the process adapter and writes errors to stderr through `runWithExit`.
 - Text tables use `cli-table3`; compact modes use tab/newline-delimited records; JSON paths use explicit projection or `JSON.stringify`.
 - `mapErrorToExit` maps core error classes/codes to numeric process outcomes, while `runWithExit(handler)` catches errors and assigns `process.exitCode`.
-- `grants.ts` is a compatibility re-export of `auth.ts`; other modules are imported directly.
 
 ## Data & control flow
 
-Handlers pass domain rows/descriptions to focused formatters: `action.ts` Actions, `artifact.ts` Artifacts, `auth.ts` grants, `realm.ts` Realms, `source.ts` Sources, `status.ts` status rows, `registry.ts` registry descriptions, `extensions.ts` Extension listings, `skills.ts` skill records/documents, and `secrets.ts` value-free backend availability/reference counts plus switch copy/cleanup outcomes. The formatter returns a string for the handler to print. Handler failures flow through `mapErrorToExit` or `runWithExit` to stderr and `process.exitCode`.
+Handlers pass domain rows/descriptions to focused formatters: `action.ts` Actions, `artifact.ts` Artifacts, `auth.ts` Grant creation confirmation, `realm.ts` Realms, `source.ts` Sources, `status.ts` status rows, `registry.ts` registry descriptions, `extensions.ts` Extension listings, `skills.ts` skill records/documents, and `secrets.ts` value-free backend availability/reference counts plus switch copy/cleanup outcomes. The formatter returns a string for the handler to print. Handler failures flow through `mapErrorToExit` or `runWithExit` to stderr and `process.exitCode`.
 
 ## Integration points
 

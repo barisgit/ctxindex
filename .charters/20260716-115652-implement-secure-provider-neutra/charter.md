@@ -34,12 +34,12 @@ Status: pass
 ### C3. Accounts and Grants are provider-neutral and deduplicated
 Google and Microsoft authorization resolve a stable external identity, upsert exactly one Account per provider identity, retain explicit Grants and scope sets, and allow multiple Sources to reuse a compatible Grant without duplicate Accounts.
 Depends: C1, C2
-Status: in-progress — implementing declarative OAuth, stable Account upsert, and provider-neutral Grants
+Status: in-progress — provider-neutral Google OAuth, stable Account upsert, and generic Grants pass; Microsoft subject proof remains in its provider slice
 
 ### C4. Agents can inspect configured Accounts and Sources
 A deterministic `account list` interface exposes safe nested Account, Grant, scope, Realm, and Source information in readable and JSON forms, while `source list` remains the canonical inventory including unauthenticated Sources. No secret material is rendered or logged.
 Depends: C3
-Status: pending
+Status: in-progress — safe nested inventory projection exists; `account list` and compiled multi-account proof are the next slice
 
 ### C5. Calendar events use one provider-neutral Profile
 A strict `calendar.event@1` Profile represents timed and all-day events, organizers, attendees, recurrence, status, location, description, provider calendar identity, typed fields, chunks, and stable relations without provider-specific core/storage paths.

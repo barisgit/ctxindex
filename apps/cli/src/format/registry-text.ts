@@ -69,8 +69,10 @@ function formatAuthText(auth: object): string[] {
   const lines = [`  auth: ${value.kind}`]
   const provider = record(value.provider)
   if (provider) {
-    if (typeof provider.authUrl === 'string')
-      lines.push(`    authorization URL: ${provider.authUrl}`)
+    if (typeof provider.id === 'string')
+      lines.push(`    provider: ${provider.id}`)
+    if (typeof provider.authorizationUrl === 'string')
+      lines.push(`    authorization URL: ${provider.authorizationUrl}`)
     if (typeof provider.tokenUrl === 'string')
       lines.push(`    token URL: ${provider.tokenUrl}`)
   }

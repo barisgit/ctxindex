@@ -39,6 +39,14 @@ export type CtxindexAuthErrorCode =
   | 'invalid_grant'
   | 'invalid_client'
   | 'oauth_failed'
+  | 'oauth_host_denied'
+  | 'insufficient_scope'
+  | 'token_response_invalid'
+  | 'identity_response_invalid'
+  | 'authorization_denied'
+  | 'loopback_timeout'
+  | 'missing_code'
+  | 'state_mismatch'
   | 'network_error'
   | 'token_refresh_failed'
   | 'unknown_auth_error'
@@ -69,6 +77,8 @@ export class CtxindexNotFoundError extends CtxindexError {
 }
 
 export type CtxindexValidationErrorCode =
+  | 'invalid_account_identity'
+  | 'invalid_oauth_selection'
   | 'duplicate_realm_slug'
   | 'unknown_realm'
   | 'invalid_filter'

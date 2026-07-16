@@ -7,6 +7,7 @@ export {
   type AdapterOperationsFor,
   type AnyAdapterDefinition,
   defineAdapter,
+  type OAuthProviderSpec,
   type SearchRouting,
 } from './adapter'
 export {

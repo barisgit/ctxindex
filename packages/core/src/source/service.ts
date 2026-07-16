@@ -1,5 +1,5 @@
 import { ulid } from 'ulid'
-import { isGrantCompatible, providerKeyForAuth } from '../auth'
+import { isGrantCompatible, providerIdForAuth } from '../auth'
 import {
   CtxindexError,
   CtxindexNotFoundError,
@@ -92,7 +92,7 @@ function resolveGrantId(
       scopes: grant.scopes_json,
     }),
   )
-  const provider = providerKeyForAuth(auth) ?? 'unknown'
+  const provider = providerIdForAuth(auth) ?? 'unknown'
   if (input.grantId) {
     const selected = grants.find((grant) => grant.id === input.grantId)
     if (!selected || !compatible.includes(selected)) {

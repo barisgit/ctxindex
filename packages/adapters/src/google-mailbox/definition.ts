@@ -3,6 +3,7 @@ import {
   communicationMessageDraftCreateInputSchema,
   communicationMessageDraftUpdateInputSchema,
 } from '@ctxindex/profiles'
+import { googleOAuthProvider } from '../google-oauth-provider'
 import { gmailSourceConfigSchema } from './config'
 import { gmailDownload } from './download'
 import { gmailDraftCreate, gmailDraftUpdate } from './draft'
@@ -15,15 +16,13 @@ export const gmailAdapterDefinition = defineAdapter({
   configSchema: gmailSourceConfigSchema,
   auth: {
     kind: 'oauth2',
-    provider: {
-      authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
-      tokenUrl: 'https://oauth2.googleapis.com/token',
-    },
+    provider: googleOAuthProvider,
     scopes: [
       'https://www.googleapis.com/auth/gmail.readonly',
       'https://www.googleapis.com/auth/gmail.compose',
     ],
   },
+  providerApiHosts: ['gmail.googleapis.com'],
   profiles: [{ id: 'communication.message', version: 1 }],
   routing: 'federated',
   capabilities: ['search-remote', 'retrieve', 'download'],

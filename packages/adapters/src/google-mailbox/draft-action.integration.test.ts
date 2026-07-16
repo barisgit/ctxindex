@@ -37,7 +37,7 @@ async function freshDb(): Promise<Database> {
     "INSERT INTO realms (id, slug, label, created_at) VALUES ('realm-1', 'work', 'Work', 1)",
   ).run()
   db.prepare(
-    "INSERT INTO accounts (id, provider, label, created_at, updated_at) VALUES ('account-1', 'google', 'Test', 1, 1)",
+    "INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES ('account-1', 'google', 'Test', 'subject-1', 1, 1)",
   ).run()
   db.prepare(
     `INSERT INTO grants (id, account_id, provider, scopes_json, created_at, updated_at)

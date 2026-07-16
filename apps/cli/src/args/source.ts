@@ -28,7 +28,7 @@ export type SourceArgs =
   | { readonly kind: 'unknown'; readonly message: string }
 
 export const sourceUsage =
-  'source add <adapter-id> [--realm <slug>] [--name|--display-name <name>] [--account <email|grant-id>] [--config-json <json>|--config-* <value>] [--search-routing indexed|federated|hybrid] | source list [--realm <slug>] [--format table|compact] [--json] | source remove <source-id>'
+  'source add <adapter-id> [--realm <slug>] [--name|--display-name <name>] [--account <account-id|grant-id>] [--config-json <json>|--config-* <value>] [--search-routing indexed|federated|hybrid] | source list [--realm <slug>] [--format table|compact] [--json] | source remove <source-id>'
 
 function parsePrimitive(value: string, type: string): unknown {
   if (type === 'json') {

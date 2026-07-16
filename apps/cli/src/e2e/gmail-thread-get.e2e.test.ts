@@ -22,17 +22,7 @@ async function initialize(
   const realm = await sandbox.run(['realm', 'add', 'mail'])
   expect(realm.exitCode, realm.stderr).toBe(0)
   const auth = await sandbox.run(
-    [
-      'auth',
-      'add',
-      'google',
-      '--client-id',
-      'mock-client-id',
-      '--client-secret',
-      'mock-client-secret',
-      '--auth-code',
-      'mock-code',
-    ],
+    ['auth', 'add', 'google', '--adapter', 'google.mailbox', '--from-env'],
     { env },
   )
   expect(auth.exitCode, auth.stderr).toBe(0)

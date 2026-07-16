@@ -1,378 +1,391 @@
 import { Database } from 'bun:sqlite'
 import { afterEach, expect, test } from 'bun:test'
-import { getEnv, resetEnvForTests } from '../config'
-import { CtxindexAuthError } from '../errors'
+import { defineAdapter } from '@ctxindex/extension-sdk'
+import { z } from 'zod'
 import type { Logger } from '../logger'
-import { keychainRef, type SecretsStore } from '../secrets'
-import { applyPragmas } from '../storage'
-import { runMigrations } from '../storage/migrator'
+import { createAdapterRegistry } from '../registry'
+import { createProfileRegistry } from '../registry/profile-registry'
+import { keychainRef, parseSecretRef, type SecretsStore } from '../secrets'
+import { applyPragmas, runMigrations } from '../storage'
+import { testOAuthProvider } from '../testing/oauth-provider'
 import { createAuthService } from './service'
 
-const gmailClientIdEnvKey = 'CTXINDEX_GMAIL_CLIENT_ID'
-const gmailClientSecretEnvKey = 'CTXINDEX_GMAIL_CLIENT_SECRET'
-
-const savedEnv = new Map<string, string | undefined>([
-  [gmailClientIdEnvKey, process.env[gmailClientIdEnvKey]],
-  [gmailClientSecretEnvKey, process.env[gmailClientSecretEnvKey]],
-])
-
-const dbs: Database[] = []
-let originalFetch: typeof globalThis.fetch | undefined
-
-type FetchCall = {
-  readonly url: string
-  readonly body: URLSearchParams
-}
-
-class MemorySecretsStore implements SecretsStore {
-  readonly values = new Map<string, string>()
-
-  async getSecret(ref: string): Promise<string> {
+class MemoryStore implements SecretsStore {
+  values = new Map<string, string>()
+  operations: string[] = []
+  failWriteAt = 0
+  writes = 0
+  failDelete = false
+  async getSecret(ref: string) {
+    this.operations.push(`get:${ref}`)
     const value = this.values.get(ref)
-    if (value === undefined) throw new Error(`secret not found: ${ref}`)
+    if (value === undefined) throw new Error('missing')
     return value
   }
-
-  async setSecret(scope: string, key: string, value: string): Promise<string> {
+  async setSecret(scope: string, key: string, value: string) {
+    this.writes++
+    if (this.failWriteAt === this.writes) throw new Error('write failed')
     const ref = keychainRef(scope, key)
     this.values.set(ref, value)
+    this.operations.push(`set:${ref}`)
     return ref
   }
-
-  async deleteSecret(ref: string): Promise<void> {
+  async deleteSecret(ref: string) {
+    this.operations.push(`delete:${ref}`)
+    if (this.failDelete) throw new Error('delete failed')
     this.values.delete(ref)
   }
-
-  async listKeys(): Promise<{ ref: string; scope: string; key: string }[]> {
-    return [...this.values.keys()].map((ref) => ({
-      ref,
-      scope: 'google',
-      key: ref,
-    }))
+  async listKeys() {
+    return []
   }
 }
-
 const logger = {
   debug() {},
+  info() {},
+  warn() {},
+  error() {},
+  fatal() {},
+  trace() {},
+  child() {
+    return this
+  },
 } as unknown as Logger
-
-function setEnv(
-  key: 'CTXINDEX_GMAIL_CLIENT_ID' | 'CTXINDEX_GMAIL_CLIENT_SECRET',
-  value: string | undefined,
-): void {
-  if (value === undefined) delete process.env[key]
-  else process.env[key] = value
-}
-
-async function freshDb(): Promise<Database> {
-  const db = new Database(':memory:', { create: true })
-  applyPragmas(db)
-  await runMigrations(db)
-  dbs.push(db)
-  return db
-}
-
-function restoreEnv(): void {
-  for (const [key, value] of savedEnv) {
-    if (value === undefined) delete process.env[key]
-    else process.env[key] = value
-  }
-  resetEnvForTests()
-}
-
-function mockTokenFetch(
-  status: number,
-  body: Record<string, unknown>,
-): FetchCall[] {
-  const calls: FetchCall[] = []
-  globalThis.fetch = (async (input, init) => {
-    calls.push({
-      url: String(input),
-      body: new URLSearchParams(String(init?.body ?? '')),
-    })
-    return new Response(JSON.stringify(body), {
-      status,
-      headers: { 'content-type': 'application/json' },
-    })
-  }) as typeof fetch
-  return calls
-}
-
-function insertGrantWithRefreshOnly(
-  db: Database,
-  refreshTokenRef: string,
-  refs: { clientIdRef?: string | null; clientSecretRef?: string | null } = {},
-): string {
-  const now = Date.now()
-  const accountId = `acct_${now}_${Math.random()}`
-  const grantId = `grant_${now}_${Math.random()}`
-  db.prepare(
-    `INSERT INTO accounts (id, provider, label, created_at, updated_at)
-     VALUES (?, 'google', 'google', ?, ?)`,
-  ).run(accountId, now, now)
-  db.prepare(
-    `INSERT INTO grants
-       (id, account_id, provider, scopes_json, client_id_ref, client_secret_ref, access_token_ref, refresh_token_ref, expires_at, created_at, updated_at)
-     VALUES (?, ?, 'google', ?, ?, ?, NULL, ?, NULL, ?, ?)`,
-  ).run(
-    grantId,
-    accountId,
-    'scope-one scope-two',
-    refs.clientIdRef ?? null,
-    refs.clientSecretRef ?? null,
-    refreshTokenRef,
-    now,
-    now,
-  )
-  return grantId
-}
-
+const dbs: Database[] = []
 afterEach(() => {
-  restoreEnv()
-  if (originalFetch) globalThis.fetch = originalFetch
-  originalFetch = undefined
   for (const db of dbs.splice(0)) db.close()
+  globalThis.fetch = originalFetch
+})
+const originalFetch = globalThis.fetch
+async function db() {
+  const value = new Database(':memory:', { create: true })
+  applyPragmas(value)
+  await runMigrations(value)
+  dbs.push(value)
+  return value
+}
+function registry() {
+  const provider = testOAuthProvider({
+    authorizationUrl: 'https://auth.test/authorize',
+    tokenUrl: 'https://auth.test/token',
+  })
+  const adapter = defineAdapter({
+    id: 'test.mail',
+    version: 1,
+    configSchema: z.object({}),
+    auth: { kind: 'oauth2', provider, scopes: ['mail.read'] },
+    profiles: [],
+    routing: 'indexed',
+    capabilities: [],
+    operations: {},
+    actions: {},
+  })
+  return createAdapterRegistry(createProfileRegistry([]), [adapter])
+}
+function account(subject = 'subject-1') {
+  return {
+    externalUserId: subject,
+    label: 'Person',
+    verifiedIdentities: [{ kind: 'email', value: 'person@example.test' }],
+  }
+}
+
+test('creates typed generic Grants and reuses one stable Account', async () => {
+  const database = await db()
+  const store = new MemoryStore()
+  const service = createAuthService({
+    db: database,
+    store,
+    logger,
+    registry: registry(),
+  })
+  const first = await service.addGrant({
+    provider: 'test',
+    account: account(),
+    clientId: 'client',
+    refreshToken: 'refresh-1',
+    accessToken: 'access-1',
+    expiresAt: 5000,
+    scopes: ['openid', 'mail.read'],
+  })
+  const second = await service.addGrant({
+    provider: 'test',
+    account: account(),
+    clientId: 'client',
+    refreshToken: 'refresh-2',
+    scopes: ['mail.read'],
+  })
+  expect(first.accountId).toBe(second.accountId)
+  expect(
+    database.query('SELECT COUNT(*) AS count FROM accounts').get(),
+  ).toEqual({ count: 1 })
+  expect(database.query('SELECT COUNT(*) AS count FROM grants').get()).toEqual({
+    count: 2,
+  })
+  const grant = await service.getGrantById(first.grantId)
+  expect(grant?.scopes).toEqual(['mail.read', 'openid'])
+  expect(parseSecretRef(grant?.clientIdRef ?? '')).toMatchObject({
+    backend: 'keychain',
+    scope: 'test',
+  })
+  expect(parseSecretRef(grant?.refreshTokenRef ?? '')).toMatchObject({
+    backend: 'keychain',
+    scope: 'test',
+  })
 })
 
-test('addGoogleGrant inserts grant + account with all secret refs', async () => {
-  const db = await freshDb()
-  const store = new MemorySecretsStore()
-  const service = createAuthService({ db, store, logger, env: getEnv() })
-
-  const result = await service.addGoogleGrant({
-    clientId: 'client-id',
-    clientSecret: 'client-secret',
-    refreshToken: 'refresh-token',
-    accessToken: 'access-token',
-    scopes: 'scope-one scope-two',
-    expiresAt: 1234,
-    accountEmail: 'user@example.com',
-  })
-
-  const account = db
-    .prepare(
-      'SELECT id, provider, external_user_id AS email FROM accounts WHERE id = ?',
-    )
-    .get(result.accountId) as {
-    id: string
-    provider: string
-    email: string
-  } | null
-  expect(account).toEqual({
-    id: result.accountId,
-    provider: 'google',
-    email: 'user@example.com',
-  })
-
-  const grant = await service.getGoogleGrantById(result.grantId)
-  expect(grant).toMatchObject({
-    id: result.grantId,
-    accountId: result.accountId,
-    provider: 'google',
-    scopes: 'scope-one scope-two',
-    expiresAt: 1234,
-  })
-  expect(grant?.accessTokenRef).toBeString()
-  expect(grant?.refreshTokenRef).toBeString()
-  expect(grant?.clientIdRef).toBeString()
-  expect(grant?.clientSecretRef).toBeString()
-
-  expect(await store.getSecret(grant?.accessTokenRef ?? '')).toBe(
-    'access-token',
+test('cleans every temporary secret when persistence fails', async () => {
+  const database = await db()
+  database.exec(
+    "CREATE TRIGGER reject_grant BEFORE INSERT ON grants BEGIN SELECT RAISE(FAIL, 'no'); END",
   )
-  expect(await store.getSecret(grant?.refreshTokenRef ?? '')).toBe(
-    'refresh-token',
-  )
-  expect(await store.getSecret(grant?.clientIdRef ?? '')).toBe('client-id')
-  expect(await store.getSecret(grant?.clientSecretRef ?? '')).toBe(
-    'client-secret',
-  )
-})
-
-test('listGoogleGrants returns the inserted grant', async () => {
-  const db = await freshDb()
-  const store = new MemorySecretsStore()
-  const service = createAuthService({ db, store, logger, env: getEnv() })
-
-  const result = await service.addGoogleGrant({
-    clientId: 'client-id',
-    clientSecret: 'client-secret',
-    refreshToken: 'refresh-token',
-    scopes: 'scope-one scope-two',
+  const store = new MemoryStore()
+  const service = createAuthService({
+    db: database,
+    store,
+    logger,
+    registry: registry(),
   })
-
-  await expect(service.listGoogleGrants()).resolves.toEqual([
-    {
-      id: result.grantId,
-      provider: 'google',
-      scopes: 'scope-one scope-two',
-      expiresAt: null,
-      accountEmail: null,
-      accountDisplayName: 'google',
-    },
-  ])
-})
-
-test('resolveLinkedGrantAccessToken reads only the requested unexpired Grant', async () => {
-  const db = await freshDb()
-  const store = new MemorySecretsStore()
-  const service = createAuthService({ db, store, logger, env: getEnv() })
-  const grantA = await service.addGoogleGrant({
-    clientId: 'client-a',
-    clientSecret: 'secret-a',
-    refreshToken: 'refresh-a',
-    accessToken: 'token-a',
-    scopes: 'scope-one',
-    expiresAt: Date.now() + 60_000,
-  })
-  const grantB = await service.addGoogleGrant({
-    clientId: 'client-b',
-    clientSecret: 'secret-b',
-    refreshToken: 'refresh-b',
-    accessToken: 'token-b',
-    scopes: 'scope-one',
-    expiresAt: Date.now() + 60_000,
-  })
-
   await expect(
-    service.resolveLinkedGrantAccessToken(grantB.grantId),
-  ).resolves.toBe('token-b')
-  expect(grantA.grantId).not.toBe(grantB.grantId)
+    service.addGrant({
+      provider: 'test',
+      account: account(),
+      clientId: 'client',
+      clientSecret: 'secret',
+      refreshToken: 'refresh',
+      accessToken: 'access',
+      scopes: ['mail.read'],
+    }),
+  ).rejects.toThrow()
+  expect(store.values.size).toBe(0)
+  expect(
+    database.query('SELECT COUNT(*) AS count FROM accounts').get(),
+  ).toEqual({ count: 0 })
 })
 
-test('resolveLinkedGrantAccessToken refreshes an expired linked Grant', async () => {
-  const db = await freshDb()
-  const store = new MemorySecretsStore()
-  const service = createAuthService({ db, store, logger, env: getEnv() })
-  const grant = await service.addGoogleGrant({
-    clientId: 'client-id',
-    clientSecret: 'client-secret',
-    refreshToken: 'refresh-token',
-    accessToken: 'expired-token',
-    scopes: 'scope-one',
-    expiresAt: Date.now() - 1,
+test('refresh writes new refs before one DB update then best-effort old cleanup', async () => {
+  const database = await db()
+  const store = new MemoryStore()
+  const loaded = registry()
+  const service = createAuthService({
+    db: database,
+    store,
+    logger,
+    registry: loaded,
+    now: () => 1000,
+    readEnvironment: (name) =>
+      name === 'CTXINDEX_OAUTH_MOCK_BASE_URL'
+        ? 'http://127.0.0.1:43123'
+        : undefined,
   })
-  originalFetch = globalThis.fetch
-  const calls = mockTokenFetch(200, {
-    access_token: 'fresh-token',
-    expires_in: 3600,
-    token_type: 'Bearer',
+  const { grantId } = await service.addGrant({
+    provider: 'test',
+    account: account(),
+    clientId: 'client',
+    refreshToken: 'old-refresh',
+    accessToken: 'old-access',
+    expiresAt: 0,
+    scopes: ['mail.read', 'openid'],
   })
-
+  const old = await service.getGrantById(grantId)
+  store.operations = []
+  globalThis.fetch = (async () =>
+    Response.json({
+      access_token: 'new-access',
+      refresh_token: 'new-refresh',
+      expires_in: 60,
+      scope: 'mail.read',
+    })) as unknown as typeof fetch
   await expect(
-    service.resolveLinkedGrantAccessToken(grant.grantId),
-  ).resolves.toBe('fresh-token')
-  expect(calls).toHaveLength(1)
+    service.resolveLinkedGrantAccessToken(grantId, { forceRefresh: true }),
+  ).resolves.toBe('new-access')
+  const updated = await service.getGrantById(grantId)
+  expect(updated?.accessTokenRef).not.toBe(old?.accessTokenRef)
+  expect(updated?.refreshTokenRef).not.toBe(old?.refreshTokenRef)
+  expect(updated?.scopes).toEqual(['mail.read'])
+  expect(
+    store.operations.indexOf(`delete:${old?.accessTokenRef}`),
+  ).toBeGreaterThan(store.operations.findIndex((op) => op.startsWith('set:')))
 })
 
-test('refreshGoogleAccessToken uses per-grant client creds when env vars are unset', async () => {
-  originalFetch = globalThis.fetch
-  setEnv('CTXINDEX_GMAIL_CLIENT_ID', undefined)
-  setEnv('CTXINDEX_GMAIL_CLIENT_SECRET', undefined)
-  resetEnvForTests()
-  const calls = mockTokenFetch(200, {
-    access_token: 'new-access-token',
-    expires_in: 3600,
-    scope: 'scope-one scope-two',
-    token_type: 'Bearer',
+test('missing loaded provider marks linked Sources needs_auth without egress', async () => {
+  const database = await db()
+  const store = new MemoryStore()
+  const withProvider = createAuthService({
+    db: database,
+    store,
+    logger,
+    registry: registry(),
   })
-  const db = await freshDb()
-  const store = new MemorySecretsStore()
-  const service = createAuthService({ db, store, logger, env: getEnv() })
-  const { grantId } = await service.addGoogleGrant({
-    clientId: 'per-grant-client-id',
-    clientSecret: 'per-grant-client-secret',
-    refreshToken: 'refresh-token',
-    scopes: 'scope-one scope-two',
+  const { grantId } = await withProvider.addGrant({
+    provider: 'test',
+    account: account(),
+    clientId: 'client',
+    refreshToken: 'refresh',
+    scopes: ['mail.read'],
   })
-
-  await expect(service.refreshGoogleAccessToken(grantId)).resolves.toBe(
-    'new-access-token',
+  database.exec(
+    "INSERT INTO realms VALUES ('r','r',NULL,1); INSERT INTO sources (id,realm_id,adapter_id,adapter_version,grant_id,config_json,created_at,updated_at) VALUES ('s','r','test.mail',1,'" +
+      grantId +
+      "','{}',1,1); INSERT INTO source_sync_state (source_id,last_status,updated_at) VALUES ('s','idle',1)",
   )
-
-  expect(calls).toHaveLength(1)
-  expect(calls[0]?.body.get('client_id')).toBe('per-grant-client-id')
-  expect(calls[0]?.body.get('client_secret')).toBe('per-grant-client-secret')
-  const grant = await service.getGoogleGrantById(grantId)
-  expect(grant?.accessTokenRef).toBeString()
-  expect(await store.getSecret(grant?.accessTokenRef ?? '')).toBe(
-    'new-access-token',
-  )
-})
-
-test('refreshGoogleAccessToken env var override path still works', async () => {
-  originalFetch = globalThis.fetch
-  setEnv('CTXINDEX_GMAIL_CLIENT_ID', 'env-client-id')
-  setEnv('CTXINDEX_GMAIL_CLIENT_SECRET', 'env-client-secret')
-  resetEnvForTests()
-  const calls = mockTokenFetch(200, {
-    access_token: 'env-access-token',
-    expires_in: 3600,
-    scope: 'scope-one scope-two',
-    token_type: 'Bearer',
+  let calls = 0
+  globalThis.fetch = (async () => {
+    calls++
+    return Response.json({})
+  }) as unknown as typeof fetch
+  const empty = createAdapterRegistry(createProfileRegistry([]), [])
+  const service = createAuthService({
+    db: database,
+    store,
+    logger,
+    registry: empty,
   })
-  const db = await freshDb()
-  const store = new MemorySecretsStore()
-  const refreshTokenRef = await store.setSecret(
-    'google',
-    'refresh_token:env',
-    'refresh-token',
-  )
-  const grantId = insertGrantWithRefreshOnly(db, refreshTokenRef)
-  const service = createAuthService({ db, store, logger, env: getEnv() })
-
-  await expect(service.refreshGoogleAccessToken(grantId)).resolves.toBe(
-    'env-access-token',
-  )
-
-  expect(calls).toHaveLength(1)
-  expect(calls[0]?.body.get('client_id')).toBe('env-client-id')
-  expect(calls[0]?.body.get('client_secret')).toBe('env-client-secret')
-})
-
-test('refreshGoogleAccessToken missing creds error', async () => {
-  setEnv('CTXINDEX_GMAIL_CLIENT_ID', undefined)
-  setEnv('CTXINDEX_GMAIL_CLIENT_SECRET', undefined)
-  resetEnvForTests()
-  const db = await freshDb()
-  const store = new MemorySecretsStore()
-  const refreshTokenRef = await store.setSecret(
-    'google',
-    'refresh_token:missing',
-    'refresh-token',
-  )
-  const grantId = insertGrantWithRefreshOnly(db, refreshTokenRef)
-  const service = createAuthService({ db, store, logger, env: getEnv() })
-
-  await expect(service.refreshGoogleAccessToken(grantId)).rejects.toMatchObject(
-    {
-      code: 'missing_oauth_client_creds',
-    },
-  )
-})
-
-test('refreshGoogleAccessToken handles invalid_grant', async () => {
-  originalFetch = globalThis.fetch
-  setEnv('CTXINDEX_GMAIL_CLIENT_ID', undefined)
-  setEnv('CTXINDEX_GMAIL_CLIENT_SECRET', undefined)
-  resetEnvForTests()
-  mockTokenFetch(400, { error: 'invalid_grant' })
-  const db = await freshDb()
-  const store = new MemorySecretsStore()
-  const service = createAuthService({ db, store, logger, env: getEnv() })
-  const { grantId } = await service.addGoogleGrant({
-    clientId: 'per-grant-client-id',
-    clientSecret: 'per-grant-client-secret',
-    refreshToken: 'refresh-token',
-    scopes: 'scope-one scope-two',
-  })
-
   await expect(
-    service.refreshGoogleAccessToken(grantId),
-  ).rejects.toBeInstanceOf(CtxindexAuthError)
-  await expect(service.refreshGoogleAccessToken(grantId)).rejects.toMatchObject(
-    {
-      code: 'invalid_grant',
-    },
+    service.resolveLinkedGrantAccessToken(grantId, { forceRefresh: true }),
+  ).rejects.toMatchObject({ code: 'needs_auth' })
+  expect(calls).toBe(0)
+  expect(
+    database
+      .query("SELECT last_status FROM source_sync_state WHERE source_id='s'")
+      .get(),
+  ).toEqual({ last_status: 'needs_auth' })
+})
+
+test('cleans prior temporary refs for every creation write failure', async () => {
+  for (const failWriteAt of [1, 2, 3, 4]) {
+    const database = await db()
+    const store = new MemoryStore()
+    store.failWriteAt = failWriteAt
+    const service = createAuthService({
+      db: database,
+      store,
+      logger,
+      registry: registry(),
+    })
+    await expect(
+      service.addGrant({
+        provider: 'test',
+        account: account(),
+        clientId: 'client',
+        clientSecret: 'secret',
+        refreshToken: 'refresh',
+        accessToken: 'access',
+        scopes: ['mail.read'],
+      }),
+    ).rejects.toThrow()
+    expect(store.values.size).toBe(0)
+    expect(
+      database.query('SELECT COUNT(*) AS count FROM grants').get(),
+    ).toEqual({ count: 0 })
+  }
+})
+
+test('refresh DB failure removes new refs and leaves the old row readable', async () => {
+  const database = await db()
+  const store = new MemoryStore()
+  const service = createAuthService({
+    db: database,
+    store,
+    logger,
+    registry: registry(),
+    readEnvironment: (name) =>
+      name === 'CTXINDEX_OAUTH_MOCK_BASE_URL'
+        ? 'http://127.0.0.1:43123'
+        : undefined,
+  })
+  const { grantId } = await service.addGrant({
+    provider: 'test',
+    account: account(),
+    clientId: 'client',
+    refreshToken: 'old-refresh',
+    accessToken: 'old-access',
+    expiresAt: 0,
+    scopes: ['mail.read'],
+  })
+  const before = await service.getGrantById(grantId)
+  const oldRefs = new Set(store.values.keys())
+  database.exec(
+    "CREATE TRIGGER reject_grant_update BEFORE UPDATE ON grants BEGIN SELECT RAISE(FAIL, 'no'); END",
   )
+  globalThis.fetch = (async () =>
+    Response.json({
+      access_token: 'new-access',
+      refresh_token: 'new-refresh',
+      expires_in: 60,
+    })) as unknown as typeof fetch
+  await expect(service.refreshAccessToken(grantId)).rejects.toThrow()
+  expect(await service.getGrantById(grantId)).toEqual(before)
+  expect(new Set(store.values.keys())).toEqual(oldRefs)
+})
+
+test('rotated refresh write failure cleans the new access ref and keeps old refs', async () => {
+  const database = await db()
+  const store = new MemoryStore()
+  const service = createAuthService({
+    db: database,
+    store,
+    logger,
+    registry: registry(),
+    readEnvironment: (name) =>
+      name === 'CTXINDEX_OAUTH_MOCK_BASE_URL'
+        ? 'http://127.0.0.1:43123'
+        : undefined,
+  })
+  const { grantId } = await service.addGrant({
+    provider: 'test',
+    account: account(),
+    clientId: 'client',
+    refreshToken: 'old-refresh',
+    accessToken: 'old-access',
+    expiresAt: 0,
+    scopes: ['mail.read'],
+  })
+  const before = await service.getGrantById(grantId)
+  const oldRefs = new Set(store.values.keys())
+  store.failWriteAt = store.writes + 2
+  globalThis.fetch = (async () =>
+    Response.json({
+      access_token: 'new-access',
+      refresh_token: 'new-refresh',
+      expires_in: 60,
+    })) as unknown as typeof fetch
+  await expect(service.refreshAccessToken(grantId)).rejects.toThrow()
+  expect(await service.getGrantById(grantId)).toEqual(before)
+  expect(new Set(store.values.keys())).toEqual(oldRefs)
+})
+
+test('old-ref delete failure is best effort after the refreshed row is committed', async () => {
+  const database = await db()
+  const store = new MemoryStore()
+  const service = createAuthService({
+    db: database,
+    store,
+    logger,
+    registry: registry(),
+    readEnvironment: (name) =>
+      name === 'CTXINDEX_OAUTH_MOCK_BASE_URL'
+        ? 'http://127.0.0.1:43123'
+        : undefined,
+  })
+  const { grantId } = await service.addGrant({
+    provider: 'test',
+    account: account(),
+    clientId: 'client',
+    refreshToken: 'old-refresh',
+    accessToken: 'old-access',
+    expiresAt: 0,
+    scopes: ['mail.read'],
+  })
+  const before = await service.getGrantById(grantId)
+  store.failDelete = true
+  globalThis.fetch = (async () =>
+    Response.json({
+      access_token: 'new-access',
+      refresh_token: 'new-refresh',
+      expires_in: 60,
+    })) as unknown as typeof fetch
+  await expect(service.refreshAccessToken(grantId)).resolves.toBe('new-access')
+  const after = await service.getGrantById(grantId)
+  expect(after?.accessTokenRef).not.toBe(before?.accessTokenRef)
+  expect(after?.refreshTokenRef).not.toBe(before?.refreshTokenRef)
 })

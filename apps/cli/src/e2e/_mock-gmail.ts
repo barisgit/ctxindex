@@ -11,7 +11,7 @@ export interface MockGmailOptions {
 }
 
 function recordedBody(pathname: string, body: string): string {
-  return pathname === '/token' ? '[REDACTED OAUTH FORM]' : body
+  return pathname === '/oauth/google/token' ? '[REDACTED OAUTH FORM]' : body
 }
 
 export interface MockGmailMessage {
@@ -193,7 +193,7 @@ export function startMockGmail(
         authorization: redactedAuthorization(request),
         body: recordedBody(url.pathname, body),
       })
-      if (url.pathname === '/token') {
+      if (url.pathname === '/oauth/google/token') {
         const params = new TokenParams(body)
         tokenCalls.push(params)
         const grantType = params.get('grant_type')
@@ -218,6 +218,14 @@ export function startMockGmail(
           refresh_token: refreshToken,
           expires_in: 3600,
           token_type: 'Bearer',
+        })
+      }
+
+      if (url.pathname === '/oauth/google/identity') {
+        return Response.json({
+          sub: 'mock-google-subject',
+          email: 'mock@example.test',
+          email_verified: true,
         })
       }
 
@@ -346,9 +354,10 @@ export function startMockGmail(
       return {
         NODE_ENV: 'test',
         CTXINDEX_GMAIL_MOCK_BASE_URL: baseUrl,
-        CTXINDEX_GMAIL_TOKEN_URL: `${baseUrl}/token`,
-        CTXINDEX_GMAIL_CLIENT_ID: 'mock-client-id',
-        CTXINDEX_GMAIL_CLIENT_SECRET: 'mock-client-secret',
+        CTXINDEX_OAUTH_MOCK_BASE_URL: baseUrl,
+        CTXINDEX_GOOGLE_CLIENT_ID: 'mock-client-id',
+        CTXINDEX_GOOGLE_CLIENT_SECRET: 'mock-client-secret',
+        CTXINDEX_GOOGLE_REFRESH_TOKEN: 'mock-refresh-token',
         CTXINDEX_KEYTAR_MOCK_FILE: join(sandbox.dir, 'keytar.json'),
         ...extra,
       }

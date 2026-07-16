@@ -18,13 +18,79 @@ export type AdapterCapability =
 
 export type SearchRouting = 'indexed' | 'federated' | 'hybrid'
 
+type JsonPath = readonly [string, ...string[]]
+
+interface OAuthProviderBase {
+  readonly id: string
+  readonly authorizationUrl: string
+  readonly tokenUrl: string
+  readonly identity: {
+    readonly url: string
+    readonly subjectPath: JsonPath
+    readonly labelPaths: readonly [JsonPath, ...JsonPath[]]
+    readonly identities: readonly [
+      {
+        readonly kind: string
+        readonly path: JsonPath
+        readonly verifiedPath?: JsonPath
+      },
+      ...{
+        readonly kind: string
+        readonly path: JsonPath
+        readonly verifiedPath?: JsonPath
+      }[],
+    ]
+  }
+  readonly pkce: { readonly method: 'S256'; readonly required: true }
+  readonly baseScopes: readonly string[]
+  readonly allowedHosts: readonly string[]
+  readonly fixedAuthorizationParams?: Readonly<Record<string, string>>
+}
+
+export type OAuthProviderSpec = OAuthProviderBase &
+  (
+    | {
+        readonly client: {
+          readonly type: 'public'
+          readonly secret: 'none'
+          readonly tokenAuthMethod: 'none'
+        }
+        readonly environment: {
+          readonly clientId: string
+          readonly clientSecret?: never
+          readonly refreshToken: string
+        }
+      }
+    | {
+        readonly client: {
+          readonly type: 'public'
+          readonly secret: 'optional'
+          readonly tokenAuthMethod: 'client_secret_post'
+        }
+        readonly environment: {
+          readonly clientId: string
+          readonly clientSecret?: string
+          readonly refreshToken: string
+        }
+      }
+    | {
+        readonly client: {
+          readonly type: 'confidential'
+          readonly secret: 'required'
+          readonly tokenAuthMethod: 'client_secret_post'
+        }
+        readonly environment: {
+          readonly clientId: string
+          readonly clientSecret: string
+          readonly refreshToken: string
+        }
+      }
+  )
+
 export type AdapterAuthSpec =
   | {
       readonly kind: 'oauth2'
-      readonly provider: {
-        readonly authUrl: string
-        readonly tokenUrl: string
-      }
+      readonly provider: OAuthProviderSpec
       readonly scopes: readonly string[]
     }
   | { readonly kind: 'api-key'; readonly label: string }
@@ -76,11 +142,14 @@ export interface AdapterDefinition<
   TActions extends Readonly<Record<string, AdapterActionBinding>> = Readonly<
     Record<string, AdapterActionBinding>
   >,
+  TAuth extends AdapterAuthSpec = AdapterAuthSpec,
 > {
   readonly id: TId
   readonly version: TVersion
   readonly configSchema: TConfigSchema
-  readonly auth: AdapterAuthSpec
+  readonly auth: TAuth
+  /** Provider API hosts this Adapter may contact. Missing/empty denies network egress. */
+  readonly providerApiHosts?: readonly string[]
   readonly profiles: readonly ProfileReference[]
   readonly routing: SearchRouting
   readonly capabilities: TCapabilities
@@ -109,14 +178,23 @@ export function defineAdapter<
   TConfigSchema extends z.ZodTypeAny,
   const TCapabilities extends readonly AdapterCapability[],
   const TActions extends Readonly<Record<string, AdapterActionBinding>>,
+  const TAuth extends AdapterAuthSpec,
 >(
   definition: AdapterDefinition<
     TId,
     TVersion,
     TConfigSchema,
     TCapabilities,
-    TActions
+    TActions,
+    TAuth
   >,
-): AdapterDefinition<TId, TVersion, TConfigSchema, TCapabilities, TActions> {
+): AdapterDefinition<
+  TId,
+  TVersion,
+  TConfigSchema,
+  TCapabilities,
+  TActions,
+  TAuth
+> {
   return definition
 }

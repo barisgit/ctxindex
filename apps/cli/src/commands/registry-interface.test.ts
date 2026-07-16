@@ -123,6 +123,32 @@ describe('describe interface', () => {
     })
   })
 
+  test('formats the provider id and renamed authorization URL', () => {
+    const [source] = description.sources
+    if (!source) throw new Error('expected source fixture')
+    const oauthDescription = {
+      ...description,
+      sources: [
+        {
+          ...source,
+          auth: {
+            kind: 'oauth2',
+            provider: {
+              id: 'fake',
+              authorizationUrl: 'https://auth.example.com/authorize',
+              tokenUrl: 'https://auth.example.com/token',
+            },
+            scopes: ['fake.read'],
+          },
+        },
+      ],
+    }
+
+    expect(formatRegistryText(oauthDescription, 'full')).toContain(
+      'provider: fake\n    authorization URL: https://auth.example.com/authorize',
+    )
+  })
+
   test('filters exact ids and renders full text, Markdown, and JSON data', () => {
     const selected = filterRegistryDescription(
       description,

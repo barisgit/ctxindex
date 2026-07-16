@@ -13,7 +13,11 @@ test('built-in Source Adapter implementation is owned by provider modules', asyn
     .map((entry) => entry.name)
     .sort()
 
-  expect(rootFiles).toEqual(['builtins.ts', 'index.ts'])
+  expect(rootFiles).toEqual([
+    'builtins.ts',
+    'google-oauth-provider.ts',
+    'index.ts',
+  ])
 
   const googleFiles = (await readdir(new URL('google-mailbox/', adapterRoot)))
     .filter(isProductionTypeScript)
@@ -25,6 +29,14 @@ test('built-in Source Adapter implementation is owned by provider modules', asyn
     .filter(isProductionTypeScript)
     .sort()
   expect(localFiles).toContain('definition.ts')
+})
+
+test('OAuth declarations expose bounded hosts through the public SDK', async () => {
+  const adapterContract = await Bun.file(new URL('adapter.ts', sdkRoot)).text()
+  expect(adapterContract).toContain('allowedHosts')
+  expect(adapterContract).toContain('providerApiHosts')
+  expect(adapterContract).toContain('identity')
+  expect(adapterContract).toContain('provider')
 })
 
 test('built-in Extension root composes definitions without owning Adapter behavior', async () => {

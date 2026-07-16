@@ -11,6 +11,7 @@ import { createExtensionRegistry } from '../registry'
 import { ResourceStore } from '../resource'
 import { applyPragmas } from '../storage'
 import { runMigrations } from '../storage/migrator'
+import { testOAuthProvider } from '../testing/oauth-provider'
 import { searchSourceRemote } from './remote-search'
 
 const sourceId = '01KXHBNECDAH1T4MJ38X88EPFJ'
@@ -30,12 +31,13 @@ const adapter = defineAdapter({
   configSchema: z.object({}).strict(),
   auth: {
     kind: 'oauth2',
-    provider: {
-      authUrl: 'https://provider.test/auth',
+    provider: testOAuthProvider({
+      authorizationUrl: 'https://provider.test/auth',
       tokenUrl: 'https://provider.test/token',
-    },
+    }),
     scopes: ['remote:read'],
   },
+  providerApiHosts: ['provider.test'],
   profiles: [{ id: 'fake.remote', version: 1 }],
   routing: 'federated',
   capabilities: ['search-remote'],
@@ -96,12 +98,12 @@ async function freshDb(): Promise<Database> {
     "INSERT INTO realms (id, slug, label, created_at) VALUES ('realm-1', 'work', 'Work', 1)",
   ).run()
   db.prepare(
-    "INSERT INTO accounts (id, provider, created_at, updated_at) VALUES ('account-1', 'provider.test', 1, 1)",
+    "INSERT INTO accounts (id, provider, external_user_id, created_at, updated_at) VALUES ('account-1', 'test', 'subject-1', 1, 1)",
   ).run()
   db.prepare(
     `INSERT INTO grants
        (id, account_id, provider, scopes_json, created_at, updated_at)
-     VALUES ('grant-1', 'account-1', 'provider.test', '["remote:read"]', 1, 1)`,
+     VALUES ('grant-1', 'account-1', 'test', '["remote:read"]', 1, 1)`,
   ).run()
   db.prepare(
     `INSERT INTO sources

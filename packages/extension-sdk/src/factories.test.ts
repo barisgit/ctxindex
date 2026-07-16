@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { z } from 'zod'
 import {
   type ActionContext,
+  type AdapterAuthSpec,
   type ArtifactDescriptor,
   type DownloadContext,
   defineAdapter,
@@ -21,6 +22,78 @@ type Equal<A, B> =
     ? true
     : false
 type Assert<T extends true> = T
+
+const oauthAdapter = defineAdapter({
+  id: 'fake.oauth',
+  version: 1,
+  configSchema: z.object({}),
+  auth: {
+    kind: 'oauth2',
+    provider: {
+      id: 'fake',
+      authorizationUrl: 'https://auth.example.com/authorize',
+      tokenUrl: 'https://auth.example.com/token',
+      identity: {
+        url: 'https://api.example.com/userinfo',
+        subjectPath: ['sub'],
+        labelPaths: [['email'], ['name']],
+        identities: [
+          { kind: 'email', path: ['email'], verifiedPath: ['email_verified'] },
+        ],
+      },
+      pkce: { method: 'S256', required: true },
+      client: {
+        type: 'public',
+        secret: 'optional',
+        tokenAuthMethod: 'client_secret_post',
+      },
+      baseScopes: ['openid', 'email'],
+      environment: {
+        clientId: 'FAKE_CLIENT_ID',
+        clientSecret: 'FAKE_CLIENT_SECRET',
+        refreshToken: 'FAKE_REFRESH_TOKEN',
+      },
+      allowedHosts: ['api.example.com', 'auth.example.com'],
+      fixedAuthorizationParams: { prompt: 'consent' },
+    },
+    scopes: ['fake.read'],
+  },
+  providerApiHosts: ['api.example.com'],
+  profiles: [],
+  routing: 'federated',
+  capabilities: ['search-remote'],
+  operations: { searchRemote: async () => ({ resources: [], warnings: [] }) },
+  actions: {},
+})
+
+type OAuthAuthInference = Assert<
+  Equal<
+    typeof oauthAdapter.auth.provider.client,
+    {
+      readonly type: 'public'
+      readonly secret: 'optional'
+      readonly tokenAuthMethod: 'client_secret_post'
+    }
+  >
+>
+const oauthAuthInferenceCompiles: OAuthAuthInference = true
+void oauthAuthInferenceCompiles
+void oauthAdapter
+
+type OAuthAuthShape = Assert<
+  Equal<
+    AdapterAuthSpec,
+    | {
+        readonly kind: 'oauth2'
+        readonly provider: import('./index').OAuthProviderSpec
+        readonly scopes: readonly string[]
+      }
+    | { readonly kind: 'api-key'; readonly label: string }
+    | { readonly kind: 'basic' | 'none' | 'custom' }
+  >
+>
+const oauthAuthShapeCompiles: OAuthAuthShape = true
+void oauthAuthShapeCompiles
 
 const noteProfile = defineProfile({
   id: 'fake.note',

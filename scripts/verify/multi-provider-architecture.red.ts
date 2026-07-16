@@ -19,7 +19,6 @@ const adapterRoot = new URL('packages/adapters/src/', repoRoot)
 const profileRoot = new URL('packages/profiles/src/', repoRoot)
 const coreRoot = new URL('packages/core/src/', repoRoot)
 const cliRoot = new URL('apps/cli/src/', repoRoot)
-const sdkRoot = new URL('packages/extension-sdk/src/', repoRoot)
 
 function isProductionTypeScript(name: string): boolean {
   return (
@@ -84,13 +83,6 @@ test('core and CLI contain no provider implementation or provider endpoints', as
   expect(
     await Bun.file(new URL('auth/google-client.ts', coreRoot)).exists(),
   ).toBe(false)
-})
-
-test('OAuth declarations expose bounded hosts through the public SDK', async () => {
-  const adapterContract = await Bun.file(new URL('adapter.ts', sdkRoot)).text()
-  expect(adapterContract).toContain('allowedHosts')
-  expect(adapterContract).toContain('identity')
-  expect(adapterContract).toContain('provider')
 })
 
 test('auth CLI accepts no literal long-lived credential options', async () => {

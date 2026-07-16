@@ -15,6 +15,7 @@ import { createExtensionRegistry } from '../registry'
 import { ResourceStore } from '../resource'
 import { applyPragmas } from '../storage'
 import { runMigrations } from '../storage/migrator'
+import { testOAuthProvider } from '../testing/oauth-provider'
 import { runAction } from './run'
 
 const sourceId = '01KXHBNECDAH1T4MJ38X88EPFJ'
@@ -47,10 +48,11 @@ test('propagates storage failures without relabeling them as Adapter results', a
 test('does not automatically retry an Action fetch after 401', async () => {
   const auth = {
     kind: 'oauth2' as const,
-    provider: {
-      authUrl: 'https://accounts.example/auth',
+    provider: testOAuthProvider({
+      id: 'google',
+      authorizationUrl: 'https://accounts.example/auth',
       tokenUrl: 'https://oauth2.googleapis.com/token',
-    },
+    }),
     scopes: ['scope:draft'],
   }
   const db = await freshDb({ auth, grantId: 'grant-once' })
@@ -157,7 +159,7 @@ async function freshDb(
   ).run()
   if (options.grantId) {
     db.prepare(
-      "INSERT INTO accounts (id, provider, label, created_at, updated_at) VALUES ('account-1', 'google', 'Test', 1, 1)",
+      "INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES ('account-1', 'google', 'Test', 'subject-1', 1, 1)",
     ).run()
     db.prepare(
       `INSERT INTO grants (id, account_id, provider, scopes_json, created_at, updated_at)
@@ -211,6 +213,7 @@ function registryWith(
     version: 1,
     configSchema: z.object({}).strict(),
     auth: options.auth ?? { kind: 'none' },
+    providerApiHosts: ['provider.example'],
     profiles: [{ id: 'fake.message', version: 1 }],
     routing: 'indexed',
     capabilities: [],
@@ -389,10 +392,11 @@ describe('runAction', () => {
   test('passes parsed input and the exact auth-bound Source provider context once', async () => {
     const auth = {
       kind: 'oauth2' as const,
-      provider: {
-        authUrl: 'https://accounts.example/auth',
+      provider: testOAuthProvider({
+        id: 'google',
+        authorizationUrl: 'https://accounts.example/auth',
         tokenUrl: 'https://oauth2.googleapis.com/token',
-      },
+      }),
       scopes: ['scope:draft'],
     }
     const db = await freshDb({ auth, grantId: 'grant-exact' })
@@ -514,10 +518,11 @@ describe('runAction', () => {
 
     const auth = {
       kind: 'oauth2' as const,
-      provider: {
-        authUrl: 'https://accounts.example/auth',
+      provider: testOAuthProvider({
+        id: 'google',
+        authorizationUrl: 'https://accounts.example/auth',
         tokenUrl: 'https://oauth2.googleapis.com/token',
-      },
+      }),
       scopes: ['scope:draft'],
     }
     const authDb = await freshDb({ auth, grantId: 'grant-auth' })

@@ -59,17 +59,7 @@ async function initialize(
   const realm = await sandbox.run(['realm', 'add', 'mail'])
   expect(realm.exitCode, realm.stderr).toBe(0)
   const auth = await sandbox.run(
-    [
-      'auth',
-      'add',
-      'google',
-      '--client-id',
-      'mock-client-id',
-      '--client-secret',
-      'mock-client-secret',
-      '--auth-code',
-      'mock-code',
-    ],
+    ['auth', 'add', 'google', '--adapter', 'google.mailbox', '--from-env'],
     { env },
   )
   expect(auth.exitCode, auth.stderr).toBe(0)
@@ -87,12 +77,15 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
   try {
     const { env, sourceId } = await initialize(sandbox, mock)
     expect(grantScopes(sandbox).sort()).toEqual([
+      'email',
       'https://www.googleapis.com/auth/gmail.compose',
       'https://www.googleapis.com/auth/gmail.readonly',
+      'openid',
     ])
     expect(
-      mock.readRecordedRequests().find(({ pathname }) => pathname === '/token')
-        ?.body,
+      mock
+        .readRecordedRequests()
+        .find(({ pathname }) => pathname === '/oauth/google/token')?.body,
     ).toBe('[REDACTED OAUTH FORM]')
     mock.resetRequests()
     mock.resetDraftState()

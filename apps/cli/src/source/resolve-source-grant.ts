@@ -1,55 +1,38 @@
 import {
   type AuthService,
   isGrantCompatible,
-  providerKeyForAuth,
+  providerIdForAuth,
 } from '@ctxindex/core/auth'
 import { CtxindexValidationError } from '@ctxindex/core/errors'
 
 type AdapterAuth = Parameters<typeof isGrantCompatible>[0]
-
 export async function resolveSourceGrant(
   authService: AuthService,
   auth: AdapterAuth,
   account?: string,
 ): Promise<string | undefined> {
   if (auth.kind === 'none') return undefined
-  if (auth.kind !== 'oauth2') {
+  if (auth.kind !== 'oauth2')
     throw new CtxindexValidationError(
       'invalid_filter',
       'Adapter authentication is not supported by this command',
     )
-  }
-  const provider = providerKeyForAuth(auth)
-  if (provider !== 'google') {
-    throw new CtxindexValidationError(
-      'invalid_filter',
-      `authorization for provider "${provider ?? 'unknown'}" is unavailable`,
-    )
-  }
-
-  const grants = await authService.listGoogleGrants()
-  const selected = account
-    ? grants.filter(
-        (grant) => grant.id === account || grant.accountEmail === account,
-      )
-    : grants
-  const matches = selected.filter((grant) => isGrantCompatible(auth, grant))
-  if (matches.length === 0) {
+  const provider = providerIdForAuth(auth)
+  const grants = (await authService.listGrants(provider ?? undefined)).filter(
+    (grant) => !account || grant.id === account || grant.accountId === account,
+  )
+  const matches = grants.filter((grant) => isGrantCompatible(auth, grant))
+  if (matches.length === 0)
     throw new CtxindexValidationError(
       'invalid_filter',
       account
-        ? `no compatible Google grant matches account "${account}"; run ctxindex auth list`
-        : 'no compatible Google grant available; run ctxindex auth add google',
+        ? `no compatible Grant matches account "${account}"`
+        : `no compatible Grant available; run ctxindex auth add ${provider ?? '<provider>'}`,
     )
-  }
-  if (matches.length > 1) {
-    const choices = matches
-      .map((grant) => grant.accountEmail ?? grant.id)
-      .join(', ')
+  if (matches.length > 1)
     throw new CtxindexValidationError(
       'invalid_filter',
-      `multiple compatible Google grants available; choose one with --account <email|grant-id>: ${choices}`,
+      `multiple compatible Grants available; choose one with --account <account-id|grant-id>: ${matches.map((grant) => grant.id).join(', ')}`,
     )
-  }
   return matches[0]?.id
 }

@@ -9,7 +9,7 @@ import {
   CtxindexError,
   CtxindexNotFoundError,
 } from '../errors'
-import { egressFetch } from '../net'
+import { assertEgressAllowed, egressFetch } from '../net'
 import type { ExtensionRegistry } from '../registry'
 import type { CtxindexDatabase } from '../storage'
 
@@ -137,19 +137,24 @@ export async function createSourceProviderContext(
   }
   const config = parseConfig(adapter, source.config_json)
   const sourceContext = { id: source.id, config }
-  const providerFetch = input.fetch ?? egressFetch
+  const providerApiHosts = adapter.providerApiHosts ?? []
+  const providerFetch =
+    input.fetch ??
+    ((url: string, init?: RequestInit) =>
+      egressFetch(url, init, providerApiHosts))
   const plainFetch = (async (
     requestInput: string | URL | { readonly url: string },
     requestInit?: RequestInit,
-  ) =>
-    providerFetch(
+  ) => {
+    const url =
       typeof requestInput === 'string'
         ? requestInput
         : requestInput instanceof URL
           ? requestInput.href
-          : requestInput.url,
-      requestInit,
-    )) as typeof fetch
+          : requestInput.url
+    assertEgressAllowed(url, providerApiHosts)
+    return providerFetch(url, { ...requestInit, redirect: 'manual' })
+  }) as typeof fetch
 
   if (adapter.auth.kind === 'none') {
     return {
@@ -198,6 +203,8 @@ export async function createSourceProviderContext(
         : requestInput instanceof URL
           ? requestInput.href
           : requestInput.url
+    // Reject undeclared hosts before resolving a token or invoking any fetch.
+    assertEgressAllowed(url, providerApiHosts)
     const send = async (token: string): Promise<Response> => {
       const headers = new Headers(
         (requestInit?.headers ?? request?.headers) as ConstructorParameters<
@@ -215,6 +222,7 @@ export async function createSourceProviderContext(
           ...(method ? { method } : {}),
           ...(body == null ? {} : { body: body as RequestInit['body'] }),
           ...(signal ? { signal } : {}),
+          redirect: 'manual',
         })
       } catch (error) {
         if ((requestInit?.signal ?? request?.signal)?.aborted) throw error

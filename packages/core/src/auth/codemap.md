@@ -2,25 +2,26 @@
 
 ## Responsibility
 
-Owns Google OAuth grant lifecycle, secret references, token exchange/refresh, provider compatibility checks, and guarded Google HTTP access.
+Owns provider-neutral OAuth authorization, Grant lifecycle, token exchange/refresh, identity discovery, Adapter selection and compatibility, loopback PKCE, and bounded OAuth HTTP access.
 
 ## Design/patterns
 
-- `createAuthService()` in `service.ts` is a dependency-injected service factory implementing `AuthService` from `types.ts`; SQLite stores account/grant metadata while the injected `SecretVault` writes to the configured backend and resolves existing typed refs through their owning backend without fallback.
-- `google-client.ts` is a narrow gateway for token and Gmail profile requests, with Zod response validation and egress allowlisting; loopback overrides are non-production only.
-- `compatibility.ts` normalizes scope encodings and matches an `AdapterAuthSpec` to a grant by provider key plus required-scope containment.
-- `index.ts` defines the public auth surface and re-exports auth-specific error types.
+- `createAuthService()` in `service.ts` is a dependency-injected `AuthService`: SQLite stores Grant metadata, `AccountService` owns Account identity upserts, and the injected `SecretsStore` persists typed client/token references.
+- `authorize-provider.ts` orchestrates Adapter-derived scopes and either environment-refresh or browser loopback authorization before identity discovery and durable Grant creation.
+- `selection.ts` validates provider/Adapter selection and deterministically unions provider base scopes with selected operation scopes; `compatibility.ts` checks provider identity plus required-scope containment.
+- `oauth-endpoints.ts`, `oauth-token.ts`, `oauth-identity.ts`, and `oauth-scopes.ts` isolate endpoint host policy, protocol requests/validation, declared JSON identity extraction, and scope invariants; `oauth.ts` is their barrel.
+- `loopback.ts` implements localhost callback OAuth with state validation and PKCE S256; browser launching and URL emission are injectable.
 
 ## Data & control flow
 
-1. `addGoogleGrant()` writes refresh/access/client secrets, then transactionally inserts `accounts` and `grants` rows and returns generated account/grant IDs.
-2. `resolveLinkedGrantAccessToken()` returns an unexpired stored access token or delegates to `refreshGoogleAccessToken()`.
-3. Refresh resolves client credentials from environment or secret refs, reads the refresh token, calls `postOAuthTokenRequest()`, overwrites/stores the new access token, and updates grant expiry metadata.
-4. `exchangeGoogleAuthCode()` posts the authorization-code grant; `getGoogleAccountEmail()` performs an allowlisted bearer request to the Gmail profile endpoint.
+1. `authorizeProvider()` resolves one declared OAuth provider and selected Adapters, reads only provider-declared environment keys, and selects `loopback` or `from-env` acquisition.
+2. OAuth requests resolve declared or non-production loopback endpoints, enforce the provider's `allowedHosts`, reject redirects, validate token scopes, and fetch a provider-declared subject/label/verified identities.
+3. `AuthService.addGrant()` writes typed client/token secrets, then transactionally upserts the Account and inserts normalized Grant metadata; any persistence failure cleans every newly written ref.
+4. `resolveLinkedGrantAccessToken()` returns an unexpired token or `refreshAccessToken()` resolves the loaded provider declaration, refreshes through its token endpoint, validates scopes, writes replacement access/refresh refs before the database update, then cleans old refs best-effort.
 
 ## Integration points
 
-- Secrets/config/logging/storage dependencies are typed by `AuthDependencies` in `types.ts` and supplied from `packages/core/src/secrets/`, `config/`, `logger/`, and `storage/`.
-- Network policy is enforced by `packages/core/src/net/index.ts` through `egressFetch`, `EGRESS_ALLOWLIST`, and `isLoopbackHost`.
-- `packages/core/src/source/provider-context.ts` and provider-facing services consume `AuthService.resolveLinkedGrantAccessToken()`.
-- Adapter auth declarations come from `@ctxindex/extension-sdk` and are checked by `isGrantCompatible()`.
+- Provider declarations and Adapter auth contracts come from `@ctxindex/extension-sdk` through `packages/core/src/registry/`; Google supplies its declaration from `packages/adapters/src/google-oauth-provider.ts`.
+- Account persistence is delegated to `packages/core/src/account/`; secrets/config/logging/storage dependencies are supplied by their core capabilities.
+- OAuth and provider API requests use `packages/core/src/net/egressFetch` with declaration-specific host lists.
+- `packages/core/src/source/provider-context.ts`, CLI auth/source workflows, and provider-facing services consume the public `@ctxindex/core/auth` surface.

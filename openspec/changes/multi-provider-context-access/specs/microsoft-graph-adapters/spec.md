@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Microsoft identity supports personal and organizational Accounts
-The `microsoft` OAuth provider SHALL use Microsoft identity platform authorization-code flow with PKCE, state/redirect validation, refresh support, and endpoints/scopes valid for both approved Outlook.com personal Accounts and Microsoft 365 organizational Accounts. Stable provider subject and a human label SHALL come from the declared identity response; tenant/account choice MUST NOT be inferred from email suffix.
+The `microsoft` OAuth provider SHALL use Microsoft identity platform authorization-code flow with PKCE, state/redirect validation, refresh support, and endpoints/scopes valid for both approved Outlook.com personal Accounts and Microsoft 365 organizational Accounts. The stable provider subject SHALL be Graph `/v1.0/me` `id`, not the client-pairwise OIDC `sub`; a human label SHALL come from the same declared Graph identity response. Tenant/account choice MUST NOT be inferred from email suffix.
 
 #### Scenario: Personal Microsoft Account authorizes
 - **WHEN** an approved personal Account completes consent for selected Microsoft Adapters

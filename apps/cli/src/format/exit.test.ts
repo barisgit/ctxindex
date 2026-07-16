@@ -8,9 +8,10 @@ import { mapErrorToExit } from './exit'
 
 describe('mapErrorToExit', () => {
   test.each([
+    'invalid_oauth_selection',
     'action_unsupported',
     'confirmation_required',
-  ] as const)('maps Action validation %s to exit 2', (code) => {
+  ] as const)('maps validation %s to exit 2', (code) => {
     expect(mapErrorToExit(new CtxindexValidationError(code, code))).toBe(2)
   })
 

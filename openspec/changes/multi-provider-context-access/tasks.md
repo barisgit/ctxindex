@@ -23,16 +23,16 @@
 
 ## 3. Provider-neutral OAuth, Accounts, and Grants
 
-- [ ] 3.1 Extend the public SDK OAuth declaration under exact public-surface/inference tests with stable provider id, authorization/token/identity metadata, subject/label/typed Account Identity JSON paths, PKCE/client mode, base scopes, environment names, and allowed hosts; validate consistent provider declarations in registries.
-- [ ] 3.2 Replace token-host provider heuristics with registry-derived provider resolution and exact code-point-sorted Adapter-selected scope unions; add negative tests for empty/unknown/mixed-provider selections, inconsistent descriptors, duplicate scopes, and unselected-scope exclusion.
-- [ ] 3.3 Update fresh Account schema with stable `(provider, external_user_id)` uniqueness and implement one Account module that atomically upserts identity/label plus deduplicated verified `account_identities`, then returns deterministic nested Account/Grant/Source inventory without secrets.
-- [ ] 3.4 Replace Google-only AuthService types/SQL with provider-neutral Grant creation/query, typed Vault references, exact granted-scope normalization, stable Account reuse, temporary-secret cleanup, and generic token refresh with refresh-token rotation.
-- [ ] 3.5 Move loopback authorization into a deep core OAuth module with explicit browser activation, state/callback/timeout validation, S256 PKCE, safe client input, declared endpoint/host enforcement, token/identity response validation, and no out-of-band code path.
-- [ ] 3.6 Generalize Source Grant compatibility and provider contexts to the declarative provider id/scopes while preserving linked-Grant-only access, one read 401 refresh retry, zero Action retry, sanitized errors, and per-provider host enforcement.
+- [x] 3.1 Extend the public SDK OAuth declaration under exact public-surface/inference tests with stable provider id, authorization/token/identity metadata, subject/label/typed Account Identity JSON paths, PKCE/client mode, base scopes, environment names, and allowed hosts; validate consistent provider declarations in registries.
+- [x] 3.2 Replace token-host provider heuristics with registry-derived provider resolution and exact code-point-sorted Adapter-selected scope unions; add negative tests for empty/unknown/mixed-provider selections, inconsistent descriptors, duplicate scopes, and unselected-scope exclusion.
+- [x] 3.3 Update fresh Account schema with stable `(provider, external_user_id)` uniqueness and implement one Account module that atomically upserts identity/label plus deduplicated verified `account_identities`, then returns deterministic nested Account/Grant/Source inventory without secrets.
+- [x] 3.4 Replace Google-only AuthService types/SQL with provider-neutral Grant creation/query, typed Vault references, exact granted-scope normalization, stable Account reuse, temporary-secret cleanup, and generic token refresh with refresh-token rotation.
+- [x] 3.5 Move loopback authorization into a deep core OAuth module with explicit browser activation, state/callback/timeout validation, S256 PKCE, safe client input, declared endpoint/host enforcement, token/identity response validation, and no out-of-band code path.
+- [x] 3.6 Generalize Source Grant compatibility and provider contexts to the declarative provider id/scopes while preserving linked-Grant-only access, one read 401 refresh retry, zero Action retry, sanitized errors, and per-provider host enforcement.
 
 ### Slice 3 gate
 
-- [ ] 3.7 Run SDK public-surface/factory, registry, Account/Auth/Source/provider-context, storage/migration, network, typecheck/lint/architecture/dependency/full-unit gates; obtain independent review and save `work/slice-3-auth-account-core-gate.md`.
+- [x] 3.7 Run SDK public-surface/factory, registry, Account/Auth/Source/provider-context, storage/migration, network, typecheck/lint/architecture/dependency/full-unit gates; obtain independent review and save `work/slice-3-auth-account-core-gate.md`.
 
 ## 4. Agent-first Auth and Account CLI
 

@@ -91,6 +91,17 @@ export async function openSecretDeps(): Promise<SecretCliDeps> {
   return { secretBackendManager, async close() {} }
 }
 
+export async function loadAuthDefinitionDeps(): Promise<{
+  readonly config: CtxindexConfig
+  readonly registry: ExtensionRegistry
+}> {
+  const config = await readConfig()
+  const registry = (
+    await loadExtensions({ config, builtins: CTXINDEX_BUILTIN_EXTENSIONS })
+  ).registry
+  return { config, registry }
+}
+
 export async function openDeps(
   opts: {
     readonly config?: CtxindexConfig
@@ -126,7 +137,7 @@ export async function openDeps(
     db,
     store: secretVault,
     logger: log,
-    env,
+    registry: registry.adapters,
   })
   const artifactService = new ArtifactService({
     db,

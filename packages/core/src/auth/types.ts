@@ -1,21 +1,15 @@
-import { z } from 'zod'
-import type { getEnv } from '../config'
+import type { UpsertAccountInput } from '../account'
 import type { Logger } from '../logger'
+import type { AdapterRegistry } from '../registry'
 import type { SecretsStore } from '../secrets'
-import type { CtxindexDatabase as SqliteDatabase } from '../storage'
+import type { CtxindexDatabase } from '../storage'
 
-export type { SqliteDatabase }
-
-export interface OAuthClientCreds {
-  readonly clientId: string
-  readonly clientSecret: string
-}
-
-export interface GoogleGrantRow {
+export interface GrantRow {
   readonly id: string
   readonly accountId: string
-  readonly provider: 'google'
-  readonly scopes: string
+  readonly provider: string
+  readonly accountLabel: string | null
+  readonly scopes: readonly string[]
   readonly accessTokenRef: string | null
   readonly refreshTokenRef: string | null
   readonly clientIdRef: string | null
@@ -25,66 +19,38 @@ export interface GoogleGrantRow {
   readonly updatedAt: number
 }
 
-export interface GoogleGrantSummary {
-  readonly id: string
-  readonly provider: 'google'
-  readonly scopes: string
-  readonly expiresAt: number | null
-  readonly accountEmail: string | null
-  readonly accountDisplayName: string | null
-}
-
-export const GoogleTokenResponseSchema = z
-  .object({
-    access_token: z.string(),
-    expires_in: z.number(),
-    refresh_token: z.string().optional(),
-    scope: z.string().optional(),
-    token_type: z.string().optional(),
-  })
-  .passthrough()
-
-export type GoogleTokenResponse = z.infer<typeof GoogleTokenResponseSchema>
-
-export interface AuthDependencies {
-  readonly db: SqliteDatabase
-  readonly store: SecretsStore
-  readonly logger: Logger
-  readonly env: ReturnType<typeof getEnv>
-}
-
-export interface AddGoogleGrantInput {
+export interface AddGrantInput {
+  readonly provider: string
+  readonly account: Omit<UpsertAccountInput, 'provider'>
+  readonly scopes: readonly string[]
   readonly clientId: string
-  readonly clientSecret: string
-  readonly refreshToken: string
+  readonly clientSecret?: string
   readonly accessToken?: string
-  readonly scopes: string
+  readonly refreshToken: string
   readonly expiresAt?: number
-  readonly accountEmail?: string
 }
 
-export interface AddGoogleGrantResult {
+export interface AddGrantResult {
   readonly grantId: string
   readonly accountId: string
 }
 
-export interface ExchangeAuthCodeInput {
-  readonly clientId: string
-  readonly clientSecret: string
-  readonly code: string
-  readonly redirectUri: string
+export interface AuthDependencies {
+  readonly db: CtxindexDatabase
+  readonly store: SecretsStore
+  readonly logger: Logger
+  readonly registry: AdapterRegistry
+  readonly readEnvironment?: (name: string) => string | undefined
+  readonly now?: () => number
 }
 
 export interface AuthService {
-  addGoogleGrant(input: AddGoogleGrantInput): Promise<AddGoogleGrantResult>
-  getGoogleGrantById(grantId: string): Promise<GoogleGrantRow | null>
-  listGoogleGrants(): Promise<GoogleGrantSummary[]>
+  addGrant(input: AddGrantInput): Promise<AddGrantResult>
+  getGrantById(grantId: string): Promise<GrantRow | null>
+  listGrants(provider?: string): Promise<readonly GrantRow[]>
   resolveLinkedGrantAccessToken(
     grantId: string,
     options?: { readonly forceRefresh?: boolean },
   ): Promise<string>
-  refreshGoogleAccessToken(grantId: string): Promise<string>
-  exchangeGoogleAuthCode(
-    input: ExchangeAuthCodeInput,
-  ): Promise<GoogleTokenResponse>
+  refreshAccessToken(grantId: string): Promise<string>
 }

@@ -1,5 +1,6 @@
 export * from './builtins'
 export { gmailSourceConfigSchema } from './google-mailbox/config'
 export { gmailAdapterDefinition } from './google-mailbox/definition'
+export { googleOAuthProvider } from './google-oauth-provider'
 export { localDirectorySourceConfigSchema } from './local-directory/config'
 export { localDirectoryAdapterDefinition } from './local-directory/definition'

@@ -88,14 +88,50 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
     expect(gmail?.auth).toEqual({
       kind: 'oauth2',
       provider: {
-        authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+        id: 'google',
+        authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
         tokenUrl: 'https://oauth2.googleapis.com/token',
+        identity: {
+          url: 'https://openidconnect.googleapis.com/v1/userinfo',
+          subjectPath: ['sub'],
+          labelPaths: [['email']],
+          identities: [
+            {
+              kind: 'email',
+              path: ['email'],
+              verifiedPath: ['email_verified'],
+            },
+          ],
+        },
+        pkce: { method: 'S256', required: true },
+        client: {
+          type: 'public',
+          secret: 'optional',
+          tokenAuthMethod: 'client_secret_post',
+        },
+        baseScopes: ['openid', 'email'],
+        environment: {
+          clientId: 'CTXINDEX_GOOGLE_CLIENT_ID',
+          clientSecret: 'CTXINDEX_GOOGLE_CLIENT_SECRET',
+          refreshToken: 'CTXINDEX_GOOGLE_REFRESH_TOKEN',
+        },
+        allowedHosts: [
+          'accounts.google.com',
+          'oauth2.googleapis.com',
+          'openidconnect.googleapis.com',
+        ],
+        fixedAuthorizationParams: {
+          access_type: 'offline',
+          include_granted_scopes: 'false',
+          prompt: 'consent',
+        },
       },
       scopes: [
         'https://www.googleapis.com/auth/gmail.readonly',
         'https://www.googleapis.com/auth/gmail.compose',
       ],
     })
+    expect(gmail?.providerApiHosts).toEqual(['gmail.googleapis.com'])
     expect(
       gmail &&
         isGrantCompatible(gmail.auth, {

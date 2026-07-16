@@ -73,17 +73,7 @@ test('real binary proves the isolated complete V1 workflow', async () => {
     await addRealm(sandbox, 'files')
 
     const auth = await sandbox.run(
-      [
-        'auth',
-        'add',
-        'google',
-        '--client-id',
-        'mock-client-id',
-        '--client-secret',
-        'mock-client-secret',
-        '--auth-code',
-        'mock-code',
-      ],
+      ['auth', 'add', 'google', '--adapter', 'google.mailbox', '--from-env'],
       { env },
     )
     expect(auth.exitCode, auth.stderr).toBe(0)

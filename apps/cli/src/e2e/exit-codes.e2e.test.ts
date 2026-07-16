@@ -130,8 +130,8 @@ describe('exit codes e2e', () => {
           'google',
           '--client-id',
           'client-id',
-          '--client-secret',
-          'client-secret',
+          '--adapter',
+          'google.mailbox',
           '--loopback',
         ],
         {

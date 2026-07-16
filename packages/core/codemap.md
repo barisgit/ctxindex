@@ -6,7 +6,7 @@ Defines the private `@ctxindex/core` workspace package, which exposes the reusab
 
 ## Design/patterns
 
-- `package.json` is an explicit ESM facade: `exports["."]` targets `src/index.ts`, while named subpaths such as `./storage`, `./registry`, `./source`, `./sync`, `./search`, and `./action` expose bounded capability barrels.
+- `package.json` is an explicit ESM facade: `exports["."]` targets `src/index.ts`, while named subpaths such as `./account`, `./auth`, `./storage`, `./registry`, `./source`, `./sync`, `./search`, and `./action` expose bounded capability barrels.
 - `src/` is organized by capability rather than technical tier. Its registries and services coordinate Profile-owned semantics with Adapter-owned I/O, while repositories and sync workflows isolate SQLite mutation.
 - The package remains source-consumed and private (`version: 0.0.0`); Bun runs TypeScript directly and `tsgo --noEmit` validates the package without a generated runtime distribution.
 - Runtime dependencies reflect its boundaries: `@ctxindex/extension-sdk` for contracts, Zod for validation, Drizzle/Bun SQLite for persistence, and Pino for logging.

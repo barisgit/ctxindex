@@ -10,6 +10,9 @@ import { runMigrations } from '../storage/migrator'
 import { createSourceService } from './service'
 
 let db: Database
+
+import { testOAuthProvider } from '../testing/oauth-provider'
+
 const logger = { debug() {} } as unknown as Logger
 const gmailScope = 'https://www.googleapis.com/auth/gmail.readonly'
 const registry = createExtensionRegistry([
@@ -24,10 +27,11 @@ const registry = createExtensionRegistry([
         configSchema: z.object({}).strict(),
         auth: {
           kind: 'oauth2',
-          provider: {
-            authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+          provider: testOAuthProvider({
+            id: 'google',
+            authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
             tokenUrl: 'https://oauth2.googleapis.com/token',
-          },
+          }),
           scopes: [gmailScope],
         },
         profiles: [],
@@ -305,12 +309,12 @@ describe('source service', () => {
     realmService.createRealm({ slug: 'work' })
     const service = createSourceService({ db, logger, realmService, registry })
     const insertAccount = db.prepare(
-      'INSERT INTO accounts (id, provider, created_at, updated_at) VALUES (?, ?, 1, 1)',
+      'INSERT INTO accounts (id, provider, external_user_id, created_at, updated_at) VALUES (?, ?, ?, 1, 1)',
     )
     const insertGrant = db.prepare(
       'INSERT INTO grants (id, account_id, provider, scopes_json, created_at, updated_at) VALUES (?, ?, ?, ?, 1, 1)',
     )
-    insertAccount.run('account-google', 'google')
+    insertAccount.run('account-google', 'google', 'subject-google')
     insertGrant.run('grant-google', 'account-google', 'google', '[]')
     expect(() =>
       service.addSource({
@@ -326,7 +330,7 @@ describe('source service', () => {
     realmService.createRealm({ slug: 'work' })
     const service = createSourceService({ db, logger, realmService, registry })
     db.prepare(
-      "INSERT INTO accounts (id, provider, created_at, updated_at) VALUES ('account-google', 'google', 1, 1)",
+      "INSERT INTO accounts (id, provider, external_user_id, created_at, updated_at) VALUES ('account-google', 'google', 'subject-google', 1, 1)",
     ).run()
     db.prepare(
       'INSERT INTO grants (id, account_id, provider, scopes_json, created_at, updated_at) VALUES (?, ?, ?, ?, 1, 1)',
@@ -356,7 +360,7 @@ describe('source service', () => {
     realmService.createRealm({ slug: 'work' })
     const service = createSourceService({ db, logger, realmService, registry })
     db.prepare(
-      "INSERT INTO accounts (id, provider, created_at, updated_at) VALUES ('account-google', 'google', 1, 1)",
+      "INSERT INTO accounts (id, provider, external_user_id, created_at, updated_at) VALUES ('account-google', 'google', 'subject-google', 1, 1)",
     ).run()
     const insertGrant = db.prepare(
       'INSERT INTO grants (id, account_id, provider, scopes_json, created_at, updated_at) VALUES (?, ?, ?, ?, 1, 1)',

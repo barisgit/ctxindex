@@ -9,9 +9,10 @@ CREATE TABLE accounts (
   id TEXT NOT NULL PRIMARY KEY,
   provider TEXT NOT NULL,
   label TEXT,
-  external_user_id TEXT,
+  external_user_id TEXT NOT NULL,
   created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
+  updated_at INTEGER NOT NULL,
+  UNIQUE(provider, external_user_id)
 );
 
 CREATE TABLE account_identities (

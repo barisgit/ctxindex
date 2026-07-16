@@ -127,6 +127,44 @@ test('fresh core migration creates only the generic V1 storage model', async () 
   ])
 })
 
+test('fresh Account schema requires stable provider identity and enforces its uniqueness', async () => {
+  const db = freshDb()
+  await runMigrations(db)
+
+  const columns = db.prepare("PRAGMA table_info('accounts')").all() as Array<{
+    name: string
+    notnull: number
+  }>
+  expect(
+    columns.find((column) => column.name === 'external_user_id')?.notnull,
+  ).toBe(1)
+
+  db.prepare(
+    "INSERT INTO accounts (id, provider, external_user_id, created_at, updated_at) VALUES ('one', 'google', 'subject', 1, 1)",
+  ).run()
+  expect(() =>
+    db
+      .prepare(
+        "INSERT INTO accounts (id, provider, external_user_id, created_at, updated_at) VALUES ('two', 'google', 'subject', 1, 1)",
+      )
+      .run(),
+  ).toThrow()
+  expect(() =>
+    db
+      .prepare(
+        "INSERT INTO accounts (id, provider, external_user_id, created_at, updated_at) VALUES ('three', 'microsoft', 'subject', 1, 1)",
+      )
+      .run(),
+  ).not.toThrow()
+  expect(() =>
+    db
+      .prepare(
+        "INSERT INTO accounts (id, provider, created_at, updated_at) VALUES ('missing', 'google', 1, 1)",
+      )
+      .run(),
+  ).toThrow()
+})
+
 test('field index enforces one typed value and ordered uniqueness', async () => {
   const db = freshDb()
   await runMigrations(db)

@@ -2,21 +2,21 @@
 
 ## Responsibility
 
-Enforces the single outbound HTTP egress boundary for core and provider adapters.
+Enforces the generic outbound HTTP egress chokepoint for core OAuth requests and provider Adapter operations.
 
 ## Design
 
-- `EGRESS_ALLOWLIST` is the central provider-host policy.
-- `assertEgressAllowed()` is a guard that parses URLs, permits declared hosts, permits loopback hosts only outside production, and raises `CtxindexError('egress_denied')` otherwise.
-- `egressFetch()` is the sanctioned wrapper around global `fetch`; response interpretation remains with callers.
+- `assertEgressAllowed()` parses a URL, rejects embedded credentials, and permits HTTPS only when its hostname is present in the caller-supplied host list.
+- Non-production HTTP or HTTPS loopback endpoints remain available for isolated mocks; all other URLs raise `CtxindexError('egress_denied')`.
+- `egressFetch()` is the sanctioned global-fetch wrapper and requires callers to pass the relevant provider or Adapter host declaration.
 
 ## Data & control flow
 
-A caller passes a URL and optional `RequestInit` to `egressFetch()`. The wrapper calls `assertEgressAllowed()` before forwarding unchanged arguments to `fetch`; denied hosts fail before network I/O.
+A caller passes a URL, optional `RequestInit`, and an explicit allowed-host list to `egressFetch()`. The wrapper calls `assertEgressAllowed()` before forwarding to global `fetch`; denied or malformed URLs fail before network I/O.
 
 ## Integration points
 
-- `packages/core/src/auth/google-client.ts` uses egress checks for Google OAuth and loopback handling.
-- `packages/core/src/source/provider-context.ts` exposes the wrapper to provider operations.
-- Adapter operation contexts use this module's egress-enforcing fetch implementation for provider traffic.
+- OAuth token and identity modules pass `OAuthProviderSpec.allowedHosts`.
+- `packages/core/src/source/provider-context.ts` passes the selected Adapter's `providerApiHosts` and rechecks requests before token resolution.
+- Adapter operation contexts receive the resulting egress-enforcing fetch implementation.
 - Depends on `packages/core/src/errors.ts` for policy failures.

@@ -18,17 +18,7 @@ async function initialize(
   const realm = await sandbox.run(['realm', 'add', 'mail'])
   expect(realm.exitCode, realm.stderr).toBe(0)
   const auth = await sandbox.run(
-    [
-      'auth',
-      'add',
-      'google',
-      '--client-id',
-      'mock-client-id',
-      '--client-secret',
-      'mock-client-secret',
-      '--auth-code',
-      'mock-code',
-    ],
+    ['auth', 'add', 'google', '--adapter', 'google.mailbox', '--from-env'],
     { env },
   )
   expect(auth.exitCode, auth.stderr).toBe(0)
@@ -46,10 +36,10 @@ test('mocked Gmail remote search and cached get use stable canonical Refs', asyn
   try {
     const { env, sourceId } = await initialize(sandbox, mock)
     expect(mock.readRequests()).toEqual([
-      { method: 'POST', pathname: '/token', search: '' },
+      { method: 'POST', pathname: '/oauth/google/token', search: '' },
       {
         method: 'GET',
-        pathname: '/gmail/v1/users/me/profile',
+        pathname: '/oauth/google/identity',
         search: '',
       },
     ])

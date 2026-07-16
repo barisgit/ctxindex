@@ -322,8 +322,15 @@ describe('registry-derived describe data', () => {
     ])
   })
 
-  test('sorts mixed case and punctuation by code unit', () => {
-    const profiles = ['a.kind', '_kind', 'A.kind', '!kind'].map((id) =>
+  test('sorts descriptor strings by Unicode code point', () => {
+    const profiles = [
+      'a.kind',
+      '_kind',
+      'A.kind',
+      '!kind',
+      '𐀀.kind',
+      '\uE000.kind',
+    ].map((id) =>
       defineProfile({
         id,
         version: 1,
@@ -340,6 +347,8 @@ describe('registry-derived describe data', () => {
       'A.kind',
       '_kind',
       'a.kind',
+      '\uE000.kind',
+      '𐀀.kind',
     ])
     expect(result.kinds[0]?.aliases).toEqual(['!', 'A', '_', 'a'])
   })

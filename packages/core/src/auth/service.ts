@@ -1,24 +1,27 @@
 import { ulid } from 'ulid'
+import { createAccountService, normalizeGrantScopes } from '../account'
+import { readEnvironmentVariable } from '../config'
 import { CtxindexAuthError } from '../errors'
-import { parseSecretRef } from '../secrets'
-import { GOOGLE_TOKEN_ENDPOINT, postOAuthTokenRequest } from './google-client'
+import {
+  normalizeOAuthScopes,
+  postOAuthToken,
+  resolveOAuthEndpoint,
+  resolveRefreshGrantedScopes,
+} from './oauth'
 import type {
-  AddGoogleGrantInput,
-  AddGoogleGrantResult,
+  AddGrantInput,
+  AddGrantResult,
   AuthDependencies,
   AuthService,
-  ExchangeAuthCodeInput,
-  GoogleGrantRow,
-  GoogleGrantSummary,
-  GoogleTokenResponse,
-  OAuthClientCreds,
+  GrantRow,
 } from './types'
 
 type GrantSqlRow = {
   id: string
   account_id: string
   provider: string
-  scopes: string
+  account_label: string | null
+  scopes_json: string
   access_token_ref: string | null
   refresh_token_ref: string | null
   client_id_ref: string | null
@@ -28,12 +31,13 @@ type GrantSqlRow = {
   updated_at: number
 }
 
-function toGoogleGrantRow(row: GrantSqlRow): GoogleGrantRow {
+function toGrantRow(row: GrantSqlRow): GrantRow {
   return {
     id: row.id,
     accountId: row.account_id,
-    provider: 'google',
-    scopes: row.scopes,
+    provider: row.provider,
+    accountLabel: row.account_label,
+    scopes: normalizeGrantScopes(row.scopes_json),
     accessTokenRef: row.access_token_ref,
     refreshTokenRef: row.refresh_token_ref,
     clientIdRef: row.client_id_ref,
@@ -44,248 +48,262 @@ function toGoogleGrantRow(row: GrantSqlRow): GoogleGrantRow {
   }
 }
 
-async function writeSecret(
-  deps: AuthDependencies,
-  key: string,
-  value: string,
-): Promise<string> {
-  return deps.store.setSecret('google', key, value)
-}
-
-async function overwriteSecret(
-  deps: AuthDependencies,
-  ref: string,
-  fallbackKey: string,
-  value: string,
-): Promise<string> {
-  const parsed = parseSecretRef(ref)
-  if (parsed.backend === 'keychain') {
-    return deps.store.setSecret(parsed.scope, parsed.key, value)
+async function cleanup(
+  store: AuthDependencies['store'],
+  refs: readonly string[],
+): Promise<void> {
+  for (const ref of refs) {
+    try {
+      await store.deleteSecret(ref)
+    } catch {}
   }
-  return deps.store.setSecret(parsed.scope, parsed.key || fallbackKey, value)
-}
-
-async function resolveOAuthClientCreds(
-  deps: AuthDependencies,
-  grant: GoogleGrantRow,
-): Promise<OAuthClientCreds> {
-  const envClientId = deps.env.CTXINDEX_GMAIL_CLIENT_ID
-  const envClientSecret = deps.env.CTXINDEX_GMAIL_CLIENT_SECRET
-  if (envClientId && envClientSecret) {
-    return { clientId: envClientId, clientSecret: envClientSecret }
-  }
-
-  if (grant.clientIdRef && grant.clientSecretRef) {
-    return {
-      clientId: await deps.store.getSecret(grant.clientIdRef),
-      clientSecret: await deps.store.getSecret(grant.clientSecretRef),
-    }
-  }
-
-  throw new CtxindexAuthError(
-    'missing_oauth_client_creds',
-    `no client_id/secret available for grant ${grant.id}`,
-  )
 }
 
 export function createAuthService(deps: AuthDependencies): AuthService {
-  return {
-    async addGoogleGrant(
-      input: AddGoogleGrantInput,
-    ): Promise<AddGoogleGrantResult> {
-      const now = Date.now()
-      const accountId = ulid()
-      const grantId = ulid()
-
-      const refreshTokenRef = await writeSecret(
-        deps,
-        `refresh_token:${grantId}`,
-        input.refreshToken,
+  const now = deps.now ?? Date.now
+  const readEnvironment = deps.readEnvironment ?? readEnvironmentVariable
+  const accountService = createAccountService({ db: deps.db, now })
+  const getGrantById = async (grantId: string): Promise<GrantRow | null> => {
+    const row = deps.db
+      .prepare(
+        'SELECT g.id, g.account_id, g.provider, a.label AS account_label, g.scopes_json, g.access_token_ref, g.refresh_token_ref, g.client_id_ref, g.client_secret_ref, g.expires_at, g.created_at, g.updated_at FROM grants AS g JOIN accounts AS a ON a.id = g.account_id WHERE g.id = ? LIMIT 1',
       )
-      const accessTokenRef = input.accessToken
-        ? await writeSecret(deps, `access_token:${grantId}`, input.accessToken)
-        : null
-      const clientIdRef = await writeSecret(
-        deps,
-        `client_id:${grantId}`,
-        input.clientId,
-      )
-      const clientSecretRef = await writeSecret(
-        deps,
-        `client_secret:${grantId}`,
-        input.clientSecret,
-      )
+      .get(grantId) as GrantSqlRow | null
+    return row ? toGrantRow(row) : null
+  }
+  const write = async (
+    provider: string,
+    grantId: string,
+    kind: string,
+    value: string,
+  ): Promise<string> =>
+    deps.store.setSecret(provider, `grant:${grantId}:${kind}:${ulid()}`, value)
 
-      const insertRows = deps.db.transaction(() => {
-        deps.db
-          .prepare(
-            `INSERT INTO accounts
-               (id, provider, label, external_user_id, created_at, updated_at)
-             VALUES (?, 'google', ?, ?, ?, ?)`,
-          )
-          .run(
-            accountId,
-            input.accountEmail ?? 'google',
-            input.accountEmail ?? null,
-            now,
-            now,
-          )
-
-        deps.db
-          .prepare(
-            `INSERT INTO grants
-               (id, account_id, provider, scopes_json, client_id_ref, client_secret_ref, access_token_ref, refresh_token_ref, expires_at, created_at, updated_at)
-             VALUES (?, ?, 'google', ?, ?, ?, ?, ?, ?, ?, ?)`,
-          )
-          .run(
+  const service: AuthService = {
+    async addGrant(input: AddGrantInput): Promise<AddGrantResult> {
+      const provider = deps.registry.getOAuthProvider(input.provider)
+      if (!provider)
+        throw new CtxindexAuthError(
+          'needs_auth',
+          'OAuth provider is not loaded',
+        )
+      if (!input.refreshToken)
+        throw new CtxindexAuthError(
+          'invalid_grant',
+          'A durable refresh token is required',
+        )
+      if (provider.client.secret === 'required' && !input.clientSecret)
+        throw new CtxindexAuthError(
+          'missing_oauth_client_creds',
+          'OAuth provider requires a client secret',
+        )
+      const timestamp = now()
+      const grantId = ulid(timestamp)
+      const refs: string[] = []
+      try {
+        const clientIdRef = await write(
+          input.provider,
+          grantId,
+          'client-id',
+          input.clientId,
+        )
+        refs.push(clientIdRef)
+        let clientSecretRef: string | null = null
+        if (input.clientSecret !== undefined) {
+          clientSecretRef = await write(
+            input.provider,
             grantId,
-            accountId,
-            input.scopes,
-            clientIdRef,
-            clientSecretRef,
-            accessTokenRef,
-            refreshTokenRef,
-            input.expiresAt ?? null,
-            now,
-            now,
+            'client-secret',
+            input.clientSecret,
           )
-      })
-      insertRows()
-      deps.logger.debug({ grantId, accountId }, 'google auth grant added')
-
-      return { grantId, accountId }
-    },
-
-    async getGoogleGrantById(grantId: string): Promise<GoogleGrantRow | null> {
-      const row = deps.db
-        .prepare(
-          `SELECT id, account_id, provider, scopes_json AS scopes, access_token_ref, refresh_token_ref, client_id_ref, client_secret_ref, expires_at, created_at, updated_at
-           FROM grants WHERE id = ? AND provider = 'google' LIMIT 1`,
+          refs.push(clientSecretRef)
+        }
+        const refreshTokenRef = await write(
+          input.provider,
+          grantId,
+          'refresh-token',
+          input.refreshToken,
         )
-        .get(grantId) as GrantSqlRow | null
-      return row ? toGoogleGrantRow(row) : null
-    },
-
-    async listGoogleGrants(): Promise<GoogleGrantSummary[]> {
-      const rows = deps.db
-        .prepare(
-          `SELECT g.id, g.provider, g.scopes_json AS scopes, g.expires_at, a.external_user_id AS account_email, a.label AS account_display_name
-           FROM grants AS g
-           LEFT JOIN accounts AS a ON a.id = g.account_id
-           WHERE g.provider = 'google'
-           ORDER BY g.updated_at DESC, g.created_at DESC`,
+        refs.push(refreshTokenRef)
+        let accessTokenRef: string | null = null
+        if (input.accessToken !== undefined) {
+          accessTokenRef = await write(
+            input.provider,
+            grantId,
+            'access-token',
+            input.accessToken,
+          )
+          refs.push(accessTokenRef)
+        }
+        const scopes = normalizeOAuthScopes(input.scopes)
+        const result = deps.db.transaction(() => {
+          const { accountId } = accountService.upsertAccount({
+            provider: input.provider,
+            ...input.account,
+          })
+          deps.db
+            .prepare(
+              'INSERT INTO grants (id, account_id, provider, scopes_json, client_id_ref, client_secret_ref, access_token_ref, refresh_token_ref, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            )
+            .run(
+              grantId,
+              accountId,
+              input.provider,
+              JSON.stringify(scopes),
+              clientIdRef,
+              clientSecretRef,
+              accessTokenRef,
+              refreshTokenRef,
+              input.expiresAt ?? null,
+              timestamp,
+              timestamp,
+            )
+          return { grantId, accountId }
+        })()
+        deps.logger.debug(
+          {
+            grantId: result.grantId,
+            accountId: result.accountId,
+            provider: input.provider,
+          },
+          'OAuth Grant added',
         )
-        .all() as {
-        id: string
-        provider: 'google'
-        scopes: string
-        expires_at: number | null
-        account_email: string | null
-        account_display_name: string | null
-      }[]
-
-      return rows.map((row) => ({
-        id: row.id,
-        provider: row.provider,
-        scopes: row.scopes,
-        expiresAt: row.expires_at,
-        accountEmail: row.account_email,
-        accountDisplayName: row.account_display_name,
-      }))
+        return result
+      } catch (cause) {
+        await cleanup(deps.store, refs)
+        throw cause
+      }
     },
-
-    async resolveLinkedGrantAccessToken(
-      grantId: string,
-      options = {},
-    ): Promise<string> {
-      const grant = await this.getGoogleGrantById(grantId)
-      if (!grant) {
+    getGrantById,
+    async listGrants(provider?: string): Promise<readonly GrantRow[]> {
+      const sql =
+        'SELECT g.id, g.account_id, g.provider, a.label AS account_label, g.scopes_json, g.access_token_ref, g.refresh_token_ref, g.client_id_ref, g.client_secret_ref, g.expires_at, g.created_at, g.updated_at FROM grants AS g JOIN accounts AS a ON a.id = g.account_id'
+      const rows = (
+        provider === undefined
+          ? deps.db.prepare(`${sql} ORDER BY g.provider, g.id`).all()
+          : deps.db
+              .prepare(`${sql} WHERE g.provider = ? ORDER BY g.id`)
+              .all(provider)
+      ) as GrantSqlRow[]
+      return rows.map(toGrantRow)
+    },
+    async resolveLinkedGrantAccessToken(grantId, options = {}) {
+      const grant = await getGrantById(grantId)
+      if (!grant)
         throw new CtxindexAuthError(
           'invalid_grant',
           'linked Grant is unavailable',
         )
-      }
       if (
         !options.forceRefresh &&
         grant.accessTokenRef &&
         grant.expiresAt !== null &&
-        grant.expiresAt > Date.now()
-      ) {
+        grant.expiresAt > now()
+      )
         return deps.store.getSecret(grant.accessTokenRef)
-      }
-      return this.refreshGoogleAccessToken(grantId)
+      return service.refreshAccessToken(grantId)
     },
-
-    async refreshGoogleAccessToken(grantId: string): Promise<string> {
-      const row = deps.db
-        .prepare(
-          `SELECT id, account_id, provider, scopes_json AS scopes, access_token_ref, refresh_token_ref, client_id_ref, client_secret_ref, expires_at, created_at, updated_at
-           FROM grants
-           WHERE id = ? AND provider = 'google'
-           LIMIT 1`,
-        )
-        .get(grantId) as GrantSqlRow | null
-      if (!row) {
+    async refreshAccessToken(grantId: string): Promise<string> {
+      const grant = await getGrantById(grantId)
+      if (!grant?.refreshTokenRef)
         throw new CtxindexAuthError(
           'invalid_grant',
-          `google grant not found: ${grantId}`,
+          'Grant cannot be refreshed',
         )
-      }
-
-      const grant = toGoogleGrantRow(row)
-      if (!grant.refreshTokenRef) {
-        throw new CtxindexAuthError(
-          'invalid_grant',
-          `no refresh token available for grant ${grantId}`,
-        )
-      }
-
-      const refreshToken = await deps.store.getSecret(grant.refreshTokenRef)
-      const client = await resolveOAuthClientCreds(deps, grant)
-      const token = await postOAuthTokenRequest(
-        new URLSearchParams({
-          client_id: client.clientId,
-          client_secret: client.clientSecret,
-          grant_type: 'refresh_token',
-          refresh_token: refreshToken,
-        }),
-      )
-
-      const accessTokenRef = grant.accessTokenRef
-        ? await overwriteSecret(
-            deps,
-            grant.accessTokenRef,
-            `access_token:${grantId}`,
-            token.access_token,
+      const provider = deps.registry.getOAuthProvider(grant.provider)
+      if (!provider) {
+        deps.db
+          .prepare(
+            "UPDATE source_sync_state SET last_status = 'needs_auth', updated_at = ? WHERE source_id IN (SELECT id FROM sources WHERE grant_id = ?)",
           )
-        : await writeSecret(deps, `access_token:${grantId}`, token.access_token)
-      const expiresAt = Date.now() + token.expires_in * 1000
-      deps.db
-        .prepare(
-          `UPDATE grants
-           SET access_token_ref = ?, expires_at = ?, updated_at = ?
-           WHERE id = ?`,
+          .run(now(), grantId)
+        throw new CtxindexAuthError(
+          'needs_auth',
+          'Grant provider is not loaded',
         )
-        .run(accessTokenRef, expiresAt, Date.now(), grantId)
-      deps.logger.debug({ grantId }, 'google access token refreshed')
-
-      return token.access_token
-    },
-
-    async exchangeGoogleAuthCode(
-      input: ExchangeAuthCodeInput,
-    ): Promise<GoogleTokenResponse> {
-      return postOAuthTokenRequest(
-        new URLSearchParams({
-          client_id: input.clientId,
-          client_secret: input.clientSecret,
-          code: input.code,
-          grant_type: 'authorization_code',
-          redirect_uri: input.redirectUri,
-        }),
+      }
+      const clientId = grant.clientIdRef
+        ? await deps.store.getSecret(grant.clientIdRef)
+        : readEnvironment(provider.environment.clientId)
+      if (!clientId)
+        throw new CtxindexAuthError(
+          'missing_oauth_client_creds',
+          'OAuth client id is unavailable',
+        )
+      const clientSecret = grant.clientSecretRef
+        ? await deps.store.getSecret(grant.clientSecretRef)
+        : provider.environment.clientSecret
+          ? readEnvironment(provider.environment.clientSecret)
+          : undefined
+      if (provider.client.secret === 'required' && !clientSecret)
+        throw new CtxindexAuthError(
+          'missing_oauth_client_creds',
+          'OAuth client secret is unavailable',
+        )
+      const refreshToken = await deps.store.getSecret(grant.refreshTokenRef)
+      const token = await postOAuthToken({
+        provider,
+        endpoint: resolveOAuthEndpoint(provider, 'token', readEnvironment),
+        clientId,
+        ...(clientSecret ? { clientSecret } : {}),
+        grant: { kind: 'refresh_token', refreshToken },
+      })
+      const scopes = resolveRefreshGrantedScopes(
+        token.scope,
+        grant.scopes,
+        provider,
       )
+      const freshRefs: string[] = []
+      try {
+        const accessTokenRef = await write(
+          grant.provider,
+          grantId,
+          'access-token',
+          token.accessToken,
+        )
+        freshRefs.push(accessTokenRef)
+        let refreshTokenRef = grant.refreshTokenRef
+        if (token.refreshToken !== undefined) {
+          refreshTokenRef = await write(
+            grant.provider,
+            grantId,
+            'refresh-token',
+            token.refreshToken,
+          )
+          freshRefs.push(refreshTokenRef)
+        }
+        const updated = deps.db
+          .prepare(
+            'UPDATE grants SET access_token_ref = ?, refresh_token_ref = ?, scopes_json = ?, expires_at = ?, updated_at = ? WHERE id = ?',
+          )
+          .run(
+            accessTokenRef,
+            refreshTokenRef,
+            JSON.stringify(scopes),
+            now() + token.expiresIn * 1000,
+            now(),
+            grantId,
+          )
+        if (updated.changes !== 1)
+          throw new CtxindexAuthError(
+            'invalid_grant',
+            'Grant disappeared during refresh',
+          )
+        const oldRefs = [
+          grant.accessTokenRef,
+          token.refreshToken !== undefined ? grant.refreshTokenRef : null,
+        ].filter((ref): ref is string => ref !== null)
+        await cleanup(deps.store, oldRefs)
+        deps.logger.debug(
+          { grantId, provider: grant.provider },
+          'OAuth access token refreshed',
+        )
+        return token.accessToken
+      } catch (cause) {
+        await cleanup(deps.store, freshRefs)
+        throw cause
+      }
     },
   }
+  return service
 }
-
-export { GOOGLE_TOKEN_ENDPOINT }

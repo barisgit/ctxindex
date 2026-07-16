@@ -21,7 +21,7 @@ Pure argument-parsing layer that converts raw argv segments into typed command d
 3. The parser validates subcommands, required values, conflicts, refs, and command-specific values.
 4. Success returns a typed operation; invalid input returns `{ kind: "unknown", message }`; handlers perform all I/O.
 
-Notable specializations include date/limit/field parsing in `search.ts`, auth-flow exclusivity in `auth.ts`, and sync mode/output selection in `sync.ts`.
+Notable specializations include date/limit/field parsing in `search.ts`, provider/Adapter selection plus exactly-one-mode validation in `auth.ts`, and sync mode/output selection in `sync.ts`.
 
 ## Integration points
 

@@ -92,8 +92,9 @@ function seedGrant(
   const now = Date.now()
   try {
     db.prepare(
-      `INSERT INTO accounts (id, provider, label, created_at, updated_at)
-       VALUES ('account-1', 'google', 'person@example.test', ?, ?)`,
+      `INSERT INTO accounts
+         (id, provider, label, external_user_id, created_at, updated_at)
+       VALUES ('account-1', 'google', 'person@example.test', 'subject-1', ?, ?)`,
     ).run(now, now)
     db.prepare(
       `INSERT INTO grants

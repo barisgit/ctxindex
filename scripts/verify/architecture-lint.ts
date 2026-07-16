@@ -317,10 +317,7 @@ function isAllowedBunSqliteImport(path: string): boolean {
 }
 
 function isAllowedProviderUrlLiteral(path: string): boolean {
-  if (isCliSrcTestFile(path)) return true
-
-  // Loopback OAuth builds the provider consent/token URLs at the UI edge.
-  return path === 'apps/cli/src/auth/google-loopback.ts'
+  return isCliSrcTestFile(path)
 }
 
 function isCliSrcTestFile(path: string): boolean {

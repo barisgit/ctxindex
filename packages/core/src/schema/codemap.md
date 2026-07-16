@@ -8,7 +8,7 @@ Declares the core SQLite relational model as Drizzle table definitions for ident
 
 - Each file owns one table or tightly coupled pair and exports a `sqliteTable` value; `index.ts` is the aggregate barrel.
 - Foreign keys encode ownership and cleanup: account identities/grants follow `accounts`, source data follows `sources`, and chunks/artifacts/relations follow `resources`, commonly with `onDelete: 'cascade'`.
-- Database invariants live beside columns through `check`, `unique`, composite `primaryKey`, and partial/indexed access paths.
+- Database invariants live beside columns through `check`, `unique`, composite `primaryKey`, and partial/indexed access paths; Accounts require an external user ID unique within each provider.
 - Typed field search is normalized by `field_index.ts` into text/number/integer columns with checks ensuring exactly the native value column appropriate to `declaredType`.
 
 ## Data & control flow

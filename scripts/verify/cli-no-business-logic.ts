@@ -31,7 +31,6 @@ function isExcludedFile(path: string): boolean {
     path === 'apps/cli/src/main.ts' ||
     path.startsWith('apps/cli/src/args/') ||
     path.startsWith('apps/cli/src/format/') ||
-    path === 'apps/cli/src/auth/google-loopback.ts' ||
     path.endsWith('.test.ts')
   )
 }

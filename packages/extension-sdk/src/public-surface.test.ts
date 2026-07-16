@@ -19,6 +19,7 @@ import type {
   ExtensionDefinition,
   FieldType,
   InferProfilePayload,
+  OAuthProviderSpec,
   ProfileAction,
   ProfileDefinition,
   ProfileExportRenderResult,
@@ -63,6 +64,7 @@ type PublicTypeSurface = {
   extensionDefinition: ExtensionDefinition
   fieldType: FieldType
   inferredProfilePayload: InferProfilePayload<AnyProfileDefinition>
+  oauthProviderSpec: OAuthProviderSpec
   profileAction: ProfileAction
   profileDefinition: ProfileDefinition
   profileExportRenderResult: ProfileExportRenderResult
@@ -109,6 +111,7 @@ const publicSymbolNames = [
   'ExtensionDefinition',
   'FieldType',
   'InferProfilePayload',
+  'OAuthProviderSpec',
   'ProfileAction',
   'ProfileDefinition',
   'ProfileExportRenderResult',
@@ -135,7 +138,7 @@ const publicSymbolNames = [
   'defineProfile',
 ]
 
-test('public index exports the exact existing symbol surface', async () => {
+test('public index exports the exact symbol surface', async () => {
   const source = await Bun.file(new URL('index.ts', import.meta.url)).text()
   const exportedNames = [
     ...source.matchAll(/export(?:\s+type)?\s*\{([\s\S]*?)\}\s*from/g),

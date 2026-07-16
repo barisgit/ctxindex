@@ -1,31 +1,33 @@
 import { describe, expect, test } from 'bun:test'
+import { testOAuthProvider } from '../testing/oauth-provider'
 import {
   isGrantCompatible,
   normalizeGrantScopes,
-  providerKeyForAuth,
+  providerIdForAuth,
 } from './compatibility'
 
 const gmailAuth = {
   kind: 'oauth2',
-  provider: {
-    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+  provider: testOAuthProvider({
+    id: 'google',
+    authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
     tokenUrl: 'https://oauth2.googleapis.com/token',
-  },
+  }),
   scopes: ['https://www.googleapis.com/auth/gmail.readonly'],
 } as const
 
 describe('OAuth Grant compatibility', () => {
-  test('derives Google identity from the canonical declared token host', () => {
-    expect(providerKeyForAuth(gmailAuth)).toBe('google')
+  test('uses the directly declared provider identity', () => {
+    expect(providerIdForAuth(gmailAuth)).toBe('google')
     expect(
-      providerKeyForAuth({
+      providerIdForAuth({
         ...gmailAuth,
         provider: {
           ...gmailAuth.provider,
           tokenUrl: 'http://localhost:9000/token',
         },
       }),
-    ).toBe('localhost')
+    ).toBe('google')
   })
 
   test('normalizes space-delimited and JSON-array Grant scopes', () => {
@@ -37,6 +39,7 @@ describe('OAuth Grant compatibility', () => {
       'scope:a',
       'scope:b',
     ])
+    expect(normalizeGrantScopes(['𐀀', '\uE000'])).toEqual(['\uE000', '𐀀'])
   })
 
   test('requires the same provider and a scope superset', () => {

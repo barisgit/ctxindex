@@ -7,6 +7,7 @@ import { CtxindexAuthError } from '../errors'
 import { createExtensionRegistry } from '../registry'
 import { applyPragmas } from '../storage'
 import { runMigrations } from '../storage/migrator'
+import { testOAuthProvider } from '../testing/oauth-provider'
 import { createSourceProviderContext } from './provider-context'
 
 const scope = 'scope:read'
@@ -22,12 +23,14 @@ const adapter = defineAdapter({
     .strict(),
   auth: {
     kind: 'oauth2',
-    provider: {
-      authUrl: 'https://accounts.google.com/auth',
+    provider: testOAuthProvider({
+      id: 'google',
+      authorizationUrl: 'https://accounts.google.com/auth',
       tokenUrl: 'https://oauth2.googleapis.com/token',
-    },
+    }),
     scopes: [scope],
   },
+  providerApiHosts: ['provider.example'],
   profiles: [],
   routing: 'indexed',
   capabilities: [],
@@ -44,6 +47,7 @@ const registry = createExtensionRegistry([
 ])
 
 const dbs: Database[] = []
+const originalFetch = globalThis.fetch
 
 async function freshDb(): Promise<Database> {
   const db = new Database(':memory:')
@@ -66,9 +70,10 @@ function insertGrant(
   const now = Date.now()
   const accountId = `account-${id}`
   db.prepare(
-    `INSERT INTO accounts (id, provider, label, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(accountId, options.provider ?? 'google', id, now, now)
+    `INSERT INTO accounts
+       (id, provider, label, external_user_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(accountId, options.provider ?? 'google', id, `subject-${id}`, now, now)
   db.prepare(
     `INSERT INTO grants
        (id, account_id, provider, scopes_json, created_at, updated_at)
@@ -114,9 +119,95 @@ const logger = {
 
 afterEach(() => {
   for (const db of dbs.splice(0)) db.close()
+  globalThis.fetch = originalFetch
 })
 
 describe('createSourceProviderContext', () => {
+  test('passes declared API hosts to the default global egress chokepoint', async () => {
+    const db = await freshDb()
+    insertGrant(db, 'grant-b')
+    insertSource(db, 'grant-b')
+    let captured: { url: string; init: RequestInit | undefined } | undefined
+    globalThis.fetch = (async (
+      url: string | URL | Request,
+      init?: RequestInit,
+    ) => {
+      captured = { url: String(url), init }
+      return new Response('ok')
+    }) as typeof fetch
+    const context = await createSourceProviderContext({
+      db,
+      sourceId: 'source-1',
+      registry,
+      authService: authService(async () => 'grant-token'),
+      logger,
+    })
+
+    await expect(
+      context.fetch('https://provider.example/messages'),
+    ).resolves.toMatchObject({ status: 200 })
+    expect(captured?.url).toBe('https://provider.example/messages')
+    expect(captured?.init?.redirect).toBe('manual')
+    expect(new Headers(captured?.init?.headers).get('authorization')).toBe(
+      'Bearer grant-token',
+    )
+  })
+
+  test('rejects undeclared API hosts before token resolution or fetch', async () => {
+    const db = await freshDb()
+    insertGrant(db, 'grant-b')
+    insertSource(db, 'grant-b')
+    let tokenResolutions = 0
+    let fetches = 0
+    const context = await createSourceProviderContext({
+      db,
+      sourceId: 'source-1',
+      registry,
+      authService: authService(async () => {
+        tokenResolutions++
+        return 'grant-token'
+      }),
+      logger,
+      fetch: async () => {
+        fetches++
+        return new Response()
+      },
+    })
+
+    await expect(
+      context.fetch('https://cross-provider.example/messages'),
+    ).rejects.toMatchObject({ code: 'egress_denied' })
+    expect(tokenResolutions).toBe(0)
+    expect(fetches).toBe(0)
+  })
+
+  test('forces manual redirects on declared provider requests', async () => {
+    const db = await freshDb()
+    insertGrant(db, 'grant-b')
+    insertSource(db, 'grant-b')
+    let redirect: RequestInit['redirect']
+    const context = await createSourceProviderContext({
+      db,
+      sourceId: 'source-1',
+      registry,
+      authService: authService(async () => 'grant-token'),
+      logger,
+      fetch: async (_url, init) => {
+        redirect = init?.redirect
+        return new Response(null, {
+          status: 302,
+          headers: { location: 'https://cross-provider.example/steal' },
+        })
+      },
+    })
+
+    const response = await context.fetch('https://provider.example/messages', {
+      redirect: 'follow',
+    })
+    expect(response.status).toBe(302)
+    expect(redirect).toBe('manual')
+  })
+
   test('uses only the Source linked Grant even when a newer Grant exists', async () => {
     const db = await freshDb()
     insertGrant(db, 'grant-b')

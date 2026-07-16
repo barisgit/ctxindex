@@ -8,7 +8,7 @@ Owns Source lifecycle and the Adapter execution boundary for sync, remote search
 
 - `createSourceService()` is a service factory over database, logger, registry, and optional Realm service dependencies; it validates Adapter config/routing/auth before persistence.
 - `createSourceProviderContext()` is an anti-corruption boundary: it resolves a persisted Source and Adapter, strips sensitive config keys, verifies Grant compatibility, and supplies a provider-safe fetch/logger/context.
-- Authorized fetch decorates outbound requests with resolved OAuth tokens and retries one 401 after forced refresh; auth/network errors are sanitized into core error categories.
+- Provider fetch rejects URLs outside the selected Adapter's `providerApiHosts` before token resolution, forces manual redirects, decorates OAuth requests with resolved tokens, and retries one 401 after forced refresh; auth/network errors are sanitized into core error categories.
 - `remote-search.ts`, `retrieve.ts`, and `sync-source.ts` are capability-specific Adapter operation facades.
 
 ## Data & control flow
