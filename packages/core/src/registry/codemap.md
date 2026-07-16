@@ -10,14 +10,14 @@ Validates and indexes extension-supplied Profile, Adapter, OAuth-provider, and E
 - `definition-registries.ts` composes `ProfileRegistry`, `AdapterRegistry`, and `ExtensionRegistry`; rebuilding all registries on `ExtensionRegistry.register()` makes registration atomic and revalidates cross-definition contracts.
 - `validateAdapter()` enforces capability/operation parity, routing requirements, Profile references, Action binding compatibility, unique scopes, and lowercase unique `providerApiHosts`. OAuth-provider schemas validate endpoints, client policy, PKCE, environment keys, hosts, scopes, and identity paths.
 - `AdapterRegistry` indexes semantically identical OAuth declarations by provider ID and rejects conflicting declarations; `getOAuthProvider()` exposes the provider-neutral lookup used by auth.
-- `describe.ts` projects definitions into sorted, presentation-neutral `RegistryDescription` data; `compare.ts` centralizes deterministic ordering.
+- `describe.ts` projects definitions into sorted, presentation-neutral `RegistryDescription` data, including each Source Adapter's `providerApiHosts` alongside its auth declaration; `compare.ts` centralizes deterministic ordering.
 
 ## Data & control flow
 
 1. `createExtensionRegistry()` calls `buildRegistries()`, validates extension shapes, flattens Profiles and Adapters, and checks globally unique Action IDs.
 2. `ProfileRegistry` validates and indexes Profiles; `AdapterRegistry` then validates Adapter capabilities, operations, auth/provider declarations, API hosts, supported Profiles, and Action bindings against that registry.
 3. Consumers call `get()`, `list()`, `resolve()`, or `resolveKind()`; unknown Profile versions may return a degraded resolution through `ProfileRegistryOptions.onWarning`.
-4. `describeRegistry()` sorts registry entries, converts Zod schemas with `z.toJSONSchema()`, derives adapter config flags, and returns kinds/sources/actions metadata.
+4. `describeRegistry()` sorts registry entries, converts Zod schemas with `z.toJSONSchema()`, derives Adapter config flags, and returns kinds/sources/actions metadata. Source descriptions preserve sorted Provider API hosts so CLI renderers can generate OAuth setup guidance entirely from registry declarations.
 
 ## Integration points
 

@@ -63,22 +63,56 @@ function formatInputMarkdown(input: object): string[] {
   return lines
 }
 
-function formatAuthMarkdown(auth: object): string[] {
+function markdownStringValues(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : []
+}
+
+function formatAuthMarkdown(
+  auth: object,
+  providerApiHosts: readonly string[],
+): string[] {
   const value = record(auth)
   if (!value || typeof value.kind !== 'string')
     return [`- Auth: \`${json(auth)}\``]
   const lines = [`- Auth: ${value.kind}`]
   const provider = record(value.provider)
   if (provider) {
-    if (typeof provider.authUrl === 'string')
-      lines.push(`- Authorization URL: ${provider.authUrl}`)
+    if (typeof provider.id === 'string')
+      lines.push(`- Provider: ${provider.id}`)
+    if (typeof provider.authorizationUrl === 'string')
+      lines.push(`- Authorization URL: ${provider.authorizationUrl}`)
     if (typeof provider.tokenUrl === 'string')
       lines.push(`- Token URL: ${provider.tokenUrl}`)
+    const authHosts = markdownStringValues(provider.allowedHosts)
+    if (authHosts.length > 0)
+      lines.push(`- Auth hosts: ${authHosts.join(', ')}`)
+    const baseScopes = markdownStringValues(provider.baseScopes)
+    if (baseScopes.length > 0)
+      lines.push(`- Provider base scopes: ${baseScopes.join(', ')}`)
+    const environment = record(provider.environment)
+    if (environment) {
+      const values = [
+        typeof environment.clientId === 'string'
+          ? `client-id=\`${environment.clientId}\``
+          : undefined,
+        typeof environment.clientSecret === 'string'
+          ? `client-secret=\`${environment.clientSecret}\``
+          : undefined,
+        typeof environment.refreshToken === 'string'
+          ? `refresh-token=\`${environment.refreshToken}\``
+          : undefined,
+      ].filter((item): item is string => item !== undefined)
+      if (values.length > 0) lines.push(`- Environment: ${values.join(', ')}`)
+    }
   }
   if (Array.isArray(value.scopes))
     lines.push(
-      `- Scopes: ${value.scopes.filter((scope): scope is string => typeof scope === 'string').join(', ') || 'none'}`,
+      `- Adapter scopes: ${markdownStringValues(value.scopes).join(', ') || 'none'}`,
     )
+  if (providerApiHosts.length > 0)
+    lines.push(`- Provider API hosts: ${providerApiHosts.join(', ')}`)
   return lines
 }
 
@@ -148,7 +182,7 @@ export function formatRegistryMarkdown(
       )
       lines.push(
         `- Routing: ${source.routing}`,
-        ...formatAuthMarkdown(source.auth),
+        ...formatAuthMarkdown(source.auth, source.providerApiHosts),
       )
       lines.push(`- Capabilities: ${source.capabilities.join(', ') || 'none'}`)
       lines.push(

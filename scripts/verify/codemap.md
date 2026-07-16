@@ -15,8 +15,8 @@ Contains executable static and runtime verification gates for CLI layering, fram
 - `no-prompts-static.ts` rejects prompt libraries and direct stdin/readline use in production CLI TypeScript; `agent-howtos.test.ts` verifies repository-owned agent guidance against the real CLI command surface.
 - `package-dependencies.ts` uses the TypeScript AST to discover imports in every app/package production and colocated test file, then enforces direct runtime declarations, dependency use, and workspace direction. `communication-message-profile.test.ts` owns the cross-package bundled Profile-to-registry integration contract.
 - `full-test-suite.sh` forces `NODE_ENV=test` and a temporary `CTXINDEX_KEYTAR_MOCK_FILE` before test discovery, preventing missed sandbox wiring from touching the user's native Keychain.
-- `module-architecture.test.ts` now owns the green secret boundary: one explicit backend-selection owner, no fallback/literal-secret CLI, no legacy service, and mandatory Keychain mock guarding in tests.
-- `multi-provider-architecture.red.ts` remains intentionally red only for later provider modules and vocabulary: Google Calendar/Microsoft Adapters, Profile-owned calendar terms, and the no-send production surface. Provider-neutral core/CLI OAuth ownership and public host declarations have moved to green verification.
+- `module-architecture.test.ts` owns green secret and provider-neutral boundaries: one explicit backend-selection owner, no fallback/literal-secret CLI, no legacy service, mandatory Keychain mock guarding in tests, no provider implementation/endpoints in core or CLI, no literal long-lived auth inputs, and public host declarations.
+- `multi-provider-architecture.red.ts` remains intentionally red only for later provider modules and vocabulary: Google Calendar/Microsoft Adapters, Profile-owned calendar terms, and the no-send production surface. Provider-neutral core/CLI ownership, endpoint isolation, credential-input restrictions, and public host declarations have graduated to green verification.
 
 ## Flow
 

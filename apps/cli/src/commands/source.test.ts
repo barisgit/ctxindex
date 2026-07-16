@@ -13,6 +13,7 @@ test('aggregates same-named generated options without losing Adapter ownership',
     profiles: [],
     routing: 'indexed',
     auth: { kind: 'none' },
+    providerApiHosts: [],
     capabilities: [],
     config: {},
     configOptions: [

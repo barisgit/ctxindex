@@ -1,5 +1,6 @@
 import { type CommandDef, defineCommand, runMain, showUsage } from 'citty'
 import pkg from '../package.json' with { type: 'json' }
+import { accountCommand } from './commands/account'
 import { actionCommand } from './commands/action'
 import { artifactCommand } from './commands/artifact'
 import { authCommand } from './commands/auth'
@@ -139,6 +140,7 @@ export const rootCommand = defineCommand({
   },
   subCommands: {
     init: initCommand,
+    account: accountCommand,
     describe: describeCommand,
     extensions: extensionsCommand,
     action: actionCommand,

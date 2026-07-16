@@ -29,6 +29,7 @@ const description: RegistryDescription = {
       profiles: [{ id: 'fake.kind', version: 1 }],
       routing: 'indexed',
       auth: { kind: 'none' },
+      providerApiHosts: [],
       capabilities: ['retrieve'],
       config: { type: 'object' },
       configOptions: [
@@ -137,15 +138,35 @@ describe('describe interface', () => {
               id: 'fake',
               authorizationUrl: 'https://auth.example.com/authorize',
               tokenUrl: 'https://auth.example.com/token',
+              baseScopes: ['openid'],
+              environment: {
+                clientId: 'FAKE_CLIENT_ID',
+                clientSecret: 'FAKE_CLIENT_SECRET',
+                refreshToken: 'FAKE_REFRESH_TOKEN',
+              },
+              allowedHosts: ['auth.example.com'],
             },
             scopes: ['fake.read'],
           },
+          providerApiHosts: ['api.example.com'],
         },
       ],
     }
 
     expect(formatRegistryText(oauthDescription, 'full')).toContain(
-      'provider: fake\n    authorization URL: https://auth.example.com/authorize',
+      [
+        'provider: fake',
+        '    authorization URL: https://auth.example.com/authorize',
+        '    token URL: https://auth.example.com/token',
+        '    auth hosts: auth.example.com',
+        '    provider base scopes: openid',
+        '    environment: client-id=FAKE_CLIENT_ID, client-secret=FAKE_CLIENT_SECRET, refresh-token=FAKE_REFRESH_TOKEN',
+        '    Adapter scopes: fake.read',
+        '  provider API hosts: api.example.com',
+      ].join('\n'),
+    )
+    expect(formatRegistryMarkdown(oauthDescription)).toContain(
+      '- Environment: client-id=`FAKE_CLIENT_ID`, client-secret=`FAKE_CLIENT_SECRET`, refresh-token=`FAKE_REFRESH_TOKEN`',
     )
   })
 

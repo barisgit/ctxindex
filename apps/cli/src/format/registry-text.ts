@@ -63,7 +63,16 @@ function formatInputText(input: object): string[] {
   return lines
 }
 
-function formatAuthText(auth: object): string[] {
+function stringValues(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : []
+}
+
+function formatAuthText(
+  auth: object,
+  providerApiHosts: readonly string[],
+): string[] {
   const value = record(auth)
   if (!value || typeof value.kind !== 'string') return [`  auth: ${json(auth)}`]
   const lines = [`  auth: ${value.kind}`]
@@ -75,12 +84,33 @@ function formatAuthText(auth: object): string[] {
       lines.push(`    authorization URL: ${provider.authorizationUrl}`)
     if (typeof provider.tokenUrl === 'string')
       lines.push(`    token URL: ${provider.tokenUrl}`)
+    const authHosts = stringValues(provider.allowedHosts)
+    if (authHosts.length > 0)
+      lines.push(`    auth hosts: ${authHosts.join(', ')}`)
+    const baseScopes = stringValues(provider.baseScopes)
+    if (baseScopes.length > 0)
+      lines.push(`    provider base scopes: ${baseScopes.join(', ')}`)
+    const environment = record(provider.environment)
+    if (environment) {
+      const values = [
+        typeof environment.clientId === 'string'
+          ? `client-id=${environment.clientId}`
+          : undefined,
+        typeof environment.clientSecret === 'string'
+          ? `client-secret=${environment.clientSecret}`
+          : undefined,
+        typeof environment.refreshToken === 'string'
+          ? `refresh-token=${environment.refreshToken}`
+          : undefined,
+      ].filter((item): item is string => item !== undefined)
+      if (values.length > 0) lines.push(`    environment: ${values.join(', ')}`)
+    }
   }
   if (Array.isArray(value.scopes)) {
-    lines.push('    scopes:')
-    for (const scope of value.scopes)
-      if (typeof scope === 'string') lines.push(`      ${scope}`)
+    lines.push(`    Adapter scopes: ${stringValues(value.scopes).join(', ')}`)
   }
+  if (providerApiHosts.length > 0)
+    lines.push(`  provider API hosts: ${providerApiHosts.join(', ')}`)
   return lines
 }
 
@@ -138,7 +168,7 @@ export function formatRegistryText(
     lines.push(`ADAPTER ${source.id}@${source.version}`)
     if (source.summary) lines.push(`  ${source.summary}`)
     lines.push(`  routing: ${source.routing}`)
-    lines.push(...formatAuthText(source.auth))
+    lines.push(...formatAuthText(source.auth, source.providerApiHosts))
     lines.push(`  capabilities: ${source.capabilities.join(', ') || 'none'}`)
     for (const option of source.configOptions)
       lines.push(

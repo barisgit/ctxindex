@@ -5,6 +5,7 @@ set -euo pipefail
 ALLOWLIST=(
   "oauth2.googleapis.com"
   "accounts.google.com"
+  "openidconnect.googleapis.com"
   "gmail.googleapis.com"
   "www.googleapis.com"
 )
@@ -23,7 +24,7 @@ grep -RInE \
   "https?://[^'\" )]+" \
   . \
   | grep -vE "($ALLOWLIST_PATTERN)" \
-  | grep -vE "apps/cli/src/auth/google-loopback.ts:.*http://127\.0\.0\.1" \
+  | grep -vE "packages/core/src/auth/loopback.ts:.*http://127\.0\.0\.1" \
   >> "$violations" || true
 
 # fetch() is only allowed inside the single core egress chokepoint; every other

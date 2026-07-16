@@ -36,14 +36,14 @@
 
 ## 4. Agent-first Auth and Account CLI
 
-- [ ] 4.1 Add strict red parser/Citty contracts for `auth add <provider> --adapter <id>... (--loopback|--from-env)` and `account list [--json]`, including repeatable Adapter flags, public client-id override, label, mutual exclusion, no literal client-secret/token/code flags, and removal of Google-only `auth list`.
-- [ ] 4.2 Implement thin auth/account commands over core registry/Auth/Account modules with deterministic safe output, exact scope preview/result, parse-before-deps behavior, close/error/exit handling, and no provider HTTP or SQL in CLI.
-- [ ] 4.3 Generalize the loopback mock and compiled CLI e2e to prove selected-scope authorization, stable identity Account deduplication across two Grants, one Grant shared by multiple Sources, ambiguity requiring explicit Grant id, malformed input zero I/O, and nested inventory without secrets.
-- [ ] 4.4 Update registry describe/help/meta tests and workflow guidance to derive OAuth providers, scopes, and safe environment names from loaded definitions without hand-maintained Adapter vocabularies.
+- [x] 4.1 Add strict red parser/Citty contracts for `auth add <provider> --adapter <id>... (--loopback|--from-env)` and `account list [--json]`, including repeatable Adapter flags, public client-id override, label, mutual exclusion, no literal client-secret/token/code flags, and removal of Google-only `auth list`.
+- [x] 4.2 Implement thin auth/account commands over core registry/Auth/Account modules with deterministic safe output, exact scope preview/result, parse-before-deps behavior, close/error/exit handling, and no provider HTTP or SQL in CLI.
+- [x] 4.3 Generalize the loopback mock and compiled CLI e2e to prove selected-scope authorization, stable identity Account deduplication across two Grants, one Grant shared by multiple Sources, ambiguity requiring explicit Grant id, malformed input zero I/O, and nested inventory without secrets.
+- [x] 4.4 Update registry describe/help/meta tests and workflow guidance to derive OAuth providers, scopes, and safe environment names from loaded definitions without hand-maintained Adapter vocabularies.
 
 ### Slice 4 gate
 
-- [ ] 4.5 Run focused auth/account parser/handler/binary tests plus typecheck, lint, architecture/dependency, full unit/e2e, strict OpenSpec and diff checks; obtain independent CLI/security review and save `work/slice-4-account-cli-gate.md`.
+- [x] 4.5 Run focused auth/account parser/handler/binary tests plus typecheck, lint, architecture/dependency, full unit/e2e, strict OpenSpec and diff checks; obtain independent CLI/security review and save `work/slice-4-account-cli-gate.md`.
 
 ## 5. Provider-neutral Calendar Profile
 

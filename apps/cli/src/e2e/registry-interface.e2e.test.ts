@@ -135,6 +135,37 @@ test('interpreted registry interface follows an explicit external Extension', as
     expect(markdown.stdout).toContain('`enarocanje.tender@1`')
     expect(markdown.stdout).not.toContain('`reference` (string)')
 
+    const googleAuth = await run(['describe', 'adapter', 'google.mailbox'])
+    expect(googleAuth.exitCode, googleAuth.stderr).toBe(0)
+    expect(googleAuth.stdout).toContain('provider: google')
+    expect(googleAuth.stdout).toContain(
+      'environment: client-id=CTXINDEX_GOOGLE_CLIENT_ID, client-secret=CTXINDEX_GOOGLE_CLIENT_SECRET, refresh-token=CTXINDEX_GOOGLE_REFRESH_TOKEN',
+    )
+    expect(googleAuth.stdout).toContain(
+      'Adapter scopes: https://www.googleapis.com/auth/gmail.readonly',
+    )
+    expect(googleAuth.stdout).toContain(
+      'provider API hosts: gmail.googleapis.com',
+    )
+    const googleAuthJson = await run([
+      'describe',
+      'adapter',
+      'google.mailbox',
+      '--json',
+    ])
+    expect(JSON.parse(googleAuthJson.stdout)).toMatchObject({
+      id: 'google.mailbox',
+      providerApiHosts: ['gmail.googleapis.com'],
+      auth: {
+        provider: {
+          environment: {
+            clientId: 'CTXINDEX_GOOGLE_CLIENT_ID',
+            refreshToken: 'CTXINDEX_GOOGLE_REFRESH_TOKEN',
+          },
+        },
+      },
+    })
+
     const profileMarkdown = await run([
       'describe',
       'profile',
@@ -158,6 +189,8 @@ test('interpreted registry interface follows an explicit external Extension', as
       ['action', '--help'],
       ['describe', '--help'],
       ['extensions', '--help'],
+      ['auth', '--help'],
+      ['account', '--help'],
     ]) {
       const commandHelp = await run(args)
       expect(commandHelp.exitCode, commandHelp.stderr).toBe(0)

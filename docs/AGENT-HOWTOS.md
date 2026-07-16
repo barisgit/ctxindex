@@ -73,15 +73,18 @@ bun cli secrets backend set keychain
 bun cli secrets backend set file
 ```
 
-For Google OAuth, required client input comes from flags or the documented environment variables; the CLI does not prompt for credentials. The loopback flow may require browser consent after explicit operator approval.
+Discover OAuth provider ids, exact Adapter scopes, API hosts, and safe environment variable names from the loaded registry rather than copying provider-specific vocabulary into prompts or scripts. The CLI does not prompt for credentials. A loopback flow may open a browser only after explicit operator approval.
 
 ```sh
-bun cli auth add google --from-env
-# or, for an explicitly approved browser flow:
-bun cli auth add google --client-id "$CTXINDEX_GMAIL_CLIENT_ID" --client-secret "$CTXINDEX_GMAIL_CLIENT_SECRET" --loopback
+bun cli describe adapter <adapter-id>
+bun cli describe adapter <adapter-id> --json
+bun cli auth add <provider> --adapter <adapter-id> --from-env
+# or, for an explicitly approved browser flow with a public client id:
+bun cli auth add <provider> --adapter <adapter-id> --client-id <public-client-id> --loopback
+bun cli account list --json
 ```
 
-After authorization, discover the loaded mailbox Adapter and generated Source options with `describe`, then add it to the intended Realm. Do not run live provider tests from the general automated lane. The accepted live read and Draft checks use the isolated Human checkpoint procedure and redacted evidence under the active charter.
+After authorization, use `account list` to choose a safe local Account or Grant id, then use the loaded Adapter's generated Source options to add it to the intended Realm. Do not run live provider tests from the general automated lane. Accepted live checks use the isolated Human checkpoint procedure and redacted evidence under the active charter.
 
 Mocked provider coverage is implemented by the CLI e2e tests for search/get, Draft Actions, and network egress. Those tests supply loopback-only endpoints and synthetic credentials; never substitute real credentials into that lane.
 
@@ -97,7 +100,7 @@ bun run test:integration
 bun run test:e2e
 bun run ci
 ./scripts/spikes/d3-compiled-extension/run.sh
-openspec validate v1-context-access-layer --strict
+openspec validate --all --strict
 ```
 
 Stable exit meanings and agent responses are owned by `SPEC.md` §12; do not maintain a second exit-code table here.

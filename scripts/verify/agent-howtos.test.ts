@@ -101,3 +101,14 @@ test('no stale commands', async () => {
 
   expect(stale).toEqual([])
 })
+
+test('OAuth guidance derives provider vocabulary from describe output', async () => {
+  const doc = await readDoc()
+  expect(doc).toContain('bun cli describe adapter <adapter-id>')
+  expect(doc).toContain(
+    'bun cli auth add <provider> --adapter <adapter-id> --from-env',
+  )
+  expect(doc).toContain('bun cli account list --json')
+  expect(doc).not.toMatch(/--client-secret|--auth-code|--refresh-token/)
+  expect(doc).not.toMatch(/CTXINDEX_(?:GOOGLE|MICROSOFT|GMAIL)_/)
+})

@@ -14,6 +14,7 @@ const externalSource: SourceDescription = {
   profiles: [],
   routing: 'indexed',
   auth: { kind: 'none' },
+  providerApiHosts: [],
   capabilities: [],
   config: {},
   configOptions: [

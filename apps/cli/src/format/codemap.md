@@ -12,10 +12,10 @@ Presentation and process-exit adapter layer for converting domain/CLI values int
 
 ## Data & control flow
 
-Handlers pass domain rows/descriptions to focused formatters: `action.ts` Actions, `artifact.ts` Artifacts, `auth.ts` Grant creation confirmation, `realm.ts` Realms, `source.ts` Sources, `status.ts` status rows, `registry.ts` registry descriptions, `extensions.ts` Extension listings, `skills.ts` skill records/documents, and `secrets.ts` value-free backend availability/reference counts plus switch copy/cleanup outcomes. The formatter returns a string for the handler to print. Handler failures flow through `mapErrorToExit` or `runWithExit` to stderr and `process.exitCode`.
+Handlers pass domain rows/descriptions to focused formatters: `account.ts` renders Account/Grant/Source inventory as hierarchical text or JSON; `action.ts` renders Actions; `artifact.ts` renders Artifacts; `auth.ts` confirms the Grant ID, provider, and exact granted scopes; `realm.ts` renders Realms; `source.ts` renders Sources; `status.ts` renders status rows; `registry.ts` renders registry descriptions; `extensions.ts` renders Extension listings; `skills.ts` renders skill records/documents; and `secrets.ts` renders value-free backend availability/reference counts plus switch copy/cleanup outcomes. The formatter returns a string for the handler to print. Handler failures flow through `mapErrorToExit` or `runWithExit` to stderr and `process.exitCode`.
 
 ## Integration points
 
 - Consumed by `apps/cli/src/main.ts`, modules under `apps/cli/src/commands/`, and handlers under `apps/cli/src/auth/`, `source/`, and `sync/`.
 - Inputs come from `@ctxindex/core/errors`, `/realm`, `/registry`, `/secrets`, `/source`, and `/sync`, plus skill types from `apps/cli/src/skills/loader.ts`.
-- `registry.ts` is a stable facade over `registry-projection.ts`, shared structural `registry-schema.ts`, and independent `registry-text.ts`/`registry-markdown.ts` renderers; `extensions.ts` owns deterministic Extension listings.
+- `registry.ts` is a stable facade over `registry-projection.ts`, shared structural `registry-schema.ts`, and independent `registry-text.ts`/`registry-markdown.ts` renderers. Source detail derives OAuth guidance from registry data: provider ID and endpoints, auth hosts, provider base scopes, Adapter scopes, environment variable names, and Provider API hosts. `extensions.ts` owns deterministic Extension listings.

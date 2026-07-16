@@ -2,9 +2,30 @@ import { expect, test } from 'bun:test'
 import { readdir } from 'node:fs/promises'
 
 const adapterRoot = new URL('../../packages/adapters/src/', import.meta.url)
+const coreSourceRoot = new URL('../../packages/core/src/', import.meta.url)
+const cliRoot = new URL('../../apps/cli/src/', import.meta.url)
 
 function isProductionTypeScript(name: string): boolean {
   return name.endsWith('.ts') && !name.endsWith('.test.ts')
+}
+
+async function productionFiles(root: URL): Promise<URL[]> {
+  const files: URL[] = []
+  for (const entry of await readdir(root, { withFileTypes: true })) {
+    const url = new URL(`${entry.name}${entry.isDirectory() ? '/' : ''}`, root)
+    if (entry.isDirectory()) files.push(...(await productionFiles(url)))
+    else if (entry.isFile() && isProductionTypeScript(entry.name))
+      files.push(url)
+  }
+  return files
+}
+
+async function sourceTree(root: URL): Promise<string> {
+  return (
+    await Promise.all(
+      (await productionFiles(root)).map((url) => Bun.file(url).text()),
+    )
+  ).join('\n')
 }
 
 test('built-in Source Adapter implementation is owned by provider modules', async () => {
@@ -29,6 +50,29 @@ test('built-in Source Adapter implementation is owned by provider modules', asyn
     .filter(isProductionTypeScript)
     .sort()
   expect(localFiles).toContain('definition.ts')
+})
+
+test('provider implementation and endpoint literals stay outside core and CLI', async () => {
+  const providerHostPattern =
+    /accounts\.google\.com|oauth2\.googleapis\.com|www\.googleapis\.com|login\.microsoftonline\.com|graph\.microsoft\.com/i
+  expect(await sourceTree(coreSourceRoot)).not.toMatch(providerHostPattern)
+  expect(await sourceTree(cliRoot)).not.toMatch(providerHostPattern)
+  expect(
+    await Bun.file(new URL('auth/google-client.ts', coreSourceRoot)).exists(),
+  ).toBe(false)
+})
+
+test('auth CLI has no literal long-lived credential inputs', async () => {
+  const authSources = (
+    await Promise.all(
+      ['args/auth.ts', 'commands/auth.ts'].map((path) =>
+        Bun.file(new URL(path, cliRoot)).text(),
+      ),
+    )
+  ).join('\n')
+  expect(authSources).not.toMatch(
+    /['"](?:client-secret|auth-code|refresh-token)['"]\s*:/,
+  )
 })
 
 test('OAuth declarations expose bounded hosts through the public SDK', async () => {
@@ -98,8 +142,6 @@ test('registry presentation is split behind a declaration-free facade', async ()
   expect(facade).not.toMatch(/^(?:export )?(?:async )?function\b/m)
   expect(facade.split('\n').length).toBeLessThanOrEqual(40)
 })
-
-const coreSourceRoot = new URL('../../packages/core/src/', import.meta.url)
 
 test('core Source removal uses declared generic cascades without prototype paths', async () => {
   expect(

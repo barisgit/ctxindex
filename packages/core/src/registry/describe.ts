@@ -78,6 +78,7 @@ export interface SourceDescription {
   readonly profiles: readonly ProfileReference[]
   readonly routing: string
   readonly auth: object
+  readonly providerApiHosts: readonly string[]
   readonly capabilities: readonly string[]
   readonly config: object
   readonly configOptions: readonly ConfigOptionDescription[]
@@ -149,6 +150,9 @@ export function describeRegistry(registry: {
         profiles: [...adapter.profiles].sort(compareReferences),
         routing: adapter.routing,
         auth: adapter.auth,
+        providerApiHosts: [...(adapter.providerApiHosts ?? [])].sort(
+          compareStrings,
+        ),
         capabilities: [...adapter.capabilities].sort(compareStrings),
         config,
         configOptions: describeConfigOptions(config),

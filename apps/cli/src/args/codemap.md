@@ -11,6 +11,7 @@ Pure argument-parsing layer that converts raw argv segments into typed command d
 - Ref-bearing parsers (`artifact.ts`, `export.ts`, `get.ts`, `thread-get.ts`) validate with `parseRef`.
 - `source.ts` derives dynamic `--config-*` value flags from `SourceDescription.configOptions` and coerces declared primitive/array types.
 - `describe.ts` validates the progressive selector/id grammar, text/Markdown/JSON formats, and explicit `--full` snapshot mode while rejecting redundant or conflicting forms.
+- `account.ts` accepts the closed `account list [--json]` inventory grammar and returns typed list/help/unknown variants.
 - `secrets.ts` keeps the secret surface deliberately narrow: safe `status [--json]` and typed `backend set <keychain|file>` forms only, with no literal-secret or passphrase arguments.
 - Each command module exports usage text alongside its parser and result types.
 
@@ -27,4 +28,4 @@ Notable specializations include date/limit/field parsing in `search.ts`, provide
 
 - Consumed by matching modules under `apps/cli/src/commands/`, plus handlers under `action/`, `artifact/`, `auth/`, `source/`, and `sync/`.
 - Domain types come from `@ctxindex/core`, `@ctxindex/core/registry`, `@ctxindex/core/secrets`, and `@ctxindex/extension-sdk`.
-- Production parser modules are `action.ts`, `artifact.ts`, `auth.ts`, `describe.ts`, `export.ts`, `extensions.ts`, `get.ts`, `purge.ts`, `realm.ts`, `search.ts`, `secrets.ts`, `skills.ts`, `source.ts`, `status.ts`, `sync.ts`, and `thread-get.ts`.
+- Production parser modules are `account.ts`, `action.ts`, `artifact.ts`, `auth.ts`, `describe.ts`, `export.ts`, `extensions.ts`, `get.ts`, `purge.ts`, `realm.ts`, `search.ts`, `secrets.ts`, `skills.ts`, `source.ts`, `status.ts`, `sync.ts`, and `thread-get.ts`.

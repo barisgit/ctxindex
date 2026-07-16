@@ -15,7 +15,7 @@ Orchestrates provider-neutral OAuth Grant creation from validated CLI input whil
 1. `handleAuthCommand(args)` calls `parseAuthArgs` and accepts only `auth add <provider> --adapter <id>...` with exactly one of `--loopback` or `--from-env`.
 2. `loadAuthDefinitionDeps()` loads config and the Extension registry; `resolveOAuthSelection()` rejects unknown, duplicate, ambiguous, non-OAuth, or cross-provider Adapter selections before database initialization.
 3. `openDeps()` builds the Auth service against the same definitions, and `authorizeProvider()` runs the selected OAuth flow.
-4. The handler prints the authorization URL when needed and renders the persisted Grant ID with `formatGrantAdded()`.
+4. The handler prints the authorization URL when needed and passes the exact authorization result to `formatGrantAdded()`, which renders the persisted Grant ID, provider, and granted scopes.
 
 ## Integration points
 

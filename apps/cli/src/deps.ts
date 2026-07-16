@@ -1,4 +1,8 @@
 import { CTXINDEX_BUILTIN_EXTENSIONS } from '@ctxindex/adapters'
+import {
+  type AccountService,
+  createAccountService,
+} from '@ctxindex/core/account'
 import { ArtifactService } from '@ctxindex/core/artifact'
 import { type AuthService, createAuthService } from '@ctxindex/core/auth'
 import {
@@ -37,6 +41,19 @@ export interface CliDeps {
   readonly registry: ExtensionRegistry
   readonly threadService: ThreadService
   readonly artifactService: ArtifactService
+  close(): Promise<void>
+}
+
+export async function openAccountDeps(): Promise<AccountCliDeps> {
+  const db = await getDb()
+  return {
+    accountService: createAccountService({ db }),
+    async close() {},
+  }
+}
+
+export interface AccountCliDeps {
+  readonly accountService: AccountService
   close(): Promise<void>
 }
 

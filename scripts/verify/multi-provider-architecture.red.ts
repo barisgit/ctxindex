@@ -17,8 +17,6 @@ import { readdir } from 'node:fs/promises'
 const repoRoot = new URL('../../', import.meta.url)
 const adapterRoot = new URL('packages/adapters/src/', repoRoot)
 const profileRoot = new URL('packages/profiles/src/', repoRoot)
-const coreRoot = new URL('packages/core/src/', repoRoot)
-const cliRoot = new URL('apps/cli/src/', repoRoot)
 
 function isProductionTypeScript(name: string): boolean {
   return (
@@ -73,29 +71,6 @@ test('provider behavior is owned by explicit Adapter modules', async () => {
   expect(builtins).toContain("from './google-mailbox/definition'")
   expect(builtins).toContain("from './microsoft/calendar/definition'")
   expect(builtins).toContain("from './microsoft/mailbox/definition'")
-})
-
-test('core and CLI contain no provider implementation or provider endpoints', async () => {
-  const hostPattern =
-    /accounts\.google\.com|oauth2\.googleapis\.com|www\.googleapis\.com|login\.microsoftonline\.com|graph\.microsoft\.com/i
-  expect(await sourceTree(coreRoot)).not.toMatch(hostPattern)
-  expect(await sourceTree(cliRoot)).not.toMatch(hostPattern)
-  expect(
-    await Bun.file(new URL('auth/google-client.ts', coreRoot)).exists(),
-  ).toBe(false)
-})
-
-test('auth CLI accepts no literal long-lived credential options', async () => {
-  const authSources = (
-    await Promise.all(
-      ['args/auth.ts', 'commands/auth.ts'].map((path) =>
-        Bun.file(new URL(path, cliRoot)).text(),
-      ),
-    )
-  ).join('\n')
-  expect(authSources).not.toMatch(
-    /['"](?:client-secret|auth-code|refresh-token)['"]\s*:/,
-  )
 })
 
 test('calendar vocabulary is Profile-owned and bundled declaratively', async () => {

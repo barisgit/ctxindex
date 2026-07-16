@@ -28,7 +28,7 @@ async function handleAdd(input: AddArgs): Promise<number> {
         emitAuthorizationUrl: (url) => console.log(`Open this URL: ${url}`),
       },
     )
-    console.log(formatGrantAdded(result.grantId))
+    console.log(formatGrantAdded(result))
     return 0
   } finally {
     await deps.close()

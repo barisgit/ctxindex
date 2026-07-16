@@ -4,11 +4,11 @@
   "objective": "Implement secure provider-neutral Accounts and Grants, repair secrets backend operations, and add production Google Calendar plus Microsoft Graph mail/calendar Adapters with read access and reversible Draft create/update only, verified through isolated mocked and explicit Human OAuth checkpoints without any send capability.",
   "status": "active",
   "createdAt": "2026-07-16T11:56:52.401Z",
-  "updatedAt": "2026-07-16T15:31:45.722Z",
+  "updatedAt": "2026-07-16T15:55:11.451Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
-  "nextSeq": 1366,
-  "latestSourceSeq": 1356,
-  "snapshotHash": "6b382e1c3f75703e5464a9bfacd89a7ebdc54816aef25174b935c6ed34376800",
+  "nextSeq": 1585,
+  "latestSourceSeq": 1574,
+  "snapshotHash": "ca400cea77d3845265278e0e825fb32f98f7e95674ac8d21321f2c0c86aebb18",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -52,10 +52,10 @@
         "C3"
       ],
       "status": {
-        "value": "in-progress",
-        "note": "safe nested inventory projection exists; `account list` and compiled multi-account proof are the next slice"
+        "value": "pass",
+        "note": "safe nested inventory, strict Account CLI, and the compiled multi-Grant/multi-Source proof pass without exposing provider subjects or secret material"
       },
-      "statusSeq": 1357
+      "statusSeq": 1573
     },
     {
       "id": "C5",
