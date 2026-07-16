@@ -4,7 +4,7 @@ import {
   describeRegistry,
 } from '@ctxindex/core/registry'
 import { defineExtension } from '@ctxindex/extension-sdk'
-import { communicationMessageProfile } from './communication-message'
+import { communicationMessageProfile } from '@ctxindex/profiles/communication-message'
 
 const communicationMessageExtension = defineExtension({
   id: 'ctxindex.communication-message.test',

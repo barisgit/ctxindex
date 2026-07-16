@@ -24,9 +24,9 @@
 
 ## 5. Durable dependency and documentation health
 
-- [ ] 5.1 Add repository verification that discovers workspace imports, rejects unused direct runtime dependencies, and enforces the established package dependency direction without hardcoded source-file allowlists.
-- [ ] 5.2 Prune unused manifests, regenerate the Bun lockfile, document Module ownership/locality in `IMPLEMENTATION.md`, and correct stale codemaps and storage comments that imply Adapter-owned tables.
-- [ ] 5.3 Pass package-boundary, architecture, install/build, compiled CLI, D3, typecheck, lint, full unit/integration/e2e, strict OpenSpec, and diff gates before final review.
+- [x] 5.1 Add repository verification that discovers workspace imports, rejects unused direct runtime dependencies, and enforces the established package dependency direction without hardcoded source-file allowlists.
+- [x] 5.2 Prune unused manifests, regenerate the Bun lockfile, document Module ownership/locality in `IMPLEMENTATION.md`, and correct stale codemaps and storage comments that imply Adapter-owned tables.
+- [x] 5.3 Pass package-boundary, architecture, install/build, compiled CLI, D3, typecheck, lint, full unit/integration/e2e, strict OpenSpec, and diff gates before final review.
 
 ## 6. Final architecture verification
 

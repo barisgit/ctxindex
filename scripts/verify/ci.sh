@@ -27,7 +27,7 @@ install_dependencies() {
   local output_file
   output_file="$(mktemp)"
 
-  if bun install >"$output_file" 2>&1; then
+  if bun install --frozen-lockfile >"$output_file" 2>&1; then
     if ! grep -qi 'no changes' "$output_file"; then
       cat "$output_file"
     fi
@@ -44,6 +44,8 @@ install_dependencies() {
 run_gate install install_dependencies
 run_gate lint biome check .
 run_gate typecheck tsgo --noEmit -p tsconfig.base.json
+run_gate build bun run build
+run_gate package-dependencies bun run scripts/verify/package-dependencies.ts
 run_gate architecture-lint bun run scripts/verify/architecture-lint.ts
 run_gate cli-no-business-logic bun run scripts/verify/cli-no-business-logic.ts
 run_gate cli-framework-citty bun run scripts/verify/cli-framework-citty.ts

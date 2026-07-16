@@ -9,7 +9,10 @@ ci:
 
 # Bun + biome + tsgo
 install:
-    bun install
+    bun install --frozen-lockfile
+
+build:
+    bun run build
 
 lint:
     bun run lint
@@ -71,6 +74,9 @@ release-checks:
     done
 
 # Architecture/structure gates
+package-dependencies:
+    bun run scripts/verify/package-dependencies.ts
+
 architecture-lint:
     bun run scripts/verify/architecture-lint.ts
 

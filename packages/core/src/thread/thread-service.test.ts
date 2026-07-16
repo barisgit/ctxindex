@@ -1,7 +1,6 @@
 import { Database } from 'bun:sqlite'
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import { defineProfile } from '@ctxindex/extension-sdk'
-import { communicationMessageProfile } from '@ctxindex/profiles'
 import { z } from 'zod'
 import { CtxindexNotFoundError, CtxindexValidationError } from '../errors'
 import {
@@ -18,6 +17,42 @@ const sourceA = '01ARZ3NDEKTSV4RRFFQ69G5FAV'
 const sourceB = '01ARZ3NDEKTSV4RRFFQ69G5FAW'
 const sourceC = '01ARZ3NDEKTSV4RRFFQ69G5FAX'
 const dbs: Database[] = []
+
+const communicationMessageTestProfile = defineProfile({
+  id: 'communication.message',
+  version: 1,
+  schema: z.object({
+    providerMessageId: z.string(),
+    conversationKey: z.string().optional(),
+    rfcMessageId: z.string().optional(),
+    inReplyTo: z.string().optional(),
+    date: z.string().optional(),
+  }),
+  search: {
+    occurredAt: (payload) =>
+      payload.date === undefined ? null : new Date(payload.date),
+    fields: {
+      conversationKey: {
+        type: 'string',
+        extract: (payload) => payload.conversationKey,
+      },
+      rfcMessageId: {
+        type: 'string',
+        extract: (payload) => payload.rfcMessageId,
+      },
+    },
+  },
+  relations: {
+    conversation: (payload) =>
+      payload.conversationKey
+        ? { field: 'conversationKey', value: payload.conversationKey }
+        : undefined,
+    parent: (payload) =>
+      payload.inReplyTo
+        ? { field: 'rfcMessageId', value: payload.inReplyTo }
+        : undefined,
+  },
+})
 
 const profile = defineProfile({
   id: 'fake.entry',
@@ -77,15 +112,15 @@ async function setupMessages(messages: readonly Message[]) {
   insertSource.run(sourceB, 'work', 'fake', 1, '{}', 1, 1)
   insertSource.run(sourceC, 'archive', 'fake', 1, '{}', 1, 1)
   dbs.push(db)
-  const profiles = createProfileRegistry([communicationMessageProfile])
+  const profiles = createProfileRegistry([communicationMessageTestProfile])
   const resources = new ResourceStore(db, profiles)
   for (const message of messages) {
     resources.upsert({
       ref: messageRef(message.sourceId, message.key),
       sourceId: message.sourceId,
       profile: {
-        id: communicationMessageProfile.id,
-        version: communicationMessageProfile.version,
+        id: communicationMessageTestProfile.id,
+        version: communicationMessageTestProfile.version,
       },
       origin: 'synced',
       completeness: 'complete',

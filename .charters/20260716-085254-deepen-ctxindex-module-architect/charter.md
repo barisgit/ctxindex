@@ -65,19 +65,19 @@ Status: pass — logger redaction/rotation owners, canonical Secrets Interface, 
 
 Workspace package imports follow the intended SDK -> Profiles/core/Adapters -> CLI direction through public seams. Every direct runtime dependency is demonstrably imported by that package's source or tests; moved/deleted prototype dependencies and lockfile entries are pruned by a repeatable verification gate.
 Depends: C3, C7
-Status: in-progress — starting OpenSpec Slice 5 with executable workspace dependency-direction and manifest contracts
+Status: pass — AST-derived import/manifests/direction gate, pruned lockfile, frozen install, build, and complete Slice 5 evidence in work/slice-5-dependency-gate.md
 
 ### C9. V1 behavior and safety contracts are unchanged
 
 CLI output/exit taxonomy, storage schema, Gmail request counts/URLs/error behavior, Draft no-send guarantee, Local Directory sync, Artifact handling, auth, search, retrieval, and Extension loading pass their existing unit/integration/e2e contracts. No live provider request is made.
 Depends: C1, C3, C4, C6
-Status: pending
+Status: pass — complete unit/integration/e2e, compiled CLI, D3, typecheck, and lint gates preserve V1 behavior without live provider traffic
 
 ### C10. Architecture drift fails automatically
 
 Repository verification discovers new production command files, misplaced built-in Adapter implementation, private deep imports, dependency-direction violations, and unused direct runtime dependencies without maintaining a list of individual implementation filenames.
 Depends: C4, C8
-Status: pending
+Status: pass — automatic command, Adapter locality, public-import, unused-dependency, and dependency-direction checks cover discovered source entrypoints
 
 ### C11. Documentation and maps describe the settled architecture
 

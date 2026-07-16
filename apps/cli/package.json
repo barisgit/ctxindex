@@ -18,7 +18,9 @@
   "dependencies": {
     "@ctxindex/adapters": "workspace:*",
     "@ctxindex/core": "workspace:*",
+    "@ctxindex/extension-sdk": "workspace:*",
     "citty": "latest",
-    "cli-table3": "^0.6.5"
+    "cli-table3": "^0.6.5",
+    "zod": "latest"
   }
 }

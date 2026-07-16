@@ -6,6 +6,7 @@ import {
   FileBackend,
   fileRef,
   KeychainBackend,
+  type KeychainBackendOptions,
   keychainRef,
   probeKeychain,
   type SecretBackend,
@@ -103,7 +104,9 @@ function fileBackedKeytarMock(path: string) {
 
 function keytarImporter(mockFile: string) {
   return async () =>
-    fileBackedKeytarMock(mockFile) as unknown as typeof import('keytar')
+    fileBackedKeytarMock(mockFile) as unknown as Awaited<
+      ReturnType<NonNullable<KeychainBackendOptions['importKeytar']>>
+    >
 }
 
 function keychainStore(mockFile: string): KeychainBackend {

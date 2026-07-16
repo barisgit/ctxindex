@@ -1,3 +1,5 @@
+/// <reference path="../types/sql.d.ts" />
+
 import initSql from '../../migrations/0000_init.sql' with { type: 'text' }
 
 export const coreMigrations = {

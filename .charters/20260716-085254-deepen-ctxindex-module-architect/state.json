@@ -4,11 +4,11 @@
   "objective": "Deepen ctxindex module architecture across Adapters, Profiles, the public Extension SDK, CLI, and core by restoring domain ownership/locality, deleting dead prototype code and unused dependencies, and adding durable architecture verification while preserving all V1 public behavior, storage, provider I/O, package exports, and exit codes.",
   "status": "active",
   "createdAt": "2026-07-16T08:52:54.604Z",
-  "updatedAt": "2026-07-16T10:45:03.671Z",
+  "updatedAt": "2026-07-16T11:08:57.529Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
-  "nextSeq": 1339,
-  "latestSourceSeq": 1330,
-  "snapshotHash": "7370fc4b144ea599fd308bf1e9892e2400a1c542931e88c8bd98def99e188613",
+  "nextSeq": 1467,
+  "latestSourceSeq": 1462,
+  "snapshotHash": "072e61e29d7d6412829eac132c1dce1402ef8d7325d22888b278e6d21a228a62",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -98,10 +98,10 @@
         "C7"
       ],
       "status": {
-        "value": "in-progress",
-        "note": "starting OpenSpec Slice 5 with executable workspace dependency-direction and manifest contracts"
+        "value": "pass",
+        "note": "AST-derived import/manifests/direction gate, pruned lockfile, frozen install, build, and complete Slice 5 evidence in work/slice-5-dependency-gate.md"
       },
-      "statusSeq": 1328
+      "statusSeq": 1460
     },
     {
       "id": "C9",
@@ -113,10 +113,10 @@
         "C6"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "pass",
+        "note": "complete unit/integration/e2e, compiled CLI, D3, typecheck, and lint gates preserve V1 behavior without live provider traffic"
       },
-      "statusSeq": 4
+      "statusSeq": 1460
     },
     {
       "id": "C10",
@@ -126,10 +126,10 @@
         "C8"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "pass",
+        "note": "automatic command, Adapter locality, public-import, unused-dependency, and dependency-direction checks cover discovered source entrypoints"
       },
-      "statusSeq": 4
+      "statusSeq": 1460
     },
     {
       "id": "C11",

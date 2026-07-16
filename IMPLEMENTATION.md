@@ -24,6 +24,8 @@ packages/adapters           bundled provider implementations
 
 `apps/cli` parses arguments, invokes core services, formats results, and maps typed errors to stable exit codes. It contains no provider HTTP, SQL, identity generation, or domain behavior.
 
+Module ownership follows behavior: the Extension SDK owns public authoring contracts and pure definition factories; Profiles own provider-neutral schemas and semantic projections; Adapters co-locate provider configuration, operations, transport helpers, and provider-specific tests; core owns registries, orchestration, and every SQLite table/migration. Tests stay with the owning module unless they intentionally exercise a repository-level package integration contract, in which case they live under `scripts/verify/`. Workspace dependencies point only toward those lower public seams; the repository verifier enforces this direction and direct runtime dependency declarations across production and colocated test files.
+
 ## 3. Definition model
 
 The public authoring surface consists of pure factories:

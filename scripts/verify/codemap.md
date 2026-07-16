@@ -13,6 +13,7 @@ Contains executable static and runtime verification gates for CLI layering, fram
 - `env-loader.ts` enforces centralized `CTXINDEX_`/`XDG_` reads and injects a temporary synthetic violation to prove the audit detects failures.
 - `exports-map.ts` validates required `@ctxindex/core` subpath declarations, target files, runtime resolution, and absence of deep core imports.
 - `no-prompts-static.ts` rejects prompt libraries and direct stdin/readline use in production CLI TypeScript; `agent-howtos.test.ts` verifies repository-owned agent guidance against the real CLI command surface.
+- `package-dependencies.ts` uses the TypeScript AST to discover imports in every app/package production and colocated test file, then enforces direct runtime declarations, dependency use, and workspace direction. `communication-message-profile.test.ts` owns the cross-package bundled Profile-to-registry integration contract.
 
 ## Flow
 

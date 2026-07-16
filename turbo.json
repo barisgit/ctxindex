@@ -20,10 +20,6 @@
     },
     "test:e2e": {
       "dependsOn": ["^test:e2e"]
-    },
-    "db:generate": {
-      "dependsOn": ["^db:generate"],
-      "outputs": ["migrations/**"]
     }
   }
 }

@@ -1,7 +1,6 @@
 import { Database } from 'bun:sqlite'
 import { afterEach, expect, test } from 'bun:test'
 import { defineProfile } from '@ctxindex/extension-sdk'
-import { communicationMessageProfile } from '@ctxindex/profiles'
 import { z } from 'zod'
 import { createProfileRegistry } from '../registry/profile-registry'
 import { ResourceStore } from '../resource/resource-store'
@@ -14,6 +13,39 @@ const sourceB = '01ARZ3NDEKTSV4RRFFQ69G5FAW'
 const sourceRef = `ctx://${sourceA}/messages/source`
 const targetRef = `ctx://${sourceB}/messages/target`
 const dbs: Database[] = []
+
+const communicationMessageTestProfile = defineProfile({
+  id: 'communication.message',
+  version: 1,
+  schema: z.object({
+    providerMessageId: z.string(),
+    conversationKey: z.string().optional(),
+    rfcMessageId: z.string().optional(),
+    inReplyTo: z.string().optional(),
+  }),
+  search: {
+    fields: {
+      conversationKey: {
+        type: 'string',
+        extract: (payload) => payload.conversationKey,
+      },
+      rfcMessageId: {
+        type: 'string',
+        extract: (payload) => payload.rfcMessageId,
+      },
+    },
+  },
+  relations: {
+    conversation: (payload) =>
+      payload.conversationKey
+        ? { field: 'conversationKey', value: payload.conversationKey }
+        : undefined,
+    parent: (payload) =>
+      payload.inReplyTo
+        ? { field: 'rfcMessageId', value: payload.inReplyTo }
+        : undefined,
+  },
+})
 
 const profile = defineProfile({
   id: 'fake.message',
@@ -44,7 +76,7 @@ test('communication.message Relations resolve lazily without collapsing cross-So
   dbs.push(db)
   const resources = new ResourceStore(
     db,
-    createProfileRegistry([communicationMessageProfile]),
+    createProfileRegistry([communicationMessageTestProfile]),
   )
   const relations = new RelationStore(db)
   const upsert = (

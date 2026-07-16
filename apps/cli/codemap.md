@@ -20,5 +20,5 @@ Packages the Bun-executed `ctxindex` command-line application, from its executab
 ## Integration points
 
 - Invoked from the repository's `package.json` script `cli` or the package-local `apps/cli/package.json` script `cli`.
-- Workspace dependencies are `@ctxindex/adapters` and `@ctxindex/core`; runtime presentation/framework dependencies are `citty` and `cli-table3`.
+- Workspace dependencies are `@ctxindex/adapters`, `@ctxindex/core`, and `@ctxindex/extension-sdk`; runtime presentation/framework dependencies are `citty` and `cli-table3`, while colocated definition fixtures use Zod.
 - Detailed maps: `apps/cli/bin/codemap.md` and `apps/cli/src/codemap.md`.
