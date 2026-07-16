@@ -4,12 +4,12 @@
   "objective": "Implement secure provider-neutral Accounts and Grants, repair secrets backend operations, and add production Google Calendar plus Microsoft Graph mail/calendar Adapters with read access and reversible Draft create/update only, verified through isolated mocked and explicit Human OAuth checkpoints without any send capability.",
   "status": "paused",
   "createdAt": "2026-07-16T11:56:52.401Z",
-  "updatedAt": "2026-07-16T18:05:01.340Z",
+  "updatedAt": "2026-07-16T18:10:41.966Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
   "previousStatus": "active",
-  "nextSeq": 2131,
-  "latestSourceSeq": 2122,
-  "snapshotHash": "1ceef208042d347d3366ebb928e3067428589900ee5ce0529a65d1619d60d154",
+  "nextSeq": 2155,
+  "latestSourceSeq": 2148,
+  "snapshotHash": "774af3cdb6fc2a92aeaf9a74c161f1051bf165159b1b2c7fdd6c152995d99b46",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -91,9 +91,9 @@
       ],
       "status": {
         "value": "blocked",
-        "note": "user completed consent; one Account/Grant and named Sources pass, but the approved eight-day Calendar read returned zero events, so search/get cannot finish without explicit wider-window approval; see `work/google-human-checkpoint-live.md`"
+        "note": "consent, exact Account/Grant/Sources, and bounded Gmail search/get pass; approved 8-day and 60-day Calendar reads produced no supported Ref, so Calendar search/get awaits explicit one-year-window approval; see `work/google-human-checkpoint-live.md`"
       },
-      "statusSeq": 2126
+      "statusSeq": 2150
     },
     {
       "id": "C8",
