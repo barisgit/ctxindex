@@ -44,6 +44,7 @@ const profileDefinitionSchema = z.object({
   search: z
     .object({
       title: functionSchema.optional(),
+      summary: functionSchema.optional(),
       occurredAt: functionSchema.optional(),
       chunks: functionSchema.optional(),
       fields: z

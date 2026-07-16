@@ -23,6 +23,17 @@ describe('ProfileRegistry', () => {
     expect(createProfileRegistry([profile]).list()).toEqual([profile])
   })
 
+  test('rejects a non-function Profile summary projection', () => {
+    expect(() =>
+      createProfileRegistry([
+        {
+          ...profile,
+          search: { summary: 'not a function' },
+        } as never,
+      ]),
+    ).toThrow(DefinitionRegistryError)
+  })
+
   test('rejects Action effects outside the reversible/irreversible contract', () => {
     expect(() =>
       createProfileRegistry([

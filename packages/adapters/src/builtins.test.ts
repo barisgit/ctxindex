@@ -28,8 +28,35 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
     expect(
       registry.profiles.list().map(({ id, version }) => ({ id, version })),
     ).toEqual([
+      { id: 'calendar.event', version: 1 },
       { id: 'communication.message', version: 1 },
       { id: 'file', version: 1 },
+    ])
+    const calendarKind = description.kinds.find(
+      ({ id }) => id === 'calendar.event',
+    )
+    expect(calendarKind).toMatchObject({
+      id: 'calendar.event',
+      version: 1,
+      summary: 'A provider-neutral calendar event or occurrence.',
+      aliases: ['events'],
+      formats: [],
+    })
+    expect(calendarKind?.fields.map(({ name }) => name)).toEqual([
+      'allDay',
+      'attendees',
+      'calendarId',
+      'endDate',
+      'endsAt',
+      'eventId',
+      'organizer',
+      'provider',
+      'seriesEventId',
+      'startDate',
+      'startsAt',
+      'status',
+      'title',
+      'updatedAt',
     ])
     const fileKind = description.kinds.find(({ id }) => id === 'file')
     expect(

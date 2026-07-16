@@ -4,6 +4,7 @@ import { readdir } from 'node:fs/promises'
 const adapterRoot = new URL('../../packages/adapters/src/', import.meta.url)
 const coreSourceRoot = new URL('../../packages/core/src/', import.meta.url)
 const cliRoot = new URL('../../apps/cli/src/', import.meta.url)
+const profileRoot = new URL('../../packages/profiles/src/', import.meta.url)
 
 function isProductionTypeScript(name: string): boolean {
   return name.endsWith('.ts') && !name.endsWith('.test.ts')
@@ -50,6 +51,16 @@ test('built-in Source Adapter implementation is owned by provider modules', asyn
     .filter(isProductionTypeScript)
     .sort()
   expect(localFiles).toContain('definition.ts')
+})
+
+test('calendar vocabulary is Profile-owned and bundled declaratively', async () => {
+  const profiles = await sourceTree(profileRoot)
+  expect(profiles).toContain("id: 'calendar.event'")
+  expect(profiles).toContain("aliases: ['events']")
+
+  const builtins = await Bun.file(new URL('builtins.ts', adapterRoot)).text()
+  expect(builtins).toContain('calendarEventProfile')
+  expect(await sourceTree(coreSourceRoot)).not.toContain('calendar.event')
 })
 
 test('provider implementation and endpoint literals stay outside core and CLI', async () => {

@@ -1,12 +1,16 @@
 import { defineExtension } from '@ctxindex/extension-sdk'
-import { communicationMessageProfile, fileProfile } from '@ctxindex/profiles'
+import {
+  calendarEventProfile,
+  communicationMessageProfile,
+  fileProfile,
+} from '@ctxindex/profiles'
 import { gmailAdapterDefinition } from './google-mailbox/definition'
 import { localDirectoryAdapterDefinition } from './local-directory/definition'
 
 export const ctxindexBuiltinExtension = defineExtension({
   id: 'ctxindex.builtins',
   version: 1,
-  profiles: [communicationMessageProfile, fileProfile],
+  profiles: [calendarEventProfile, communicationMessageProfile, fileProfile],
   adapters: [gmailAdapterDefinition, localDirectoryAdapterDefinition],
   docs: { summary: 'Bundled ctxindex definitions.' },
 })

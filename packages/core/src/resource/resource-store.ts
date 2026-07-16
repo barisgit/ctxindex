@@ -316,11 +316,13 @@ export class ResourceStore {
         ? 'synced'
         : 'adhoc'
     let title = input.title ?? null
+    let summary = input.summary ?? null
     let occurredAt = input.occurredAt ?? null
     let chunks: readonly string[] = []
 
     if (profile && payload !== undefined) {
       title = profile.search?.title?.(payload) ?? title
+      summary = profile.search?.summary?.(payload) ?? summary
       occurredAt =
         profile.search?.occurredAt?.(payload)?.getTime() ?? occurredAt
       chunks = profile.search?.chunks?.(payload) ?? []
@@ -353,7 +355,7 @@ export class ResourceStore {
           input.sourceId,
           source.realm_id,
           title,
-          input.summary ?? null,
+          summary,
           occurredAt,
           input.providerUpdatedAt ?? null,
           origin,
@@ -393,7 +395,7 @@ export class ResourceStore {
         input.profile.id,
         input.profile.version,
         title,
-        input.summary ?? null,
+        summary,
         occurredAt,
         input.providerUpdatedAt ?? null,
         input.completeness === 'complete' ? now : null,

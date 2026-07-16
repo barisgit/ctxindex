@@ -6,7 +6,7 @@ Implements and bundles ctxindex's built-in provider adapters: the federated `goo
 
 ## Design/patterns
 
-- `builtins.ts` is a composition-only root. Provider modules own their declarative Adapter definitions; `ctxindexBuiltinExtension` bundles them with `communicationMessageProfile` and `fileProfile`, and `CTXINDEX_BUILTIN_EXTENSIONS` is the host-facing registry input.
+- `builtins.ts` is a composition-only root. Provider modules own their declarative Adapter definitions; `ctxindexBuiltinExtension` bundles them with the provider-neutral `calendarEventProfile`, `communicationMessageProfile`, and `fileProfile`, and `CTXINDEX_BUILTIN_EXTENSIONS` is the host-facing registry input.
 - `google-oauth-provider.ts` owns the reusable Google `OAuthProviderSpec`: declared endpoints/hosts, PKCE/client/environment policy, base scopes, and identity extraction paths.
 - `google-mailbox/` owns Gmail configuration, definition, declared API host, operations, provider DTO/header/date helpers, response/error handling, and URL/mock routing; see `packages/adapters/src/google-mailbox/codemap.md`.
 - `local-directory/sync.ts` orchestrates a deterministic incremental manifest pipeline over configuration, walking, safe reads, canonical refs, and code-point ordering; see `packages/adapters/src/local-directory/codemap.md`.

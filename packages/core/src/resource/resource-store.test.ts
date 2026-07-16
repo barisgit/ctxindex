@@ -21,9 +21,11 @@ const fakeProfile = defineProfile({
     at: z.date(),
     tags: z.array(z.string()),
     body: z.string(),
+    summary: z.string().optional(),
   }),
   search: {
     title: (payload) => payload.name,
+    summary: (payload) => payload.summary ?? null,
     occurredAt: (payload) => payload.at,
     chunks: (payload) => [payload.body],
     fields: {
@@ -145,6 +147,31 @@ afterEach(() => {
 })
 
 describe('ResourceStore', () => {
+  test('materializes a generic Profile-derived summary', async () => {
+    const db = await freshDb()
+    const store = new ResourceStore(db, createProfileRegistry([fakeProfile]))
+
+    store.upsert({
+      ref,
+      sourceId,
+      profile: { id: 'fake.record', version: 1 },
+      origin: 'synced',
+      completeness: 'complete',
+      summary: 'Envelope fallback',
+      payload: {
+        name: 'Record',
+        score: 1,
+        active: true,
+        at: new Date(123),
+        tags: [],
+        body: 'body',
+        summary: 'Profile summary',
+      },
+    })
+
+    expect(store.get(ref)?.summary).toBe('Profile summary')
+  })
+
   test('complete upserts hydrate the full stored Resource envelope', async () => {
     const db = await freshDb()
     const store = new ResourceStore(db, createProfileRegistry([fakeProfile]))

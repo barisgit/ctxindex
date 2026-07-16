@@ -101,6 +101,7 @@ const noteProfile = defineProfile({
   schema: z.object({ title: z.string(), pinned: z.boolean() }),
   search: {
     title: (payload) => payload.title,
+    summary: (payload) => (payload.pinned ? 'Pinned note' : null),
     fields: {
       pinned: { type: 'boolean', extract: (payload) => payload.pinned },
     },

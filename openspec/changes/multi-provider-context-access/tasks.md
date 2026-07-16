@@ -47,13 +47,13 @@
 
 ## 5. Provider-neutral Calendar Profile
 
-- [ ] 5.1 Write red Profile tests for timed/all-day discriminated payloads, interval/date ordering, provider identity, organizer/attendees/status/recurrence, strict invalid variants, pure title/summary/occurred-at/search/chunks/typed fields/series Relations, alias, docs, and zero Actions.
-- [ ] 5.2 Implement `calendar.event@1` in an owned Profiles module with deterministic projections and register/export it through the built-in Extension/public Profile package without calendar branches in core.
-- [ ] 5.3 Add generic storage/search/get/registry contract tests using fake Google/Microsoft event payloads and stable Source-scoped event Refs, including overlapping Sources remaining distinct and exact Realm filtering.
+- [x] 5.1 Write red Profile tests for timed/all-day discriminated payloads, interval/date ordering, provider identity, organizer/attendees/status/recurrence, strict invalid variants, pure title/summary/occurred-at/search/chunks/typed fields/series Relations, alias, docs, and zero Actions.
+- [x] 5.2 Implement `calendar.event@1` in an owned Profiles module with deterministic projections and register/export it through the built-in Extension/public Profile package without calendar branches in core.
+- [x] 5.3 Add generic storage/search/get/registry contract tests using fake Google/Microsoft event payloads and stable Source-scoped event Refs, including overlapping Sources remaining distinct and exact Realm filtering.
 
 ### Slice 5 gate
 
-- [ ] 5.4 Run Profile/registry/generic storage-search-retrieval tests, typecheck/lint/architecture/dependency/full unit, strict OpenSpec and diff checks; independently review Profile semantics and save `work/slice-5-calendar-profile-gate.md`.
+- [x] 5.4 Run Profile/registry/generic storage-search-retrieval tests, typecheck/lint/architecture/dependency/full unit, strict OpenSpec and diff checks; independently review Profile semantics and save `work/slice-5-calendar-profile-gate.md`.
 
 ## 6. Google Calendar Adapter
 

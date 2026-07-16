@@ -44,7 +44,7 @@ Status: pass — safe nested inventory, strict Account CLI, and the compiled mul
 ### C5. Calendar events use one provider-neutral Profile
 A strict `calendar.event@1` Profile represents timed and all-day events, organizers, attendees, recurrence, status, location, description, provider calendar identity, typed fields, chunks, and stable relations without provider-specific core/storage paths.
 Depends: C1
-Status: pending
+Status: pass — strict Profile, bounded projections, exact Source-scoped Refs/series Relations, public registration, and generic storage/search/get proofs pass
 
 ### C6. Google Calendar is a complete read Source Adapter
 A configured Google Calendar Source uses exact selected scopes and supports deterministic incremental sync, pagination, tombstones, invalid-cursor recovery, retrieval, stable Source-scoped Refs, and generic search/get over selected calendars with no calendar mutation capability.

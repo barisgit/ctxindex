@@ -6,7 +6,7 @@ Validates and indexes extension-supplied Profile, Adapter, OAuth-provider, and E
 
 ## Design/patterns
 
-- `profile-registry.ts` implements a keyed registry (`ProfileRegistry`) over `id@version`, with Zod boundary validation, duplicate detection, alias resolution, and degraded resolution warnings.
+- `profile-registry.ts` implements a keyed registry (`ProfileRegistry`) over `id@version`, with Zod boundary validation of search hooks (including `summary`), duplicate detection, alias resolution, and degraded resolution warnings.
 - `definition-registries.ts` composes `ProfileRegistry`, `AdapterRegistry`, and `ExtensionRegistry`; rebuilding all registries on `ExtensionRegistry.register()` makes registration atomic and revalidates cross-definition contracts.
 - `validateAdapter()` enforces capability/operation parity, routing requirements, Profile references, Action binding compatibility, unique scopes, and lowercase unique `providerApiHosts`. OAuth-provider schemas validate endpoints, client policy, PKCE, environment keys, hosts, scopes, and identity paths.
 - `AdapterRegistry` indexes semantically identical OAuth declarations by provider ID and rejects conflicting declarations; `getOAuthProvider()` exposes the provider-neutral lookup used by auth.

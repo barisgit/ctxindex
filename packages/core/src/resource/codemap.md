@@ -7,14 +7,14 @@ Canonical SQLite repository for Resource lifecycle, Profile validation, hydratio
 ## Design/patterns
 
 - `ResourceStore` in `resource-store.ts` is a transactional repository around the `resources`, `field_index`, and `chunks` tables, delegating edges to `RelationStore`.
-- Profiles act as schema plus projection strategies: schema validation, title/time/chunk extraction, typed search-field extraction, and relation extraction all occur at the persistence boundary.
+- Profiles act as schema plus projection strategies: schema validation, title/summary/time/chunk extraction, typed search-field extraction, and relation extraction all occur at the persistence boundary.
 - Unknown Profile versions use degraded storage with `UnknownProfileWarning`; partial writes preserve already hydrated content.
 - `index.ts` re-exports the repository API.
 
 ## Data & control flow
 
 1. `upsert()` validates Ref/Source ownership, resolves the Profile version, validates known payloads, and runs `write()` in a transaction.
-2. `write()` obtains the Source's Realm, preserves `synced` origin precedence, derives Profile projections, and either updates envelope metadata for a partial existing hydration or upserts the full Resource.
+2. `write()` obtains the Source's Realm, preserves `synced` origin precedence, derives Profile title and summary (falling back to the input envelope) plus time/chunk projections, and either updates envelope metadata for a partial existing hydration or upserts the full Resource.
 3. Full writes replace field/chunk projections and call `RelationStore.replace()` with relations extracted from the payload.
 4. `get()` maps a SQLite row and decoded `payload_json` to `StoredResource`; soft-deleted rows are hidden unless requested.
 5. `remove()` hard-deletes `adhoc` Resources but marks `synced` Resources with `deleted_at`.

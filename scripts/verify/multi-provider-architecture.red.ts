@@ -16,7 +16,6 @@ import { readdir } from 'node:fs/promises'
 
 const repoRoot = new URL('../../', import.meta.url)
 const adapterRoot = new URL('packages/adapters/src/', repoRoot)
-const profileRoot = new URL('packages/profiles/src/', repoRoot)
 
 function isProductionTypeScript(name: string): boolean {
   return (
@@ -71,14 +70,6 @@ test('provider behavior is owned by explicit Adapter modules', async () => {
   expect(builtins).toContain("from './google-mailbox/definition'")
   expect(builtins).toContain("from './microsoft/calendar/definition'")
   expect(builtins).toContain("from './microsoft/mailbox/definition'")
-})
-
-test('calendar vocabulary is Profile-owned and bundled declaratively', async () => {
-  const profiles = await sourceTree(profileRoot)
-  expect(profiles).toContain('calendar.event')
-
-  const builtins = await Bun.file(new URL('builtins.ts', adapterRoot)).text()
-  expect(builtins).toContain('calendarEventProfile')
 })
 
 test('production Adapter surface has no send permission, Action, or route', async () => {

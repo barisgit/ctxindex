@@ -56,6 +56,7 @@ export interface ProfileDefinition<
   readonly schema: TSchema
   readonly search?: {
     readonly title?: (payload: z.infer<TSchema>) => string | null
+    readonly summary?: (payload: z.infer<TSchema>) => string | null
     readonly occurredAt?: (payload: z.infer<TSchema>) => Date | null
     readonly chunks?: (payload: z.infer<TSchema>) => readonly string[]
     readonly fields?: Readonly<Record<string, ProfileField<z.infer<TSchema>>>>

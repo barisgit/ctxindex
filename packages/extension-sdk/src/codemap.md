@@ -7,7 +7,7 @@ Defines the public TypeScript authoring and runtime contract for ctxindex Profil
 ## Design / patterns
 
 - `reference.ts`: shared definition versions and Profile references.
-- `profile.ts`: Profile schemas, search/field/relation/artifact/export/Action contracts, and the `defineProfile` identity factory.
+- `profile.ts`: Profile schemas, title/summary/time/chunk/field search projections, relation/artifact/export/Action contracts, and the `defineProfile` identity factory.
 - `operations.ts`: provider operation contexts, generic Resource values, sync emissions, remote-search values, logging, and host callbacks.
 - `adapter.ts`: Adapter capabilities, provider-neutral `OAuthProviderSpec` declarations, auth/routing, per-Adapter `providerApiHosts`, capability-gated operations, Action bindings, definitions, and the `defineAdapter` identity factory.
 - `extension.ts`: Extension composition, the host authoring contract, and the `defineExtension` identity factory.

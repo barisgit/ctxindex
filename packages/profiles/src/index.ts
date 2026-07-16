@@ -1,3 +1,9 @@
+export type { CalendarEvent } from './calendar-event'
+export {
+  calendarEventProfile,
+  calendarEventRef,
+  calendarEventSchema,
+} from './calendar-event'
 export {
   communicationMessageDraftCreateInputSchema,
   communicationMessageDraftUpdateInputSchema,

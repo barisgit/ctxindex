@@ -4,11 +4,11 @@
   "objective": "Implement secure provider-neutral Accounts and Grants, repair secrets backend operations, and add production Google Calendar plus Microsoft Graph mail/calendar Adapters with read access and reversible Draft create/update only, verified through isolated mocked and explicit Human OAuth checkpoints without any send capability.",
   "status": "active",
   "createdAt": "2026-07-16T11:56:52.401Z",
-  "updatedAt": "2026-07-16T15:55:11.451Z",
+  "updatedAt": "2026-07-16T16:14:55.753Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
-  "nextSeq": 1585,
-  "latestSourceSeq": 1574,
-  "snapshotHash": "ca400cea77d3845265278e0e825fb32f98f7e95674ac8d21321f2c0c86aebb18",
+  "nextSeq": 1765,
+  "latestSourceSeq": 1756,
+  "snapshotHash": "4648382785663f0aeac952027cfb822bb0289224df7693a495831d4f863cd04a",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -64,10 +64,10 @@
         "C1"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "pass",
+        "note": "strict Profile, bounded projections, exact Source-scoped Refs/series Relations, public registration, and generic storage/search/get proofs pass"
       },
-      "statusSeq": 8
+      "statusSeq": 1753
     },
     {
       "id": "C6",
