@@ -6,7 +6,7 @@ Publishes the immutable core database migration manifest consumed by storage ini
 
 ## Design
 
-`index.ts` statically imports `packages/core/migrations/0000_init.sql` as text and exposes `coreMigrations` as a const manifest with a namespace, ordered migration list, and dedicated `ctxindex_migrations_core` tracking table.
+`index.ts` statically imports `packages/core/migrations/0000_init.sql` as text, references the package-owned ambient SQL module type, and exposes `coreMigrations` as a const manifest with a namespace, ordered migration list, and dedicated `ctxindex_migrations_core` tracking table.
 
 ## Data & control flow
 

@@ -16,7 +16,7 @@ Each accessor reads the memoized environment via `getEnv()`, selects the highest
 
 ## Integration points
 
-- Re-exported by `packages/core/src/paths.ts`.
+- Exported by the capability `index.ts`, which the `@ctxindex/core/paths` package subpath targets directly.
 - `packages/core/src/config/io.ts` uses `configDir()`; storage and artifacts use `dataDir()`; logger uses `logDir()`; secrets use config/data paths.
 - `packages/core/src/storage/init.ts` creates all five directory classes during initialization.
 - Depends on `packages/core/src/config/env-loader.ts` and Node `os`/`path`.

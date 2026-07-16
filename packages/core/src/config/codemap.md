@@ -20,7 +20,7 @@ Owns runtime environment capture, TOML configuration persistence, schema validat
 
 ## Integration points
 
-- Re-exported by `packages/core/src/config.ts` and `packages/core/src/index.ts`; CLI auth, definitions, secrets commands, and adapters import `@ctxindex/core/config`.
+- Exported by the capability `index.ts`, targeted directly by the `@ctxindex/core/config` package subpath and re-exported by `packages/core/src/index.ts`; CLI auth, definitions, secrets commands, and adapters consume that public seam.
 - `packages/core/src/paths/index.ts` supplies `configDir()` and consumes typed environment keys.
 - `packages/core/src/extension/loader.ts`, `packages/core/src/logger/index.ts`, secrets, auth, and storage initialization consume configuration or environment values.
 - Depends on `@iarna/toml`, Zod, Bun file I/O, and `packages/core/src/errors.ts`.

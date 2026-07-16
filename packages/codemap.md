@@ -7,7 +7,7 @@ Contains the reusable workspace libraries that define ctxindex's domain/runtime 
 ## Design/patterns
 
 - Layered packages: `extension-sdk` defines contracts; `profiles` supplies declarative domain vocabularies; `adapters` performs provider/filesystem I/O; `core` validates definitions and owns application services, persistence, orchestration, configuration, security, and search.
-- Package boundaries are explicit TypeScript export maps in each `packages/*/package.json`; the root `package.json` includes `packages/*` as Bun workspaces.
+- Package boundaries are explicit TypeScript export maps in each `packages/*/package.json`; the root `package.json` includes `packages/*` as Bun workspaces, and repository verification derives imports to enforce downward dependency direction and truthful direct manifests.
 - Detailed maps: `packages/extension-sdk/codemap.md`, `packages/profiles/codemap.md`, `packages/adapters/codemap.md`. Core's completed subsystem maps live under `packages/core/src/*/codemap.md`.
 
 ## Data & control flow

@@ -22,4 +22,4 @@ Implements validated local SQLite search and multi-Source routing that unifies i
 
 - Depends on `packages/core/src/storage/db.ts`, `registry/profile-registry.ts`, and SQLite tables/FTS indexes associated with `resources`, `chunks`, and `field_index`.
 - Remote execution delegates to `packages/core/src/source/remote-search.ts`, using registry, auth, logger, and fetch dependencies.
-- `apps/cli/src/commands/search.ts` constructs `SearchPlanner`; `index.ts` exports the planner, preflight, sanitizer, executor, and result/query types through `packages/core/src/search.ts`.
+- `apps/cli/src/commands/search.ts` constructs `SearchPlanner`; the capability `index.ts` is the direct `@ctxindex/core/search` target and exports the planner, preflight, sanitizer, executor, and result/query types.

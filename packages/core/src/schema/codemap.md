@@ -21,5 +21,5 @@ Declares the core SQLite relational model as Drizzle table definitions for ident
 ## Integration points
 
 - Depends on `drizzle-orm` and `drizzle-orm/sqlite-core`; cross-file references link `accounts.ts`, `realms.ts`, `sources.ts`, `resources.ts`, and `sync_runs.ts` into the graph.
-- `packages/core/src/schema.ts` re-exports `schema/index.ts` for package consumers.
+- The capability `index.ts` is the direct target of the `@ctxindex/core/schema` package subpath.
 - Runtime SQL in `packages/core/src/resource/resource-store.ts`, `relation/relation-store.ts`, `source/service.ts`, `search/local-search.ts`, and `sync/sync-coordinator.ts` operates on these table shapes; `packages/core/src/storage/` owns database creation and migrations.

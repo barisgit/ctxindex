@@ -83,7 +83,7 @@ Status: pass — automatic command, Adapter locality, public-import, unused-depe
 
 `IMPLEMENTATION.md`, affected codemaps, storage comments, and package descriptions use current Profile/Adapter/Extension terminology and describe actual ownership. Incremental cartography and drift sweep report no unresolved code/document mismatch.
 Depends: C1, C3, C4, C7
-Status: pending
+Status: pass — four-part drift sweep plus 209-file incremental cartography are clean; evidence in work/final-drift-cartography.md
 
 ### C12. The complete reviewed snapshot is releasable
 

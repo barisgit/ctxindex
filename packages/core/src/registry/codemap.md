@@ -23,4 +23,4 @@ Validates and indexes extension-supplied Profile, Adapter, and Extension definit
 - Definition types come from `@ctxindex/extension-sdk`; validation uses `zod`.
 - `packages/core/src/extension/loader.ts` and `packages/core/src/extension/index.ts` supply extension definitions; `packages/core/src/source/`, `search/`, `resource/`, and `action/` consume registry lookups.
 - `apps/cli/src/definitions.ts`, `apps/cli/src/commands/describe.ts`, and `apps/cli/src/commands/source.ts` consume registry construction/descriptions.
-- `index.ts` is the leaf barrel; `packages/core/src/registry.ts` exposes it as `@ctxindex/core/registry`.
+- `index.ts` is the canonical capability Interface and the direct target of the `@ctxindex/core/registry` package subpath.

@@ -4,11 +4,11 @@
   "objective": "Deepen ctxindex module architecture across Adapters, Profiles, the public Extension SDK, CLI, and core by restoring domain ownership/locality, deleting dead prototype code and unused dependencies, and adding durable architecture verification while preserving all V1 public behavior, storage, provider I/O, package exports, and exit codes.",
   "status": "active",
   "createdAt": "2026-07-16T08:52:54.604Z",
-  "updatedAt": "2026-07-16T11:08:57.529Z",
+  "updatedAt": "2026-07-16T11:30:46.815Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
-  "nextSeq": 1467,
-  "latestSourceSeq": 1462,
-  "snapshotHash": "072e61e29d7d6412829eac132c1dce1402ef8d7325d22888b278e6d21a228a62",
+  "nextSeq": 1564,
+  "latestSourceSeq": 1561,
+  "snapshotHash": "4d4b1da2e5901e28b6b7ed842322d2bfe02cffd0bc9d9d1b1f5632e52e9c26fd",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -141,10 +141,10 @@
         "C7"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "pass",
+        "note": "four-part drift sweep plus 209-file incremental cartography are clean; evidence in work/final-drift-cartography.md"
       },
-      "statusSeq": 4
+      "statusSeq": 1551
     },
     {
       "id": "C12",
