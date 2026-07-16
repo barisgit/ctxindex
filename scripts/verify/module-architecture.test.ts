@@ -37,3 +37,30 @@ test('built-in Extension root composes definitions without owning Adapter behavi
   )
   expect(source).not.toContain("from 'zod'")
 })
+
+const sdkRoot = new URL('../../packages/extension-sdk/src/', import.meta.url)
+
+test('public Extension SDK is a stable barrel over core-independent modules', async () => {
+  const entries = await readdir(sdkRoot, { withFileTypes: true })
+  const productionFiles = entries
+    .filter((entry) => entry.isFile() && isProductionTypeScript(entry.name))
+    .map((entry) => entry.name)
+    .sort()
+
+  expect(productionFiles).toEqual([
+    'adapter.ts',
+    'extension.ts',
+    'index.ts',
+    'operations.ts',
+    'profile.ts',
+    'reference.ts',
+  ])
+
+  for (const filename of productionFiles) {
+    const source = await Bun.file(new URL(filename, sdkRoot)).text()
+    expect(source).not.toContain('@ctxindex/core')
+  }
+
+  const publicIndex = await Bun.file(new URL('index.ts', sdkRoot)).text()
+  expect(publicIndex).not.toMatch(/export (?:interface|function|class|const)\b/)
+})

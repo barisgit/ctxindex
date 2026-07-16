@@ -36,7 +36,7 @@ Status: pass — builtins is composition-only; Profile registry/path contracts m
 
 SDK references, Profile contracts, operation contexts, Adapter contracts, and Extension factories are internally coherent Modules behind the unchanged `@ctxindex/extension-sdk` Interface. Existing symbol exports, generic inference, host-provided factories, and external compiled Extension behavior remain intact.
 Depends: C2
-Status: in-progress — starting OpenSpec Slice 2 with exact public SDK value/type and factory-inference contracts
+Status: pass — exact 43-symbol surface, private SDK Modules, external Extension e2es, D3 relocation, and independent approval evidenced in work/slice-2-extension-sdk-gate.md
 
 ### C4. CLI command composition is uniformly thin
 
@@ -48,7 +48,7 @@ Status: pending
 
 Registry selection/projection, JSON-Schema detail rendering, text rendering, and Markdown rendering are separate private Modules behind the existing formatter Interface. Requiredness, constraints, local schema fallbacks, examples, JSON cardinality, and deterministic order remain covered.
 Depends: C3
-Status: pending
+Status: in-progress — starting OpenSpec Slice 3 with registry formatter seam contracts
 
 ### C6. Core contains no forbidden prototype storage path
 

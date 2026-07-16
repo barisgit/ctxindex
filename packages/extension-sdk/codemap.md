@@ -6,7 +6,7 @@ Publishes the stateless public authoring/runtime contract used to define ctxinde
 
 ## Design/patterns
 
-- Single-module package: `packages/extension-sdk/package.json` exports `packages/extension-sdk/src/index.ts` as `@ctxindex/extension-sdk`.
+- Deep package Interface: `packages/extension-sdk/package.json` exposes only `src/index.ts` as `@ctxindex/extension-sdk`; the index is a stable barrel over cohesive private contract Modules.
 - Declarative definition types and generic identity helpers (`defineProfile`, `defineAdapter`, `defineExtension`) preserve literal IDs, versions, schemas, capabilities, and Action maps without owning runtime state.
 - Capability-gated Strategy contracts and callback/event contexts keep provider implementations independent of core persistence and orchestration.
 - Full symbol-level map: `packages/extension-sdk/src/codemap.md`.

@@ -4,11 +4,11 @@
   "objective": "Deepen ctxindex module architecture across Adapters, Profiles, the public Extension SDK, CLI, and core by restoring domain ownership/locality, deleting dead prototype code and unused dependencies, and adding durable architecture verification while preserving all V1 public behavior, storage, provider I/O, package exports, and exit codes.",
   "status": "active",
   "createdAt": "2026-07-16T08:52:54.604Z",
-  "updatedAt": "2026-07-16T09:42:32.831Z",
+  "updatedAt": "2026-07-16T09:52:35.490Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
-  "nextSeq": 199,
-  "latestSourceSeq": 190,
-  "snapshotHash": "b325887d53ed0f09acd636e90ce213e7fc90301f1043af24a0d85ae38b4a1b8f",
+  "nextSeq": 306,
+  "latestSourceSeq": 301,
+  "snapshotHash": "9928f3994116522780836fc114172e1f733d17a0778f61eecae69d5e72c314f3",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -39,10 +39,10 @@
         "C2"
       ],
       "status": {
-        "value": "in-progress",
-        "note": "starting OpenSpec Slice 2 with exact public SDK value/type and factory-inference contracts"
+        "value": "pass",
+        "note": "exact 43-symbol surface, private SDK Modules, external Extension e2es, D3 relocation, and independent approval evidenced in work/slice-2-extension-sdk-gate.md"
       },
-      "statusSeq": 189
+      "statusSeq": 299
     },
     {
       "id": "C4",
@@ -63,10 +63,10 @@
         "C3"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "in-progress",
+        "note": "starting OpenSpec Slice 3 with registry formatter seam contracts"
       },
-      "statusSeq": 4
+      "statusSeq": 299
     },
     {
       "id": "C6",

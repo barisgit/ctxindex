@@ -6,8 +6,8 @@
 
 ## 2. Public Extension SDK depth
 
-- [ ] 2.1 Lock the exact public SDK value/type surface and factory inference, then split references, Profile contracts, provider operation contexts, Adapter contracts, and Extension factories behind the unchanged package index.
-- [ ] 2.2 Pass SDK/package tests, root typecheck/lint, external Extension boundary tests, and the relocated D3 compiled-Extension spike before the next slice.
+- [x] 2.1 Lock the exact public SDK value/type surface and factory inference, then split references, Profile contracts, provider operation contexts, Adapter contracts, and Extension factories behind the unchanged package index.
+- [x] 2.2 Pass SDK/package tests, root typecheck/lint, external Extension boundary tests, and the relocated D3 compiled-Extension spike before the next slice.
 
 ## 3. Thin CLI and presentation Modules
 
