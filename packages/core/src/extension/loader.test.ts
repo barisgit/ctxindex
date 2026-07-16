@@ -89,114 +89,58 @@ describe('loadExtensions', () => {
     ])
   })
 
-  test('marks Sources unavailable without deleting materialized Resources when an Extension disappears', async () => {
+  test('Extension disappearance and reload leave stored sync and materialized rows byte-for-byte untouched', async () => {
     const db = new Database(':memory:', { create: true })
     databases.push(db)
     await runMigrations(db)
     db.prepare(
-      `INSERT INTO sources (
-         id, realm_id, adapter_id, adapter_version, display_name, config_json,
-         sync_enabled, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      'source-1',
-      'global',
-      'fixture.missing',
-      1,
-      'Missing fixture',
-      '{}',
-      1,
-      1,
-      1,
-    )
-    db.prepare(
-      `INSERT INTO resources (
-         id, ref, source_id, realm_id, profile_id, profile_version, title,
-         origin, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      'resource-1',
-      'fixture:item-1',
-      'source-1',
-      'global',
-      'fixture.note',
-      1,
-      'Preserved note',
-      'synced',
-      1,
-      1,
-    )
-    const missingPath = resolve(import.meta.dir, 'fixtures/disappeared.ts')
-    const config = {
-      ...defaultConfig(),
-      extensions: { paths: [missingPath] },
-    }
-
-    const result = await loadExtensions({ config, builtins: [], db })
-
-    expect(
-      result.registry.adapters.get({ id: 'fixture.missing', version: 1 }),
-    ).toBeUndefined()
-    expect(
-      db
-        .prepare(
-          'SELECT last_status FROM source_sync_state WHERE source_id = ?',
-        )
-        .get('source-1'),
-    ).toEqual({ last_status: 'extension_unavailable' })
-    expect(
-      db.prepare('SELECT title FROM resources WHERE id = ?').get('resource-1'),
-    ).toEqual({
-      title: 'Preserved note',
-    })
-    expect(
-      db.prepare('SELECT id FROM sources WHERE id = ?').get('source-1'),
-    ).toEqual({
-      id: 'source-1',
-    })
-  })
-  test('recovers an unavailable Source to idle when its Adapter is loaded again', async () => {
-    const db = new Database(':memory:', { create: true })
-    databases.push(db)
-    await runMigrations(db)
+      "INSERT INTO realms (id, slug, created_at) VALUES ('realm-1', 'work', 1)",
+    ).run()
     db.prepare(
       `INSERT INTO sources (
          id, realm_id, adapter_id, adapter_version, display_name, config_json,
          sync_enabled, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      'source-returned',
-      'global',
-      'fixture.returned',
-      1,
-      'Returned fixture',
-      '{}',
-      1,
-      1,
-      1,
-    )
+       ) VALUES ('source-1', 'realm-1', 'fixture.returned', 1, 'Fixture', '{}', 1, 1, 1)`,
+    ).run()
     db.prepare(
       `INSERT INTO source_sync_state (
-         source_id, last_status, last_run_id, cursor_json, updated_at
-       ) VALUES (?, ?, ?, ?, ?)`,
-    ).run('source-returned', 'extension_unavailable', null, null, 1)
+         source_id, last_status, cursor_json, updated_at
+       ) VALUES ('source-1', 'failed', '{"page":3}', 42)`,
+    ).run()
     db.prepare(
       `INSERT INTO resources (
          id, ref, source_id, realm_id, profile_id, profile_version, title,
-         origin, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      'resource-returned',
-      'fixture:item-returned',
-      'source-returned',
-      'global',
-      'fixture.note',
-      1,
-      'Still present',
-      'synced',
-      1,
-      1,
-    )
+         payload_json, origin, created_at, updated_at
+       ) VALUES (
+         'resource-1', 'ctx://source-1/item/1', 'source-1', 'realm-1',
+         'fixture.note', 1, 'Preserved note', '{"body":"unchanged"}',
+         'synced', 1, 1
+       )`,
+    ).run()
+    const snapshot = () => ({
+      sources: db.prepare('SELECT * FROM sources ORDER BY id').all(),
+      syncState: db
+        .prepare('SELECT * FROM source_sync_state ORDER BY source_id')
+        .all(),
+      resources: db.prepare('SELECT * FROM resources ORDER BY id').all(),
+    })
+    const before = snapshot()
+    const missingPath = resolve(import.meta.dir, 'fixtures/disappeared.ts')
+
+    const missing = await loadExtensions({
+      config: {
+        ...defaultConfig(),
+        extensions: { paths: [missingPath] },
+      },
+      builtins: [],
+    })
+
+    expect(missing.diagnostics).toHaveLength(1)
+    expect(
+      missing.registry.adapters.get({ id: 'fixture.returned', version: 1 }),
+    ).toBeUndefined()
+    expect(snapshot()).toEqual(before)
+
     const adapter = defineAdapter({
       id: 'fixture.returned',
       version: 1,
@@ -208,34 +152,22 @@ describe('loadExtensions', () => {
       operations: {},
       actions: {},
     })
-    const builtin = defineExtension({
-      id: 'fixture.returned-extension',
-      version: 1,
-      profiles: [],
-      adapters: [adapter],
-    })
-
-    await loadExtensions({
+    const restored = await loadExtensions({
       config: defaultConfig(),
-      builtins: [builtin],
-      db,
+      builtins: [
+        defineExtension({
+          id: 'fixture.returned-extension',
+          version: 1,
+          profiles: [],
+          adapters: [adapter],
+        }),
+      ],
     })
 
     expect(
-      db
-        .prepare(
-          'SELECT last_status FROM source_sync_state WHERE source_id = ?',
-        )
-        .get('source-returned'),
-    ).toEqual({ last_status: 'idle' })
-    expect(
-      db
-        .prepare('SELECT title FROM resources WHERE id = ?')
-        .get('resource-returned'),
-    ).toEqual({ title: 'Still present' })
-    expect(
-      db.prepare('SELECT id FROM sources WHERE id = ?').get('source-returned'),
-    ).toEqual({ id: 'source-returned' })
+      restored.registry.adapters.get({ id: 'fixture.returned', version: 1 }),
+    ).toBeDefined()
+    expect(snapshot()).toEqual(before)
   })
   test('requires callers to provide an explicit complete built-ins list', async () => {
     await expect(
@@ -243,65 +175,5 @@ describe('loadExtensions', () => {
     ).rejects.toThrow(
       'loadExtensions requires an explicit complete builtins list',
     )
-  })
-
-  test("does not mark a loaded built-in Adapter's Source unavailable when an external path disappears", async () => {
-    const db = new Database(':memory:', { create: true })
-    databases.push(db)
-    await runMigrations(db)
-    db.prepare(
-      `INSERT INTO sources (
-         id, realm_id, adapter_id, adapter_version, display_name, config_json,
-         sync_enabled, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      'source-builtin',
-      'global',
-      'fixture.builtin-adapter',
-      1,
-      'Built-in fixture',
-      '{}',
-      1,
-      1,
-      1,
-    )
-    db.prepare(
-      `INSERT INTO source_sync_state (
-         source_id, last_status, last_run_id, cursor_json, updated_at
-       ) VALUES (?, ?, ?, ?, ?)`,
-    ).run('source-builtin', 'idle', null, null, 1)
-    const adapter = defineAdapter({
-      id: 'fixture.builtin-adapter',
-      version: 1,
-      configSchema: z.object({}),
-      auth: { kind: 'none' },
-      profiles: [],
-      routing: 'indexed',
-      capabilities: [],
-      operations: {},
-      actions: {},
-    })
-    const builtin = defineExtension({
-      id: 'fixture.builtin-adapter-extension',
-      version: 1,
-      profiles: [],
-      adapters: [adapter],
-    })
-    const missingPath = resolve(import.meta.dir, 'fixtures/disappeared.ts')
-    const config = {
-      ...defaultConfig(),
-      extensions: { paths: [missingPath] },
-    }
-
-    const result = await loadExtensions({ config, builtins: [builtin], db })
-
-    expect(result.diagnostics).toHaveLength(1)
-    expect(
-      db
-        .prepare(
-          'SELECT last_status FROM source_sync_state WHERE source_id = ?',
-        )
-        .get('source-builtin'),
-    ).toEqual({ last_status: 'idle' })
   })
 })

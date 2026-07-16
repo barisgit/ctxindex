@@ -127,12 +127,32 @@ interface GrantRow {
 interface StatusDbRow {
   readonly sourceId: string
   readonly adapterId: string
+  readonly adapterVersion: number
   readonly realmSlug: string
   readonly lastStatus: string
   readonly lastRunAt: number | null
   readonly errorsCount: number | null
   readonly cursorJson: string | null
   readonly errorJson: string | null
+}
+
+function sourceAvailability(
+  deps: SourceServiceDeps,
+  source: Pick<SourceRow, 'adapter_id' | 'adapter_version'>,
+): SourceRow['availability'] {
+  return deps.registry.adapters.get({
+    id: source.adapter_id,
+    version: source.adapter_version,
+  })
+    ? 'available'
+    : 'extension_unavailable'
+}
+
+function withAvailability(
+  deps: SourceServiceDeps,
+  source: Omit<SourceRow, 'availability'>,
+): SourceRow {
+  return { ...source, availability: sourceAvailability(deps, source) }
 }
 
 function parseCursor(cursorJson: string | null): unknown {
@@ -311,23 +331,26 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
     listSources(input: ListSourcesInput = {}): SourceRow[] {
       const select = sourceListSelect()
       if (input.realmSlug) {
-        return deps.db
+        const rows = deps.db
           .prepare(
             `${select}
              WHERE r.slug = ?
              ORDER BY s.created_at`,
           )
-          .all(input.realmSlug) as SourceRow[]
+          .all(input.realmSlug) as Omit<SourceRow, 'availability'>[]
+        return rows.map((source) => withAvailability(deps, source))
       }
-      return deps.db
+      const rows = deps.db
         .prepare(`${select} ORDER BY s.created_at`)
-        .all() as SourceRow[]
+        .all() as Omit<SourceRow, 'availability'>[]
+      return rows.map((source) => withAvailability(deps, source))
     },
 
     findSourceById(sourceId: string): SourceRow | null {
-      return deps.db
+      const source = deps.db
         .prepare(`SELECT ${selectSourceColumns()} FROM sources WHERE id = ?`)
-        .get(sourceId) as SourceRow | null
+        .get(sourceId) as Omit<SourceRow, 'availability'> | null
+      return source ? withAvailability(deps, source) : null
     },
 
     removeSource(sourceId: string): void {
@@ -379,31 +402,38 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
         }
       }
       const base = `
-        SELECT sss.source_id AS sourceId,
+        SELECT s.id AS sourceId,
                s.adapter_id AS adapterId,
+               s.adapter_version AS adapterVersion,
                r.slug AS realmSlug,
-               sss.last_status AS lastStatus,
+               COALESCE(sss.last_status, 'pending') AS lastStatus,
                sr.completed_at AS lastRunAt,
                sr.errors_count AS errorsCount,
                sss.cursor_json AS cursorJson,
                sr.error_summary AS errorJson
-        FROM source_sync_state sss
-        JOIN sources s ON s.id = sss.source_id
+        FROM sources s
         JOIN realms r ON r.id = s.realm_id
+        LEFT JOIN source_sync_state sss ON sss.source_id = s.id
         LEFT JOIN sync_runs sr ON sr.id = sss.last_run_id
       `
       const rows = input.sourceId
         ? (deps.db
-            .prepare(`${base} WHERE sss.source_id = ?`)
+            .prepare(`${base} WHERE s.id = ?`)
             .all(input.sourceId) as StatusDbRow[])
         : (deps.db
-            .prepare(`${base} ORDER BY sss.updated_at DESC`)
+            .prepare(
+              `${base} ORDER BY COALESCE(sss.updated_at, s.created_at) DESC`,
+            )
             .all() as StatusDbRow[])
 
       return rows.map((row) => ({
         sourceId: row.sourceId,
         adapterId: row.adapterId,
         realmSlug: row.realmSlug,
+        availability: sourceAvailability(deps, {
+          adapter_id: row.adapterId,
+          adapter_version: row.adapterVersion,
+        }),
         lastStatus: row.lastStatus,
         lastRunAt: row.lastRunAt,
         errorsCount: row.errorsCount ?? 0,

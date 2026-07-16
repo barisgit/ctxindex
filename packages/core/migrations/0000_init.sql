@@ -147,7 +147,7 @@ CREATE INDEX artifacts_content_hash_idx ON artifacts(content_hash);
 
 CREATE TABLE source_sync_state (
   source_id TEXT NOT NULL PRIMARY KEY REFERENCES sources(id) ON DELETE CASCADE,
-   last_status TEXT NOT NULL DEFAULT 'pending' CHECK(last_status IN ('pending', 'idle', 'needs_auth', 'failed', 'disabled', 'extension_unavailable')),
+    last_status TEXT NOT NULL DEFAULT 'pending' CHECK(last_status IN ('pending', 'idle', 'needs_auth', 'failed', 'disabled')),
   last_run_id TEXT,
   cursor_json TEXT,
   updated_at INTEGER NOT NULL

@@ -88,10 +88,10 @@ After the final task, run the `openspec-verify-change` workflow against all requ
 
 ## 9. External tenders Extension proof
 
-- [ ] 9.1 Author the tenders proof outside bundled packages using only public Profile/Adapter/Extension contracts and explicit-path configuration.
-- [ ] 9.2 Verify its Resources participate in generic operations through the compiled binary and no bundled-only imports or hooks exist.
-- [ ] 9.3 Remove the Extension and verify its Source becomes unavailable while local Resources remain searchable.
-- [ ] 9.4 **Slice gate:** run the tenders proof through the relocated compiled binary, verify only public SDK imports, rerun D3, then run `bun run typecheck`, `bun run lint`, and `bun test`.
+- [x] 9.1 Author the tenders proof outside bundled packages using only public Profile/Adapter/Extension contracts and explicit-path configuration.
+- [x] 9.2 Verify its Resources participate in generic operations through the compiled binary and no bundled-only imports or hooks exist.
+- [x] 9.3 Remove the Extension and verify its Source becomes unavailable while local Resources remain searchable.
+- [x] 9.4 **Slice gate:** run the tenders proof through the relocated compiled binary, verify only public SDK imports, rerun D3, then run `bun run typecheck`, `bun run lint`, and `bun test`.
 
 ## 10. Generated docs and final validation
 

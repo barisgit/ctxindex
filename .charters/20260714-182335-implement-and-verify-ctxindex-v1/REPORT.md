@@ -66,3 +66,11 @@
 - Safety and identity: deterministic ignore handling, bounded no-follow reads, binary/oversize/race/path warnings, strict cursor ordering, and stable `ctx://<SOURCE>/file/<encoded-path>` identity cover unchanged, modification, rename, deletion, and transient uncertainty without leaking absolute paths.
 - Generic path: the CLI invokes public core sync orchestration; binary tests prove the same search/get/StoredResource envelope as Gmail, no local-directory imports in generic CLI/core paths, no provider egress, and no domain-specific tables.
 - Verification: `work/slice-8-gate.txt` records local integration and binary CLI gates, D3 relocation, typecheck, lint, 592 passing full-suite tests with one live-provider skip, strict OpenSpec validation, and diff checking.
+
+## C9. An external tenders Extension proves the public seam
+
+- Result: Passed.
+- External authoring: `examples/tenders-extension/` default-exports a host-factory Extension using only type-only public SDK contracts plus relative Extension-owned code. It defines `enarocanje.tender@1` and `enarocanje.fixture@1` without entering built-ins or importing core internals.
+- Compiled boundary: the real CLI embeds its canonical ordered SQL migration manifest, initializes after relocation, loads the trusted TypeScript path explicitly, and runs generic sync/search/get from `/` with stable Refs and no tender-specific command, envelope, hook, or table.
+- Disappearance: Adapter availability is derived from exact loaded `(id,version)` and remains separate from persisted sync status. Removing the Extension leaves Resources searchable/gettable with degradation warnings, unavailable sync exits 50, and restoring the path recovers availability without mutating Resource identity or historical sync state.
+- Verification: `work/slice-9-gate.txt` records public-import boundary tests, the relocated compiled-binary full lifecycle, D3's own-dependency relocation proof, typecheck, lint, 598 passing full-suite tests with one live-provider skip, strict OpenSpec validation, and diff checking.

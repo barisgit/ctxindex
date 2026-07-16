@@ -1,10 +1,7 @@
-import { fileURLToPath } from 'node:url'
-import { dirname, resolve } from 'node:path'
-
-const here = dirname(fileURLToPath(import.meta.url))
+import initSql from '../../migrations/0000_init.sql' with { type: 'text' }
 
 export const coreMigrations = {
   namespace: 'core',
-  migrationsFolder: resolve(here, '..', '..', 'migrations'),
+  migrations: [{ name: '0000_init.sql', sql: initSql }],
   migrationsTable: 'ctxindex_migrations_core',
 } as const

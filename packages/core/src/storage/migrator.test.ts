@@ -98,6 +98,22 @@ test('fresh core migration creates only the generic V1 storage model', async () 
   expect(db.prepare('SELECT count(*) AS count FROM realms').get()).toEqual({
     count: 0,
   })
+  db.prepare(
+    "INSERT INTO realms (id, slug, created_at) VALUES ('realm-1', 'work', 1)",
+  ).run()
+  db.prepare(
+    `INSERT INTO sources (
+       id, realm_id, adapter_id, adapter_version, config_json, created_at,
+       updated_at
+     ) VALUES ('source-1', 'realm-1', 'fixture.adapter', 1, '{}', 1, 1)`,
+  ).run()
+  expect(() =>
+    db
+      .prepare(
+        "INSERT INTO source_sync_state (source_id, last_status, updated_at) VALUES ('source-1', 'extension_unavailable', 1)",
+      )
+      .run(),
+  ).toThrow()
   expect(
     db.prepare("SELECT name, pk FROM pragma_table_info('sync_locks')").all(),
   ).toEqual([

@@ -7,14 +7,7 @@ export const sourceSyncState = sqliteTable('source_sync_state', {
     .primaryKey()
     .references(() => sources.id, { onDelete: 'cascade' }),
   lastStatus: text('last_status', {
-    enum: [
-      'pending',
-      'idle',
-      'needs_auth',
-      'failed',
-      'disabled',
-      'extension_unavailable',
-    ],
+    enum: ['pending', 'idle', 'needs_auth', 'failed', 'disabled'],
   })
     .notNull()
     .default('pending'),

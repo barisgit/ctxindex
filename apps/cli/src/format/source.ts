@@ -6,6 +6,12 @@ export function formatSourceAdded(sourceId: string): string {
   return `source added: ${sourceId}`
 }
 
+function displayStatus(source: SourceRow): string {
+  return source.availability === 'extension_unavailable'
+    ? source.availability
+    : (source.last_status ?? '-')
+}
+
 function compactValue(value: string | number | null | undefined): string {
   const text =
     value === null || value === undefined || value === '' ? '-' : String(value)
@@ -19,7 +25,7 @@ function compactSource(source: SourceRow): string {
     `adapter=${compactValue(source.adapter_id)}`,
     `realm=${compactValue(source.realm_slug ?? source.realm_id)}`,
     `ref=${compactValue(sourceRef(source))}`,
-    `status=${compactValue(source.last_status ?? '-')}`,
+    `status=${compactValue(displayStatus(source))}`,
     `items=${source.items_count ?? 0}`,
     `chunks=${source.chunks_count ?? 0}`,
     `errors=${source.errors_count ?? 0}`,
@@ -99,6 +105,7 @@ export function formatSources(
       configJson: source.config_json,
       ...(source.grant_id !== undefined ? { grantId: source.grant_id } : {}),
       createdAt: source.created_at,
+      availability: source.availability,
       lastStatus: source.last_status ?? null,
       lastRunAt: source.last_run_at ?? null,
       errorsCount: source.errors_count ?? 0,
@@ -122,7 +129,7 @@ export function formatSources(
       'Last run',
       'ID',
     ],
-    colWidths: [18, 17, 12, 32, 11, 9, 9, 6, 18, 28],
+    colWidths: [18, 17, 12, 32, 24, 9, 9, 6, 18, 28],
     colAligns: [
       'left',
       'left',
@@ -145,7 +152,7 @@ export function formatSources(
       source.adapter_id,
       source.realm_slug ?? source.realm_id,
       sourceRef(source),
-      source.last_status ?? '-',
+      displayStatus(source),
       String(source.items_count ?? 0),
       String(source.chunks_count ?? 0),
       String(source.errors_count ?? 0),

@@ -1,14 +1,5 @@
-import { readdir, readFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import { coreMigrations } from '../migrations/index'
 import type { CtxindexDatabase } from './db'
-
-async function getMigrationFiles(folder: string): Promise<string[]> {
-  const entries = await readdir(folder)
-  return entries
-    .filter((file) => file.endsWith('.sql') && !file.startsWith('_'))
-    .sort()
-}
 
 /** Run the core-owned schema on a fresh or already-current database. */
 export async function runMigrations(db: CtxindexDatabase): Promise<void> {
@@ -64,17 +55,13 @@ export async function runMigrations(db: CtxindexDatabase): Promise<void> {
     ).map((row) => row.name),
   )
 
-  for (const file of await getMigrationFiles(coreMigrations.migrationsFolder)) {
-    if (applied.has(file)) continue
-    const sql = await readFile(
-      join(coreMigrations.migrationsFolder, file),
-      'utf8',
-    )
+  for (const migration of coreMigrations.migrations) {
+    if (applied.has(migration.name)) continue
     db.transaction(() => {
-      db.exec(sql)
+      db.exec(migration.sql)
       db.prepare(
         `INSERT INTO "${coreMigrations.migrationsTable}" (name, applied_at) VALUES (?, ?)`,
-      ).run(file, Date.now())
+      ).run(migration.name, Date.now())
     })()
   }
 }

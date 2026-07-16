@@ -294,12 +294,14 @@ describe('source e2e', () => {
         name: string | null
         realmSlug: string
         ref: string
+        availability: string
         itemsCount: number
       }>
       expect(rows[0]).toMatchObject({
         name: 'repo-under-test',
         realmSlug: 'global',
         ref: root,
+        availability: 'available',
         itemsCount: 1,
       })
 

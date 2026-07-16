@@ -53,10 +53,141 @@ const registry = createExtensionRegistry([
   }),
 ])
 
+function registryWithLocalDirectoryVersion(version: number) {
+  return createExtensionRegistry([
+    defineExtension({
+      id: `test.local-directory-v${version}`,
+      version: 1,
+      profiles: [],
+      adapters: [
+        defineAdapter({
+          id: 'local.directory',
+          version,
+          configSchema: z.object({ root_path: z.string().min(1) }).strict(),
+          auth: { kind: 'none' },
+          profiles: [],
+          routing: 'indexed',
+          capabilities: [],
+          operations: {},
+          actions: {},
+        }),
+      ],
+    }),
+  ])
+}
+
 beforeEach(async () => {
   db = new Database(':memory:', { create: true })
   applyPragmas(db)
   await runMigrations(db)
+})
+
+test('derives Source availability from the exact Adapter id and version', () => {
+  const realmService = createRealmService({ db, logger })
+  realmService.createRealm({ slug: 'work' })
+  const service = createSourceService({
+    db,
+    logger,
+    realmService,
+    registry: registryWithLocalDirectoryVersion(1),
+  })
+  const added = service.addSource({
+    adapterId: 'local.directory',
+    adapterVersion: 1,
+    realmSlug: 'work',
+    configJson: '{"root_path":"/tmp"}',
+  })
+
+  expect(service.listSources()[0]?.availability).toBe('available')
+  expect(service.findSourceById(added.sourceId)?.availability).toBe('available')
+
+  const wrongVersionService = createSourceService({
+    db,
+    logger,
+    realmService,
+    registry: registryWithLocalDirectoryVersion(2),
+  })
+  expect(wrongVersionService.listSources()[0]?.availability).toBe(
+    'extension_unavailable',
+  )
+  expect(wrongVersionService.findSourceById(added.sourceId)?.availability).toBe(
+    'extension_unavailable',
+  )
+})
+
+test('status includes never-synced Sources with pending sync status', () => {
+  const realmService = createRealmService({ db, logger })
+  realmService.createRealm({ slug: 'work' })
+  const service = createSourceService({ db, logger, realmService, registry })
+  const added = service.addSource({
+    adapterId: 'local.directory',
+    realmSlug: 'work',
+    configJson: '{"root_path":"/tmp"}',
+  })
+
+  expect(service.getStatus()).toEqual([
+    {
+      sourceId: added.sourceId,
+      adapterId: 'local.directory',
+      realmSlug: 'work',
+      availability: 'available',
+      lastStatus: 'pending',
+      lastRunAt: null,
+      errorsCount: 0,
+      lastError: null,
+      cursor: null,
+    },
+  ])
+})
+
+test('missing and restored Adapters preserve historical sync status', () => {
+  const realmService = createRealmService({ db, logger })
+  realmService.createRealm({ slug: 'work' })
+  const availableService = createSourceService({
+    db,
+    logger,
+    realmService,
+    registry: registryWithLocalDirectoryVersion(1),
+  })
+  const added = availableService.addSource({
+    adapterId: 'local.directory',
+    realmSlug: 'work',
+    configJson: '{"root_path":"/tmp"}',
+  })
+  db.prepare(
+    `INSERT INTO source_sync_state
+       (source_id, last_status, cursor_json, updated_at)
+     VALUES (?, 'failed', '{"page":3}', 42)`,
+  ).run(added.sourceId)
+
+  const missingService = createSourceService({
+    db,
+    logger,
+    realmService,
+    registry: createExtensionRegistry(),
+  })
+  expect(missingService.getStatus()[0]).toMatchObject({
+    availability: 'extension_unavailable',
+    lastStatus: 'failed',
+    cursor: { page: 3 },
+  })
+
+  expect(availableService.getStatus()[0]).toMatchObject({
+    availability: 'available',
+    lastStatus: 'failed',
+    cursor: { page: 3 },
+  })
+  expect(
+    db
+      .prepare('SELECT * FROM source_sync_state WHERE source_id = ?')
+      .get(added.sourceId),
+  ).toEqual({
+    source_id: added.sourceId,
+    last_status: 'failed',
+    last_run_id: null,
+    cursor_json: '{"page":3}',
+    updated_at: 42,
+  })
 })
 
 test('addSource validates config against the selected Adapter', () => {

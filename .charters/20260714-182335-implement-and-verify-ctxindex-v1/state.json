@@ -4,12 +4,12 @@
   "objective": "Implement and verify ctxindex V1 as the local personal-context gateway defined by `v1-context-access-layer`: typed definitions, trusted Extension loading, fresh generic storage, exact Realms, Gmail discovery/retrieval, threads, Artifacts/exports, reversible provider email Draft Actions, local-directory support, an external tenders proof, generated docs, and complete validation.",
   "status": "active",
   "createdAt": "2026-07-14T18:23:35.445Z",
-  "updatedAt": "2026-07-16T00:42:05.539Z",
+  "updatedAt": "2026-07-16T01:35:58.342Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
   "previousStatus": "active",
-  "nextSeq": 2141,
-  "latestSourceSeq": 2139,
-  "snapshotHash": "30ab20a15586795adc3520e8a881d7febc6116ef5d5a043d2033380c3eafbfe6",
+  "nextSeq": 2312,
+  "latestSourceSeq": 2307,
+  "snapshotHash": "7541ea8ddc2fbb8ef6d7b7bf4a8dd216477d3e2f5e380af5bfa9c1de108aae6b",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -119,10 +119,10 @@
         "C3"
       ],
       "status": {
-        "value": "in-progress",
-        "note": ""
+        "value": "pass",
+        "note": "evidence: `work/slice-9-gate.txt` (public-SDK-only external tenders definitions, explicit-path loading, relocated compiled-binary init/sync/search/get/removal/degraded reads/recovery, registry-derived availability, D3, typecheck, lint, 598 passing full-suite tests with one live skip, strict OpenSpec, and diff checks passed)"
       },
-      "statusSeq": 2133
+      "statusSeq": 2306
     },
     {
       "id": "C10",
@@ -134,10 +134,10 @@
         "C9"
       ],
       "status": {
-        "value": "pending",
+        "value": "in-progress",
         "note": ""
       },
-      "statusSeq": 6
+      "statusSeq": 2306
     },
     {
       "id": "C11",

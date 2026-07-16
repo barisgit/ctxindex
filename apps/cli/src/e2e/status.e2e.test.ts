@@ -8,6 +8,7 @@ type StatusRow = {
   sourceId: string
   adapterId: string
   realmSlug: string
+  availability: 'available' | 'extension_unavailable'
   lastStatus: string
   lastRunAt: number | null
   errorsCount: number
@@ -86,12 +87,12 @@ function syncRunErrorCount(sandbox: Sandbox, sourceId: string): number {
   }
 }
 
-function sourceSyncStateCount(sandbox: Sandbox): number {
+function sourceCount(sandbox: Sandbox): number {
   const db = new Database(dbPath(sandbox), { readonly: true })
   try {
-    const row = db
-      .prepare('SELECT COUNT(*) AS count FROM source_sync_state')
-      .get() as { count: number }
+    const row = db.prepare('SELECT COUNT(*) AS count FROM sources').get() as {
+      count: number
+    }
     return row.count
   } finally {
     db.close()
@@ -161,6 +162,7 @@ test('json output reflects the generic cursor from a real sync', async () => {
       sourceId,
       adapterId: 'local.directory',
       realmSlug: 'work',
+      availability: 'available',
       lastStatus: 'idle',
       lastRunAt: expect.any(Number),
       errorsCount: 0,
@@ -187,7 +189,7 @@ test('counts match fresh-schema SQLite state', async () => {
     const rows = parseStatusRows(result.stdout)
 
     expect(result.exitCode).toBe(0)
-    expect(rows.length).toBe(sourceSyncStateCount(sandbox))
+    expect(rows.length).toBe(sourceCount(sandbox))
     const bySourceId = new Map(rows.map((row) => [row.sourceId, row]))
     expect(bySourceId.get(firstSourceId)?.errorsCount).toBe(
       syncRunErrorCount(sandbox, firstSourceId),
@@ -225,7 +227,7 @@ test('no sources still exits 0', async () => {
   }
 })
 
-test('reports extension_unavailable after an unavailable Adapter sync', async () => {
+test('reports derived unavailability separately from failed sync status', async () => {
   const sandbox = await initSandbox()
   try {
     const sourceId = await addSource(sandbox)
@@ -237,7 +239,8 @@ test('reports extension_unavailable after an unavailable Adapter sync', async ()
       (await sandbox.run(['status', '--json'])).stdout,
     )
     expect(rows[0]?.sourceId).toBe(sourceId)
-    expect(rows[0]?.lastStatus).toBe('extension_unavailable')
+    expect(rows[0]?.availability).toBe('extension_unavailable')
+    expect(rows[0]?.lastStatus).toBe('failed')
   } finally {
     await sandbox.cleanup()
   }

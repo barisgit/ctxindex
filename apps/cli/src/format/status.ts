@@ -1,5 +1,11 @@
 import type { StatusRow } from '@ctxindex/core/source'
 
+function displayStatus(row: StatusRow): string {
+  return row.availability === 'extension_unavailable'
+    ? row.availability
+    : row.lastStatus
+}
+
 export function formatStatus(
   rows: StatusRow[],
   opts: { readonly json: boolean; readonly format?: 'summary' | 'compact' },
@@ -12,7 +18,7 @@ export function formatStatus(
           row.sourceId,
           `adapter=${row.adapterId}`,
           `realm=${row.realmSlug}`,
-          `status=${row.lastStatus}`,
+          `status=${displayStatus(row)}`,
           `errors=${row.errorsCount}`,
           row.lastError ? `error=${row.lastError.replace(/\s+/g, '_')}` : null,
         ]
@@ -21,10 +27,11 @@ export function formatStatus(
       )
       .join('\n')
   }
+
   return rows
     .map(
       (row) =>
-        `${row.sourceId}\t${row.adapterId}\t${row.realmSlug}\t${row.lastStatus}\terrors=${row.errorsCount}${row.lastError ? `\t${row.lastError}` : ''}`,
+        `${row.sourceId}\t${row.adapterId}\t${row.realmSlug}\t${displayStatus(row)}\terrors=${row.errorsCount}${row.lastError ? `\t${row.lastError}` : ''}`,
     )
     .join('\n')
 }

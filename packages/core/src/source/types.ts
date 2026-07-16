@@ -4,6 +4,8 @@ import type { RealmService } from '../realm'
 import type { ExtensionRegistry } from '../registry'
 import type { CtxindexDatabase } from '../storage'
 
+export type SourceAvailability = 'available' | 'extension_unavailable'
+
 export interface SourceRow {
   readonly id: string
   readonly realm_id: string
@@ -16,6 +18,7 @@ export interface SourceRow {
   readonly search_routing?: SearchRouting | null
   readonly grant_id?: string | null
   readonly created_at: number
+  readonly availability: SourceAvailability
   readonly last_status?: string | null
   readonly last_run_at?: number | null
   readonly errors_count?: number | null
@@ -48,6 +51,7 @@ export interface StatusRow {
   readonly sourceId: string
   readonly adapterId: string
   readonly realmSlug: string
+  readonly availability: SourceAvailability
   readonly lastStatus: string
   readonly lastRunAt: number | null
   readonly errorsCount: number

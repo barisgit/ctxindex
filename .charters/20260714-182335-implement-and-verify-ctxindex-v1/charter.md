@@ -61,12 +61,12 @@ Status: pass — evidence: `work/slice-8-gate.txt` (generic local-directory sync
 ### C9. An external tenders Extension proves the public seam
 A tenders Extension outside bundled packages imports only public SDK contracts, loads by explicit path through the relocated compiled binary, participates in generic operations, and leaves its Source unavailable but materialized Resources searchable after removal.
 Depends: C2, C3
-Status: in-progress
+Status: pass — evidence: `work/slice-9-gate.txt` (public-SDK-only external tenders definitions, explicit-path loading, relocated compiled-binary init/sync/search/get/removal/degraded reads/recovery, registry-derived availability, D3, typecheck, lint, 598 passing full-suite tests with one live skip, strict OpenSpec, and diff checks passed)
 
 ### C10. User and agent interfaces derive from loaded registries
 CLI help, `ctxindex describe`, Action affordances, supported kinds, aliases, fields, formats, Source configuration, and agent reference material are generated from loaded definitions with no parallel hand-maintained vocabulary and no required interactive prompts.
 Depends: C1, C7, C8, C9
-Status: pending
+Status: in-progress
 
 ### C11. Complete V1 behavior is verified end to end
 All focused checks, mandatory Slice gates, final automated commands, sandboxed runtime workflow, strict OpenSpec validation, independent change verification, and both required human-assisted Gmail checks pass with meaningful redacted artifacts and SPEC §12 exit behavior; the change remains unarchived for review.

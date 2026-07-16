@@ -70,7 +70,6 @@ export async function openDeps(
   const { registry } = await loadExtensions({
     config,
     builtins: CTXINDEX_BUILTIN_EXTENSIONS,
-    db,
   })
   const threadService = createThreadService({ db, profiles: registry.profiles })
   const sourceService = createSourceService({

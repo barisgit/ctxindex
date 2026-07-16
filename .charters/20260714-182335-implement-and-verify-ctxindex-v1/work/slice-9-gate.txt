@@ -1,0 +1,858 @@
+
+===== public-SDK-only external tenders proof =====
+$ bun test examples/tenders-extension/extension.test.ts
+bun test v1.3.14 (0d9b296a)
+
+examples/tenders-extension/extension.test.ts:
+(pass) external tenders Extension proof > loads exact definitions from an explicit path [13.42ms]
+(pass) uses only the public type-only SDK import and is not bundled [66.50ms]
+(pass) emits deterministic complete Resources and an ordered checkpoint without provider egress [2.63ms]
+
+ 3 pass
+ 0 fail
+ 35 expect() calls
+Ran 3 tests across 1 file. [219.00ms]
+RESULT: PASS
+
+===== relocated compiled-binary tenders lifecycle =====
+$ bun test --path-ignore-patterns __none__ --pass-with-no-tests external-tenders-extension.e2e.test
+bun test v1.3.14 (0d9b296a)
+
+apps/cli/src/e2e/external-tenders-extension.e2e.test.ts:
+(pass) relocated compiled CLI syncs external tenders through generic verbs [4638.34ms]
+
+ 1 pass
+ 0 fail
+ 57 expect() calls
+Ran 1 test across 1 file. [4.65s]
+RESULT: PASS
+
+===== D3 compiled Extension relocation =====
+$ bash scripts/spikes/d3-compiled-extension/run.sh
+Passed: Bun 1.3.14 compiled binary loaded external TypeScript, its relative TypeScript import, and its own node_modules dependency after relocation.
+RESULT: PASS
+
+===== typecheck =====
+$ bun run typecheck
+$ tsgo --noEmit -p tsconfig.base.json
+RESULT: PASS
+
+===== lint =====
+$ bun run lint
+$ biome check .
+Checked 321 files in 144ms. No fixes applied.
+RESULT: PASS
+
+===== full unit suite =====
+$ bun test
+bun test v1.3.14 (0d9b296a)
+
+scripts/with-timeout.test.ts:
+(pass) exit 0 passthrough [127.34ms]
+(pass) exit 42 passthrough [20.66ms]
+(pass) timeout exits 124 [365.56ms]
+(pass) SIGINT propagates to child [25.77ms]
+(pass) TEST_WALL_TIMEOUT_SECS precedence [366.42ms]
+(pass) process group kill [5316.63ms]
+
+examples/tenders-extension/extension.test.ts:
+(pass) external tenders Extension proof > loads exact definitions from an explicit path [5.58ms]
+(pass) uses only the public type-only SDK import and is not bundled [33.50ms]
+(pass) emits deterministic complete Resources and an ordered checkpoint without provider egress [1.73ms]
+
+scripts/verify/architecture-lint.test.ts:
+(pass) thin sync command has no architecture violations [3.34ms]
+(pass) accepts a clean fixture [0.95ms]
+(pass) reports side-effect imports of banned modules [0.40ms]
+
+scripts/verify/ci-d3.test.ts:
+(pass) CI runs the D3 compiled Extension regression [0.25ms]
+
+apps/cli/src/no-prompts.contract.test.ts:
+(pass) no-prompts contract > init: exits 0 with stdin=null [307.44ms]
+(pass) no-prompts contract > realm list: exits 0 with stdin=null [259.43ms]
+(pass) no-prompts contract > source list: exits 0 with stdin=null [260.49ms]
+(pass) no-prompts contract > status: exits 0 with stdin=null [272.46ms]
+(pass) no-prompts contract > skills list: exits 0 with stdin=null [254.51ms]
+(pass) no-prompts contract > skills path: exits 0 with stdin=null [243.55ms]
+(pass) no-prompts contract > action describe/run: missing required input exits non-zero without prompting [356.79ms]
+(pass) no-prompts contract > realm add (missing slug): exits non-zero fast [255.60ms]
+(pass) no-prompts contract > source add (missing adapter-id): exits non-zero fast [250.02ms]
+(pass) no-prompts contract > source add --realm unknown: exits 2 with actionable message [260.68ms]
+(pass) no-prompts contract > source remove (missing id): exits non-zero fast [245.87ms]
+(pass) no-prompts contract > source remove (unknown id): exits 2 with actionable message [267.34ms]
+(pass) no-prompts contract > skills get (missing name): exits non-zero fast [241.07ms]
+(pass) no-prompts contract > auth (pending): exits non-zero with actionable message [243.56ms]
+(pass) no-prompts contract > sync: no Sources exits 0 without prompting [265.37ms]
+
+apps/cli/src/main.test.ts:
+(pass) registers action describe and run as nested root commands [0.06ms]
+(pass) registers export as a root command [0.01ms]
+(pass) registers purge as a root command with artifacts nested beneath it [0.01ms]
+(pass) prints help successfully [1.36ms]
+(pass) prints export help successfully [0.08ms]
+
+packages/core/src/cli-init.test.ts:
+(pass) ctxindex init creates XDG layout, config, sqlite, and PRAGMAs [139.75ms]
+
+packages/core/src/exit-codes.test.ts:
+(pass) SPEC §12 exit codes > keeps the stable numeric contract [0.01ms]
+(pass) SPEC §12 exit codes > maps auth_expired without requiring a sync implementation [0.02ms]
+(pass) SPEC §12 exit codes > maps auth_revoked without requiring a sync implementation
+(pass) SPEC §12 exit codes > maps rate_limited without requiring a sync implementation
+(pass) SPEC §12 exit codes > maps network without requiring a sync implementation
+(pass) SPEC §12 exit codes > maps provider_unavailable without requiring a sync implementation
+(pass) SPEC §12 exit codes > maps provider_bad_response without requiring a sync implementation
+(pass) SPEC §12 exit codes > maps provider_quota without requiring a sync implementation
+(pass) SPEC §12 exit codes > maps permission_denied without requiring a sync implementation
+(pass) SPEC §12 exit codes > maps cancelled without requiring a sync implementation
+(pass) SPEC §12 exit codes > maps not_found without requiring a sync implementation
+(pass) SPEC §12 exit codes > maps unknown without requiring a sync implementation
+
+packages/adapters/src/gmail-retrieve.test.ts:
+(pass) Gmail retrieve > collects nested, single-part, and inline attachment descriptors [2.82ms]
+(pass) Gmail retrieve > retrieves the exact Ref and prefers nested plain text while skipping attachment leaves [0.56ms]
+(pass) Gmail retrieve > converts an html-only body to text instead of emitting markup [1.39ms]
+(pass) Gmail retrieve > reads a single-part payload body [0.09ms]
+(pass) Gmail retrieve > rejects an invalid adapter Ref ctx://01KXHBNECDAH1T4MJ38X88EPFJ/messages/message-1 [0.09ms]
+(pass) Gmail retrieve > rejects an invalid adapter Ref ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/message-1/extra [0.01ms]
+(pass) Gmail retrieve > rejects an invalid adapter Ref ctx://01ARZ3NDEKTSV4RRFFQ69G5FAA/message/message-1
+(pass) Gmail retrieve > maps HTTP status 401 to auth_expired [0.31ms]
+(pass) Gmail retrieve > maps HTTP status 403 to permission_denied [0.02ms]
+(pass) Gmail retrieve > maps HTTP status 404 to not_found [0.02ms]
+(pass) Gmail retrieve > maps HTTP status 429 to rate_limited [0.18ms]
+(pass) Gmail retrieve > maps HTTP status 503 to provider_unavailable [0.02ms]
+(pass) Gmail retrieve > maps HTTP status 400 to provider_bad_response [0.02ms]
+(pass) Gmail retrieve > passes and propagates cancellation [0.08ms]
+(pass) Gmail retrieve > retrieves an exact stable Draft Ref without advertising attachments [0.31ms]
+(pass) Gmail retrieve > rejects an invalid Draft response: %s [0.06ms]
+(pass) Gmail retrieve > rejects an invalid Draft response: %s [0.06ms]
+
+packages/adapters/src/gmail-search-remote.test.ts:
+(pass) Gmail searchRemote > maps fatal list status 401 to auth_expired [0.52ms]
+(pass) Gmail searchRemote > maps fatal list status 403 to permission_denied [0.03ms]
+(pass) Gmail searchRemote > maps fatal list status 404 to not_found [0.02ms]
+(pass) Gmail searchRemote > maps fatal list status 503 to provider_unavailable [0.01ms]
+(pass) Gmail searchRemote > maps list rate limits with Retry-After milliseconds [0.06ms]
+(pass) Gmail searchRemote > maps malformed successful list responses to provider_bad_response [0.06ms]
+(pass) Gmail searchRemote > maps invalid list JSON shape to provider_bad_response [0.06ms]
+(pass) Gmail searchRemote > translates text, typed filters, and time bounds and returns scoreless metadata envelopes in provider order [0.42ms]
+(pass) Gmail searchRemote > caps pagination and reports truncation in the result envelope [0.28ms]
+(pass) Gmail searchRemote > propagates cancellation during metadata fetch without continuing [0.28ms]
+(pass) Gmail searchRemote > keeps provider order after partial metadata failures [0.22ms]
+(pass) Gmail searchRemote > caps provider items and warns when more are returned [2.24ms]
+
+packages/adapters/src/builtins.test.ts:
+(pass) CTXINDEX_BUILTIN_EXTENSIONS > describes declarative Gmail and local Source definitions [2.80ms]
+(pass) CTXINDEX_BUILTIN_EXTENSIONS > declares canonical Gmail OAuth and strict token-free configs [0.70ms]
+
+packages/adapters/src/gmail-shared.test.ts:
+(pass) normalizeGmailMessageId > trims and prefers the first angle-bracket Message-ID token [0.02ms]
+(pass) normalizeGmailMessageId > falls back to trimmed nonempty text and omits empty values [0.02ms]
+
+packages/adapters/src/gmail-draft.test.ts:
+(pass) buildGmailDraftRaw > builds the deterministic RFC5322 text message and unpadded base64url [0.33ms]
+(pass) buildGmailDraftRaw > RFC2047 B-encodes a non-ASCII Subject and emits optional recipients in fixed order [0.04ms]
+(pass) buildGmailDraftRaw > rejects malformed direct builder input before encoding [0.56ms]
+(pass) buildGmailDraftRaw > rejects malformed direct builder input before encoding [0.05ms]
+(pass) gmailDraftCreate > is bound declaratively and performs one exact POST with a stable Draft Resource [0.52ms]
+(pass) gmailDraftCreate > routes one Draft POST through the non-production loopback base [0.21ms]
+(pass) gmailDraftCreate > defensively rejects malformed direct input before fetch [0.07ms]
+(pass) gmailDraftCreate > maps HTTP 401 with one request [0.09ms]
+(pass) gmailDraftCreate > maps HTTP 403 with one request [0.02ms]
+(pass) gmailDraftCreate > maps HTTP 429 with one request [0.02ms]
+(pass) gmailDraftCreate > maps HTTP 500 with one request [0.01ms]
+(pass) gmailDraftCreate > maps not-json response to provider_bad_response [0.06ms]
+(pass) gmailDraftCreate > maps {"id":"draft-1","message":{}} response to provider_bad_response [0.04ms]
+(pass) gmailDraftUpdate > is bound declaratively and performs one exact PUT with complete replacement content [0.46ms]
+(pass) gmailDraftUpdate > rejects non-addressable Ref ctx://01KXHBNECDAH1T4MJ38X88EPFK/draft/draft-1 before fetch [0.05ms]
+(pass) gmailDraftUpdate > rejects non-addressable Ref ctx://01kxhbnecdah1t4mj38x88epfj/draft/draft-1 before fetch [0.01ms]
+(pass) gmailDraftUpdate > rejects non-addressable Ref ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/message-1 before fetch [0.01ms]
+(pass) gmailDraftUpdate > rejects non-addressable Ref ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/draft-1?format=full before fetch [0.01ms]
+(pass) gmailDraftUpdate > rejects non-addressable Ref ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/draft-1/extra before fetch
+(pass) gmailDraftUpdate > rejects non-addressable Ref ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/draft-1/ before fetch [0.04ms]
+(pass) gmailDraftUpdate > rejects non-addressable Ref ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/draft%ZZ before fetch [0.01ms]
+(pass) gmailDraftUpdate > defensively rejects incomplete direct input before Ref parsing or fetch [0.06ms]
+(pass) gmailDraftUpdate > maps HTTP 404 with exactly one PUT [0.09ms]
+(pass) gmailDraftUpdate > maps HTTP 401 with exactly one PUT [0.02ms]
+(pass) gmailDraftUpdate > maps HTTP 403 with exactly one PUT [0.01ms]
+(pass) gmailDraftUpdate > maps HTTP 429 with exactly one PUT [0.03ms]
+(pass) gmailDraftUpdate > maps HTTP 503 with exactly one PUT [0.01ms]
+(pass) gmailDraftUpdate > maps not-json response to provider_bad_response [0.06ms]
+(pass) gmailDraftUpdate > maps {"id":"draft-1"} response to provider_bad_response [0.03ms]
+(pass) gmailDraftUpdate > maps {"id":"other-draft","message":{"id":"message-2"}} response to provider_bad_response [0.02ms]
+(pass) gmailDraftUpdate > routes one Draft PUT through the non-production loopback base [0.13ms]
+
+packages/adapters/src/communication-message-profile.test.ts:
+(pass) bundled communication.message enters the public registry path [0.74ms]
+
+packages/adapters/src/gmail-download.test.ts:
+(pass) Gmail attachment download > fetches the exact attachment URL and writes decoded bytes [1.09ms]
+(pass) Gmail attachment download > rejects malformed JSON [0.08ms]
+(pass) Gmail attachment download > rejects %s [0.05ms]
+(pass) Gmail attachment download > rejects %s [0.02ms]
+(pass) Gmail attachment download > rejects %s [0.02ms]
+(pass) Gmail attachment download > rejects %s [0.02ms]
+(pass) Gmail attachment download > rejects %s [0.02ms]
+(pass) Gmail attachment download > maps HTTP status 401 to auth_expired [0.05ms]
+(pass) Gmail attachment download > maps HTTP status 403 to permission_denied [0.01ms]
+(pass) Gmail attachment download > maps HTTP status 404 to not_found [0.01ms]
+(pass) Gmail attachment download > maps HTTP status 429 to rate_limited [0.02ms]
+(pass) Gmail attachment download > maps HTTP status 503 to provider_unavailable [0.01ms]
+(pass) Gmail attachment download > maps HTTP status 400 to provider_bad_response [0.01ms]
+(pass) Gmail attachment download > rejects bad suffix/source before I/O [0.05ms]
+(pass) Gmail attachment download > rejects bad suffix/source before I/O [0.01ms]
+(pass) Gmail attachment download > rejects bad suffix/source before I/O
+(pass) Gmail attachment download > rejects bad suffix/source before I/O
+(pass) Gmail attachment download > rejects bad suffix/source before I/O
+(pass) Gmail attachment download > passes and propagates cancellation [0.06ms]
+
+packages/profiles/src/communication-message-export.test.ts:
+(pass) communication.message EML export > declares the RFC 822 media type [0.01ms]
+(pass) communication.message EML export > renders full messages with fixed headers, UTC dates, and CRLF bytes [0.13ms]
+(pass) communication.message EML export > renders a minimal message without snippet fallback or attachment headers [0.02ms]
+(pass) communication.message EML export > sanitizes every header value and is byte-identical across calls [0.03ms]
+
+packages/profiles/src/file.test.ts:
+(pass) fileProfile > validates and deterministically projects a file payload [0.46ms]
+(pass) fileProfile > declares only the file search vocabulary [0.05ms]
+(pass) fileProfile > rejects invalid paths, hashes, dates, and unknown fields [0.21ms]
+
+packages/profiles/src/file-chunk.test.ts:
+(pass) chunkText > empty or whitespace-only text yields no chunks [0.01ms]
+(pass) chunkText > short text under the target size yields exactly one chunk [0.01ms]
+(pass) chunkText > long text produces bounded, overlapping, contiguous chunks [0.27ms]
+(pass) chunkText > prefers a paragraph break over a hard split [0.03ms]
+
+packages/profiles/src/communication-message.test.ts:
+(pass) communication.message Profile v1 > strictly validates the minimal Gmail search/get payload [0.26ms]
+(pass) communication.message Profile v1 > declares the strict reversible Draft create Action and rejects header injection [0.19ms]
+(pass) communication.message Profile v1 > declares strict complete-replacement Draft update with a stable Ref example [0.17ms]
+(pass) communication.message Profile v1 > extracts title, occurrence date, chunks, and typed fields purely [0.08ms]
+(pass) communication.message Profile v1 > strictly validates and purely extracts attachment descriptors [0.14ms]
+(pass) communication.message Profile v1 > extracts exact identity fields and natural-key Relations [0.04ms]
+(pass) communication.message Profile v1 > omits identity fields and Relations when values are absent [0.02ms]
+(pass) communication.message Profile v1 > has no runtime import from core [0.12ms]
+
+packages/extension-sdk/src/factories.test.ts:
+(pass) extension SDK definition factories > return plain definitions without wrapping or mutation [0.02ms]
+(pass) extension SDK definition factories > has no runtime dependency on @ctxindex/core [0.11ms]
+(pass) extension SDK definition factories > remote search results are typed and scoreless [0.01ms]
+
+apps/cli/src/auth/headless-google.test.ts:
+(pass) headless google auth > auth-code exchange returns tokens without browser fallback [0.83ms]
+(pass) headless google auth > missing auth-code inputs fail fast without network [0.04ms]
+
+apps/cli/src/auth/google-scopes.test.ts:
+(pass) googleOAuthScopes > derives sorted unique scopes from every loaded Google OAuth Adapter [0.47ms]
+(pass) googleOAuthScopes > errors when no Google OAuth Adapter is loaded [0.02ms]
+
+apps/cli/src/source/realm-cli.test.ts:
+(pass) realm-cli unit: sourceAdd realm semantics > omitting realm fails without creating a global Realm [1.52ms]
+(pass) realm-cli unit: sourceAdd realm semantics > unknown realm throws with exit code 2 and exact message [0.96ms]
+(pass) realm-cli unit: sourceAdd realm semantics > realm add work then source add --realm work succeeds [1.32ms]
+(pass) realm-cli integration: CLI subprocess > source add without --realm fails explicitly [267.17ms]
+(pass) realm-cli integration: CLI subprocess > source add --realm unknown exits 2 with exact message [284.49ms]
+(pass) realm-cli integration: CLI subprocess > realm add work then source add --realm work succeeds [390.60ms]
+(pass) realm-cli integration: CLI subprocess > no TTY prompt: source add with explicit Realm and no stdin runs cleanly [388.78ms]
+
+apps/cli/src/format/exit.test.ts:
+(pass) mapErrorToExit > maps Action validation action_unsupported to exit 2 [0.10ms]
+(pass) mapErrorToExit > maps Action validation confirmation_required to exit 2
+(pass) mapErrorToExit > keeps transient auth network failures on exit 30 [0.06ms]
+(pass) mapErrorToExit > maps an unavailable Extension Adapter to other sync failure [0.01ms]
+(pass) mapErrorToExit > maps provider taxonomy auth_expired to exit 10 [0.02ms]
+(pass) mapErrorToExit > maps provider taxonomy permission_denied to exit 40
+(pass) mapErrorToExit > maps provider taxonomy not_found to exit 2
+(pass) mapErrorToExit > maps provider taxonomy rate_limited to exit 20
+(pass) mapErrorToExit > maps provider taxonomy provider_unavailable to exit 30
+(pass) mapErrorToExit > maps provider taxonomy provider_bad_response to exit 30
+
+apps/cli/src/format/status.test.ts:
+(pass) status output projects availability only for text display [0.16ms]
+
+apps/cli/src/format/source.test.ts:
+(pass) source output exposes availability without replacing lastStatus [3.01ms]
+
+apps/cli/src/format/grants.test.ts:
+(pass) formatGrants > json output is stable and parseable [0.11ms]
+(pass) formatGrants > json output is [] for empty input [0.01ms]
+(pass) formatGrants > empty state is clear and points to add command [0.01ms]
+(pass) formatGrants > renders label, provider, id, scopes, and expiry for a labelled grant [0.42ms]
+(pass) formatGrants > display name is shown as label when email is absent [0.29ms]
+(pass) formatGrants > placeholder google account is not shown as a label column [0.27ms]
+(pass) formatGrants > multiple scopes are shown comma-separated [0.18ms]
+(pass) formatGrants > space-separated scope string is parsed [0.17ms]
+(pass) formatGrants > expired token is labelled, not timestamped [0.19ms]
+(pass) formatGrants > null expiry renders as "no expiry" [0.17ms]
+(pass) formatGrants > non-Google scope is preserved in full [0.16ms]
+(pass) formatGrants > malformed scope JSON falls back to whitespace split [0.19ms]
+(pass) formatGrants > multiple grants are listed [0.24ms]
+(pass) formatGrantAdded > labels the grant [0.01ms]
+
+apps/cli/src/commands/purge.test.ts:
+(pass) purge artifacts command > formats deterministic compact text and JSON [0.03ms]
+(pass) purge artifacts command > dispatches through ArtifactService and closes dependencies [0.55ms]
+(pass) purge artifacts command > rejects invalid args before opening dependencies [0.09ms]
+
+apps/cli/src/commands/artifact.test.ts:
+(pass) artifact command output and handlers > formats deterministic compact text and JSON without binary or CAS paths [0.09ms]
+(pass) artifact command output and handlers > dispatches list and download through the ArtifactService [0.54ms]
+(pass) artifact command output and handlers > maps invalid args before opening dependencies [0.06ms]
+
+apps/cli/src/commands/sync.test.ts:
+(pass) sync command > renders stable summary and compact output [0.10ms]
+(pass) sync command > syncs one explicit Source through the public core service and closes deps [0.49ms]
+(pass) sync command > fails fast for an unknown explicit Source [0.07ms]
+(pass) sync command > explicit Source reports a loaded non-sync Adapter as unsupported [0.19ms]
+(pass) sync command > all mode is id-ordered, skips loaded non-sync Adapters, includes unavailable Sources, and continues [1.11ms]
+(pass) sync command > uses the worst stable exit and renders deterministic completed events [0.12ms]
+
+apps/cli/src/commands/action.test.ts:
+(pass) Action input > returns arbitrary inline JSON unchanged: {"body":"hello"} [0.12ms]
+(pass) Action input > returns arbitrary inline JSON unchanged: [1,"two",null]
+(pass) Action input > returns arbitrary inline JSON unchanged: "value"
+(pass) Action input > returns arbitrary inline JSON unchanged: 42
+(pass) Action input > returns arbitrary inline JSON unchanged: true
+(pass) Action input > returns arbitrary inline JSON unchanged: null
+(pass) Action input > falls back to the exact readable UTF-8 file path [0.50ms]
+(pass) Action input > rejects syntactically invalid inline, unreadable, and invalid file input [0.83ms]
+(pass) Action output > formats compact describe text with all registry and Source facts [0.05ms]
+(pass) Action output > formats run text as Resource Ref and optional title [0.02ms]
+(pass) Action handler > passes exact describe arguments, prints the full JSON result, and closes [0.37ms]
+(pass) Action handler > parses input before deps and propagates explicit Source, confirmation, signal, output, warnings, and close [0.12ms]
+profile_unavailable	raw warning
+(pass) Action handler > passes scalar, array, and null input unchanged to runAction: 42 [0.09ms]
+profile_unavailable	raw warning
+(pass) Action handler > passes scalar, array, and null input unchanged to runAction: [1,"two"] [0.02ms]
+profile_unavailable	raw warning
+(pass) Action handler > passes scalar, array, and null input unchanged to runAction: null [0.01ms]
+(pass) Action handler > rejects unreadable and invalid files before opening dependencies [0.51ms]
+(pass) Action handler > maps service errors and always closes [0.06ms]
+(pass) Action handler > maps service errors and always closes [0.01ms]
+(pass) Action handler > maps service errors and always closes [0.01ms]
+(pass) Action handler > maps service errors and always closes
+
+apps/cli/src/commands/search.test.ts:
+(pass) search JSON output > uses the unified deterministic result envelope [0.02ms]
+
+apps/cli/src/commands/export.test.ts:
+(pass) export command > writes exact binary bytes directly, reports warnings to stderr, and closes dependencies [0.32ms]
+(pass) export command > rejects invalid input before dependencies and returns help without opening [0.08ms]
+(pass) export command > maps unsupported formats to exit 2 and always closes dependencies [0.14ms]
+
+apps/cli/src/commands/generic-source-boundary.test.ts:
+(pass) generic CLI/core search, get, and sync paths do not import local-directory internals [1.66ms]
+
+apps/cli/src/commands/get.test.ts:
+(pass) get output > formats deterministic JSON with the full Resource envelope [0.02ms]
+(pass) get output > formats concise text [0.01ms]
+(pass) get output > returns exit 2 for an invalid Ref before opening dependencies [0.18ms]
+
+apps/cli/src/commands/thread.test.ts:
+(pass) thread output > formats deterministic compact text with tree indentation [0.04ms]
+(pass) thread output > formats the typed JSON envelope with full Resource payloads [0.02ms]
+(pass) thread output > handler prints service output and closes dependencies [0.18ms]
+(pass) thread output > malformed and unknown seeds use typed exit 2 [0.13ms]
+
+apps/cli/src/skills/skills.cli.test.ts:
+(pass) skills list shows bundled skills [120.69ms]
+(pass) skills get returns bundled markdown [116.81ms]
+(pass) skills get --inline merges referenced markdown [112.66ms]
+(pass) skills path returns an existing directory [111.88ms]
+(pass) skills --json output is parseable [226.81ms]
+
+apps/cli/src/args/purge.test.ts:
+(pass) purge artifacts arguments > accepts only the optional JSON flag [0.03ms]
+(pass) purge artifacts arguments > rejects extra arguments and flags [0.02ms]
+(pass) purge artifacts arguments > rejects extra arguments and flags
+(pass) purge artifacts arguments > rejects extra arguments and flags
+(pass) purge artifacts arguments > rejects extra arguments and flags
+
+apps/cli/src/args/artifact.test.ts:
+(pass) artifact arguments > parses list and download forms [0.05ms]
+(pass) artifact arguments > rejects invalid forms [0.01ms]
+(pass) artifact arguments > rejects invalid forms
+(pass) artifact arguments > rejects invalid forms
+(pass) artifact arguments > rejects invalid forms
+
+apps/cli/src/args/sync.test.ts:
+(pass) parses every public SyncMode and output flag [0.05ms]
+
+apps/cli/src/args/action.test.ts:
+(pass) parseActionArgs > parses strict action arguments [0.02ms]
+(pass) parseActionArgs > parses strict action arguments [0.01ms]
+(pass) parseActionArgs > parses strict action arguments
+(pass) parseActionArgs > parses strict action arguments
+(pass) parseActionArgs > parses strict action arguments
+(pass) parseActionArgs > rejects invalid arguments: [] [0.01ms]
+(pass) parseActionArgs > rejects invalid arguments: ["other","fake.note.create"]
+(pass) parseActionArgs > rejects invalid arguments: ["describe"]
+(pass) parseActionArgs > rejects invalid arguments: ["describe","fake.note.create","extra"]
+(pass) parseActionArgs > rejects invalid arguments: ["describe","fake.note.create","--input","{}"]
+(pass) parseActionArgs > rejects invalid arguments: ["describe","fake.note.create","--confirm-irreversible"]
+(pass) parseActionArgs > rejects invalid arguments: ["describe","fake.note.create","--source"]
+(pass) parseActionArgs > rejects invalid arguments: ["describe","fake.note.create","--source="]
+(pass) parseActionArgs > rejects invalid arguments: ["describe","fake.note.create","--source","a","--source=b"]
+(pass) parseActionArgs > rejects invalid arguments: ["describe","fake.note.create","--wat"]
+(pass) parseActionArgs > rejects invalid arguments: ["describe","fake.note.create","-x"]
+(pass) parseActionArgs > rejects invalid arguments: ["run"]
+(pass) parseActionArgs > rejects invalid arguments: ["run","fake.note.create","--input","{}"]
+(pass) parseActionArgs > rejects invalid arguments: ["run","fake.note.create","--source","a"]
+(pass) parseActionArgs > rejects invalid arguments: ["run","fake.note.create","--source=","--input","{}"]
+(pass) parseActionArgs > rejects invalid arguments: ["run","fake.note.create","--source","a","--input="]
+(pass) parseActionArgs > rejects invalid arguments: ["run","fake.note.create","--source","a","--source","b","--input","{}"]
+(pass) parseActionArgs > rejects invalid arguments: ["run","fake.note.create","--source","a","--input","{}","--input","{}"]
+(pass) parseActionArgs > rejects invalid arguments: ["run","fake.note.create","--source","a","--input","{}","--wat"]
+(pass) parseActionArgs > rejects invalid arguments: ["run","fake.note.create","--source","a","--input","{}","extra"]
+(pass) parseActionArgs > accepts help [0.01ms]
+(pass) parseActionArgs > accepts help
+(pass) parseActionArgs > accepts help
+
+apps/cli/src/args/search.test.ts:
+(pass) repeatable CLI flags > keeps all values while stringFlag remains last-value deterministic [0.05ms]
+(pass) repeatable CLI flags > parses repeated typed fields and JSON search output [0.16ms]
+(pass) repeatable CLI flags > keeps a query after leading boolean flags [0.02ms]
+(pass) repeatable CLI flags > rejects fields without kind and conflicting routing overrides [0.02ms]
+
+apps/cli/src/args/export.test.ts:
+(pass) export arguments > parses ["ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/one","--format","eml"] [0.03ms]
+(pass) export arguments > parses ["--format","eml","ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/one"]
+(pass) export arguments > parses ["ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/one","--format=eml"]
+(pass) export arguments > accepts help [0.01ms]
+(pass) export arguments > accepts help
+(pass) export arguments > accepts help
+(pass) export arguments > rejects invalid forms
+(pass) export arguments > rejects invalid forms
+(pass) export arguments > rejects invalid forms
+(pass) export arguments > rejects invalid forms
+(pass) export arguments > rejects invalid forms
+(pass) export arguments > rejects invalid forms
+(pass) export arguments > rejects invalid forms
+(pass) export arguments > rejects invalid forms
+(pass) export arguments > rejects invalid forms
+(pass) export arguments > rejects invalid forms [0.02ms]
+
+apps/cli/src/args/get.test.ts:
+(pass) parseGetArgs > parses a canonical Ref and JSON mode [0.02ms]
+(pass) parseGetArgs > parses JSON mode before the Ref [0.01ms]
+(pass) parseGetArgs > rejects invalid arguments
+(pass) parseGetArgs > rejects invalid arguments
+(pass) parseGetArgs > rejects invalid arguments
+
+apps/cli/src/args/thread-get.test.ts:
+(pass) parseThreadGetArgs > parses the exact Ref and JSON flag in either order [0.03ms]
+(pass) parseThreadGetArgs > parses the exact Ref and JSON flag in either order [0.01ms]
+(pass) parseThreadGetArgs > parses the exact Ref and JSON flag in either order
+(pass) parseThreadGetArgs > rejects invalid arguments
+(pass) parseThreadGetArgs > rejects invalid arguments
+(pass) parseThreadGetArgs > rejects invalid arguments
+
+packages/core/src/ref/ref.test.ts:
+(pass) parseRef > preserves a valid opaque suffix byte-for-byte [0.02ms]
+(pass) parseRef > rejects invalid Ref https://01ARZ3NDEKTSV4RRFFQ69G5FAV/a [0.02ms]
+(pass) parseRef > rejects invalid Ref ctx://01arz3ndektsv4rrffq69g5fav/a
+(pass) parseRef > rejects invalid Ref ctx://01ARZ3NDEKTSV4RRFFQ69G5FAI/a
+(pass) parseRef > rejects invalid Ref ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/
+(pass) parseRef > rejects invalid Ref ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/raw space
+(pass) parseRef > rejects invalid Ref ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/é
+(pass) parseRef > rejects invalid Ref ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/lower%2fescape
+(pass) parseRef > rejects invalid Ref ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/bad%XX
+(pass) parseRef > rejects invalid Ref ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa [0.17ms]
+
+packages/core/src/relation/relation-store.test.ts:
+(pass) communication.message Relations resolve lazily without collapsing cross-Source identities [3.17ms]
+(pass) natural-key Relations remain observable and resolve lazily after target arrival [1.90ms]
+(pass) Ref Relations resolve and inverse traversal excludes tombstoned targets by default [1.64ms]
+(pass) natural keys resolve globally to multiple live Resources and refresh after deletion [1.82ms]
+
+packages/core/src/net/index.test.ts:
+(pass) network egress policy > denial is a typed non-network policy failure [0.06ms]
+
+packages/core/src/extension/loader.test.ts:
+(pass) loadExtensions > imports a trusted external TypeScript Extension from a configured path [0.59ms]
+(pass) loadExtensions > loads built-ins first and reports an external id conflict [0.39ms]
+(pass) loadExtensions > reports invalid Extensions without activating any of their definitions [0.54ms]
+(pass) loadExtensions > Extension disappearance and reload leave stored sync and materialized rows byte-for-byte untouched [1.35ms]
+(pass) loadExtensions > requires callers to provide an explicit complete built-ins list [0.05ms]
+
+packages/core/src/config/schema.test.ts:
+(pass) configuration without an Extensions section defaults to no trusted paths [0.49ms]
+
+packages/core/src/config/env-uri.test.ts:
+(pass) env:// resolves through getEnv [0.16ms]
+(pass) env: resolves through getEnv [0.04ms]
+(pass) getEnv memoized and frozen [0.10ms]
+(pass) resetEnvForTests invalidates memoized env [0.09ms]
+(pass) lowercase rejected [0.09ms]
+(pass) unset env var does not leak value [0.08ms]
+(pass) bare string rejected [0.79ms]
+(pass) invalid prefix rejected [0.03ms]
+
+packages/core/src/config/turbo-env.test.ts:
+(pass) globalDependencies present [0.29ms]
+(pass) root has no extends [0.06ms]
+(pass) per-workspace env keys [0.69ms]
+(pass) workspace lane scripts back turbo tasks [0.13ms]
+(pass) turbo dry json parses [139.91ms]
+
+packages/core/src/config/test-lanes.test.ts:
+(pass) unit lane excludes integration [0.44ms]
+(pass) e2e lane isolated [0.08ms]
+(pass) path-ignore-patterns honored [13.16ms]
+
+packages/core/src/config/env-example.test.ts:
+(pass) drift between EnvSchema and .env.example fails both directions [0.61ms]
+(pass) every .env.example key has a comment [0.10ms]
+
+packages/core/src/auth/service.test.ts:
+(pass) auth service exposes google grant operations [1.23ms]
+
+packages/core/src/auth/compatibility.test.ts:
+(pass) OAuth Grant compatibility > derives Google identity from the canonical declared token host [0.04ms]
+(pass) OAuth Grant compatibility > normalizes space-delimited and JSON-array Grant scopes [0.03ms]
+(pass) OAuth Grant compatibility > requires the same provider and a scope superset [0.03ms]
+
+packages/core/src/auth/auth-service.test.ts:
+(pass) addGoogleGrant inserts grant + account with all secret refs [1.33ms]
+(pass) listGoogleGrants returns the inserted grant [1.02ms]
+(pass) resolveLinkedGrantAccessToken reads only the requested unexpired Grant [1.03ms]
+(pass) resolveLinkedGrantAccessToken refreshes an expired linked Grant [1.22ms]
+(pass) refreshGoogleAccessToken uses per-grant client creds when env vars are unset [1.04ms]
+(pass) refreshGoogleAccessToken env var override path still works [1.24ms]
+(pass) refreshGoogleAccessToken missing creds error [0.92ms]
+(pass) refreshGoogleAccessToken handles invalid_grant [1.23ms]
+
+packages/core/src/auth/google-token-refresh.live.test.ts:
+(skip) refreshGoogleAccessToken returns a real Google access token
+
+packages/core/src/secrets/migrate.test.ts:
+(pass) secrets service migrate > migrate moves grant secret refs from keychain to file and back [1.98ms]
+
+packages/core/src/secrets/service.test.ts:
+
+packages/core/src/secrets/file.test.ts:
+(pass) file backend round-trips, lists, deletes, encrypts, and forces private mode [1698.44ms]
+(pass) file backend supports passphrase without creating a key file [417.25ms]
+(pass) file backend falls back to a generated device key file [4.75ms]
+(pass) file backend detects tampered ciphertext [624.68ms]
+
+packages/core/src/secrets/keychain.test.ts:
+(pass) KeychainBackend > wraps keytar import failure as backend_unavailable [0.24ms]
+(pass) KeychainBackend > wraps keytar runtime failure as backend_unavailable [0.09ms]
+(pass) KeychainBackend > maps missing keychain entry to not_found [0.04ms]
+
+packages/core/src/source/service.test.ts:
+
+packages/core/src/source/sync-source.test.ts:
+(pass) invokes the loaded public Adapter inside the lock with Source-bound context [3.33ms]
+(pass) unsupported sync operation is typed and releases the lock [1.45ms]
+(pass) unavailable Adapter is a typed failure [1.24ms]
+
+packages/core/src/source/retrieve.test.ts:
+(pass) getSourceResource > returns a complete local cache hit without invoking the provider [1.91ms]
+(pass) getSourceResource > retrieves and persists a cache miss only after one valid emission [1.46ms]
+(pass) getSourceResource > retrieves a partial synced cache and keeps its synced origin [1.39ms]
+(pass) getSourceResource > returns a local tombstone exactly and never invokes the provider [1.25ms]
+(pass) getSourceResource > rejects zero emissions without persisting them [1.08ms]
+(pass) getSourceResource > rejects multiple emissions without persisting them [1.02ms]
+(pass) getSourceResource > rejects mismatched Ref emissions without persisting them [1.00ms]
+(pass) getSourceResource > rejects missing payload emissions without persisting them [0.94ms]
+(pass) getSourceResource > rejects an Adapter without retrieve capability [0.97ms]
+(pass) getSourceResource > passes cancellation through and persists nothing [1.00ms]
+(pass) getSourceResource > degrades an unknown retrieved Profile to envelope-only with a warning [1.31ms]
+(pass) getSourceResource > converges get then partial sync without content loss [1.48ms]
+(pass) getSourceResource > converges partial sync then get into complete synced content [1.51ms]
+
+packages/core/src/source/remote-search.test.ts:
+(pass) searchSourceRemote > materializes provider resources idempotently and preserves warnings [2.85ms]
+(pass) searchSourceRemote > post-filters typed fields and excludes unverifiable provider envelopes [1.07ms]
+
+packages/core/src/source/source-service.test.ts:
+(pass) derives Source availability from the exact Adapter id and version [1.66ms]
+(pass) status includes never-synced Sources with pending sync status [1.07ms]
+(pass) missing and restored Adapters preserve historical sync status [1.13ms]
+(pass) addSource validates config against the selected Adapter [0.98ms]
+(pass) stores only routing overrides compatible with Adapter capabilities [0.95ms]
+(pass) source service > addSource resolves a provided realm slug [1.31ms]
+(pass) source service > addSource requires an explicit Realm [1.12ms]
+(pass) source service > unknown realm slug throws unknown realm validation error [0.77ms]
+(pass) source service > authenticated Adapter cannot be created without a compatible Grant [0.81ms]
+(pass) source service > rejects a scope-incompatible explicit Grant [0.85ms]
+(pass) source service > binds an explicit compatible Grant and persists the selected Adapter version [0.87ms]
+(pass) source service > auto-binds only one compatible Grant and rejects ambiguity [0.88ms]
+(pass) source service > auth:none Adapter needs no Grant and rejects a supplied Grant [0.92ms]
+(pass) source service > rejects an unknown Adapter [1.06ms]
+
+packages/core/src/source/provider-context.test.ts:
+(pass) createSourceProviderContext > uses only the Source linked Grant even when a newer Grant exists [1.59ms]
+(pass) createSourceProviderContext > rejects missing and incompatible Grants before provider HTTP [1.83ms]
+(pass) createSourceProviderContext > refreshes and retries exactly once after provider 401 [0.96ms]
+(pass) createSourceProviderContext > config token fields cannot override Authorization or enter source context [0.92ms]
+(pass) createSourceProviderContext > maps revoked Grant failures without leaking tokens or client secrets [0.96ms]
+(pass) createSourceProviderContext > preserves sanitized network auth failures during token resolution [1.25ms]
+(pass) createSourceProviderContext > preserves typed egress-policy denial instead of classifying it as network [1.00ms]
+(pass) createSourceProviderContext > classifies an actual provider transport failure as network [0.94ms]
+(pass) createSourceProviderContext > propagates provider cancellation instead of classifying it as network [0.91ms]
+
+packages/core/src/paths/paths.test.ts:
+(pass) CTXINDEX path env vars take precedence over XDG vars [0.53ms]
+(pass) XDG path env vars are used when CTXINDEX vars are absent [0.06ms]
+(pass) home defaults are used when CTXINDEX and XDG vars are absent [0.06ms]
+
+packages/core/src/meta/agent-howtos.test.ts:
+(pass) agent-howtos doc exists [0.26ms]
+(pass) documented commands match implemented commands [0.37ms]
+(pass) no stale commands [0.14ms]
+
+packages/core/src/storage/migrator.test.ts:
+(pass) refuses the prototype 0000 marker without the V1 schema [0.47ms]
+(pass) fresh core migration creates only the generic V1 storage model [0.95ms]
+(pass) field index enforces one typed value and ordered uniqueness [0.98ms]
+(pass) generic FTS tables are queryable [0.83ms]
+(pass) Resource FTS retains tombstone envelopes and removes hard-deleted rows [1.03ms]
+(pass) PRAGMAs match spec after migrations [4.95ms]
+(pass) refuses to migrate a prototype database [0.13ms]
+(pass) fresh migration is idempotent [0.87ms]
+(pass) fresh Artifact schema enforces ownership, stable refs, retention, and hash indexing [0.97ms]
+
+packages/core/src/search/sanitize.test.ts:
+(pass) sanitizeQuery > produces exact and relaxed FTS expressions [0.09ms]
+(pass) sanitizeQuery > removes FTS operators and handles an empty query [0.02ms]
+
+packages/core/src/search/local-search.test.ts:
+(pass) LocalSearchExecutor > returns each Resource once in deterministic BM25 order with best chunk evidence [3.17ms]
+(pass) LocalSearchExecutor > normalizes exact Realm and Source filters while omission spans all values [1.84ms]
+(pass) LocalSearchExecutor > filters by kind aliases, occurredAt, and every V1 field type [1.97ms]
+(pass) LocalSearchExecutor > rejects invalid Profile-derived field queries deterministically before FTS execution [1.44ms]
+(pass) LocalSearchExecutor > supports tombstone states, ad-hoc envelope matches, hostile input, and relaxed fallback [2.66ms]
+
+packages/core/src/search/planner.test.ts:
+(pass) SearchPlanner > preflights kind, fields, bounds, and exact selection before any provider leg [1.92ms]
+(pass) SearchPlanner > uses CLI over source over Adapter routing, warns on stale overrides, and explains decisions [2.82ms]
+(pass) SearchPlanner > warns deterministically when --remote selects an unsupported Source [1.10ms]
+(pass) SearchPlanner > keeps an unavailable-Adapter Source locally searchable and degrades remote explain [1.88ms]
+(pass) SearchPlanner > starts sorted provider legs concurrently with independent timeouts [44.51ms]
+(pass) SearchPlanner > requires verified hybrid coverage or includes remote [2.96ms]
+(pass) SearchPlanner > preserves local results, aborts timeout, dedupes local-first, and interleaves by origin rank [8.67ms]
+
+packages/core/src/testing/sandbox.test.ts:
+(pass) run spawns binary [119.95ms]
+(pass) cleanup removes tmpDir [0.37ms]
+(pass) parallel sandboxes isolated [136.18ms]
+(pass) env does not leak [0.29ms]
+
+packages/core/src/action/run.test.ts:
+(pass) propagates storage failures without relabeling them as Adapter results [3.08ms]
+(pass) does not automatically retry an Action fetch after 401 [1.54ms]
+(pass) reports a nonexistent Source as not found before auth or provider I/O [1.06ms]
+(pass) runAction > validates and transforms complete input before auth, Adapter, or provider I/O [1.05ms]
+(pass) runAction > rejects unknown Actions as typed usage errors before Source resolution [0.99ms]
+(pass) runAction > reports an unsupported Source and available implementing Adapters without I/O [2.29ms]
+(pass) runAction > requires explicit confirmation for irreversible Actions before I/O [1.76ms]
+(pass) runAction > passes parsed input and the exact auth-bound Source provider context once [1.51ms]
+(pass) runAction > rejects wrong output Profile without writing [1.10ms]
+(pass) runAction > rejects cross-Source Ref without writing [0.99ms]
+(pass) runAction > rejects absent payload without writing [1.04ms]
+(pass) runAction > rejects invalid payload without writing [0.97ms]
+(pass) runAction > materializes the exact provider envelope as complete adhoc and preserves synced origin [1.31ms]
+(pass) runAction > propagates typed provider and auth errors unchanged [2.10ms]
+
+packages/core/src/action/describe.test.ts:
+(pass) describeAction > returns the exact registry projection and all Sources sorted by id [1.83ms]
+(pass) describeAction > reports only an exact selected Source [1.01ms]
+(pass) describeAction > uses typed errors for unknown Action and selected Source [1.00ms]
+
+packages/core/src/registry/describe.test.ts:
+(pass) registry-derived describe data > a fake Profile changes kinds, vocabulary, Source config, and Actions [0.38ms]
+
+packages/core/src/registry/registry-core.test.ts:
+(pass) createCtxindexAdapterRegistry > narrows literal adapter ids through isKnownAdapter [0.25ms]
+(pass) createCtxindexAdapterRegistry > assertKnownAdapter throws a typed registry error for unknown ids [0.11ms]
+(pass) createCtxindexAdapterRegistry > getAdapter returns the typed adapter definition [0.02ms]
+(pass) createCtxindexAdapterRegistry > groups adapters by provider and kind [0.12ms]
+(pass) createCtxindexAdapterRegistry > reports capabilities and required OAuth scopes [0.04ms]
+(pass) createCtxindexAdapterRegistry > exposes search mode and search capability lookups [0.06ms]
+(pass) createCtxindexAdapterRegistry > createSourceAdapter rejects federated/hybrid definitions without search [0.03ms]
+(pass) createCtxindexAdapterRegistry > registerAdapter and unregisterAdapter round-trip through the overlay [0.16ms]
+
+packages/core/src/registry/profile-registry.test.ts:
+(pass) ProfileRegistry > validates dynamic definitions before registration [0.21ms]
+(pass) ProfileRegistry > rejects Action effects outside the reversible/irreversible contract [0.11ms]
+(pass) ProfileRegistry > rejects an empty Profile Action id [0.07ms]
+(pass) ProfileRegistry > rejects duplicate id and version pairs [0.03ms]
+(pass) ProfileRegistry > degrades unknown profile versions without throwing [0.04ms]
+(pass) kind lookup prefers canonical ids and reports alias collisions [0.12ms]
+
+packages/core/src/registry/definition-registries.test.ts:
+(pass) rejects an empty Adapter Action id [0.15ms]
+(pass) requires routing capabilities while indexed may support remote override [0.16ms]
+(pass) AdapterRegistry > rejects Profile Actions whose output Profile is not loaded [0.10ms]
+(pass) AdapterRegistry > rejects malformed Action bindings as invalid definitions [0.13ms]
+(pass) AdapterRegistry > requires a declarative auth specification [0.08ms]
+(pass) AdapterRegistry > rejects capability and operation mismatches [0.08ms]
+(pass) AdapterRegistry > accepts a supported Profile with an unbound optional Action [0.05ms]
+(pass) AdapterRegistry > rejects undeclared and schema-incompatible Actions [0.24ms]
+(pass) ExtensionRegistry > rejects an unknown Action output atomically during registration [0.13ms]
+(pass) ExtensionRegistry > rejects duplicate global Action ids atomically [0.18ms]
+(pass) ExtensionRegistry > rejects an invalid Extension atomically [0.14ms]
+
+packages/core/src/artifact/artifact-store.test.ts:
+(pass) streams bytes into the managed CAS before recording metadata [6.87ms]
+(pass) a filesystem failure after metadata deletion leaves safe orphan bytes for the next purge [4.31ms]
+(pass) purge reclaims only strict regular stale quarantine entries [2.66ms]
+(pass) concurrent equal writes to one Artifact Ref are idempotent [2.88ms]
+(pass) deduplicates equal bytes while accounting for logical and physical size [3.13ms]
+(pass) concurrent equal writes install one CAS object [2.53ms]
+(pass) abort and producer failure leave no metadata or temporary files [2.99ms]
+(pass) rejects missing owners and invalid Artifact Ref metadata [2.87ms]
+(pass) same Artifact Ref is idempotent but cannot be rebound [2.96ms]
+(pass) detects a corrupt existing CAS object before reuse or cache lookup [2.95ms]
+(pass) disk accounting includes actual orphan CAS objects [2.51ms]
+(pass) purge removes metadata, deduplicated and orphan bytes, and abandoned temp data [4.27ms]
+(pass) purge leaves bytes untouched when deleting metadata fails [2.77ms]
+(pass) purge removes only fixed managed subtrees without following symlinks [1.97ms]
+(pass) a tombstoned origin Resource still owns Artifact metadata [3.08ms]
+
+packages/core/src/artifact/artifact-service.test.ts:
+(pass) ArtifactService > lists exact live Resource Profile descriptors without provider I/O [2.27ms]
+(pass) ArtifactService > list, accounting, and download never evict even old cached bytes [3.91ms]
+(pass) ArtifactService > purge preserves the owning Resource descriptor and a later download refetches [4.81ms]
+(pass) ArtifactService > download self-heals metadata after purge filesystem failure [4.90ms]
+(pass) ArtifactService > aborts without metadata, temp, or CAS object on failure and declared-size mismatch [5.49ms]
+(pass) ArtifactService > deduplicates concurrent same-Ref misses [2.92ms]
+(pass) ArtifactService > rejects same-process purge while a download is in flight [2.87ms]
+(pass) ArtifactService > copies verified bytes atomically without transferring store ownership [5.41ms]
+(pass) ArtifactService > rejects invalid, duplicate, cross-source, unowned, and unsupported descriptors [2.35ms]
+
+packages/core/src/sync/emission.test.ts:
+(pass) accepts each exact generic Sync emission envelope [0.67ms]
+(pass) rejects invalid Adapter emission 0 as provider_bad_response [0.07ms]
+(pass) rejects invalid Adapter emission 1 as provider_bad_response [0.02ms]
+(pass) rejects invalid Adapter emission 2 as provider_bad_response [0.03ms]
+(pass) rejects invalid Adapter emission 3 as provider_bad_response [0.10ms]
+(pass) rejects invalid Adapter emission 4 as provider_bad_response [0.03ms]
+(pass) rejects invalid Adapter emission 5 as provider_bad_response [0.03ms]
+(pass) rejects invalid Adapter emission 6 as provider_bad_response [0.04ms]
+(pass) rejects invalid Adapter emission 7 as provider_bad_response [0.03ms]
+(pass) rejects invalid Adapter emission 8 as provider_bad_response [0.04ms]
+(pass) rejects invalid Adapter emission 9 as provider_bad_response [0.05ms]
+
+packages/core/src/sync/sync-coordinator.test.ts:
+(pass) holds the global lock and running row throughout drive, then applies generic emissions [1.88ms]
+(pass) a second run is busy while the first drive is blocked [1.11ms]
+(pass) counts sequential duplicate upserts from each operation pre-state [1.43ms]
+(pass) counts an upsert followed by removal in emission order [1.17ms]
+(pass) warnings complete and are persisted as nonfatal errors [1.04ms]
+(pass) invalid emission is provider_bad_response and writes nothing [1.27ms]
+(pass) drive failure preserves resources and cursor and releases lock [0.98ms]
+(pass) auth failure maps Source to needs_auth [0.95ms]
+(pass) cancellation preserves cursor and persists cancelled taxonomy [0.97ms]
+(pass) diff validates and counts operations without durable writes [1.25ms]
+(pass) failing diff audits the run without changing current Source state [1.06ms]
+(pass) diff does not count removal of a nonexistent Resource [1.02ms]
+(pass) diff counts duplicate upserts in order and rolls them back [1.29ms]
+(pass) cross-Source Ref is rejected before mutation [1.02ms]
+(pass) unknown Source is a typed failure [0.85ms]
+(pass) stale global locks are recovered [0.97ms]
+(pass) recovers a running global lock whose owner PID is provably dead [1.03ms]
+(pass) keeps a running global lock whose owner PID is alive [0.99ms]
+(pass) malformed durable cursor is audited after lock acquisition [0.99ms]
+(pass) invalid emitted Ref grammar is provider_bad_response without mutation [0.98ms]
+(pass) does not reclaim a running global lock without an owner PID [0.97ms]
+
+packages/core/src/export/export-service.test.ts:
+(pass) exportSourceResource > exports deterministic compact validated-payload JSON from the hydrated cache [1.95ms]
+(pass) exportSourceResource > hydrates through the Adapter and invokes the exact Profile renderer with undefined dependencies [1.15ms]
+(pass) exportSourceResource > built-in JSON takes precedence over a Profile declaration named json [1.12ms]
+(pass) exportSourceResource > reports sorted exact-version registry-derived formats [1.27ms]
+(pass) exportSourceResource > rejects unavailable Profiles and null or schema-invalid payloads as data integrity failures [2.09ms]
+(pass) exportSourceResource > rejects invalid external renderer output as a data integrity failure [1.14ms]
+
+packages/core/src/resource/resource-store.test.ts:
+(pass) relation extractor failure rolls back an existing Resource and Relations [2.25ms]
+(pass) unknown Profile upsert clears derived Relations [1.37ms]
+(pass) ResourceStore > complete upserts hydrate the full stored Resource envelope [1.22ms]
+(pass) ResourceStore > merges every completeness and origin combination without inferring hydration from origin [21.72ms]
+(pass) ResourceStore > partial restoration preserves complete content, projections, hydration, and its Profile [1.79ms]
+(pass) ResourceStore > validates a known Profile and replaces typed fields and chunks [1.65ms]
+(pass) ResourceStore > ad-hoc and synced writes converge on one Source-scoped Resource [1.61ms]
+(pass) ResourceStore > rejects a Ref whose Source differs from the operation Source [0.99ms]
+(pass) ResourceStore > tombstones synced Resources but excludes them by default [1.32ms]
+(pass) ResourceStore > a later synced upsert restores a tombstoned Resource and projections [1.34ms]
+(pass) ResourceStore > evicts ad-hoc Resources and their projections instead of tombstoning [1.17ms]
+(pass) ResourceStore > rolls back the Resource and all projections on extraction failure [1.27ms]
+(pass) ResourceStore > unknown Profile versions degrade to envelope-only with a warning [1.04ms]
+(pass) ResourceStore > ad-hoc refresh cannot clobber a synced payload or projections [1.15ms]
+
+packages/core/src/thread/thread-service.test.ts:
+(pass) out-of-order related Resources form the same tree from every seed [5.75ms]
+(pass) repeats conversation and bidirectional parent traversal until the closure is dry [5.41ms]
+(pass) keeps multiple roots and sorts roots and siblings by occurrence then Ref [2.89ms]
+(pass) returns a Source-scoped parentless conversation flat in date and Ref order [2.99ms]
+(pass) keeps cross-Source RFC Message-ID copies distinct and parents each child within its Source [10.27ms]
+(pass) falls back to the lexical parent Ref when no same-Source copy exists [1.76ms]
+(pass) excludes a tombstoned duplicate parent without losing a live cross-Source match [1.56ms]
+(pass) terminates cycles and breaks them deterministically in lexical child order [2.17ms]
+(pass) rejects malformed, absent, and tombstoned seeds and excludes related tombstones [1.45ms]
+(pass) uses local rows only and deduplicates unknown Profile warnings [1.67ms]
+
+packages/core/src/realm/realm-service.test.ts:
+(pass) realm service > createRealm and listRealms round trip a realm [1.77ms]
+(pass) realm service > getRealmBySlug returns the matching row [0.87ms]
+(pass) realm service > duplicate slug throws duplicate_realm_slug validation error [0.88ms]
+
+packages/core/src/realm/service.test.ts:
+
+packages/adapters/src/local-directory/walker.test.ts:
+(pass) walkDirectory > applies the SPEC §5 built-in ignore globs [3.53ms]
+(pass) walkDirectory > include patterns use glob semantics, not substring matching [1.20ms]
+(pass) walkDirectory > .ctxindexignore negation can re-include a gitignored path [1.02ms]
+(pass) walkDirectory > .ctxindexignore must unignore a parent before re-including its child [1.36ms]
+(pass) walkDirectory > returns deterministic nested paths and lets .ctxindexignore override exclusions [1.10ms]
+(pass) walkDirectory > requires an existing directory root [0.33ms]
+(pass) walkDirectory > never follows symlinks and reports only relative warning paths [0.64ms]
+(pass) walkDirectory > prunes ignored directories before inspecting their contents [1.07ms]
+(pass) walkDirectory > skips a Unix filename containing a literal backslash without collision [0.59ms]
+
+packages/adapters/src/local-directory/ref.test.ts:
+(pass) localDirectoryRef > encodes the entire normalized path as one opaque component [0.06ms]
+(pass) localDirectoryRef > keeps nested paths distinct from percent-looking names [0.01ms]
+(pass) localDirectoryRef > produces a parseable Ref owned by the Source [0.02ms]
+(pass) normalizeRelativePath > rejects backslashes, non-relative traversal, and absolute paths [0.06ms]
+
+packages/adapters/src/local-directory/sync.test.ts:
+(pass) localDirectorySync > emits the exact stable Ref and complete file@1 payload [3.95ms]
+(pass) localDirectorySync > orders typed skip warnings without leaking absolute paths or contents [1.96ms]
+(pass) localDirectorySync > uses a deterministic strict cursor, skips unchanged, and resync emits all [2.68ms]
+(pass) localDirectorySync > round-trips mixed-case cursor order without invalidation [7.14ms]
+(pass) localDirectorySync > rename emits old removal plus new upsert and diff has the same candidates [1.68ms]
+(pass) localDirectorySync > transient incomplete traversal carries prior records instead of tombstoning [1.43ms]
+
+packages/adapters/src/local-directory/reader.test.ts:
+(pass) readLocalFile > accepts plain source text and returns complete content metadata [0.93ms]
+(pass) readLocalFile > rejects magic binary, NUL bytes, and invalid UTF-8 [1.61ms]
+(pass) readLocalFile > skips initial and unexpectedly grown oversize files [1.78ms]
+(pass) readLocalFile > does not follow a walked file replaced by an outward symlink [0.89ms]
+(pass) readLocalFile > rejects same-size modification after walking as uncertain [0.47ms]
+(pass) readLocalFile > does not swallow cancellation [0.54ms]
+
+1 tests skipped:
+(skip) refreshGoogleAccessToken returns a real Google access token
+
+ 598 pass
+ 1 skip
+ 0 fail
+ 1839 expect() calls
+Ran 599 tests across 94 files. [16.24s]
+RESULT: PASS
+
+===== strict OpenSpec =====
+$ bunx openspec validate v1-context-access-layer --strict
+Change 'v1-context-access-layer' is valid
+RESULT: PASS
+
+===== diff check =====
+$ git diff --check
+RESULT: PASS
+SLICE 9 GATE: PASSED
