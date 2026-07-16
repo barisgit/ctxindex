@@ -86,19 +86,53 @@ test('built-in Source Adapter implementation is owned by provider modules', asyn
   )
   expect(builtins).toContain("from './microsoft/mailbox/definition'")
 
+  const microsoftDirectories = (
+    await readdir(new URL('microsoft/', adapterRoot), { withFileTypes: true })
+  )
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort()
+  expect(microsoftDirectories).toEqual(['calendar', 'mailbox'])
+
+  const microsoftCalendarFiles = (
+    await readdir(new URL('microsoft/calendar/', adapterRoot))
+  )
+    .filter(isProductionTypeScript)
+    .sort()
+  expect(microsoftCalendarFiles).toEqual(
+    expect.arrayContaining([
+      'config.ts',
+      'definition.ts',
+      'event.ts',
+      'response.ts',
+      'retrieve.ts',
+      'sync.ts',
+    ]),
+  )
+  expect(builtins).toContain("from './microsoft/calendar/definition'")
+
   const localFiles = (await readdir(new URL('local-directory/', adapterRoot)))
     .filter(isProductionTypeScript)
     .sort()
   expect(localFiles).toContain('definition.ts')
 })
 
-test('Microsoft mailbox production surface has no send permission or route', async () => {
-  const source = await sourceTree(new URL('microsoft/mailbox/', adapterRoot))
+test('Microsoft production surface has no send permission or route', async () => {
+  const source = await sourceTree(new URL('microsoft/', adapterRoot))
   expect(source).toContain('Mail.ReadWrite')
+  expect(source).toContain('Calendars.Read')
   expect(source).not.toMatch(/Mail\.Send|\/send(?:Mail)?\b|send-message/i)
   expect(source).not.toMatch(/@microsoft\/|microsoft-graph-client/i)
   expect(await sourceTree(coreSourceRoot)).not.toContain('microsoft.mailbox')
+  expect(await sourceTree(coreSourceRoot)).not.toContain('microsoft.calendar')
   expect(await sourceTree(cliRoot)).not.toContain('microsoft.mailbox')
+  expect(await sourceTree(cliRoot)).not.toContain('microsoft.calendar')
+})
+
+test('production Adapter surface has no send permission, Action, or route', async () => {
+  expect(await sourceTree(adapterRoot)).not.toMatch(
+    /Mail\.Send|gmail\.send|\/send(?:Mail)?\b|send-message/i,
+  )
 })
 
 test('Google Calendar production surface is read-only', async () => {
@@ -108,6 +142,15 @@ test('Google Calendar production surface is read-only', async () => {
     'calendar.events',
   )
   expect(source).not.toMatch(/\b(?:POST|PATCH|PUT|DELETE)\b/)
+})
+
+test('Microsoft Calendar production surface is stable and read-only', async () => {
+  const source = await sourceTree(new URL('microsoft/calendar/', adapterRoot))
+  expect(source).toContain("scopes: ['Calendars.Read']")
+  expect(source).not.toMatch(
+    /Calendars\.ReadWrite|\b(?:POST|PATCH|PUT|DELETE)\b/,
+  )
+  expect(source).not.toMatch(/\/beta\b/)
 })
 
 test('calendar vocabulary is Profile-owned and bundled declaratively', async () => {

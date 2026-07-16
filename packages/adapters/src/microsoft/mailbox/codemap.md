@@ -7,7 +7,7 @@ Implements the federated `microsoft.mailbox@1` Adapter for Outlook message searc
 ## Design/patterns
 
 - `definition.ts` binds strict empty Source configuration, shared Microsoft OAuth with `Mail.ReadWrite`, `communication.message@1`, Graph host authority, `search-remote`/`retrieve`/`download` operations, and the Profile-owned `communication.message.draft.create` and `.update` schemas to provider handlers.
-- `transport.ts` is the Graph transport boundary: canonical v1.0 URL construction, immutable-ID and text-body `Prefer` headers, typed HTTP/JSON error translation with retry metadata, and same-origin/path validation for provider `@odata.nextLink` values. A development-only `CTXINDEX_GRAPH_MOCK_BASE_URL` accepts only a bare `127.0.0.1` origin.
+- `transport.ts` is a compatibility re-export of the provider-root `../transport.ts`, which now owns canonical v1.0/mock URL construction, immutable-ID and text-body `Prefer` headers, typed HTTP/JSON error translation with retry metadata, and same-origin/path validation for provider continuation links shared with Microsoft Calendar.
 - `message.ts` validates Graph DTOs and normalizes addresses, headers, timestamps, conversation identity, labels, read state, body text, and Artifact descriptors into `communication.message@1` resources.
 - `draft.ts` validates shared complete-replacement Action inputs and Graph recipient syntax, maps text content and recipients to Graph, performs one `POST /me/messages` or `PATCH /me/messages/<id>`, validates the complete Draft response, and normalizes it through the communication resource path. There is no send handler or follow-up request.
 - `ref.ts` enforces canonical same-Source `ctx://<SOURCE>/message/<immutable-id>`, `ctx://<SOURCE>/draft/<immutable-id>`, and child `/attachment/<id>` Refs before provider I/O; Draft IDs must be canonically percent-encoded immutable IDs.
@@ -23,5 +23,5 @@ Implements the federated `microsoft.mailbox@1` Adapter for Outlook message searc
 ## Integration points
 
 - Registered by `packages/adapters/src/builtins.ts` and exported through `packages/adapters/src/index.ts`; core source/search/retrieve/artifact and Action services invoke it through Extension SDK contexts.
-- Depends on `@ctxindex/core/config` and `@ctxindex/core/errors`, `@ctxindex/extension-sdk`, `@ctxindex/profiles`, Zod, and the shared `microsoftOAuthProvider`.
+- Depends on `@ctxindex/core/config` and `@ctxindex/core/errors`, `@ctxindex/extension-sdk`, `@ctxindex/profiles`, Zod, and the shared `microsoftOAuthProvider` and provider-root Graph transport.
 - External boundary: `https://graph.microsoft.com/v1.0/`, constrained to declared host `graph.microsoft.com` by the Adapter definition and provider execution context.

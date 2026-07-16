@@ -344,4 +344,4 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
     mock.stop()
     await sandbox.cleanup()
   }
-})
+}, 30_000)

@@ -17,6 +17,10 @@ export interface MockGraphRequest {
   readonly body: string
 }
 
+export type MockGraphCalendarEvent = Readonly<Record<string, unknown>> & {
+  readonly id: string
+}
+
 export interface MockGraphAttachment {
   readonly id: string
   readonly name: string
@@ -48,6 +52,10 @@ export interface MockGraphMessage {
 
 export interface MockGraphOptions {
   readonly messages?: readonly MockGraphMessage[]
+  readonly calendarEvents?: Readonly<
+    Record<string, readonly MockGraphCalendarEvent[]>
+  >
+  readonly tokenScopes?: string
 }
 
 export interface MockGraphServer {
@@ -62,6 +70,11 @@ export interface MockGraphServer {
   setIdentity(kind: MockMicrosoftIdentityKind): void
   setTokenMode(mode: MockMicrosoftTokenMode): void
   setMessages(messages: readonly MockGraphMessage[]): void
+  setCalendarEvents(
+    calendarId: string,
+    events: readonly MockGraphCalendarEvent[],
+  ): void
+  expireDefaultCalendarDeltaOnce(): void
   setGraphStatus(status: number | undefined): void
   stop(): void
 }
@@ -164,6 +177,63 @@ function attachmentMetadata(attachment: MockGraphAttachment) {
   }
 }
 
+function calendarEventOverlapsWindow(
+  event: MockGraphCalendarEvent,
+  startDateTime: string | null,
+  endDateTime: string | null,
+): boolean {
+  if (!startDateTime || !endDateTime) return true
+  const timing = event.start as
+    | {
+        readonly date?: unknown
+        readonly dateTime?: unknown
+        readonly timeZone?: unknown
+      }
+    | undefined
+  const ending = event.end as
+    | {
+        readonly date?: unknown
+        readonly dateTime?: unknown
+        readonly timeZone?: unknown
+      }
+    | undefined
+  const parseGraphTime = (
+    value: unknown,
+    timeZone: unknown,
+  ): number | undefined => {
+    if (typeof value !== 'string') return undefined
+    const normalized =
+      timeZone === 'UTC' && !/(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
+        ? `${value}Z`
+        : value
+    const parsed = Date.parse(normalized)
+    return Number.isFinite(parsed) ? parsed : undefined
+  }
+  const eventStart =
+    parseGraphTime(timing?.dateTime, timing?.timeZone) ??
+    parseGraphTime(timing?.date, 'UTC')
+  const eventEnd =
+    parseGraphTime(ending?.dateTime, ending?.timeZone) ??
+    parseGraphTime(ending?.date, 'UTC')
+  const windowStart = Date.parse(startDateTime)
+  const windowEnd = Date.parse(endDateTime)
+  if (
+    eventStart === undefined ||
+    eventEnd === undefined ||
+    !Number.isFinite(windowStart) ||
+    !Number.isFinite(windowEnd)
+  )
+    return true
+  return eventEnd > windowStart && eventStart < windowEnd
+}
+
+function compareCalendarEventIds(
+  left: MockGraphCalendarEvent,
+  right: MockGraphCalendarEvent,
+): number {
+  return left.id < right.id ? -1 : left.id > right.id ? 1 : 0
+}
+
 export function startMockGraph(
   options: MockGraphOptions = {},
 ): MockGraphServer {
@@ -171,8 +241,28 @@ export function startMockGraph(
   const validRefreshTokens = new Set(['microsoft-initial-refresh-token'])
   let identityKind: MockMicrosoftIdentityKind = 'work'
   let tokenMode: MockMicrosoftTokenMode = 'ok'
+  const tokenScopes = options.tokenScopes ?? 'Mail.ReadWrite User.Read'
   let rotation = 0
   let messages = [...(options.messages ?? [])]
+  const calendars = new Map<string, MockGraphCalendarEvent[]>(
+    Object.entries(options.calendarEvents ?? {}).map(([id, events]) => [
+      id,
+      [...events],
+    ]),
+  )
+  let defaultCalendarVersion = 1
+  const defaultCalendarSnapshots = new Map<
+    number,
+    Map<string, MockGraphCalendarEvent>
+  >([
+    [
+      defaultCalendarVersion,
+      new Map(
+        (calendars.get('default') ?? []).map((event) => [event.id, event]),
+      ),
+    ],
+  ])
+  let expireDefaultDelta = false
   let graphStatus: number | undefined
   let draftSequence = 0
 
@@ -222,10 +312,7 @@ export function startMockGraph(
           expires_in: 3600,
           token_type: 'Bearer',
           // Microsoft commonly omits OIDC/offline scopes from this field.
-          scope:
-            tokenMode === 'insufficient_scope'
-              ? 'User.Read'
-              : 'Mail.ReadWrite User.Read',
+          scope: tokenMode === 'insufficient_scope' ? 'User.Read' : tokenScopes,
         })
       }
 
@@ -246,6 +333,177 @@ export function startMockGraph(
             { status: 400 },
           )
         }
+      }
+
+      const isCalendarRequest =
+        url.pathname === '/v1.0/me/calendarView/delta' ||
+        /^\/v1\.0\/me\/(?:calendar\/events|calendars\/[^/]+\/(?:calendarView|events))/.test(
+          url.pathname,
+        )
+      if (
+        isCalendarRequest &&
+        !request.headers.get('prefer')?.includes('outlook.timezone="UTC"')
+      ) {
+        return Response.json(
+          { error: 'utc_calendar_preference_required' },
+          { status: 400 },
+        )
+      }
+      if (isCalendarRequest && request.method !== 'GET') {
+        return Response.json({ error: 'method_not_allowed' }, { status: 405 })
+      }
+
+      if (url.pathname === '/v1.0/me/calendarView/delta') {
+        const deltaToken = url.searchParams.get('$deltatoken')
+        const skipToken = url.searchParams.get('$skiptoken')
+        if (deltaToken !== null && expireDefaultDelta) {
+          expireDefaultDelta = false
+          const restart = new URL('/v1.0/me/calendarView/delta', url.origin)
+          restart.searchParams.set('$deltatoken', '')
+          return Response.json(
+            { error: { code: 'syncStateNotFound', message: 'expired' } },
+            { status: 410, headers: { location: restart.toString() } },
+          )
+        }
+
+        let mode: 'delta' | 'initial' =
+          deltaToken === null ? 'initial' : 'delta'
+        let fromVersion = deltaToken === null ? 0 : Number(deltaToken)
+        let targetVersion = defaultCalendarVersion
+        let pageIndex = 0
+        if (skipToken !== null) {
+          const match = /^(initial|delta):(\d+):(\d+):(\d+)$/.exec(skipToken)
+          if (!match)
+            return Response.json(
+              { error: 'invalid_skiptoken' },
+              { status: 400 },
+            )
+          mode = match[1] as 'delta' | 'initial'
+          fromVersion = Number(match[2])
+          targetVersion = Number(match[3])
+          pageIndex = Number(match[4])
+        }
+
+        const targetSnapshot = defaultCalendarSnapshots.get(targetVersion)
+        const previousSnapshot =
+          mode === 'delta'
+            ? defaultCalendarSnapshots.get(fromVersion)
+            : undefined
+        if (!targetSnapshot || (mode === 'delta' && !previousSnapshot)) {
+          return Response.json(
+            { error: { code: 'syncStateNotFound', message: 'expired' } },
+            { status: 410 },
+          )
+        }
+        const windowStart = url.searchParams.get('startDateTime')
+        const windowEnd = url.searchParams.get('endDateTime')
+        const target = new Map(
+          [...targetSnapshot].filter(([, event]) =>
+            calendarEventOverlapsWindow(event, windowStart, windowEnd),
+          ),
+        )
+        const previous = previousSnapshot
+          ? new Map(
+              [...previousSnapshot].filter(([, event]) =>
+                calendarEventOverlapsWindow(event, windowStart, windowEnd),
+              ),
+            )
+          : undefined
+        const values: unknown[] = []
+        if (mode === 'initial') {
+          values.push(...target.values())
+        } else {
+          for (const [id, event] of target) {
+            const prior = previous?.get(id)
+            if (
+              prior === undefined ||
+              JSON.stringify(prior) !== JSON.stringify(event)
+            )
+              values.push(event)
+          }
+          for (const id of previous?.keys() ?? []) {
+            if (!target.has(id))
+              values.push({ id, '@removed': { reason: 'deleted' } })
+          }
+        }
+        values.sort((left, right) =>
+          String((left as { id?: unknown }).id ?? '').localeCompare(
+            String((right as { id?: unknown }).id ?? ''),
+          ),
+        )
+        const pageSize = 2
+        const page = values.slice(
+          pageIndex * pageSize,
+          (pageIndex + 1) * pageSize,
+        )
+        const payload: Record<string, unknown> = { value: page }
+        if ((pageIndex + 1) * pageSize < values.length) {
+          const next = new URL(url.pathname, url.origin)
+          if (windowStart) next.searchParams.set('startDateTime', windowStart)
+          if (windowEnd) next.searchParams.set('endDateTime', windowEnd)
+          next.searchParams.set(
+            '$skiptoken',
+            `${mode}:${fromVersion}:${targetVersion}:${pageIndex + 1}`,
+          )
+          payload['@odata.nextLink'] = next.toString()
+        } else {
+          const delta = new URL(url.pathname, url.origin)
+          if (windowStart) delta.searchParams.set('startDateTime', windowStart)
+          if (windowEnd) delta.searchParams.set('endDateTime', windowEnd)
+          delta.searchParams.set('$deltatoken', String(targetVersion))
+          payload['@odata.deltaLink'] = delta.toString()
+        }
+        return Response.json(payload)
+      }
+
+      const namedCalendarView = url.pathname.match(
+        /^\/v1\.0\/me\/calendars\/([^/]+)\/calendarView$/,
+      )
+      if (namedCalendarView?.[1]) {
+        const calendarId = decodeURIComponent(namedCalendarView[1])
+        const events = [...(calendars.get(calendarId) ?? [])]
+          .filter((event) =>
+            calendarEventOverlapsWindow(
+              event,
+              url.searchParams.get('startDateTime'),
+              url.searchParams.get('endDateTime'),
+            ),
+          )
+          .sort(compareCalendarEventIds)
+        const pageIndex = Number(url.searchParams.get('$skiptoken') ?? '0')
+        if (!Number.isInteger(pageIndex) || pageIndex < 0)
+          return Response.json({ error: 'invalid_skiptoken' }, { status: 400 })
+        const pageSize = 2
+        const payload: Record<string, unknown> = {
+          value: events.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize),
+        }
+        if ((pageIndex + 1) * pageSize < events.length) {
+          const next = new URL(url.toString())
+          next.searchParams.set('$skiptoken', String(pageIndex + 1))
+          payload['@odata.nextLink'] = next.toString()
+        }
+        return Response.json(payload)
+      }
+
+      const defaultCalendarEvent = url.pathname.match(
+        /^\/v1\.0\/me\/calendar\/events\/([^/]+)$/,
+      )
+      const namedCalendarEvent = url.pathname.match(
+        /^\/v1\.0\/me\/calendars\/([^/]+)\/events\/([^/]+)$/,
+      )
+      if (defaultCalendarEvent?.[1] || namedCalendarEvent?.[2]) {
+        const calendarId = namedCalendarEvent?.[1]
+          ? decodeURIComponent(namedCalendarEvent[1])
+          : 'default'
+        const eventId = decodeURIComponent(
+          (namedCalendarEvent?.[2] ?? defaultCalendarEvent?.[1]) as string,
+        )
+        const event = calendars
+          .get(calendarId)
+          ?.find((candidate) => candidate.id === eventId)
+        return event
+          ? Response.json(event)
+          : Response.json({ error: 'not_found' }, { status: 404 })
       }
 
       if (url.pathname === '/v1.0/me/messages' && request.method === 'POST') {
@@ -473,6 +731,19 @@ export function startMockGraph(
     },
     setMessages(value) {
       messages = [...value]
+    },
+    setCalendarEvents(calendarId, events) {
+      calendars.set(calendarId, [...events])
+      if (calendarId === 'default') {
+        defaultCalendarVersion += 1
+        defaultCalendarSnapshots.set(
+          defaultCalendarVersion,
+          new Map(events.map((event) => [event.id, event])),
+        )
+      }
+    },
+    expireDefaultCalendarDeltaOnce() {
+      expireDefaultDelta = true
     },
     setGraphStatus(status) {
       graphStatus = status

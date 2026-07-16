@@ -4,12 +4,12 @@
   "objective": "Implement secure provider-neutral Accounts and Grants, repair secrets backend operations, and add production Google Calendar plus Microsoft Graph mail/calendar Adapters with read access and reversible Draft create/update only, verified through isolated mocked and explicit Human OAuth checkpoints without any send capability.",
   "status": "active",
   "createdAt": "2026-07-16T11:56:52.401Z",
-  "updatedAt": "2026-07-16T19:16:35.609Z",
+  "updatedAt": "2026-07-16T20:10:11.179Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
   "previousStatus": "active",
-  "nextSeq": 2800,
-  "latestSourceSeq": 2790,
-  "snapshotHash": "e27c4c7dfb23501fa5feb478a82dad0611145129657cdea9d952e56ae06c2cd2",
+  "nextSeq": 3174,
+  "latestSourceSeq": 3167,
+  "snapshotHash": "b2ff26ec7a96166e2483832128900d028449a6f0e1b12b73119f70fcbb92d431",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -140,10 +140,10 @@
         "C8"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "pass",
+        "note": "provider-owned default v1.0 delta and named-calendar complete scans, exact Source-scoped retrieval, cross-provider Realm/search/get/window isolation, `Calendars.Read`, and no beta/write routes pass focused/full/compiled gates and independent review; see `work/slice-9-microsoft-calendar-gate.md`"
       },
-      "statusSeq": 2109
+      "statusSeq": 3131
     },
     {
       "id": "C12",
@@ -156,9 +156,9 @@
       ],
       "status": {
         "value": "in-progress",
-        "note": "Google/Microsoft identity and reads plus Outlook Drafts now pass declared-host, loopback-only mock, redaction, canonical malformed-input zero-I/O, one-shot mutation, and no-send gates; Microsoft Calendar remains in Slice 9; see `work/slice-7-microsoft-mail-gate.md` and `work/slice-8-outlook-draft-gate.md`"
+        "note": "Google/Microsoft identity, mail/calendar reads, and Outlook Drafts pass declared-host, loopback-only mock, redaction, canonical malformed-input zero-I/O, one-shot mutation, and no-send gates; Slice 10 still owns the final recursive global hardening; see `work/slice-7-microsoft-mail-gate.md`, `work/slice-8-outlook-draft-gate.md`, and `work/slice-9-microsoft-calendar-gate.md`"
       },
-      "statusSeq": 2780
+      "statusSeq": 3131
     },
     {
       "id": "C13",
@@ -172,9 +172,9 @@
       ],
       "status": {
         "value": "in-progress",
-        "note": "compiled workflows now prove named Google mailbox/calendar and Microsoft Outlook Sources across exact Realms with Account inventory, mail/event search/get, Outlook thread/export/attachment cache, and Outlook Draft create/update/cached get/export; Microsoft Calendar remains"
+        "note": "compiled workflows now add named Microsoft Calendar beside Google Calendar and Outlook across exact Realms with Account inventory, isolated overlapping event ids, search/get/update/delete/window behavior, threads/exports/attachment cache, and reversible Drafts; Slice 10 still owns one relocated all-product workflow"
       },
-      "statusSeq": 2780
+      "statusSeq": 3131
     },
     {
       "id": "C14",
@@ -189,9 +189,9 @@
       ],
       "status": {
         "value": "in-progress",
-        "note": "registry-derived interfaces now expose Microsoft OAuth/mailbox and exact shared Draft Action declarations through generic commands without provider-specific CLI/core paths; Microsoft Calendar declarations and final generated guidance verification remain"
+        "note": "registry-derived interfaces now expose Microsoft OAuth/mailbox/calendar and exact read-only Calendar plus reversible Draft declarations through generic commands without provider-specific CLI/core paths; Slice 10 still owns final generated guidance and package verification"
       },
-      "statusSeq": 2780
+      "statusSeq": 3131
     },
     {
       "id": "C15",
@@ -204,9 +204,9 @@
       ],
       "status": {
         "value": "in-progress",
-        "note": "Slice 8 focused/full/compiled/D3/strict/review gates pass 913/0 with redacted evidence and 0 critical/important review findings; Microsoft Calendar, live Human checkpoint, final drift, and fresh-context QA remain; see `work/slice-8-outlook-draft-gate.md`"
+        "note": "Slice 9 Microsoft/Google calendar focused/full/compiled/D3/strict gates and corrected independent reviews pass with no remaining critical/important findings; the live Microsoft Human checkpoint, final drift, and fresh-context QA remain; see `work/slice-9-microsoft-calendar-gate.md`"
       },
-      "statusSeq": 2780
+      "statusSeq": 3131
     }
   ]
 }

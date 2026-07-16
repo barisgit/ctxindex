@@ -30,6 +30,11 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
       },
       { id: 'local.directory', version: 1, capabilities: ['sync'] },
       {
+        id: 'microsoft.calendar',
+        version: 1,
+        capabilities: ['retrieve', 'sync'],
+      },
+      {
         id: 'microsoft.mailbox',
         version: 1,
         capabilities: ['download', 'retrieve', 'search-remote'],
@@ -96,6 +101,10 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
     })
     expect(
       description.sources.find(({ id }) => id === 'google.calendar')?.profiles,
+    ).toEqual([{ id: 'calendar.event', version: 1 }])
+    expect(
+      description.sources.find(({ id }) => id === 'microsoft.calendar')
+        ?.profiles,
     ).toEqual([{ id: 'calendar.event', version: 1 }])
     expect(
       description.sources.find(({ id }) => id === 'local.directory')?.profiles,

@@ -7,7 +7,7 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 ## Design / patterns
 
 - Bun/Turborepo monorepo split into a user-facing application (`apps/`), reusable runtime and contract packages (`packages/`), external authoring examples (`examples/`), and repository tooling (`scripts/`).
-- Layered boundaries keep CLI presentation separate from provider-neutral core services and Profiles: the communication Profile owns shared Draft Action contracts, while Adapters own provider-specific Google, Microsoft Graph, and filesystem I/O.
+- Layered boundaries keep CLI presentation separate from provider-neutral core services and Profiles: calendar and communication Profiles own shared vocabulary and Draft Action contracts, while Adapters own provider-specific Google, Microsoft Graph, and filesystem I/O.
 - Extensions bundle declarative Profiles and Source Adapters; core registries validate definitions and OAuth provider declarations before workflows dispatch operations and persist local state.
 - Secret persistence and central typed environment capture provide provider credentials without moving provider-specific transport logic into core.
 
@@ -21,13 +21,13 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 
 ## Data & control flow
 
-CLI input is parsed and dispatched by `apps/cli/` into core services. Core loads Profile, Adapter, and OAuth declarations, constrains authenticated provider contexts, validates outputs, and coordinates search, retrieval, Artifact download, Actions, sync, persistence, and typed secrets. Gmail and Microsoft Graph Outlook Adapters implement the shared reversible Draft create/update Actions as one provider mutation that returns and materializes a canonical Draft Resource; sending remains outside the Action surface. Google APIs, Microsoft Graph, or the local filesystem remain behind Adapter operation contracts; results return through CLI formatters with stable process statuses. Stateful provider mocks exercise the complete Outlook create/update and cached read/export flow at CLI e2e scope.
+CLI input is parsed and dispatched by `apps/cli/` into core services. Core loads Profile, Adapter, and OAuth declarations, constrains authenticated provider contexts, validates outputs, and coordinates search, retrieval, Artifact download, Actions, sync, persistence, and typed secrets. Gmail and Microsoft Graph Outlook Adapters implement the shared reversible Draft create/update Actions as one provider mutation that returns and materializes a canonical Draft Resource; sending remains outside the Action surface. Indexed Google and Microsoft Calendar Adapters synchronize provider events into the shared calendar Profile, while provider-root Graph transport serves both Microsoft calendar and mailbox modules. Google APIs, Microsoft Graph, or the local filesystem remain behind Adapter operation contracts; results return through CLI formatters with stable process statuses.
 
 ## Integration points
 
 - Root orchestration: Bun workspaces and Turbo tasks in `package.json`; repository gates enforce dependency and architecture boundaries.
 - Runtime: core storage, schema, configuration, secrets, logging, networking, auth, and operation services under `packages/core/src/`.
-- External systems: Google OAuth/Gmail/Calendar, Microsoft OAuth/Graph Outlook mailbox, and filesystem access under `packages/adapters/src/`.
+- External systems: Google OAuth/Gmail/Calendar, Microsoft OAuth/Graph Calendar and Outlook mailbox, and filesystem access under `packages/adapters/src/`.
 - Public extension boundary: `packages/extension-sdk/src/index.ts`, demonstrated by `examples/`.
 
 ## Directory map

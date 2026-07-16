@@ -100,15 +100,15 @@
 
 ## 9. Microsoft Calendar Adapter
 
-- [ ] 9.1 Add provider-owned `microsoft/calendar` definition/config with one default/explicit calendar, positive rolling window, `calendar.event@1`, `Calendars.Read`, indexed sync/retrieve, built-in registration, and stateful Graph mocks for default-calendar v1.0 delta plus named-calendar v1.0 full window scans, without beta or write routes.
-- [ ] 9.2 Implement/test strict Graph event/delta schemas and normalization using immutable ids plus UTC response preference while preserving original zones, all-day ranges, attendees/organizer/status/recurrence/series identity, removed entries, and deterministic warnings.
-- [ ] 9.3 Implement/test default-calendar fixed-window initial/multi-page delta sync, opaque next/delta URL validation, manifest/final-link checkpoint, incremental changes/deletions and expired/invalid link reconciliation; implement/test named-calendar complete paged v1.0 window scans with manifest reconciliation and no delta cursor; cover monthly/config/resync window roll, diff, cancellation, and partial-failure preservation for both strategies.
-- [ ] 9.4 Implement/test calendar-scoped canonical retrieval with stable Ref, linked Grant/host confinement, complete event emission, 404/bad-response taxonomy, and foreign Source/calendar zero I/O.
-- [ ] 9.5 Extend compiled multi-provider e2e with named personal Google and work Microsoft calendar Sources, sync/search/get across both, exact Realm filters, overlapping event identity isolation, update/delete/window behavior, Account inventory, and no calendar mutation Actions/routes/scopes.
+- [x] 9.1 Add provider-owned `microsoft/calendar` definition/config with one default/explicit calendar, positive rolling window, `calendar.event@1`, `Calendars.Read`, indexed sync/retrieve, built-in registration, and stateful Graph mocks for default-calendar v1.0 delta plus named-calendar v1.0 full window scans, without beta or write routes.
+- [x] 9.2 Implement/test strict Graph event/delta schemas and normalization using immutable ids plus UTC response preference while preserving original zones, all-day ranges, attendees/organizer/status/recurrence/series identity, removed entries, and deterministic warnings.
+- [x] 9.3 Implement/test default-calendar fixed-window initial/multi-page delta sync, opaque next/delta URL validation, manifest/final-link checkpoint, incremental changes/deletions and expired/invalid link reconciliation; implement/test named-calendar complete paged v1.0 window scans with manifest reconciliation and no delta cursor; cover monthly/config/resync window roll, diff, cancellation, and partial-failure preservation for both strategies.
+- [x] 9.4 Implement/test calendar-scoped canonical retrieval with stable Ref, linked Grant/host confinement, complete event emission, 404/bad-response taxonomy, and foreign Source/calendar zero I/O.
+- [x] 9.5 Extend compiled multi-provider e2e with named personal Google and work Microsoft calendar Sources, sync/search/get across both, exact Realm filters, overlapping event identity isolation, update/delete/window behavior, Account inventory, and no calendar mutation Actions/routes/scopes.
 
 ### Slice 9 gate
 
-- [ ] 9.6 Run Microsoft/Google calendar/Profile/sync focused and integration/e2e tests, provider no-write/egress gates, D3, typecheck/lint/architecture/dependency/full suites, strict OpenSpec/diff; independently review delta/window/time semantics and save `work/slice-9-microsoft-calendar-gate.md`.
+- [x] 9.6 Run Microsoft/Google calendar/Profile/sync focused and integration/e2e tests, provider no-write/egress gates, D3, typecheck/lint/architecture/dependency/full suites, strict OpenSpec/diff; independently review delta/window/time semantics and save `work/slice-9-microsoft-calendar-gate.md`.
 
 ## 10. Cross-provider Product Workflow and Human Acceptance
 
