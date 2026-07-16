@@ -4,11 +4,11 @@
   "objective": "Implement secure provider-neutral Accounts and Grants, repair secrets backend operations, and add production Google Calendar plus Microsoft Graph mail/calendar Adapters with read access and reversible Draft create/update only, verified through isolated mocked and explicit Human OAuth checkpoints without any send capability.",
   "status": "active",
   "createdAt": "2026-07-16T11:56:52.401Z",
-  "updatedAt": "2026-07-16T17:09:04.646Z",
+  "updatedAt": "2026-07-16T17:31:23.568Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
-  "nextSeq": 2053,
-  "latestSourceSeq": 2043,
-  "snapshotHash": "8c87a0e0a6f03b54f25b4fa71d88e31a859b28b58fc7273b78120b200a65ba9a",
+  "nextSeq": 2094,
+  "latestSourceSeq": 2087,
+  "snapshotHash": "4aebfaa63f47a6f7f2fae33e7b954e8bc0a8e5143ce9c536bc85a97045f510dc",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -16,9 +16,9 @@
       "depends": [],
       "status": {
         "value": "pass",
-        "note": ""
+        "note": "reverified 2026-07-16 after `069725d`: strict change/all OpenSpec validation and final CI pass with the accepted scope/design; see `work/slice-1-contract-gate.md` and `work/slice-6-google-calendar-mocked-gate.md`"
       },
-      "statusSeq": 235
+      "statusSeq": 2086
     },
     {
       "id": "C2",
@@ -28,9 +28,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": ""
+        "note": "reverified 2026-07-16 after `069725d`: final CI/full suite retain explicit typed backends, no fallback/literal-secret CLI, and crash-safe switching; see `work/slice-2-secrets-gate.md`"
       },
-      "statusSeq": 816
+      "statusSeq": 2086
     },
     {
       "id": "C3",
@@ -43,7 +43,7 @@
         "value": "in-progress",
         "note": "provider-neutral Google OAuth, stable Account upsert, and generic Grants pass; Microsoft subject proof remains in its provider slice"
       },
-      "statusSeq": 1357
+      "statusSeq": 2086
     },
     {
       "id": "C4",
@@ -53,9 +53,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "safe nested inventory, strict Account CLI, and the compiled multi-Grant/multi-Source proof pass without exposing provider subjects or secret material"
+        "note": "reverified 2026-07-16 after `069725d`: compiled Google workflow lists one Account/Grant and three named Realm/Source bindings with exact scopes and no subject/secret output; see `work/slice-6-google-calendar-mocked-gate.md`"
       },
-      "statusSeq": 1573
+      "statusSeq": 2086
     },
     {
       "id": "C5",
@@ -65,9 +65,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "strict Profile, bounded projections, exact Source-scoped Refs/series Relations, public registration, and generic storage/search/get proofs pass"
+        "note": "reverified 2026-07-16 after `069725d`: strict Profile tests, provider-neutral integration, Calendar Adapter tests, and full suite pass exact Refs/relations and generic storage/search/get; see `work/slice-5-calendar-profile-gate.md` and `work/slice-6-google-calendar-mocked-gate.md`"
       },
-      "statusSeq": 1753
+      "statusSeq": 2086
     },
     {
       "id": "C6",
@@ -78,9 +78,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "mocked full/incremental sync, paging, cancellation/tombstone, newly anchored recovery/reconciliation, retrieve/search/get, exact shared Grant/scopes/Realms, GET-only egress, and the real compiled workflow pass; see `work/slice-6-google-calendar-mocked-gate.md`"
+        "note": "reverified 2026-07-16 at `069725d`: final CI, 862-test suite, focused Calendar tests, compiled workflow, and two independent approvals prove sync/reconciliation/retrieve, exact Grant/scopes/Realms, and GET-only egress; see `work/slice-6-google-calendar-mocked-gate.md`"
       },
-      "statusSeq": 2000
+      "statusSeq": 2086
     },
     {
       "id": "C7",
@@ -92,7 +92,7 @@
         "value": "in-progress",
         "note": "mocked gate passes and fresh ignored state/read plan are prepared in `work/google-human-checkpoint-plan.md`; explicit user browser/consent and harmless-query approval remain required"
       },
-      "statusSeq": 2051
+      "statusSeq": 2086
     },
     {
       "id": "C8",
@@ -105,7 +105,7 @@
         "value": "pending",
         "note": ""
       },
-      "statusSeq": 8
+      "statusSeq": 2086
     },
     {
       "id": "C9",
@@ -117,7 +117,7 @@
         "value": "pending",
         "note": ""
       },
-      "statusSeq": 8
+      "statusSeq": 2086
     },
     {
       "id": "C10",
@@ -129,7 +129,7 @@
         "value": "pending",
         "note": ""
       },
-      "statusSeq": 8
+      "statusSeq": 2086
     },
     {
       "id": "C11",
@@ -142,7 +142,7 @@
         "value": "pending",
         "note": ""
       },
-      "statusSeq": 8
+      "statusSeq": 2086
     },
     {
       "id": "C12",
@@ -157,7 +157,7 @@
         "value": "pending",
         "note": ""
       },
-      "statusSeq": 8
+      "statusSeq": 2086
     },
     {
       "id": "C13",
@@ -173,7 +173,7 @@
         "value": "pending",
         "note": ""
       },
-      "statusSeq": 8
+      "statusSeq": 2086
     },
     {
       "id": "C14",
@@ -190,7 +190,7 @@
         "value": "pending",
         "note": ""
       },
-      "statusSeq": 8
+      "statusSeq": 2086
     },
     {
       "id": "C15",
@@ -205,7 +205,7 @@
         "value": "pending",
         "note": ""
       },
-      "statusSeq": 8
+      "statusSeq": 2086
     }
   ]
 }

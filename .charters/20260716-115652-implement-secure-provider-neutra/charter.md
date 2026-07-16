@@ -24,12 +24,12 @@ Out of scope: sending mail, calendar mutations, on-premises Exchange, arbitrary 
 
 ### C1. Normative scope and domain language are coherent
 The milestone, OpenSpec artifacts, and domain documents define provider-neutral Accounts, Grants, calendar Resources, secrets behavior, Microsoft Graph scope, and mutation limits without duplicating or contradicting the timeless specification.
-Status: pass
+Status: pass — reverified 2026-07-16 after `069725d`: strict change/all OpenSpec validation and final CI pass with the accepted scope/design; see `work/slice-1-contract-gate.md` and `work/slice-6-google-calendar-mocked-gate.md`
 
 ### C2. Secret backend operation is explicit and safe
 The CLI can report the active backend without exposing secret values and explicitly switch between OS Keychain and encrypted file storage. It never silently falls back, never accepts passphrases in argv, does not strand references if a switch fails, and persists the selected backend only after successful movement.
 Depends: C1
-Status: pass
+Status: pass — reverified 2026-07-16 after `069725d`: final CI/full suite retain explicit typed backends, no fallback/literal-secret CLI, and crash-safe switching; see `work/slice-2-secrets-gate.md`
 
 ### C3. Accounts and Grants are provider-neutral and deduplicated
 Google and Microsoft authorization resolve a stable external identity, upsert exactly one Account per provider identity, retain explicit Grants and scope sets, and allow multiple Sources to reuse a compatible Grant without duplicate Accounts.
@@ -39,17 +39,17 @@ Status: in-progress — provider-neutral Google OAuth, stable Account upsert, an
 ### C4. Agents can inspect configured Accounts and Sources
 A deterministic `account list` interface exposes safe nested Account, Grant, scope, Realm, and Source information in readable and JSON forms, while `source list` remains the canonical inventory including unauthenticated Sources. No secret material is rendered or logged.
 Depends: C3
-Status: pass — safe nested inventory, strict Account CLI, and the compiled multi-Grant/multi-Source proof pass without exposing provider subjects or secret material
+Status: pass — reverified 2026-07-16 after `069725d`: compiled Google workflow lists one Account/Grant and three named Realm/Source bindings with exact scopes and no subject/secret output; see `work/slice-6-google-calendar-mocked-gate.md`
 
 ### C5. Calendar events use one provider-neutral Profile
 A strict `calendar.event@1` Profile represents timed and all-day events, organizers, attendees, recurrence, status, location, description, provider calendar identity, typed fields, chunks, and stable relations without provider-specific core/storage paths.
 Depends: C1
-Status: pass — strict Profile, bounded projections, exact Source-scoped Refs/series Relations, public registration, and generic storage/search/get proofs pass
+Status: pass — reverified 2026-07-16 after `069725d`: strict Profile tests, provider-neutral integration, Calendar Adapter tests, and full suite pass exact Refs/relations and generic storage/search/get; see `work/slice-5-calendar-profile-gate.md` and `work/slice-6-google-calendar-mocked-gate.md`
 
 ### C6. Google Calendar is a complete read Source Adapter
 A configured Google Calendar Source uses exact selected scopes and supports deterministic incremental sync, pagination, tombstones, invalid-cursor recovery, retrieval, stable Source-scoped Refs, and generic search/get over selected calendars with no calendar mutation capability.
 Depends: C3, C5
-Status: pass — mocked full/incremental sync, paging, cancellation/tombstone, newly anchored recovery/reconciliation, retrieve/search/get, exact shared Grant/scopes/Realms, GET-only egress, and the real compiled workflow pass; see `work/slice-6-google-calendar-mocked-gate.md`
+Status: pass — reverified 2026-07-16 at `069725d`: final CI, 862-test suite, focused Calendar tests, compiled workflow, and two independent approvals prove sync/reconciliation/retrieve, exact Grant/scopes/Realms, and GET-only egress; see `work/slice-6-google-calendar-mocked-gate.md`
 
 ### C7. Google multi-Source consent works live
 At an explicit Human checkpoint, one approved Google Account can authorize the exact requested mailbox/calendar scopes, reuse one compatible Grant across named mailbox and calendar Sources, and expose the exact approved harmless live mailbox and calendar search/get evidence without leaking credentials or mutating provider state.
