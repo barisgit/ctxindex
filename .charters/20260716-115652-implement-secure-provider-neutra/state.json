@@ -4,11 +4,11 @@
   "objective": "Implement secure provider-neutral Accounts and Grants, repair secrets backend operations, and add production Google Calendar plus Microsoft Graph mail/calendar Adapters with read access and reversible Draft create/update only, verified through isolated mocked and explicit Human OAuth checkpoints without any send capability.",
   "status": "active",
   "createdAt": "2026-07-16T11:56:52.401Z",
-  "updatedAt": "2026-07-16T17:06:08.381Z",
+  "updatedAt": "2026-07-16T17:09:04.646Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
-  "nextSeq": 2026,
-  "latestSourceSeq": 2017,
-  "snapshotHash": "c6fafcb18ceeec547495009ad22ae5cf07091f210435d59819f6df92023be4c2",
+  "nextSeq": 2053,
+  "latestSourceSeq": 2043,
+  "snapshotHash": "8c87a0e0a6f03b54f25b4fa71d88e31a859b28b58fc7273b78120b200a65ba9a",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -90,9 +90,9 @@
       ],
       "status": {
         "value": "in-progress",
-        "note": "mocked gate passes; fresh ignored live checkpoint state and explicit user browser/consent approval remain required"
+        "note": "mocked gate passes and fresh ignored state/read plan are prepared in `work/google-human-checkpoint-plan.md`; explicit user browser/consent and harmless-query approval remain required"
       },
-      "statusSeq": 2000
+      "statusSeq": 2051
     },
     {
       "id": "C8",

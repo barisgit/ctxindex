@@ -54,7 +54,7 @@ Status: pass — mocked full/incremental sync, paging, cancellation/tombstone, n
 ### C7. Google multi-Source consent works live
 At an explicit Human checkpoint, one approved Google Account can authorize the exact requested mailbox/calendar scopes, reuse one compatible Grant across named mailbox and calendar Sources, and expose the exact approved harmless live mailbox and calendar search/get evidence without leaking credentials or mutating provider state.
 Depends: C6
-Status: in-progress — mocked gate passes; fresh ignored live checkpoint state and explicit user browser/consent approval remain required
+Status: in-progress — mocked gate passes and fresh ignored state/read plan are prepared in `work/google-human-checkpoint-plan.md`; explicit user browser/consent and harmless-query approval remain required
 
 ### C8. Microsoft authorization supports personal and work Accounts
 The Microsoft identity flow supports approved Outlook.com and Microsoft 365 Accounts through authorization code with PKCE/loopback semantics, exact Adapter-selected delegated scopes, refresh, stable external identity, deterministic errors, and no broader permissions than loaded selected Sources require.
