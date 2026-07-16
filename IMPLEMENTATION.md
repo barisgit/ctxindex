@@ -2,7 +2,7 @@
 
 Status: draft
 
-This document describes intended reference-implementation choices for `SPEC.md` and the V1 scope in `V1.md`. The repository's current code and local databases are disposable prototype scaffolding: implementation proceeds against a fresh schema with no compatibility or data-migration path.
+This document describes intended reference-implementation choices for `SPEC.md` and the milestone scopes in `V1.md` and `V1_1.md`. The repository's current code and local databases are disposable prototype scaffolding: implementation proceeds against a fresh schema with no compatibility or data-migration path.
 
 ## 1. Runtime and distribution
 
@@ -123,6 +123,14 @@ Realms are ordinary user-defined rows; initialization does not seed a `global` R
 
 A Source binds exactly one Adapter, one Realm, one config payload, and when required one compatible Grant. Sync enablement is Source configuration, not Source identity.
 
+## 8a. Secrets, Accounts, and provider authorization
+
+A routing Secret Vault resolves reads/deletes by typed `keychain:` or `file:` reference and sends new writes only to the backend persisted in config. Fresh initialization probes Keychain once and persists either Keychain or an explicitly prepared encrypted-file backend. Backend changes use copy-first, reference-update, atomic-config, then cleanup ordering; mixed references remain readable during interruption. Secret values and passphrases never enter argv.
+
+Accounts use a unique stable `(provider, external_user_id)` subject. Mutable verified email/principal values live in `account_identities`; Grants retain exact normalized scopes and secret references; Sources retain explicit compatible Grant ids. One Account module owns upsert and nested inventory SQL.
+
+OAuth Adapter declarations carry a stable provider id, endpoint/identity JSON-path metadata, PKCE/client mode, provider base scopes, safe environment names, and allowed hosts. `auth add` selects loaded Adapter ids and core requests only their scope union. One core host flow owns explicit loopback, state/PKCE, token/identity validation, refresh rotation, Account/Grant persistence, and cleanup. Provider response schemas and Resource normalization remain in provider-owned Adapter modules.
+
 ## 9. Search and retrieval
 
 Search normalizes one query/filter model, plans local and provider origins per Source, and merges warnings without losing successful local results. Local BM25 and provider relevance scores are ranked within their origins and interleaved rather than compared numerically.
@@ -140,7 +148,7 @@ communication.message.draft.create
 communication.message.draft.update
 ```
 
-Both require an explicit mailbox Source. The host validates input before provider I/O; the Adapter persists the provider Draft and returns a normalized `communication.message` Resource/Ref. Gmail Draft Refs use `ctx://<source-id>/draft/<immutable-draft-id>` because Gmail replaces the embedded Message id on update. Update input addresses that Ref and supplies complete replacement recipients, subject, and body. Gmail remote message discovery excludes Draft-labelled messages to prevent a second message-id identity for the same Draft. The Gmail Adapter and OAuth Grant require `gmail.readonly` plus `gmail.compose`, but no send binding exists. A Draft is reversible provider state. Message sending and irreversible action execution are not implemented in V1.
+Both require an explicit mailbox Source. The host validates input before provider I/O; the Adapter persists the provider Draft and returns a normalized `communication.message` Resource/Ref. Gmail Draft Refs use `ctx://<source-id>/draft/<immutable-draft-id>` because Gmail replaces the embedded Message id on update. Outlook Draft Refs use the Microsoft Graph message id returned under `Prefer: IdType="ImmutableId"` on every relevant request. Update input addresses that Ref and supplies complete replacement recipients, subject, and body. Mailbox search excludes provider Drafts to prevent a second message identity. Gmail requires `gmail.readonly` plus `gmail.compose`; Microsoft requires delegated `Mail.ReadWrite`; neither binds send, requests `Mail.Send`/a send-only permission, exposes a send route, or retries a mutation automatically. A Draft is reversible provider state. Message sending and irreversible action execution remain unimplemented.
 
 The generic CLI shape is:
 
@@ -155,15 +163,15 @@ No bespoke `mail draft` command is maintained in parallel.
 
 The loaded registries determine valid kinds/aliases, field names and parsers, Source configuration flags, export formats, and Actions. `ctxindex describe` exposes a compact generated index, selector-only forms narrow that index, exact-id forms expose full readable or JSON detail, and explicit `--full` requests the complete snapshot. Citty help points to this interface instead of appending all loaded definitions.
 
-All required input is non-interactive. OAuth may open a browser but has a headless authorization-code path. Human text goes to stderr when structured output is requested; JSON data goes to stdout.
+All required input is non-interactive. OAuth opens a browser only when explicitly requested and has a headless environment/typed-secret path; codes, tokens, client secrets, and secret-store passphrases are never literal command arguments. Human text goes to stderr when structured output is requested; JSON data goes to stdout.
 
 ## 12. Testing
 
 - Bun's built-in test runner; tests live beside source as `*.test.ts`, `*.integration.test.ts`, and `*.e2e.test.ts`.
 - Every storage/integration test creates a fresh sandboxed database.
-- Provider tests use mocked authorized HTTP; optional live Gmail checks remain separate.
+- Provider tests use stateful loopback-only authorized HTTP for Google and Microsoft; optional live checks remain isolated Human checkpoints.
 - Contract tests instantiate bundled and external definitions through the same public SDK.
 - Architecture checks keep provider HTTP and SQL out of `apps/cli`.
 - The D3 compiled-extension spike runs in CI.
 
-Implementation follows the vertical slices in `V1.md`; no slice starts by reproducing the prototype schema or preserving prototype behavior.
+Implementation follows the vertical slices in the active milestone; no slice starts by reproducing the prototype schema or preserving prototype behavior.

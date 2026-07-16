@@ -14,6 +14,7 @@ Contains executable static and runtime verification gates for CLI layering, fram
 - `exports-map.ts` validates required `@ctxindex/core` subpath declarations, target files, runtime resolution, and absence of deep core imports.
 - `no-prompts-static.ts` rejects prompt libraries and direct stdin/readline use in production CLI TypeScript; `agent-howtos.test.ts` verifies repository-owned agent guidance against the real CLI command surface.
 - `package-dependencies.ts` uses the TypeScript AST to discover imports in every app/package production and colocated test file, then enforces direct runtime declarations, dependency use, and workspace direction. `communication-message-profile.test.ts` owns the cross-package bundled Profile-to-registry integration contract.
+- `multi-provider-architecture.red.ts` is the explicit red contract for the V1.1 provider work. It discovers provider ownership, OAuth/secret boundaries, calendar Profile ownership, and send surfaces; assertions move into the normal architecture suite as their dependency-ordered implementation slices turn green.
 
 ## Flow
 
@@ -28,3 +29,4 @@ Contains executable static and runtime verification gates for CLI layering, fram
 - `cli-framework-citty.ts` invokes the Bun CLI entry point and inspects command modules under `apps/cli/src/commands/`.
 - `exports-map.ts` consumes `packages/core/package.json` and imports `@ctxindex/core/{auth,sync,realm,source,search,errors}`.
 - All scripts target Bun APIs/runtime and expose process exit status as their integration contract for higher-level verification runners.
+- Red contract files are invoked only by exact path while implementation is pending; normal test discovery remains green, and final gates require every red assertion to be promoted or removed.

@@ -295,15 +295,33 @@ through their capability-specific contexts.
 ### Auth (D5)
 
 ```ts
-auth: { kind: "oauth2", provider: { authUrl, tokenUrl }, scopes: [...] }
+auth: {
+  kind: "oauth2",
+  provider: {
+    id,
+    authorizationUrl,
+    tokenUrl,
+    identity: { url, subjectPath, labelPaths, accountIdentityPaths },
+    pkce,
+    client,
+    baseScopes,
+    allowedHosts,
+  },
+  scopes: [...],
+}
 auth: { kind: "api-key", label: "Fastmail API token" }
 auth: { kind: "basic" } | { kind: "none" } | { kind: "custom" }
 ```
 
 Core runs declarative flows, stores secrets, refreshes tokens, surfaces
 `needs_auth` (exit 10) uniformly, hands adapters a pre-authorized `ctx.fetch`.
-`custom` grants only `ctx.secrets.get/set` (namespaced); `auth list` shows it
-as custom-managed.
+OAuth consent derives from explicitly selected loaded Adapters: provider base
+scopes plus only their sorted scope union. Core resolves stable provider
+identity, upserts one Account per `(provider, external subject)`, records
+verified Account Identities, and stores exact Grants. Reads route typed secret
+references to their backend while new writes use only the configured backend;
+there is no silent fallback. `custom` grants only `ctx.secrets.get/set`
+(namespaced).
 
 ### Realms and Sources (D20)
 
@@ -311,6 +329,11 @@ Realms are exact user-defined operating contexts. Every Source must select one
 existing Realm; initialization seeds no `global` Realm. An unfiltered query
 spans all Realms, while `--realm company` includes only company Sources.
 Realms organize reasoning and search, not authorization.
+
+An Account may own multiple Grants and back multiple Sources. Multiple Sources
+may explicitly share one compatible Grant; authorization never creates an
+"account Source", and Source creation never selects the latest Grant
+implicitly when more than one is compatible.
 
 ### Typed Actions (D21)
 
@@ -329,6 +352,13 @@ remote message discovery excludes the `DRAFT` label so the mutable embedded
 Message id cannot create a second Resource identity for the same Draft. The
 Gmail Adapter and OAuth grant require both `gmail.readonly` and `gmail.compose`;
 ctxindex exposes no send binding despite the broader provider scope.
+
+Microsoft Graph mailbox Sources bind the same two Profile Actions. Every
+message/Draft request opts into `Prefer: IdType="ImmutableId"`; create uses one
+`POST /me/messages`, update uses one `PATCH /me/messages/{id}`, and the stable
+Ref is `ctx://<source-id>/draft/<immutable-message-id>`. The Grant requires
+delegated `Mail.ReadWrite` but never `Mail.Send`; no send/reply-send/forward-send
+route or Action exists and mutations are never automatically retried.
 
 ### Search routing (D7, provisional)
 
@@ -391,7 +421,8 @@ before building bespoke fetch logic.
 
 ```text
 ctxindex init
-ctxindex auth add <provider> | list
+ctxindex auth add <provider> --adapter <id>... (--loopback|--from-env)
+ctxindex account list [--json]
 ctxindex realm add|list|remove
 ctxindex source add <adapter-id> --realm <slug> [--account ...] [--no-sync] [adapter flags]
 ctxindex source list|remove
@@ -412,7 +443,8 @@ ctxindex purge index|raw|artifacts|adhoc|source <id>
 ctxindex extensions list
 ctxindex describe [profile|adapter|action] [id] [--json]
 ctxindex skills list|get|path      # retained; ACF may supersede
-ctxindex secrets migrate <backend>
+ctxindex secrets status [--json]
+ctxindex secrets backend set <keychain|file>
 ```
 
 Search results and Source descriptions carry machine-readable affordances so

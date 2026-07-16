@@ -44,6 +44,10 @@ _Avoid_: Arbitrary extension command, workflow, provider API call
 A reversible, provider-persisted proposed change, such as a message saved in a mailbox's Drafts collection; text composed only in an agent conversation is not yet a Draft.
 _Avoid_: Suggested text, sent message
 
+**Calendar Event**:
+A provider record occupying a timed interval or an all-day date range in one calendar; a meeting is one kind of Calendar Event, not a synonym for all Calendar Events.
+_Avoid_: Event, meeting
+
 **Source Adapter**:
 Provider-facing code that implements declared operations such as sync, remote search, retrieval, download, and Profile Actions for a Source.
 _Avoid_: Plugin, Extension, connector
@@ -91,6 +95,7 @@ _Avoid_: Source, import
 - A **Realm** contains zero or more **Sources**; every **Source** belongs to exactly one **Realm**.
 - An unscoped query considers all **Realms**; a realm-scoped query considers exactly the requested Realms.
 - A **Source** uses exactly one **Source Adapter** and may use one **Account** through one **Grant**.
+- One **Account** may own multiple **Grants** and back multiple **Sources**; multiple compatible **Sources** may explicitly share one **Grant**.
 - An **Extension** bundles one or more **Profiles** and **Source Adapters**.
 - A **Profile** declares zero or more **Actions**; a **Source Adapter** implements the Actions it supports.
 - A **Source Adapter** emits **Resources**, **Relations**, and **Artifact** descriptors through sync, search, retrieval, and action results.

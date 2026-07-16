@@ -1,0 +1,211 @@
+{
+  "charterId": "20260716-115652-implement-secure-provider-neutra",
+  "schemaVersion": "file-interface",
+  "objective": "Implement secure provider-neutral Accounts and Grants, repair secrets backend operations, and add production Google Calendar plus Microsoft Graph mail/calendar Adapters with read access and reversible Draft create/update only, verified through isolated mocked and explicit Human OAuth checkpoints without any send capability.",
+  "status": "active",
+  "createdAt": "2026-07-16T11:56:52.401Z",
+  "updatedAt": "2026-07-16T12:29:33.180Z",
+  "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
+  "nextSeq": 253,
+  "latestSourceSeq": 248,
+  "snapshotHash": "87aa3ddc47b4d93bb93fdd451caef66e5c546294f8781a7f2ce565fc3cfbf4ff",
+  "criteriaSnapshot": [
+    {
+      "id": "C1",
+      "title": "Normative scope and domain language are coherent",
+      "depends": [],
+      "status": {
+        "value": "pass",
+        "note": ""
+      },
+      "statusSeq": 235
+    },
+    {
+      "id": "C2",
+      "title": "Secret backend operation is explicit and safe",
+      "depends": [
+        "C1"
+      ],
+      "status": {
+        "value": "in-progress",
+        "note": "implementing explicit Secret Vault routing and crash-safe backend switching"
+      },
+      "statusSeq": 235
+    },
+    {
+      "id": "C3",
+      "title": "Accounts and Grants are provider-neutral and deduplicated",
+      "depends": [
+        "C1",
+        "C2"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 8
+    },
+    {
+      "id": "C4",
+      "title": "Agents can inspect configured Accounts and Sources",
+      "depends": [
+        "C3"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 8
+    },
+    {
+      "id": "C5",
+      "title": "Calendar events use one provider-neutral Profile",
+      "depends": [
+        "C1"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 8
+    },
+    {
+      "id": "C6",
+      "title": "Google Calendar is a complete read Source Adapter",
+      "depends": [
+        "C3",
+        "C5"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 8
+    },
+    {
+      "id": "C7",
+      "title": "Google multi-Source consent works live",
+      "depends": [
+        "C6"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 8
+    },
+    {
+      "id": "C8",
+      "title": "Microsoft authorization supports personal and work Accounts",
+      "depends": [
+        "C2",
+        "C3"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 8
+    },
+    {
+      "id": "C9",
+      "title": "Outlook mail uses the communication Profile",
+      "depends": [
+        "C8"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 8
+    },
+    {
+      "id": "C10",
+      "title": "Outlook Drafts are reversible and never sent",
+      "depends": [
+        "C9"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 8
+    },
+    {
+      "id": "C11",
+      "title": "Microsoft Calendar is a complete read Source Adapter",
+      "depends": [
+        "C5",
+        "C8"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 8
+    },
+    {
+      "id": "C12",
+      "title": "Provider egress and secrets remain bounded",
+      "depends": [
+        "C6",
+        "C9",
+        "C10",
+        "C11"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 8
+    },
+    {
+      "id": "C13",
+      "title": "Multi-account workflow is useful end to end",
+      "depends": [
+        "C4",
+        "C6",
+        "C9",
+        "C10",
+        "C11"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 8
+    },
+    {
+      "id": "C14",
+      "title": "Generated interface and agent guidance remain authoritative",
+      "depends": [
+        "C2",
+        "C4",
+        "C6",
+        "C9",
+        "C10",
+        "C11"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 8
+    },
+    {
+      "id": "C15",
+      "title": "Mocked, live, packaging, and regression gates pass",
+      "depends": [
+        "C7",
+        "C12",
+        "C13",
+        "C14"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 8
+    }
+  ]
+}

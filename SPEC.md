@@ -43,8 +43,8 @@ The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**, **SHOULD NOT**, 
 - A **source adapter** is code connecting one provider collection type, such as `google.mailbox` or `local.directory`. It declares capability flags, an auth spec, a config schema, and the profiles it emits.
 - An **action** is a typed provider-side mutation declared by a profile and implemented by a source adapter through a specific source.
 - A **realm** is a user-defined operating context, such as `personal`, `company`, or `university`, used to group sources that should be searched and reasoned about together.
-- An **account** is an external authenticated identity.
-- A **grant** is a permission set and secret reference for an account.
+- An **account** is one stable external authenticated identity within a provider. Its mutable labels and addresses are Account Identities, not its identity key.
+- A **grant** is an exact normalized permission set and secret reference for one account. Multiple compatible sources MAY explicitly share one grant, and one account MAY own multiple grants.
 - A **source** is one configured connection to one collection using exactly one source adapter. Sync is an optional per-source setting; a Source with sync disabled may still participate in remote search, retrieval, download, and supported Actions.
 - A **resource** is one unit of context emitted by a source: an envelope (ref, primary profile id+version, title, times, origin) plus validated profile payload(s). The envelope kind IS the primary profile id.
 - A **ref** is the stable locator `ctx://<source-id>/<adapter-opaque-suffix>` for one resource, valid whether or not the resource is indexed. The suffix is adapter-owned and opaque to core. Provider-native URIs are envelope metadata, never addressing input.
@@ -98,7 +98,7 @@ Extensions are TS/JS modules loaded in-process by dynamic import, running with f
 
 When an extension is removed or fails to load, its sources become unavailable (listed; no sync; no remote operations) but their synced resources REMAIN searchable, degrading to envelope-level behavior where profile vocabulary is missing. Removing extension code MUST NOT silently delete data; explicit source removal/purge commands are the only deletion paths.
 
-The CLI's generic verbs MUST derive their argument space from the registries: valid kinds from profile ids and declared aliases, valid `--field` names and value types from profile field declarations, adapter config flags from config schemas, export formats from profile export maps, and Actions/input schemas from Profile declarations plus Adapter bindings. Parallel hand-maintained command or alias declarations MUST NOT exist.
+The CLI's generic verbs MUST derive their argument space from the registries: valid kinds from profile ids and declared aliases, valid `--field` names and value types from profile field declarations, adapter config flags from config schemas, OAuth providers/scopes from Adapter auth declarations, export formats from profile export maps, and Actions/input schemas from Profile declarations plus Adapter bindings. Parallel hand-maintained command or alias declarations MUST NOT exist.
 
 ## 4. Identity, deletion, and relations
 
@@ -167,6 +167,10 @@ ctxindex MUST store OAuth tokens, API keys, and other secrets outside SQLite by 
 SQLite and declarative config MUST store secret references, not raw secrets.
 
 An encrypted local secret-store fallback MAY exist for environments without a usable OS keychain.
+
+The configured backend MUST be the only destination for new secret writes. Runtime MUST NOT silently fall back to another backend when it is unavailable. Reads and deletes MUST resolve an existing secret according to its typed reference so an interrupted explicit backend move cannot strand mixed references.
+
+An explicit backend move MUST copy and validate target entries before changing durable references or configured backend, retain source entries until the target is selected durably, and be safely retryable after interruption. Secret values, keys, access/refresh tokens, client secrets, and encryption passphrases MUST NOT appear in command output, logs, or literal process arguments.
 
 Secret references in declarative config (TOML or otherwise) MUST be one of the following typed URI forms:
 
@@ -273,6 +277,8 @@ An irreversible Action MUST require an explicit non-interactive confirmation sig
 
 A provider-persisted email Draft is a `communication.message` Resource produced by a reversible Action. Text composed only in an agent conversation is not a provider Draft and requires no ctxindex operation.
 
+When a milestone ships Draft Actions without sending, its Adapters MUST NOT bind a send Action, call a send endpoint, or request a send-only permission. A broader provider permission that is the narrowest available permission capable of Draft persistence MUST be paired with registry, request, and acceptance checks proving no send capability.
+
 ## 10a. Realms
 
 A realm is a user-defined operating context and search scope, such as `personal`, `company`, or `university`. ctxindex MUST support multiple user-created realms and MUST NOT assign special semantics to a `global` realm.
@@ -297,7 +303,7 @@ Every read command SHOULD support a machine-readable JSON output mode.
 
 User-facing configuration SHOULD be reachable through CLI commands. Direct TOML editing MAY remain as a power-user path, but the CLI MUST be able to express the same configuration without hand-edited TOML.
 
-The CLI MUST NOT use interactive TTY prompts for required input. Every required input MUST be expressible via flags, environment variables, or explicitly declared stdin. Missing required input MUST fail with a clear error and a non-zero exit code, not by waiting for an interactive answer. The one permitted exception is the user's browser during an OAuth authorization redirect; even there, the CLI MUST also accept the authorization result via flag (e.g. `--auth-code <code>`) so headless and agent-driven flows can complete the same operation without a browser.
+The CLI MUST NOT use interactive TTY prompts for required input. Every required input MUST be expressible via non-secret flags, environment variables, typed secret references, or explicitly declared stdin. Missing required input MUST fail with a clear error and a non-zero exit code, not by waiting for an interactive answer. The one permitted interactive surface is a user's browser during an explicitly requested OAuth authorization redirect. Headless and agent-driven flows MUST use a declared environment/secret input path; long-lived tokens, client secrets, and authorization codes MUST NOT be accepted as literal process arguments.
 
 References to entities that do not exist (unknown realm, unknown source id, unknown adapter id) MUST fail fast with an actionable error message and MUST NOT auto-create the missing entity unless an explicit create flag is passed.
 
@@ -319,11 +325,11 @@ Agent-facing documentation of kinds, fields, filters, formats, Actions, and adap
 
 Code under `apps/cli/src/**` MUST NOT import `bun:sqlite` or `drizzle-orm/*`. It MUST NOT contain raw SQL literals for `INSERT`, `UPDATE`, `DELETE`, or `SELECT` statements.
 
-Code under `apps/cli/src/**` MUST NOT issue `fetch()` calls to provider APIs such as OAuth or Gmail endpoints. Provider HTTP behavior belongs in `@ctxindex/core` or `@ctxindex/adapters`.
+Code under `apps/cli/src/**` MUST NOT issue `fetch()` calls to provider APIs such as OAuth, Google, or Microsoft endpoints. Provider HTTP behavior belongs in `@ctxindex/core` or `@ctxindex/adapters`.
 
 Code under `apps/cli/src/**` MUST NOT generate ULIDs or UUIDs and MUST NOT encode schema column names. Identity assignment and schema knowledge are core concerns.
 
-The OAuth loopback flow MAY bind a `127.0.0.1` socket from `apps/cli` because browser launch and redirect capture are user-interface concerns. The authorization code exchange MUST be delegated to a `@ctxindex/core/auth` function.
+The OAuth host flow MAY bind a loopback-only socket and explicitly open a browser. State, callback, timeout, PKCE, token exchange, provider identity, and secret persistence MUST be owned by a provider-neutral `@ctxindex/core/auth` module; the CLI only selects definitions and invokes that module.
 
 ## 11. Concurrency
 
@@ -426,7 +432,7 @@ License: **MIT**.
 ctxindex is local-first. The reference implementation MUST NOT:
 
 - emit telemetry, analytics, crash reports, or update pings;
-- contact any host that is not a declared provider API for an active source;
+- contact any host that is not a globally approved host declared by the active authorization flow or Source Adapter;
 - store user-visible secrets outside the configured secrets store (keychain or encrypted file).
 
 ctxindex MUST:
@@ -436,4 +442,4 @@ ctxindex MUST:
 - redact known sensitive fields at the logger boundary;
 - treat the SQLite file, the log directory, and the secrets store as user-controlled files (`0600` for secrets-related files; `0700` for their parent directories where feasible).
 
-Network egress is limited to declared provider APIs needed to satisfy a sync of a registered source. Adding a provider that talks to a non-provider host requires a SPEC change.
+Network egress is limited to globally approved identity/provider APIs needed to authorize selected Adapters or operate registered Sources. A declarative provider/Adapter host list MUST narrow each operation before the global egress chokepoint. Adding a provider that talks to a non-provider host requires a SPEC change.
