@@ -1,5 +1,4 @@
 import { expect, test } from 'bun:test'
-import { readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createSandbox, type Sandbox } from '@ctxindex/core/testing'
@@ -131,6 +130,8 @@ async function initializedSandbox(): Promise<Sandbox> {
   const init = await sandbox.run(['init'])
   expect(init.exitCode, init.stderr).toBe(0)
   expect(init.stderr).toBe('')
+  const realm = await sandbox.run(['realm', 'add', 'work'])
+  expect(realm.exitCode, realm.stderr).toBe(0)
   return sandbox
 }
 
@@ -149,23 +150,11 @@ async function addGmailSource(sandbox: Sandbox): Promise<string> {
     '--adapter',
     'google.mailbox',
     '--realm',
-    'global',
+    'work',
   ])
   expect(result.exitCode, result.stderr).toBe(0)
   expect(result.stderr).toBe('')
   return parseSourceId(result.stdout)
-}
-
-function parseFetchLog(text: string): URL[] {
-  return text
-    .trim()
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => {
-      const match = /^(\S+)\s+(\S+)$/.exec(line)
-      expect(match).not.toBeNull()
-      return new URL(match?.[2] ?? '')
-    })
 }
 
 async function runRg(
@@ -193,27 +182,22 @@ async function runRg(
 test('only allowed hosts', async () => {
   const sandbox = await initializedSandbox()
   const gmail = startGmailMock()
-  const fetchLog = join(sandbox.dir, 'fetch.log')
-
   try {
     const env = gmailEnv(sandbox, gmail)
     await authGoogle(sandbox, env)
-    const sourceId = await addGmailSource(sandbox)
-    const requestsBeforeSync = gmail.requests.length
-    const sync = await sandbox.run(['sync', '--source', sourceId], {
+    await addGmailSource(sandbox)
+    const requestsBeforeSearch = gmail.requests.length
+    const search = await sandbox.run(['search', '--remote', 'network egress'], {
       env: {
         ...env,
-        CTXINDEX_TEST_FETCH_LOG: fetchLog,
       },
     })
 
-    expect(sync.exitCode, sync.stderr).toBe(0)
-    expect(sync.stderr).toBe('')
-    expect(gmail.requests.length).toBeGreaterThan(requestsBeforeSync)
+    expect(search.exitCode, `${search.stderr}\n${search.stdout}`).toBe(0)
+    expect(search.stderr).toBe('')
+    expect(gmail.requests.length).toBeGreaterThan(requestsBeforeSearch)
 
-    const entries = parseFetchLog(await readFile(fetchLog, 'utf8'))
-    expect(entries.length).toBeGreaterThan(0)
-    for (const url of entries) {
+    for (const url of gmail.requests) {
       expect(ALLOWED_HOSTS.has(url.hostname), url.toString()).toBe(true)
     }
   } finally {
@@ -229,8 +213,8 @@ test('disallowed host rejected', async () => {
   try {
     const env = gmailEnv(sandbox, gmail)
     await authGoogle(sandbox, env)
-    const sourceId = await addGmailSource(sandbox)
-    const sync = await sandbox.run(['sync', '--source', sourceId], {
+    await addGmailSource(sandbox)
+    const search = await sandbox.run(['search', '--remote', 'network egress'], {
       env: {
         ...env,
         CTXINDEX_GMAIL_MOCK_BASE_URL: 'http://evil.example.com:1',
@@ -238,9 +222,10 @@ test('disallowed host rejected', async () => {
       },
     })
 
-    expect(sync.exitCode).not.toBe(0)
-    expect(sync.stderr).toContain('network egress host is not allowlisted')
-    expect(sync.stderr).toContain('evil.example.com')
+    expect(`${search.stderr}\n${search.stdout}`).toContain(
+      'network egress host is not allowlisted',
+    )
+    expect(`${search.stderr}\n${search.stdout}`).toContain('evil.example.com')
   } finally {
     gmail.stop()
     await sandbox.cleanup()

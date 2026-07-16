@@ -49,7 +49,7 @@ async function addSource(
     'local.directory',
     '--realm',
     'work',
-    '--root',
+    '--config-root-path',
     root,
   ])
   expect(result.exitCode, result.stderr).toBe(0)

@@ -1,0 +1,22 @@
+# Task 10.4 complete V1 workflow gate
+
+Date: 2026-07-15
+
+Passed in a fresh isolated real-binary sandbox with loopback-only provider traffic:
+
+- Two explicit Realms and two Sources (mock Gmail and local directory).
+- Exact, disjoint Realm-scoped discovery with deterministic repeated JSON.
+- Generic local-file and Gmail get envelopes.
+- Local-only Gmail thread traversal with zero provider requests.
+- Artifact list and download: first cache miss fetched once, second cache hit fetched zero additional bytes; exact file bytes and stable SHA-256 matched.
+- Exact deterministic raw stdout for Profile-owned EML and core JSON exports.
+- Unsupported `mbox` export exited 2 with deterministic valid-format guidance.
+- Reversible Gmail Draft create and complete replacement update retained one stable Draft Ref, produced exactly POST then PUT, and never invoked a send path.
+
+Verification:
+
+- Complete workflow e2e: 1 passed, 0 failed.
+- SPEC §12 exit-code e2e: 6 passed, 0 failed.
+- Full e2e suite: 72 passed, 0 failed.
+- `bun run ci`, integration suite, D3 relocation spike, strict OpenSpec validation, typecheck, lint, and diff checking passed.
+- Earlier human-assisted Gmail checkpoints remain accepted: read-only discovery/get and visible Draft create/update with explicit confirmation that nothing was sent. No live-provider traffic ran for this gate.

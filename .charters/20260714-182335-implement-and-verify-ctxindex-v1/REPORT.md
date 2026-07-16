@@ -74,3 +74,20 @@
 - Compiled boundary: the real CLI embeds its canonical ordered SQL migration manifest, initializes after relocation, loads the trusted TypeScript path explicitly, and runs generic sync/search/get from `/` with stable Refs and no tender-specific command, envelope, hook, or table.
 - Disappearance: Adapter availability is derived from exact loaded `(id,version)` and remains separate from persisted sync status. Removing the Extension leaves Resources searchable/gettable with degradation warnings, unavailable sync exits 50, and restoring the path recovers availability without mutating Resource identity or historical sync state.
 - Verification: `work/slice-9-gate.txt` records public-import boundary tests, the relocated compiled-binary full lifecycle, D3's own-dependency relocation proof, typecheck, lint, 598 passing full-suite tests with one live-provider skip, strict OpenSpec validation, and diff checking.
+## C10. User and agent interfaces derive from loaded registries
+
+- Result: Passed.
+- Runtime-generated interface: `describeRegistry` deterministically derives Profile kinds, aliases, fields, formats, Adapter routing/auth/configuration, Extension summaries, and Action schemas/examples/bindings from the exact loaded definitions. `ctxindex describe`, `extensions list`, and relevant help render that single source of truth.
+- Source configuration: CLI options are projected from Adapter schemas with collision-safe names, strict unknown/repeated input rejection, typed parsing, and `--config-json` as an exact whole-object escape hatch.
+- Agent workflows: bundled skills and `docs/AGENT-HOWTOS.md` describe workflows rather than duplicating domain vocabulary; they discover current capabilities through `ctxindex describe`. Missing required input exits non-interactively.
+- Relocated binary: canonical migration SQL and all bundled Markdown skills are embedded at build time without a hand-maintained manifest. A relocated binary serves list/get/inline/path from `/` without checkout sidecars.
+- Verification: `work/slice-10-interface-gate.txt` records focused interface and skill tests, the compiled relocation proof, 647 passing full-suite tests with one live-provider skip, typecheck, lint, diff checking, and independent approval.
+## C11. Complete V1 behavior is verified end to end
+
+- Result: Passed.
+- Complete workflow: a real CLI sandbox proves two exact disjoint Realms, Gmail and local-directory discovery/get, local-only thread traversal, Artifact miss/hit and stable bytes/hash, deterministic raw EML/core JSON exports, reversible stable-Ref Draft create/update, no send path, and SPEC exit-2 behavior.
+- Human checkpoints: the isolated live Gmail read checkpoint and the separately approved Draft create/update checkpoint passed; provider UI confirmation showed the updated Draft and the user explicitly confirmed that nothing was sent.
+- Independent validation: fresh-context black-box QA passed the workflow, exit taxonomy, relocated compiled tenders and skills lifecycles, D3, and DB-free describe/skills smokes. Semantic OpenSpec verification approved Completeness, Correctness, and Coherence with no critical or warning findings.
+- Documentation and maintenance: six capability specs are synchronized and strictly valid, active-surface drift review found no mismatch, task-scoped simplification removed the only demonstrated duplicate, and hierarchical codemaps cover the 198-file production/config surface with no incremental drift.
+- Final automated gate: CI, 13 integration tests, 72 e2e tests, D3, typecheck, lint, strict active-change validation, six strict main-spec validations, diff checking, and cartography drift checking all passed.
+- Lifecycle: all 55 tasks are checked. `v1-context-access-layer` remains active and unarchived, ready for a separate explicit archive request.

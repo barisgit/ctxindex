@@ -1,85 +1,8 @@
-import { CtxindexValidationError } from '@ctxindex/core/errors'
+import { compareStrings, type SourceDescription } from '@ctxindex/core/registry'
 import { defineCommand } from 'citty'
-import { parseSourceArgs, sourceUsage } from '../args/source'
-import { openDeps } from '../deps'
-import { mapErrorToExit, runWithExit } from '../format/exit'
-import {
-  formatSourceAdded,
-  formatSourceRemoved,
-  formatSources,
-} from '../format/source'
-import { resolveSourceGrant } from '../source/resolve-source-grant'
-
-function printOutput(output: string): void {
-  if (output.length > 0) console.log(output)
-}
-
-export async function handleSourceCommand(args: string[]): Promise<number> {
-  const parsed = parseSourceArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(`${parsed.message}. Try: ${sourceUsage}`)
-    return 2
-  }
-
-  try {
-    const deps = await openDeps()
-    if (parsed.kind === 'add') {
-      const adapter = deps.registry.adapters
-        .list()
-        .filter((candidate) => candidate.id === parsed.adapterId)
-        .sort((left, right) => right.version - left.version)[0]
-      if (!adapter) {
-        throw new CtxindexValidationError(
-          'invalid_filter',
-          `Unknown adapter: ${parsed.adapterId}`,
-        )
-      }
-      let config: unknown
-      try {
-        config = JSON.parse(parsed.configJson ?? '{}')
-      } catch {
-        throw new CtxindexValidationError(
-          'invalid_filter',
-          `invalid config for Adapter ${adapter.id}@${adapter.version}`,
-        )
-      }
-      const validatedConfig = adapter.configSchema.safeParse(config)
-      if (!validatedConfig.success) {
-        throw new CtxindexValidationError(
-          'invalid_filter',
-          `invalid config for Adapter ${adapter.id}@${adapter.version}`,
-        )
-      }
-      const grantId = await resolveSourceGrant(
-        deps.authService,
-        adapter.auth,
-        parsed.account,
-      )
-      const { sourceId } = deps.sourceService.addSource({
-        adapterId: parsed.adapterId,
-        adapterVersion: adapter.version,
-        ...(parsed.realmSlug ? { realmSlug: parsed.realmSlug } : {}),
-        ...(parsed.displayName ? { displayName: parsed.displayName } : {}),
-        configJson: JSON.stringify(validatedConfig.data),
-        ...(grantId ? { grantId } : {}),
-        ...(parsed.searchRouting
-          ? { searchRouting: parsed.searchRouting }
-          : {}),
-      })
-      console.log(formatSourceAdded(sourceId))
-    } else if (parsed.kind === 'list') {
-      printOutput(formatSources(deps.sourceService.listSources(parsed), parsed))
-    } else {
-      deps.sourceService.removeSource(parsed.sourceId)
-      console.log(formatSourceRemoved(parsed.sourceId))
-    }
-    return 0
-  } catch (err) {
-    console.error(err instanceof Error ? err.message : String(err))
-    return mapErrorToExit(err)
-  }
-}
+import { loadCliDefinitions } from '../definitions'
+import { runWithExit } from '../format/exit'
+import { handleSourceCommand } from '../source/handle-source-command'
 
 const sourceOptionArgs = {
   realm: { type: 'string', description: 'Realm slug' },
@@ -87,15 +10,36 @@ const sourceOptionArgs = {
   json: { type: 'boolean', description: 'Print JSON' },
 } as const
 
+export function generatedSourceConfigArgs(
+  sources: readonly SourceDescription[],
+): Record<string, { type: 'string'; description: string }> {
+  const byFlag = new Map<string, string[]>()
+  for (const source of [...sources].sort((left, right) =>
+    compareStrings(left.id, right.id),
+  )) {
+    for (const option of source.configOptions) {
+      const description = `${source.id}: ${option.docs ?? option.property} (${option.type}${option.required ? ', required' : ''}${option.default !== undefined ? `, default ${JSON.stringify(option.default)}` : ''})`
+      const flag = option.flag.slice(2)
+      byFlag.set(flag, [...(byFlag.get(flag) ?? []), description])
+    }
+  }
+  return Object.fromEntries(
+    [...byFlag.entries()]
+      .sort(([left], [right]) => compareStrings(left, right))
+      .map(([flag, descriptions]) => [
+        flag,
+        { type: 'string' as const, description: descriptions.join('; ') },
+      ]),
+  )
+}
+
 export const sourceCommand = defineCommand({
   meta: { name: 'source', description: 'Manage indexed sources.' },
   subCommands: {
     add: defineCommand({
       meta: { name: 'add', description: 'Add a source.' },
-      args: {
+      args: async () => ({
         adapter: { type: 'string', description: 'Adapter ID' },
-        root: { type: 'string', description: 'Local root path' },
-        path: { type: 'string', description: 'Local root path' },
         name: { type: 'string', description: 'Source name' },
         'display-name': { type: 'string', description: 'Display name' },
         account: {
@@ -109,7 +53,10 @@ export const sourceCommand = defineCommand({
         },
         'adapter-id': { type: 'positional', required: false },
         realm: sourceOptionArgs.realm,
-      },
+        ...generatedSourceConfigArgs(
+          (await loadCliDefinitions()).description.sources,
+        ),
+      }),
       run: ({ rawArgs }) =>
         runWithExit(() => handleSourceCommand(['add', ...rawArgs])),
     }),

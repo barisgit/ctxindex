@@ -98,8 +98,5 @@ cli *args:
 cli-help:
     bash scripts/verify/cli.sh
 
-live-gmail-sync:
-    bash scripts/verify/live-gmail-sync.sh
-
 network-egress:
     bash scripts/verify/network-egress.sh

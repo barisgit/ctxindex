@@ -7,6 +7,11 @@ export interface ParsedFlags {
 
 export interface ParseFlagsOptions {
   readonly booleanFlags?: readonly string[]
+  readonly valueFlags?: readonly string[]
+}
+
+function isNegativeNumericValue(value: string): boolean {
+  return /^-(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value)
 }
 
 function addFlag(
@@ -28,6 +33,7 @@ export function parseFlags(
   const flags: Record<string, FlagValue> = {}
   const positional: string[] = []
   const booleanFlags = new Set(options.booleanFlags ?? [])
+  const valueFlags = new Set(options.valueFlags ?? [])
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index]
     if (arg === undefined) continue
@@ -42,7 +48,8 @@ export function parseFlags(
       if (
         !booleanFlags.has(key) &&
         next !== undefined &&
-        !next.startsWith('-')
+        (!next.startsWith('-') ||
+          (valueFlags.has(key) && isNegativeNumericValue(next)))
       ) {
         addFlag(flags, key, next)
         index += 1

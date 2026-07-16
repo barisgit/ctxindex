@@ -1,0 +1,24 @@
+# packages/core/src/testing/
+
+## Responsibility
+
+Provides a reusable black-box CLI sandbox with isolated filesystem homes, subprocess capture, timing, and idempotent cleanup.
+
+## Design/patterns
+
+- `createSandbox()` is a test-fixture factory returning the `Sandbox` interface rather than exposing setup details.
+- Environment isolation redirects config, data, cache, and state through `CTXINDEX_*_HOME` variables under one temporary directory.
+- `run()` wraps `Bun.spawn` for the repository CLI entrypoint and captures exit code, stdout, stderr, and elapsed time as `SandboxRunResult`.
+- `cleanup()` is idempotent through a closure-scoped `cleaned` flag.
+
+## Data & control flow
+
+1. `createSandbox()` allocates `ctxindex-sandbox-*` under the OS temp directory and builds isolated environment paths while preserving `PATH` when present.
+2. `sandbox.run(args, opts)` launches `bun apps/cli/bin/ctxindex.mjs ...args`, merges per-run environment overrides, converts string stdin to a `Blob`, and reads both output streams concurrently with process exit.
+3. The caller inspects the captured result and calls `cleanup()`, which recursively removes the sandbox exactly once.
+
+## Integration points
+
+- Uses Bun process/stream APIs and Node filesystem/path/URL utilities; the CLI path is resolved relative to `packages/core/src/testing/sandbox.ts`.
+- `index.ts` re-exports the harness from the `@ctxindex/core/testing` package subpath for repository consumers.
+- The harness exercises the real `apps/cli/bin/ctxindex.mjs` entrypoint without importing CLI internals.

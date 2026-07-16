@@ -314,14 +314,14 @@ describe('oauth headless e2e', () => {
       const db = openSandboxDb(sandbox)
       try {
         const account = db
-          .prepare('SELECT display_name, email FROM accounts')
+          .prepare('SELECT label, external_user_id FROM accounts')
           .get() as {
-          display_name: string
-          email: string
+          label: string
+          external_user_id: string
         }
         expect(account).toEqual({
-          display_name: 'baristovnik@gmail.com',
-          email: 'baristovnik@gmail.com',
+          label: 'baristovnik@gmail.com',
+          external_user_id: 'baristovnik@gmail.com',
         })
       } finally {
         db.close()

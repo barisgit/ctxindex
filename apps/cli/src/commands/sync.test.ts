@@ -7,7 +7,7 @@ import {
   type SyncDeps,
   type SyncOutput,
   type SyncServices,
-} from './sync'
+} from '../sync/runner'
 
 const completed: SyncRunResult = {
   runId: 'run-1',

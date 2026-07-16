@@ -55,10 +55,10 @@ test('binary CLI syncs local files through generic search, get, and Ref contract
         'local.directory',
         '--realm',
         'work',
-        '--root',
+        '--config-root-path',
         root,
-        '--config-json',
-        '{"size_cap_bytes":64}',
+        '--config-size-cap-bytes',
+        '64',
       ],
       { env },
     )

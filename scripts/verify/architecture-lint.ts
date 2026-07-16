@@ -317,6 +317,8 @@ function isAllowedBunSqliteImport(path: string): boolean {
 }
 
 function isAllowedProviderUrlLiteral(path: string): boolean {
+  if (isCliSrcTestFile(path)) return true
+
   // Loopback OAuth builds the provider consent/token URLs at the UI edge.
   return path === 'apps/cli/src/auth/google-loopback.ts'
 }
@@ -332,7 +334,11 @@ function isDirectStorageImport(specifier: string): boolean {
 }
 
 function isCommandFile(path: string): boolean {
-  return path.startsWith('apps/cli/src/commands/') && path.endsWith('.ts')
+  return (
+    path.startsWith('apps/cli/src/commands/') &&
+    path.endsWith('.ts') &&
+    !isCliSrcTestFile(path)
+  )
 }
 
 function importViolation(

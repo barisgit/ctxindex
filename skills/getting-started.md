@@ -16,6 +16,6 @@ Start with the [CLI overview](./reference/cli-overview.md).
 
 ## Email Drafts
 
-The agent may compose proposed text without calling ctxindex. To persist it in a provider mailbox, invoke the loaded `communication.message.draft.create` Action through an explicit mailbox Source. Updating a provider Draft uses `communication.message.draft.update`.
+The agent may compose proposed text without calling ctxindex. Before persisting a provider Draft, inspect the loaded reversible Actions with `ctxindex describe --format markdown` and invoke the applicable Action through an explicit mailbox Source.
 
 V1 does not send email. Sending and other consequential provider mutations are deferred.

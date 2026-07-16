@@ -9,6 +9,8 @@ START_SECONDS="$SECONDS"
 
 cli_command_files=(
   apps/cli/src/commands/auth.ts
+  apps/cli/src/commands/describe.ts
+  apps/cli/src/commands/extensions.ts
   apps/cli/src/commands/sync.ts
   apps/cli/src/commands/realm.ts
   apps/cli/src/commands/source.ts

@@ -1,9 +1,11 @@
-import { type CommandDef, defineCommand, runMain } from 'citty'
+import { type CommandDef, defineCommand, runMain, showUsage } from 'citty'
 import pkg from '../package.json' with { type: 'json' }
 import { actionCommand } from './commands/action'
 import { artifactCommand } from './commands/artifact'
 import { authCommand } from './commands/auth'
+import { describeCommand } from './commands/describe'
 import { exportCommand } from './commands/export'
+import { extensionsCommand } from './commands/extensions'
 import { getCommand } from './commands/get'
 import { initCommand } from './commands/init'
 import { purgeCommand } from './commands/purge'
@@ -15,8 +17,10 @@ import { sourceCommand } from './commands/source'
 import { statusCommand } from './commands/status'
 import { syncCommand } from './commands/sync'
 import { threadCommand } from './commands/thread'
+import { loadCliDefinitions, printExtensionDiagnostics } from './definitions'
 import { setCliLogLevel } from './deps'
 import { mapErrorToExit } from './format/exit'
+import { formatRegistryText } from './format/registry'
 
 const LOG_LEVELS = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'] as const
 type LogLevelName = (typeof LOG_LEVELS)[number]
@@ -107,6 +111,8 @@ export const rootCommand = defineCommand({
   },
   subCommands: {
     init: initCommand,
+    describe: describeCommand,
+    extensions: extensionsCommand,
     action: actionCommand,
     auth: authCommand,
     artifact: artifactCommand,
@@ -139,6 +145,14 @@ export async function runCli(args: string[]): Promise<number> {
   try {
     await runMain(rootCommand, {
       rawArgs: rest.length === 0 ? ['--help'] : rest,
+      showUsage: async (command, parent) => {
+        await showUsage(command, parent)
+        const definitions = await loadCliDefinitions()
+        printExtensionDiagnostics(definitions.diagnostics)
+        console.log(
+          `\nLoaded interface:\n${formatRegistryText(definitions.description)}`,
+        )
+      },
     })
   } finally {
     restoreExit()

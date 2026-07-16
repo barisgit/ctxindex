@@ -1,0 +1,16 @@
+# Task 10.3 final automated gate
+
+Date: 2026-07-15
+
+All required commands passed on the settled task 10.3 snapshot:
+
+- `bun run ci`
+- `bun run test:integration` — 13 passed, 0 failed
+- `bun run test:e2e` — 71 passed, 0 failed
+- `./scripts/spikes/d3-compiled-extension/run.sh`
+- `bunx openspec validate v1-context-access-layer --strict`
+- `git diff --check`
+
+CI includes install consistency, lint, typecheck, architecture lint, CLI thinness/framework/boundary gates, exports-map validation, D3 relocation, and the full serial suite. The previously stale init/Realm/logging/OAuth tests now exercise the fresh V1 model. Obsolete prototype Gmail-sync/live harnesses were removed; no live-provider traffic ran.
+
+Final-gate corrections also made the sync CLI a thin wrapper without changing orchestration semantics, limited architecture-lint fixture exemptions to test files, and made the full-suite verifier concise on success while retaining complete output on failure.

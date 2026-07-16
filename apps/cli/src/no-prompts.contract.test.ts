@@ -87,6 +87,18 @@ describe('no-prompts contract', () => {
     }
   })
 
+  test('registry inspection: exits 0 with stdin=null', async () => {
+    const { env, cleanup } = await mkSandbox()
+    try {
+      for (const args of [['describe'], ['extensions', 'list']]) {
+        const { exitCode } = await spawnCli(args, env, 'null')
+        expect(exitCode).toBe(0)
+      }
+    } finally {
+      await cleanup()
+    }
+  })
+
   test('realm list: exits 0 with stdin=null', async () => {
     const { env, cleanup } = await mkSandbox()
     try {
@@ -132,6 +144,22 @@ describe('no-prompts contract', () => {
     try {
       const { exitCode } = await spawnCli(['skills', 'path'], env, 'null')
       expect(exitCode).toBe(0)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  test('skills get: exits 0 with stdin=null', async () => {
+    const { env, cleanup } = await mkSandbox()
+    try {
+      const { exitCode, stdout, stderr } = await spawnCli(
+        ['skills', 'get', 'getting-started'],
+        env,
+        'null',
+      )
+      expect(exitCode).toBe(0)
+      expect(stdout).toContain('# Getting started with ctxindex')
+      expect(stderr).toBe('')
     } finally {
       await cleanup()
     }
@@ -192,7 +220,7 @@ describe('no-prompts contract', () => {
           'local.directory',
           '--realm',
           'unknown',
-          '--root',
+          '--config-root-path',
           '/tmp',
         ],
         env,
@@ -244,17 +272,14 @@ describe('no-prompts contract', () => {
         env,
         'null',
       )
-      expect(exitCode).not.toBe(0)
-      expect(stderr.length).toBeGreaterThan(0)
+      expect(exitCode).toBe(2)
+      expect(stderr).toContain('missing skill name')
     } finally {
       await cleanup()
     }
   })
 
-  // ---------------------------------------------------------------------------
-  // Pending commands: exit non-zero, not hang, actionable message
-  // ---------------------------------------------------------------------------
-  test('auth (pending): exits non-zero with actionable message', async () => {
+  test('auth add: missing credentials exits non-zero without prompting', async () => {
     const { env, cleanup } = await mkSandbox()
     try {
       const { exitCode, stderr } = await spawnCli(

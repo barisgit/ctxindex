@@ -34,7 +34,7 @@ grep -RInE \
   --exclude-dir='e2e' \
   --exclude-dir='.git' \
   --exclude-dir='node_modules' \
-  "\bfetch\s*\(" \
+  "(^|[^.[:alnum:]_])fetch[[:space:]]*\(" \
   . \
   | grep -v "packages/core/src/net/index.ts" \
   >> "$violations" || true
@@ -56,7 +56,8 @@ if [[ -s "$violations" ]]; then
   exit 1
 fi
 
-bun test --path-ignore-patterns '__none__' ./packages/adapters/src/network-egress.integration.test.ts
+NODE_ENV=production bun test --path-ignore-patterns '__none__' ./packages/adapters/src/local-directory/sync.test.ts
+NODE_ENV=production bun test --path-ignore-patterns '__none__' ./packages/core/src/net/index.test.ts
 bun test --path-ignore-patterns '__none__' ./apps/cli/src/e2e/network-egress.e2e.test.ts
 
-echo "VAL-NETWORK-EGRESS: static audit, runtime interceptor, and e2e passed"
+echo "VAL-NETWORK-EGRESS: static audit, production local no-egress, Gmail allowlist/rejection, and e2e passed"

@@ -10,10 +10,20 @@ export const localDirectorySourceConfigSchema = z
     root_path: z
       .string()
       .min(1)
-      .refine(isAbsolute, 'root_path must be absolute'),
-    include: nonemptyStrings.optional(),
-    exclude: nonemptyStrings.optional(),
-    size_cap_bytes: z.number().int().positive().optional(),
+      .refine(isAbsolute, 'root_path must be absolute')
+      .describe('Absolute root directory to index.'),
+    include: nonemptyStrings
+      .optional()
+      .describe('Repeatable glob patterns that select paths to include.'),
+    exclude: nonemptyStrings
+      .optional()
+      .describe('Repeatable glob patterns that select paths to exclude.'),
+    size_cap_bytes: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Maximum file size in bytes; larger files are skipped.'),
   })
   .strict()
 

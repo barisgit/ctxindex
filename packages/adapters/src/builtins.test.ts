@@ -21,7 +21,7 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
       {
         id: 'google.mailbox',
         version: 1,
-        capabilities: ['search-remote', 'retrieve', 'download'],
+        capabilities: ['download', 'retrieve', 'search-remote'],
       },
       { id: 'local.directory', version: 1, capabilities: ['sync'] },
     ])
@@ -47,13 +47,13 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
       summary: 'An extracted local file.',
       aliases: ['files'],
       fields: [
-        { name: 'path', type: 'string' },
-        { name: 'name', type: 'string' },
+        { name: 'contentHash', type: 'string' },
         { name: 'extension', type: 'string' },
         { name: 'mediaType', type: 'string' },
-        { name: 'size', type: 'number' },
         { name: 'modifiedAt', type: 'datetime' },
-        { name: 'contentHash', type: 'string' },
+        { name: 'name', type: 'string' },
+        { name: 'path', type: 'string' },
+        { name: 'size', type: 'number' },
       ],
       formats: [],
     })

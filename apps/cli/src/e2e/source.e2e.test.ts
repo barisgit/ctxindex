@@ -175,7 +175,7 @@ describe('source e2e', () => {
         'local.directory',
         '--realm',
         'global',
-        '--root',
+        '--config-root-path',
         root,
       ])
 
@@ -198,61 +198,6 @@ describe('source e2e', () => {
     })
   })
 
-  test('source add accepts local-directory as alias for local.directory', async () => {
-    await withInitializedSandbox(async (sandbox) => {
-      const dottedRoot = join(sandbox.dir, 'source-root-dotted')
-      const dashedRoot = join(sandbox.dir, 'source-root-dashed')
-      await mkdir(dottedRoot, { recursive: true })
-      await mkdir(dashedRoot, { recursive: true })
-
-      const dotted = await sandbox.run([
-        'source',
-        'add',
-        'local.directory',
-        '--realm',
-        'global',
-        '--root',
-        dottedRoot,
-      ])
-      const dashed = await sandbox.run([
-        'source',
-        'add',
-        'local-directory',
-        '--realm',
-        'global',
-        '--root',
-        dashedRoot,
-      ])
-
-      expect(dotted.stderr).toBe('')
-      expect(dotted.exitCode).toBe(0)
-      expect(dashed.stderr).toBe('')
-      expect(dashed.exitCode).toBe(0)
-
-      const db = new Database(dbPath(sandbox), { readonly: true })
-      try {
-        const rows = db
-          .prepare(
-            'SELECT adapter_id, config_json FROM sources ORDER BY created_at',
-          )
-          .all() as { adapter_id: string; config_json: string }[]
-        expect(rows).toHaveLength(2)
-        expect(rows.map((row) => row.adapter_id)).toEqual([
-          'local.directory',
-          'local.directory',
-        ])
-        expect(JSON.parse(rows[0]?.config_json ?? '{}')).toEqual({
-          root_path: dottedRoot,
-        })
-        expect(JSON.parse(rows[1]?.config_json ?? '{}')).toEqual({
-          root_path: dashedRoot,
-        })
-      } finally {
-        db.close()
-      }
-    })
-  })
-
   test('source list shows added source', async () => {
     await withInitializedSandbox(async (sandbox) => {
       const root = join(sandbox.dir, 'source-root')
@@ -267,7 +212,7 @@ describe('source e2e', () => {
         'global',
         '--name',
         'repo-under-test',
-        '--root',
+        '--config-root-path',
         root,
       ])
       const sourceId = parseSourceId(add.stdout)
@@ -334,7 +279,7 @@ describe('source e2e', () => {
             'local.directory',
             '--realm',
             'global',
-            '--root',
+            '--config-root-path',
             root,
           ],
           {
@@ -362,7 +307,7 @@ describe('source e2e', () => {
         'add',
         '--realm',
         'global',
-        '--root',
+        '--config-root-path',
         root,
       ])
 
@@ -385,7 +330,7 @@ describe('source e2e', () => {
         'local.directory',
         '--realm',
         'global',
-        '--root',
+        '--config-root-path',
         root,
       ])
       const sourceId = parseSourceId(add.stdout)
@@ -430,20 +375,17 @@ describe('source e2e', () => {
 
   test('unknown adapter exits 2', async () => {
     await withInitializedSandbox(async (sandbox) => {
-      const root = join(sandbox.dir, 'source-root')
-      await mkdir(root, { recursive: true })
-
       const result = await sandbox.run([
         'source',
         'add',
         '--adapter',
         'foo.bar',
-        '--root',
-        root,
+        '--realm',
+        'global',
       ])
 
       expect(result.exitCode).toBe(2)
-      expect(result.stderr).toContain('Unknown adapter')
+      expect(result.stderr).toContain('unknown adapter id "foo.bar"')
       expect(result.stderr).toContain('foo.bar')
     })
   })

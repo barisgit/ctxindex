@@ -37,7 +37,8 @@ function fencedCodeBlocks(markdown: string): string[] {
 
 function extractCtxindexInvocations(markdown: string): CtxindexInvocation[] {
   const invocations: CtxindexInvocation[] = []
-  const ctxindexCommand = /(?:^|[\s;&|])ctxindex(?:\s+([^\s;&|]+))?/g
+  const ctxindexCommand =
+    /(?:^|[\s;&|])(?:ctxindex|bun\s+(?:run\s+)?cli)(?:\s+([^\s;&|]+))?/g
 
   for (const block of fencedCodeBlocks(markdown)) {
     for (const rawLine of block.split('\n')) {

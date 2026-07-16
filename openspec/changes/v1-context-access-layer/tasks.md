@@ -95,8 +95,8 @@ After the final task, run the `openspec-verify-change` workflow against all requ
 
 ## 10. Generated docs and final validation
 
-- [ ] 10.1 Generate CLI help, `ctxindex describe`, and agent reference material from loaded registries; remove any parallel hand-maintained kinds/fields/formats/Actions.
-- [ ] 10.2 Update workflow-only bundled skills for the implemented V1 surface and verify required input remains non-interactive.
-- [ ] 10.3 Run the final automated gate: `bun run ci`, `bun run test:integration`, `bun run test:e2e`, `./scripts/spikes/d3-compiled-extension/run.sh`, and `openspec validate v1-context-access-layer --strict`; fix every failure.
-- [ ] 10.4 Exercise the complete V1 workflow: exact Realm-scoped discovery, get/thread retrieval, Artifact/export materialization, and provider Draft create/update with deterministic JSON and SPEC §12 exit behavior.
-- [ ] 10.5 Run `openspec-verify-change`, resolve every mismatch, sync capability specs, and archive `v1-context-access-layer`.
+- [x] 10.1 Generate CLI help, `ctxindex describe`, and agent reference material from loaded registries; remove any parallel hand-maintained kinds/fields/formats/Actions.
+- [x] 10.2 Update workflow-only bundled skills for the implemented V1 surface and verify required input remains non-interactive.
+- [x] 10.3 Run the final automated gate: `bun run ci`, `bun run test:integration`, `bun run test:e2e`, `./scripts/spikes/d3-compiled-extension/run.sh`, and `openspec validate v1-context-access-layer --strict`; fix every failure.
+- [x] 10.4 Exercise the complete V1 workflow: exact Realm-scoped discovery, get/thread retrieval, Artifact/export materialization, and provider Draft create/update with deterministic JSON and SPEC §12 exit behavior.
+- [x] 10.5 Run `openspec-verify-change`, resolve every mismatch, sync capability specs, and leave `v1-context-access-layer` active and ready for a separate explicit archive request.

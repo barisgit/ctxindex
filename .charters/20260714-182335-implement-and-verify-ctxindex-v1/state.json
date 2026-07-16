@@ -2,14 +2,16 @@
   "charterId": "20260714-182335-implement-and-verify-ctxindex-v1",
   "schemaVersion": "file-interface",
   "objective": "Implement and verify ctxindex V1 as the local personal-context gateway defined by `v1-context-access-layer`: typed definitions, trusted Extension loading, fresh generic storage, exact Realms, Gmail discovery/retrieval, threads, Artifacts/exports, reversible provider email Draft Actions, local-directory support, an external tenders proof, generated docs, and complete validation.",
-  "status": "active",
+  "status": "completed",
   "createdAt": "2026-07-14T18:23:35.445Z",
-  "updatedAt": "2026-07-16T01:35:58.342Z",
+  "updatedAt": "2026-07-16T03:47:03.377Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
   "previousStatus": "active",
-  "nextSeq": 2312,
-  "latestSourceSeq": 2307,
-  "snapshotHash": "7541ea8ddc2fbb8ef6d7b7bf4a8dd216477d3e2f5e380af5bfa9c1de108aae6b",
+  "completedAt": "2026-07-16T03:47:03.377Z",
+  "completionNote": "All 55 tasks, mandatory Slice gates, final CI/integration/e2e/D3/strict validation, isolated workflow, fresh-context QA, semantic OpenSpec verification, capability-spec sync, drift/cartography maintenance, and approved human Gmail checkpoints passed. Change remains active and unarchived for explicit archive.",
+  "nextSeq": 3411,
+  "latestSourceSeq": 3381,
+  "snapshotHash": "435d459f18baee8c383873d0e1de5bf23cd89d064e4f78ef5fc99f8395e3b8f8",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -17,9 +19,9 @@
       "depends": [],
       "status": {
         "value": "pass",
-        "note": "evidence: `work/slice-1-gate.txt` (typecheck, lint, 181 passing tests, and compiled-extension regression passed)"
+        "note": "evidence: `work/slice-1-gate.txt` (typecheck, lint, 181 passing tests, and compiled-extension regression passed); final verification: `work/final-v1-gate.txt`"
       },
-      "statusSeq": 225
+      "statusSeq": 3408
     },
     {
       "id": "C2",
@@ -29,9 +31,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "evidence: `work/slice-2-gate.txt` (explicit-path loading, atomic rejection, D3 relocation, Source preservation/recovery, typecheck, lint, and 190 tests passed)"
+        "note": "evidence: `work/slice-2-gate.txt` (explicit-path loading, atomic rejection, D3 relocation, Source preservation/recovery, typecheck, lint, and 190 tests passed); final verification: `work/final-v1-gate.txt`"
       },
-      "statusSeq": 352
+      "statusSeq": 3408
     },
     {
       "id": "C3",
@@ -41,9 +43,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "evidence: `work/slice-3-gate.txt` (fresh generic schema and prototype rejection, 51 focused storage tests, 198 passing full-suite tests with one skip, 10 integration tests, typecheck, lint, strict OpenSpec validation, and diff check passed)"
+        "note": "evidence: `work/slice-3-gate.txt` (fresh generic schema and prototype rejection, 51 focused storage tests, 198 passing full-suite tests with one skip, 10 integration tests, typecheck, lint, strict OpenSpec validation, and diff check passed); final verification: `work/final-v1-gate.txt`"
       },
-      "statusSeq": 571
+      "statusSeq": 3408
     },
     {
       "id": "C4",
@@ -54,9 +56,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "evidence: `work/slice-4-gate.txt` (mocked Gmail binary search/get/cache proof and the approved isolated read-only live Gmail search/get checkpoint passed)"
+        "note": "evidence: `work/slice-4-gate.txt` (mocked Gmail binary search/get/cache proof and the approved isolated read-only live Gmail search/get checkpoint passed); final verification: `work/final-v1-gate.txt`"
       },
-      "statusSeq": 1403
+      "statusSeq": 3408
     },
     {
       "id": "C5",
@@ -67,9 +69,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "evidence: `work/slice-5-gate.txt` (Relation/thread unit and binary-CLI out-of-order traversal, cross-Source joins, no provider I/O, typecheck, lint, full tests, and D3 passed)"
+        "note": "evidence: `work/slice-5-gate.txt` (Relation/thread unit and binary-CLI out-of-order traversal, cross-Source joins, no provider I/O, typecheck, lint, full tests, and D3 passed); final verification: `work/final-v1-gate.txt`"
       },
-      "statusSeq": 1403
+      "statusSeq": 3408
     },
     {
       "id": "C6",
@@ -80,9 +82,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "evidence: `work/slice-6-gate.txt` (Artifact CAS/download/cache/copy, exact retention purge and re-download, disk accounting, deterministic JSON/Profile EML export, 107 focused and 419 full-suite tests, typecheck, lint, strict OpenSpec, D3, and diff checks passed)"
+        "note": "evidence: `work/slice-6-gate.txt` (Artifact CAS/download/cache/copy, exact retention purge and re-download, disk accounting, deterministic JSON/Profile EML export, 107 focused and 419 full-suite tests, typecheck, lint, strict OpenSpec, D3, and diff checks passed); final verification: `work/final-v1-gate.txt`"
       },
-      "statusSeq": 1403
+      "statusSeq": 3408
     },
     {
       "id": "C7",
@@ -94,9 +96,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "evidence: `work/slice-7-mocked-gate.txt` and `work/slice-7-live-draft.txt` (typed reversible Action contracts, zero-I/O invalid/no-send proofs, mocked binary create/update, and approved live stable-Ref Draft create/update with provider UI confirmation passed)"
+        "note": "evidence: `work/slice-7-mocked-gate.txt` and `work/slice-7-live-draft.txt` (typed reversible Action contracts, zero-I/O invalid/no-send proofs, mocked binary create/update, and approved live stable-Ref Draft create/update with provider UI confirmation passed); final verification: `work/final-v1-gate.txt`"
       },
-      "statusSeq": 1802
+      "statusSeq": 3408
     },
     {
       "id": "C8",
@@ -107,9 +109,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "evidence: `work/slice-8-gate.txt` (generic local-directory sync/search/get, stable Refs and tombstones, ignored/binary/oversize warnings, zero egress, fresh schema boundaries, D3, typecheck, lint, 592 passing full-suite tests with one live skip, strict OpenSpec, and diff checks passed)"
+        "note": "evidence: `work/slice-8-gate.txt` (generic local-directory sync/search/get, stable Refs and tombstones, ignored/binary/oversize warnings, zero egress, fresh schema boundaries, D3, typecheck, lint, 592 passing full-suite tests with one live skip, strict OpenSpec, and diff checks passed); final verification: `work/final-v1-gate.txt`"
       },
-      "statusSeq": 2133
+      "statusSeq": 3408
     },
     {
       "id": "C9",
@@ -120,9 +122,9 @@
       ],
       "status": {
         "value": "pass",
-        "note": "evidence: `work/slice-9-gate.txt` (public-SDK-only external tenders definitions, explicit-path loading, relocated compiled-binary init/sync/search/get/removal/degraded reads/recovery, registry-derived availability, D3, typecheck, lint, 598 passing full-suite tests with one live skip, strict OpenSpec, and diff checks passed)"
+        "note": "evidence: `work/slice-9-gate.txt` (public-SDK-only external tenders definitions, explicit-path loading, relocated compiled-binary init/sync/search/get/removal/degraded reads/recovery, registry-derived availability, D3, typecheck, lint, 598 passing full-suite tests with one live skip, strict OpenSpec, and diff checks passed); final verification: `work/final-v1-gate.txt`"
       },
-      "statusSeq": 2306
+      "statusSeq": 3408
     },
     {
       "id": "C10",
@@ -134,10 +136,10 @@
         "C9"
       ],
       "status": {
-        "value": "in-progress",
-        "note": ""
+        "value": "pass",
+        "note": "evidence: `work/slice-10-interface-gate.txt` (registry-generated CLI/agent interfaces, collision-safe Source configuration, embedded relocated-binary skills, non-interactive input, focused and full tests, typecheck, lint, diff checking, and independent review passed); final verification: `work/final-v1-gate.txt`"
       },
-      "statusSeq": 2306
+      "statusSeq": 3408
     },
     {
       "id": "C11",
@@ -155,10 +157,10 @@
         "C10"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "pass",
+        "note": "evidence: `work/final-v1-gate.txt`, `work/final-runtime-qa.txt`, and `work/task-10.5-openspec-verify.txt` (all Slice gates, complete isolated workflow, SPEC exits, fresh-context QA, strict final commands, semantic verification, drift/cartography checks, and both approved live Gmail checkpoints passed; the change remains unarchived)"
       },
-      "statusSeq": 6
+      "statusSeq": 3402
     }
   ]
 }

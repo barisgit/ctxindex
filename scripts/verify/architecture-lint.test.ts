@@ -26,6 +26,15 @@ test('thin sync command has no architecture violations', async () => {
   expect(violations).toEqual([])
 })
 
+test('test fixtures may import commands and name provider URLs', async () => {
+  const violations = await lintFiles([
+    'apps/cli/src/commands/action.test.ts',
+    'apps/cli/src/auth/google-scopes.test.ts',
+  ])
+
+  expect(violations).toEqual([])
+})
+
 test('accepts a clean fixture', async () => {
   const cleanPath = await makeTempFile(`
 import type { Database } from 'bun:sqlite'

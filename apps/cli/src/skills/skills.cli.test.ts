@@ -30,6 +30,7 @@ test('skills list shows bundled skills', async () => {
   expect(result.exitCode).toBe(0)
   expect(result.stderr).toBe('')
   expect(result.stdout).toContain('getting-started\t')
+  expect(result.stdout).not.toContain('reference/cli-overview\t')
   // README is directory documentation, not a bundled skill (SPEC §10c).
   expect(result.stdout).not.toContain('README\t')
 })

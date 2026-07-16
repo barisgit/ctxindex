@@ -1,132 +1,100 @@
 # Agent how-tos for ctxindex
 
-> These recipes drive the current disposable prototype while V1 is implemented.
-> They are harness documentation, not the target CLI contract; use `V1.md` and
-> `SPEC.md` for that.
-
-
-This page is for autonomous agents driving the real `ctxindex` CLI from a clean checkout. Run commands from the repo root unless a step says otherwise. Replace placeholder values such as `<path>` and `<query>` before running.
+This page is workflow guidance for autonomous agents driving the V1 CLI from a clean checkout. Runtime vocabulary is not repeated here: inspect the activated Extensions and generated interface before constructing commands.
 
 ## Prerequisites
 
-Install dependencies and verify that the CLI runs through `bun cli`:
+Run from the repository root. The supported development invocation is `bun cli` (or `bun run cli` from the repository root or `apps/cli`); there is no `bun link` workflow.
 
 ```sh
 bun install
 bash scripts/verify/cli.sh
+bun cli extensions list
+bun cli describe --format markdown
 ```
 
-The CLI is invoked only through `bun cli` (from repo root) or `bun run cli` (from repo root or from `apps/cli`). There is no `bun link` / global install path. Every snippet below assumes you prefix commands with `bun cli` (or `bun run cli`) when running from a clone of this repo.
+The generated description is authoritative for Profile IDs and aliases, field types, export formats, Adapter IDs and configuration flags, and Action schemas.
 
-## Setup a fresh ctxindex home
+## Fresh isolated state
 
-Use sandboxed XDG/CTXINDEX paths in tests. For a normal local smoke, initialize once:
+Tests and checkpoints must use isolated XDG/CTXINDEX directories. Initialize the selected home, then create an explicit Realm; V1 has no implicit Realm.
 
 ```sh
 bun cli init
+bun cli realm add personal --name Personal
 ```
 
-## Index local files
+## Add and query a Source
 
-Add a local directory source to the global realm, run sync, search, and inspect status:
+Choose an Adapter and its generated options from `describe`, then bind the Source to an explicit Realm.
 
 ```sh
-bun cli source add local.directory --realm global --root <path>
+bun cli source add <adapter-id> --realm personal <generated-adapter-options>
 bun cli sync
-bun cli search 'query'
-bun cli status
+bun cli search '<query>' --realm personal --json
+bun cli status --json
 ```
 
-Use `--json` on commands that support it when another program will parse output.
+Use `sync` only when the selected Adapter declares that capability. Federated Sources can be searched remotely immediately. Follow returned stable `ctx://` Refs with the generic retrieval verbs:
+
+```sh
+bun cli get <ref> --json
+bun cli thread get <ref> --json
+bun cli artifact list <ref> --json
+bun cli artifact download <artifact-ref> --output <path> --json
+bun cli export <ref> --format <generated-format> --output <path> --json
+```
+
+Before any provider mutation, inspect the generated reversible Action schema and select the Source explicitly. V1 supports Draft persistence only and never sends mail.
+
+```sh
+bun cli action describe <generated-action-id> --source <source-id> --json
+bun cli action run <generated-action-id> --source <source-id> --input <json-or-file> --json
+```
 
 ## Bundled skills
-
-List available skills, read the getting-started skill, and optionally inline referenced files:
 
 ```sh
 bun cli skills list
 bun cli skills get getting-started
 bun cli skills get getting-started --inline
+bun cli skills path
 ```
 
-## Secrets migration
+## Secrets and provider authentication
 
-Choose the destination backend explicitly; `keychain|file` in specs means one of these concrete commands:
+Choose secret migration destinations explicitly:
 
 ```sh
-ctxindex secrets migrate keychain
-ctxindex secrets migrate file
+bun cli secrets migrate keychain
+bun cli secrets migrate file
 ```
 
-For the encrypted file backend, set `CTXINDEX_SECRETS_PASSPHRASE` or pass the required flag before migrating.
-
-## OAuth in autonomous CI with mocks
-
-Mocked Gmail acceptance is defined in `apps/cli/src/e2e/gmail-autonomous.e2e.test.ts`. That test starts a local OAuth/Gmail mock and drives the CLI with these env vars:
-
-- `CTXINDEX_GMAIL_MOCK_BASE_URL`
-- `CTXINDEX_GMAIL_CLIENT_ID`
-- `CTXINDEX_GMAIL_CLIENT_SECRET`
-- `CTXINDEX_GMAIL_REFRESH_TOKEN`
-
-A CI-style mocked auth/source/sync flow looks like:
+For Google OAuth, required client input comes from flags or the documented environment variables; the CLI does not prompt for credentials. The loopback flow may require browser consent after explicit operator approval.
 
 ```sh
-export CTXINDEX_GMAIL_MOCK_BASE_URL=http://127.0.0.1:<port>
-export CTXINDEX_GMAIL_CLIENT_ID=gmail-client-id
-export CTXINDEX_GMAIL_CLIENT_SECRET=gmail-client-secret
-export CTXINDEX_GMAIL_REFRESH_TOKEN=gmail-refresh-token
-ctxindex auth add google --from-env
-ctxindex source add google.mailbox --realm global
-ctxindex sync
+bun cli auth add google --from-env
+# or, for an explicitly approved browser flow:
+bun cli auth add google --client-id "$CTXINDEX_GMAIL_CLIENT_ID" --client-secret "$CTXINDEX_GMAIL_CLIENT_SECRET" --loopback
 ```
 
-Do not use real network credentials for the mocked lane; rely on the e2e test harness to supply the local mock base URL.
+After authorization, discover the loaded mailbox Adapter and generated Source options with `describe`, then add it to the intended Realm. Do not run live provider tests from the general automated lane. The accepted live read and Draft checks use the isolated Human checkpoint procedure and redacted evidence under the active charter.
 
-## OAuth with real loopback authorization
+Mocked provider coverage is implemented by the CLI e2e tests for search/get, Draft Actions, and network egress. Those tests supply loopback-only endpoints and synthetic credentials; never substitute real credentials into that lane.
 
-For real Gmail, create a Google Cloud OAuth client with a loopback redirect URI allowed for `http://127.0.0.1:<random>/callback`, then run the loopback flow. The CLI binds a random local port, opens the browser, captures the callback code, exchanges it, and stores tokens in the configured secret backend.
+## Verification
 
-```sh
-export CTXINDEX_GMAIL_CLIENT_ID=<google-oauth-client-id>
-export CTXINDEX_GMAIL_CLIENT_SECRET=<google-oauth-client-secret>
-ctxindex auth add google --client-id "$CTXINDEX_GMAIL_CLIENT_ID" --client-secret "$CTXINDEX_GMAIL_CLIENT_SECRET" --loopback
-ctxindex source add google.mailbox --realm global
-ctxindex sync
-```
-
-For autonomous live e2e runs, also set `CTXINDEX_GMAIL_REFRESH_TOKEN` so the test can exchange a refresh token without operator handoff:
+Run narrow checks first, then the repository gates required by the active OpenSpec task:
 
 ```sh
-export CTXINDEX_GMAIL_REFRESH_TOKEN=<refresh-token-for-test-mailbox>
-bun run test:e2e
-```
-
-If the machine has no browser, set `CTXINDEX_NO_BROWSER=1` to print the auth URL and complete the callback manually within `CTXINDEX_LOOPBACK_TIMEOUT_SECS` seconds.
-
-## Verifying changes
-
-Run the narrow check first when editing this guide, then the normal repo checks:
-
-```sh
-bun test packages/core/src/meta/agent-howtos.test.ts
 bun run typecheck
 bun run lint
 bun test
+bun run test:integration
 bun run test:e2e
-bash scripts/verify/ci.sh
+bun run ci
+./scripts/spikes/d3-compiled-extension/run.sh
+openspec validate v1-context-access-layer --strict
 ```
 
-## Exit code reference
-
-| Code | Meaning | Typical agent action |
-| ---: | --- | --- |
-| 0 | Success | Continue to the next step. |
-| 2 | Invalid usage or missing required input | Fix flags, env, or referenced entities and retry. |
-| 10 | Needs authentication, such as revoked Gmail token | Re-run `ctxindex auth add google` or refresh credentials. |
-| 20 | Rate limited or transient provider condition | Back off and retry later. |
-| 30 | Network or provider failure/conflict | Check connectivity, provider mock, or remote service state. |
-| 40 | Permission denied or inaccessible local path/secret | Fix filesystem, keychain, or provider permissions. |
-| 50 | Timeout or terminal sync/OAuth failure; loopback OAuth timeout lands here | Inspect stderr/logs and rerun with corrected OAuth or sync inputs. |
-| 124 | Wall-clock timeout from `scripts/with-timeout.ts` | Treat as a hung command; inspect child process logs. |
-| 130 | Cancelled by SIGINT | Stop or rerun intentionally. |
+Stable exit meanings and agent responses are owned by `SPEC.md` §12; do not maintain a second exit-code table here.

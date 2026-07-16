@@ -11,6 +11,7 @@ test('skills list returns bundled skills', async () => {
     expect(result.exitCode).toBe(0)
     expect(result.stderr).toBe('')
     expect(result.stdout).toContain('getting-started')
+    expect(result.stdout).not.toContain('reference/cli-overview')
   } finally {
     await sandbox.cleanup()
   }

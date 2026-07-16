@@ -1,7 +1,12 @@
 import { CTXINDEX_BUILTIN_EXTENSIONS } from '@ctxindex/adapters'
 import { ArtifactService } from '@ctxindex/core/artifact'
 import { type AuthService, createAuthService } from '@ctxindex/core/auth'
-import { getEnv, type LogLevel, readConfig } from '@ctxindex/core/config'
+import {
+  type CtxindexConfig,
+  getEnv,
+  type LogLevel,
+  readConfig,
+} from '@ctxindex/core/config'
 import { loadExtensions } from '@ctxindex/core/extension'
 import { logger as createLogger, type Logger } from '@ctxindex/core/logger'
 import { createRealmService, type RealmService } from '@ctxindex/core/realm'
@@ -46,9 +51,11 @@ export function setCliLogLevel(level: LogLevel | undefined): void {
   cliLogLevel = level
 }
 
-async function loadWritableSecretsStore(): Promise<SecretsStore> {
+async function loadWritableSecretsStore(
+  config: CtxindexConfig,
+): Promise<SecretsStore> {
   try {
-    return await loadSecretsStore(await readConfig())
+    return await loadSecretsStore(config)
   } catch (err) {
     if (
       err instanceof CtxindexSecretsError &&
@@ -61,16 +68,24 @@ async function loadWritableSecretsStore(): Promise<SecretsStore> {
 }
 
 export async function openDeps(
-  opts: { readonly filePassphrase?: string } = {},
+  opts: {
+    readonly filePassphrase?: string
+    readonly config?: CtxindexConfig
+    readonly registry?: ExtensionRegistry
+  } = {},
 ): Promise<CliDeps> {
   const db = await getDb()
   const log = await createLogger(cliLogLevel ? { level: cliLogLevel } : {})
-  const config = await readConfig()
+  const config = opts.config ?? (await readConfig())
   const realmService = createRealmService({ db, logger: log })
-  const { registry } = await loadExtensions({
-    config,
-    builtins: CTXINDEX_BUILTIN_EXTENSIONS,
-  })
+  const registry =
+    opts.registry ??
+    (
+      await loadExtensions({
+        config,
+        builtins: CTXINDEX_BUILTIN_EXTENSIONS,
+      })
+    ).registry
   const threadService = createThreadService({ db, profiles: registry.profiles })
   const sourceService = createSourceService({
     db,
@@ -90,7 +105,7 @@ export async function openDeps(
     logger: log,
     backend: config.secrets.backend,
   })
-  const secretsStore = await loadWritableSecretsStore()
+  const secretsStore = await loadWritableSecretsStore(config)
   const env = getEnv()
   const authService = createAuthService({
     db,

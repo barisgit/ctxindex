@@ -134,4 +134,213 @@ describe('registry-derived describe data', () => {
       },
     ])
   })
+
+  test('sorts definitions and binds duplicate Action ids by exact Profile', () => {
+    const actionInput = z.object({ value: z.string() })
+    const makeProfile = (id: 'z.kind' | 'a.kind') =>
+      defineProfile({
+        id,
+        version: 1,
+        schema: z.object({ value: z.string() }),
+        search: {
+          fields: {
+            zebra: { type: 'string', extract: (payload) => payload.value },
+            alpha: { type: 'string', extract: (payload) => payload.value },
+          },
+        },
+        exports: {
+          zeta: { mediaType: 'text/zeta', render: () => '' },
+          alpha: { mediaType: 'text/alpha', render: () => '' },
+        },
+        actions: {
+          shared: {
+            effect: 'reversible',
+            input: actionInput,
+            output: { id, version: 1 },
+            docs: `${id} shared`,
+          },
+        },
+        docs: { summary: `${id} summary`, aliases: ['z-alias', 'a-alias'] },
+      })
+    const makeAdapter = (
+      id: 'z.adapter' | 'a.adapter',
+      profileId: 'z.kind' | 'a.kind',
+    ) =>
+      defineAdapter({
+        id,
+        version: 1,
+        configSchema: z.object({
+          foo_bar: z.string().describe('Foo path'),
+          count: z.number().int().default(2),
+          labels: z.array(z.string()).optional(),
+          enabled: z.boolean().optional(),
+        }),
+        auth: { kind: 'none' },
+        profiles: [{ id: profileId, version: 1 }],
+        routing: 'indexed',
+        capabilities: ['retrieve', 'sync'],
+        operations: { retrieve: async () => {}, sync: async () => {} },
+        actions: {
+          shared: {
+            profile: { id: profileId, version: 1 },
+            input: actionInput,
+            output: { id: profileId, version: 1 },
+            run: async () => ({
+              ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/one',
+              profile: { id: profileId, version: 1 },
+              payload: { value: 'one' },
+            }),
+          },
+        },
+      })
+    const zProfile = makeProfile('z.kind')
+    const aProfile = makeProfile('a.kind')
+    const zAdapter = makeAdapter('z.adapter', 'z.kind')
+    const aAdapter = makeAdapter('a.adapter', 'a.kind')
+
+    const shuffledRegistry = {
+      profiles: { list: () => [zProfile, aProfile] },
+      adapters: { list: () => [zAdapter, aAdapter] },
+    }
+    const result = describeRegistry(shuffledRegistry)
+
+    expect(result.kinds.map(({ id }) => id)).toEqual(['a.kind', 'z.kind'])
+    expect(result.kinds[0]?.aliases).toEqual(['a-alias', 'z-alias'])
+    expect(result.kinds[0]?.fields.map(({ name }) => name)).toEqual([
+      'alpha',
+      'zebra',
+    ])
+    expect(result.kinds[0]?.formats.map(({ name }) => name)).toEqual([
+      'alpha',
+      'zeta',
+    ])
+    expect(result.sources.map(({ id }) => id)).toEqual([
+      'a.adapter',
+      'z.adapter',
+    ])
+    expect(result.sources[0]).toMatchObject({
+      routing: 'indexed',
+      auth: { kind: 'none' },
+      capabilities: ['retrieve', 'sync'],
+      configOptions: [
+        {
+          property: 'count',
+          flag: '--config-count',
+          type: 'integer',
+          required: false,
+          default: 2,
+        },
+        {
+          property: 'enabled',
+          flag: '--config-enabled',
+          type: 'boolean',
+          required: false,
+        },
+        {
+          property: 'foo_bar',
+          flag: '--config-foo-bar',
+          type: 'string',
+          required: true,
+          docs: 'Foo path',
+        },
+        {
+          property: 'labels',
+          flag: '--config-labels',
+          type: 'string[]',
+          required: false,
+        },
+      ],
+    })
+    expect(result.actions).toHaveLength(2)
+    expect(result.actions[0]).toMatchObject({
+      id: 'shared',
+      profile: { id: 'a.kind', version: 1 },
+      adapters: [{ id: 'a.adapter', version: 1 }],
+    })
+    expect(result.actions[1]).toMatchObject({
+      id: 'shared',
+      profile: { id: 'z.kind', version: 1 },
+      adapters: [{ id: 'z.adapter', version: 1 }],
+    })
+  })
+
+  test('uses strict ordering and collision-safe JSON-capable config flags', () => {
+    const adapter = defineAdapter({
+      id: 'config.adapter',
+      version: 1,
+      configSchema: z.object({
+        foo_bar: z.string(),
+        'foo-bar': z.string(),
+        'foo_bar--666f6f5f626172': z.string(),
+        json: z.string(),
+        nested: z.object({ token: z.string() }).describe('Nested credentials'),
+      }),
+      auth: { kind: 'none' },
+      profiles: [],
+      routing: 'indexed',
+      capabilities: [],
+      operations: {},
+      actions: {},
+    })
+    const result = describeRegistry({
+      profiles: { list: () => [] },
+      adapters: { list: () => [adapter] },
+    })
+
+    expect(result.sources[0]?.configOptions).toEqual([
+      {
+        property: 'foo-bar',
+        flag: '--config--666f6f2d626172',
+        type: 'string',
+        required: true,
+      },
+      {
+        property: 'foo_bar',
+        flag: '--config--666f6f5f626172',
+        type: 'string',
+        required: true,
+      },
+      {
+        property: 'foo_bar--666f6f5f626172',
+        flag: '--config-foo-bar--666f6f5f626172',
+        type: 'string',
+        required: true,
+      },
+      {
+        property: 'json',
+        flag: '--config--6a736f6e',
+        type: 'string',
+        required: true,
+      },
+      {
+        property: 'nested',
+        flag: '--config-nested',
+        type: 'json',
+        required: true,
+        docs: 'Nested credentials',
+      },
+    ])
+  })
+
+  test('sorts mixed case and punctuation by code unit', () => {
+    const profiles = ['a.kind', '_kind', 'A.kind', '!kind'].map((id) =>
+      defineProfile({
+        id,
+        version: 1,
+        schema: z.object({}),
+        docs: { summary: 'Ordering fixture', aliases: ['a', '_', 'A', '!'] },
+      }),
+    )
+    const result = describeRegistry({
+      profiles: { list: () => profiles },
+      adapters: { list: () => [] },
+    })
+    expect(result.kinds.map(({ id }) => id)).toEqual([
+      '!kind',
+      'A.kind',
+      '_kind',
+      'a.kind',
+    ])
+    expect(result.kinds[0]?.aliases).toEqual(['!', 'A', '_', 'a'])
+  })
 })

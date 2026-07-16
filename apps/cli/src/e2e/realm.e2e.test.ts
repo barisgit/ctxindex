@@ -6,8 +6,8 @@ import { createSandbox, type Sandbox } from '@ctxindex/core/testing'
 type RealmRow = {
   id: string
   slug: string
-  is_default: number
-  created_at: number
+  label: string | null
+  createdAt: number
 }
 
 function dbPath(sandbox: Sandbox): string {
@@ -44,15 +44,20 @@ test('realm add and list', async () => {
     const add = await sandbox.run(['realm', 'add', 'foo'])
     expect(add.exitCode).toBe(0)
     expect(add.stderr).toBe('')
-    expect(add.stdout).toContain('realm added: foo')
+    expect(add.stdout).toBe('realm added: foo\n')
 
     const list = await sandbox.run(['realm', 'list', '--json'])
     expect(list.exitCode).toBe(0)
     expect(list.stderr).toBe('')
 
-    const realms = parseRealmList(list.stdout)
-    expect(realms.some((realm) => realm.slug === 'global')).toBe(true)
-    expect(realms.some((realm) => realm.slug === 'foo')).toBe(true)
+    expect(parseRealmList(list.stdout)).toEqual([
+      {
+        id: 'foo',
+        slug: 'foo',
+        label: null,
+        createdAt: expect.any(Number),
+      },
+    ])
   } finally {
     await sandbox.cleanup()
   }
@@ -105,9 +110,7 @@ test('list json parses', async () => {
     expect(list.exitCode).toBe(0)
     expect(list.stderr).toBe('')
 
-    const realms = parseRealmList(list.stdout)
-    expect(Array.isArray(realms)).toBe(true)
-    expect(realms.some((realm) => realm.slug === 'global')).toBe(true)
+    expect(parseRealmList(list.stdout)).toEqual([])
   } finally {
     await sandbox.cleanup()
   }

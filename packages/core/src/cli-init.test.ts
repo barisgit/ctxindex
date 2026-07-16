@@ -99,8 +99,6 @@ test('ctxindex init creates XDG layout, config, sqlite, and PRAGMAs', async () =
       expect(pragmaValue(database, 'foreign_keys')).toBe(1)
       expect(pragmaValue(database, 'synchronous')).toBe(1)
       expect(pragmaValue(database, 'busy_timeout')).toBe(5000)
-      // TODO(f04): assert the seeded global realm row here after f04 adds
-      // migrations and realm seeding to init.
     } finally {
       database.close()
     }

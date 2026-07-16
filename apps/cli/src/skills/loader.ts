@@ -1,5 +1,6 @@
-import { readdir, readFile, stat } from 'node:fs/promises'
-import { dirname, isAbsolute, posix, relative, resolve, sep } from 'node:path'
+import { readdir, readFile } from 'node:fs/promises'
+import { isAbsolute, posix, relative, resolve, sep } from 'node:path'
+import { compareStrings } from '@ctxindex/core/registry'
 
 export type SkillRecord = {
   name: string
@@ -11,13 +12,35 @@ export type SkillDocument = SkillRecord & {
   content: string
 }
 
+export type SkillsSource =
+  | {
+      readonly kind: 'filesystem'
+      readonly root: string
+      readonly location: string
+    }
+  | {
+      readonly kind: 'embedded'
+      readonly location: string
+      readonly files: readonly EmbeddedSkillFile[]
+    }
+
+export interface EmbeddedSkillFile {
+  readonly path: string
+  readonly content: string
+}
+
 function toPosixPath(path: string): string {
   return path.split(sep).join(posix.sep)
 }
 
-function skillNameFromPath(root: string, path: string): string {
-  const relativePath = toPosixPath(relative(root, path))
-  return relativePath.endsWith('.md') ? relativePath.slice(0, -3) : relativePath
+function asSource(source: SkillsSource | string): SkillsSource {
+  return typeof source === 'string'
+    ? { kind: 'filesystem', root: source, location: source }
+    : source
+}
+
+function skillNameFromRelativePath(path: string): string {
+  return path.endsWith('.md') ? path.slice(0, -3) : path
 }
 
 function assertInsideRoot(root: string, path: string): void {
@@ -25,117 +48,164 @@ function assertInsideRoot(root: string, path: string): void {
 
   if (relativePath.startsWith('..') || isAbsolute(relativePath)) {
     throw new Error(
-      `Refusing to read skill outside bundled skills directory: ${path}`,
+      `Refusing to read skill outside bundled skills location: ${path}`,
     )
   }
 }
 
-function resolveSkillPath(root: string, name: string): string {
-  const normalizedName = toPosixPath(name)
+function assertEmbeddedPath(path: string): void {
+  if (path.startsWith('..') || posix.isAbsolute(path)) {
+    throw new Error(
+      `Refusing to read skill outside bundled skills location: ${path}`,
+    )
+  }
+}
+
+function resolveSkillRelativePath(name: string): string {
+  const normalizedName = posix.normalize(toPosixPath(name))
   const markdownName = normalizedName.endsWith('.md')
     ? normalizedName
     : `${normalizedName}.md`
-  const path = resolve(root, markdownName)
+  assertEmbeddedPath(markdownName)
+  return markdownName
+}
 
-  assertInsideRoot(root, path)
-
-  return path
+function documentPath(source: SkillsSource, relativePath: string): string {
+  return source.kind === 'filesystem'
+    ? resolve(source.root, relativePath)
+    : `${source.location}/${relativePath}`
 }
 
 function summarize(content: string): string {
   const lines = content.split(/\r?\n/)
   let index = 0
 
-  while (index < lines.length && lines[index]?.trim() === '') {
-    index += 1
-  }
-
-  if (lines[index]?.startsWith('# ')) {
-    index += 1
-  }
+  while (index < lines.length && lines[index]?.trim() === '') index += 1
+  if (lines[index]?.startsWith('# ')) index += 1
 
   while (index < lines.length) {
     const line = lines[index]?.trim()
-
-    if (line) {
-      return line
-    }
-
+    if (line) return line
     index += 1
   }
 
   return ''
 }
 
-async function readSkillRecord(
+async function filesystemMarkdownFiles(
   root: string,
-  path: string,
-): Promise<SkillRecord> {
-  const content = await readFile(path, 'utf8')
+  directory = root,
+): Promise<string[]> {
+  const entries = await readdir(directory, { withFileTypes: true })
+  const files: string[] = []
 
-  return {
-    name: skillNameFromPath(root, path),
-    path,
-    summary: summarize(content),
+  for (const entry of entries) {
+    const path = resolve(directory, entry.name)
+    if (entry.isDirectory()) {
+      files.push(...(await filesystemMarkdownFiles(root, path)))
+    } else if (entry.isFile() && entry.name.endsWith('.md')) {
+      files.push(toPosixPath(relative(root, path)))
+    }
   }
+
+  return files
 }
 
-export async function listSkills(root: string): Promise<SkillRecord[]> {
-  const entries = await readdir(root, { withFileTypes: true })
-  const markdownFiles = entries
-    // README is directory documentation, not a bundled skill (SPEC §10c).
+async function readContent(
+  source: SkillsSource,
+  relativePath: string,
+): Promise<string | undefined> {
+  if (source.kind === 'embedded') {
+    return source.files.find((file) => file.path === relativePath)?.content
+  }
+
+  const path = resolve(source.root, relativePath)
+  assertInsideRoot(source.root, path)
+  return readFile(path, 'utf8').catch(() => undefined)
+}
+
+export async function listSkills(
+  input: SkillsSource | string,
+): Promise<SkillRecord[]> {
+  const source = asSource(input)
+  const markdownFiles = (
+    source.kind === 'filesystem'
+      ? await filesystemMarkdownFiles(source.root)
+      : source.files.map((file) => file.path)
+  )
+    // Files under reference/ support inlining/get but are not top-level skills.
     .filter(
-      (entry) =>
-        entry.isFile() &&
-        entry.name.endsWith('.md') &&
-        entry.name.toLowerCase() !== 'readme.md',
+      (path) => !path.includes(posix.sep) && path.toLowerCase() !== 'readme.md',
     )
-    .map((entry) => resolve(root, entry.name))
     .sort((a, b) =>
-      skillNameFromPath(root, a).localeCompare(skillNameFromPath(root, b)),
+      compareStrings(
+        skillNameFromRelativePath(a),
+        skillNameFromRelativePath(b),
+      ),
     )
 
-  return Promise.all(markdownFiles.map((path) => readSkillRecord(root, path)))
+  return Promise.all(
+    markdownFiles.map(async (relativePath) => {
+      const content = await readContent(source, relativePath)
+      if (content === undefined) {
+        throw new Error(`Bundled skill not found: ${relativePath}`)
+      }
+      return {
+        name: skillNameFromRelativePath(relativePath),
+        path: documentPath(source, relativePath),
+        summary: summarize(content),
+      }
+    }),
+  )
 }
 
 export async function getSkill(
-  root: string,
+  input: SkillsSource | string,
   name: string,
 ): Promise<SkillDocument> {
-  const path = resolveSkillPath(root, name)
-  const fileStat = await stat(path).catch(() => null)
+  const source = asSource(input)
+  const relativePath = resolveSkillRelativePath(name)
+  const content = await readContent(source, relativePath)
 
-  if (!fileStat?.isFile()) {
+  if (content === undefined) {
     throw Object.assign(new Error(`Bundled skill not found: ${name}`), {
       exitCode: 2,
     })
   }
 
-  const content = await readFile(path, 'utf8')
-  const record = await readSkillRecord(root, path)
-
   return {
-    ...record,
+    name: skillNameFromRelativePath(relativePath),
+    path: documentPath(source, relativePath),
+    summary: summarize(content),
     content,
   }
 }
 
 async function inlineSkillFile(
-  root: string,
-  path: string,
+  source: SkillsSource,
+  relativePath: string,
   stack: string[],
 ): Promise<string> {
-  assertInsideRoot(root, path)
+  assertEmbeddedPath(relativePath)
 
-  if (stack.includes(path)) {
-    const cycle = [...stack, path]
-      .map((cyclePath) => skillNameFromPath(root, cyclePath))
+  if (stack.includes(relativePath)) {
+    const cycle = [...stack, relativePath]
+      .map(skillNameFromRelativePath)
       .join(' -> ')
     throw new Error(`Cycle detected while inlining bundled skills: ${cycle}`)
   }
 
-  const content = await readFile(path, 'utf8')
-  const nextStack = [...stack, path]
+  const content = await readContent(source, relativePath)
+  if (content === undefined) {
+    throw Object.assign(
+      new Error(
+        `Bundled skill not found: ${skillNameFromRelativePath(relativePath)}`,
+      ),
+      { exitCode: 2 },
+    )
+  }
+
+  const nextStack = [...stack, relativePath]
   const linkPattern = /!?\[[^\]]*\]\(((?:\.\/|\.\.\/)[^)]+?\.md)\)/g
   let result = ''
   let lastIndex = 0
@@ -143,16 +213,14 @@ async function inlineSkillFile(
   for (const match of content.matchAll(linkPattern)) {
     const link = match[1]
     const matchIndex = match.index
+    if (link === undefined || matchIndex === undefined) continue
 
-    if (link === undefined || matchIndex === undefined) {
-      continue
-    }
-
-    const linkedPath = resolve(dirname(path), link)
-    assertInsideRoot(root, linkedPath)
-
-    const linkedContent = await inlineSkillFile(root, linkedPath, nextStack)
-    const linkedName = skillNameFromPath(root, linkedPath)
+    const linkedPath = posix.normalize(
+      posix.join(posix.dirname(relativePath), link),
+    )
+    assertEmbeddedPath(linkedPath)
+    const linkedContent = await inlineSkillFile(source, linkedPath, nextStack)
+    const linkedName = skillNameFromRelativePath(linkedPath)
 
     result += content.slice(lastIndex, matchIndex)
     result += `\n\n--- inlined: ${linkedName} ---\n\n${linkedContent}`
@@ -160,23 +228,21 @@ async function inlineSkillFile(
   }
 
   result += content.slice(lastIndex)
-
   return result
 }
 
 export async function getSkillContent(
-  root: string,
+  input: SkillsSource | string,
   name: string,
   options: { inline?: boolean } = {},
 ): Promise<SkillDocument> {
-  const skill = await getSkill(root, name)
+  const source = asSource(input)
+  const skill = await getSkill(source, name)
 
-  if (!options.inline) {
-    return skill
-  }
+  if (!options.inline) return skill
 
   return {
     ...skill,
-    content: await inlineSkillFile(root, skill.path, []),
+    content: await inlineSkillFile(source, resolveSkillRelativePath(name), []),
   }
 }

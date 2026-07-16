@@ -13,19 +13,19 @@ else
   bun_exit=$?
 fi
 
-cat "$output_file"
-
 pass_line="$(grep -E '^ [0-9]+ pass$' "$output_file" | tail -n 1 || true)"
 fail_line="$(grep -E '^ [0-9]+ fail$' "$output_file" | tail -n 1 || true)"
 pass_count="$(awk '{print $1}' <<<"$pass_line")"
 fail_count="$(awk '{print $1}' <<<"$fail_line")"
 
 if [[ -z "$pass_count" || -z "$fail_count" ]]; then
+  cat "$output_file" >&2
   echo 'could not parse bun test output' >&2
   exit 1
 fi
 
 if (( bun_exit != 0 )); then
+  cat "$output_file" >&2
   echo "bun test failed with exit code $bun_exit" >&2
   exit "$bun_exit"
 fi
@@ -41,25 +41,23 @@ if (( fail_count != 0 )); then
 fi
 
 required_paths=(
-  'packages/core/src/sync/lock-recovery.test.ts'
-  'packages/core/src/sync/exit-codes.test.ts'
+  'packages/core/src/sync/sync-coordinator.test.ts'
+  'packages/core/src/exit-codes.test.ts'
 )
 
-if [[ -f 'packages/adapters/src/google-mailbox/sync.integration.test.ts' ]]; then
-  required_paths+=(
-    'packages/adapters/src/google-mailbox/sync.integration.test.ts'
-  )
-else
-  found_google_tests=0
-  while IFS= read -r path; do
-    required_paths+=("$path")
-    found_google_tests=1
-  done < <(find packages/adapters/src/google-mailbox -type f -name '*test.ts' | sort)
+found_gmail_tests=0
+while IFS= read -r path; do
+  required_paths+=("$path")
+  found_gmail_tests=1
+done < <(
+  find packages/adapters/src -maxdepth 1 -type f \
+    \( -name 'gmail-*.test.ts' -o -name 'gmail-*.integration.test.ts' \) \
+    | sort
+)
 
-  if (( found_google_tests == 0 )); then
-    echo 'full-test-suite: missing required google-mailbox tests' >&2
-    exit 1
-  fi
+if (( found_gmail_tests == 0 )); then
+  echo 'full-test-suite: missing required Gmail Adapter tests' >&2
+  exit 1
 fi
 
 found_cli_e2e=0

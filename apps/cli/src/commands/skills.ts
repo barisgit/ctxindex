@@ -3,7 +3,7 @@ import { parseSkillsArgs, skillsUsage } from '../args/skills'
 import { mapErrorToExit, runWithExit } from '../format/exit'
 import { formatSkill, formatSkillsList } from '../format/skills'
 import { getSkillContent, listSkills } from '../skills/loader'
-import { resolveBundledSkillsDir } from '../skills/resolve'
+import { resolveBundledSkills } from '../skills/resolve'
 
 function printOutput(output: string): void {
   if (output.length > 0) console.log(output)
@@ -18,18 +18,15 @@ export async function handleSkillsCommand(args: string[]): Promise<number> {
   }
 
   try {
-    const skillsDir = resolveBundledSkillsDir()
+    const skills = resolveBundledSkills()
     if (parsed.kind === 'list') {
-      printOutput(formatSkillsList(await listSkills(skillsDir), parsed))
+      printOutput(formatSkillsList(await listSkills(skills), parsed))
     } else if (parsed.kind === 'get') {
       printOutput(
-        formatSkill(
-          await getSkillContent(skillsDir, parsed.name, parsed),
-          parsed,
-        ),
+        formatSkill(await getSkillContent(skills, parsed.name, parsed), parsed),
       )
     } else {
-      console.log(skillsDir)
+      console.log(skills.location)
     }
     return 0
   } catch (err) {
@@ -58,7 +55,7 @@ export const skillsCommand = defineCommand({
         runWithExit(() => handleSkillsCommand(['get', ...rawArgs])),
     }),
     path: defineCommand({
-      meta: { name: 'path', description: 'Print bundled skills path.' },
+      meta: { name: 'path', description: 'Print bundled skills location.' },
       run: () => runWithExit(() => handleSkillsCommand(['path'])),
     }),
   },

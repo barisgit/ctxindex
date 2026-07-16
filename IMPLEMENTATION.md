@@ -8,7 +8,7 @@ This document describes intended reference-implementation choices for `SPEC.md` 
 
 - Bun + TypeScript monorepo; Node is not a build target.
 - Bun is pinned to 1.3.14 because compiled external-TypeScript loading fails on 1.3.12 and passes on 1.3.13/1.3.14.
-- Distribution remains a single executable built with `bun build --compile`; compiled binaries apply ordered manifests that embed the canonical migration SQL.
+- Distribution remains a single executable built with `bun build --compile`; compiled binaries apply ordered manifests that embed the canonical migration SQL and bundled skills.
 - External Extensions are trusted in-process modules loaded with dynamic `import()`.
 - `scripts/spikes/d3-compiled-extension/run.sh` is the permanent loader regression check.
 

@@ -142,7 +142,7 @@ describe('realm-cli integration: CLI subprocess', () => {
     const { env, cleanup } = await mkSandbox()
     try {
       const { exitCode, stdout, stderr } = await spawnCli(
-        ['source', 'add', 'local.directory', '--root', '/tmp'],
+        ['source', 'add', 'local.directory', '--config-root-path', '/tmp'],
         env,
       )
       expect(exitCode).toBe(2)
@@ -163,7 +163,7 @@ describe('realm-cli integration: CLI subprocess', () => {
           'local.directory',
           '--realm',
           'unknown',
-          '--root',
+          '--config-root-path',
           '/tmp',
         ],
         env,
@@ -190,7 +190,7 @@ describe('realm-cli integration: CLI subprocess', () => {
           'local.directory',
           '--realm',
           'work',
-          '--root',
+          '--config-root-path',
           '/tmp',
         ],
         env,
@@ -216,7 +216,7 @@ describe('realm-cli integration: CLI subprocess', () => {
           'local.directory',
           '--realm',
           'work',
-          '--root',
+          '--config-root-path',
           '/tmp',
         ],
         {

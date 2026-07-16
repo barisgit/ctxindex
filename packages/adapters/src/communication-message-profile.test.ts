@@ -16,8 +16,18 @@ test('bundled communication.message enters the public registry path', () => {
         id: 'communication.message',
         version: 1,
         summary: 'An email or provider message.',
-        aliases: ['message', 'email', 'mail'],
+        aliases: ['email', 'mail', 'message'],
         fields: [
+          {
+            name: 'conversationKey',
+            type: 'string',
+            docs: 'Source-scoped provider conversation identity.',
+          },
+          {
+            name: 'rfcMessageId',
+            type: 'string',
+            docs: 'Normalized RFC Message-ID header value.',
+          },
           {
             name: 'sender',
             type: 'string[]',
@@ -27,16 +37,6 @@ test('bundled communication.message enters the public registry path', () => {
             name: 'unread',
             type: 'boolean',
             docs: 'Whether the message is unread.',
-          },
-          {
-            name: 'rfcMessageId',
-            type: 'string',
-            docs: 'Normalized RFC Message-ID header value.',
-          },
-          {
-            name: 'conversationKey',
-            type: 'string',
-            docs: 'Source-scoped provider conversation identity.',
           },
         ],
         formats: [{ name: 'eml', mediaType: 'message/rfc822' }],

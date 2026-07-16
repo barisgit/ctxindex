@@ -30,12 +30,12 @@ function pragmaValue(database: Database, pragma: string): unknown {
   return Object.values(row)[0]
 }
 
-function realmCount(sandbox: Sandbox, slug: string): number {
+function realmCount(sandbox: Sandbox): number {
   const db = new Database(dbPath(sandbox), { readonly: true })
   try {
-    const row = db
-      .prepare('SELECT COUNT(*) AS count FROM realms WHERE slug = ?')
-      .get(slug) as { count: number }
+    const row = db.prepare('SELECT COUNT(*) AS count FROM realms').get() as {
+      count: number
+    }
     return row.count
   } finally {
     db.close()
@@ -115,13 +115,13 @@ test('init creates XDG dirs', async () => {
   }
 })
 
-test('init seeds global realm', async () => {
+test('init creates no realms', async () => {
   const sandbox = await createSandbox()
   try {
     const result = await sandbox.run(['init'])
 
     expect(result.exitCode).toBe(0)
-    expect(realmCount(sandbox, 'global')).toBe(1)
+    expect(realmCount(sandbox)).toBe(0)
   } finally {
     await sandbox.cleanup()
   }
@@ -136,7 +136,7 @@ test('init idempotent on re-run', async () => {
     expect(first.exitCode).toBe(0)
     expect(second.exitCode).toBe(0)
     expect(second.stderr).toBe('')
-    expect(realmCount(sandbox, 'global')).toBe(1)
+    expect(realmCount(sandbox)).toBe(0)
   } finally {
     await sandbox.cleanup()
   }
