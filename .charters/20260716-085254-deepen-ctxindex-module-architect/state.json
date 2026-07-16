@@ -1,0 +1,172 @@
+{
+  "charterId": "20260716-085254-deepen-ctxindex-module-architect",
+  "schemaVersion": "file-interface",
+  "objective": "Deepen ctxindex module architecture across Adapters, Profiles, the public Extension SDK, CLI, and core by restoring domain ownership/locality, deleting dead prototype code and unused dependencies, and adding durable architecture verification while preserving all V1 public behavior, storage, provider I/O, package exports, and exit codes.",
+  "status": "active",
+  "createdAt": "2026-07-16T08:52:54.604Z",
+  "updatedAt": "2026-07-16T09:42:32.831Z",
+  "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
+  "nextSeq": 199,
+  "latestSourceSeq": 190,
+  "snapshotHash": "b325887d53ed0f09acd636e90ce213e7fc90301f1043af24a0d85ae38b4a1b8f",
+  "criteriaSnapshot": [
+    {
+      "id": "C1",
+      "title": "Source Adapter ownership is visible in the tree",
+      "depends": [],
+      "status": {
+        "value": "pass",
+        "note": "owned provider Modules, discovery-based architecture contract, and 735-test gate evidenced in work/slice-1-adapter-profile-gate.md"
+      },
+      "statusSeq": 189
+    },
+    {
+      "id": "C2",
+      "title": "Extension composition and Profile semantics have one owner",
+      "depends": [
+        "C1"
+      ],
+      "status": {
+        "value": "pass",
+        "note": "builtins is composition-only; Profile registry/path contracts moved to packages/profiles and provider MIME remains Adapter-owned"
+      },
+      "statusSeq": 189
+    },
+    {
+      "id": "C3",
+      "title": "The public Extension SDK is deep and stable",
+      "depends": [
+        "C2"
+      ],
+      "status": {
+        "value": "in-progress",
+        "note": "starting OpenSpec Slice 2 with exact public SDK value/type and factory-inference contracts"
+      },
+      "statusSeq": 189
+    },
+    {
+      "id": "C4",
+      "title": "CLI command composition is uniformly thin",
+      "depends": [
+        "C3"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 4
+    },
+    {
+      "id": "C5",
+      "title": "Registry presentation has explicit private seams",
+      "depends": [
+        "C3"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 4
+    },
+    {
+      "id": "C6",
+      "title": "Core contains no forbidden prototype storage path",
+      "depends": [],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 4
+    },
+    {
+      "id": "C7",
+      "title": "Core infrastructure Modules expose one clear Interface",
+      "depends": [
+        "C6"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 4
+    },
+    {
+      "id": "C8",
+      "title": "Dependency direction and manifests are truthful",
+      "depends": [
+        "C3",
+        "C7"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 4
+    },
+    {
+      "id": "C9",
+      "title": "V1 behavior and safety contracts are unchanged",
+      "depends": [
+        "C1",
+        "C3",
+        "C4",
+        "C6"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 4
+    },
+    {
+      "id": "C10",
+      "title": "Architecture drift fails automatically",
+      "depends": [
+        "C4",
+        "C8"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 4
+    },
+    {
+      "id": "C11",
+      "title": "Documentation and maps describe the settled architecture",
+      "depends": [
+        "C1",
+        "C3",
+        "C4",
+        "C7"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 4
+    },
+    {
+      "id": "C12",
+      "title": "The complete reviewed snapshot is releasable",
+      "depends": [
+        "C1",
+        "C2",
+        "C3",
+        "C4",
+        "C5",
+        "C6",
+        "C7",
+        "C8",
+        "C9",
+        "C10",
+        "C11"
+      ],
+      "status": {
+        "value": "pending",
+        "note": ""
+      },
+      "statusSeq": 4
+    }
+  ]
+}

@@ -3,8 +3,8 @@ import {
   CtxindexValidationError,
 } from '@ctxindex/core/errors'
 import type { DownloadContext } from '@ctxindex/extension-sdk'
-import { gmailJson } from './gmail-shared'
-import { gmailApiUrl } from './google-mailbox/api'
+import { gmailJson } from './response'
+import { gmailApiUrl } from './url'
 
 const WRITE_CHUNK_SIZE = 64 * 1024
 

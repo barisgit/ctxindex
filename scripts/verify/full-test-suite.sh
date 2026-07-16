@@ -50,9 +50,7 @@ while IFS= read -r path; do
   required_paths+=("$path")
   found_gmail_tests=1
 done < <(
-  find packages/adapters/src -maxdepth 1 -type f \
-    \( -name 'gmail-*.test.ts' -o -name 'gmail-*.integration.test.ts' \) \
-    | sort
+  find packages/adapters/src/google-mailbox -type f -name '*.test.ts' | sort
 )
 
 if (( found_gmail_tests == 0 )); then

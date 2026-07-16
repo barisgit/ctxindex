@@ -2,24 +2,23 @@
 
 ## Responsibility
 
-Provides the shared Google/Gmail HTTP boundary: constructs Gmail and OAuth token URLs, enforces the outbound-host policy, validates selected provider payloads, and translates transport or HTTP failures into `CtxindexSyncError` codes.
+Owns the complete `google.mailbox` Adapter module: configuration and definition, Gmail search/retrieval/download and reversible Draft operations, provider message helpers, response handling, and development URL routing.
 
 ## Design/patterns
 
-- `api.ts` centralizes endpoint constants and URL builders in `gmailApiUrl()`, `googleTokenUrl()`, and `routeGoogleApiUrl()`; non-production overrides are accepted only for `127.0.0.1`.
-- `assertGoogleEgressAllowed()` applies an allowlist guard before `egressFetch()`; `safeFetch()` is a schema-parameterized gateway over `fetchAndParse()` and retries one `rate_limited` response after its `retryAfterMs` delay.
-- Zod schemas (`OAuthTokenResponseSchema`, `GmailMessageListSchema`, `GmailMessageSchema`, `GmailHistorySchema`, `GmailProfileSchema`) define tolerant provider DTOs with passthrough fields.
-- Provider failures are normalized to domain error codes such as `network`, `auth_revoked`, `permission_denied`, `rate_limited`, `not_found`, `provider_unavailable`, and `provider_bad_response`.
+- `config.ts` owns `gmailSourceConfigSchema`; `definition.ts` binds Profile-owned Draft schemas and the module's operations into `gmailAdapterDefinition`.
+- `message.ts` owns the provider DTO plus header, date, and message-ID helpers; `response.ts` owns JSON decoding and HTTP-status-to-`CtxindexSyncError` mapping.
+- `url.ts` provides `gmailApiUrl()` and accepts non-production mock routing only through loopback `127.0.0.1`.
+- Capability files keep provider request construction and payload validation local to search, retrieve, download, and Draft behavior.
 
 ## Data & control flow
 
-1. Callers build an endpoint with `gmailApiUrl()` or `googleTokenUrl()`; configured development URLs may reroute Gmail/OAuth requests to a loopback mock.
-2. `safeFetch(schema, url, init)` routes the URL, then `fetchAndParse()` checks egress, optionally records a non-production fetch log, and calls `@ctxindex/core/net`'s `egressFetch()`.
-3. The response body is decoded as JSON, HTTP statuses are mapped to `CtxindexSyncError`, and the supplied Zod schema returns a typed payload; rate limiting triggers one delayed retry.
-4. `exchangeGoogleRefreshToken()` posts URL-encoded OAuth refresh credentials through this pipeline using `OAuthTokenResponseSchema`.
+1. Core invokes an operation from `gmailAdapterDefinition` with an SDK context whose `fetch` implementation enforces egress policy.
+2. The operation builds its Gmail endpoint through `gmailApiUrl()` and sends the provider request through `context.fetch`.
+3. `gmailJson()` maps non-success statuses to stable sync errors and decodes JSON; each operation validates the payload it owns.
+4. The operation returns Profile-shaped resources, artifacts, or reversible Draft Action results.
 
 ## Integration points
 
-- `packages/adapters/src/gmail-search-remote.ts`, `gmail-retrieve.ts`, `gmail-download.ts`, and `gmail-draft.ts` consume `gmailApiUrl()` for Gmail operations.
-- Depends on `@ctxindex/core/config` for mock/log environment settings, `@ctxindex/core/net` for `EGRESS_ALLOWLIST` and `egressFetch`, and `@ctxindex/core/errors` for sync error semantics.
-- Exposes `GOOGLE_EGRESS_ALLOWLIST` as a compatibility re-export of the core network allowlist.
+- `packages/adapters/src/builtins.ts` imports `gmailAdapterDefinition` for Extension composition; `packages/adapters/src/index.ts` re-exports the definition and config schema.
+- Depends on SDK operation contexts, Profile schemas, `@ctxindex/core/config` for mock routing, and `@ctxindex/core/errors` for stable sync error semantics.

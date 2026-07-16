@@ -16,8 +16,8 @@ import { createRealmService } from '@ctxindex/core/realm'
 import { createExtensionRegistry } from '@ctxindex/core/registry'
 import { createSourceService, syncSource } from '@ctxindex/core/source'
 import { applyPragmas, runMigrations } from '@ctxindex/core/storage'
-import { CTXINDEX_BUILTIN_EXTENSIONS } from './index'
-import { localDirectoryRef } from './local-directory/ref'
+import { CTXINDEX_BUILTIN_EXTENSIONS } from '../index'
+import { localDirectoryRef } from './ref'
 
 const logger = {
   trace() {},

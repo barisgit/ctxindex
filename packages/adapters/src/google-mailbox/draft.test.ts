@@ -5,12 +5,8 @@ import {
   communicationMessageDraftCreateInputSchema,
   communicationMessageDraftUpdateInputSchema,
 } from '@ctxindex/profiles'
-import { gmailAdapterDefinition } from './builtins'
-import {
-  buildGmailDraftRaw,
-  gmailDraftCreate,
-  gmailDraftUpdate,
-} from './gmail-draft'
+import { gmailAdapterDefinition } from './definition'
+import { buildGmailDraftRaw, gmailDraftCreate, gmailDraftUpdate } from './draft'
 
 const sourceId = '01KXHBNECDAH1T4MJ38X88EPFJ'
 const signal = new AbortController().signal

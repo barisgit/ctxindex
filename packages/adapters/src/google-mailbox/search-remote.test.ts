@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { CtxindexSyncError } from '@ctxindex/core/errors'
 import type { SearchContext } from '@ctxindex/extension-sdk'
-import { gmailAdapterDefinition } from './builtins'
+import { gmailAdapterDefinition } from './definition'
 
 const sourceId = '01kxhbnecdah1t4mj38x88epfj'
 const logger = {

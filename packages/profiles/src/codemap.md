@@ -8,7 +8,7 @@ Provides ctxindex's bundled, provider-neutral Profile definitions and their publ
 
 - Schema-first definitions: `communicationMessageSchema`, Draft input schemas, and `fileSchema` use strict Zod objects before being attached to `defineProfile` definitions.
 - Declarative projections: each Profile supplies search title/time/chunk/field extractors; `communicationMessageProfile` additionally declares relation resolvers, attachment descriptors, reversible Draft Actions, and an EML export renderer.
-- Pure helpers: `chunkText` performs overlapping, boundary-aware text chunking; `renderEml` and `sanitizeHeader` produce normalized RFC822-style text without external state.
+- Pure helpers: `chunkText` performs overlapping, boundary-aware text chunking; `isNormalizedRelativeFilePath` owns the file Profile's path invariant; `renderEml` and `sanitizeHeader` produce normalized RFC822-style text without external state.
 - Facade exports: `packages/profiles/src/index.ts` re-exports the public definitions, schemas, `chunkText`, and `FileChunk` while package subpath exports permit direct Profile imports.
 
 ## Data & control flow
@@ -20,8 +20,8 @@ Provides ctxindex's bundled, provider-neutral Profile definitions and their publ
 
 ## Integration points
 
-- Depends on `defineProfile`/`defineExtension` from `packages/extension-sdk/src/index.ts` and Zod.
+- Depends on `defineProfile` from `packages/extension-sdk/src/index.ts` and Zod.
 - `packages/adapters/src/builtins.ts` bundles `communicationMessageProfile` and `fileProfile` into `ctxindexBuiltinExtension`; its Gmail Adapter binds the Draft schemas, while its local-directory Adapter targets `file@1`.
-- Gmail provider modules under `packages/adapters/src/gmail-*.ts` create and consume communication-message payloads; `packages/adapters/src/local-directory/sync.ts` emits file payloads.
+- Gmail provider modules under `packages/adapters/src/google-mailbox/` create and consume communication-message payloads; local-directory emits file payloads and reuses the exported path predicate.
 - Core Profile registries and resource/search/relation/export/action services consume the declarative hooks through the SDK interfaces.
 - Exported as `@ctxindex/profiles`, `@ctxindex/profiles/communication-message`, and `@ctxindex/profiles/file` by `packages/profiles/package.json`.

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { normalizeGmailMessageId } from './gmail-shared'
+import { normalizeGmailMessageId } from './message'
 
 describe('normalizeGmailMessageId', () => {
   test('trims and prefers the first angle-bracket Message-ID token', () => {

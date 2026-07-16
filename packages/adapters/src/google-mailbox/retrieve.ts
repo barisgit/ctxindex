@@ -15,11 +15,11 @@ import {
   type GmailPayload,
   gmailHeader,
   gmailHeaderDate,
-  gmailJson,
   gmailOccurredAt,
   normalizeGmailMessageId,
-} from './gmail-shared'
-import { gmailApiUrl } from './google-mailbox/api'
+} from './message'
+import { gmailJson } from './response'
+import { gmailApiUrl } from './url'
 
 interface GmailRefTarget {
   readonly kind: 'message' | 'draft'

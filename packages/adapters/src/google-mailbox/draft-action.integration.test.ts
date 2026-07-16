@@ -5,7 +5,7 @@ import type { AuthService } from '@ctxindex/core/auth'
 import { createExtensionRegistry } from '@ctxindex/core/registry'
 import { getSourceResource } from '@ctxindex/core/source'
 import { applyPragmas, runMigrations } from '@ctxindex/core/storage'
-import { CTXINDEX_BUILTIN_EXTENSIONS } from './builtins'
+import { CTXINDEX_BUILTIN_EXTENSIONS } from '../builtins'
 
 const sourceId = '01KXHBNECDAH1T4MJ38X88EPFJ'
 const createActionId = 'communication.message.draft.create'

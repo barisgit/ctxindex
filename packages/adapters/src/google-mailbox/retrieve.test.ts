@@ -8,7 +8,7 @@ import type {
   RetrieveContext,
   RetrievedResource,
 } from '@ctxindex/extension-sdk'
-import { gmailAdapterDefinition } from './builtins'
+import { gmailAdapterDefinition } from './definition'
 
 const sourceId = '01kxhbnecdah1t4mj38x88epfj'
 const ref = `ctx://${sourceId.toUpperCase()}/message/message-1`

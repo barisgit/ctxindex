@@ -1,11 +1,6 @@
 import { expect, test } from 'bun:test'
-import { join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { createSandbox, type Sandbox } from '@ctxindex/core/testing'
-
-const repoRoot = resolve(
-  fileURLToPath(new URL('../../../../', import.meta.url)),
-)
 
 const ALLOWED_HOSTS = new Set([
   '127.0.0.1',
@@ -157,28 +152,6 @@ async function addGmailSource(sandbox: Sandbox): Promise<string> {
   return parseSourceId(result.stdout)
 }
 
-async function runRg(
-  pattern: string,
-  path: string,
-): Promise<{
-  readonly exitCode: number
-  readonly stdout: string
-  readonly stderr: string
-}> {
-  const proc = Bun.spawn(['rg', pattern, path], {
-    cwd: repoRoot,
-    stdin: 'ignore',
-    stdout: 'pipe',
-    stderr: 'pipe',
-  })
-  const [exitCode, stdout, stderr] = await Promise.all([
-    proc.exited,
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-  ])
-  return { exitCode, stdout, stderr }
-}
-
 test('only allowed hosts', async () => {
   const sandbox = await initializedSandbox()
   const gmail = startGmailMock()
@@ -218,7 +191,6 @@ test('disallowed host rejected', async () => {
       env: {
         ...env,
         CTXINDEX_GMAIL_MOCK_BASE_URL: 'http://evil.example.com:1',
-        CTXINDEX_TEST_FETCH_LOG: join(sandbox.dir, 'fetch.log'),
       },
     })
 
@@ -230,20 +202,4 @@ test('disallowed host rejected', async () => {
     gmail.stop()
     await sandbox.cleanup()
   }
-})
-
-test('fetch log hook gated', async () => {
-  const rg = await runRg(
-    'CTXINDEX_TEST_FETCH_LOG|NODE_ENV.*production|production.*NODE_ENV',
-    'packages/adapters/src/google-mailbox/api.ts',
-  )
-  expect(rg.exitCode, rg.stderr).toBe(0)
-  expect(rg.stdout).toContain('CTXINDEX_TEST_FETCH_LOG')
-
-  const source = await Bun.file(
-    join(repoRoot, 'packages/adapters/src/google-mailbox/api.ts'),
-  ).text()
-  expect(source).toMatch(
-    /CTXINDEX_TEST_FETCH_LOG[\s\S]{0,240}NODE_ENV !== 'production'/,
-  )
 })

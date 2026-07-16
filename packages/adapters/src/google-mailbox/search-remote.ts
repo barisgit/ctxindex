@@ -8,11 +8,11 @@ import { communicationMessageSchema } from '@ctxindex/profiles'
 import {
   type GmailMessage,
   gmailHeader,
-  gmailJson,
   gmailOccurredAt,
   normalizeGmailMessageId,
-} from './gmail-shared'
-import { gmailApiUrl } from './google-mailbox/api'
+} from './message'
+import { gmailJson } from './response'
+import { gmailApiUrl } from './url'
 
 const MAX_PAGES = 3
 const MAX_ITEMS = 50

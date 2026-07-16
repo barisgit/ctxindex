@@ -50,7 +50,7 @@ export function chunkText(text: string): FileChunk[] {
   return chunks
 }
 
-function isNormalizedRelativePath(path: string): boolean {
+export function isNormalizedRelativeFilePath(path: string): boolean {
   if (
     path.length === 0 ||
     path.startsWith('/') ||
@@ -72,7 +72,7 @@ function extensionOf(name: string): string | undefined {
 
 export const fileSchema = z
   .object({
-    path: z.string().refine(isNormalizedRelativePath),
+    path: z.string().refine(isNormalizedRelativeFilePath),
     name: z.string().min(1),
     mediaType: z.string().min(1),
     byteSize: z.number().int().nonnegative(),

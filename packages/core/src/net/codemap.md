@@ -18,5 +18,5 @@ A caller passes a URL and optional `RequestInit` to `egressFetch()`. The wrapper
 
 - `packages/core/src/auth/google-client.ts` uses egress checks for Google OAuth and loopback handling.
 - `packages/core/src/source/provider-context.ts` exposes the wrapper to provider operations.
-- `packages/adapters/src/google-mailbox/api.ts` uses `EGRESS_ALLOWLIST` and `egressFetch()` for Gmail API traffic.
+- Adapter operation contexts use this module's egress-enforcing fetch implementation for provider traffic.
 - Depends on `packages/core/src/errors.ts` for policy failures.

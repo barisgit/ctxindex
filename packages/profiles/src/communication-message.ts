@@ -1,4 +1,4 @@
-import { defineExtension, defineProfile } from '@ctxindex/extension-sdk'
+import { defineProfile } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
 
 const artifactDescriptorSchema = z
@@ -178,12 +178,4 @@ export const communicationMessageProfile = defineProfile({
     summary: 'An email or provider message.',
     aliases: ['message', 'email', 'mail'],
   },
-})
-
-export const communicationMessageExtension = defineExtension({
-  id: 'ctxindex.communication-message',
-  version: 1,
-  profiles: [communicationMessageProfile],
-  adapters: [],
-  docs: { summary: 'Bundled communication message vocabulary.' },
 })

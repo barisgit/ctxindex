@@ -4,7 +4,7 @@ import {
   CtxindexValidationError,
 } from '@ctxindex/core/errors'
 import type { DownloadContext } from '@ctxindex/extension-sdk'
-import { gmailAdapterDefinition } from './builtins'
+import { gmailAdapterDefinition } from './definition'
 
 const sourceId = '01kxhbnecdah1t4mj38x88epfj'
 const originRef = `ctx://${sourceId.toUpperCase()}/message/message-1`

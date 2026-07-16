@@ -6,10 +6,10 @@ Implements the `local.directory` indexed adapter: validates source configuration
 
 ## Design/patterns
 
-- `config.ts` defines the strict `localDirectorySourceConfigSchema` and `DEFAULT_SIZE_CAP_BYTES`; `root_path` must be absolute.
+- `config.ts` defines the strict `localDirectorySourceConfigSchema` and `DEFAULT_SIZE_CAP_BYTES`; `definition.ts` owns `localDirectoryAdapterDefinition`.
 - `walker.ts` is a deterministic, non-following filesystem walker. `walkDirectory()` composes built-in ignores, root `.gitignore`, configured excludes, and `.ctxindexignore`, applies optional includes, rejects symlinks/path escapes, and records uncertain prefixes instead of treating inaccessible paths as deleted.
 - `reader.ts` uses a snapshot/check pattern: `readLocalFile()` opens with `O_NOFOLLOW`, compares pre/post metadata, enforces the size cap, rejects binary or invalid UTF-8 content, and computes a SHA-256 content hash.
-- `ref.ts` validates POSIX root-relative paths and `localDirectoryRef()` creates canonical `ctx://<SOURCE>/file/<encoded-path>` references. `order.ts` supplies code-point ordering for reproducible traversal, emissions, and cursors.
+- `ref.ts` reuses the file Profile's normalized relative-path predicate, preserves its thrown Error interface, and creates canonical `ctx://<SOURCE>/file/<encoded-path>` references. `order.ts` supplies code-point ordering for reproducible traversal, emissions, and cursors.
 - `sync.ts` acts as the orchestration pipeline and incremental-diff strategy around a strict, sorted version-1 manifest cursor.
 
 ## Data & control flow
@@ -21,6 +21,6 @@ Implements the `local.directory` indexed adapter: validates source configuration
 
 ## Integration points
 
-- `packages/adapters/src/builtins.ts` registers `localDirectorySourceConfigSchema` and `localDirectorySync` as the `local.directory` adapter (`routing: 'indexed'`, capability `sync`, profile `file@1`) and re-exports the config schema through `packages/adapters/src/index.ts`.
+- `definition.ts` registers `localDirectorySourceConfigSchema` and `localDirectorySync` as the `local.directory` adapter (`routing: 'indexed'`, capability `sync`, profile `file@1`); builtins imports the definition and the package index re-exports it with the config schema.
 - `sync.ts` integrates with `@ctxindex/extension-sdk` through `SyncContext`, `SyncEmission`, `SyncedResource`, and `context.emit()`.
 - `reader.ts` depends on `file-type` for binary media detection; `walker.ts` depends on `ignore` for gitignore-style matching and Node filesystem/path APIs for containment checks.

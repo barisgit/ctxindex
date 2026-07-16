@@ -3,7 +3,15 @@ import {
   createExtensionRegistry,
   describeRegistry,
 } from '@ctxindex/core/registry'
-import { communicationMessageExtension } from '@ctxindex/profiles'
+import { defineExtension } from '@ctxindex/extension-sdk'
+import { communicationMessageProfile } from './communication-message'
+
+const communicationMessageExtension = defineExtension({
+  id: 'ctxindex.communication-message.test',
+  version: 1,
+  profiles: [communicationMessageProfile],
+  adapters: [],
+})
 
 test('bundled communication.message enters the public registry path', () => {
   const description = describeRegistry(

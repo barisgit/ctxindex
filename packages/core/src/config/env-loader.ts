@@ -22,7 +22,6 @@ const envShape = {
   CTXINDEX_GMAIL_CLIENT_ID: optionalString,
   CTXINDEX_GMAIL_CLIENT_SECRET: optionalString,
   CTXINDEX_GMAIL_REFRESH_TOKEN: optionalString,
-  CTXINDEX_TEST_FETCH_LOG: optionalString,
   CTXINDEX_TEST_LOG_ROTATE_BYTES: optionalString,
   CTXINDEX_TEST_LOG_SPAM_BYTES: optionalString,
   CTXINDEX_TEST_SYNC_DELAY_MS: optionalString,

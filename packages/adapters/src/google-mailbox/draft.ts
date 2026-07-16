@@ -9,8 +9,8 @@ import {
   communicationMessageSchema,
 } from '@ctxindex/profiles'
 import { z } from 'zod'
-import { gmailJson } from './gmail-shared'
-import { gmailApiUrl } from './google-mailbox/api'
+import { gmailJson } from './response'
+import { gmailApiUrl } from './url'
 
 export type GmailDraftCreateInput = z.infer<
   typeof communicationMessageDraftCreateInputSchema

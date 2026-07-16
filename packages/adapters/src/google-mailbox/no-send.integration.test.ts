@@ -8,8 +8,8 @@ import {
   describeRegistry,
 } from '@ctxindex/core/registry'
 import { applyPragmas, runMigrations } from '@ctxindex/core/storage'
-import { CTXINDEX_BUILTIN_EXTENSIONS } from './builtins'
-import { buildGmailDraftRaw } from './gmail-draft'
+import { CTXINDEX_BUILTIN_EXTENSIONS } from '../builtins'
+import { buildGmailDraftRaw } from './draft'
 
 const sourceId = '01KXHBNECDAH1T4MJ38X88EPFJ'
 const actionIds = [

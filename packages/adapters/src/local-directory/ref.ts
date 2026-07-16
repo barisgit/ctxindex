@@ -1,13 +1,7 @@
+import { isNormalizedRelativeFilePath } from '@ctxindex/profiles'
+
 export function normalizeRelativePath(path: string): string {
-  const segments = path.split('/')
-  if (
-    path.includes('\\') ||
-    path.startsWith('/') ||
-    /^[A-Za-z]:\//.test(path) ||
-    segments.some(
-      (segment) => segment === '' || segment === '.' || segment === '..',
-    )
-  ) {
+  if (!isNormalizedRelativeFilePath(path)) {
     throw new Error('File path must be root-relative')
   }
   return path
