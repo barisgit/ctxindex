@@ -162,3 +162,33 @@ test('core subpaths target capability indexes without root shims', async () => {
     ).exists(),
   ).toBe(false)
 })
+
+test('secret backend selection has one explicit owner and no literal-secret CLI', async () => {
+  const cliRoot = new URL('../../apps/cli/src/', import.meta.url)
+  const deps = await Bun.file(new URL('deps.ts', cliRoot)).text()
+  expect(deps).not.toContain('loadWritableSecretsStore')
+  expect(deps).not.toMatch(/backend_unavailable[\s\S]{0,500}new FileBackend/)
+
+  const secretCli = (
+    await Promise.all(
+      ['args/secrets.ts', 'commands/secrets.ts'].map((path) =>
+        Bun.file(new URL(path, cliRoot)).text(),
+      ),
+    )
+  ).join('\n')
+  expect(secretCli).not.toMatch(/passphrase|secrets migrate/)
+
+  const configSchema = await Bun.file(
+    new URL('config/schema.ts', coreSourceRoot),
+  ).text()
+  expect(configSchema).not.toContain('passphrase_env')
+  expect(
+    await Bun.file(new URL('secrets/service.ts', coreSourceRoot)).exists(),
+  ).toBe(false)
+
+  const keychain = await Bun.file(
+    new URL('secrets/keychain.ts', coreSourceRoot),
+  ).text()
+  expect(keychain).toContain("process.env.NODE_ENV === 'test'")
+  expect(keychain).toContain('CTXINDEX_KEYTAR_MOCK_FILE')
+})

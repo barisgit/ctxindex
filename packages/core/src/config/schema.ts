@@ -15,10 +15,11 @@ export const configSchema = z.object({
       paths: z.array(z.string().min(1)).default([]),
     })
     .default({ paths: [] }),
-  secrets: z.object({
-    backend: z.enum(['keychain', 'file']),
-    passphrase_env: z.string().min(1).optional(),
-  }),
+  secrets: z
+    .object({
+      backend: z.enum(['keychain', 'file']),
+    })
+    .strict(),
   log: z.object({
     level: logLevelSchema.default('info'),
     file: z.object({

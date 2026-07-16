@@ -13,7 +13,7 @@ Presentation and process-exit adapter layer for converting domain/CLI values int
 
 ## Data & control flow
 
-Handlers pass domain rows/descriptions to focused formatters: `action.ts` Actions, `artifact.ts` Artifacts, `auth.ts` grants, `realm.ts` Realms, `source.ts` Sources, `status.ts` status rows, `registry.ts` registry descriptions, `extensions.ts` Extension listings, `skills.ts` skill records/documents, and `secrets.ts` migration results. The formatter returns a string for the handler to print. Handler failures flow through `mapErrorToExit` or `runWithExit` to stderr and `process.exitCode`.
+Handlers pass domain rows/descriptions to focused formatters: `action.ts` Actions, `artifact.ts` Artifacts, `auth.ts` grants, `realm.ts` Realms, `source.ts` Sources, `status.ts` status rows, `registry.ts` registry descriptions, `extensions.ts` Extension listings, `skills.ts` skill records/documents, and `secrets.ts` value-free backend availability/reference counts plus switch copy/cleanup outcomes. The formatter returns a string for the handler to print. Handler failures flow through `mapErrorToExit` or `runWithExit` to stderr and `process.exitCode`.
 
 ## Integration points
 

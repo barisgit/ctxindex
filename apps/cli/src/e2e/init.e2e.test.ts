@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test'
 import { existsSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
+import { readConfig } from '@ctxindex/core/config'
 import { applyPragmas } from '@ctxindex/core/storage'
 import { createSandbox, type Sandbox } from '@ctxindex/core/testing'
 
@@ -74,6 +75,40 @@ test('init creates layout', async () => {
     expect(await mode(join(sandbox.env.CTXINDEX_STATE_HOME, 'logs'))).toBe(
       0o700,
     )
+  } finally {
+    await sandbox.cleanup()
+  }
+})
+
+test('fresh init persists file backend with private key when Keychain is unavailable', async () => {
+  const sandbox = await createSandbox()
+  try {
+    const result = await sandbox.run(['init'], {
+      env: {
+        CTXINDEX_KEYTAR_MOCK_FILE: join(
+          sandbox.dir,
+          'missing-parent',
+          'keytar.json',
+        ),
+      },
+    })
+
+    expect(result.exitCode).toBe(0)
+    expect(
+      await readConfig(join(sandbox.env.CTXINDEX_CONFIG_HOME, 'config.toml')),
+    ).toMatchObject({ secrets: { backend: 'file' } })
+    const keyPath = join(sandbox.env.CTXINDEX_CONFIG_HOME, 'secret.key')
+    await expectFile(keyPath)
+    expect(await mode(keyPath)).toBe(0o600)
+
+    const second = await sandbox.run(['init'])
+    expect(second.exitCode).toBe(0)
+    expect(
+      await readConfig(join(sandbox.env.CTXINDEX_CONFIG_HOME, 'config.toml')),
+    ).toMatchObject({ secrets: { backend: 'file' } })
+    expect(
+      await Bun.file(sandbox.env.CTXINDEX_KEYTAR_MOCK_FILE ?? '').exists(),
+    ).toBe(false)
   } finally {
     await sandbox.cleanup()
   }

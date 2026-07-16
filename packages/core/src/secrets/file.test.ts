@@ -35,6 +35,63 @@ afterEach(() => {
   resetEnvForTests()
 })
 
+test('file references preserve scope so equal keys cannot collide', async () => {
+  const { root } = await sandbox()
+  try {
+    const store = new FileBackend()
+    const google = await store.setSecret('google', 'refresh-token', 'GOOGLE')
+    const microsoft = await store.setSecret(
+      'microsoft',
+      'refresh-token',
+      'MICROSOFT',
+    )
+
+    expect(google).toBe('file:secrets.box#google/refresh-token')
+    expect(microsoft).toBe('file:secrets.box#microsoft/refresh-token')
+    expect(await store.getSecret(google)).toBe('GOOGLE')
+    expect(await store.getSecret(microsoft)).toBe('MICROSOFT')
+    expect(await store.listKeys()).toEqual([
+      { ref: google, scope: 'google', key: 'refresh-token' },
+      { ref: microsoft, scope: 'microsoft', key: 'refresh-token' },
+    ])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('explicit file-backend probe prepares private key material without writing a box', async () => {
+  const { root, configHome, dataHome } = await sandbox()
+  try {
+    const store = new FileBackend()
+    await store.probeAvailable()
+
+    const keyPath = join(configHome, 'secret.key')
+    expect((await readFile(keyPath)).byteLength).toBe(32)
+    if (process.platform !== 'darwin') expect(await mode(keyPath)).toBe(0o600)
+    expect(await Bun.file(secretsBoxPath(dataHome)).exists()).toBe(false)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('file key index uses deterministic code-unit ordering', async () => {
+  const { root } = await sandbox()
+  try {
+    const store = new FileBackend()
+    await store.setSecret('a', 'key', 'a')
+    await store.setSecret('_', 'key', '_')
+    await store.setSecret('A', 'key', 'A')
+
+    expect((await store.listKeys()).map((entry) => entry.ref)).toEqual([
+      'file:secrets.box#A/key',
+      'file:secrets.box#_/key',
+      'file:secrets.box#a/key',
+    ])
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
 async function sandbox(): Promise<{
   root: string
   configHome: string
@@ -62,7 +119,7 @@ test('file backend round-trips, lists, deletes, encrypts, and forces private mod
     const store = new FileBackend({ passphrase: 'test-passphrase' })
     const ref = await store.setSecret('google', 'refresh-token', 'plain-secret')
 
-    expect(ref).toBe('file:secrets.box#refresh-token')
+    expect(ref).toBe('file:secrets.box#google/refresh-token')
     expect(await store.getSecret(ref)).toBe('plain-secret')
     expect(await store.listKeys()).toEqual([
       { ref, scope: 'google', key: 'refresh-token' },
@@ -86,6 +143,50 @@ test('file backend round-trips, lists, deletes, encrypts, and forces private mod
     await expect(store.getSecret(ref)).rejects.toMatchObject({
       code: 'not_found',
     })
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('passphrase envelope requires passphrase material and never falls back to a key file', async () => {
+  const { root, dataHome } = await sandbox()
+  try {
+    const initial = new FileBackend({ passphrase: 'required-passphrase' })
+    const ref = await initial.setSecret('scope', 'key', 'PASSPHRASE-VALUE')
+    const envelope = JSON.parse(
+      await readFile(secretsBoxPath(dataHome), 'utf8'),
+    ) as { v: number; keyMode?: string }
+    expect(envelope).toMatchObject({ v: 2, keyMode: 'passphrase' })
+
+    await expect(
+      new FileBackend({ createKeyFileIfMissing: true }).getSecret(ref),
+    ).rejects.toMatchObject({ code: 'backend_unavailable' })
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('encrypted envelope records key-file mode and ignores a later passphrase environment', async () => {
+  const { root, dataHome } = await sandbox()
+  try {
+    const initial = new FileBackend()
+    const ref = await initial.setSecret('scope', 'key', 'KEY-FILE-VALUE')
+    const envelope = JSON.parse(
+      await readFile(secretsBoxPath(dataHome), 'utf8'),
+    ) as { v: number; keyMode?: string }
+    expect(envelope).toMatchObject({ v: 2, keyMode: 'key-file' })
+
+    setEnv('CTXINDEX_SECRETS_PASSPHRASE', 'later-passphrase')
+    resetEnvForTests()
+    const reopened = new FileBackend()
+    expect(await reopened.getSecret(ref)).toBe('KEY-FILE-VALUE')
+    await reopened.setSecret('scope', 'second', 'SECOND')
+    const rewritten = JSON.parse(
+      await readFile(secretsBoxPath(dataHome), 'utf8'),
+    ) as { keyMode?: string; keyCheck?: string; boxMac?: string }
+    expect(rewritten.keyMode).toBe('key-file')
+    expect(rewritten.keyCheck).toBeString()
+    expect(rewritten.boxMac).toBeString()
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -132,6 +233,9 @@ test('file backend detects tampered ciphertext', async () => {
     envelope.entries.box = bytes.toString('base64')
     await Bun.write(boxPath, `${JSON.stringify(envelope)}\n`)
 
+    await expect(store.probeAvailable()).rejects.toMatchObject({
+      code: 'decrypt_failed',
+    })
     await expect(store.getSecret(ref)).rejects.toBeInstanceOf(
       CtxindexSecretsError,
     )

@@ -43,6 +43,7 @@ function baseEnv(dir: string): SandboxEnv {
     CTXINDEX_DATA_HOME: join(dir, 'data'),
     CTXINDEX_CACHE_HOME: join(dir, 'cache'),
     CTXINDEX_STATE_HOME: join(dir, 'state'),
+    CTXINDEX_KEYTAR_MOCK_FILE: join(dir, 'keytar-mock.json'),
   }
 
   if (process.env.PATH === undefined) return env

@@ -6,7 +6,7 @@ Owns Google OAuth grant lifecycle, secret references, token exchange/refresh, pr
 
 ## Design/patterns
 
-- `createAuthService()` in `service.ts` is a dependency-injected service factory implementing `AuthService` from `types.ts`; SQLite stores account/grant metadata while `SecretsStore` stores credentials and tokens.
+- `createAuthService()` in `service.ts` is a dependency-injected service factory implementing `AuthService` from `types.ts`; SQLite stores account/grant metadata while the injected `SecretVault` writes to the configured backend and resolves existing typed refs through their owning backend without fallback.
 - `google-client.ts` is a narrow gateway for token and Gmail profile requests, with Zod response validation and egress allowlisting; loopback overrides are non-production only.
 - `compatibility.ts` normalizes scope encodings and matches an `AdapterAuthSpec` to a grant by provider key plus required-scope containment.
 - `index.ts` defines the public auth surface and re-exports auth-specific error types.

@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer'
-import { randomBytes } from 'node:crypto'
+import { randomBytes, timingSafeEqual } from 'node:crypto'
 import {
   chmod,
   mkdir,
@@ -10,12 +10,15 @@ import {
 } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { xchacha20poly1305 } from '@noble/ciphers/chacha.js'
+import { hkdf } from '@noble/hashes/hkdf.js'
+import { hmac } from '@noble/hashes/hmac.js'
 import { pbkdf2 } from '@noble/hashes/pbkdf2.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { getEnv } from '../config/env-loader'
 import { configDir, dataDir } from '../paths'
 import {
   CtxindexSecretsError,
+  encodeSecretPart,
   fileRef,
   parseSecretRef,
   type SecretsStore,
@@ -25,8 +28,11 @@ import {
 const boxFileName = 'secrets.box'
 const keyFileName = 'secret.key'
 const kdfIters = 200_000
+const keyCheckContext = textBytes('ctxindex/secrets.box/v2/key-check')
+const boxMacContext = textBytes('ctxindex/secrets.box/v2/box-mac')
 
 type FileKdf = 'pbkdf2-sha256'
+type FileKeyMode = 'passphrase' | 'key-file'
 
 interface SecretRecord {
   readonly scope: string
@@ -34,16 +40,23 @@ interface SecretRecord {
   readonly value: string
 }
 
+function recordId(scope: string, key: string): string {
+  return `${encodeSecretPart(scope)}/${encodeSecretPart(key)}`
+}
+
 interface SecretsPlaintext {
   readonly records: Record<string, SecretRecord>
 }
 
 interface SecretsEnvelope {
-  readonly v: 1
+  readonly v: 2
+  readonly keyMode: FileKeyMode
   readonly nonce: string
-  readonly salt: string
-  readonly kdf: FileKdf
+  readonly salt?: string
+  readonly kdf: FileKdf | 'none'
   readonly iters?: number
+  readonly keyCheck: string
+  readonly boxMac: string
   readonly entries: Record<string, string>
 }
 
@@ -68,6 +81,23 @@ function textBytes(value: string): Uint8Array {
 
 function decodeText(bytes: Uint8Array): string {
   return new TextDecoder().decode(bytes)
+}
+
+function keyedDigest(
+  key: Uint8Array,
+  context: Uint8Array,
+  value: Uint8Array,
+): Uint8Array {
+  const macKey = hkdf(sha256, key, undefined, context, 32)
+  return hmac(sha256, macKey, value)
+}
+
+function digestMatches(expected: Uint8Array, encoded: string): boolean {
+  const actual = fromBase64(encoded)
+  return (
+    actual.byteLength === expected.byteLength &&
+    timingSafeEqual(Buffer.from(actual), Buffer.from(expected))
+  )
 }
 
 function secretKeyPath(configDirectory = configDir()): string {
@@ -109,7 +139,11 @@ export async function ensureSecretKeyFile(
   }
 
   await ensurePrivateDir(dirname(path))
-  await writeFile(path, randomBytes(32), { mode: 0o600 })
+  try {
+    await writeFile(path, randomBytes(32), { mode: 0o600, flag: 'wx' })
+  } catch (cause) {
+    if ((cause as NodeJS.ErrnoException).code !== 'EEXIST') throw cause
+  }
   await chmod(path, 0o600).catch(() => undefined)
   return path
 }
@@ -134,6 +168,14 @@ export class FileBackend implements SecretsStore {
     this.createKeyFileIfMissing = options.createKeyFileIfMissing ?? true
   }
 
+  async probeAvailable(): Promise<void> {
+    if (await exists(this.path)) {
+      await this.readValidatedEnvelope()
+      return
+    }
+    await this.writeEnvelopeKey()
+  }
+
   async getSecret(ref: string): Promise<string> {
     const parsed = parseSecretRef(ref)
     if (parsed.backend !== 'file') {
@@ -144,7 +186,7 @@ export class FileBackend implements SecretsStore {
     }
 
     const records = await this.readRecords()
-    const record = records[parsed.key]
+    const record = records[recordId(parsed.scope, parsed.key)]
     if (!record) {
       throw new CtxindexSecretsError(`secret not found: ${ref}`, 'not_found')
     }
@@ -153,9 +195,9 @@ export class FileBackend implements SecretsStore {
 
   async setSecret(scope: string, key: string, value: string): Promise<string> {
     const records = await this.readRecords()
-    records[key] = { scope, key, value }
+    records[recordId(scope, key)] = { scope, key, value }
     await this.writeRecords(records)
-    return fileRef(key)
+    return fileRef(scope, key)
   }
 
   async deleteSecret(ref: string): Promise<void> {
@@ -168,7 +210,7 @@ export class FileBackend implements SecretsStore {
     }
 
     const records = await this.readRecords()
-    delete records[parsed.key]
+    delete records[recordId(parsed.scope, parsed.key)]
     await this.writeRecords(records)
   }
 
@@ -176,46 +218,27 @@ export class FileBackend implements SecretsStore {
     const records = await this.readRecords()
     return Object.values(records)
       .map((record) => ({
-        ref: fileRef(record.key),
+        ref: fileRef(record.scope, record.key),
         scope: record.scope,
         key: record.key,
       }))
-      .sort((a, b) => a.ref.localeCompare(b.ref))
+      .sort((a, b) => (a.ref < b.ref ? -1 : a.ref > b.ref ? 1 : 0))
   }
 
   private async readRecords(): Promise<Record<string, SecretRecord>> {
     if (!(await exists(this.path))) return {}
 
-    let envelope: SecretsEnvelope
     try {
-      envelope = JSON.parse(
-        await readFile(this.path, 'utf8'),
-      ) as SecretsEnvelope
-    } catch (cause) {
-      throw new CtxindexSecretsError(
-        'failed to read encrypted secrets file',
-        'decrypt_failed',
-        { cause },
-      )
-    }
-
-    try {
-      if (envelope.v !== 1 || envelope.kdf !== 'pbkdf2-sha256') {
-        throw new Error('unsupported secrets.box version or kdf')
-      }
-      const ciphertext = envelope.entries.box
-      if (!ciphertext) throw new Error('missing encrypted entries box')
-
-      const key = await this.deriveKey(fromBase64(envelope.salt))
+      const { envelope, key, ciphertext } = await this.readValidatedEnvelope()
       const cipher = xchacha20poly1305(key, fromBase64(envelope.nonce))
-      const plaintext = cipher.decrypt(fromBase64(ciphertext))
+      const plaintext = cipher.decrypt(ciphertext)
       const decoded = JSON.parse(decodeText(plaintext)) as SecretsPlaintext
       return decoded.records ?? {}
     } catch (cause) {
-      throw new CtxindexSecretsError(
+      throw wrapSecretsError(
+        cause,
         'failed to decrypt secrets.box',
         'decrypt_failed',
-        { cause },
       )
     }
   }
@@ -223,22 +246,36 @@ export class FileBackend implements SecretsStore {
   private async writeRecords(
     records: Record<string, SecretRecord>,
   ): Promise<void> {
-    const salt = randomBytes(16)
     const nonce = randomBytes(24)
-    const key = await this.deriveKey(salt)
-    const cipher = xchacha20poly1305(key, nonce)
+    const existing = (await exists(this.path))
+      ? await this.readValidatedEnvelope()
+      : undefined
+    const keyMaterial = existing
+      ? {
+          keyMode: existing.envelope.keyMode,
+          key: existing.key,
+          ...(existing.envelope.salt
+            ? { salt: fromBase64(existing.envelope.salt) }
+            : {}),
+        }
+      : await this.writeEnvelopeKey()
+    const cipher = xchacha20poly1305(keyMaterial.key, nonce)
     const plaintext = textBytes(
       JSON.stringify({ records } satisfies SecretsPlaintext),
     )
     const encrypted = cipher.encrypt(plaintext)
     const envelope: SecretsEnvelope = {
-      v: 1,
+      v: 2,
+      keyMode: keyMaterial.keyMode,
       nonce: toBase64(nonce),
-      salt: toBase64(salt),
-      kdf: 'pbkdf2-sha256',
-      ...(this.passphrase || getEnv().CTXINDEX_SECRETS_PASSPHRASE
-        ? { iters: kdfIters }
+      kdf: keyMaterial.keyMode === 'passphrase' ? 'pbkdf2-sha256' : 'none',
+      ...(keyMaterial.salt
+        ? { salt: toBase64(keyMaterial.salt), iters: kdfIters }
         : {}),
+      keyCheck: toBase64(
+        keyedDigest(keyMaterial.key, keyCheckContext, keyCheckContext),
+      ),
+      boxMac: toBase64(keyedDigest(keyMaterial.key, boxMacContext, encrypted)),
       entries: { box: toBase64(encrypted) },
     }
 
@@ -253,20 +290,123 @@ export class FileBackend implements SecretsStore {
     }
   }
 
-  private async deriveKey(salt: Uint8Array): Promise<Uint8Array> {
-    const passphrase = this.passphrase ?? getEnv().CTXINDEX_SECRETS_PASSPHRASE
-    if (passphrase) {
-      return pbkdf2(sha256, textBytes(passphrase), salt, {
-        c: kdfIters,
-        dkLen: 32,
-      })
+  private async readValidatedEnvelope(): Promise<{
+    readonly envelope: SecretsEnvelope
+    readonly key: Uint8Array
+    readonly ciphertext: Uint8Array
+  }> {
+    let envelope: SecretsEnvelope
+    try {
+      envelope = JSON.parse(
+        await readFile(this.path, 'utf8'),
+      ) as SecretsEnvelope
+    } catch (cause) {
+      throw new CtxindexSecretsError(
+        'failed to read encrypted secrets file',
+        'decrypt_failed',
+        { cause },
+      )
     }
 
+    try {
+      if (
+        envelope.v !== 2 ||
+        (envelope.keyMode !== 'passphrase' &&
+          envelope.keyMode !== 'key-file') ||
+        (envelope.keyMode === 'passphrase' &&
+          envelope.kdf !== 'pbkdf2-sha256') ||
+        (envelope.keyMode === 'key-file' && envelope.kdf !== 'none') ||
+        typeof envelope.keyCheck !== 'string' ||
+        typeof envelope.boxMac !== 'string'
+      ) {
+        throw new Error('unsupported secrets.box version or key mode')
+      }
+      const encodedCiphertext = envelope.entries.box
+      if (!encodedCiphertext) throw new Error('missing encrypted entries box')
+
+      const key = await this.readEnvelopeKey(envelope)
+      const ciphertext = fromBase64(encodedCiphertext)
+      if (
+        !digestMatches(
+          keyedDigest(key, keyCheckContext, keyCheckContext),
+          envelope.keyCheck,
+        )
+      ) {
+        throw new Error('secrets.box key check failed')
+      }
+      if (
+        !digestMatches(
+          keyedDigest(key, boxMacContext, ciphertext),
+          envelope.boxMac,
+        )
+      ) {
+        throw new Error('secrets.box integrity check failed')
+      }
+      return { envelope, key, ciphertext }
+    } catch (cause) {
+      throw wrapSecretsError(
+        cause,
+        'failed to validate secrets.box',
+        'decrypt_failed',
+      )
+    }
+  }
+
+  private async writeEnvelopeKey(): Promise<{
+    readonly keyMode: FileKeyMode
+    readonly key: Uint8Array
+    readonly salt?: Uint8Array
+  }> {
+    const passphrase = this.passphrase ?? getEnv().CTXINDEX_SECRETS_PASSPHRASE
+    if (passphrase) {
+      const salt = randomBytes(16)
+      return {
+        keyMode: 'passphrase',
+        key: this.derivePassphraseKey(passphrase, salt),
+        salt,
+      }
+    }
+
+    return { keyMode: 'key-file', key: await this.readKeyFile() }
+  }
+
+  private async readEnvelopeKey(
+    envelope: SecretsEnvelope,
+  ): Promise<Uint8Array> {
+    if (envelope.keyMode === 'key-file') return this.readKeyFile()
+
+    const passphrase = this.passphrase ?? getEnv().CTXINDEX_SECRETS_PASSPHRASE
+    if (!passphrase) {
+      throw new CtxindexSecretsError(
+        'passphrase-encrypted secrets.box requires CTXINDEX_SECRETS_PASSPHRASE',
+        'backend_unavailable',
+      )
+    }
+    if (!envelope.salt || envelope.iters !== kdfIters) {
+      throw new CtxindexSecretsError(
+        'invalid passphrase secrets envelope',
+        'decrypt_failed',
+      )
+    }
+    return this.derivePassphraseKey(passphrase, fromBase64(envelope.salt))
+  }
+
+  private derivePassphraseKey(
+    passphrase: string,
+    salt: Uint8Array,
+  ): Uint8Array {
+    return pbkdf2(sha256, textBytes(passphrase), salt, {
+      c: kdfIters,
+      dkLen: 32,
+    })
+  }
+
+  private async readKeyFile(): Promise<Uint8Array> {
     const keyPath = secretKeyPath(this.configDirectory)
     if (!(await exists(keyPath))) {
       if (!this.createKeyFileIfMissing) {
         throw new CtxindexSecretsError(
-          'file secrets backend requires --passphrase, CTXINDEX_SECRETS_PASSPHRASE, or an existing secret.key file',
+          'file secrets backend requires CTXINDEX_SECRETS_PASSPHRASE or an existing secret.key file',
           'backend_unavailable',
         )
       }

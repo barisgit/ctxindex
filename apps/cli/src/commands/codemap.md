@@ -22,6 +22,7 @@ Delegating adapters include `action.ts` to `action/handle-action-command.ts`, `a
 
 - `action.ts` and `artifact.ts` are Citty-only declaration adapters; `purge.ts` uses `ArtifactService`; `export.ts` uses `exportSourceResource`.
 - `describe.ts`: loads definitions and routes compact indexes, exact-id detail, or explicit full snapshots through registry formatters; `extensions.ts`: loaded Extension listings; `get.ts`: `getSourceResource`; `search.ts`: `SearchPlanner`.
-- `realm.ts`: `realmService`; `status.ts`: `sourceService`; `thread.ts`: `ThreadService`; `secrets.ts`: secrets/config services.
-- `skills.ts`: `resolveBundledSkills`, `listSkills`, and `getSkillContent`; `init.ts`/`db.ts`: core storage bootstrap/open/migration functions.
+- `realm.ts`: `realmService`; `status.ts`: `sourceService`; `thread.ts`: `ThreadService`.
+- `secrets.ts`: opens only `SecretBackendManager` dependencies for safe status and crash-safe backend selection; `init.ts` delegates fresh-config backend probing and persistence to core before database bootstrap.
+- `skills.ts`: `resolveBundledSkills`, `listSkills`, and `getSkillContent`; `db.ts`: core storage open/migration functions.
 - All command descriptors are consumed by `apps/cli/src/main.ts`; shared wiring lives in `apps/cli/src/deps.ts`, `definitions.ts`, `args/`, and `format/`.

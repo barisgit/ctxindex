@@ -10,16 +10,16 @@
 
 ## 2. Explicit Secret Backend Operations
 
-- [ ] 2.1 Write public-interface red tests for typed-reference Secret Vault routing, configured-backend-only writes, unavailable-backend failure, no value disclosure, and mixed-reference readability.
-- [ ] 2.2 Implement the deep Secret Vault and correct encrypted-file envelope key-mode selection, private key generation/modes, deterministic backend entry indexing, and central environment resolution without argv secrets.
-- [ ] 2.3 Write red tests for backend switch success, target copy failure, DB/config failure windows, interruption/retry, source cleanup failure, idempotence, and fresh `init` backend selection.
-- [ ] 2.4 Implement copy-first crash-safe backend movement and safe status, remove silent fallback plus unused `secrets.passphrase_env`/`paths` plumbing, and keep configuration changes atomic and last.
-- [ ] 2.5 Replace CLI `secrets migrate` with thin strict `secrets status [--json]` and `secrets backend set <keychain|file>` handlers; reject legacy/passphrase/value-bearing options before dependencies open and update safe formatter/help tests.
-- [ ] 2.6 Add a real binary sandbox covering fresh Keychain-unavailable init to encrypted file, status non-disclosure, file→mock-Keychain→file movement with auth secret continuity, unavailable target rollback, and zero emitted canaries.
+- [x] 2.1 Write public-interface red tests for typed-reference Secret Vault routing, configured-backend-only writes, unavailable-backend failure, no value disclosure, and mixed-reference readability.
+- [x] 2.2 Implement the deep Secret Vault and correct encrypted-file envelope key-mode selection, private key generation/modes, deterministic backend entry indexing, and central environment resolution without argv secrets.
+- [x] 2.3 Write red tests for backend switch success, target copy failure, DB/config failure windows, interruption/retry, source cleanup failure, idempotence, and fresh `init` backend selection.
+- [x] 2.4 Implement copy-first crash-safe backend movement and safe status, remove silent fallback plus unused `secrets.passphrase_env`/`paths` plumbing, and keep configuration changes atomic and last.
+- [x] 2.5 Replace CLI `secrets migrate` with thin strict `secrets status [--json]` and `secrets backend set <keychain|file>` handlers; reject legacy/passphrase/value-bearing options before dependencies open and update safe formatter/help tests.
+- [x] 2.6 Add a real binary sandbox covering fresh Keychain-unavailable init to encrypted file, status non-disclosure, file→mock-Keychain→file movement with auth secret continuity, unavailable target rollback, and zero emitted canaries.
 
 ### Slice 2 gate
 
-- [ ] 2.7 Run focused secrets/config/init/CLI tests, typecheck, lint, architecture/dependency checks, full unit suite, strict OpenSpec and diff checks; obtain independent security review and save `work/slice-2-secrets-gate.md` before proceeding.
+- [x] 2.7 Run focused secrets/config/init/CLI tests, typecheck, lint, architecture/dependency checks, full unit suite, strict OpenSpec and diff checks; obtain independent security review and save `work/slice-2-secrets-gate.md` before proceeding.
 
 ## 3. Provider-neutral OAuth, Accounts, and Grants
 

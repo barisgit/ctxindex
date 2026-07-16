@@ -14,7 +14,7 @@ Defines the private `@ctxindex/core` workspace package, which exposes the reusab
 ## Data & control flow
 
 1. A consumer imports `@ctxindex/core` or a declared subpath; the `package.json` export map resolves directly to `src/index.ts` or the owning capability `index.ts`.
-2. Application composition loads config and extensions, opens storage, and constructs auth, Realm, Source, search, and other services from the exported factories and classes.
+2. Application composition loads config and extensions, opens storage, constructs both secret backends behind a configured `SecretVault` plus `SecretBackendManager`, and builds auth, Realm, Source, search, and other services from exported factories and classes.
 3. Core services validate calls against the extension registry, cross the provider boundary through Adapter operations when required, persist normalized state in SQLite, and return typed results, warnings, or `CtxindexError` subclasses.
 4. Package scripts run type checking, Biome linting, and Bun tests in focused, integration, and e2e modes; they do not alter the runtime API surface.
 

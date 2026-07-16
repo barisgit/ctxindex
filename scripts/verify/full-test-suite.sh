@@ -5,7 +5,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
 
 output_file="$(mktemp)"
-trap 'rm -f "$output_file"' EXIT
+keytar_mock_dir="$(mktemp -d)"
+trap 'rm -f "$output_file"; rm -rf "$keytar_mock_dir"' EXIT
+
+# A missed sandbox variable must never let automated tests touch the user's
+# native Keychain. Individual tests may override this with their own mock.
+export NODE_ENV=test
+export CTXINDEX_KEYTAR_MOCK_FILE="${CTXINDEX_KEYTAR_MOCK_FILE:-$keytar_mock_dir/keytar.json}"
 
 if bun test --path-ignore-patterns '__none__' --max-concurrency=1 >"$output_file" 2>&1; then
   bun_exit=0

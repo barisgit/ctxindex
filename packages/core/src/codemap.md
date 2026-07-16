@@ -10,11 +10,11 @@ Implements ctxindex's core domain and application layer: extension definition re
 - Profiles and Adapters from `@ctxindex/extension-sdk` form the strategy/plugin boundary: `extension/loader.ts` loads definitions, `registry/` validates and indexes them, Profiles own payload semantics, and Adapters own provider I/O.
 - Factory-built application services (`createRealmService()`, `createSourceService()`, `createThreadService()`) and repositories (`ResourceStore`, `RelationStore`, `ArtifactStore`) receive explicit database, registry, auth, and logger dependencies.
 - SQLite is the system of record: `schema/` defines tables, `storage/` opens and bootstraps databases, and `sync/` applies validated Adapter emissions transactionally. Zod guards configuration, extension, provider, and payload boundaries.
-- Cross-cutting contracts are centralized in `errors.ts` (`CtxindexError` hierarchy), `exit-codes.ts` (`mapSyncErrorCode()`), `ids.ts` (`newId()`), `ref/` (`parseRef()`), plus `config/`, `paths/`, `logger/`, `net/`, and `secrets/`.
+- Cross-cutting contracts are centralized in `errors.ts` (`CtxindexError` hierarchy), `exit-codes.ts` (`mapSyncErrorCode()`), `ids.ts` (`newId()`), `ref/` (`parseRef()`), plus `config/`, `paths/`, `logger/`, `net/`, and `secrets/`; the latter routes typed refs without fallback and switches backends with copy/verify/reference-commit/config-commit/cleanup ordering.
 
 ## Data & control flow
 
-1. `config/readConfig()` and `paths/` resolve runtime state; `storage/bootstrapDatabase()` creates directories, opens SQLite, and applies the `migrations/coreMigrations` manifest.
+1. `config/readConfig()` and `paths/` resolve runtime state; on first initialization `secrets/initialize.ts` probes Keychain, falls back to file only during selection, and persists the choice before `storage/bootstrapDatabase()` creates directories, opens SQLite, and applies migrations.
 2. `extension/loadExtensions()` builds an `ExtensionRegistry`; Realm, auth Grant, and `source/createSourceService()` operations establish the ownership and provider coordinates used by later calls.
 3. Source sync runs `source/syncSource()` into `SyncCoordinator.run()`, which validates emissions, writes Resources through `ResourceStore`, resolves Relations through `RelationStore`, and advances durable sync state.
 4. Reads and commands enter through `SearchPlanner`, `getSourceResource()`, `runAction()`, `exportSourceResource()`, `ArtifactService`, or `ThreadService`; these resolve registry definitions, invoke Adapter operations through `createSourceProviderContext()` when needed, and return validated domain results and warnings.

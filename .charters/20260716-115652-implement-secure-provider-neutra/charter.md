@@ -29,12 +29,12 @@ Status: pass
 ### C2. Secret backend operation is explicit and safe
 The CLI can report the active backend without exposing secret values and explicitly switch between OS Keychain and encrypted file storage. It never silently falls back, never accepts passphrases in argv, does not strand references if a switch fails, and persists the selected backend only after successful movement.
 Depends: C1
-Status: in-progress — implementing explicit Secret Vault routing and crash-safe backend switching
+Status: pass
 
 ### C3. Accounts and Grants are provider-neutral and deduplicated
 Google and Microsoft authorization resolve a stable external identity, upsert exactly one Account per provider identity, retain explicit Grants and scope sets, and allow multiple Sources to reuse a compatible Grant without duplicate Accounts.
 Depends: C1, C2
-Status: pending
+Status: in-progress — implementing declarative OAuth, stable Account upsert, and provider-neutral Grants
 
 ### C4. Agents can inspect configured Accounts and Sources
 A deterministic `account list` interface exposes safe nested Account, Grant, scope, Realm, and Source information in readable and JSON forms, while `source list` remains the canonical inventory including unauthenticated Sources. No secret material is rendered or logged.

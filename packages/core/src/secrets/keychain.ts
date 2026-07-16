@@ -32,6 +32,15 @@ function serviceName(scope: string): string {
 async function defaultImportKeytar(): Promise<KeytarModule> {
   const mockFile = getEnv().CTXINDEX_KEYTAR_MOCK_FILE
   if (mockFile) return fileBackedKeytarMock(mockFile) as KeytarModule
+  if (
+    process.env.NODE_ENV === 'test' &&
+    process.env.CTXINDEX_LIVE_TESTS !== '1'
+  ) {
+    throw new CtxindexSecretsError(
+      'test processes must configure CTXINDEX_KEYTAR_MOCK_FILE',
+      'backend_unavailable',
+    )
+  }
   return import('keytar')
 }
 
@@ -177,7 +186,7 @@ export class KeychainBackend implements SecretsStore {
     const keytar = await this.keytar()
     try {
       return (await this.readIndex(keytar)).sort((a, b) =>
-        a.ref.localeCompare(b.ref),
+        a.ref < b.ref ? -1 : a.ref > b.ref ? 1 : 0,
       )
     } catch (err) {
       throw wrapKeytarRuntimeError(err, 'failed to list keychain secrets')
@@ -189,7 +198,7 @@ export class KeychainBackend implements SecretsStore {
       return await this.importKeytar()
     } catch (cause) {
       throw new CtxindexSecretsError(
-        'keychain backend unavailable; run ctxindex secrets migrate file',
+        'keychain backend unavailable; run ctxindex secrets backend set file',
         'backend_unavailable',
         { cause },
       )

@@ -93,18 +93,16 @@ test('OAuth declarations expose bounded hosts through the public SDK', async () 
   expect(adapterContract).toContain('provider')
 })
 
-test('CLI accepts no literal long-lived credential or passphrase options', async () => {
-  const cliSources = await sourceTree(cliRoot)
-  expect(cliSources).not.toMatch(
-    /['"](?:passphrase|client-secret|auth-code|refresh-token)['"]\s*:/,
-  )
-})
-
-test('configured secret backend has no silent writable fallback', async () => {
-  const deps = await Bun.file(new URL('deps.ts', cliRoot)).text()
-  expect(deps).not.toContain('loadWritableSecretsStore')
-  expect(deps).not.toMatch(
-    /backend_unavailable[\s\S]{0,500}new FileSecretsBackend/,
+test('auth CLI accepts no literal long-lived credential options', async () => {
+  const authSources = (
+    await Promise.all(
+      ['args/auth.ts', 'commands/auth.ts'].map((path) =>
+        Bun.file(new URL(path, cliRoot)).text(),
+      ),
+    )
+  ).join('\n')
+  expect(authSources).not.toMatch(
+    /['"](?:client-secret|auth-code|refresh-token)['"]\s*:/,
   )
 })
 

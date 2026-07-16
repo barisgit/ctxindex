@@ -11,6 +11,7 @@ Pure argument-parsing layer that converts raw argv segments into typed command d
 - Ref-bearing parsers (`artifact.ts`, `export.ts`, `get.ts`, `thread-get.ts`) validate with `parseRef`.
 - `source.ts` derives dynamic `--config-*` value flags from `SourceDescription.configOptions` and coerces declared primitive/array types.
 - `describe.ts` validates the progressive selector/id grammar, text/Markdown/JSON formats, and explicit `--full` snapshot mode while rejecting redundant or conflicting forms.
+- `secrets.ts` keeps the secret surface deliberately narrow: safe `status [--json]` and typed `backend set <keychain|file>` forms only, with no literal-secret or passphrase arguments.
 - Each command module exports usage text alongside its parser and result types.
 
 ## Data & control flow

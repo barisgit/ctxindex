@@ -6,7 +6,7 @@ Provides repository-level executable tooling: policy verification gates under `s
 
 ## Design/patterns
 
-- Verification scripts are deterministic command-line gates: they scan production source/config, optionally spawn or import runtime targets, print findings, and signal success or failure by exit status. Explicit `.red.ts` contracts record unmet milestone architecture before their assertions graduate into the normal suite. See `scripts/verify/codemap.md`.
+- Verification scripts are deterministic command-line gates: they scan production source/config, optionally spawn or import runtime targets, print findings, and signal success or failure by exit status. The full-suite wrapper installs a temporary Keychain mock, and explicit `.red.ts` contracts retain only unmet milestone architecture before assertions graduate into the normal suite. See `scripts/verify/codemap.md`.
 - Spike scripts isolate uncertain integration behavior from product packages. See `scripts/spikes/codemap.md`.
 - `with-timeout.ts` is a process-supervisor wrapper. It runs a command in a detached process group where supported, forwards terminal streams/signals, and applies TERM-then-KILL timeout escalation.
 

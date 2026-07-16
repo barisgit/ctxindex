@@ -4,11 +4,11 @@
   "objective": "Implement secure provider-neutral Accounts and Grants, repair secrets backend operations, and add production Google Calendar plus Microsoft Graph mail/calendar Adapters with read access and reversible Draft create/update only, verified through isolated mocked and explicit Human OAuth checkpoints without any send capability.",
   "status": "active",
   "createdAt": "2026-07-16T11:56:52.401Z",
-  "updatedAt": "2026-07-16T12:29:33.180Z",
+  "updatedAt": "2026-07-16T13:34:58.757Z",
   "sessionId": "019f61de-764e-71c5-a230-71306da4d00e",
-  "nextSeq": 253,
-  "latestSourceSeq": 248,
-  "snapshotHash": "87aa3ddc47b4d93bb93fdd451caef66e5c546294f8781a7f2ce565fc3cfbf4ff",
+  "nextSeq": 827,
+  "latestSourceSeq": 821,
+  "snapshotHash": "6275f27e8d0f1f810cfa13479dd5475f2bfdac1c3d6e717e7740857a26e93173",
   "criteriaSnapshot": [
     {
       "id": "C1",
@@ -27,10 +27,10 @@
         "C1"
       ],
       "status": {
-        "value": "in-progress",
-        "note": "implementing explicit Secret Vault routing and crash-safe backend switching"
+        "value": "pass",
+        "note": ""
       },
-      "statusSeq": 235
+      "statusSeq": 816
     },
     {
       "id": "C3",
@@ -40,10 +40,10 @@
         "C2"
       ],
       "status": {
-        "value": "pending",
-        "note": ""
+        "value": "in-progress",
+        "note": "implementing declarative OAuth, stable Account upsert, and provider-neutral Grants"
       },
-      "statusSeq": 8
+      "statusSeq": 816
     },
     {
       "id": "C4",

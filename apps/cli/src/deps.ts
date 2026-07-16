@@ -6,21 +6,19 @@ import {
   getEnv,
   type LogLevel,
   readConfig,
+  writeConfig,
 } from '@ctxindex/core/config'
 import { loadExtensions } from '@ctxindex/core/extension'
 import { logger as createLogger, type Logger } from '@ctxindex/core/logger'
 import { createRealmService, type RealmService } from '@ctxindex/core/realm'
 import type { ExtensionRegistry } from '@ctxindex/core/registry'
 import {
-  CtxindexSecretsError,
-  createSecretsService,
+  createSecretBackendManager,
+  createSecretVault,
   FileBackend,
-  FileBackend as FileSecretsBackend,
   KeychainBackend,
-  loadSecretsStore,
-  type SecretBackend,
-  type SecretsService,
-  type SecretsStore,
+  type SecretBackendManager,
+  type SecretVault,
 } from '@ctxindex/core/secrets'
 import { createSourceService, type SourceService } from '@ctxindex/core/source'
 import type { CtxindexDatabase } from '@ctxindex/core/storage'
@@ -33,13 +31,17 @@ export interface CliDeps {
   readonly env: ReturnType<typeof getEnv>
   readonly realmService: RealmService
   readonly sourceService: SourceService
-  readonly secretsService: SecretsService
-  readonly secretsBackend: SecretBackend
-  readonly secretsStore: SecretsStore
+  readonly secretBackendManager: SecretBackendManager
+  readonly secretVault: SecretVault
   readonly authService: AuthService
   readonly registry: ExtensionRegistry
   readonly threadService: ThreadService
   readonly artifactService: ArtifactService
+  close(): Promise<void>
+}
+
+export interface SecretCliDeps {
+  readonly secretBackendManager: SecretBackendManager
   close(): Promise<void>
 }
 
@@ -50,25 +52,47 @@ export function setCliLogLevel(level: LogLevel | undefined): void {
   cliLogLevel = level
 }
 
-async function loadWritableSecretsStore(
+function createSecretRuntime(
+  db: CtxindexDatabase,
+  log: Logger,
   config: CtxindexConfig,
-): Promise<SecretsStore> {
-  try {
-    return await loadSecretsStore(config)
-  } catch (err) {
-    if (
-      err instanceof CtxindexSecretsError &&
-      err.code === 'backend_unavailable'
-    ) {
-      return new FileSecretsBackend()
-    }
-    throw err
-  }
+): {
+  readonly secretBackendManager: SecretBackendManager
+  readonly secretVault: SecretVault
+} {
+  const fileStore = new FileBackend()
+  const keychainStore = new KeychainBackend()
+  const secretVault = createSecretVault({
+    fileStore,
+    keychainStore,
+    backend: config.secrets.backend,
+  })
+  const secretBackendManager = createSecretBackendManager({
+    db,
+    fileStore,
+    keychainStore,
+    logger: log,
+    backend: config.secrets.backend,
+    commitBackend: async (target) => {
+      await writeConfig({
+        ...config,
+        secrets: { backend: target },
+      })
+    },
+  })
+  return { secretBackendManager, secretVault }
+}
+
+export async function openSecretDeps(): Promise<SecretCliDeps> {
+  const db = await getDb()
+  const log = await createLogger(cliLogLevel ? { level: cliLogLevel } : {})
+  const config = await readConfig()
+  const { secretBackendManager } = createSecretRuntime(db, log, config)
+  return { secretBackendManager, async close() {} }
 }
 
 export async function openDeps(
   opts: {
-    readonly filePassphrase?: string
     readonly config?: CtxindexConfig
     readonly registry?: ExtensionRegistry
   } = {},
@@ -92,23 +116,15 @@ export async function openDeps(
     realmService,
     registry,
   })
-  const fileStore = new FileBackend(
-    opts.filePassphrase === undefined
-      ? { createKeyFileIfMissing: false }
-      : { passphrase: opts.filePassphrase, createKeyFileIfMissing: false },
-  )
-  const secretsService = createSecretsService({
+  const { secretBackendManager, secretVault } = createSecretRuntime(
     db,
-    fileStore,
-    keychainStore: new KeychainBackend(),
-    logger: log,
-    backend: config.secrets.backend,
-  })
-  const secretsStore = await loadWritableSecretsStore(config)
+    log,
+    config,
+  )
   const env = getEnv()
   const authService = createAuthService({
     db,
-    store: secretsStore,
+    store: secretVault,
     logger: log,
     env,
   })
@@ -124,9 +140,8 @@ export async function openDeps(
     env,
     realmService,
     sourceService,
-    secretsService,
-    secretsBackend: config.secrets.backend,
-    secretsStore,
+    secretBackendManager,
+    secretVault,
     authService,
     registry,
     threadService,

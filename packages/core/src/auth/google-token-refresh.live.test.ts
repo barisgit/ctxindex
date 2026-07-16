@@ -4,7 +4,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { getEnv, readConfig } from '../config'
 import type { Logger } from '../logger'
-import { loadSecretsStore } from '../secrets'
+import { createSecretVault, FileBackend, KeychainBackend } from '../secrets'
 import { applyPragmas, runMigrations } from '../storage'
 import { createAuthService } from './service'
 
@@ -38,7 +38,12 @@ test.skipIf(process.env[liveTestsEnvKey] !== '1')(
       expect(grant?.refresh_token_ref).toBeDefined()
       expect(grant?.refresh_token_ref).not.toBeNull()
 
-      const store = await loadSecretsStore(await readConfig())
+      const config = await readConfig()
+      const store = createSecretVault({
+        backend: config.secrets.backend,
+        fileStore: new FileBackend(),
+        keychainStore: new KeychainBackend(),
+      })
       const refreshToken = await store.getSecret(grant?.refresh_token_ref ?? '')
       expect(refreshToken.length).toBeGreaterThan(0)
 

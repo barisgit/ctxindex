@@ -7,7 +7,7 @@ Owns runtime environment capture, TOML configuration persistence, schema validat
 ## Design
 
 - `env-loader.ts` defines `EnvSchema`, snapshots `process.env` through memoized `getEnv()`, and exports the key set used by typed path resolution.
-- `schema.ts` uses Zod as the canonical `CtxindexConfig` contract and constructs defaults through `defaultConfig()`.
+- `schema.ts` uses Zod as the canonical `CtxindexConfig` contract, requires `secrets.backend` to be `keychain` or `file`, and constructs the keychain default through `defaultConfig()`; fresh initialization may persist file after an explicit failed Keychain probe.
 - `env-uri.ts` treats `env:`, `keychain:`, and `file:` values as secret references; `parseEnvUri()` and `resolveEnvUri()` emit typed `CtxindexConfigError`s.
 - `io.ts` is the repository boundary: TOML parsing on read and atomic temp-file/rename writes with restrictive permissions.
 
@@ -15,7 +15,7 @@ Owns runtime environment capture, TOML configuration persistence, schema validat
 
 1. `readConfig()` resolves `configPath()`, returns `defaultConfig()` when absent, otherwise parses TOML.
 2. Secret references are checked before `configSchema.parse()` returns typed configuration.
-3. `writeConfig()` repeats validation, serializes normalized config, creates the parent directory, writes a mode-`0600` temporary file, then renames it into place.
+3. `writeConfig()` repeats validation, serializes normalized config, creates the parent directory, writes a mode-`0600` temporary file, then renames it into place; backend switching commits this file only after copied secrets and database refs are usable.
 4. Environment consumers call `getEnv()` once per process snapshot; `resolveEnvUri()` maps an `env:` URI to that snapshot.
 
 ## Integration points

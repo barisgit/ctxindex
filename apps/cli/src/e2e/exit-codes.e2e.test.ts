@@ -109,7 +109,7 @@ describe('exit codes e2e', () => {
         '[secrets\nbackend = "file"\n',
       )
 
-      const result = await sandbox.run(['secrets', 'migrate', 'file'])
+      const result = await sandbox.run(['secrets', 'status', '--json'])
 
       expect(result.exitCode).toBe(40)
       expect(result.stderr).toContain('failed to parse config.toml')

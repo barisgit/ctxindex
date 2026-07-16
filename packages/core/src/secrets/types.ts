@@ -40,6 +40,7 @@ export interface ParsedKeychainRef {
 
 export interface ParsedFileRef {
   readonly backend: 'file'
+  readonly scope: string
   readonly key: string
 }
 
@@ -87,8 +88,8 @@ export function keychainRef(scope: string, key: string): string {
   return `keychain:ctxindex/${encodeSecretPart(scope)}/${encodeSecretPart(key)}`
 }
 
-export function fileRef(key: string): string {
-  return `file:secrets.box#${encodeSecretPart(key)}`
+export function fileRef(scope: string, key: string): string {
+  return `file:secrets.box#${encodeSecretPart(scope)}/${encodeSecretPart(key)}`
 }
 
 export function parseSecretRef(ref: string): ParsedSecretRef {
@@ -109,8 +110,14 @@ export function parseSecretRef(ref: string): ParsedSecretRef {
   }
 
   if (ref.startsWith('file:secrets.box#')) {
-    const key = ref.slice('file:secrets.box#'.length)
-    if (!key || !urlSafePattern.test(key.replaceAll('%', ''))) {
+    const rest = ref.slice('file:secrets.box#'.length)
+    const parts = rest.split('/')
+    if (
+      parts.length !== 2 ||
+      !parts[0] ||
+      !parts[1] ||
+      !parts.every((part) => urlSafePattern.test(part.replaceAll('%', '')))
+    ) {
       throw new CtxindexSecretsError(
         `invalid file secret reference: ${ref}`,
         'invalid_ref',
@@ -118,7 +125,8 @@ export function parseSecretRef(ref: string): ParsedSecretRef {
     }
     return {
       backend: 'file',
-      key: decodeSecretPart(key, 'key'),
+      scope: decodeSecretPart(parts[0], 'scope'),
+      key: decodeSecretPart(parts[1], 'key'),
     }
   }
 

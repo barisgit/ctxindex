@@ -2,46 +2,37 @@ import type { SecretBackend } from '@ctxindex/core/secrets'
 import { hasHelpFlag } from './flags'
 
 export type SecretsArgs =
-  | {
-      readonly kind: 'migrate'
-      readonly target: SecretBackend
-      readonly passphrase?: string
-    }
+  | { readonly kind: 'status'; readonly json: boolean }
+  | { readonly kind: 'set'; readonly target: SecretBackend }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
 
 export const secretsUsage =
-  'secrets migrate <keychain|file> [--passphrase <passphrase>]'
+  'secrets status [--json] | secrets backend set <keychain|file>'
+
+function unknown(): SecretsArgs {
+  return { kind: 'unknown', message: `usage: ctxindex ${secretsUsage}` }
+}
 
 export function parseSecretsArgs(args: string[]): SecretsArgs {
   if (hasHelpFlag(args)) return { kind: 'help' }
-  const [subcommand, target, ...rest] = args
+
+  if (args[0] === 'status') {
+    if (args.length === 1) return { kind: 'status', json: false }
+    if (args.length === 2 && args[1] === '--json') {
+      return { kind: 'status', json: true }
+    }
+    return unknown()
+  }
+
   if (
-    subcommand !== 'migrate' ||
-    (target !== 'keychain' && target !== 'file')
+    args.length === 3 &&
+    args[0] === 'backend' &&
+    args[1] === 'set' &&
+    (args[2] === 'keychain' || args[2] === 'file')
   ) {
-    return {
-      kind: 'unknown',
-      message:
-        'usage: ctxindex secrets migrate <keychain|file> [--passphrase <passphrase>]',
-    }
+    return { kind: 'set', target: args[2] }
   }
-  let passphrase: string | undefined
-  for (let index = 0; index < rest.length; index += 1) {
-    const arg = rest[index]
-    if (arg === '--passphrase') {
-      const value = rest[index + 1]
-      if (!value)
-        return { kind: 'unknown', message: '--passphrase requires a value' }
-      passphrase = value
-      index += 1
-    } else if (arg?.startsWith('--passphrase=')) {
-      passphrase = arg.slice('--passphrase='.length)
-    } else {
-      return { kind: 'unknown', message: `unknown option: ${arg}` }
-    }
-  }
-  return passphrase === undefined
-    ? { kind: 'migrate', target }
-    : { kind: 'migrate', target, passphrase }
+
+  return unknown()
 }

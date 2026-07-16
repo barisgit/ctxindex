@@ -14,7 +14,9 @@ Contains executable static and runtime verification gates for CLI layering, fram
 - `exports-map.ts` validates required `@ctxindex/core` subpath declarations, target files, runtime resolution, and absence of deep core imports.
 - `no-prompts-static.ts` rejects prompt libraries and direct stdin/readline use in production CLI TypeScript; `agent-howtos.test.ts` verifies repository-owned agent guidance against the real CLI command surface.
 - `package-dependencies.ts` uses the TypeScript AST to discover imports in every app/package production and colocated test file, then enforces direct runtime declarations, dependency use, and workspace direction. `communication-message-profile.test.ts` owns the cross-package bundled Profile-to-registry integration contract.
-- `multi-provider-architecture.red.ts` is the explicit red contract for the V1.1 provider work. It discovers provider ownership, OAuth/secret boundaries, calendar Profile ownership, and send surfaces; assertions move into the normal architecture suite as their dependency-ordered implementation slices turn green.
+- `full-test-suite.sh` forces `NODE_ENV=test` and a temporary `CTXINDEX_KEYTAR_MOCK_FILE` before test discovery, preventing missed sandbox wiring from touching the user's native Keychain.
+- `module-architecture.test.ts` now owns the green secret boundary: one explicit backend-selection owner, no fallback/literal-secret CLI, no legacy service, and mandatory Keychain mock guarding in tests.
+- `multi-provider-architecture.red.ts` remains intentionally red only for later multi-provider ownership: Google Calendar/Microsoft Adapter modules, provider-neutral core/CLI endpoints and OAuth declarations, removal of literal long-lived auth options, Profile-owned calendar vocabulary, and the no-send production surface.
 
 ## Flow
 

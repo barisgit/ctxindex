@@ -9,6 +9,7 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 - Bun/Turborepo monorepo split into a user-facing application (`apps/`), reusable runtime and contract packages (`packages/`), external authoring examples (`examples/`), and repository tooling (`scripts/`).
 - Layered boundaries keep CLI parsing and presentation separate from core application services, provider-neutral Profile contracts, and provider/filesystem Adapter I/O.
 - Extensions bundle declarative Profiles and Source Adapters; core registries validate those definitions before service workflows dispatch operations and persist local state.
+- Secret persistence is selected explicitly: a typed vault routes existing references to file or Keychain backends without fallback, while a crash-safe manager owns backend changes.
 
 ## Entry points
 
@@ -20,7 +21,7 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 
 ## Data & control flow
 
-CLI argv enters `apps/cli/bin/ctxindex.mjs`, is parsed and dispatched by `apps/cli/src/`, and reaches services exported by `packages/core/`. Core loads Profile and Adapter definitions from the package registry, invokes provider operations through the Extension SDK contracts, validates emitted data, and coordinates search, retrieval, Actions, sync, and local persistence. Results return through CLI formatters to terminal output and a stable process status.
+CLI argv enters `apps/cli/bin/ctxindex.mjs`, is parsed and dispatched by `apps/cli/src/`, and reaches services exported by `packages/core/`. Core loads Profile and Adapter definitions from the package registry, invokes provider operations through the Extension SDK contracts, validates emitted data, and coordinates search, retrieval, Actions, sync, local persistence, and typed secret storage. Results return through CLI formatters to terminal output and a stable process status.
 
 ## Integration points
 

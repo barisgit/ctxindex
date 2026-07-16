@@ -62,7 +62,7 @@ async function overwriteSecret(
   if (parsed.backend === 'keychain') {
     return deps.store.setSecret(parsed.scope, parsed.key, value)
   }
-  return deps.store.setSecret('google', parsed.key || fallbackKey, value)
+  return deps.store.setSecret(parsed.scope, parsed.key || fallbackKey, value)
 }
 
 async function resolveOAuthClientCreds(

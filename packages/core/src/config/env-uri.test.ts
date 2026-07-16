@@ -1,7 +1,4 @@
 import { afterEach, expect, test } from 'bun:test'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { CtxindexConfigError } from '../errors'
 import {
   assertSecretUri,
@@ -9,7 +6,6 @@ import {
   resetEnvForTests,
   resolveEnvUri,
 } from './index'
-import { readConfig } from './io'
 
 const savedEnv = { ...process.env }
 
@@ -78,40 +74,13 @@ test('unset env var does not leak value', () => {
   expect(String((thrown as Error).message)).not.toContain('secret-leak-canary')
 })
 
-test('bare string rejected', async () => {
+test('bare string rejected', () => {
   expect(() => assertSecretUri('plaintext', 'secrets.passphrase_env')).toThrow(
     CtxindexConfigError,
   )
   expect(() => assertSecretUri('plaintext', 'secrets.passphrase_env')).toThrow(
     'must be a URI',
   )
-
-  const sandbox = await mkdtemp(join(tmpdir(), 'ctxindex-env-uri-'))
-  const configPath = join(sandbox, 'config.toml')
-  await writeFile(
-    configPath,
-    `
-[secrets]
-backend = "file"
-passphrase_env = "plaintext"
-
-[log]
-level = "info"
-
-[log.file]
-rotate = "daily"
-retain_days = 14
-compress = true
-`,
-  )
-
-  try {
-    await expect(readConfig(configPath)).rejects.toMatchObject({
-      code: 'secret_must_be_uri',
-    })
-  } finally {
-    await rm(sandbox, { recursive: true, force: true })
-  }
 })
 
 test('invalid prefix rejected', () => {

@@ -63,11 +63,14 @@ bun cli skills path
 
 ## Secrets and provider authentication
 
-Choose secret migration destinations explicitly:
+Inspect the configured secret backend or switch it explicitly. A switch copies
+and verifies stored values before committing configuration and cleaning the old
+backend; secret values are never accepted on this command line.
 
 ```sh
-bun cli secrets migrate keychain
-bun cli secrets migrate file
+bun cli secrets status --json
+bun cli secrets backend set keychain
+bun cli secrets backend set file
 ```
 
 For Google OAuth, required client input comes from flags or the documented environment variables; the CLI does not prompt for credentials. The loopback flow may require browser consent after explicit operator approval.

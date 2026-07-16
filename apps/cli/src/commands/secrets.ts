@@ -1,10 +1,11 @@
-import { readConfig, writeConfig } from '@ctxindex/core/config'
-import { hasFileSecretMaterial } from '@ctxindex/core/secrets'
 import { defineCommand } from 'citty'
 import { parseSecretsArgs, secretsUsage } from '../args/secrets'
-import { openDeps } from '../deps'
+import { openSecretDeps } from '../deps'
 import { mapErrorToExit, runWithExit } from '../format/exit'
-import { formatSecretsAlready, formatSecretsMigrated } from '../format/secrets'
+import {
+  formatSecretBackendStatus,
+  formatSecretBackendSwitch,
+} from '../format/secrets'
 
 export async function handleSecretsCommand(args: string[]): Promise<number> {
   const parsed = parseSecretsArgs(args)
@@ -14,58 +15,54 @@ export async function handleSecretsCommand(args: string[]): Promise<number> {
     return 2
   }
 
+  let deps: Awaited<ReturnType<typeof openSecretDeps>> | undefined
   try {
-    const config = await readConfig()
-    if (parsed.target === 'file') {
-      const hasMaterial = await hasFileSecretMaterial(
-        parsed.passphrase === undefined
-          ? {}
-          : { passphrase: parsed.passphrase },
+    deps = await openSecretDeps()
+    if (parsed.kind === 'status') {
+      console.log(
+        formatSecretBackendStatus(
+          await deps.secretBackendManager.getStatus(),
+          parsed.json,
+        ),
       )
-      if (!hasMaterial) {
-        console.error(
-          'ctxindex secrets migrate file requires --passphrase, CTXINDEX_SECRETS_PASSPHRASE, or an existing $XDG_CONFIG_HOME/ctxindex/secret.key file',
-        )
-        return 2
-      }
-    }
-    if (config.secrets.backend === parsed.target) {
-      await writeConfig({
-        ...config,
-        secrets: { ...config.secrets, backend: parsed.target },
-      })
-      console.log(formatSecretsAlready(parsed.target))
       return 0
     }
-    const deps = await openDeps(
-      parsed.passphrase === undefined
-        ? {}
-        : { filePassphrase: parsed.passphrase },
-    )
-    const result = await deps.secretsService.migrateSecrets(parsed.target)
-    await writeConfig({
-      ...config,
-      secrets: { ...config.secrets, backend: parsed.target },
-    })
-    console.log(formatSecretsMigrated(result.moved, parsed.target))
+
+    const result = await deps.secretBackendManager.switchBackend(parsed.target)
+    console.log(formatSecretBackendSwitch(result))
+    for (const warning of result.warnings) console.error(`warning: ${warning}`)
     return 0
   } catch (err) {
     console.error(err instanceof Error ? err.message : String(err))
     return mapErrorToExit(err)
+  } finally {
+    await deps?.close()
   }
 }
 
 export const secretsCommand = defineCommand({
-  meta: { name: 'secrets', description: 'Manage secrets backends.' },
+  meta: { name: 'secrets', description: 'Inspect and select secret storage.' },
   subCommands: {
-    migrate: defineCommand({
-      meta: { name: 'migrate', description: 'Migrate secrets backend.' },
-      args: {
-        target: { type: 'positional', required: false },
-        passphrase: { type: 'string', description: 'File backend passphrase' },
-      },
+    status: defineCommand({
+      meta: { name: 'status', description: 'Show safe backend status.' },
+      args: { json: { type: 'boolean', description: 'Print JSON' } },
       run: ({ rawArgs }) =>
-        runWithExit(() => handleSecretsCommand(['migrate', ...rawArgs])),
+        runWithExit(() => handleSecretsCommand(['status', ...rawArgs])),
+    }),
+    backend: defineCommand({
+      meta: { name: 'backend', description: 'Manage the active backend.' },
+      subCommands: {
+        set: defineCommand({
+          meta: { name: 'set', description: 'Set keychain or file backend.' },
+          args: {
+            target: { type: 'positional', required: true },
+          },
+          run: ({ rawArgs }) =>
+            runWithExit(() =>
+              handleSecretsCommand(['backend', 'set', ...rawArgs]),
+            ),
+        }),
+      },
     }),
   },
 })

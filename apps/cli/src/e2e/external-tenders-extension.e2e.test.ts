@@ -26,6 +26,7 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
     XDG_DATA_HOME: xdgData,
     XDG_STATE_HOME: xdgState,
     XDG_CACHE_HOME: xdgCache,
+    CTXINDEX_KEYTAR_MOCK_FILE: join(root, 'keytar.json'),
   }
 
   async function run(args: string[]) {
