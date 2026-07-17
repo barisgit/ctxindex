@@ -2,9 +2,7 @@
 
 ## Purpose
 Define the public Profile, Adapter, and Extension vocabulary contracts and require user and agent interfaces to derive from loaded definitions.
-
 ## Requirements
-
 ### Requirement: Public definition factories and validated registries
 For V1, the system SHALL expose `defineProfile`, `defineAdapter`, and `defineExtension` as public factories for plain versioned definitions, and SHALL build runtime-validated registries in accordance with SPEC §3a and §3d. Registry binding MUST use `(id, version)` rather than object identity, and duplicate or invalid definitions MUST be rejected before activation.
 
@@ -32,11 +30,11 @@ For V1, Profile definitions SHALL provide the schema-backed domain vocabulary de
 - **THEN** core accepts and indexes the envelope, emits a warning, and does not fail the operation
 
 ### Requirement: Registry-derived interface and documentation
-For V1.1, valid kinds and aliases, typed field filters, export formats, Source configuration, Actions, OAuth provider/scopes, CLI affordances, and generated agent documentation SHALL derive from loaded registries as required by SPEC §3d and §10b. Parallel hand-maintained declarations of the same Adapter, Profile, Action, or auth-selection vocabulary MUST NOT exist. Generic Citty help MUST remain concise and SHALL point agents to registry discovery rather than append the complete loaded interface. Registry discovery SHALL use compact list output by default, full readable detail for an exact definition id, and an explicit full-snapshot option. JSON detail and full-snapshot output MUST retain exact registry schemas, while text and Markdown detail MUST render Action input properties, requiredness, constraints, bindings, and examples structurally rather than as a single serialized schema line.
+For V1, valid kinds and aliases, typed field filters, export formats, Source configuration, Actions, CLI affordances, and generated agent documentation SHALL derive from loaded registries as required by SPEC §3d and §10b. Parallel hand-maintained declarations of the same command vocabulary MUST NOT exist. Generic Citty help MUST remain concise and SHALL point agents to registry discovery rather than append the complete loaded interface. Registry discovery SHALL use compact list output by default, full readable detail for an exact definition id, and an explicit full-snapshot option. JSON detail and full-snapshot output MUST retain exact registry schemas, while text and Markdown detail MUST render Action input properties, requiredness, constraints, bindings, and examples structurally rather than as a single serialized schema line.
 
 #### Scenario: Loaded definition changes the described interface
-- **WHEN** an Extension declaring a kind, field, format, Source option, Action, or OAuth provider requirement is activated
-- **THEN** compact `describe` indexes, exact-id detail, CLI validation/help, and generated agent documentation expose that declaration from registry data
+- **WHEN** an Extension declaring a kind, field, format, Source option, or Action is activated
+- **THEN** compact `describe` indexes, exact-id detail, CLI validation, and generated agent documentation expose that declaration from registry data
 
 #### Scenario: Agent progressively discovers one definition
 - **WHEN** an agent runs bare `describe`, selector-only `describe`, and then exact-id `describe`
@@ -56,4 +54,5 @@ For V1.1, valid kinds and aliases, typed field filters, export formats, Source c
 
 #### Scenario: Required input remains non-interactive
 - **WHEN** a registry-derived command requires input
-- **THEN** the command accepts that input through arguments, environment variables, typed secret references, or declared stdin and does not require a TTY prompt
+- **THEN** the command accepts that input through arguments, environment variables, or declared stdin and does not require a TTY prompt
+
