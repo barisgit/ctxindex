@@ -2,9 +2,7 @@
 
 ## Purpose
 Define Google Calendar Source selection, authorization, synchronization, normalization, and retrieval through generic calendar contracts.
-
 ## Requirements
-
 ### Requirement: Google Calendar Source selects one collection explicitly
 `google.calendar@1` SHALL be a bundled indexed Source Adapter for `calendar.event@1`. Its registry-derived configuration SHALL identify exactly one Google calendar, defaulting only to the provider's documented primary calendar identifier, and explicit positive past/future coverage days. One Source SHALL maintain one independent anchored window, cursor, manifest, and Resource namespace for that calendar.
 
@@ -36,7 +34,7 @@ Initial sync SHALL traverse all provider pages for the selected calendar using o
 - **THEN** the previous cursor remains durable and absence alone produces no tombstones
 
 ### Requirement: Google Calendar normalization preserves event semantics
-The Adapter SHALL normalize timed/all-day values, status, organizer, attendees, recurrence instance/series identity, visibility-safe text, and updated timestamps without treating HTML as trusted text. Unsupported event variants SHALL yield bounded warnings or safe optional omissions rather than malformed Resources.
+The Adapter SHALL normalize timed/all-day values, status, organizer, attendees, recurrence instance/series identity, visibility-safe text, and updated timestamps without treating HTML as trusted text. The `birthday` event variant SHALL be normalized as a standard all-day event with series linkage derived from its recurring-event identity, ignoring `birthdayProperties`. The `fromGmail` and `workingLocation` variants (and any other non-`default` variant) SHALL remain intentionally unindexed with the stable `google_calendar_unsupported_event` warning: `fromGmail` duplicates Gmail-derived context whose source of truth is the mailbox, and `workingLocation` carries presence metadata outside the calendar-event vocabulary. Unsupported event variants and malformed events SHALL yield bounded warnings or safe optional omissions rather than malformed Resources.
 
 #### Scenario: Recurring instance is synchronized
 - **WHEN** Google returns an expanded recurring occurrence with a recurring-event identity and original start
@@ -45,6 +43,14 @@ The Adapter SHALL normalize timed/all-day values, status, organizer, attendees, 
 #### Scenario: All-day event crosses multiple dates
 - **WHEN** Google returns date-only start and exclusive end values
 - **THEN** the normalized payload retains the same half-open date range
+
+#### Scenario: Birthday variant is synchronized
+- **WHEN** Google returns an `eventType: birthday` recurring instance with date-only timing, a recurring-event identity, and `birthdayProperties`
+- **THEN** ctxindex materializes it as a normal all-day `calendar.event@1` Resource with series linkage from the recurring-event identity and without any `birthdayProperties`-derived payload
+
+#### Scenario: Working-location variant stays excluded
+- **WHEN** Google returns an `eventType: workingLocation` or `eventType: fromGmail` event
+- **THEN** the event is skipped with the stable `google_calendar_unsupported_event` warning and no Resource is emitted
 
 ### Requirement: Google Calendar retrieval and auth are bounded
 Retrieval SHALL fetch only the selected calendar and event addressed by a canonical same-Source Ref, and all requests SHALL use the linked Grant and Google allowlisted hosts. The Adapter SHALL require only its declared read scope plus provider identity/refresh scopes and SHALL expose no write scope or Action.
@@ -63,3 +69,4 @@ Automated loopback tests SHALL cover paging, incremental updates/deletions, inva
 #### Scenario: Human live checkpoint is approved
 - **WHEN** the user explicitly completes Google consent and approves the bounded read check
 - **THEN** evidence records exact scopes and successful event discovery/retrieval with identifiers and secrets redacted and no provider mutation
+
