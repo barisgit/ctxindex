@@ -58,7 +58,7 @@ Source files: `.pi/charters/8d28cb6d-7eef-4a16-b1bc-f5846176e722/charter.md` and
 
 ## 3. CLI walkthrough
 
-The walkthrough used a fresh `mktemp -d` sandbox with `HOME`, `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_CACHE_HOME`, and `XDG_STATE_HOME` pointed inside it. A sibling `mktemp -d` content directory contained three text files with distinct words (`quokka`, `nebula`, `zephyr`). Raw capture: `docs/release/run-logs/cli-walkthrough.md`.
+The walkthrough used a fresh `mktemp -d` sandbox with `HOME`, `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_CACHE_HOME`, and `XDG_STATE_HOME` pointed inside it. A sibling `mktemp -d` content directory contained three text files with distinct words (`quokka`, `nebula`, `zephyr`). The raw capture is intentionally omitted from the repository.
 
 Note: the shipped adapter id printed by `ctxindex --help` is `local.directory`; this is the v1 CLI spelling for the local-directory adapter.
 
@@ -196,20 +196,20 @@ Subcommands:
 ## 4. Test suite results
 
 ### `bun run typecheck`
-Exit code: `0`; duration: 1s; raw log: `docs/release/run-logs/01-bun-run-typecheck.log`
+Exit code: `0`; duration: 1s; raw log intentionally omitted from the repository
 ```text
 $ tsgo --noEmit -p tsconfig.base.json
 ```
 
 ### `bun run lint`
-Exit code: `0`; duration: 0s; raw log: `docs/release/run-logs/02-bun-run-lint.log`
+Exit code: `0`; duration: 0s; raw log intentionally omitted from the repository
 ```text
 $ biome check .
 Checked 144 files in 80ms. No fixes applied.
 ```
 
 ### `bun test`
-Exit code: `0`; duration: 18s; raw log: `docs/release/run-logs/03-bun-test.log`
+Exit code: `0`; duration: 18s; raw log intentionally omitted from the repository
 ```text
 packages/core/src/sync/lock-recovery.test.ts:
 (pass) releaseStaleGlobalLock: removes lock when run is not running [1.40ms]
@@ -234,7 +234,7 @@ Ran 109 tests across 24 files. [18.05s]
 ```
 
 ### `bun run test:e2e`
-Exit code: `0`; duration: 34s; raw log: `docs/release/run-logs/04-bun-run-test-e2e.log`
+Exit code: `0`; duration: 34s; raw log intentionally omitted from the repository
 ```text
 (pass) list json parses [311.69ms]
 
@@ -259,7 +259,7 @@ Ran 87 tests across 16 files. [33.70s]
 ```
 
 ### `bun run test:integration`
-Exit code: `0`; duration: 1s; raw log: `docs/release/run-logs/05-bun-run-test-integration.log`
+Exit code: `0`; duration: 1s; raw log intentionally omitted from the repository
 ```text
 
 packages/adapters/src/google-mailbox/sync.integration.test.ts:
@@ -284,7 +284,7 @@ Ran 32 tests across 5 files. [1242.00ms]
 ```
 
 ### `bash scripts/verify/ci.sh`
-Exit code: `0`; duration: 58s; raw log: `docs/release/run-logs/06-bash-scripts-verify-ci.sh.log`
+Exit code: `0`; duration: 58s; raw log intentionally omitted from the repository
 ```text
 packages/adapters/src/registry.contract.test.ts:
 (pass) CTXINDEX_ADAPTER_REGISTRY > contains exactly the bundled v1 adapters
@@ -309,7 +309,7 @@ ci: all checks passed
 ```
 
 ### `bash scripts/verify/bun-link.sh`
-Exit code: `0`; duration: 0s; raw log: `docs/release/run-logs/07-bash-scripts-verify-bun-link.sh.log`
+Exit code: `0`; duration: 0s; raw log intentionally omitted from the repository
 ```text
 bun-link: dependencies already installed; skipping bun install
 bun-link: registering @ctxindex/cli with bun link
@@ -334,13 +334,13 @@ bun-link: verified linked ctxindex binary at /var/folders/jy/098pldf54rj47nxsdhy
 ```
 
 ### `bash scripts/verify/env-loader.sh`
-Exit code: `0`; duration: 0s; raw log: `docs/release/run-logs/08-bash-scripts-verify-env-loader.sh.log`
+Exit code: `0`; duration: 0s; raw log intentionally omitted from the repository
 ```text
 VAL-ENV-LOADER: no direct CTXINDEX_/XDG_ process.env reads outside env-loader; synthetic check caught direct reads.
 ```
 
 ### `bash scripts/verify/network-egress.sh`
-Exit code: `0`; duration: 1s; raw log: `docs/release/run-logs/09-bash-scripts-verify-network-egress.sh.log`
+Exit code: `0`; duration: 1s; raw log intentionally omitted from the repository
 ```text
 
 packages/adapters/src/network-egress.integration.test.ts:
@@ -365,7 +365,7 @@ VAL-NETWORK-EGRESS: static audit, runtime interceptor, and e2e passed
 ```
 
 ### `bash scripts/verify/no-prompts-static.sh`
-Exit code: `0`; duration: 0s; raw log: `docs/release/run-logs/10-bash-scripts-verify-no-prompts-static.sh.log`
+Exit code: `0`; duration: 0s; raw log intentionally omitted from the repository
 ```text
 no interactive prompt imports or stdin reads found
 ```
@@ -409,10 +409,7 @@ Overall e2e lane summary: `87 pass`, `0 fail`, `627 expect() calls`.
 
 ## 6. File inventory
 
-Two views were captured:
-
-- `git diff --name-status main..HEAD` at `docs/release/run-logs/git-diff-name-status.txt` for committed branch shape against `main`.
-- `git status --short` at `docs/release/run-logs/git-status-short.txt` for current worktree shape, including uncommitted v1 files and this report directory.
+The raw `git diff` and `git status` snapshots are intentionally omitted from the repository.
 
 ### Current worktree status excerpt
 
