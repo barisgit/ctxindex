@@ -17,3 +17,4 @@ build/
 .pi/
 .charters/
 docs/release/run-logs/
+.operator-artifacts/
