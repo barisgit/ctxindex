@@ -176,7 +176,15 @@ export function normalizeGoogleCalendarEvent(
   }
 
   const event = parsed.data
-  if (event.eventType !== undefined && event.eventType !== 'default') {
+  // 'birthday' is a normal all-day recurring instance plus birthdayProperties,
+  // which carries no Profile-relevant data; map it like 'default'. Other
+  // variants (fromGmail duplicates mailbox context; workingLocation is
+  // presence metadata) stay intentionally unindexed.
+  if (
+    event.eventType !== undefined &&
+    event.eventType !== 'default' &&
+    event.eventType !== 'birthday'
+  ) {
     return {
       providerEventId: event.id,
       warnings: [

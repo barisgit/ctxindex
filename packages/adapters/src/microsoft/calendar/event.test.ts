@@ -90,7 +90,51 @@ describe('Microsoft Calendar event normalization', () => {
     })
   })
 
-  test('warns instead of guessing an all-day series date for an unsupported provider zone', () => {
+  test('treats explicit Graph nulls on optional fields as absent (live evidence shape)', () => {
+    const result = normalizeMicrosoftCalendarEvent(
+      {
+        id: 'single-instance-nulls',
+        type: 'singleInstance',
+        subject: 'Standup',
+        bodyPreview: 'Daily sync',
+        body: { contentType: 'html', content: '<p>Daily sync</p>' },
+        isAllDay: false,
+        start: { dateTime: '2025-09-11T08:00:00.0000000', timeZone: 'UTC' },
+        end: { dateTime: '2025-09-11T08:30:00.0000000', timeZone: 'UTC' },
+        seriesMasterId: null,
+        recurrence: null,
+        occurrenceId: null,
+        originalStart: null,
+        originalStartTimeZone: 'Greenwich Standard Time',
+        originalEndTimeZone: null,
+        organizer: null,
+        attendees: null,
+        location: { displayName: null },
+        isCancelled: false,
+        showAs: null,
+        webLink: null,
+        createdDateTime: null,
+        lastModifiedDateTime: '2025-09-10T12:00:00Z',
+      },
+      sourceId,
+      'default',
+    )
+    expect(result.warnings).toEqual([])
+    expect(result.resource?.payload).toMatchObject({
+      provider: 'microsoft',
+      providerEventId: 'single-instance-nulls',
+      timing: {
+        kind: 'timed',
+        start: '2025-09-11T08:00:00.000Z',
+        end: '2025-09-11T08:30:00.000Z',
+      },
+      title: 'Standup',
+      status: 'confirmed',
+    })
+    expect(result.resource?.payload).not.toHaveProperty('series')
+  })
+
+  test('resolves an all-day series date through a Windows provider zone', () => {
     const result = normalizeMicrosoftCalendarEvent(
       {
         id: 'all-day-windows-zone',
@@ -106,6 +150,94 @@ describe('Microsoft Calendar event normalization', () => {
         seriesMasterId: 'all-day-series',
         originalStart: '2026-07-13T07:00:00Z',
         originalStartTimeZone: 'Pacific Standard Time',
+      },
+      sourceId,
+      'team',
+    )
+    expect(result.warnings).toEqual([])
+    expect(result.resource?.payload).toMatchObject({
+      series: {
+        providerEventId: 'all-day-series',
+        originalStart: { kind: 'all-day', date: '2026-07-13' },
+      },
+    })
+  })
+
+  test('resolves a timed occurrence start through a Windows provider zone', () => {
+    const result = normalizeMicrosoftCalendarEvent(
+      {
+        id: 'timed-windows-zone',
+        isAllDay: false,
+        start: {
+          dateTime: '2026-07-13T09:00:00.0000000',
+          timeZone: 'UTC',
+        },
+        end: {
+          dateTime: '2026-07-13T10:00:00.0000000',
+          timeZone: 'UTC',
+        },
+        seriesMasterId: 'timed-series',
+        originalStart: '2026-07-13T02:00:00.0000000',
+        originalStartTimeZone: 'Pacific Standard Time',
+      },
+      sourceId,
+      'team',
+    )
+    expect(result.warnings).toEqual([])
+    expect(result.resource?.payload).toMatchObject({
+      series: {
+        providerEventId: 'timed-series',
+        originalStart: {
+          kind: 'timed',
+          at: '2026-07-13T09:00:00.000Z',
+          timeZone: 'America/Los_Angeles',
+        },
+      },
+    })
+  })
+
+  test('warns instead of resolving a nonexistent local occurrence start (DST gap)', () => {
+    const result = normalizeMicrosoftCalendarEvent(
+      {
+        id: 'dst-gap-occurrence',
+        isAllDay: false,
+        start: {
+          dateTime: '2026-03-08T10:30:00.0000000',
+          timeZone: 'UTC',
+        },
+        end: {
+          dateTime: '2026-03-08T11:30:00.0000000',
+          timeZone: 'UTC',
+        },
+        seriesMasterId: 'timed-series',
+        originalStart: '2026-03-08T02:30:00.0000000',
+        originalStartTimeZone: 'Pacific Standard Time',
+      },
+      sourceId,
+      'team',
+    )
+    expect(result.resource?.payload).not.toHaveProperty('series')
+    expect(result.warnings.map(({ code }) => code)).toEqual([
+      'microsoft_calendar_unresolved_series_start',
+    ])
+  })
+
+  test('warns instead of guessing an all-day series date for an unresolvable provider zone', () => {
+    const result = normalizeMicrosoftCalendarEvent(
+      {
+        id: 'all-day-unknown-zone',
+        isAllDay: true,
+        start: {
+          dateTime: '2026-07-13T00:00:00.0000000',
+          timeZone: 'Definitely Not A Zone',
+        },
+        end: {
+          dateTime: '2026-07-14T00:00:00.0000000',
+          timeZone: 'Definitely Not A Zone',
+        },
+        seriesMasterId: 'all-day-series',
+        originalStart: '2026-07-13T07:00:00Z',
+        originalStartTimeZone: 'Definitely Not A Zone',
       },
       sourceId,
       'team',

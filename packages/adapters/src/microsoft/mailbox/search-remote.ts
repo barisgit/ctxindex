@@ -9,6 +9,7 @@ import {
   graphHeaders,
   graphJson,
   graphUrl,
+  IMMUTABLE_ID_PREFERENCE,
   validateGraphNextLink,
 } from './transport'
 
@@ -120,7 +121,9 @@ export async function microsoftMailboxSearchRemote(
     const response = pageSchema.safeParse(
       await graphJson(
         await context.fetch(next, {
-          headers: graphHeaders(),
+          // Immutable-id opt-in must hold on every page fetch so emitted
+          // Refs stay stable; keep it explicit rather than a default.
+          headers: graphHeaders(IMMUTABLE_ID_PREFERENCE),
           signal: context.signal,
         }),
       ),

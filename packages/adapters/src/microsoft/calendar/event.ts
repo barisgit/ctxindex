@@ -2,14 +2,22 @@ import type { SyncedResource } from '@ctxindex/extension-sdk'
 import { calendarEventRef, calendarEventSchema } from '@ctxindex/profiles'
 import { parseHTML } from 'linkedom'
 import { z } from 'zod'
+import { resolveTimeZone } from './windows-zones'
+
+// Graph serializes absent optional fields as explicit null; treat null as absent.
+function absentable<Schema extends z.ZodTypeAny>(schema: Schema) {
+  return schema
+    .nullish()
+    .transform((value) => (value === null ? undefined : value))
+}
 
 const dateTimeZoneSchema = z
   .object({ dateTime: z.string().min(1), timeZone: z.string().min(1) })
   .passthrough()
 const emailAddressSchema = z
   .object({
-    name: z.string().min(1).optional(),
-    address: z.string().min(1).optional(),
+    name: absentable(z.string().min(1)),
+    address: absentable(z.string().min(1)),
   })
   .passthrough()
 const participantSchema = z
@@ -17,10 +25,7 @@ const participantSchema = z
   .passthrough()
 const attendeeSchema = participantSchema
   .extend({
-    status: z
-      .object({ response: z.string().min(1) })
-      .passthrough()
-      .optional(),
+    status: absentable(z.object({ response: z.string().min(1) }).passthrough()),
   })
   .passthrough()
 
@@ -31,34 +36,34 @@ export const microsoftCalendarEventSchema = z
       .object({ reason: z.string().optional() })
       .passthrough()
       .optional(),
-    subject: z.string().optional(),
-    body: z
-      .object({
-        contentType: z.string().optional(),
-        content: z.string().optional(),
-      })
-      .passthrough()
-      .optional(),
-    bodyPreview: z.string().optional(),
-    location: z
-      .object({ displayName: z.string().optional() })
-      .passthrough()
-      .optional(),
-    start: dateTimeZoneSchema.optional(),
-    end: dateTimeZoneSchema.optional(),
-    isAllDay: z.boolean().optional(),
-    originalStartTimeZone: z.string().min(1).optional(),
-    originalEndTimeZone: z.string().min(1).optional(),
-    organizer: participantSchema.optional(),
-    attendees: z.array(attendeeSchema).optional(),
-    isCancelled: z.boolean().optional(),
-    showAs: z.string().optional(),
+    subject: absentable(z.string()),
+    body: absentable(
+      z
+        .object({
+          contentType: absentable(z.string()),
+          content: absentable(z.string()),
+        })
+        .passthrough(),
+    ),
+    bodyPreview: absentable(z.string()),
+    location: absentable(
+      z.object({ displayName: absentable(z.string()) }).passthrough(),
+    ),
+    start: absentable(dateTimeZoneSchema),
+    end: absentable(dateTimeZoneSchema),
+    isAllDay: absentable(z.boolean()),
+    originalStartTimeZone: absentable(z.string().min(1)),
+    originalEndTimeZone: absentable(z.string().min(1)),
+    organizer: absentable(participantSchema),
+    attendees: absentable(z.array(attendeeSchema)),
+    isCancelled: absentable(z.boolean()),
+    showAs: absentable(z.string()),
     recurrence: z.unknown().optional(),
-    seriesMasterId: z.string().min(1).optional(),
-    originalStart: z.string().min(1).optional(),
-    webLink: z.string().optional(),
-    createdDateTime: z.string().optional(),
-    lastModifiedDateTime: z.string().optional(),
+    seriesMasterId: absentable(z.string().min(1)),
+    originalStart: absentable(z.string().min(1)),
+    webLink: absentable(z.string()),
+    createdDateTime: absentable(z.string()),
+    lastModifiedDateTime: absentable(z.string()),
   })
   .passthrough()
 
@@ -101,6 +106,53 @@ function instant(value: string | undefined, zone = 'UTC'): string | undefined {
   const ms = Date.parse(normalized)
   return Number.isNaN(ms) ? undefined : new Date(ms).toISOString()
 }
+function zoneOffsetMs(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(date)
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((candidate) => candidate.type === type)?.value)
+  const asUtc = Date.UTC(
+    part('year'),
+    part('month') - 1,
+    part('day'),
+    part('hour') % 24,
+    part('minute'),
+    part('second'),
+  )
+  return asUtc - date.getTime()
+}
+// Convert a Graph datetime to a UTC instant using a resolved IANA zone for
+// offset-less local wall times. Returns undefined when neither an explicit
+// offset nor a resolvable zone is available.
+function instantInZone(
+  value: string | undefined,
+  zone: string | undefined,
+): string | undefined {
+  if (!value) return undefined
+  if (/(?:Z|[+-]\d\d:\d\d)$/.test(value)) return instant(value)
+  if (!zone) return undefined
+  const wall = Date.parse(`${value.replace(/\.(\d{3})\d+$/, '.$1')}Z`)
+  if (Number.isNaN(wall)) return undefined
+  try {
+    const guess = wall - zoneOffsetMs(new Date(wall), zone)
+    const exact = wall - zoneOffsetMs(new Date(guess), zone)
+    // A nonexistent local time (DST spring-forward gap) never round-trips to
+    // the requested wall time; refuse to guess an instant for it.
+    if (exact + zoneOffsetMs(new Date(exact), zone) !== wall) return undefined
+    return new Date(exact).toISOString()
+  } catch {
+    return undefined
+  }
+}
+
 function dateInTimeZone(
   value: string | undefined,
   timeZone: string | undefined,
@@ -355,23 +407,20 @@ export function normalizeMicrosoftCalendarEvent(
         ref,
       ),
     )
+  const originalZone = resolveTimeZone(
+    event.originalStartTimeZone ?? event.start?.timeZone,
+  )
   const originalInstant = event.isAllDay
     ? undefined
-    : instant(
-        event.originalStart,
-        event.originalStartTimeZone ?? event.start?.timeZone,
-      )
+    : instantInZone(event.originalStart, originalZone)
   const originalDate = event.isAllDay
-    ? dateInTimeZone(
-        event.originalStart,
-        event.originalStartTimeZone ?? event.start?.timeZone,
-      )
+    ? dateInTimeZone(event.originalStart, originalZone)
     : undefined
   if (event.seriesMasterId && !originalInstant && !originalDate)
     warnings.push(
       warning(
         'microsoft_calendar_unresolved_series_start',
-        `Microsoft Calendar event ${providerEventId} had an occurrence start whose provider time zone could not be resolved; series identity was omitted.`,
+        `Microsoft Calendar event ${providerEventId} had an occurrence start that could not be resolved to a valid instant in its provider time zone; series identity was omitted.`,
         ref,
       ),
     )
@@ -410,8 +459,8 @@ export function normalizeMicrosoftCalendarEvent(
               : {
                   kind: 'timed' as const,
                   at: originalInstant,
-                  ...(event.originalStartTimeZone
-                    ? { timeZone: event.originalStartTimeZone }
+                  ...(event.originalStartTimeZone && originalZone
+                    ? { timeZone: originalZone }
                     : {}),
                 },
           },
