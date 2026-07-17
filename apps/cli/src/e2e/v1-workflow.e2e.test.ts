@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createSandbox, type Sandbox } from '@ctxindex/core/testing'
 import { type MockGmailRecordedRequest, startMockGmail } from './_mock-gmail'
+import { installLoopbackBrowser } from './_oauth-account'
 
 const createDraftAction = 'communication.message.draft.create'
 const updateDraftAction = 'communication.message.draft.update'
@@ -61,9 +62,12 @@ test('real binary proves the isolated complete V1 workflow', async () => {
       },
     ],
   })
-  const env = mock.env(sandbox)
-
   try {
+    const bin = await installLoopbackBrowser(sandbox.dir)
+    const env = mock.env(sandbox, {
+      PATH: `${bin}:${process.env.PATH ?? ''}`,
+      CTXINDEX_LOOPBACK_TIMEOUT_SECS: '5',
+    })
     const root = join(sandbox.dir, 'local-directory')
     await mkdir(root, { recursive: true })
     await writeFile(join(root, 'workflow.txt'), 'local workflow needle only\n')
@@ -72,16 +76,31 @@ test('real binary proves the isolated complete V1 workflow', async () => {
     await addRealm(sandbox, 'mail')
     await addRealm(sandbox, 'files')
 
-    const auth = await sandbox.run(
-      ['auth', 'add', 'google', '--adapter', 'google.mailbox', '--from-env'],
+    const client = await sandbox.run(
+      ['client', 'add', 'google', '--from-env'],
       { env },
     )
-    expect(auth.exitCode, auth.stderr).toBe(0)
+    expect(client.exitCode, client.stderr).toBe(0)
+    const account = await sandbox.run(
+      ['account', 'add', 'google', '--label', 'workflow-google'],
+      { env },
+    )
+    expect(account.exitCode, account.stderr).toBe(0)
 
     const gmailSource = parseSourceId(
       (
         await sandbox.run(
-          ['source', 'add', '--adapter', 'google.mailbox', '--realm', 'mail'],
+          [
+            'source',
+            'add',
+            'google.mailbox',
+            '--realm',
+            'mail',
+            '--account',
+            'workflow-google',
+            '--label',
+            'workflow-mail',
+          ],
           { env },
         )
       ).stdout,
@@ -95,6 +114,8 @@ test('real binary proves the isolated complete V1 workflow', async () => {
             'local.directory',
             '--realm',
             'files',
+            '--label',
+            'workflow-files',
             '--config-root-path',
             root,
           ],
@@ -105,7 +126,9 @@ test('real binary proves the isolated complete V1 workflow', async () => {
     expect(gmailSource).not.toBe(localSource)
 
     const synced = jsonOutput(
-      await sandbox.run(['sync', '--source', localSource, '--json'], { env }),
+      await sandbox.run(['sync', '--source', 'workflow-files', '--json'], {
+        env,
+      }),
     ) as { results: { sourceId: string; status: string }[] }
     expect(synced.results).toEqual([
       expect.objectContaining({ sourceId: localSource, status: 'completed' }),
@@ -395,7 +418,7 @@ test('real binary proves the isolated complete V1 workflow', async () => {
         'run',
         createDraftAction,
         '--source',
-        gmailSource,
+        'workflow-mail',
         '--input',
         JSON.stringify(createInput),
         '--json',
@@ -432,7 +455,7 @@ test('real binary proves the isolated complete V1 workflow', async () => {
         'run',
         updateDraftAction,
         '--source',
-        gmailSource,
+        'workflow-mail',
         '--input',
         JSON.stringify(updateInput),
         '--json',

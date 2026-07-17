@@ -15,17 +15,18 @@ import type {
 
 interface AccountIdRow {
   readonly id: string
+  readonly label: string
 }
 
 interface InventoryRow {
   readonly accountId: string
   readonly provider: string
-  readonly label: string | null
+  readonly label: string
   readonly grantId: string | null
   readonly scopesJson: string | null
   readonly expiresAt: number | null
   readonly sourceId: string | null
-  readonly displayName: string | null
+  readonly sourceLabel: string | null
   readonly adapterId: string | null
   readonly adapterVersion: number | null
   readonly realmId: string | null
@@ -67,6 +68,12 @@ function assertValidUpsertInput(input: UpsertAccountInput): void {
     throw new CtxindexValidationError(
       'invalid_account_identity',
       'Account external user id must be nonempty',
+    )
+  }
+  if (input.label !== undefined && !isNonemptyString(input.label)) {
+    throw new CtxindexValidationError(
+      'invalid_account_identity',
+      'Account label must be nonempty',
     )
   }
   if (
@@ -134,34 +141,53 @@ export function createAccountService(deps: AccountServiceDeps): AccountService {
       const timestamp = now()
 
       return deps.db.transaction(() => {
-        deps.db
+        let account = deps.db
           .prepare(
-            `INSERT OR IGNORE INTO accounts
-               (id, provider, label, external_user_id, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-          )
-          .run(
-            ulid(timestamp),
-            input.provider,
-            input.label ?? null,
-            input.externalUserId,
-            timestamp,
-            timestamp,
-          )
-
-        const account = deps.db
-          .prepare(
-            'SELECT id FROM accounts WHERE provider = ? AND external_user_id = ?',
+            'SELECT id, label FROM accounts WHERE provider = ? AND external_user_id = ?',
           )
           .get(input.provider, input.externalUserId) as AccountIdRow | null
-        if (!account) throw new Error('Account upsert failed')
+        const label = input.label ?? account?.label
+        if (label === undefined) {
+          throw new CtxindexValidationError(
+            'invalid_account_identity',
+            'Account label must be supplied for a new Account',
+          )
+        }
+        const conflict = deps.db
+          .prepare('SELECT id FROM accounts WHERE label = ? AND id != ?')
+          .get(label, account?.id ?? '') as { readonly id: string } | null
+        if (conflict) {
+          throw new CtxindexValidationError(
+            'invalid_filter',
+            `Account label "${label}" is already taken; choose another with --label`,
+          )
+        }
+
+        if (!account) {
+          const accountId = ulid(timestamp)
+          deps.db
+            .prepare(
+              `INSERT INTO accounts
+                 (id, provider, label, external_user_id, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?)`,
+            )
+            .run(
+              accountId,
+              input.provider,
+              label,
+              input.externalUserId,
+              timestamp,
+              timestamp,
+            )
+          account = { id: accountId, label }
+        }
 
         if (input.label !== undefined) {
           deps.db
             .prepare(
               'UPDATE accounts SET label = ?, updated_at = ? WHERE id = ?',
             )
-            .run(input.label ?? null, timestamp, account.id)
+            .run(input.label, timestamp, account.id)
         }
 
         const insertIdentity = deps.db.prepare(
@@ -194,7 +220,7 @@ export function createAccountService(deps: AccountServiceDeps): AccountService {
              g.scopes_json AS scopesJson,
              g.expires_at AS expiresAt,
              s.id AS sourceId,
-             s.display_name AS displayName,
+             s.label AS sourceLabel,
              s.adapter_id AS adapterId,
              s.adapter_version AS adapterVersion,
              r.id AS realmId,
@@ -237,16 +263,18 @@ export function createAccountService(deps: AccountServiceDeps): AccountService {
         }
         if (
           row.sourceId === null ||
+          row.sourceLabel === null ||
           row.adapterId === null ||
           row.adapterVersion === null ||
           row.realmId === null ||
-          row.realmSlug === null
+          row.realmSlug === null ||
+          row.realmLabel === null
         ) {
           continue
         }
         const source: AccountInventorySource = {
           id: row.sourceId,
-          displayName: row.displayName,
+          label: row.sourceLabel,
           adapter: { id: row.adapterId, version: row.adapterVersion },
           realm: {
             id: row.realmId,

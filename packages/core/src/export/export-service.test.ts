@@ -35,9 +35,9 @@ async function freshDb(): Promise<Database> {
   ).run()
   db.prepare(
     `INSERT INTO sources
-       (id, realm_id, adapter_id, adapter_version, config_json, sync_enabled, created_at, updated_at)
-     VALUES (?, 'realm-1', 'fake.export', 1, '{}', 1, 1, 1)`,
-  ).run(sourceId)
+       (id, realm_id, adapter_id, adapter_version, label, config_json, sync_enabled, created_at, updated_at)
+     VALUES (?, 'realm-1', 'fake.export', 1, ?, '{}', 1, 1, 1)`,
+  ).run(sourceId, sourceId)
   return db
 }
 

@@ -21,6 +21,7 @@ import {
   type MockGraphMessage,
   startMockGraph,
 } from './_mock-graph'
+import { installLoopbackBrowser } from './_oauth-account'
 
 const repoRoot = new URL('../../../../', import.meta.url).pathname
 const createDraft = 'communication.message.draft.create'
@@ -187,6 +188,7 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
     await chmod(relocatedPath, 0o755)
     await rm(join(dir, 'build'), { recursive: true })
 
+    const bin = await installLoopbackBrowser(dir)
     const baseEnv = {
       ...graph.env(
         sandbox,
@@ -202,6 +204,8 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
         ),
       ),
       CTXINDEX_OAUTH_MOCK_BASE_URL: graph.baseUrl,
+      CTXINDEX_LOOPBACK_TIMEOUT_SECS: '5',
+      PATH: `${bin}:${process.env.PATH ?? ''}`,
     }
     const run = async (
       args: string[],
@@ -235,42 +239,20 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
     await ok(['realm', 'add', 'work'])
     await ok(['realm', 'add', 'files'])
 
+    await ok(['client', 'add', 'google', '--from-env'])
+    await ok(['client', 'add', 'microsoft', '--from-env'])
+    await ok(['account', 'add', 'google', '--label', 'personal'], {
+      ...baseEnv,
+      ...personalGmail.env(sandbox),
+      CTXINDEX_GOOGLE_CALENDAR_MOCK_BASE_URL: googleCalendar.baseUrl,
+    })
+    await ok(['account', 'add', 'google', '--label', 'work'], {
+      ...baseEnv,
+      ...workGmail.env(sandbox),
+      CTXINDEX_GOOGLE_CALENDAR_MOCK_BASE_URL: googleCalendar.baseUrl,
+    })
     await ok(
-      [
-        'auth',
-        'add',
-        'google',
-        '--adapter',
-        'google.mailbox',
-        '--adapter',
-        'google.calendar',
-        '--from-env',
-      ],
-      {
-        ...baseEnv,
-        ...personalGmail.env(sandbox),
-        CTXINDEX_GOOGLE_CALENDAR_MOCK_BASE_URL: googleCalendar.baseUrl,
-      },
-    )
-    await ok(
-      ['auth', 'add', 'google', '--adapter', 'google.mailbox', '--from-env'],
-      {
-        ...baseEnv,
-        ...workGmail.env(sandbox),
-        CTXINDEX_GOOGLE_CALENDAR_MOCK_BASE_URL: googleCalendar.baseUrl,
-      },
-    )
-    await ok(
-      [
-        'auth',
-        'add',
-        'microsoft',
-        '--adapter',
-        'microsoft.mailbox',
-        '--adapter',
-        'microsoft.calendar',
-        '--from-env',
-      ],
+      ['account', 'add', 'microsoft', '--label', 'microsoft-work'],
       baseEnv,
     )
 
@@ -278,12 +260,11 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
     const database = new Database(dataPath, { readonly: true })
     const grants = database
       .query(
-        `SELECT g.id, a.provider, a.external_user_id, g.scopes_json
+        `SELECT a.provider, a.external_user_id, g.scopes_json
          FROM grants g JOIN accounts a ON a.id = g.account_id
          ORDER BY a.provider, a.external_user_id`,
       )
       .all() as {
-      id: string
       provider: string
       external_user_id: string
       scopes_json: string
@@ -305,64 +286,67 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
       ],
       [
         'email',
+        'https://www.googleapis.com/auth/calendar.events.readonly',
         'https://www.googleapis.com/auth/gmail.compose',
         'https://www.googleapis.com/auth/gmail.readonly',
         'openid',
       ],
       ['Calendars.Read', 'Mail.ReadWrite', 'User.Read'],
     ])
-    const grantFor = (subject: string) =>
-      grants.find(({ external_user_id }) => external_user_id === subject)?.id ??
-      ''
 
     const addSource = async (args: string[]) =>
       parseSourceId((await ok(['source', 'add', ...args])).stdout)
+    const personalMailLabel = 'personal-mail'
     const personalMail = await addSource([
       'google.mailbox',
       '--realm',
       'personal',
       '--account',
-      grantFor('google-personal-subject-canary'),
-      '--name',
-      'Personal Gmail',
+      'personal',
+      '--label',
+      personalMailLabel,
     ])
+    const personalCalendarLabel = 'personal-calendar'
     const personalCalendar = await addSource([
       'google.calendar',
       '--realm',
       'personal',
       '--account',
-      grantFor('google-personal-subject-canary'),
-      '--name',
-      'Personal Google Calendar',
+      'personal',
+      '--label',
+      personalCalendarLabel,
       '--config-calendar-id',
       'personal@example.test',
     ])
+    const workGmailLabel = 'work-gmail'
     const workGmailSource = await addSource([
       'google.mailbox',
       '--realm',
       'work',
       '--account',
-      grantFor('google-work-subject-canary'),
-      '--name',
-      'Work Gmail',
+      'work',
+      '--label',
+      workGmailLabel,
     ])
+    const workOutlookLabel = 'work-outlook'
     const workOutlook = await addSource([
       'microsoft.mailbox',
       '--realm',
       'work',
       '--account',
-      grantFor('microsoft-work-subject'),
-      '--name',
-      'Work Outlook',
+      'microsoft-work',
+      '--label',
+      workOutlookLabel,
     ])
+    const workCalendarLabel = 'work-calendar'
     const workCalendar = await addSource([
       'microsoft.calendar',
       '--realm',
       'work',
       '--account',
-      grantFor('microsoft-work-subject'),
-      '--name',
-      'Work Microsoft Calendar',
+      'microsoft-work',
+      '--label',
+      workCalendarLabel,
       '--config-calendar-id',
       'work/calendar',
     ])
@@ -372,12 +356,13 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
       join(fixtureRoot, 'workflow.txt'),
       'Shared workflow local file fixture.\n',
     )
+    const localSourceLabel = 'local-fixture'
     const localSource = await addSource([
       'local.directory',
       '--realm',
       'files',
-      '--name',
-      'Local Fixture',
+      '--label',
+      localSourceLabel,
       '--config-root-path',
       fixtureRoot,
     ])
@@ -388,34 +373,23 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
     )
     const accounts = deterministicJson(accountsResult.stdout) as {
       provider: string
+      label: string
       grants: {
         scopes: string[]
-        sources: { id: string; realm: { slug: string } }[]
       }[]
     }[]
     expect(accounts).toHaveLength(3)
+    expect(accounts.map(({ label }) => label)).toEqual([
+      'personal',
+      'work',
+      'microsoft-work',
+    ])
     expect(accounts.flatMap(({ grants: nested }) => nested)).toHaveLength(3)
     expect(
       accounts.flatMap(({ grants: nested }) =>
         nested.map(({ scopes }) => scopes),
       ),
     ).toEqual(grants.map(({ scopes_json }) => JSON.parse(scopes_json)))
-    expect(
-      accounts.flatMap(({ grants: nested }) =>
-        nested.flatMap(({ sources }) => sources.map(({ id }) => id)),
-      ),
-    ).toEqual([
-      personalMail,
-      personalCalendar,
-      workGmailSource,
-      workOutlook,
-      workCalendar,
-    ])
-    expect(
-      accounts.flatMap(({ grants: nested }) =>
-        nested.flatMap(({ sources }) => sources.map(({ realm }) => realm.slug)),
-      ),
-    ).toEqual(['personal', 'personal', 'work', 'work', 'work'])
     for (const canary of [
       'google-personal-subject-canary',
       'google-work-subject-canary',
@@ -433,6 +407,7 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
     )
     const sources = deterministicJson(sourcesResult.stdout) as {
       id: string
+      label: string
       grantId: string | null
       realmSlug: string
     }[]
@@ -447,9 +422,23 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
         localSource,
       ]),
     )
+    expect(new Set(sources.map(({ label }) => label))).toEqual(
+      new Set([
+        personalMailLabel,
+        personalCalendarLabel,
+        workGmailLabel,
+        workOutlookLabel,
+        workCalendarLabel,
+        localSourceLabel,
+      ]),
+    )
     expect(sources.find(({ id }) => id === localSource)?.grantId).toBeNull()
 
-    for (const source of [personalCalendar, workCalendar, localSource]) {
+    for (const source of [
+      personalCalendarLabel,
+      workCalendarLabel,
+      localSourceLabel,
+    ]) {
       deterministicJson(
         (await ok(['sync', '--source', source, '--json'])).stdout,
       )
@@ -634,7 +623,7 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
       'run',
       createDraft,
       '--source',
-      workOutlook,
+      workOutlookLabel,
       '--input',
       '{not-json',
       '--json',
@@ -645,7 +634,7 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
       'run',
       createDraft,
       '--source',
-      personalMail,
+      personalMailLabel,
       '--input',
       JSON.stringify({
         to: ['victim@example.test\r\nBcc: injected@example.test'],
@@ -719,8 +708,8 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
         bodyText: `${provider} replacement body`,
       })
     }
-    await runDraftPair(personalMail, 'gmail')
-    await runDraftPair(workOutlook, 'outlook')
+    await runDraftPair(personalMailLabel, 'gmail')
+    await runDraftPair(workOutlookLabel, 'outlook')
 
     const requestsBeforeUnknown =
       workGmail.readRecordedRequests().length + graph.readRequests().length
@@ -729,7 +718,7 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
       'run',
       'communication.message.draft.send',
       '--source',
-      workOutlook,
+      workOutlookLabel,
       '--input',
       '{}',
       '--json',

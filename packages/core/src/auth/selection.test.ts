@@ -53,88 +53,46 @@ function nonOAuthAdapter(id: string) {
   })
 }
 
-function registry(adapters: readonly ReturnType<typeof adapter>[]) {
+function registry(adapters: Parameters<typeof createAdapterRegistry>[1]) {
   return createAdapterRegistry(createProfileRegistry([]), adapters)
 }
 
 describe('selectedOAuthScopes', () => {
-  test('returns deduplicated provider base scopes plus only selected Adapter scopes', () => {
+  test('returns deduplicated provider base scopes plus all loaded provider Adapter scopes', () => {
     const loaded = registry([
       adapter('google.mailbox'),
       adapter('google.calendar', googleProvider, ['calendar']),
+      adapter('microsoft.mailbox', microsoftProvider, ['microsoft.mail']),
     ])
 
-    expect(selectedOAuthScopes(loaded, 'google', ['google.mailbox'])).toEqual([
+    expect(selectedOAuthScopes(loaded, 'google')).toEqual([
+      'calendar',
       'mail',
       'openid',
       'shared',
     ])
   })
 
-  test.each([
-    ['empty', registry([adapter('google.mailbox')]), 'google', []],
-    [
-      'duplicate',
-      registry([adapter('google.mailbox')]),
-      'google',
-      ['google.mailbox', 'google.mailbox'],
-    ],
-    [
-      'unknown provider',
-      registry([adapter('google.mailbox')]),
-      'missing',
-      ['google.mailbox'],
-    ],
-    [
-      'unknown Adapter',
-      registry([adapter('google.mailbox')]),
-      'google',
-      ['missing'],
-    ],
-    [
-      'ambiguous Adapter version',
-      registry([
-        adapter('google.mailbox'),
-        adapter('google.mailbox', googleProvider, ['mail'], 2),
-      ]),
-      'google',
-      ['google.mailbox'],
-    ],
-    [
-      'mixed provider',
-      registry([
-        adapter('google.mailbox'),
-        adapter('microsoft.mailbox', microsoftProvider),
-      ]),
-      'google',
-      ['google.mailbox', 'microsoft.mailbox'],
-    ],
-    [
-      'non-OAuth Adapter',
-      createAdapterRegistry(createProfileRegistry([]), [
-        adapter('google.mailbox'),
-        nonOAuthAdapter('local.directory'),
-      ]),
-      'google',
-      ['local.directory'],
-    ],
-  ] as const)('rejects %s selection with a validation error', (_name, loaded, provider, adapterIds) => {
-    expect(() => selectedOAuthScopes(loaded, provider, adapterIds)).toThrow()
+  test('rejects an unknown provider with a validation error', () => {
+    const loaded = registry([adapter('google.mailbox')])
+    expect(() => selectedOAuthScopes(loaded, 'missing')).toThrow()
     try {
-      selectedOAuthScopes(loaded, provider, adapterIds)
+      selectedOAuthScopes(loaded, 'missing')
     } catch (error) {
       expect(error).toMatchObject({ code: 'invalid_oauth_selection' })
     }
   })
 })
 
-test('resolveOAuthSelection returns provider and separates selected operation scopes from requested scopes', () => {
+test('resolveOAuthSelection returns provider and separates all operation scopes from requested scopes', () => {
   const loaded = registry([
     adapter('google.mailbox', googleProvider, ['shared', 'mail.read']),
+    adapter('google.calendar', googleProvider, ['calendar.read']),
+    nonOAuthAdapter('local.directory'),
   ])
-  expect(resolveOAuthSelection(loaded, 'google', ['google.mailbox'])).toEqual({
+  expect(resolveOAuthSelection(loaded, 'google')).toEqual({
     provider: googleProvider,
-    operationScopes: ['mail.read', 'shared'],
-    requestedScopes: ['mail.read', 'openid', 'shared'],
+    operationScopes: ['calendar.read', 'mail.read', 'shared'],
+    requestedScopes: ['calendar.read', 'mail.read', 'openid', 'shared'],
   })
 })

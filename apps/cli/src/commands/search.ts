@@ -20,12 +20,18 @@ export async function handleSearchCommand(args: string[]): Promise<number> {
 
   const deps = await openDeps()
   try {
+    const sourceIds = parsed.input.sourceIds?.map((source) =>
+      deps.sourceService.resolveSourceId(source),
+    )
     const result = await new SearchPlanner({
       db: deps.db,
       registry: deps.registry,
       authService: deps.authService,
       logger: deps.logger,
-    }).search(parsed.input)
+    }).search({
+      ...parsed.input,
+      ...(sourceIds ? { sourceIds } : {}),
+    })
     if (parsed.json) {
       console.log(formatSearchJson(result))
     } else if (parsed.refs) {
@@ -56,7 +62,7 @@ export const searchCommand = defineCommand({
     query: { type: 'positional', required: false, description: 'Query text' },
     realm: { type: 'string', description: 'Exact Realm slug' },
     adapter: { type: 'string', description: 'Adapter ID' },
-    source: { type: 'string', description: 'Exact Source ID' },
+    source: { type: 'string', description: 'Exact Source label or ID' },
     kind: { type: 'string', description: 'Profile kind or alias' },
     field: { type: 'string', description: 'Typed equality filter name=value' },
     since: { type: 'string', description: 'Start ISO date' },

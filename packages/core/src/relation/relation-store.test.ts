@@ -69,10 +69,10 @@ test('communication.message Relations resolve lazily without collapsing cross-So
   db.exec("INSERT INTO realms VALUES ('personal', 'personal', NULL, 1)")
   db.exec("INSERT INTO realms VALUES ('work', 'work', NULL, 1)")
   const insertSource = db.prepare(
-    'INSERT INTO sources (id, realm_id, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO sources (id, realm_id, adapter_id, adapter_version, label, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
   )
-  insertSource.run(sourceA, 'personal', 'gmail', 1, '{}', 1, 1)
-  insertSource.run(sourceB, 'work', 'gmail', 1, '{}', 1, 1)
+  insertSource.run(sourceA, 'personal', 'gmail', 1, sourceA, '{}', 1, 1)
+  insertSource.run(sourceB, 'work', 'gmail', 1, sourceB, '{}', 1, 1)
   dbs.push(db)
   const resources = new ResourceStore(
     db,
@@ -151,10 +151,10 @@ async function setup() {
   db.exec("INSERT INTO realms VALUES ('personal', 'personal', NULL, 1)")
   db.exec("INSERT INTO realms VALUES ('work', 'work', NULL, 1)")
   const insertSource = db.prepare(
-    'INSERT INTO sources (id, realm_id, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO sources (id, realm_id, adapter_id, adapter_version, label, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
   )
-  insertSource.run(sourceA, 'personal', 'fake', 1, '{}', 1, 1)
-  insertSource.run(sourceB, 'work', 'fake', 1, '{}', 1, 1)
+  insertSource.run(sourceA, 'personal', 'fake', 1, sourceA, '{}', 1, 1)
+  insertSource.run(sourceB, 'work', 'fake', 1, sourceB, '{}', 1, 1)
   dbs.push(db)
   return {
     db,

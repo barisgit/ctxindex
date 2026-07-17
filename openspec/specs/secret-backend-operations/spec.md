@@ -39,7 +39,7 @@ Secret reads SHALL route by typed secret reference, while new writes SHALL use e
 - **THEN** an attempted credential write fails and creates no encrypted-file secret or contradictory configuration
 
 ### Requirement: Long-lived secret input avoids process arguments
-The CLI MUST NOT accept a secret-store passphrase, refresh token, access token, or OAuth client secret as a literal command argument. Such inputs SHALL resolve through the central environment/typed-secret mechanism or an explicitly prepared private key file, and help text MUST identify the safe input path without echoing values.
+The CLI MUST NOT accept a secret-store passphrase, refresh token, access token, or OAuth client secret as a literal command argument. OAuth client credentials SHALL be read from the provider's declared environment names only during `client add --from-env`, then persisted through typed secret references; authorization and refresh MUST NOT read them from the environment. Other secret inputs SHALL resolve through the central environment/typed-secret mechanism or an explicitly prepared private key file, and help text MUST identify the safe input path without echoing values.
 
 #### Scenario: Legacy passphrase option is rejected
 - **WHEN** a caller supplies `secrets backend set file --passphrase <value>`

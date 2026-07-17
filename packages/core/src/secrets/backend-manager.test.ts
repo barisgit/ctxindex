@@ -94,7 +94,7 @@ function insertGrant(
     `INSERT INTO accounts
        (id, provider, label, external_user_id, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
-  ).run(`account-${id}`, provider, provider, `subject-${id}`, now, now)
+  ).run(`account-${id}`, provider, `Account ${id}`, `subject-${id}`, now, now)
   db.prepare(
     `INSERT INTO grants
        (id, account_id, provider, scopes_json, refresh_token_ref, created_at, updated_at)

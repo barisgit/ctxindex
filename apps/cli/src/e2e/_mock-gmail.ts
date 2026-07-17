@@ -382,7 +382,6 @@ export function startMockGmail(
         CTXINDEX_OAUTH_MOCK_BASE_URL: baseUrl,
         CTXINDEX_GOOGLE_CLIENT_ID: 'mock-client-id',
         CTXINDEX_GOOGLE_CLIENT_SECRET: 'mock-client-secret',
-        CTXINDEX_GOOGLE_REFRESH_TOKEN: 'mock-refresh-token',
         CTXINDEX_KEYTAR_MOCK_FILE: join(sandbox.dir, 'keytar.json'),
         ...extra,
       }

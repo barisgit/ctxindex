@@ -168,8 +168,8 @@ async function freshDb(
   }
   db.prepare(
     `INSERT INTO sources
-       (id, realm_id, adapter_id, adapter_version, grant_id, config_json, sync_enabled, created_at, updated_at)
-     VALUES (?, 'realm-1', ?, 1, ?, '{}', 1, 1, 1)`,
+       (id, realm_id, label, adapter_id, adapter_version, grant_id, config_json, sync_enabled, created_at, updated_at)
+     VALUES (?, 'realm-1', 'Action Source', ?, 1, ?, '{}', 1, 1, 1)`,
   ).run(sourceId, options.adapterId ?? 'fake.actions', options.grantId ?? null)
   return db
 }

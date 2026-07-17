@@ -98,7 +98,7 @@ describe('loadExtensions', () => {
     ).run()
     db.prepare(
       `INSERT INTO sources (
-         id, realm_id, adapter_id, adapter_version, display_name, config_json,
+         id, realm_id, adapter_id, adapter_version, label, config_json,
          sync_enabled, created_at, updated_at
        ) VALUES ('source-1', 'realm-1', 'fixture.returned', 1, 'Fixture', '{}', 1, 1, 1)`,
     ).run()

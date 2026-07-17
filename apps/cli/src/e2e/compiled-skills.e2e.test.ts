@@ -73,6 +73,8 @@ test('relocated compiled CLI serves embedded bundled skills', async () => {
     const get = await run(['skills', 'get', 'getting-started'])
     expect(get.exitCode).toBe(0)
     expect(get.stdout).toContain('# Getting started with ctxindex')
+    expect(get.stdout).toContain('ctxindex client add <provider> --from-env')
+    expect(get.stdout).not.toMatch(/ctxindex auth\b/)
 
     const getJson = await run([
       'skills',
@@ -97,4 +99,4 @@ test('relocated compiled CLI serves embedded bundled skills', async () => {
   } finally {
     await rm(sandbox, { recursive: true, force: true })
   }
-})
+}, 30_000)

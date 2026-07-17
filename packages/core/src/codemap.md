@@ -2,25 +2,22 @@
 
 ## Responsibility
 
-Implements ctxindex's provider-neutral domain and application layer: extension registration, Realm/Source lifecycle, authenticated provider operations, Resource/Relation persistence, sync/search/retrieval, Actions, exports, Artifacts, threads, and shared runtime infrastructure.
+Implements provider-neutral domain and application services: Extension registration, OAuth client/Account/Grant layering, Realm/Source lifecycle, constrained provider operations, generic storage, sync/search/retrieval, Actions, exports, Artifacts, and runtime infrastructure.
 
-## Design/patterns
+## Design / patterns
 
-- Capability folders expose canonical `index.ts` interfaces; the root barrel and package subpaths publish those seams without provider-specific business logic.
-- Profiles and Adapters form the strategy/plugin boundary: registries validate definitions and OAuth declarations, Profiles own payload semantics, and Adapters own provider I/O and API-host authority. Built-in Google and Microsoft implementations enter only through composition.
-- Factory-built services and repositories receive explicit database, registry, auth, and logger dependencies; SQLite schema/storage plus transactional sync remain the local system of record.
-- Cross-cutting contracts are centralized in errors, exit codes, IDs, Refs, configuration, paths, logging, networking, and typed secret routing. `config/` centrally types Google/Microsoft credential and loopback test environment keys.
+- Capability folders expose `index.ts` seams; root/package export maps publish them without provider-specific logic.
+- Registries validate Profiles, Adapters, OAuth providers, scopes, and host authority; Adapters remain the provider-I/O strategy boundary.
+- Factory services receive explicit database, registry, secrets, auth, and logger dependencies.
+- OAuth client credentials enter through add-time declared environment names, persist as client refs, and are copied to Grant-owned refs for runtime refresh.
 
 ## Data & control flow
 
-1. Configuration/paths resolve runtime state, secrets select and persist a backend, and storage bootstraps SQLite and migrations.
-2. Extension loading builds registries; account/auth establish provider-neutral Account identities and Grants for provider declarations such as Google or Microsoft, while Realm/Source services establish ownership and Adapter coordinates.
-3. Source sync validates Adapter emissions transactionally; search, retrieval, Artifact download, Actions, exports, and threads resolve registered definitions and invoke provider operations through constrained provider contexts.
-4. Adapter results return as validated resources, relations, artifacts, warnings, checkpoints, or Action outputs; typed core errors map failures across module and process boundaries.
+1. Config/paths and secrets initialize runtime state; storage applies the fresh schema.
+2. Extension loading builds registries. `client/` persists provider-scoped labeled clients; `account/` maintains globally labeled identities; `auth/` requests all loaded same-provider scopes and updates one stable Grant per Account.
+3. Realm/Source services persist required Source labels and explicit Grant bindings; Account removal marks bound Sources `needs_auth` and clears bindings.
+4. Sync/search/retrieval/Action/Artifact/export/thread services invoke constrained Adapter operations and persist validated generic results.
 
 ## Integration points
 
-- Public surface: `packages/core/src/index.ts` and capability subpaths in `packages/core/package.json`.
-- Definitions/contracts: `packages/extension-sdk/src/`, provider-neutral Profiles, and built-in Google, Microsoft, and filesystem Adapters under `packages/adapters/src/`.
-- Application composition: `apps/cli/src/deps.ts`, command handlers, and sync runner.
-- Detailed capability maps live in populated child `codemap.md` files, including auth, config, registry, source, search, sync, artifact, and persistence infrastructure.
+Public through `src/index.ts` and package subpaths; consumed primarily by `apps/cli/src/deps.ts` and Adapter operation hosts. Detailed capability maps live in child folders including `client/`, `account/`, `auth/`, `schema/`, and `source/`.

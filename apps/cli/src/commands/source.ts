@@ -40,11 +40,10 @@ export const sourceCommand = defineCommand({
       meta: { name: 'add', description: 'Add a source.' },
       args: async () => ({
         adapter: { type: 'string', description: 'Adapter ID' },
-        name: { type: 'string', description: 'Source name' },
-        'display-name': { type: 'string', description: 'Display name' },
+        label: { type: 'string', description: 'Global Source label' },
         account: {
           type: 'string',
-          description: 'Account email or grant ID (required when ambiguous)',
+          description: 'Account label, Account ID, or Grant ID',
         },
         'config-json': { type: 'string', description: 'Adapter config JSON' },
         'search-routing': {
@@ -68,7 +67,7 @@ export const sourceCommand = defineCommand({
     }),
     remove: defineCommand({
       meta: { name: 'remove', description: 'Remove a source.' },
-      args: { 'source-id': { type: 'positional', required: false } },
+      args: { source: { type: 'positional', required: false } },
       run: ({ rawArgs }) =>
         runWithExit(() => handleSourceCommand(['remove', ...rawArgs])),
     }),

@@ -5,11 +5,7 @@ import { getEnv, resetEnvForTests } from './env-loader'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
 const rootGlobalDependencies = ['**/.env', '**/.env.*', '**/bunfig.toml']
-const gmailEnv = [
-  'CTXINDEX_GOOGLE_CLIENT_ID',
-  'CTXINDEX_GOOGLE_CLIENT_SECRET',
-  'CTXINDEX_GOOGLE_REFRESH_TOKEN',
-]
+const gmailEnv = ['CTXINDEX_GOOGLE_CLIENT_ID', 'CTXINDEX_GOOGLE_CLIENT_SECRET']
 const workspaceTaskNames = [
   'build',
   'lint',

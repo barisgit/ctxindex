@@ -29,7 +29,7 @@ test('thin sync command has no architecture violations', async () => {
 test('test fixtures may import commands and name provider URLs', async () => {
   const violations = await lintFiles([
     'apps/cli/src/commands/registry-interface.test.ts',
-    'apps/cli/src/args/auth.test.ts',
+    'apps/cli/src/args/client.test.ts',
   ])
 
   expect(violations).toEqual([])

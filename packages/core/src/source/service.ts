@@ -19,6 +19,21 @@ interface RealmIdRow {
   readonly id: string
 }
 
+function defaultSourceLabel(
+  deps: SourceServiceDeps,
+  adapterId: string,
+  grantId: string | null,
+): string {
+  const tail = adapterId.slice(adapterId.lastIndexOf('.') + 1)
+  if (grantId === null) return tail
+  const account = deps.db
+    .prepare(
+      'SELECT a.label FROM accounts AS a JOIN grants AS g ON g.account_id = a.id WHERE g.id = ?',
+    )
+    .get(grantId) as { readonly label: string } | null
+  return account ? `${account.label}-${tail}` : tail
+}
+
 function resolveAdapter(deps: SourceServiceDeps, input: AddSourceInput) {
   const adapter =
     input.adapterVersion !== undefined
@@ -179,7 +194,7 @@ function parseLastError(errorJson: string | null): string | null {
 }
 
 function selectSourceColumns(): string {
-  return 'id, realm_id, adapter_id, adapter_version, display_name, config_json, sync_enabled, grant_id, search_routing, created_at'
+  return 'id, realm_id, adapter_id, adapter_version, label, config_json, sync_enabled, grant_id, search_routing, created_at'
 }
 
 function sourceListSelect(): string {
@@ -188,7 +203,7 @@ function sourceListSelect(): string {
                  r.slug AS realm_slug,
                  s.adapter_id,
                  s.adapter_version,
-                 s.display_name,
+                 s.label,
                  s.config_json,
                  s.sync_enabled,
                  s.grant_id,
@@ -240,6 +255,23 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
       const adapter = resolveAdapter(deps, input)
       validateSearchRouting(input.searchRouting, adapter.capabilities)
       const grantId = resolveGrantId(deps, input, adapter.auth)
+      const label =
+        input.label ?? defaultSourceLabel(deps, input.adapterId, grantId)
+      if (label.trim().length === 0) {
+        throw new CtxindexValidationError(
+          'invalid_filter',
+          'Source label must be nonempty',
+        )
+      }
+      const collision = deps.db
+        .prepare('SELECT id FROM sources WHERE label = ?')
+        .get(label)
+      if (collision) {
+        throw new CtxindexValidationError(
+          'invalid_filter',
+          `Source label "${label}" is already taken; choose another with --label`,
+        )
+      }
       let config: unknown
       try {
         config = JSON.parse(input.configJson ?? '{}')
@@ -263,7 +295,7 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
       deps.db
         .prepare(
           `INSERT INTO sources (
-             id, realm_id, adapter_id, adapter_version, display_name, config_json,
+             id, realm_id, adapter_id, adapter_version, label, config_json,
              grant_id, search_routing, created_at, updated_at
            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
@@ -272,7 +304,7 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
           realm.id,
           input.adapterId,
           adapter.version,
-          input.displayName ?? null,
+          label,
           JSON.stringify(parsedConfig.data),
           grantId,
           input.searchRouting ?? null,
@@ -303,6 +335,18 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
         .prepare(`${select} ORDER BY s.created_at`)
         .all() as Omit<SourceRow, 'availability'>[]
       return rows.map((source) => withAvailability(deps, source))
+    },
+
+    resolveSourceId(reference: string): string {
+      const source = deps.db
+        .prepare(
+          'SELECT id FROM sources WHERE label = ? UNION ALL SELECT id FROM sources WHERE id = ? AND NOT EXISTS (SELECT 1 FROM sources WHERE label = ?) LIMIT 1',
+        )
+        .get(reference, reference, reference) as { readonly id: string } | null
+      if (!source) {
+        throw new CtxindexNotFoundError(`source not found: "${reference}"`)
+      }
+      return source.id
     },
 
     findSourceById(sourceId: string): SourceRow | null {

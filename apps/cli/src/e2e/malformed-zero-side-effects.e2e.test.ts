@@ -4,15 +4,9 @@ import { createSandbox } from '@ctxindex/core/testing'
 
 const malformedCommands = [
   ['account', 'list', '--client-secret', 'malformed-secret-canary'],
-  [
-    'auth',
-    'add',
-    'google',
-    '--adapter',
-    'google.mailbox',
-    '--from-env',
-    '--unknown-auth-flag',
-  ],
+  ['client', 'add', 'google', '--from-env', '--unknown-client-flag'],
+  ['account', 'add', 'google', '--unknown-account-flag'],
+  ['auth'],
   [
     'source',
     'add',
@@ -53,16 +47,20 @@ test('malformed commands perform zero auth, network, or storage work', async () 
     CTXINDEX_GOOGLE_CALENDAR_MOCK_BASE_URL: mockBaseUrl,
     CTXINDEX_GRAPH_MOCK_BASE_URL: mockBaseUrl,
     CTXINDEX_GOOGLE_CLIENT_ID: 'malformed-client-canary',
-    CTXINDEX_GOOGLE_REFRESH_TOKEN: 'malformed-refresh-canary',
     CTXINDEX_MICROSOFT_CLIENT_ID: 'malformed-client-canary',
-    CTXINDEX_MICROSOFT_REFRESH_TOKEN: 'malformed-refresh-canary',
   }
 
   try {
     for (const args of malformedCommands) {
       const result = await sandbox.run([...args], { env })
       expect(result.exitCode, `${args.join(' ')}\n${result.stderr}`).toBe(2)
-      expect(result.stdout).toBe('')
+      if (args[0] === 'auth') {
+        expect(result.stderr).toContain('Unknown command')
+        expect(result.stdout).toContain('ctxindex init|account|client')
+        expect(result.stdout).not.toContain('init|auth|')
+      } else {
+        expect(result.stdout).toBe('')
+      }
       expect(result.stderr).not.toContain('malformed-secret-canary')
       expect(result.stderr).not.toContain('malformed-client-canary')
       expect(result.stderr).not.toContain('malformed-refresh-canary')

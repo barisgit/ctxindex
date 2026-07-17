@@ -234,7 +234,7 @@ describe('source option validation', () => {
 
   test.each([
     [['add', 'external.adapter', '--realm']],
-    [['add', 'external.adapter', '--name']],
+    [['add', 'external.adapter', '--label']],
     [['add', 'external.adapter', '--account']],
     [['add', 'external.adapter', '--config-json']],
     [['add', 'external.adapter', '--search-routing']],

@@ -6,6 +6,10 @@ import {
 import { ArtifactService } from '@ctxindex/core/artifact'
 import { type AuthService, createAuthService } from '@ctxindex/core/auth'
 import {
+  createOAuthClientService,
+  type OAuthClientService,
+} from '@ctxindex/core/client'
+import {
   type CtxindexConfig,
   getEnv,
   type LogLevel,
@@ -38,6 +42,7 @@ export interface CliDeps {
   readonly secretBackendManager: SecretBackendManager
   readonly secretVault: SecretVault
   readonly authService: AuthService
+  readonly oauthClientService: OAuthClientService
   readonly registry: ExtensionRegistry
   readonly threadService: ThreadService
   readonly artifactService: ArtifactService
@@ -150,6 +155,10 @@ export async function openDeps(
     config,
   )
   const env = getEnv()
+  const oauthClientService = createOAuthClientService({
+    db,
+    store: secretVault,
+  })
   const authService = createAuthService({
     db,
     store: secretVault,
@@ -171,6 +180,7 @@ export async function openDeps(
     secretBackendManager,
     secretVault,
     authService,
+    oauthClientService,
     registry,
     threadService,
     artifactService,

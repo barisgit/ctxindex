@@ -131,6 +131,7 @@ describe('Action handler', () => {
       registry: {},
       authService: {},
       logger: {},
+      sourceService: { resolveSourceId: (reference: string) => reference },
       async close() {
         closed = true
       },
@@ -170,6 +171,7 @@ describe('Action handler', () => {
         registry: {},
         authService: {},
         logger: {},
+        sourceService: { resolveSourceId: (reference: string) => reference },
         async close() {
           closed = true
         },
@@ -229,6 +231,7 @@ describe('Action handler', () => {
       registry: {},
       authService: {},
       logger: {},
+      sourceService: { resolveSourceId: (reference: string) => reference },
       async close() {},
     })
     const services: ActionServices = {
@@ -288,6 +291,7 @@ describe('Action handler', () => {
       registry: {},
       authService: {},
       logger: {},
+      sourceService: { resolveSourceId: (reference: string) => reference },
       async close() {
         closed = true
       },

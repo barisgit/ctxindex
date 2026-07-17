@@ -96,8 +96,8 @@ function insertSource(
   const now = Date.now()
   db.prepare(
     `INSERT INTO sources
-       (id, realm_id, adapter_id, adapter_version, grant_id, config_json, sync_enabled, created_at, updated_at)
-     VALUES ('source-1', 'realm-1', 'test.oauth', 1, ?, ?, 1, ?, ?)`,
+       (id, realm_id, label, adapter_id, adapter_version, grant_id, config_json, sync_enabled, created_at, updated_at)
+     VALUES ('source-1', 'realm-1', 'source-1', 'test.oauth', 1, ?, ?, 1, ?, ?)`,
   ).run(grantId, JSON.stringify(config), now, now)
 }
 

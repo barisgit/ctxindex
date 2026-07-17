@@ -16,20 +16,26 @@ export async function handleStatusCommand(args: string[]): Promise<number> {
     return 2
   }
 
+  let deps: Awaited<ReturnType<typeof openDeps>> | undefined
   try {
-    const deps = await openDeps()
-    printOutput(formatStatus(deps.sourceService.getStatus(parsed), parsed))
+    deps = await openDeps()
+    const input = parsed.sourceId
+      ? { sourceId: deps.sourceService.resolveSourceId(parsed.sourceId) }
+      : {}
+    printOutput(formatStatus(deps.sourceService.getStatus(input), parsed))
     return 0
   } catch (err) {
     console.error(err instanceof Error ? err.message : String(err))
     return mapErrorToExit(err)
+  } finally {
+    await deps?.close()
   }
 }
 
 export const statusCommand = defineCommand({
   meta: { name: 'status', description: 'Show last sync status.' },
   args: {
-    source: { type: 'string', description: 'Source ID' },
+    source: { type: 'string', description: 'Source label or ID' },
     format: {
       type: 'string',
       description: 'Output format: summary or compact',

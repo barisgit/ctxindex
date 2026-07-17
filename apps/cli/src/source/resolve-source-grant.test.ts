@@ -11,12 +11,13 @@ function grant(
   id: string,
   accountId: string,
   scopes: readonly string[] = requiredScopes,
+  accountLabel = accountId,
 ): GrantRow {
   return {
     id,
     accountId,
     provider: 'google',
-    accountLabel: accountId,
+    accountLabel,
     scopes,
     accessTokenRef: null,
     refreshTokenRef: null,
@@ -65,4 +66,14 @@ test('never selects by hidden external provider identity or insufficient scopes'
   await expect(
     resolveSourceGrant(service([row]), gmailAuth, row.accountId),
   ).rejects.toMatchObject({ code: 'invalid_filter' })
+})
+
+test('resolves Account labels before account and Grant ids', async () => {
+  const auth = service([
+    grant('grant-1', 'account-1', requiredScopes, 'work'),
+    grant('work', 'account-2', requiredScopes, 'other'),
+  ])
+  await expect(resolveSourceGrant(auth, gmailAuth, 'work')).resolves.toBe(
+    'grant-1',
+  )
 })

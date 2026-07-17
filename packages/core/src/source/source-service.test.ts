@@ -255,6 +255,48 @@ afterEach(() => {
 })
 
 describe('source service', () => {
+  test('defaults Source labels verbatim and rejects global collisions', () => {
+    const realmService = createRealmService({ db, logger })
+    realmService.createRealm({ slug: 'work' })
+    const service = createSourceService({ db, logger, realmService, registry })
+
+    const local = service.addSource({
+      adapterId: 'local.directory',
+      realmSlug: 'work',
+      configJson: '{"root_path":"/tmp"}',
+    })
+    expect(service.findSourceById(local.sourceId)?.label).toBe('directory')
+    expect(() =>
+      service.addSource({
+        adapterId: 'local.directory',
+        realmSlug: 'work',
+        configJson: '{"root_path":"/other"}',
+      }),
+    ).toThrow(
+      'Source label "directory" is already taken; choose another with --label',
+    )
+
+    db.prepare(
+      "INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES ('account-google', 'google', 'work@example.com', 'subject-google', 1, 1)",
+    ).run()
+    db.prepare(
+      'INSERT INTO grants (id, account_id, provider, scopes_json, created_at, updated_at) VALUES (?, ?, ?, ?, 1, 1)',
+    ).run(
+      'grant-google',
+      'account-google',
+      'google',
+      JSON.stringify([gmailScope]),
+    )
+    const mailbox = service.addSource({
+      adapterId: 'google.mailbox',
+      realmSlug: 'work',
+      grantId: 'grant-google',
+    })
+    expect(service.findSourceById(mailbox.sourceId)?.label).toBe(
+      'work@example.com-mailbox',
+    )
+  })
+
   test('addSource resolves a provided realm slug', () => {
     const realmService = createRealmService({ db, logger })
     const realm = realmService.createRealm({ slug: 'work' })
@@ -309,12 +351,12 @@ describe('source service', () => {
     realmService.createRealm({ slug: 'work' })
     const service = createSourceService({ db, logger, realmService, registry })
     const insertAccount = db.prepare(
-      'INSERT INTO accounts (id, provider, external_user_id, created_at, updated_at) VALUES (?, ?, ?, 1, 1)',
+      'INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES (?, ?, ?, ?, 1, 1)',
     )
     const insertGrant = db.prepare(
       'INSERT INTO grants (id, account_id, provider, scopes_json, created_at, updated_at) VALUES (?, ?, ?, ?, 1, 1)',
     )
-    insertAccount.run('account-google', 'google', 'subject-google')
+    insertAccount.run('account-google', 'google', 'google', 'subject-google')
     insertGrant.run('grant-google', 'account-google', 'google', '[]')
     expect(() =>
       service.addSource({
@@ -330,7 +372,7 @@ describe('source service', () => {
     realmService.createRealm({ slug: 'work' })
     const service = createSourceService({ db, logger, realmService, registry })
     db.prepare(
-      "INSERT INTO accounts (id, provider, external_user_id, created_at, updated_at) VALUES ('account-google', 'google', 'subject-google', 1, 1)",
+      "INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES ('account-google', 'google', 'google', 'subject-google', 1, 1)",
     ).run()
     db.prepare(
       'INSERT INTO grants (id, account_id, provider, scopes_json, created_at, updated_at) VALUES (?, ?, ?, ?, 1, 1)',
@@ -360,7 +402,7 @@ describe('source service', () => {
     realmService.createRealm({ slug: 'work' })
     const service = createSourceService({ db, logger, realmService, registry })
     db.prepare(
-      "INSERT INTO accounts (id, provider, external_user_id, created_at, updated_at) VALUES ('account-google', 'google', 'subject-google', 1, 1)",
+      "INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES ('account-google', 'google', 'google', 'subject-google', 1, 1)",
     ).run()
     const insertGrant = db.prepare(
       'INSERT INTO grants (id, account_id, provider, scopes_json, created_at, updated_at) VALUES (?, ?, ?, ?, 1, 1)',
@@ -379,9 +421,12 @@ describe('source service', () => {
       grant_id: 'grant-one',
     })
 
+    db.prepare(
+      "INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES ('account-google-two', 'google', 'google-two', 'subject-google-two', 1, 1)",
+    ).run()
     insertGrant.run(
       'grant-two',
-      'account-google',
+      'account-google-two',
       'google',
       JSON.stringify([gmailScope]),
     )
@@ -421,11 +466,13 @@ describe('source service', () => {
     const target = service.addSource({
       adapterId: 'local.directory',
       realmSlug: 'work',
+      label: 'target',
       configJson: '{"root_path":"/tmp/target"}',
     })
     const survivor = service.addSource({
       adapterId: 'local.directory',
       realmSlug: 'work',
+      label: 'survivor',
       configJson: '{"root_path":"/tmp/survivor"}',
     })
 
@@ -587,4 +634,20 @@ describe('source service', () => {
       service.addSource({ adapterId: 'missing.adapter', realmSlug: 'work' }),
     ).toThrow('Unknown Adapter')
   })
+})
+
+test('resolves Source labels before ids', () => {
+  const realmService = createRealmService({ db, logger })
+  realmService.createRealm({ slug: 'work' })
+  const service = createSourceService({ db, logger, realmService, registry })
+  const { sourceId } = service.addSource({
+    adapterId: 'local.directory',
+    realmSlug: 'work',
+    label: 'notes',
+    configJson: JSON.stringify({ root_path: '/tmp' }),
+  })
+
+  expect(service.resolveSourceId('notes')).toBe(sourceId)
+  expect(service.resolveSourceId(sourceId)).toBe(sourceId)
+  expect(() => service.resolveSourceId('missing')).toThrow('source not found')
 })

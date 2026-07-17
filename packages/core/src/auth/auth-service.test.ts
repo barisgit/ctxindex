@@ -55,6 +55,88 @@ afterEach(() => {
   for (const db of dbs.splice(0)) db.close()
   globalThis.fetch = originalFetch
 })
+
+test('removes an Account with its Grant secrets and leaves bound Sources needs_auth', async () => {
+  const database = await db()
+  const store = new MemoryStore()
+  const service = createAuthService({
+    db: database,
+    store,
+    logger,
+    registry: registry(),
+    now: () => 1_000,
+  })
+  const { grantId } = await service.addGrant({
+    provider: 'test',
+    account: account(),
+    clientId: 'client',
+    refreshToken: 'refresh',
+    accessToken: 'access',
+    scopes: ['mail.read'],
+  })
+  database.exec(
+    "INSERT INTO realms VALUES ('r','r',NULL,1); INSERT INTO sources (id,realm_id,adapter_id,adapter_version,grant_id,label,config_json,created_at,updated_at) VALUES ('s','r','test.mail',1,'" +
+      grantId +
+      "','person-mail','{}',1,1)",
+  )
+
+  await service.removeAccount('Person')
+
+  expect(
+    database.query('SELECT count(*) AS count FROM accounts').get(),
+  ).toEqual({
+    count: 0,
+  })
+  expect(database.query('SELECT count(*) AS count FROM grants').get()).toEqual({
+    count: 0,
+  })
+  expect(
+    database.query("SELECT grant_id FROM sources WHERE id = 's'").get(),
+  ).toEqual({ grant_id: null })
+  expect(
+    database
+      .query("SELECT last_status FROM source_sync_state WHERE source_id = 's'")
+      .get(),
+  ).toEqual({ last_status: 'needs_auth' })
+  expect(store.values.size).toBe(0)
+})
+
+test('refresh never falls back to environment client credentials', async () => {
+  const database = await db()
+  const store = new MemoryStore()
+  let reads = 0
+  let calls = 0
+  const service = createAuthService({
+    db: database,
+    store,
+    logger,
+    registry: registry(),
+    readEnvironment: () => {
+      reads++
+      return 'environment-client-id'
+    },
+  })
+  const { grantId } = await service.addGrant({
+    provider: 'test',
+    account: account(),
+    clientId: 'persisted-client-id',
+    refreshToken: 'refresh',
+    scopes: ['mail.read'],
+  })
+  database
+    .prepare('UPDATE grants SET client_id_ref = NULL WHERE id = ?')
+    .run(grantId)
+  globalThis.fetch = (async () => {
+    calls++
+    return Response.json({})
+  }) as unknown as typeof fetch
+
+  await expect(service.refreshAccessToken(grantId)).rejects.toMatchObject({
+    code: 'missing_oauth_client_creds',
+  })
+  expect(reads).toBe(0)
+  expect(calls).toBe(0)
+})
 const originalFetch = globalThis.fetch
 async function db() {
   const value = new Database(':memory:', { create: true })
@@ -89,7 +171,7 @@ function account(subject = 'subject-1') {
   }
 }
 
-test('creates typed generic Grants and reuses one stable Account', async () => {
+test('re-authorization updates one stable Grant and cleans replaced refs', async () => {
   const database = await db()
   const store = new MemoryStore()
   const service = createAuthService({
@@ -107,6 +189,7 @@ test('creates typed generic Grants and reuses one stable Account', async () => {
     expiresAt: 5000,
     scopes: ['openid', 'mail.read'],
   })
+  const before = await service.getGrantById(first.grantId)
   const second = await service.addGrant({
     provider: 'test',
     account: account(),
@@ -115,14 +198,15 @@ test('creates typed generic Grants and reuses one stable Account', async () => {
     scopes: ['mail.read'],
   })
   expect(first.accountId).toBe(second.accountId)
+  expect(first.grantId).toBe(second.grantId)
   expect(
     database.query('SELECT COUNT(*) AS count FROM accounts').get(),
   ).toEqual({ count: 1 })
   expect(database.query('SELECT COUNT(*) AS count FROM grants').get()).toEqual({
-    count: 2,
+    count: 1,
   })
   const grant = await service.getGrantById(first.grantId)
-  expect(grant?.scopes).toEqual(['mail.read', 'openid'])
+  expect(grant?.scopes).toEqual(['mail.read'])
   expect(parseSecretRef(grant?.clientIdRef ?? '')).toMatchObject({
     backend: 'keychain',
     scope: 'test',
@@ -131,6 +215,9 @@ test('creates typed generic Grants and reuses one stable Account', async () => {
     backend: 'keychain',
     scope: 'test',
   })
+  expect(store.values.get(grant?.refreshTokenRef ?? '')).toBe('refresh-2')
+  expect(store.values.has(before?.clientIdRef ?? '')).toBe(false)
+  expect(store.values.has(before?.refreshTokenRef ?? '')).toBe(false)
 })
 
 test('cleans every temporary secret when persistence fails', async () => {
@@ -224,9 +311,9 @@ test('missing loaded provider marks linked Sources needs_auth without egress', a
     scopes: ['mail.read'],
   })
   database.exec(
-    "INSERT INTO realms VALUES ('r','r',NULL,1); INSERT INTO sources (id,realm_id,adapter_id,adapter_version,grant_id,config_json,created_at,updated_at) VALUES ('s','r','test.mail',1,'" +
+    "INSERT INTO realms VALUES ('r','r',NULL,1); INSERT INTO sources (id,realm_id,adapter_id,adapter_version,grant_id,label,config_json,created_at,updated_at) VALUES ('s','r','test.mail',1,'" +
       grantId +
-      "','{}',1,1); INSERT INTO source_sync_state (source_id,last_status,updated_at) VALUES ('s','idle',1)",
+      "','test-mail','{}',1,1); INSERT INTO source_sync_state (source_id,last_status,updated_at) VALUES ('s','idle',1)",
   )
   let calls = 0
   globalThis.fetch = (async () => {

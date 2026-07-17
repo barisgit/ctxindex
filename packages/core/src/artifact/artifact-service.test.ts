@@ -59,8 +59,10 @@ async function fixture(
     "INSERT INTO realms (id, slug, label, created_at) VALUES ('realm', 'work', 'Work', 1)",
   )
   db.prepare(`INSERT INTO sources
-    (id, realm_id, adapter_id, adapter_version, config_json, sync_enabled, created_at, updated_at)
-    VALUES (?, 'realm', 'fake.artifacts', 1, '{}', 1, 1, 1)`).run(sourceId)
+    (id, realm_id, label, adapter_id, adapter_version, config_json, sync_enabled, created_at, updated_at)
+    VALUES (?, 'realm', 'Artifact Service Source', 'fake.artifacts', 1, '{}', 1, 1, 1)`).run(
+    sourceId,
+  )
 
   let calls = 0
   const profile = defineProfile({

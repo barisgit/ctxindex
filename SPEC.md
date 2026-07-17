@@ -43,9 +43,10 @@ The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**, **SHOULD NOT**, 
 - A **source adapter** is code connecting one provider collection type, such as `google.mailbox` or `local.directory`. It declares capability flags, an auth spec, a config schema, and the profiles it emits.
 - An **action** is a typed provider-side mutation declared by a profile and implemented by a source adapter through a specific source.
 - A **realm** is a user-defined operating context, such as `personal`, `company`, or `university`, used to group sources that should be searched and reasoned about together.
-- An **account** is one stable external authenticated identity within a provider. Its mutable labels and addresses are Account Identities, not its identity key.
-- A **grant** is an exact normalized permission set and secret reference for one account. Multiple compatible sources MAY explicitly share one grant, and one account MAY own multiple grants.
-- A **source** is one configured connection to one collection using exactly one source adapter. Sync is an optional per-source setting; a Source with sync disabled may still participate in remote search, retrieval, download, and supported Actions.
+- A **client** is one persisted OAuth application configuration for a provider. Its label is unique within that provider, while its credentials are stored as typed secret references.
+- An **account** is one stable external authenticated identity within a provider. It has a globally unique local label; verified addresses are Account Identities, not its identity key.
+- A **grant** is the internal stable normalized permission set and secret reference for one account. Each account owns exactly one grant, which reauthorization updates in place; multiple compatible sources MAY explicitly share it.
+- A **source** is one labeled configured connection to one collection using exactly one source adapter. Its label is globally unique. Sync is an optional per-source setting; a Source with sync disabled may still participate in remote search, retrieval, download, and supported Actions.
 - A **resource** is one unit of context emitted by a source: an envelope (ref, primary profile id+version, title, times, origin) plus validated profile payload(s). The envelope kind IS the primary profile id.
 - A **ref** is the stable locator `ctx://<source-id>/<adapter-opaque-suffix>` for one resource, valid whether or not the resource is indexed. The suffix is adapter-owned and opaque to core. Provider-native URIs are envelope metadata, never addressing input.
 - A **chunk** is one searchable segment of a resource's extracted content.
@@ -289,13 +290,17 @@ Realms MUST NOT be treated as a security boundary. Credentials, grants, and acco
 
 Multiple sources MAY use the same account or grant across different realms when the provider permits it.
 
-Every source whose adapter requires authentication MUST store an explicit `grant_id` link. Such a source MUST NOT be created without a valid provider-compatible grant. When exactly one compatible grant exists, the CLI MAY bind it automatically; when zero or multiple compatible grants exist, source creation MUST fail unless the caller identifies one explicitly. Sync and federated search MUST resolve credentials only through the source's linked grant and MUST NOT select a global "active" or most-recent grant.
+Every source whose adapter requires authentication MUST store an explicit `grant_id` link when created and while authenticated. Source creation MUST resolve `--account` by exact Account label, then Account id, then Grant id, considering only Accounts for the adapter's declared provider, and bind that Account's one stable compatible Grant. Creation MUST fail when the reference is absent, unknown, provider-incompatible, or lacks required scopes. A Source preserved after Account removal MAY have its link cleared and MUST report `needs_auth` until recreated. Sync and federated search MUST resolve credentials only through the source's linked Grant and MUST NOT select a global "active" or most-recent Grant.
 
 Search MUST consider all realms when no realm filter is provided. Callers MUST be able to filter to one or more realms, and an explicit realm filter MUST be exact: no additional realm is implicitly included.
 
 ## 10b. CLI surface and output
 
-The reference CLI SHOULD provide commands for initialization, authentication, realm/source configuration, sync, search, retrieval, typed Actions, status, and maintenance. The specific command set offered by a release is captured in that release's milestone document.
+The reference CLI SHOULD provide commands for initialization, OAuth Client configuration, Account authorization, realm/source configuration, sync, search, retrieval, typed Actions, status, and maintenance. The specific command set offered by a release is captured in that release's milestone document.
+
+OAuth lifecycle commands MUST include `client add <provider> [--label <label>] --from-env`, `client list`, `client remove <provider> <label>`, `account add <provider> [--label <label>] [--client <label>]`, `account list`, and `account remove <label>`. Client labels MUST resolve only within their explicit provider; Account and Source labels MUST be globally unique bare handles. An omitted Client label MUST default verbatim to the provider id, an omitted Account label MUST default verbatim to the verified provider identity, and an omitted Source label MUST default verbatim to `<account-label>-<adapter-tail>` or `<adapter-tail>` when no Account is required. Labels MUST NOT be normalized, prompted for, or automatically suffixed.
+
+OAuth client credentials MUST be read from the provider's declared environment names only during `client add --from-env` and persisted through typed secret references. Account authorization and token refresh MUST use the persisted Client/Grant records and MUST NOT re-read Client credentials from the environment. With one Client for a provider, `account add` MUST select it automatically; with none or more than one, it MUST fail with actionable Client-add or `--client` guidance.
 
 CLI output SHOULD be token-efficient by default: compact human-readable text with one item per line and only key fields. Verbose human output and machine-readable JSON SHOULD be opt-in flags.
 
@@ -305,7 +310,7 @@ User-facing configuration SHOULD be reachable through CLI commands. Direct TOML 
 
 The CLI MUST NOT use interactive TTY prompts for required input. Every required input MUST be expressible via non-secret flags, environment variables, typed secret references, or explicitly declared stdin. Missing required input MUST fail with a clear error and a non-zero exit code, not by waiting for an interactive answer. The one permitted interactive surface is a user's browser during an explicitly requested OAuth authorization redirect. Headless and agent-driven flows MUST use a declared environment/secret input path; long-lived tokens, client secrets, and authorization codes MUST NOT be accepted as literal process arguments.
 
-References to entities that do not exist (unknown realm, unknown source id, unknown adapter id) MUST fail fast with an actionable error message and MUST NOT auto-create the missing entity unless an explicit create flag is passed.
+References to entities that do not exist (unknown realm, Client label, Account label/id, Source label/id, Grant id, or adapter id) MUST fail fast with an actionable error message and MUST NOT auto-create the missing entity unless an explicit create flag is passed. Source-referencing commands MUST accept an exact Source label wherever they accept a Source id.
 
 ## 10c. Skills surface
 
@@ -381,7 +386,7 @@ Mapping rules (normative):
 - `source_sync_state.last_status` = `failed` for every other terminal error.
 - `source_sync_state.last_status` = `disabled` is set only by the CLI, never by the runner.
 
-User-visible CLI exit codes MUST be stable: `0` success, `2` invalid usage, `10` `needs_auth`, `20` rate-limited, `30` network/provider, `40` permission denied, `50` other sync failure, `130` cancelled (SIGINT).
+User-visible CLI exit codes MUST be stable: `0` success, `2` invalid usage, `10` `needs_auth`, `20` rate-limited, `30` network/provider, `40` permission denied, `50` other sync failure, `130` cancelled (SIGINT). Client, Account, and Source label collisions MUST exit `2`, name the taken label, and make no change; they MUST NOT prompt, normalize, or automatically suffix the label.
 
 ## 13. Time and clock
 

@@ -8,7 +8,7 @@ CREATE TABLE realms (
 CREATE TABLE accounts (
   id TEXT NOT NULL PRIMARY KEY,
   provider TEXT NOT NULL,
-  label TEXT,
+  label TEXT NOT NULL UNIQUE,
   external_user_id TEXT NOT NULL,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
@@ -24,6 +24,16 @@ CREATE TABLE account_identities (
   UNIQUE(account_id, kind, value)
 );
 
+CREATE TABLE oauth_clients (
+  provider TEXT NOT NULL,
+  label TEXT NOT NULL,
+  client_id_ref TEXT NOT NULL,
+  client_secret_ref TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  UNIQUE(provider, label)
+);
+
 CREATE TABLE grants (
   id TEXT NOT NULL PRIMARY KEY,
   account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
@@ -35,7 +45,8 @@ CREATE TABLE grants (
   refresh_token_ref TEXT,
   expires_at INTEGER,
   created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
+  updated_at INTEGER NOT NULL,
+  UNIQUE(account_id)
 );
 
 CREATE TABLE sources (
@@ -44,7 +55,7 @@ CREATE TABLE sources (
   adapter_id TEXT NOT NULL,
   adapter_version INTEGER NOT NULL,
   grant_id TEXT REFERENCES grants(id),
-  display_name TEXT,
+  label TEXT NOT NULL UNIQUE,
   config_json TEXT NOT NULL,
   sync_enabled INTEGER NOT NULL DEFAULT 1 CHECK(sync_enabled IN (0, 1)),
   search_routing TEXT CHECK(search_routing IN ('indexed', 'federated', 'hybrid')),

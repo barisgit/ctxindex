@@ -196,9 +196,10 @@ function addSource(
   } = {},
 ) {
   db.prepare(
-    `INSERT INTO sources (id, realm_id, adapter_id, adapter_version, config_json, sync_enabled, search_routing, created_at, updated_at) VALUES (?, 'realm-1', ?, 1, ?, ?, ?, 1, 1)`,
+    `INSERT INTO sources (id, realm_id, label, adapter_id, adapter_version, config_json, sync_enabled, search_routing, created_at, updated_at) VALUES (?, 'realm-1', ?, ?, 1, ?, ?, ?, 1, 1)`,
   ).run(
     id,
+    `Test Source ${id}`,
     adapter,
     JSON.stringify(options.config ?? {}),
     options.enabled === false ? 0 : 1,

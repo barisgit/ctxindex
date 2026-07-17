@@ -7,7 +7,7 @@ Implements and bundles ctxindex's built-in provider adapters: indexed read-only 
 ## Design/patterns
 
 - `builtins.ts` is a composition-only root. `ctxindexBuiltinExtension` bundles provider-neutral calendar, communication-message, and file Profiles with Google Calendar, Gmail, local-directory, Microsoft Calendar, and Microsoft mailbox Adapter definitions; `CTXINDEX_BUILTIN_EXTENSIONS` is the host-facing registry input.
-- `google-oauth-provider.ts` and `microsoft/provider.ts` own reusable provider-neutral OAuth declarations, including endpoints, identity extraction, PKCE/client policy, scopes, credential environment keys, and allowed hosts.
+- `google-oauth-provider.ts` and `microsoft/provider.ts` own reusable provider-neutral OAuth declarations, including endpoints, identity extraction, PKCE/client policy, scopes, add-time client-credential environment keys, and allowed hosts. Built-ins declare a client ID plus Google's optional client secret; refresh tokens are Grant-owned runtime state rather than environment inputs.
 - Provider folders isolate configuration, definitions, provider DTO validation, operation implementations, response handling, canonical Refs, and transport/test routing. Draft handlers bind the shared communication Profile schemas while retaining provider-owned payload translation and mutation I/O. Detailed maps: `google-calendar/codemap.md`, `google-mailbox/codemap.md`, `local-directory/codemap.md`, and `microsoft/codemap.md`.
 
 ## Data & control flow

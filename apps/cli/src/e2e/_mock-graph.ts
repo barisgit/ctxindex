@@ -709,7 +709,6 @@ export function startMockGraph(
         CTXINDEX_OAUTH_MOCK_BASE_URL: baseUrl,
         CTXINDEX_GRAPH_MOCK_BASE_URL: baseUrl,
         CTXINDEX_MICROSOFT_CLIENT_ID: 'microsoft-fixture-client-id',
-        CTXINDEX_MICROSOFT_REFRESH_TOKEN: 'microsoft-initial-refresh-token',
         CTXINDEX_KEYTAR_MOCK_FILE: join(sandbox.dir, 'keytar.json'),
         ...extra,
       }

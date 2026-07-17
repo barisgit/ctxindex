@@ -136,8 +136,8 @@ async function freshDb(): Promise<Database> {
   await runMigrations(db)
   db.exec("INSERT INTO realms VALUES ('personal', 'personal', NULL, 1)")
   db.prepare(
-    'INSERT INTO sources (id, realm_id, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-  ).run(sourceId, 'personal', 'fake', 1, '{}', 1, 1)
+    'INSERT INTO sources (id, realm_id, adapter_id, adapter_version, label, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+  ).run(sourceId, 'personal', 'fake', 1, sourceId, '{}', 1, 1)
   dbs.push(db)
   return db
 }

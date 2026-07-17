@@ -81,6 +81,7 @@ describe('upsertAccount', () => {
     const input = {
       provider: 'google',
       externalUserId: 'subject',
+      label: 'person@example.com',
       verifiedIdentities: [
         { kind: 'email', value: 'person@example.com' },
         { kind: 'email', value: 'person@example.com' },
@@ -101,23 +102,26 @@ describe('upsertAccount', () => {
     ])
   })
 
-  test('keeps the same human label distinct across providers', () => {
+  test('rejects a label already held by another provider Account', () => {
     const accounts = service()
-    const google = accounts.upsertAccount({
+    accounts.upsertAccount({
       provider: 'google',
       externalUserId: 'google-subject',
       label: 'person@example.com',
       verifiedIdentities: [],
     })
-    const microsoft = accounts.upsertAccount({
-      provider: 'microsoft',
-      externalUserId: 'microsoft-subject',
-      label: 'person@example.com',
-      verifiedIdentities: [],
-    })
 
-    expect(google.accountId).not.toBe(microsoft.accountId)
-    expect(counts().accounts).toBe(2)
+    expect(() =>
+      accounts.upsertAccount({
+        provider: 'microsoft',
+        externalUserId: 'microsoft-subject',
+        label: 'person@example.com',
+        verifiedIdentities: [],
+      }),
+    ).toThrow(
+      'Account label "person@example.com" is already taken; choose another with --label',
+    )
+    expect(counts().accounts).toBe(1)
   })
 
   test('rejects malformed provider, stable subject, or verified identity before writes', () => {
@@ -252,9 +256,8 @@ describe('listAccountInventory', () => {
         ('realm-a', '\uE000-realm', 'Realm earlier', 1);
       INSERT INTO grants (id, account_id, provider, scopes_json, access_token_ref, expires_at, created_at, updated_at) VALUES
         ('grant-empty', '${earlier}', '\uE000-provider', '["scope-z","scope-a","scope-a"]', 'keychain:secret-empty', NULL, 1, 1),
-        ('grant-expired', '${earlier}', '\uE000-provider', 'scope-b scope-a', 'file:secret-expired', 1999, 1, 1),
         ('grant-active', '${later}', '𐀀-provider', '["𐀀","\uE000"]', 'keychain:secret-active', 2001, 1, 1);
-      INSERT INTO sources (id, realm_id, adapter_id, adapter_version, grant_id, display_name, config_json, created_at, updated_at) VALUES
+      INSERT INTO sources (id, realm_id, adapter_id, adapter_version, grant_id, label, config_json, created_at, updated_at) VALUES
         ('𐀀-source', 'realm-z', '𐀀-adapter', 2, 'grant-active', 'Later source', '{}', 1, 1),
         ('\uE000-source', 'realm-a', '\uE000-adapter', 1, 'grant-active', 'Earlier source', '{}', 1, 1),
         ('local-source', 'realm-a', 'local-directory', 1, NULL, 'Local', '{"path":"/sensitive"}', 1, 1);
@@ -273,13 +276,6 @@ describe('listAccountInventory', () => {
             expiryState: 'unknown',
             sources: [],
           },
-          {
-            id: 'grant-expired',
-            scopes: ['scope-a', 'scope-b'],
-            expiresAt: 1999,
-            expiryState: 'expired',
-            sources: [],
-          },
         ],
       },
       {
@@ -295,7 +291,7 @@ describe('listAccountInventory', () => {
             sources: [
               {
                 id: '\uE000-source',
-                displayName: 'Earlier source',
+                label: 'Earlier source',
                 adapter: { id: '\uE000-adapter', version: 1 },
                 realm: {
                   id: 'realm-a',
@@ -305,7 +301,7 @@ describe('listAccountInventory', () => {
               },
               {
                 id: '𐀀-source',
-                displayName: 'Later source',
+                label: 'Later source',
                 adapter: { id: '𐀀-adapter', version: 2 },
                 realm: { id: 'realm-z', slug: '𐀀-realm', label: 'Realm later' },
               },

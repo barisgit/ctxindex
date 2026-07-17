@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import { createSandbox, type Sandbox } from '@ctxindex/core/testing'
 import { type MockGmailServer, startMockGmail } from './_mock-gmail'
+import { installLoopbackBrowser } from './_oauth-account'
 
 function parseSourceId(stdout: string): string {
   const match = /^source added: (.+)$/m.exec(stdout)
@@ -12,18 +13,36 @@ async function initialize(
   sandbox: Sandbox,
   mock: MockGmailServer,
 ): Promise<{ env: Record<string, string | undefined>; sourceId: string }> {
-  const env = mock.env(sandbox)
+  const bin = await installLoopbackBrowser(sandbox.dir)
+  const env = mock.env(sandbox, {
+    PATH: `${bin}:${process.env.PATH ?? ''}`,
+    CTXINDEX_LOOPBACK_TIMEOUT_SECS: '5',
+  })
   const init = await sandbox.run(['init'])
   expect(init.exitCode, init.stderr).toBe(0)
   const realm = await sandbox.run(['realm', 'add', 'mail'])
   expect(realm.exitCode, realm.stderr).toBe(0)
-  const auth = await sandbox.run(
-    ['auth', 'add', 'google', '--adapter', 'google.mailbox', '--from-env'],
+  const client = await sandbox.run(['client', 'add', 'google', '--from-env'], {
+    env,
+  })
+  expect(client.exitCode, client.stderr).toBe(0)
+  const account = await sandbox.run(
+    ['account', 'add', 'google', '--label', 'gmail'],
     { env },
   )
-  expect(auth.exitCode, auth.stderr).toBe(0)
+  expect(account.exitCode, account.stderr).toBe(0)
   const source = await sandbox.run(
-    ['source', 'add', '--adapter', 'google.mailbox', '--realm', 'mail'],
+    [
+      'source',
+      'add',
+      'google.mailbox',
+      '--realm',
+      'mail',
+      '--account',
+      'gmail',
+      '--label',
+      'gmail-mailbox',
+    ],
     { env },
   )
   expect(source.exitCode, source.stderr).toBe(0)
@@ -119,7 +138,7 @@ test('mocked Gmail remote search and cached get use stable canonical Refs', asyn
     mock.stop()
     await sandbox.cleanup()
   }
-})
+}, 30_000)
 
 test('Gmail get rejects malformed and nonexistent provider Refs', async () => {
   const sandbox = await createSandbox()
@@ -151,4 +170,4 @@ test('Gmail get rejects malformed and nonexistent provider Refs', async () => {
     mock.stop()
     await sandbox.cleanup()
   }
-})
+}, 30_000)

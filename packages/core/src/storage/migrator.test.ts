@@ -106,9 +106,9 @@ test('fresh core migration creates only the generic V1 storage model', async () 
   ).run()
   db.prepare(
     `INSERT INTO sources (
-       id, realm_id, adapter_id, adapter_version, config_json, created_at,
+       id, realm_id, label, adapter_id, adapter_version, config_json, created_at,
        updated_at
-     ) VALUES ('source-1', 'realm-1', 'fixture.adapter', 1, '{}', 1, 1)`,
+     ) VALUES ('source-1', 'realm-1', 'Fixture Source', 'fixture.adapter', 1, '{}', 1, 1)`,
   ).run()
   expect(() =>
     db
@@ -140,26 +140,26 @@ test('fresh Account schema requires stable provider identity and enforces its un
   ).toBe(1)
 
   db.prepare(
-    "INSERT INTO accounts (id, provider, external_user_id, created_at, updated_at) VALUES ('one', 'google', 'subject', 1, 1)",
+    "INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES ('one', 'google', 'Google One', 'subject', 1, 1)",
   ).run()
   expect(() =>
     db
       .prepare(
-        "INSERT INTO accounts (id, provider, external_user_id, created_at, updated_at) VALUES ('two', 'google', 'subject', 1, 1)",
+        "INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES ('two', 'google', 'Google Two', 'subject', 1, 1)",
       )
       .run(),
   ).toThrow()
   expect(() =>
     db
       .prepare(
-        "INSERT INTO accounts (id, provider, external_user_id, created_at, updated_at) VALUES ('three', 'microsoft', 'subject', 1, 1)",
+        "INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES ('three', 'microsoft', 'Microsoft Three', 'subject', 1, 1)",
       )
       .run(),
   ).not.toThrow()
   expect(() =>
     db
       .prepare(
-        "INSERT INTO accounts (id, provider, created_at, updated_at) VALUES ('missing', 'google', 1, 1)",
+        "INSERT INTO accounts (id, provider, label, created_at, updated_at) VALUES ('missing', 'google', 'Missing Account', 1, 1)",
       )
       .run(),
   ).toThrow()
@@ -171,7 +171,7 @@ test('field index enforces one typed value and ordered uniqueness', async () => 
 
   db.exec("INSERT INTO realms VALUES ('personal', 'personal', NULL, 1)")
   db.exec(
-    "INSERT INTO sources (id, realm_id, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAV', 'personal', 'fake', 1, '{}', 1, 1)",
+    "INSERT INTO sources (id, realm_id, label, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAV', 'personal', 'Field Index Source', 'fake', 1, '{}', 1, 1)",
   )
   db.exec(
     "INSERT INTO resources (id, ref, source_id, realm_id, profile_id, profile_version, origin, created_at, updated_at) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAW', 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/a', '01ARZ3NDEKTSV4RRFFQ69G5FAV', 'personal', 'fake.record', 1, 'synced', 1, 1)",
@@ -210,7 +210,7 @@ test('Resource FTS retains tombstone envelopes and removes hard-deleted rows', a
   await runMigrations(db)
   db.exec("INSERT INTO realms VALUES ('personal', 'personal', NULL, 1)")
   db.exec(
-    "INSERT INTO sources (id, realm_id, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES ('source', 'personal', 'fake', 1, '{}', 1, 1)",
+    "INSERT INTO sources (id, realm_id, label, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES ('source', 'personal', 'Retention Source', 'fake', 1, '{}', 1, 1)",
   )
   db.exec(
     "INSERT INTO resources (id, ref, source_id, realm_id, profile_id, profile_version, title, summary, origin, created_at, updated_at) VALUES ('resource', 'ctx://source/one', 'source', 'personal', 'fake.record', 1, 'Retained title', 'Retained summary', 'synced', 1, 1)",
@@ -308,9 +308,9 @@ test('fresh Artifact schema enforces ownership, stable refs, retention, and hash
   db.exec(`
     INSERT INTO realms (id, slug, created_at) VALUES ('realm', 'test', 1);
     INSERT INTO sources (
-      id, realm_id, adapter_id, adapter_version, config_json, created_at, updated_at
+      id, realm_id, label, adapter_id, adapter_version, config_json, created_at, updated_at
     ) VALUES (
-      '01ARZ3NDEKTSV4RRFFQ69G5FAV', 'realm', 'fake', 1, '{}', 1, 1
+      '01ARZ3NDEKTSV4RRFFQ69G5FAV', 'realm', 'Artifact Source', 'fake', 1, '{}', 1, 1
     );
     INSERT INTO resources (
       id, ref, source_id, realm_id, profile_id, profile_version, origin,

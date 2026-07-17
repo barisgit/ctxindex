@@ -80,8 +80,15 @@ Profile Actions are in scope; arbitrary Extension subcommands are not.
 - **Realm** — user-defined operating context such as personal, company, or
   university. Every Source belongs to exactly one Realm; no filter means all
   Realms, while an explicit filter is exact. There is no special global Realm.
-- **Source** — one configured connection instance (Account, Realm, config,
-  sync on/off) using exactly one Adapter.
+- **Client** — persisted OAuth application credentials/configuration for one
+  provider. Its verbatim label defaults to the provider id and is unique there.
+- **Account** — one stable provider identity with a globally unique local label
+  defaulting verbatim to the verified provider identity.
+- **Grant** — one internal stable permission/token record per Account, updated
+  in place on reauthorization and shareable by compatible Sources.
+- **Source** — one globally labeled configured connection instance (Grant,
+  Realm, config, sync on/off) using exactly one Adapter. Its verbatim default
+  label is `<account-label>-<adapter-tail>`, or `<adapter-tail>` without auth.
 - **Extension** — distributable module bundling Profiles and Adapters via
   `defineExtension`; it has no operations or command surface of its own.
 - **Profile** — versioned, schema-backed declaration of a domain shape plus
@@ -109,14 +116,17 @@ Profile Actions are in scope; arbitrary Extension subcommands are not.
 Dependency DAG:
 
 ```text
-Realm ─contains─> Source ─uses─> AdapterDef <──────┐
-                         │          ▲              │
-                         │          │              │
-Extension ─bundles───────┼────> ProfileDef         │
-                         │          │ declares     │
-                         │          ▼              │
-                         │       ActionDef ─implemented by─┘
+Client ─authorizes─> Account ─owns─> Grant
+                                      ▲
+                                      │ binds
+Realm ─contains─> Source ─────────────┘
                          │
+                         ├─ uses ────────────────> AdapterDef <──────┐
+                         │                           ▲                │
+Extension ─bundles───────┼────────────────────> ProfileDef           │
+                         │                           │ declares       │
+                         │                           ▼                │
+                         │                        ActionDef ─implemented by─┘
                          ├─ sync/search/retrieve ─> Resource + Relation + Artifact
                          └─ action run ────────────> Resource (for example Draft)
 
@@ -200,7 +210,8 @@ V1 starts from a fresh generic schema with no per-domain tables:
 | `chunks` (+FTS) | searchable text segments |
 | `relations` + `relation_resolutions` | Logical Ref/natural-key edges plus zero-to-many cached Resource matches |
 | `artifacts` | CAS metadata: stable Artifact Ref, owning Resource, hash, media type, size, origin Ref, fixed `cached` retention class, local path |
-| `sources` + sync bookkeeping | sync_runs, sync_locks, source_sync_state, tombstones, accounts, grants, user-defined realms |
+| `oauth_clients` | Provider-scoped Client labels, typed credential refs, and timestamps |
+| `sources` + sync bookkeeping | sync_runs, sync_locks, source_sync_state, tombstones, globally labeled accounts/sources, one grant per account, user-defined realms |
 
 Prototype tables such as `items`, `mail_messages`, `mail_bodies`, and
 `mail_attachments` are not part of V1. Development databases are deleted and
@@ -314,14 +325,17 @@ auth: { kind: "basic" } | { kind: "none" } | { kind: "custom" }
 ```
 
 Core runs declarative flows, stores secrets, refreshes tokens, surfaces
-`needs_auth` (exit 10) uniformly, hands adapters a pre-authorized `ctx.fetch`.
-OAuth consent derives from explicitly selected loaded Adapters: provider base
-scopes plus only their sorted scope union. Core resolves stable provider
-identity, upserts one Account per `(provider, external subject)`, records
-verified Account Identities, and stores exact Grants. Reads route typed secret
-references to their backend while new writes use only the configured backend;
-there is no silent fallback. `custom` grants only `ctx.secrets.get/set`
-(namespaced).
+`needs_auth` (exit 10) uniformly, and hands adapters a pre-authorized `ctx.fetch`.
+`client add --from-env` reads declared Client environment names once and stores
+typed secret references plus provider-scoped labeled metadata; runtime never
+consults those environment values. `account add` resolves one persisted Client
+for its provider and requests provider base scopes plus the sorted union of all
+loaded same-provider Adapters. Core resolves stable provider identity, upserts
+one globally labeled Account per `(provider, external subject)`, records
+verified Account Identities, and creates or updates that Account's one Grant in
+place. Reads route typed secret references to their backend while new writes use
+only the configured backend; there is no silent fallback. `custom` grants only
+`ctx.secrets.get/set` (namespaced).
 
 ### Realms and Sources (D20)
 
@@ -330,10 +344,12 @@ existing Realm; initialization seeds no `global` Realm. An unfiltered query
 spans all Realms, while `--realm company` includes only company Sources.
 Realms organize reasoning and search, not authorization.
 
-An Account may own multiple Grants and back multiple Sources. Multiple Sources
-may explicitly share one compatible Grant; authorization never creates an
-"account Source", and Source creation never selects the latest Grant
-implicitly when more than one is compatible.
+Each Account owns exactly one stable Grant and may back multiple Sources.
+Reauthorization updates that Grant in place so existing Source bindings remain
+valid. Source creation resolves `--account` by exact globally unique Account
+label, then Account id, then Grant id, restricted to the Adapter's provider;
+authorization never creates an "account Source" or selects a global/latest
+Grant.
 
 ### Typed Actions (D21)
 
@@ -421,12 +437,16 @@ before building bespoke fetch logic.
 
 ```text
 ctxindex init
-ctxindex auth add <provider> --adapter <id>... (--loopback|--from-env)
+ctxindex client add <provider> [--label <label>] --from-env
+ctxindex client list
+ctxindex client remove <provider> <label>
+ctxindex account add <provider> [--label <label>] [--client <label>]
 ctxindex account list [--json]
+ctxindex account remove <label>
 ctxindex realm add|list|remove
-ctxindex source add <adapter-id> --realm <slug> [--account ...] [--no-sync] [adapter flags]
+ctxindex source add <adapter-id> --realm <slug> [--account <label|id>] [--label <label>] [--no-sync] [adapter flags]
 ctxindex source list|remove
-ctxindex sync [--source <id>] [--mode sync|resync|diff]
+ctxindex sync [--source <label|id>] [--mode sync|resync|diff]
 ctxindex search <query> [--realm|--source|--adapter|--kind|--field k=v ...]
                         [--since|--until] [--local-only|--remote]
                         [--include-deleted] [--explain] [--json]
@@ -436,10 +456,10 @@ ctxindex thread get <ref> [--json]
 ctxindex artifact list <ref> [--json]
 ctxindex artifact download <artifact-ref> [--output <path>]
 ctxindex export <ref> --format <fmt> [--output <path>]
-ctxindex action describe <action-id> [--source <id>] [--json]
-ctxindex action run <action-id> --source <id> --input <json-or-file> [--json]
-ctxindex status [--source <id>] [--json]
-ctxindex purge index|raw|artifacts|adhoc|source <id>
+ctxindex action describe <action-id> [--source <label|id>] [--json]
+ctxindex action run <action-id> --source <label|id> --input <json-or-file> [--json]
+ctxindex status [--source <label|id>] [--json]
+ctxindex purge index|raw|artifacts|adhoc|source <label|id>
 ctxindex extensions list
 ctxindex describe [profile|adapter|action] [id] [--json]
 ctxindex skills list|get|path      # retained; ACF may supersede

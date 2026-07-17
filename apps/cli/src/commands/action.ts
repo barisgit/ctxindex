@@ -6,7 +6,7 @@ export const actionDescribeCommand = defineCommand({
   meta: { name: 'describe', description: 'Describe a registry Action.' },
   args: {
     'action-id': { type: 'positional', required: false },
-    source: { type: 'string', description: 'Exact Source ID' },
+    source: { type: 'string', description: 'Exact Source label or ID' },
     json: { type: 'boolean', description: 'Print deterministic JSON' },
   },
   run: ({ rawArgs }) =>
@@ -17,7 +17,7 @@ export const actionRunCommand = defineCommand({
   meta: { name: 'run', description: 'Run a registry Action.' },
   args: {
     'action-id': { type: 'positional', required: false },
-    source: { type: 'string', description: 'Exact Source ID' },
+    source: { type: 'string', description: 'Exact Source label or ID' },
     input: {
       type: 'string',
       description: 'Inline JSON object or UTF-8 JSON file path',

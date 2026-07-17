@@ -5,7 +5,7 @@ import { handleSyncCommand } from '../sync/runner'
 export const syncCommand = defineCommand({
   meta: { name: 'sync', description: 'Run a sync for one or all sources.' },
   args: {
-    source: { type: 'string', description: 'Source ID' },
+    source: { type: 'string', description: 'Source label or ID' },
     mode: {
       type: 'enum',
       options: ['sync', 'resync', 'diff'],

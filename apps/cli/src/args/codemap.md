@@ -2,30 +2,20 @@
 
 ## Responsibility
 
-Pure argument-parsing layer that converts raw argv segments into typed command descriptors for CLI handlers.
+Pure argv parsing into typed discriminated command unions.
 
 ## Design / patterns
 
-- Parsers return discriminated unions keyed by `kind`, including operation, `help`, and `unknown` variants.
-- `flags.ts` centralizes `parseFlags`, `hasHelpFlag`, `stringFlag`, and `listFlag`; its opt-in strict mode returns typed unknown/duplicate/missing-value failures for closed command grammars while non-strict parsing retains repeatable flags.
-- Ref-bearing parsers (`artifact.ts`, `export.ts`, `get.ts`, `thread-get.ts`) validate with `parseRef`.
-- `source.ts` derives dynamic `--config-*` value flags from `SourceDescription.configOptions` and coerces declared primitive/array types.
-- `describe.ts` validates the progressive selector/id grammar, text/Markdown/JSON formats, and explicit `--full` snapshot mode while rejecting redundant or conflicting forms.
-- `account.ts` accepts the closed `account list [--json]` inventory grammar and returns typed list/help/unknown variants.
-- `secrets.ts` keeps the secret surface deliberately narrow: safe `status [--json]` and typed `backend set <keychain|file>` forms only, with no literal-secret or passphrase arguments.
-- Each command module exports usage text alongside its parser and result types.
+- `flags.ts` centralizes help, scalar/list extraction, duplicate detection, and strict closed-grammar failures.
+- `client.ts` accepts only add-from-environment, safe list, and provider-scoped remove; no client credential value is accepted on argv.
+- `account.ts` accepts provider authorization with optional Account/client labels, deterministic inventory, and label removal.
+- `source.ts` derives `--config-*` values from registry descriptions, accepts `--label` and Account label/Account ID/Grant ID references, and rejects removed `--name` / `--display-name` forms.
+- Ref-bearing parsers validate stable `ctx://` / Artifact Refs; search/sync/status/Action source flags remain strings for later label-or-ID resolution.
 
 ## Data & control flow
 
-1. A command handler passes its remaining `string[]` to `parse*Args`.
-2. Help detection and flag decomposition separate options from positionals.
-3. The parser validates subcommands, required values, conflicts, refs, and command-specific values.
-4. Success returns a typed operation; invalid input returns `{ kind: "unknown", message }`; handlers perform all I/O.
-
-Notable specializations include date/limit/field parsing in `search.ts`, provider/Adapter selection plus exactly-one-mode validation in `auth.ts`, and sync mode/output selection in `sync.ts`.
+Handlers pass remaining argv to `parse*Args`; parsers split flags/positionals, validate required values and conflicts, then return an operation, `help`, or `{ kind: "unknown", message }`. Parsers perform no I/O.
 
 ## Integration points
 
-- Consumed by matching modules under `apps/cli/src/commands/`, plus handlers under `action/`, `artifact/`, `auth/`, `source/`, and `sync/`.
-- Domain types come from `@ctxindex/core`, `@ctxindex/core/registry`, `@ctxindex/core/secrets`, and `@ctxindex/extension-sdk`.
-- Production parser modules are `account.ts`, `action.ts`, `artifact.ts`, `auth.ts`, `describe.ts`, `export.ts`, `extensions.ts`, `get.ts`, `purge.ts`, `realm.ts`, `search.ts`, `secrets.ts`, `skills.ts`, `source.ts`, `status.ts`, `sync.ts`, and `thread-get.ts`.
+Consumed by matching command/workflow modules. Domain grammar types come from core registry, source, secrets, and Ref capabilities.

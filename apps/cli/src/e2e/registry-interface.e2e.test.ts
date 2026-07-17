@@ -139,7 +139,7 @@ test('interpreted registry interface follows an explicit external Extension', as
     expect(googleAuth.exitCode, googleAuth.stderr).toBe(0)
     expect(googleAuth.stdout).toContain('provider: google')
     expect(googleAuth.stdout).toContain(
-      'environment: client-id=CTXINDEX_GOOGLE_CLIENT_ID, client-secret=CTXINDEX_GOOGLE_CLIENT_SECRET, refresh-token=CTXINDEX_GOOGLE_REFRESH_TOKEN',
+      'environment: client-id=CTXINDEX_GOOGLE_CLIENT_ID, client-secret=CTXINDEX_GOOGLE_CLIENT_SECRET',
     )
     expect(googleAuth.stdout).toContain(
       'Adapter scopes: https://www.googleapis.com/auth/gmail.readonly',
@@ -160,7 +160,6 @@ test('interpreted registry interface follows an explicit external Extension', as
         provider: {
           environment: {
             clientId: 'CTXINDEX_GOOGLE_CLIENT_ID',
-            refreshToken: 'CTXINDEX_GOOGLE_REFRESH_TOKEN',
           },
         },
       },
@@ -188,7 +187,6 @@ test('interpreted registry interface follows an explicit external Extension', as
           baseScopes: ['openid', 'offline_access', 'User.Read'],
           environment: {
             clientId: 'CTXINDEX_MICROSOFT_CLIENT_ID',
-            refreshToken: 'CTXINDEX_MICROSOFT_REFRESH_TOKEN',
           },
         },
       },
@@ -237,6 +235,8 @@ test('interpreted registry interface follows an explicit external Extension', as
     expect(help.stdout).toContain('INTERFACE')
     expect(help.stdout).toContain('ctxindex describe <type> <id> --json')
     expect(help.stdout).not.toContain('enarocanje.tender@1')
+    expect(help.stdout).toContain('client')
+    expect(help.stdout).not.toMatch(/\bauth\b/)
 
     for (const args of [
       ['search', '--help'],
@@ -244,7 +244,7 @@ test('interpreted registry interface follows an explicit external Extension', as
       ['action', '--help'],
       ['describe', '--help'],
       ['extensions', '--help'],
-      ['auth', '--help'],
+      ['client', '--help'],
       ['account', '--help'],
     ]) {
       const commandHelp = await run(args)

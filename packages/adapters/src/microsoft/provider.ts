@@ -23,7 +23,6 @@ export const microsoftOAuthProvider = {
   baseScopes: ['openid', 'offline_access', 'User.Read'],
   environment: {
     clientId: 'CTXINDEX_MICROSOFT_CLIENT_ID',
-    refreshToken: 'CTXINDEX_MICROSOFT_REFRESH_TOKEN',
   },
   allowedHosts: ['login.microsoftonline.com', 'graph.microsoft.com'],
   fixedAuthorizationParams: { prompt: 'select_account' },

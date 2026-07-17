@@ -13,7 +13,7 @@ export const sources = sqliteTable(
     adapterId: text('adapter_id').notNull(),
     adapterVersion: integer('adapter_version', { mode: 'number' }).notNull(),
     grantId: text('grant_id').references(() => grants.id),
-    displayName: text('display_name'),
+    label: text('label').notNull().unique(),
     configJson: text('config_json').notNull(),
     syncEnabled: integer('sync_enabled', { mode: 'boolean' })
       .notNull()

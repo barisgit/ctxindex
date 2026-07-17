@@ -46,6 +46,7 @@ export interface AuthDependencies {
 
 export interface AuthService {
   addGrant(input: AddGrantInput): Promise<AddGrantResult>
+  removeAccount(label: string): Promise<void>
   getGrantById(grantId: string): Promise<GrantRow | null>
   listGrants(provider?: string): Promise<readonly GrantRow[]>
   resolveLinkedGrantAccessToken(

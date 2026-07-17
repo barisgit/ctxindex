@@ -102,7 +102,8 @@ field_index               ordered rows with one native typed value column
 chunks + FTS              searchable text
 relations + resolutions   logical Ref/string-natural-key edges and zero-to-many matches
 artifacts                 content-addressed metadata and local path
-sources/sync bookkeeping  Accounts, Grants, Realms, Sources, cursors, runs, locks
+oauth_clients             provider-scoped labels, typed credential refs, timestamps
+sources/sync bookkeeping  labeled Accounts/Sources, one Grant per Account, Realms, cursors, runs, locks
 ```
 
 `field_index` stores a ULID, Resource id, field name, declared type, ordinal,
@@ -130,15 +131,15 @@ Artifact bytes live under the ctxindex data directory by content hash. SQLite st
 
 Realms are ordinary user-defined rows; initialization does not seed a `global` Realm. Source creation requires an explicit existing Realm. Unfiltered search spans all Realms; filtered search uses exactly the requested Realm set.
 
-A Source binds exactly one Adapter, one Realm, one config payload, and when required one compatible Grant. Sync enablement is Source configuration, not Source identity.
+A Source binds exactly one Adapter, one Realm, one config payload, and when required one compatible Grant. It carries one globally unique verbatim label, replacing a separate display name. Without `--label`, the default is `<account-label>-<adapter-tail>` or `<adapter-tail>` when no Account is required. Sync enablement is Source configuration, not Source identity.
 
 ## 8a. Secrets, Accounts, and provider authorization
 
 A routing Secret Vault resolves reads/deletes by typed `keychain:` or `file:` reference and sends new writes only to the backend persisted in config. Fresh initialization probes Keychain once and persists either Keychain or an explicitly prepared encrypted-file backend. Backend changes use copy-first, reference-update, atomic-config, then cleanup ordering; mixed references remain readable during interruption. Secret values and passphrases never enter argv.
 
-Accounts use a unique stable `(provider, external_user_id)` subject. Mutable verified email/principal values live in `account_identities`; Grants retain exact normalized scopes and secret references; Sources retain explicit compatible Grant ids. One Account module owns upsert and nested inventory SQL.
+Accounts use a unique stable `(provider, external_user_id)` subject and a globally unique verbatim local label defaulting to the verified provider identity. Mutable verified email/principal values live in `account_identities`. Each Account owns one stable Grant whose exact normalized scopes and secret references are updated in place on reauthorization; Sources retain explicit compatible Grant ids. One Account module owns upsert, removal, and nested inventory SQL.
 
-OAuth Adapter declarations carry a stable provider id, endpoint/identity JSON-path metadata, PKCE/client mode, provider base scopes, safe environment names, and allowed hosts. `auth add` selects loaded Adapter ids and core requests only their scope union. One core host flow owns explicit loopback, state/PKCE, token/identity validation, refresh rotation, Account/Grant persistence, and cleanup. Provider response schemas and Resource normalization remain in provider-owned Adapter modules.
+OAuth Adapter declarations carry a stable provider id, endpoint/identity JSON-path metadata, PKCE/client mode, provider base scopes, safe environment names, and allowed hosts. `client add <provider> --from-env` reads those declared environment names once, stores credentials through the configured secret backend, and persists provider-scoped labeled Client metadata; runtime authorization never consults the environment. `account add` resolves one persisted Client for the provider and requests provider base scopes plus the sorted union of all loaded same-provider Adapters. One core host flow owns loopback authorization, state/PKCE, token/identity validation, refresh rotation, stable Account/Grant persistence, and cleanup. Provider response schemas and Resource normalization remain in provider-owned Adapter modules.
 
 ## 9. Search and retrieval
 
@@ -172,7 +173,7 @@ No bespoke `mail draft` command is maintained in parallel.
 
 The loaded registries determine valid kinds/aliases, field names and parsers, Source configuration flags, export formats, and Actions. `ctxindex describe` exposes a compact generated index, selector-only forms narrow that index, exact-id forms expose full readable or JSON detail, and explicit `--full` requests the complete snapshot. Citty help points to this interface instead of appending all loaded definitions.
 
-All required input is non-interactive. OAuth opens a browser only when explicitly requested and has a headless environment/typed-secret path; codes, tokens, client secrets, and secret-store passphrases are never literal command arguments. Human text goes to stderr when structured output is requested; JSON data goes to stdout.
+All required input is non-interactive. OAuth Client credentials enter only through `client add --from-env` and are persisted as typed secret references; `account add` performs authorization with the persisted Client. Codes, tokens, client secrets, and secret-store passphrases are never literal command arguments. Human text goes to stderr when structured output is requested; JSON data goes to stdout.
 
 ## 12. Testing
 

@@ -3,7 +3,7 @@ import pkg from '../package.json' with { type: 'json' }
 import { accountCommand } from './commands/account'
 import { actionCommand } from './commands/action'
 import { artifactCommand } from './commands/artifact'
-import { authCommand } from './commands/auth'
+import { clientCommand } from './commands/client'
 import { describeCommand } from './commands/describe'
 import { exportCommand } from './commands/export'
 import { extensionsCommand } from './commands/extensions'
@@ -141,10 +141,10 @@ export const rootCommand = defineCommand({
   subCommands: {
     init: initCommand,
     account: accountCommand,
+    client: clientCommand,
     describe: describeCommand,
     extensions: extensionsCommand,
     action: actionCommand,
-    auth: authCommand,
     artifact: artifactCommand,
     purge: purgeCommand,
     realm: realmCommand,

@@ -8,11 +8,14 @@ Start with the [CLI overview](./reference/cli-overview.md).
 
 1. Initialize ctxindex.
 2. Create a Realm.
-3. Configure authentication when the Adapter requires it.
-4. Add a Source to that Realm.
-5. Search remotely immediately, or sync when the Source supports a local projection.
-6. Retrieve complete Resources by their stable `ctx://` Ref.
-7. Download Artifacts or export Profile-supported representations when needed.
+3. For an OAuth Adapter, add a provider client from its declared environment values.
+4. Authorize the provider Account with that persisted client.
+5. Add a Source to that Realm.
+6. Search remotely immediately, or sync when the Source supports a local projection.
+7. Retrieve complete Resources by their stable `ctx://` Ref.
+8. Download Artifacts or export Profile-supported representations when needed.
+
+Discover the provider id and client environment names with `ctxindex describe adapter <adapter-id> --json`, then run `ctxindex client add <provider> --from-env` once and `ctxindex account add <provider>`. The environment is read only by `client add`; authorization resolves the persisted client and never accepts credentials on argv. Client labels default to the provider id and are unique per provider; use `--client <label>` when several exist. Account labels default to the verified provider identity, and Source labels default to `<account-label>-<adapter-tail>` or `<adapter-tail>` without an Account. Account and Source labels are globally unique verbatim handles; collisions exit 2 without prompting or automatic suffixes. Use `client remove <provider> <label>` and `account remove <label>` for explicit cleanup.
 
 An unscoped search spans all configured Accounts and unauthenticated Sources.
 Use an explicit Realm filter to keep personal and work retrieval exact. Inspect
@@ -24,10 +27,11 @@ Source label.
 Calendar Sources are indexed: synchronize the selected calendar, search with
 the generated event alias, then retrieve complete events by their stable
 Source-scoped Ref.
-One compatible Grant can be shared by mailbox and calendar Sources for the same
-provider Account. Different provider Accounts remain separate even when their
-labels overlap. Inspect the Adapter definition for generated configuration
-flags and exact scopes.
+One stable Grant is shared by compatible mailbox and calendar Sources for the
+same provider Account and is updated in place on reauthorization. Account labels
+cannot overlap globally; identical cross-provider default identities require
+distinct explicit `--label` values, and collisions exit 2. Inspect the Adapter
+definition for generated configuration flags and exact scopes.
 
 Calendar Adapters are read-only and expose no mutation Actions.
 

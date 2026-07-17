@@ -95,6 +95,8 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
       'enarocanje.fixture',
       '--realm',
       'procurement',
+      '--label',
+      'public-tenders',
     ])
     expect(added.exitCode, added.stderr).toBe(0)
     expect(added.stderr).toBe('')
@@ -102,7 +104,7 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
     expect(sourceMatch?.[1]).toBeDefined()
     const sourceId = sourceMatch?.[1] as string
 
-    const synced = await run(['sync', '--source', sourceId, '--json'])
+    const synced = await run(['sync', '--source', 'public-tenders', '--json'])
     expect(synced.exitCode, synced.stderr).toBe(0)
     expect(synced.stderr).toBe('')
     expect(JSON.parse(synced.stdout)).toEqual({

@@ -2,26 +2,18 @@
 
 ## Responsibility
 
-Owns Source lifecycle and the Adapter execution boundary for sync, remote search, and retrieval, including Realm/Grant validation, provider context creation, and materialization of provider Resources.
+Owns Source lifecycle and Adapter execution boundaries for sync, remote search, and retrieval, including labels, Realm/Grant validation, provider contexts, and Resource materialization.
 
-## Design/patterns
+## Design / patterns
 
-- `createSourceService()` is a service factory over database, logger, registry, and optional Realm service dependencies; it validates Adapter config/routing/auth before persistence.
-- `createSourceProviderContext()` is an anti-corruption boundary: it resolves a persisted Source and Adapter, strips sensitive config keys, verifies Grant compatibility, and supplies a provider-safe fetch/logger/context.
-- Provider fetch rejects URLs outside the selected Adapter's `providerApiHosts` before token resolution, forces manual redirects, decorates OAuth requests with resolved tokens, and retries one 401 after forced refresh; auth/network errors are sanitized into core error categories.
-- `remote-search.ts`, `retrieve.ts`, and `sync-source.ts` are capability-specific Adapter operation facades.
+- `createSourceService()` validates Adapter config/routing/auth, derives verbatim labels, enforces global label uniqueness, and resolves Source label-or-ID references.
+- Defaults are `<account-label>-<adapter-tail>` for authenticated Sources or `<adapter-tail>` without an Account; no normalization or suffixing occurs.
+- Provider contexts strip sensitive config, enforce Grant compatibility and Adapter host allowlists, and perform bounded token refresh/retry behavior.
 
 ## Data & control flow
 
-1. `addSource()` resolves an explicit Realm, Adapter version, compatible Grant, routing override, and Zod-validated config, then inserts `sources`; list/status methods join Realm and sync state and annotate Adapter availability.
-2. Provider operations call `createSourceProviderContext()`, which loads Source/Grant rows, resolves the Adapter registry entry and token, then invokes the Adapter with sanitized config and controlled fetch.
-3. `searchSourceRemote()` verifies provider results against time/typed field filters, stores verified partial Resources as `adhoc`, and returns warnings.
-4. `getSourceResource()` returns cached deleted/hydrated data or `retrieveSourceResource()` enforces exactly one matching payload-bearing Resource and stores it complete; `syncSource()` drives Adapter sync through `SyncCoordinator`.
-5. `removeSource()` deletes one Source; canonical generic-table `ON DELETE CASCADE` declarations remove its Resources, fields, chunks, Relations/resolutions, Artifacts, sync state/runs/checkpoints/locks, and FTS index rows while unrelated Sources remain intact.
+Add resolves Realm, Adapter, Grant, routing, config, and label before inserting. List/status join Realm/sync state and annotate Adapter availability. Label-based commands resolve to stable IDs before remove/sync/search/status/Action operations. Provider operations invoke Adapter methods with controlled fetch and persist validated results; Source deletion cascades Source-owned generic rows.
 
 ## Integration points
 
-- Depends on `packages/core/src/registry/`, `auth/`, `realm/`, `resource/`, `ref/`, `storage/`, `sync/`, and `net/egressFetch`.
-- Adapter contracts come from `@ctxindex/extension-sdk`; concrete operations are supplied by `packages/adapters/` definitions.
-- `apps/cli/src/deps.ts` constructs `SourceService`; CLI source/status/get commands consume its types and methods, and `apps/cli/src/sync/runner.ts` calls `syncSource()`.
-- `index.ts` is exported as `@ctxindex/core/source`.
+Depends on registry, auth, realm, resource, ref, storage, sync, and egress. Constructed by CLI deps and consumed by Source/status/search/get/Action/sync workflows. Exported by `@ctxindex/core/source`.

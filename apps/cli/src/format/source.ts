@@ -1,4 +1,4 @@
-import { basename, dirname } from 'node:path'
+import { dirname } from 'node:path'
 import type { SourceRow } from '@ctxindex/core/source'
 import Table from 'cli-table3'
 
@@ -21,7 +21,7 @@ function compactValue(value: string | number | null | undefined): string {
 function compactSource(source: SourceRow): string {
   return [
     source.id,
-    `name=${compactValue(sourceName(source))}`,
+    `label=${compactValue(source.label)}`,
     `adapter=${compactValue(source.adapter_id)}`,
     `realm=${compactValue(source.realm_slug ?? source.realm_id)}`,
     `ref=${compactValue(sourceRef(source))}`,
@@ -69,13 +69,6 @@ function sourceRef(source: SourceRow): string {
   return '-'
 }
 
-function sourceName(source: SourceRow): string {
-  if (source.display_name) return source.display_name
-  const ref = sourceRef(source)
-  if (ref !== '-') return basename(ref) || ref
-  return source.adapter_id
-}
-
 function lastRun(source: SourceRow): string {
   return source.last_run_at
     ? new Date(source.last_run_at).toISOString().replace('T', ' ').slice(0, 16)
@@ -95,11 +88,10 @@ export function formatSources(
     // camelCase keys for consistency with status / search / auth JSON output.
     const rows = sources.map((source) => ({
       id: source.id,
-      name: source.display_name,
+      label: source.label,
       realmId: source.realm_id,
       realmSlug: source.realm_slug,
       adapterId: source.adapter_id,
-      displayName: source.display_name,
       ref: sourceRef(source),
       rootPath: rootPath(source),
       configJson: source.config_json,
@@ -148,7 +140,7 @@ export function formatSources(
   })
   for (const source of sources) {
     table.push([
-      sourceName(source),
+      source.label,
       source.adapter_id,
       source.realm_slug ?? source.realm_id,
       sourceRef(source),

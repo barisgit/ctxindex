@@ -2,21 +2,19 @@
 
 ## Responsibility
 
-Owns provider-neutral Account identity persistence and deterministic Account/Grant/Source inventory projection.
+Owns provider-neutral Account identity persistence and deterministic Account/Grant/labeled-Source inventory.
 
 ## Design / patterns
 
-- `createAccountService()` is a database-backed service factory implementing the contracts in `types.ts`.
-- `upsertAccount()` validates provider, external subject, and verified identities, then keys Accounts by `(provider, external_user_id)` and inserts identity rows idempotently in one transaction.
-- `listAccountInventory()` uses one joined query and in-memory grouping to project Accounts, Grants, linked Sources, Realms, normalized scopes, and computed expiry state.
-- `normalizeGrantScopes()` accepts stored string/JSON representations, deduplicates values, and sorts by Unicode code point.
+- `upsertAccount()` validates provider, external subject, verbatim label, and verified identities.
+- `(provider, external_user_id)` remains the identity key while Account labels are globally unique; reauthorization of the same identity may rename its existing Account.
+- Label conflict detection and identity writes occur in one transaction so outer Grant persistence can roll back cleanly.
+- Inventory uses one joined query plus deterministic in-memory grouping and scope normalization.
 
 ## Data & control flow
 
-OAuth identity discovery supplies an `UpsertAccountInput`; the service creates or finds the Account, optionally updates its label, and records verified identities. Inventory reads left-join Accounts through Grants and Sources to Realms, group rows by IDs, then return provider/ID-sorted nested values.
+OAuth identity discovery supplies the final default/explicit label. The service finds or creates the Account, rejects another Account holding that label, updates the same identity's label, records identities, and returns its stable ID. Inventory projects one Grant and labeled bound Sources with Realms and expiry state.
 
 ## Integration points
 
-- `packages/core/src/auth/service.ts` delegates Account creation during Grant persistence.
-- Uses `packages/core/src/storage/` for SQLite access, `schema/accounts.ts` invariants, `errors.ts` for validation failures, and `internal/code-point-order.ts` for deterministic ordering.
-- Exported by `@ctxindex/core/account` and the root core barrel.
+Used by `AuthService` Grant upsert; depends on storage, schema Account constraints, validation errors, and Unicode code-point ordering. Exported by `@ctxindex/core/account`.

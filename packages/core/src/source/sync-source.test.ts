@@ -67,8 +67,8 @@ async function setup(sync?: (context: SyncContext) => void | Promise<void>) {
   await runMigrations(db)
   db.exec("INSERT INTO realms VALUES ('realm-1', 'work', 'Work', 1)")
   db.prepare(
-    "INSERT INTO sources (id, realm_id, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES (?, 'realm-1', 'fake.sync', 1, ?, 1, 1)",
-  ).run(sourceId, JSON.stringify({ folder: '/tmp/root' }))
+    "INSERT INTO sources (id, realm_id, adapter_id, adapter_version, label, config_json, created_at, updated_at) VALUES (?, 'realm-1', 'fake.sync', 1, ?, ?, 1, 1)",
+  ).run(sourceId, sourceId, JSON.stringify({ folder: '/tmp/root' }))
   return { db, registry }
 }
 

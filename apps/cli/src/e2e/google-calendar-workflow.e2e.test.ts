@@ -7,6 +7,7 @@ import {
   type MockGoogleCalendarEvent,
   startMockGoogleCalendar,
 } from './_mock-google-calendar'
+import { installLoopbackBrowser } from './_oauth-account'
 
 function parseSourceId(stdout: string): string {
   const match = /^source added: (.+)$/m.exec(stdout)
@@ -69,23 +70,24 @@ const personalRoadmap: MockGoogleCalendarEvent = {
   end: { dateTime: '2026-07-21T17:30:00Z' },
 }
 
-test('compiled CLI shares one Google Grant across named mailbox and Calendar Sources', async () => {
+test('compiled CLI shares one Google Account across labeled mailbox and Calendar Sources', async () => {
   const sandbox = await createSandbox()
   const gmail = startMockGmail()
   const calendar = startMockGoogleCalendar({
     'team@example.test': [teamRoadmap, teamOffsite],
     'personal@example.test': [personalRoadmap],
   })
-  const env = calendar.env(
-    sandbox,
-    gmail.env(sandbox, {
-      CTXINDEX_GOOGLE_CLIENT_ID: 'public-client-id',
-      CTXINDEX_GOOGLE_CLIENT_SECRET: 'client-secret-canary',
-      CTXINDEX_GOOGLE_REFRESH_TOKEN: 'refresh-token-canary',
-    }),
-  )
-
   try {
+    const bin = await installLoopbackBrowser(sandbox.dir)
+    const env = calendar.env(
+      sandbox,
+      gmail.env(sandbox, {
+        PATH: `${bin}:${process.env.PATH ?? ''}`,
+        CTXINDEX_LOOPBACK_TIMEOUT_SECS: '5',
+        CTXINDEX_GOOGLE_CLIENT_ID: 'public-client-id',
+        CTXINDEX_GOOGLE_CLIENT_SECRET: 'client-secret-canary',
+      }),
+    )
     for (const command of [
       ['init'],
       ['realm', 'add', 'work'],
@@ -95,21 +97,17 @@ test('compiled CLI shares one Google Grant across named mailbox and Calendar Sou
       expect(result.exitCode, result.stderr).toBe(0)
     }
 
-    const authenticated = await sandbox.run(
-      [
-        'auth',
-        'add',
-        'google',
-        '--adapter',
-        'google.mailbox',
-        '--adapter',
-        'google.calendar',
-        '--from-env',
-      ],
+    const client = await sandbox.run(
+      ['client', 'add', 'google', '--from-env'],
       { env },
     )
-    expect(authenticated.exitCode, authenticated.stderr).toBe(0)
-    expect(authenticated.stdout).not.toContain('canary')
+    expect(client.exitCode, client.stderr).toBe(0)
+    const account = await sandbox.run(
+      ['account', 'add', 'google', '--label', 'google-account'],
+      { env },
+    )
+    expect(account.exitCode, account.stderr).toBe(0)
+    expect(account.stdout).not.toContain('canary')
 
     const db = new Database(
       join(sandbox.env.CTXINDEX_DATA_HOME, 'ctxindex.sqlite'),
@@ -137,7 +135,7 @@ test('compiled CLI shares one Google Grant across named mailbox and Calendar Sou
     const addSource = async (
       adapter: 'google.mailbox' | 'google.calendar',
       realm: 'work' | 'personal',
-      name: string,
+      label: string,
       calendarId?: string,
     ): Promise<string> => {
       const result = await sandbox.run(
@@ -148,9 +146,9 @@ test('compiled CLI shares one Google Grant across named mailbox and Calendar Sou
           '--realm',
           realm,
           '--account',
-          grantId,
-          '--name',
-          name,
+          'google-account',
+          '--label',
+          label,
           ...(calendarId ? ['--config-calendar-id', calendarId] : []),
         ],
         { env },
@@ -159,17 +157,20 @@ test('compiled CLI shares one Google Grant across named mailbox and Calendar Sou
       return parseSourceId(result.stdout)
     }
 
-    await addSource('google.mailbox', 'work', 'Primary Inbox')
+    const mailboxSourceLabel = 'primary-inbox'
+    const teamSourceLabel = 'team-calendar'
+    const personalSourceLabel = 'personal-calendar'
+    await addSource('google.mailbox', 'work', mailboxSourceLabel)
     const teamSourceId = await addSource(
       'google.calendar',
       'work',
-      'Team Calendar',
+      teamSourceLabel,
       'team@example.test',
     )
     const personalSourceId = await addSource(
       'google.calendar',
       'personal',
-      'Personal Calendar',
+      personalSourceLabel,
       'personal@example.test',
     )
 
@@ -178,16 +179,13 @@ test('compiled CLI shares one Google Grant across named mailbox and Calendar Sou
     expect(listed.stdout).not.toContain('canary')
     expect(listed.stdout).not.toContain('mock-google-subject')
     const inventory = JSON.parse(listed.stdout) as {
-      grants: { id: string; sources: { displayName: string }[] }[]
+      label: string
+      grants: { id: string; sources: { label: string }[] }[]
     }[]
     expect(inventory).toHaveLength(1)
+    expect(inventory[0]?.label).toBe('google-account')
     expect(inventory[0]?.grants).toHaveLength(1)
     expect(inventory[0]?.grants[0]?.id).toBe(grantId)
-    expect(
-      inventory[0]?.grants[0]?.sources
-        .map(({ displayName }) => displayName)
-        .sort(),
-    ).toEqual(['Personal Calendar', 'Primary Inbox', 'Team Calendar'])
 
     const sourceList = await sandbox.run(['source', 'list', '--json'], { env })
     expect(sourceList.exitCode, sourceList.stderr).toBe(0)
@@ -195,36 +193,32 @@ test('compiled CLI shares one Google Grant across named mailbox and Calendar Sou
     expect(
       (
         JSON.parse(sourceList.stdout) as {
-          displayName: string
+          label: string
           adapterId: string
           grantId: string
         }[]
       )
-        .map(({ displayName, adapterId, grantId: listedGrantId }) => ({
-          displayName,
+        .map(({ label, adapterId, grantId: listedGrantId }) => ({
+          label,
           adapterId,
           grantId: listedGrantId,
         }))
         .sort((left, right) =>
-          left.displayName < right.displayName
-            ? -1
-            : left.displayName > right.displayName
-              ? 1
-              : 0,
+          left.label < right.label ? -1 : left.label > right.label ? 1 : 0,
         ),
     ).toEqual([
       {
-        displayName: 'Personal Calendar',
+        label: personalSourceLabel,
         adapterId: 'google.calendar',
         grantId,
       },
       {
-        displayName: 'Primary Inbox',
+        label: mailboxSourceLabel,
         adapterId: 'google.mailbox',
         grantId,
       },
       {
-        displayName: 'Team Calendar',
+        label: teamSourceLabel,
         adapterId: 'google.calendar',
         grantId,
       },
@@ -234,7 +228,7 @@ test('compiled CLI shares one Google Grant across named mailbox and Calendar Sou
     calendar.resetRequests()
 
     const teamInitial = await sandbox.run(
-      ['sync', '--source', teamSourceId, '--json'],
+      ['sync', '--source', teamSourceLabel, '--json'],
       { env },
     )
     expect(teamInitial.exitCode, teamInitial.stderr).toBe(0)
@@ -246,7 +240,7 @@ test('compiled CLI shares one Google Grant across named mailbox and Calendar Sou
       deleted: 0,
     })
     const personalInitial = await sandbox.run(
-      ['sync', '--source', personalSourceId, '--json'],
+      ['sync', '--source', personalSourceLabel, '--json'],
       { env },
     )
     expect(personalInitial.exitCode, personalInitial.stderr).toBe(0)
@@ -322,7 +316,7 @@ test('compiled CLI shares one Google Grant across named mailbox and Calendar Sou
     })
 
     const unchanged = await sandbox.run(
-      ['sync', '--source', teamSourceId, '--json'],
+      ['sync', '--source', teamSourceLabel, '--json'],
       { env },
     )
     expect(unchanged.exitCode, unchanged.stderr).toBe(0)
@@ -351,7 +345,7 @@ test('compiled CLI shares one Google Grant across named mailbox and Calendar Sou
     calendar.upsertEvent('team@example.test', releaseEvent)
 
     const diff = await sandbox.run(
-      ['sync', '--source', teamSourceId, '--mode', 'diff', '--json'],
+      ['sync', '--source', teamSourceLabel, '--mode', 'diff', '--json'],
       { env },
     )
     expect(diff.exitCode, diff.stderr).toBe(0)
@@ -368,7 +362,7 @@ test('compiled CLI shares one Google Grant across named mailbox and Calendar Sou
     ).toBe('Roadmap planning')
 
     const reconciled = await sandbox.run(
-      ['sync', '--source', teamSourceId, '--json'],
+      ['sync', '--source', teamSourceLabel, '--json'],
       { env },
     )
     expect(reconciled.exitCode, reconciled.stderr).toBe(0)
@@ -397,7 +391,7 @@ test('compiled CLI shares one Google Grant across named mailbox and Calendar Sou
       end: { dateTime: '2035-01-01T10:00:00Z' },
     })
     const windowReconcile = await sandbox.run(
-      ['sync', '--source', teamSourceId, '--mode', 'resync', '--json'],
+      ['sync', '--source', teamSourceLabel, '--mode', 'resync', '--json'],
       { env },
     )
     expect(windowReconcile.exitCode, windowReconcile.stderr).toBe(0)
@@ -457,7 +451,7 @@ test('compiled CLI shares one Google Grant across named mailbox and Calendar Sou
         'run',
         'calendar.event.create',
         '--source',
-        teamSourceId,
+        teamSourceLabel,
         '--input',
         '{}',
         '--json',

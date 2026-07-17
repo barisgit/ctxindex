@@ -30,7 +30,26 @@ const adapter = defineAdapter({
   operations: {},
   actions: {},
 })
-const registry = createAdapterRegistry(createProfileRegistry([]), [adapter])
+const calendarAdapter = defineAdapter({
+  ...adapter,
+  id: 'example.calendar',
+  auth: { kind: 'oauth2', provider, scopes: ['calendar.read'] },
+})
+const otherProvider = testOAuthProvider({
+  id: 'other',
+  authorizationUrl: 'https://auth.other/authorize',
+  tokenUrl: 'https://auth.other/token',
+})
+const otherAdapter = defineAdapter({
+  ...adapter,
+  id: 'other.mail',
+  auth: { kind: 'oauth2', provider: otherProvider, scopes: ['other.read'] },
+})
+const registry = createAdapterRegistry(createProfileRegistry([]), [
+  adapter,
+  calendarAdapter,
+  otherAdapter,
+])
 function environment(name: string): string | undefined {
   return (
     {
@@ -41,7 +60,7 @@ function environment(name: string): string | undefined {
   )[name]
 }
 
-test('from-env absent token scope stores requested scopes and label never becomes subject', async () => {
+test('from-env stores all loaded provider scopes with a persisted client', async () => {
   let persisted: AddGrantInput | undefined
   const authService = {
     addGrant: async (input: AddGrantInput) => {
@@ -60,17 +79,27 @@ test('from-env absent token scope stores requested scopes and label never become
   const result = await authorizeProvider(
     {
       provider: 'example',
-      adapterIds: ['example.mail'],
       mode: 'from-env',
       label: 'Override',
     },
-    { registry, authService, readEnvironment: environment, now: () => 1000 },
+    {
+      registry,
+      authService,
+      resolveClient: async () => ({
+        provider: 'example',
+        label: 'default',
+        clientId: 'persisted-client',
+      }),
+      readEnvironment: environment,
+      now: () => 1000,
+    },
   )
-  expect(result.scopes).toEqual(['mail.read', 'openid'])
+  expect(result.scopes).toEqual(['calendar.read', 'mail.read', 'openid'])
   expect(persisted?.account).toMatchObject({
     externalUserId: 'stable-subject',
     label: 'Override',
   })
+  expect(persisted?.clientId).toBe('persisted-client')
   expect(persisted?.refreshToken).toBe('durable')
 })
 
@@ -91,8 +120,17 @@ test('malformed provider subject reaches no persistence', async () => {
         })) as unknown as typeof fetch
   await expect(
     authorizeProvider(
-      { provider: 'example', adapterIds: ['example.mail'], mode: 'from-env' },
-      { registry, authService, readEnvironment: environment },
+      { provider: 'example', mode: 'from-env' },
+      {
+        registry,
+        authService,
+        resolveClient: async () => ({
+          provider: 'example',
+          label: 'default',
+          clientId: 'persisted-client',
+        }),
+        readEnvironment: environment,
+      },
     ),
   ).rejects.toMatchObject({ code: 'identity_response_invalid' })
   expect(writes).toBe(0)

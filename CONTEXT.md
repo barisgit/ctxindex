@@ -15,16 +15,20 @@ A user-defined operating context, such as `personal`, `company`, or `university`
 _Avoid_: Tenant, security boundary, account, global realm
 
 **Source**:
-One configured connection to one collection of context through exactly one Source Adapter, belonging to exactly one Realm.
+One configured connection to one collection of context through exactly one Source Adapter, belonging to exactly one Realm and carrying a globally unique local label.
 _Avoid_: Integration, connector instance, sync target
 
+**Client**:
+Persisted OAuth application credentials and configuration for one provider, identified by a label unique within that provider and used to authorize Accounts.
+_Avoid_: Account, Grant, runtime environment configuration
+
 **Account**:
-An authenticated external identity that one or more Sources may use.
+One stable authenticated external identity within a provider, carrying a globally unique local label and usable by one or more Sources.
 _Avoid_: User, Realm, Source
 
 **Grant**:
-A permission set and secret reference through which ctxindex accesses an Account.
-_Avoid_: Account, raw token
+The internal stable permission set and secret references through which ctxindex accesses one Account; reauthorization updates it in place.
+_Avoid_: Account, raw token, user-selected credential
 
 **Account Identity**:
 An address or provider identity representing the Account owner for distinctions such as sent versus received mail.
@@ -94,8 +98,9 @@ _Avoid_: Source, import
 
 - A **Realm** contains zero or more **Sources**; every **Source** belongs to exactly one **Realm**.
 - An unscoped query considers all **Realms**; a realm-scoped query considers exactly the requested Realms.
-- A **Source** uses exactly one **Source Adapter** and may use one **Account** through one **Grant**.
-- One **Account** may own multiple **Grants** and back multiple **Sources**; multiple compatible **Sources** may explicitly share one **Grant**.
+- A **Client** authorizes zero or more **Accounts** for its provider; Client labels are unique per provider.
+- A **Source** uses exactly one **Source Adapter** and may use one **Account** through that Account's **Grant**; Account and Source labels are globally unique.
+- One **Account** owns exactly one stable **Grant** and may back multiple **Sources**; reauthorization updates the Grant in place, and multiple compatible Sources may explicitly share it.
 - An **Extension** bundles one or more **Profiles** and **Source Adapters**.
 - A **Profile** declares zero or more **Actions**; a **Source Adapter** implements the Actions it supports.
 - A **Source Adapter** emits **Resources**, **Relations**, and **Artifact** descriptors through sync, search, retrieval, and action results.

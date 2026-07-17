@@ -26,7 +26,6 @@ export const googleOAuthProvider = {
   environment: {
     clientId: 'CTXINDEX_GOOGLE_CLIENT_ID',
     clientSecret: 'CTXINDEX_GOOGLE_CLIENT_SECRET',
-    refreshToken: 'CTXINDEX_GOOGLE_REFRESH_TOKEN',
   },
   allowedHosts: [
     'accounts.google.com',

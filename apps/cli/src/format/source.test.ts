@@ -8,7 +8,7 @@ const source: SourceRow = {
   realm_slug: 'work',
   adapter_id: 'fixture.adapter',
   adapter_version: 1,
-  display_name: 'Fixture',
+  label: 'fixture',
   config_json: '{}',
   sync_enabled: true,
   created_at: 1,

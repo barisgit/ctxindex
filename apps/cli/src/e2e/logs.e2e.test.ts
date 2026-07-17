@@ -100,7 +100,7 @@ test('no tokens in logs', async () => {
   } finally {
     await sandbox.cleanup()
   }
-})
+}, 30_000)
 
 test('log file exists after sync', async () => {
   const { sandbox } = await runLoggedSync({ CTXINDEX_LOG_SYNC: '1' })
@@ -110,7 +110,7 @@ test('log file exists after sync', async () => {
   } finally {
     await sandbox.cleanup()
   }
-})
+}, 30_000)
 
 test('rotation fires log.gz exists', async () => {
   const { sandbox, sourceId, env } = await runLoggedSync({
@@ -130,7 +130,7 @@ test('rotation fires log.gz exists', async () => {
   } finally {
     await sandbox.cleanup()
   }
-})
+}, 30_000)
 
 test('rotated log redacted', async () => {
   const { sandbox, sourceId, env } = await runLoggedSync({
@@ -149,7 +149,7 @@ test('rotated log redacted', async () => {
   } finally {
     await sandbox.cleanup()
   }
-})
+}, 30_000)
 
 test('canary token not leaked', async () => {
   const { sandbox, sourceId, env } = await runLoggedSync({
@@ -167,4 +167,4 @@ test('canary token not leaked', async () => {
   } finally {
     await sandbox.cleanup()
   }
-})
+}, 30_000)

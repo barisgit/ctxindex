@@ -85,11 +85,12 @@ async function setup(retrieveCalls = { google: 0, microsoft: 0 }) {
   db.exec("INSERT INTO realms VALUES ('realm-personal', 'personal', NULL, 1)")
   db.exec("INSERT INTO realms VALUES ('realm-work', 'work', NULL, 1)")
   const insertSource = db.prepare(
-    'INSERT INTO sources (id, realm_id, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO sources (id, realm_id, label, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
   )
   insertSource.run(
     googleSourceId,
     'realm-personal',
+    'Google Calendar Fixture',
     'fake.google-calendar',
     1,
     '{}',
@@ -99,6 +100,7 @@ async function setup(retrieveCalls = { google: 0, microsoft: 0 }) {
   insertSource.run(
     microsoftSourceId,
     'realm-work',
+    'Microsoft Calendar Fixture',
     'fake.microsoft-calendar',
     1,
     '{}',

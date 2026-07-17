@@ -196,16 +196,23 @@ test('provider implementation and endpoint literals stay outside core and CLI', 
   ).toBe(false)
 })
 
-test('auth CLI has no literal long-lived credential inputs', async () => {
-  const authSources = (
+test('client and account CLIs have no literal long-lived credential inputs', async () => {
+  const accessSources = (
     await Promise.all(
-      ['args/auth.ts', 'commands/auth.ts'].map((path) =>
-        Bun.file(new URL(path, cliRoot)).text(),
-      ),
+      [
+        'args/client.ts',
+        'commands/client.ts',
+        'args/account.ts',
+        'commands/account.ts',
+      ].map((path) => Bun.file(new URL(path, cliRoot)).text()),
     )
   ).join('\n')
-  expect(authSources).not.toMatch(
-    /['"](?:client-secret|auth-code|refresh-token)['"]\s*:/,
+  expect(accessSources).not.toMatch(
+    /['"](?:client-id|client-secret|auth-code|refresh-token)['"]\s*:/,
+  )
+  expect(await Bun.file(new URL('args/auth.ts', cliRoot)).exists()).toBe(false)
+  expect(await Bun.file(new URL('commands/auth.ts', cliRoot)).exists()).toBe(
+    false,
   )
 })
 

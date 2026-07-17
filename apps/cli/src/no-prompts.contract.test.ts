@@ -65,6 +65,8 @@ async function mkSandbox(): Promise<{
     CTXINDEX_DATA_HOME: undefined,
     CTXINDEX_STATE_HOME: undefined,
     CTXINDEX_CACHE_HOME: undefined,
+    CTXINDEX_GOOGLE_CLIENT_ID: '',
+    CTXINDEX_GOOGLE_CLIENT_SECRET: '',
   }
   await mkdir(join(dir, 'config'), { recursive: true })
   await mkdir(join(dir, 'data'), { recursive: true })
@@ -82,6 +84,32 @@ describe('no-prompts contract', () => {
     try {
       const { exitCode } = await spawnCli(['init'], env, 'null')
       expect(exitCode).toBe(0)
+    } finally {
+      await cleanup()
+    }
+  })
+
+  test('account add: missing client exits non-zero without prompting', async () => {
+    const { env, cleanup } = await mkSandbox()
+    try {
+      const { exitCode, stderr } = await spawnCli(
+        ['account', 'add', 'google'],
+        env,
+        'null',
+      )
+      expect(exitCode).not.toBe(0)
+      expect(stderr).toContain('client add google')
+    } finally {
+      await cleanup()
+    }
+  })
+
+  test('auth: deleted command exits non-zero without prompting', async () => {
+    const { env, cleanup } = await mkSandbox()
+    try {
+      const { exitCode, stderr } = await spawnCli(['auth'], env, 'null')
+      expect(exitCode).toBe(2)
+      expect(stderr).toContain('Unknown command')
     } finally {
       await cleanup()
     }
@@ -279,11 +307,11 @@ describe('no-prompts contract', () => {
     }
   })
 
-  test('auth add: missing credentials exits non-zero without prompting', async () => {
+  test('client add: missing credentials exits non-zero without prompting', async () => {
     const { env, cleanup } = await mkSandbox()
     try {
       const { exitCode, stderr } = await spawnCli(
-        ['auth', 'add', 'google'],
+        ['client', 'add', 'google', '--from-env'],
         env,
         'null',
       )

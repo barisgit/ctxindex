@@ -123,24 +123,18 @@ describe('exit codes e2e', () => {
     try {
       await initSandbox(sandbox)
 
-      const result = await sandbox.run(
-        [
-          'auth',
-          'add',
-          'google',
-          '--client-id',
-          'client-id',
-          '--adapter',
-          'google.mailbox',
-          '--loopback',
-        ],
-        {
-          env: {
-            CTXINDEX_NO_BROWSER: '1',
-            CTXINDEX_LOOPBACK_TIMEOUT_SECS: '0.5',
-          },
-        },
+      const client = await sandbox.run(
+        ['client', 'add', 'google', '--from-env'],
+        { env: { CTXINDEX_GOOGLE_CLIENT_ID: 'client-id' } },
       )
+      expect(client.exitCode, client.stderr).toBe(0)
+
+      const result = await sandbox.run(['account', 'add', 'google'], {
+        env: {
+          CTXINDEX_NO_BROWSER: '1',
+          CTXINDEX_LOOPBACK_TIMEOUT_SECS: '0.5',
+        },
+      })
 
       expect(result.exitCode).toBe(50)
       expect(result.stderr).toContain('loopback_timeout')

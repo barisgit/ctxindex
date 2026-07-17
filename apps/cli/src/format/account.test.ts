@@ -16,7 +16,7 @@ const inventory: AccountInventoryItem[] = [
         sources: [
           {
             id: 'source-1',
-            displayName: 'Primary Inbox',
+            label: 'primary-inbox',
             adapter: { id: 'google.mailbox', version: 1 },
             realm: { id: 'realm-1', slug: 'work', label: 'Work' },
           },
@@ -46,7 +46,7 @@ test('formats compact nested Account, Grant, and Source inventory', () => {
       'ACCOUNT account-1  provider=google  label="Person\\nOne"',
       '  GRANT grant-1  active  expiresAt=2000',
       '    scopes: mail.read, openid',
-      '    SOURCE source-1  name="Primary Inbox"  adapter=google.mailbox@1  realm=work',
+      '    SOURCE source-1  label="primary-inbox"  adapter=google.mailbox@1  realm=work',
       'ACCOUNT account-2  provider=microsoft  label=(unlabeled)',
       '  GRANT grant-2  unknown  expiresAt=-',
       '    scopes: none',

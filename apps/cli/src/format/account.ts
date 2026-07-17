@@ -4,6 +4,17 @@ function label(value: string | null, fallback: string): string {
   return value === null ? fallback : JSON.stringify(value)
 }
 
+export function formatAccountAdded(result: {
+  readonly accountId: string
+  readonly grantId: string
+}): string {
+  return `account added: ${result.accountId} grant=${result.grantId}`
+}
+
+export function formatAccountRemoved(label: string): string {
+  return `account removed: ${JSON.stringify(label)}`
+}
+
 export function formatAccountInventory(
   accounts: readonly AccountInventoryItem[],
   json: boolean,
@@ -23,7 +34,7 @@ export function formatAccountInventory(
       )
       for (const source of grant.sources) {
         lines.push(
-          `    SOURCE ${source.id}  name=${label(source.displayName, '(unnamed)')}  adapter=${source.adapter.id}@${source.adapter.version}  realm=${source.realm.slug}`,
+          `    SOURCE ${source.id}  label=${JSON.stringify(source.label)}  adapter=${source.adapter.id}@${source.adapter.version}  realm=${source.realm.slug}`,
         )
       }
     }

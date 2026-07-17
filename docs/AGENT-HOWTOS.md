@@ -61,7 +61,7 @@ bun cli skills get getting-started --inline
 bun cli skills path
 ```
 
-## Secrets and provider authentication
+## Secrets, clients, and provider Accounts
 
 Inspect the configured secret backend or switch it explicitly. A switch copies
 and verifies stored values before committing configuration and cleaning the old
@@ -73,31 +73,32 @@ bun cli secrets backend set keychain
 bun cli secrets backend set file
 ```
 
-Discover OAuth provider ids, exact Adapter scopes, API hosts, and safe environment variable names from the loaded registry rather than copying provider-specific vocabulary into prompts or scripts. The CLI does not prompt for credentials. A loopback flow may open a browser only after explicit operator approval.
+Discover OAuth provider ids, exact Adapter scopes, API hosts, and safe client environment variable names from the loaded registry rather than copying provider-specific vocabulary into prompts or scripts. The CLI does not prompt for credentials and never accepts secret values on argv. `client add --from-env` reads the provider's declared environment values once and persists them through the configured secrets backend; later authorization never resolves client credentials from the environment. An Account loopback flow may open a browser only after explicit operator approval.
 
 ```sh
 bun cli describe adapter <adapter-id>
 bun cli describe adapter <adapter-id> --json
-bun cli auth add <provider> --adapter <adapter-id> --from-env
-# or, for an explicitly approved browser flow with a public client id:
-bun cli auth add <provider> --adapter <adapter-id> --client-id <public-client-id> --loopback
+bun cli client add <provider> --from-env
+bun cli client list
+bun cli account add <provider>
 bun cli account list --json
 ```
 
-After authorization, use `account list` to choose a safe local Account or Grant id, then use the loaded Adapter's generated Source options to add it to the intended Realm. Do not run live provider tests from the general automated lane. Accepted live checks use the isolated Human checkpoint procedure and redacted evidence under the active charter.
+When a provider has multiple persisted clients, pass `--client <label>` to `account add`; with exactly one, it is selected automatically. Client labels default to the provider id and are unique per provider; Account labels default to the verified provider identity, and Source labels default to `<account-label>-<adapter-tail>` or `<adapter-tail>` without an Account. Account and Source labels are globally unique. Labels remain verbatim, and collisions fail with exit 2 instead of prompting or auto-suffixing. Re-running `account add` for the same identity updates its Grant in place so existing Source bindings remain valid. `client remove <provider> <label>` removes Client metadata and secrets without breaking existing Grants; `account remove <label>` removes the Account and Grant while leaving bound Sources configured as `needs_auth`. Do not run live provider tests from the general automated lane. Accepted live checks use the isolated Human checkpoint procedure and redacted evidence under the active charter.
 
-Select every compatible Adapter for one provider Account in one authorization
-request when the intended Sources should share one exact Grant. Calendar
-Adapters are indexed and read-only: synchronize them before local event
-searches, and do not invent Actions that are absent from `describe`. Keep
+Account authorization requests the provider base scopes plus the sorted union
+of all loaded Adapters for that provider. Calendar Adapters are indexed and
+read-only: synchronize them before local event searches, and do not invent
+Actions that are absent from `describe`. Keep
 personal and work Sources in explicit separate Realms; an unscoped search spans
 both, while an explicit Realm filter is exact.
 
 ```sh
-bun cli auth add <provider-id> --adapter <mailbox-adapter-id> --adapter <calendar-adapter-id> --loopback
+bun cli client add <provider-id> --label <client-label> --from-env
+bun cli account add <provider-id> --client <client-label> --label <account-label>
 bun cli account list --json
-bun cli source add <calendar-adapter-id> --realm <realm> --account <grant-id> --name '<calendar-name>' <generated-calendar-options>
-bun cli sync --source <calendar-source-id> --json
+bun cli source add <calendar-adapter-id> --realm <realm> --account <account-label> --label '<calendar-label>' <generated-calendar-options>
+bun cli sync --source <calendar-label> --json
 bun cli search '<query>' --kind <event-profile-id-or-alias> --realm <realm> --json
 bun cli get <ctx-calendar-event-ref> --json
 ```

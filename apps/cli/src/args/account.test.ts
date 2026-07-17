@@ -1,22 +1,43 @@
 import { expect, test } from 'bun:test'
 import { parseAccountArgs } from './account'
 
-test('parses only account list with an optional JSON flag', () => {
-  expect(parseAccountArgs(['list'])).toEqual({ kind: 'list', json: false })
+test('parses account add, list, and label removal', () => {
+  expect(parseAccountArgs(['add', 'google'])).toEqual({
+    kind: 'add',
+    provider: 'google',
+  })
+  expect(
+    parseAccountArgs([
+      'add',
+      'google',
+      '--label',
+      'work',
+      '--client',
+      'desktop',
+    ]),
+  ).toEqual({
+    kind: 'add',
+    provider: 'google',
+    label: 'work',
+    client: 'desktop',
+  })
   expect(parseAccountArgs(['list', '--json'])).toEqual({
     kind: 'list',
     json: true,
   })
-  expect(parseAccountArgs(['--help'])).toEqual({ kind: 'help' })
+  expect(parseAccountArgs(['remove', 'work'])).toEqual({
+    kind: 'remove',
+    label: 'work',
+  })
 })
 
-test.each([
-  { args: [] },
-  { args: ['list', '--json', '--json'] },
-  { args: ['list', '--format', 'table'] },
-  { args: ['list', 'extra'] },
-  { args: ['add'] },
-  { args: ['auth', 'list'] },
-])('rejects unsupported account inventory arguments: $args', ({ args }) => {
-  expect(parseAccountArgs([...args])).toMatchObject({ kind: 'unknown' })
+test('rejects removed authorization vocabulary and malformed account commands', () => {
+  for (const args of [
+    ['add', 'google', '--adapter', 'google.mailbox'],
+    ['add', 'google', '--from-env'],
+    ['remove'],
+    ['remove', 'work', 'extra'],
+  ]) {
+    expect(parseAccountArgs(args)).toMatchObject({ kind: 'unknown' })
+  }
 })

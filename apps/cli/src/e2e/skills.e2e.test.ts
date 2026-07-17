@@ -25,6 +25,9 @@ test('skills get returns markdown', async () => {
     expect(result.exitCode).toBe(0)
     expect(result.stderr).toBe('')
     expect(result.stdout).toMatch(/^# Getting started with ctxindex/m)
+    expect(result.stdout).toContain('ctxindex client add <provider> --from-env')
+    expect(result.stdout).toContain('ctxindex account add <provider>')
+    expect(result.stdout).not.toMatch(/ctxindex auth\b/)
   } finally {
     await sandbox.cleanup()
   }

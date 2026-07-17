@@ -6,10 +6,10 @@ Define Microsoft mailbox and calendar authorization, synchronization, search, re
 ## Requirements
 
 ### Requirement: Microsoft identity supports personal and organizational Accounts
-The `microsoft` OAuth provider SHALL use Microsoft identity platform authorization-code flow with PKCE, state/redirect validation, refresh support, and endpoints/scopes valid for both approved Outlook.com personal Accounts and Microsoft 365 organizational Accounts. The stable provider subject SHALL be Graph `/v1.0/me` `id`, not the client-pairwise OIDC `sub`; a human label SHALL come from the same declared Graph identity response. Tenant/account choice MUST NOT be inferred from email suffix.
+The `microsoft` OAuth provider SHALL use Microsoft identity platform authorization-code flow with PKCE, state/redirect validation, refresh support, and endpoints/scopes valid for both approved Outlook.com personal Accounts and Microsoft 365 organizational Accounts. The stable provider subject SHALL be Graph `/v1.0/me` `id`, not the client-pairwise OIDC `sub`; the verified Graph identity from that response SHALL be the default Account-label candidate, while an explicit `--label` MAY set the local Account label. Tenant/account choice MUST NOT be inferred from email suffix.
 
 #### Scenario: Personal Microsoft Account authorizes
-- **WHEN** an approved personal Account completes consent for selected Microsoft Adapters
+- **WHEN** an approved personal Account runs `account add microsoft` with the Microsoft Adapters loaded
 - **THEN** one Microsoft Account and Grant are stored with the exact granted delegated scopes
 
 #### Scenario: Organizational Account authorizes
@@ -77,11 +77,11 @@ Microsoft file attachment metadata SHALL become Profile-derived Artifact descrip
 - **THEN** generic local search returns both through the same Profile and field grammar
 
 ### Requirement: Microsoft egress and consent are bounded and verified
-Production requests SHALL contact only the declared Microsoft identity and Graph hosts. Automated loopback tests SHALL prove exact selected scopes, token refresh/rotation, read paging/delta, immutable ids, attachments, Draft create/update, malformed-input zero I/O, and absence of send routes. An explicit Human checkpoint SHALL verify approved Microsoft login, harmless mailbox/calendar reads, one Draft create and one update, and visible confirmation that nothing was sent.
+Production requests SHALL contact only the declared Microsoft identity and Graph hosts. Automated loopback tests SHALL prove the exact all-loaded same-provider scope union, token refresh/rotation, read paging/delta, immutable ids, attachments, Draft create/update, malformed-input zero I/O, and absence of send routes. An explicit Human checkpoint SHALL verify approved Microsoft login, harmless mailbox/calendar reads, one Draft create and one update, and visible confirmation that nothing was sent.
 
-#### Scenario: Unselected calendar contributes no scope
-- **WHEN** authorization selects only `microsoft.mailbox`
-- **THEN** calendar scopes are absent while `Mail.ReadWrite` is present for Draft support and `Mail.Send` is absent
+#### Scenario: Loaded calendar contributes its scope
+- **WHEN** `account add microsoft` runs with `microsoft.mailbox` and `microsoft.calendar` loaded
+- **THEN** consent includes both Adapters' scopes, including `Mail.ReadWrite` for Draft support, while `Mail.Send` is absent
 
 #### Scenario: Human Microsoft checkpoint completes
 - **WHEN** the user explicitly approves consent and the bounded live workflow

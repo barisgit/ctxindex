@@ -49,6 +49,8 @@ async function addSource(
     'local.directory',
     '--realm',
     'work',
+    '--label',
+    name,
     '--config-root-path',
     root,
   ])

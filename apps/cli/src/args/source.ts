@@ -12,7 +12,7 @@ export type SourceArgs =
       readonly kind: 'add'
       readonly adapterId: string
       readonly realmSlug?: string
-      readonly displayName?: string
+      readonly label?: string
       readonly configJson?: string
       readonly account?: string
       readonly searchRouting?: 'indexed' | 'federated' | 'hybrid'
@@ -28,7 +28,7 @@ export type SourceArgs =
   | { readonly kind: 'unknown'; readonly message: string }
 
 export const sourceUsage =
-  'source add <adapter-id> [--realm <slug>] [--name|--display-name <name>] [--account <account-id|grant-id>] [--config-json <json>|--config-* <value>] [--search-routing indexed|federated|hybrid] | source list [--realm <slug>] [--format table|compact] [--json] | source remove <source-id>'
+  'source add <adapter-id> [--realm <slug>] [--label <label>] [--account <label|account-id|grant-id>] [--config-json <json>|--config-* <value>] [--search-routing indexed|federated|hybrid] | source list [--realm <slug>] [--format table|compact] [--json] | source remove <label|source-id>'
 
 function parsePrimitive(value: string, type: string): unknown {
   if (type === 'json') {
@@ -148,8 +148,7 @@ export function parseSourceArgs(
     const allowed = new Set([
       'adapter',
       'realm',
-      'name',
-      'display-name',
+      'label',
       'account',
       'config-json',
       'search-routing',
@@ -172,8 +171,7 @@ export function parseSourceArgs(
     const repeated = repeatedScalarOption(flags, [
       'adapter',
       'realm',
-      'name',
-      'display-name',
+      'label',
       'account',
       'config-json',
       'search-routing',
@@ -195,10 +193,9 @@ export function parseSourceArgs(
       adapterId,
     }
     const realmSlug = stringFlag(flags, 'realm')
-    const displayName =
-      stringFlag(flags, 'name') ?? stringFlag(flags, 'display-name')
+    const label = stringFlag(flags, 'label')
     if (realmSlug) result = { ...result, realmSlug }
-    if (displayName) result = { ...result, displayName }
+    if (label) result = { ...result, label }
     if (config.value) result = { ...result, configJson: config.value }
     const account = stringFlag(flags, 'account')
     if (account) result = { ...result, account }
@@ -281,7 +278,7 @@ export function parseSourceArgs(
     const sourceId = positional[0]
     return sourceId
       ? { kind: 'remove', sourceId }
-      : { kind: 'unknown', message: 'source remove: missing <source-id>' }
+      : { kind: 'unknown', message: 'source remove: missing <label|source-id>' }
   }
   return {
     kind: 'unknown',

@@ -67,9 +67,9 @@ async function freshDb(): Promise<Database> {
   ).run(JSON.stringify(scopes))
   db.prepare(
     `INSERT INTO sources
-       (id, realm_id, adapter_id, adapter_version, grant_id, config_json, sync_enabled, created_at, updated_at)
-     VALUES (?, 'realm-1', 'google.mailbox', 1, 'grant-1', '{}', 1, 1, 1)`,
-  ).run(sourceId)
+       (id, realm_id, label, adapter_id, adapter_version, grant_id, config_json, sync_enabled, created_at, updated_at)
+     VALUES (?, 'realm-1', ?, 'google.mailbox', 1, 'grant-1', '{}', 1, 1, 1)`,
+  ).run(sourceId, sourceId)
   return db
 }
 

@@ -68,9 +68,10 @@ if ! help_output=$(cd "$repo_root" && NO_COLOR=1 bun cli --help 2>"$version_stde
 fi
 
 for expected in \
-  'USAGE ctxindex init|auth|realm|source|sync|search|status|secrets|skills' \
+  'USAGE ctxindex init|account|client|describe|extensions|action|artifact|purge|realm|source|sync|get|export|thread|search|status|secrets|skills' \
   'init' \
-  'auth' \
+  'account' \
+  'client' \
   'realm' \
   'source' \
   'sync' \
@@ -83,7 +84,23 @@ for expected in \
   fi
 done
 
-# Per-command help sanity: source / skills / auth subcommands enumerated.
+if ! client_help=$(cd "$repo_root" && NO_COLOR=1 bun cli client --help 2>"$version_stderr"); then
+  cat "$version_stderr" >&2
+  die 'bun cli client --help failed'
+fi
+for expected in 'USAGE ctxindex client add|list|remove' 'add' 'list' 'remove'; do
+  grep -Fq "$expected" <<<"$client_help" || die "missing client help text: $expected"
+done
+
+if ! account_help=$(cd "$repo_root" && NO_COLOR=1 bun cli account --help 2>"$version_stderr"); then
+  cat "$version_stderr" >&2
+  die 'bun cli account --help failed'
+fi
+for expected in 'USAGE ctxindex account add|list|remove' 'add' 'list' 'remove'; do
+  grep -Fq "$expected" <<<"$account_help" || die "missing account help text: $expected"
+done
+
+# Per-command help sanity: source / skills / client / account subcommands enumerated.
 if ! source_help=$(cd "$repo_root" && NO_COLOR=1 bun cli source --help 2>"$version_stderr"); then
   cat "$version_stderr" >&2
   die 'bun cli source --help failed'
@@ -104,7 +121,7 @@ if ! secrets_help=$(cd "$repo_root" && NO_COLOR=1 bun cli secrets --help 2>"$ver
   cat "$version_stderr" >&2
   die 'bun cli secrets --help failed'
 fi
-for expected in 'USAGE ctxindex secrets' 'migrate'; do
+for expected in 'USAGE ctxindex secrets status|backend' 'status' 'backend'; do
   grep -Fq "$expected" <<<"$secrets_help" || die "missing secrets help text: $expected"
 done
 

@@ -8,6 +8,7 @@ import {
   startMockGoogleCalendar,
 } from './_mock-google-calendar'
 import { type MockGraphCalendarEvent, startMockGraph } from './_mock-graph'
+import { installLoopbackBrowser } from './_oauth-account'
 
 function parseSourceId(stdout: string): string {
   const match = /^source added: (.+)$/m.exec(stdout)
@@ -109,16 +110,18 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
     calendarEvents: {
       'work/calendar': [graphShared, graphRemoved],
     },
-    tokenScopes: 'Calendars.Read User.Read',
+    tokenScopes: 'Calendars.Read Mail.ReadWrite User.Read',
   })
+  const bin = await installLoopbackBrowser(sandbox.dir)
   const baseEnv = graph.env(
     sandbox,
     googleCalendar.env(
       sandbox,
       gmail.env(sandbox, {
+        PATH: `${bin}:${process.env.PATH ?? ''}`,
+        CTXINDEX_LOOPBACK_TIMEOUT_SECS: '5',
         CTXINDEX_GOOGLE_CLIENT_ID: 'public-client-id',
         CTXINDEX_GOOGLE_CLIENT_SECRET: 'client-secret-canary',
-        CTXINDEX_GOOGLE_REFRESH_TOKEN: 'refresh-token-canary',
       }),
     ),
   )
@@ -141,29 +144,23 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
       expect(result.exitCode, result.stderr).toBe(0)
     }
 
+    const googleClient = await sandbox.run(
+      ['client', 'add', 'google', '--from-env'],
+      { env: googleAuthEnv },
+    )
+    expect(googleClient.exitCode, googleClient.stderr).toBe(0)
     const googleAuth = await sandbox.run(
-      [
-        'auth',
-        'add',
-        'google',
-        '--adapter',
-        'google.mailbox',
-        '--adapter',
-        'google.calendar',
-        '--from-env',
-      ],
+      ['account', 'add', 'google', '--label', 'personal-google'],
       { env: googleAuthEnv },
     )
     expect(googleAuth.exitCode, googleAuth.stderr).toBe(0)
+    const microsoftClient = await sandbox.run(
+      ['client', 'add', 'microsoft', '--from-env'],
+      { env: microsoftAuthEnv },
+    )
+    expect(microsoftClient.exitCode, microsoftClient.stderr).toBe(0)
     const microsoftAuth = await sandbox.run(
-      [
-        'auth',
-        'add',
-        'microsoft',
-        '--adapter',
-        'microsoft.calendar',
-        '--from-env',
-      ],
+      ['account', 'add', 'microsoft', '--label', 'work-microsoft'],
       { env: microsoftAuthEnv },
     )
     expect(microsoftAuth.exitCode, microsoftAuth.stderr).toBe(0)
@@ -173,8 +170,8 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
       { readonly: true },
     )
     const grants = database
-      .query('SELECT id, provider, scopes_json FROM grants ORDER BY provider')
-      .all() as { id: string; provider: string; scopes_json: string }[]
+      .query('SELECT provider, scopes_json FROM grants ORDER BY provider')
+      .all() as { provider: string; scopes_json: string }[]
     database.close()
     expect(grants.map(({ provider }) => provider)).toEqual([
       'google',
@@ -191,16 +188,15 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
     )
     expect(JSON.parse(grants[1]?.scopes_json ?? 'null')).toEqual([
       'Calendars.Read',
+      'Mail.ReadWrite',
       'User.Read',
     ])
-    const googleGrant = grants[0]?.id ?? ''
-    const microsoftGrant = grants[1]?.id ?? ''
 
     const addCalendar = async (
       adapter: 'google.calendar' | 'microsoft.calendar',
       realm: 'personal' | 'work',
-      grantId: string,
-      name: string,
+      account: string,
+      label: string,
       calendarId: string,
       futureDays?: number,
     ): Promise<string> => {
@@ -212,9 +208,9 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
           '--realm',
           realm,
           '--account',
-          grantId,
-          '--name',
-          name,
+          account,
+          '--label',
+          label,
           '--config-calendar-id',
           calendarId,
           ...(futureDays === undefined
@@ -227,18 +223,20 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
       return parseSourceId(result.stdout)
     }
 
+    const googleSourceLabel = 'personal-google-calendar'
     const googleSource = await addCalendar(
       'google.calendar',
       'personal',
-      googleGrant,
-      'Personal Google Calendar',
+      'personal-google',
+      googleSourceLabel,
       'personal@example.test',
     )
+    const graphSourceLabel = 'work-microsoft-calendar'
     const graphSource = await addCalendar(
       'microsoft.calendar',
       'work',
-      microsoftGrant,
-      'Work Microsoft Calendar',
+      'work-microsoft',
+      graphSourceLabel,
       'work/calendar',
     )
 
@@ -249,26 +247,31 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
     expect(inventoryResult.stdout).not.toContain('canary')
     const inventory = JSON.parse(inventoryResult.stdout) as {
       provider: string
-      grants: { sources: { displayName: string }[] }[]
+      label: string
     }[]
     expect(inventory.map(({ provider }) => provider).sort()).toEqual([
       'google',
       'microsoft',
     ])
-    expect(
-      inventory.flatMap(({ grants: accountGrants }) =>
-        accountGrants.flatMap(({ sources }) =>
-          sources.map(({ displayName }) => displayName),
-        ),
-      ),
-    ).toEqual(['Personal Google Calendar', 'Work Microsoft Calendar'])
+    expect(inventory.map(({ label }) => label).sort()).toEqual([
+      'personal-google',
+      'work-microsoft',
+    ])
+    const sources = JSON.parse(
+      (await sandbox.run(['source', 'list', '--json'], { env: baseEnv }))
+        .stdout,
+    ) as { label: string }[]
+    expect(sources.map(({ label }) => label)).toEqual([
+      googleSourceLabel,
+      graphSourceLabel,
+    ])
 
     gmail.resetRequests()
     googleCalendar.resetRequests()
     graph.resetRequests()
     for (const [source, expectedAdded] of [
-      [googleSource, 2],
-      [graphSource, 2],
+      [googleSourceLabel, 2],
+      [graphSourceLabel, 2],
     ] as const) {
       const result = await sandbox.run(['sync', '--source', source, '--json'], {
         env: baseEnv,
@@ -351,7 +354,7 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
         '2035-07-20T09:00:00.000',
       ),
     ])
-    for (const source of [googleSource, graphSource]) {
+    for (const source of [googleSourceLabel, graphSourceLabel]) {
       const result = await sandbox.run(['sync', '--source', source, '--json'], {
         env: baseEnv,
       })
@@ -366,13 +369,13 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
     const wideGraphSource = await addCalendar(
       'microsoft.calendar',
       'work',
-      microsoftGrant,
-      'Wide Microsoft Calendar',
+      'work-microsoft',
+      'wide-microsoft-calendar',
       'work/calendar',
       4_000,
     )
     const wideSync = await sandbox.run(
-      ['sync', '--source', wideGraphSource, '--json'],
+      ['sync', '--source', 'wide-microsoft-calendar', '--json'],
       { env: baseEnv },
     )
     expect(wideSync.exitCode, wideSync.stderr).toBe(0)
@@ -409,7 +412,7 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
     ).toBe(true)
     expect(gmail.readRequests()).toEqual([])
 
-    for (const source of [googleSource, graphSource]) {
+    for (const source of [googleSourceLabel, graphSourceLabel]) {
       const googleBefore = googleCalendar.readRequests().length
       const graphBefore = graph.readRequests().length
       const unknownAction = await sandbox.run(

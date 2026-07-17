@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createSandbox, type Sandbox } from '@ctxindex/core/testing'
 import { type MockGraphMessage, startMockGraph } from './_mock-graph'
+import { installLoopbackBrowser } from './_oauth-account'
 
 const createDraftActionId = 'communication.message.draft.create'
 const updateDraftActionId = 'communication.message.draft.update'
@@ -107,8 +108,15 @@ const messages: readonly MockGraphMessage[] = [
 
 test('binary CLI runs provider-neutral Outlook read and artifact workflow', async () => {
   const sandbox = await createSandbox()
-  const graph = startMockGraph({ messages })
-  const env = graph.env(sandbox)
+  const graph = startMockGraph({
+    messages,
+    tokenScopes: 'Calendars.Read Mail.ReadWrite User.Read',
+  })
+  const bin = await installLoopbackBrowser(sandbox.dir)
+  const env = graph.env(sandbox, {
+    PATH: `${bin}:${process.env.PATH ?? ''}`,
+    CTXINDEX_LOOPBACK_TIMEOUT_SECS: '5',
+  })
   try {
     for (const command of [
       ['init'],
@@ -119,40 +127,44 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
       expect(result.exitCode, result.stderr).toBe(0)
     }
 
+    const client = await sandbox.run(
+      ['client', 'add', 'microsoft', '--from-env'],
+      { env },
+    )
+    expect(client.exitCode, client.stderr).toBe(0)
     const authenticated = await sandbox.run(
-      [
-        'auth',
-        'add',
-        'microsoft',
-        '--adapter',
-        'microsoft.mailbox',
-        '--from-env',
-      ],
+      ['account', 'add', 'microsoft', '--label', 'outlook'],
       { env },
     )
     expect(authenticated.exitCode, authenticated.stderr).toBe(0)
     expect(authenticated.stdout).not.toContain('microsoft-personal-subject')
-    expect(grantScopes(sandbox)).toEqual(['Mail.ReadWrite', 'User.Read'])
+    expect(grantScopes(sandbox)).toEqual([
+      'Calendars.Read',
+      'Mail.ReadWrite',
+      'User.Read',
+    ])
 
-    const addSource = async (realm: string, name: string) => {
+    const addSource = async (realm: string, label: string) => {
       const result = await sandbox.run(
         [
           'source',
           'add',
-          '--adapter',
           'microsoft.mailbox',
           '--realm',
           realm,
-          '--name',
-          name,
+          '--account',
+          'outlook',
+          '--label',
+          label,
         ],
         { env },
       )
       expect(result.exitCode, result.stderr).toBe(0)
       return parseSourceId(result.stdout)
     }
-    const workSourceId = await addSource('work', 'Work Outlook')
-    await addSource('personal', 'Personal Outlook')
+    const workSourceLabel = 'work-outlook'
+    const workSourceId = await addSource('work', workSourceLabel)
+    await addSource('personal', 'personal-outlook')
 
     const inventoryResult = await sandbox.run(['account', 'list', '--json'], {
       env,
@@ -161,20 +173,25 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
     expect(inventoryResult.stdout).not.toContain('microsoft-work-subject')
     const inventory = JSON.parse(inventoryResult.stdout) as {
       provider: string
-      grants: { scopes: string[]; sources: { displayName: string }[] }[]
+      label: string
+      grants: { scopes: string[] }[]
     }[]
     expect(inventory).toHaveLength(1)
     expect(inventory[0]?.provider).toBe('microsoft')
+    expect(inventory[0]?.label).toBe('outlook')
     expect(inventory[0]?.grants).toHaveLength(1)
     expect(inventory[0]?.grants[0]?.scopes).toEqual([
+      'Calendars.Read',
       'Mail.ReadWrite',
       'User.Read',
     ])
-    expect(
-      inventory[0]?.grants[0]?.sources
-        .map(({ displayName }) => displayName)
-        .sort(),
-    ).toEqual(['Personal Outlook', 'Work Outlook'])
+    const sources = JSON.parse(
+      (await sandbox.run(['source', 'list', '--json'], { env })).stdout,
+    ) as { label: string }[]
+    expect(sources.map(({ label }) => label).sort()).toEqual([
+      'personal-outlook',
+      workSourceLabel,
+    ])
 
     graph.resetRequests()
     const searched = await sandbox.run(
@@ -333,7 +350,7 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
         'run',
         createDraftActionId,
         '--source',
-        workSourceId,
+        workSourceLabel,
         '--input',
         JSON.stringify({
           to: ['victim@example.test\r\nBcc: injected@example.test'],
@@ -361,7 +378,7 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
         'run',
         createDraftActionId,
         '--source',
-        workSourceId,
+        workSourceLabel,
         '--input',
         JSON.stringify(createInput),
         '--json',
@@ -402,7 +419,7 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
         'run',
         updateDraftActionId,
         '--source',
-        workSourceId,
+        workSourceLabel,
         '--input',
         JSON.stringify(updateInput),
         '--json',
@@ -484,7 +501,7 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
         'run',
         'communication.message.draft.send',
         '--source',
-        workSourceId,
+        workSourceLabel,
         '--input',
         '{}',
         '--json',

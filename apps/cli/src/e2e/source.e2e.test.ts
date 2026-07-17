@@ -171,7 +171,6 @@ describe('source e2e', () => {
       const result = await sandbox.run([
         'source',
         'add',
-        '--adapter',
         'local.directory',
         '--realm',
         'global',
@@ -206,11 +205,10 @@ describe('source e2e', () => {
       const add = await sandbox.run([
         'source',
         'add',
-        '--adapter',
         'local.directory',
         '--realm',
         'global',
-        '--name',
+        '--label',
         'repo-under-test',
         '--config-root-path',
         root,
@@ -236,14 +234,14 @@ describe('source e2e', () => {
       expect(json.stderr).toBe('')
       expect(json.exitCode).toBe(0)
       const rows = JSON.parse(json.stdout) as Array<{
-        name: string | null
+        label: string
         realmSlug: string
         ref: string
         availability: string
         itemsCount: number
       }>
       expect(rows[0]).toMatchObject({
-        name: 'repo-under-test',
+        label: 'repo-under-test',
         realmSlug: 'global',
         ref: root,
         availability: 'available',
@@ -259,7 +257,7 @@ describe('source e2e', () => {
       expect(compact.stderr).toBe('')
       expect(compact.exitCode).toBe(0)
       expect(compact.stdout).toContain(sourceId)
-      expect(compact.stdout).toContain('name=repo-under-test')
+      expect(compact.stdout).toContain('label=repo-under-test')
       expect(compact.stdout).toContain('adapter=local.directory')
       expect(compact.stdout).toContain('items=1')
     })
@@ -275,7 +273,6 @@ describe('source e2e', () => {
           [
             'source',
             'add',
-            '--adapter',
             'local.directory',
             '--realm',
             'global',
@@ -326,7 +323,6 @@ describe('source e2e', () => {
       const add = await sandbox.run([
         'source',
         'add',
-        '--adapter',
         'local.directory',
         '--realm',
         'global',
@@ -378,7 +374,6 @@ describe('source e2e', () => {
       const result = await sandbox.run([
         'source',
         'add',
-        '--adapter',
         'foo.bar',
         '--realm',
         'global',

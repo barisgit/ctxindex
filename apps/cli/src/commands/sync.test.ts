@@ -26,7 +26,7 @@ function source(id: string, adapterId = 'sync.adapter', syncEnabled = true) {
     realm_id: 'realm-1',
     adapter_id: adapterId,
     adapter_version: 1,
-    display_name: null,
+    label: id,
     config_json: '{}',
     sync_enabled: syncEnabled,
     created_at: 1,
@@ -45,6 +45,13 @@ function harness(input: {
     authService: {},
     logger: {},
     sourceService: {
+      resolveSourceId: (reference: string) => {
+        const match = sources.find(
+          (item) => item.id === reference || item.label === reference,
+        )
+        if (!match) throw new Error(`Source not found: "${reference}"`)
+        return match.id
+      },
       listSources: () => sources,
       findSourceById: (id: string) =>
         sources.find((item) => item.id === id) ?? null,

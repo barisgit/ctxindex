@@ -57,7 +57,7 @@ export async function handleSourceCommand(args: string[]): Promise<number> {
         adapterId: parsed.adapterId,
         adapterVersion: adapter.version,
         ...(parsed.realmSlug ? { realmSlug: parsed.realmSlug } : {}),
-        ...(parsed.displayName ? { displayName: parsed.displayName } : {}),
+        ...(parsed.label ? { label: parsed.label } : {}),
         configJson: JSON.stringify(validatedConfig.data),
         ...(grantId ? { grantId } : {}),
         ...(parsed.searchRouting
@@ -72,8 +72,9 @@ export async function handleSourceCommand(args: string[]): Promise<number> {
       )
       if (output.length > 0) console.log(output)
     } else {
-      deps.sourceService.removeSource(parsed.sourceId)
-      console.log(formatSourceRemoved(parsed.sourceId))
+      const sourceId = deps.sourceService.resolveSourceId(parsed.sourceId)
+      deps.sourceService.removeSource(sourceId)
+      console.log(formatSourceRemoved(sourceId))
     }
     return 0
   } catch (error) {

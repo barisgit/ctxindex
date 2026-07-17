@@ -12,7 +12,7 @@ import { mapErrorToExit } from '../format/exit'
 
 export type ActionDeps = Pick<
   CliDeps,
-  'db' | 'registry' | 'authService' | 'logger' | 'close'
+  'db' | 'registry' | 'authService' | 'logger' | 'sourceService' | 'close'
 >
 type OpenActionDeps = () => Promise<ActionDeps>
 
@@ -75,11 +75,14 @@ export async function handleActionCommand(
   try {
     deps = await open()
     if (parsed.kind === 'describe') {
+      const sourceId = parsed.sourceId
+        ? deps.sourceService.resolveSourceId(parsed.sourceId)
+        : undefined
       const result = services.describe({
         db: deps.db,
         registry: deps.registry,
         actionId: parsed.actionId,
-        ...(parsed.sourceId ? { sourceId: parsed.sourceId } : {}),
+        ...(sourceId ? { sourceId } : {}),
       })
       console.log(
         parsed.json ? JSON.stringify(result) : formatActionDescribeText(result),
@@ -87,13 +90,14 @@ export async function handleActionCommand(
       return 0
     }
 
+    const sourceId = deps.sourceService.resolveSourceId(parsed.sourceId)
     const result = await services.run({
       db: deps.db,
       registry: deps.registry,
       authService: deps.authService,
       logger: deps.logger,
       actionId: parsed.actionId,
-      sourceId: parsed.sourceId,
+      sourceId,
       actionInput,
       signal: new AbortController().signal,
       confirmIrreversible: parsed.confirmIrreversible,

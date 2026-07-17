@@ -1,7 +1,7 @@
 import { ulid } from 'ulid'
 import { createAccountService, normalizeGrantScopes } from '../account'
 import { readEnvironmentVariable } from '../config'
-import { CtxindexAuthError } from '../errors'
+import { CtxindexAuthError, CtxindexNotFoundError } from '../errors'
 import {
   normalizeOAuthScopes,
   postOAuthToken,
@@ -20,7 +20,7 @@ type GrantSqlRow = {
   id: string
   account_id: string
   provider: string
-  account_label: string | null
+  account_label: string
   scopes_json: string
   access_token_ref: string | null
   refresh_token_ref: string | null
@@ -29,6 +29,14 @@ type GrantSqlRow = {
   expires_at: number | null
   created_at: number
   updated_at: number
+}
+
+type ExistingGrantRefs = {
+  readonly id: string
+  readonly client_id_ref: string | null
+  readonly client_secret_ref: string | null
+  readonly access_token_ref: string | null
+  readonly refresh_token_ref: string | null
 }
 
 function toGrantRow(row: GrantSqlRow): GrantRow {
@@ -98,8 +106,22 @@ export function createAuthService(deps: AuthDependencies): AuthService {
           'OAuth provider requires a client secret',
         )
       const timestamp = now()
-      const grantId = ulid(timestamp)
+      const existing = deps.db
+        .prepare(
+          `SELECT g.id, g.client_id_ref, g.client_secret_ref,
+                  g.access_token_ref, g.refresh_token_ref
+             FROM grants AS g
+             JOIN accounts AS a ON a.id = g.account_id
+            WHERE a.provider = ? AND a.external_user_id = ?
+            LIMIT 1`,
+        )
+        .get(
+          input.provider,
+          input.account.externalUserId,
+        ) as ExistingGrantRefs | null
+      const grantId = existing?.id ?? ulid(timestamp)
       const refs: string[] = []
+      let result: AddGrantResult
       try {
         const clientIdRef = await write(
           input.provider,
@@ -136,43 +158,122 @@ export function createAuthService(deps: AuthDependencies): AuthService {
           refs.push(accessTokenRef)
         }
         const scopes = normalizeOAuthScopes(input.scopes)
-        const result = deps.db.transaction(() => {
+        result = deps.db.transaction(() => {
           const { accountId } = accountService.upsertAccount({
             provider: input.provider,
             ...input.account,
           })
-          deps.db
-            .prepare(
-              'INSERT INTO grants (id, account_id, provider, scopes_json, client_id_ref, client_secret_ref, access_token_ref, refresh_token_ref, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            )
-            .run(
-              grantId,
-              accountId,
-              input.provider,
-              JSON.stringify(scopes),
-              clientIdRef,
-              clientSecretRef,
-              accessTokenRef,
-              refreshTokenRef,
-              input.expiresAt ?? null,
-              timestamp,
-              timestamp,
-            )
+          if (existing) {
+            const updated = deps.db
+              .prepare(
+                `UPDATE grants
+                    SET scopes_json = ?, client_id_ref = ?, client_secret_ref = ?,
+                        access_token_ref = ?, refresh_token_ref = ?, expires_at = ?,
+                        updated_at = ?
+                  WHERE id = ? AND account_id = ?`,
+              )
+              .run(
+                JSON.stringify(scopes),
+                clientIdRef,
+                clientSecretRef,
+                accessTokenRef,
+                refreshTokenRef,
+                input.expiresAt ?? null,
+                timestamp,
+                grantId,
+                accountId,
+              )
+            if (updated.changes !== 1) throw new Error('Grant upsert failed')
+          } else {
+            deps.db
+              .prepare(
+                'INSERT INTO grants (id, account_id, provider, scopes_json, client_id_ref, client_secret_ref, access_token_ref, refresh_token_ref, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              )
+              .run(
+                grantId,
+                accountId,
+                input.provider,
+                JSON.stringify(scopes),
+                clientIdRef,
+                clientSecretRef,
+                accessTokenRef,
+                refreshTokenRef,
+                input.expiresAt ?? null,
+                timestamp,
+                timestamp,
+              )
+          }
           return { grantId, accountId }
         })()
-        deps.logger.debug(
-          {
-            grantId: result.grantId,
-            accountId: result.accountId,
-            provider: input.provider,
-          },
-          'OAuth Grant added',
-        )
-        return result
       } catch (cause) {
         await cleanup(deps.store, refs)
         throw cause
       }
+      if (existing) {
+        await cleanup(
+          deps.store,
+          [
+            existing.client_id_ref,
+            existing.client_secret_ref,
+            existing.access_token_ref,
+            existing.refresh_token_ref,
+          ].filter((ref): ref is string => ref !== null),
+        )
+      }
+      deps.logger.debug(
+        {
+          grantId: result.grantId,
+          accountId: result.accountId,
+          provider: input.provider,
+        },
+        existing ? 'OAuth Grant updated' : 'OAuth Grant added',
+      )
+      return result
+    },
+    async removeAccount(label: string): Promise<void> {
+      const account = deps.db
+        .prepare('SELECT id FROM accounts WHERE label = ?')
+        .get(label) as { readonly id: string } | null
+      if (!account) {
+        throw new CtxindexNotFoundError(`account not found: "${label}"`)
+      }
+      const grants = deps.db
+        .prepare(
+          'SELECT client_id_ref, client_secret_ref, access_token_ref, refresh_token_ref FROM grants WHERE account_id = ?',
+        )
+        .all(account.id) as Omit<ExistingGrantRefs, 'id'>[]
+      const timestamp = now()
+      deps.db.transaction(() => {
+        deps.db
+          .prepare(
+            `INSERT INTO source_sync_state (source_id, last_status, updated_at)
+             SELECT id, 'needs_auth', ? FROM sources
+              WHERE grant_id IN (SELECT id FROM grants WHERE account_id = ?)
+             ON CONFLICT(source_id) DO UPDATE
+               SET last_status = 'needs_auth', updated_at = excluded.updated_at`,
+          )
+          .run(timestamp, account.id)
+        deps.db
+          .prepare(
+            'UPDATE sources SET grant_id = NULL, updated_at = ? WHERE grant_id IN (SELECT id FROM grants WHERE account_id = ?)',
+          )
+          .run(timestamp, account.id)
+        deps.db
+          .prepare('DELETE FROM grants WHERE account_id = ?')
+          .run(account.id)
+        deps.db.prepare('DELETE FROM accounts WHERE id = ?').run(account.id)
+      })()
+      await cleanup(
+        deps.store,
+        grants.flatMap((grant) =>
+          [
+            grant.client_id_ref,
+            grant.client_secret_ref,
+            grant.access_token_ref,
+            grant.refresh_token_ref,
+          ].filter((ref): ref is string => ref !== null),
+        ),
+      )
     },
     getGrantById,
     async listGrants(provider?: string): Promise<readonly GrantRow[]> {
@@ -222,19 +323,15 @@ export function createAuthService(deps: AuthDependencies): AuthService {
           'Grant provider is not loaded',
         )
       }
-      const clientId = grant.clientIdRef
-        ? await deps.store.getSecret(grant.clientIdRef)
-        : readEnvironment(provider.environment.clientId)
-      if (!clientId)
+      if (!grant.clientIdRef)
         throw new CtxindexAuthError(
           'missing_oauth_client_creds',
           'OAuth client id is unavailable',
         )
+      const clientId = await deps.store.getSecret(grant.clientIdRef)
       const clientSecret = grant.clientSecretRef
         ? await deps.store.getSecret(grant.clientSecretRef)
-        : provider.environment.clientSecret
-          ? readEnvironment(provider.environment.clientSecret)
-          : undefined
+        : undefined
       if (provider.client.secret === 'required' && !clientSecret)
         throw new CtxindexAuthError(
           'missing_oauth_client_creds',

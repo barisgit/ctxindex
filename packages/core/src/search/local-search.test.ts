@@ -50,8 +50,8 @@ async function freshDb(): Promise<Database> {
   await runMigrations(db)
   db.exec("INSERT INTO realms VALUES ('personal-id', 'personal', NULL, 1)")
   db.prepare(
-    'INSERT INTO sources (id, realm_id, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-  ).run(sourceId, 'personal-id', 'test', 1, '{}', 1, 1)
+    'INSERT INTO sources (id, realm_id, label, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+  ).run(sourceId, 'personal-id', 'Personal Source', 'test', 1, '{}', 1, 1)
   dbs.push(db)
   return db
 }
@@ -125,8 +125,8 @@ describe('LocalSearchExecutor', () => {
     const companySource = '01ARZ3NDEKTSV4RRFFQ69G5FB0'
     db.exec("INSERT INTO realms VALUES ('company-id', 'company', NULL, 1)")
     db.prepare(
-      'INSERT INTO sources (id, realm_id, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    ).run(companySource, 'company-id', 'test', 1, '{}', 1, 1)
+      'INSERT INTO sources (id, realm_id, label, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    ).run(companySource, 'company-id', 'Company Source', 'test', 1, '{}', 1, 1)
     const profiles = createProfileRegistry([searchProfile])
     const store = new ResourceStore(db, profiles)
     store.upsert({

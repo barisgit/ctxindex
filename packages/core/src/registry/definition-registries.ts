@@ -85,7 +85,7 @@ const identitySchema = z
   .strict()
 const environmentBaseSchema = z.object({
   clientId: z.string(),
-  refreshToken: z.string(),
+  refreshToken: z.string().optional(),
 })
 const oauthProviderBaseShape = {
   id: z.string(),

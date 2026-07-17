@@ -5,7 +5,7 @@ import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { createSandbox } from '@ctxindex/core/testing'
 
-test('mixed provider selection fails before network, secrets, or database creation', async () => {
+test('unknown client provider fails before network, secrets, or database creation', async () => {
   let calls = 0
   const server = createServer((_request, response) => {
     calls++
@@ -17,22 +17,12 @@ test('mixed provider selection fails before network, secrets, or database creati
   const sandbox = await createSandbox()
   try {
     const result = await sandbox.run(
-      [
-        'auth',
-        'add',
-        'google',
-        '--adapter',
-        'google.mailbox',
-        '--adapter',
-        'local.directory',
-        '--from-env',
-      ],
+      ['client', 'add', 'unknown-provider', '--from-env'],
       {
         env: {
           NODE_ENV: 'test',
           CTXINDEX_OAUTH_MOCK_BASE_URL: base,
           CTXINDEX_GOOGLE_CLIENT_ID: 'id',
-          CTXINDEX_GOOGLE_REFRESH_TOKEN: 'refresh',
           CTXINDEX_KEYTAR_MOCK_FILE: join(sandbox.dir, 'keytar.json'),
         },
       },

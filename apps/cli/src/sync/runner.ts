@@ -138,7 +138,11 @@ export async function handleSyncCommand(
   try {
     let sources: ReturnType<SyncDeps['sourceService']['listSources']>
     if (parsed.sourceId) {
-      const source = deps.sourceService.findSourceById(parsed.sourceId)
+      let source: ReturnType<SyncDeps['sourceService']['findSourceById']> = null
+      try {
+        const sourceId = deps.sourceService.resolveSourceId(parsed.sourceId)
+        source = deps.sourceService.findSourceById(sourceId)
+      } catch {}
       if (!source) {
         console.error(`Source not found: "${parsed.sourceId}"`)
         return 2

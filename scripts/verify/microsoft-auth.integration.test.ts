@@ -80,13 +80,20 @@ function startIdentity(
 test('one core OAuth flow supports Microsoft personal and work identities safely', async () => {
   const database = await createDatabase()
   const store = new MemorySecretsStore()
+  const provider = {
+    ...microsoftOAuthProvider,
+    environment: {
+      ...microsoftOAuthProvider.environment,
+      refreshToken: 'CTXINDEX_MICROSOFT_REFRESH_TOKEN',
+    },
+  }
   const adapter = defineAdapter({
     id: 'microsoft.fixture-mailbox',
     version: 1,
     configSchema: z.object({}).strict(),
     auth: {
       kind: 'oauth2',
-      provider: microsoftOAuthProvider,
+      provider,
       scopes: ['Mail.ReadWrite'],
     },
     profiles: [],
@@ -119,10 +126,19 @@ test('one core OAuth flow supports Microsoft personal and work identities safely
     authorizeProvider(
       {
         provider: 'microsoft',
-        adapterIds: ['microsoft.fixture-mailbox'],
         mode: 'from-env',
       },
-      { registry, authService, readEnvironment, now: () => 1_000 },
+      {
+        registry,
+        authService,
+        resolveClient: async () => ({
+          provider: 'microsoft',
+          label: 'microsoft',
+          clientId: 'fixture-client',
+        }),
+        readEnvironment,
+        now: () => 1_000,
+      },
     )
 
   const work = await authorize()
@@ -144,7 +160,7 @@ test('one core OAuth flow supports Microsoft personal and work identities safely
     database.query('SELECT COUNT(*) AS count FROM accounts').get(),
   ).toEqual({ count: 2 })
   expect(database.query('SELECT COUNT(*) AS count FROM grants').get()).toEqual({
-    count: 3,
+    count: 2,
   })
   expect(
     current
@@ -162,7 +178,7 @@ test('one core OAuth flow supports Microsoft personal and work identities safely
   })
   expect(store.values).toEqual(valuesBeforeFailure)
   expect(database.query('SELECT COUNT(*) AS count FROM grants').get()).toEqual({
-    count: 3,
+    count: 2,
   })
 
   current = startIdentity('work')
@@ -172,7 +188,7 @@ test('one core OAuth flow supports Microsoft personal and work identities safely
   })
   expect(store.values).toEqual(valuesBeforeFailure)
   expect(database.query('SELECT COUNT(*) AS count FROM grants').get()).toEqual({
-    count: 3,
+    count: 2,
   })
 
   current = startIdentity('malformed')
@@ -181,6 +197,6 @@ test('one core OAuth flow supports Microsoft personal and work identities safely
   })
   expect(store.values).toEqual(valuesBeforeFailure)
   expect(database.query('SELECT COUNT(*) AS count FROM grants').get()).toEqual({
-    count: 3,
+    count: 2,
   })
 })

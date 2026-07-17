@@ -98,7 +98,7 @@ async function freshDb(): Promise<Database> {
     "INSERT INTO realms (id, slug, label, created_at) VALUES ('realm-1', 'work', 'Work', 1)",
   ).run()
   db.prepare(
-    "INSERT INTO accounts (id, provider, external_user_id, created_at, updated_at) VALUES ('account-1', 'test', 'subject-1', 1, 1)",
+    "INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES ('account-1', 'test', 'account-1', 'subject-1', 1, 1)",
   ).run()
   db.prepare(
     `INSERT INTO grants
@@ -107,9 +107,9 @@ async function freshDb(): Promise<Database> {
   ).run()
   db.prepare(
     `INSERT INTO sources
-       (id, realm_id, adapter_id, adapter_version, config_json, grant_id, sync_enabled, created_at, updated_at)
-     VALUES (?, 'realm-1', 'fake.remote-adapter', 1, '{}', 'grant-1', 1, 1, 1)`,
-  ).run(sourceId)
+       (id, realm_id, adapter_id, adapter_version, label, config_json, grant_id, sync_enabled, created_at, updated_at)
+     VALUES (?, 'realm-1', 'fake.remote-adapter', 1, ?, '{}', 'grant-1', 1, 1, 1)`,
+  ).run(sourceId, sourceId)
   return db
 }
 

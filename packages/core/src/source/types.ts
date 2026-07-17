@@ -12,7 +12,7 @@ export interface SourceRow {
   readonly realm_slug?: string
   readonly adapter_id: string
   readonly adapter_version: number
-  readonly display_name: string | null
+  readonly label: string
   readonly config_json: string | null
   readonly sync_enabled: boolean
   readonly search_routing?: SearchRouting | null
@@ -32,7 +32,7 @@ export interface AddSourceInput {
   readonly adapterId: string
   readonly realmSlug?: string
   readonly adapterVersion?: number
-  readonly displayName?: string
+  readonly label?: string
   readonly configJson?: string
   readonly grantId?: string
   readonly searchRouting?: SearchRouting
@@ -69,6 +69,7 @@ export interface SourceServiceDeps {
 export interface SourceService {
   addSource(input: AddSourceInput): AddSourceResult
   listSources(input?: ListSourcesInput): SourceRow[]
+  resolveSourceId(reference: string): string
   findSourceById(sourceId: string): SourceRow | null
   removeSource(sourceId: string): void
   getStatus(input?: { sourceId?: string }): StatusRow[]

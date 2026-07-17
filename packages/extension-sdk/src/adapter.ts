@@ -58,7 +58,7 @@ export type OAuthProviderSpec = OAuthProviderBase &
         readonly environment: {
           readonly clientId: string
           readonly clientSecret?: never
-          readonly refreshToken: string
+          readonly refreshToken?: string
         }
       }
     | {
@@ -70,7 +70,7 @@ export type OAuthProviderSpec = OAuthProviderBase &
         readonly environment: {
           readonly clientId: string
           readonly clientSecret?: string
-          readonly refreshToken: string
+          readonly refreshToken?: string
         }
       }
     | {
@@ -82,7 +82,7 @@ export type OAuthProviderSpec = OAuthProviderBase &
         readonly environment: {
           readonly clientId: string
           readonly clientSecret: string
-          readonly refreshToken: string
+          readonly refreshToken?: string
         }
       }
   )

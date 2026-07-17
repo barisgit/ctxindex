@@ -21,7 +21,7 @@ export type AccountExpiryState = 'active' | 'expired' | 'unknown'
 export interface AccountInventoryRealm {
   readonly id: string
   readonly slug: string
-  readonly label: string | null
+  readonly label: string
 }
 
 export interface AccountInventoryAdapter {
@@ -31,7 +31,7 @@ export interface AccountInventoryAdapter {
 
 export interface AccountInventorySource {
   readonly id: string
-  readonly displayName: string | null
+  readonly label: string
   readonly adapter: AccountInventoryAdapter
   readonly realm: AccountInventoryRealm
 }

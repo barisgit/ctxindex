@@ -84,11 +84,11 @@ async function freshDb(): Promise<Database> {
     "INSERT INTO realms (id, slug, label, created_at) VALUES ('realm-1', 'work', 'Work', 1)",
   ).run()
   const insert = db.prepare(`INSERT INTO sources
-    (id, realm_id, adapter_id, adapter_version, config_json, sync_enabled, created_at, updated_at)
-    VALUES (?, 'realm-1', ?, ?, '{}', 1, 1, 1)`)
-  insert.run('source-z', 'fake.bound', 3)
-  insert.run('source-a', 'fake.unbound', 4)
-  insert.run('source-m', 'fake.missing', 9)
+    (id, realm_id, label, adapter_id, adapter_version, config_json, sync_enabled, created_at, updated_at)
+    VALUES (?, 'realm-1', ?, ?, ?, '{}', 1, 1, 1)`)
+  insert.run('source-z', 'Bound Source', 'fake.bound', 3)
+  insert.run('source-a', 'Unbound Source', 'fake.unbound', 4)
+  insert.run('source-m', 'Missing Source', 'fake.missing', 9)
   return db
 }
 

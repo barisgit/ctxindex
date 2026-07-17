@@ -2,15 +2,14 @@
 
 ## Responsibility
 
-Owns the CLI workflow for describing and running typed registry Actions after the Citty declaration delegates raw argv.
+Owns CLI workflows for describing and running typed registry Actions.
 
 ## Design / patterns
 
-- `handle-action-command.ts` parses with `args/action.ts`, resolves inline-or-file JSON before opening dependencies, invokes public core Action services, formats through `format/action.ts`, maps exits, prints warnings, and always closes opened dependencies.
-- Injectable dependency and service Interfaces keep command behavior testable without provider or storage side effects.
-- Focused tests live beside the handler and cover arbitrary JSON inputs, parse-before-deps, exact service arguments, output/warnings, error exits, and closure.
+- `handle-action-command.ts` parses input, resolves inline-or-file JSON before dependencies, and always closes dependencies.
+- Source references are resolved as exact labels first and IDs second through `SourceService`; core Action services receive only the stable Source ID.
+- Injectable dependencies/services keep parsing, output, and failure mapping testable without provider side effects.
 
 ## Integration points
 
-- Called only by `commands/action.ts`.
-- Uses `@ctxindex/core/action`, CLI dependency composition, shared Action parsing, output formatting, and exit mapping.
+- Called by `commands/action.ts`; uses `args/action.ts`, `format/action.ts`, `format/exit.ts`, `SourceService`, and `@ctxindex/core/action`.

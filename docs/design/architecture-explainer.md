@@ -42,7 +42,7 @@ Four rules keep the vocabulary honest. **Purity**: vocabulary functions are pure
 {% /section %}
 
 {% section claim="One shared domain model and six generic storage areas replace provider-specific silos." %}
-The model adds **Realm, Source, Extension, Profile, Action, Draft, Adapter, Resource, Ref, Relation, Artifact, Field Index, and Sync Run**. Storage uses six generic areas — Resources, field_index, chunks+FTS, Relations, Artifact metadata, and Source/Sync bookkeeping. Prototype `items` and `mail_*` tables are not a prior version: V1 starts with a fresh database and no migration path.
+The model adds **Realm, Client, Account, Grant, Source, Extension, Profile, Action, Draft, Adapter, Resource, Ref, Relation, Artifact, Field Index, and Sync Run**. Storage uses six generic areas — Resources, field_index, chunks+FTS, Relations, Artifact metadata, and Source/Sync bookkeeping, including OAuth Client metadata. Prototype `items` and `mail_*` tables are not a prior version: V1 starts with a fresh database and no migration path.
 
 Adapters own **no tables**. Their escape valves are the sync cursor (state) and the artifact store (blobs); a namespaced `ctx.storage` API can be added later without breaking anything — the reverse migration (removing tables extensions already use) would have been a rewrite. That asymmetry decided it.
 
@@ -55,7 +55,7 @@ Adapters own **no tables**. Their escape valves are the sync cursor (state) and 
 | `chunks` + FTS | searchable text segments |
 | `relations` | typed edges; target = ref OR natural key; resolved lazily |
 | `artifacts` | CAS metadata: hash, media type, size, origin ref, retention class |
-| Source/Sync bookkeeping | Sources, sync_runs, sync_locks, source_sync_state, tombstones, Accounts, Grants, user-defined Realms |
+| Source/Sync bookkeeping | labeled OAuth Clients, Accounts, one stable Grant per Account, labeled Sources, sync_runs, sync_locks, source_sync_state, tombstones, user-defined Realms |
 
 {% /depth %}
 
@@ -79,7 +79,7 @@ An adapter declares `capabilities: ["sync", "search-remote", "retrieve", "downlo
 
 Routing precedence: **CLI flag** (`--local-only` / `--remote`) beats **per-source config** beats **adapter decision**. Default is hybrid orchestration: each source answers per its adapter's routing choice, which should consult sync coverage — a fully mirrored mailbox answers locally; a partial 90-day window includes the provider. Remote failures degrade to per-origin warnings; local results always return. This default is explicitly provisional (D7) pending dogfooding with a partially-synced Gmail.
 
-Auth is layered the same way (D5): declarative specs (`oauth2` with adapter-supplied endpoints, `api-key`, `basic`, `none`) that core executes uniformly — token refresh, `needs_auth`, exit code 10 — plus a deliberately minimal `ctx.secrets.get/set` escape hatch for weird schemes like cookie-jar portals.
+Auth is layered the same way (D5): declarative specs (`oauth2` with adapter-supplied endpoints, `api-key`, `basic`, `none`) that core executes uniformly — token refresh, `needs_auth`, exit code 10 — plus a deliberately minimal `ctx.secrets.get/set` escape hatch for weird schemes like cookie-jar portals. OAuth application credentials enter once through `client add --from-env` and persist as a provider-scoped labeled Client. `account add` authorizes one provider identity with that Client, requests all loaded same-provider Adapter scopes, and creates or updates the Account's one stable internal Grant in place. Globally labeled Sources bind that Grant, so reauthorization preserves their credential link.
 {% /section %}
 
 {% section claim="Typed Actions are provider operations without arbitrary Extension command packs." %}
