@@ -1,6 +1,6 @@
 ## Why
 
-The first live multi-provider sync (2026-07-17) surfaced three systematic real-world calendar data shapes that the strict adapters skip: Google `birthday`-variant events (9 errors on one personal calendar), Microsoft Calendar events rejected as malformed (43 skips on one Outlook.com work calendar — a volume suggesting one systematic schema mismatch rather than genuinely broken data), and Graph occurrence starts whose provider time zone cannot be resolved (series identity omitted). All degrade gracefully today, but they silently exclude real events from the local index.
+The first live multi-provider sync (2026-07-17) surfaced three systematic real-world calendar data shapes plus one Microsoft mailbox Ref contract bug that the strict adapters skip: Google `birthday`-variant events (9 errors on one personal calendar), Microsoft Calendar events rejected as malformed (43 skips on one Outlook.com work calendar — a volume suggesting one systematic schema mismatch rather than genuinely broken data), and Graph occurrence starts whose provider time zone cannot be resolved (series identity omitted). All degrade gracefully today, but they silently exclude real events from the local index.
 
 ## What Changes
 
@@ -34,3 +34,11 @@ Filed from live smoke-test evidence; diagnosis precedes design per the diagnose-
 1. `google_calendar_unsupported_event` — variant `birthday`, recurring series instances (`_20260207` style suffixes), 9 occurrences on one personal calendar.
 2. `microsoft_calendar_malformed_event` — 43 skips on one Outlook.com calendar in a single initial sync window; ids share one mailbox prefix, suggesting one recurring generator (likely one property shape).
 3. `microsoft_calendar_unresolved_series_start` — provider time zone unresolvable on occurrence starts; series identity omitted but events materialized.
+
+### Modified Capabilities (mailbox addition)
+
+- `microsoft-graph-adapters` (mailbox): `search-remote` MUST request `Prefer: IdType="ImmutableId"` on all Graph page fetches so emitted message Refs carry immutable ids, matching the `message/<immutable-id>` Ref contract already enforced by `ref.ts` and expected by `retrieve`/`download`/`draft`.
+
+## Symptom 4 (mailbox Ref id-type mismatch)
+
+Live evidence: `ctxindex get` returned Microsoft Graph 400 on recent messages whose search-derived Refs contained mutable ids with URL-hostile characters; other gets succeeded by luck. Root cause confirmed in code: `search-remote.ts` calls `graphHeaders()` without `IMMUTABLE_ID_PREFERENCE` (transport.ts exports it; calendar sync/retrieve and mailbox retrieve/download/draft all use immutable-id semantics). Consequences: (a) 400s on get for ids containing `+`/`/`; (b) Refs silently go stale when messages move folders. Fix shape: send `IMMUTABLE_ID_PREFERENCE` on search-remote page fetches + header assertion test; verify draft create/update responses also use immutable ids. Existing materialized mailbox envelopes (~377 rows) carry mutable-id Refs — pre-alpha data is disposable, purge/re-search, no migration.
