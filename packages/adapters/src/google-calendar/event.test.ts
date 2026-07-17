@@ -139,29 +139,67 @@ describe('Google Calendar event normalization', () => {
     ])
   })
 
-  test('returns deterministic warnings instead of malformed resources for unsupported variants', () => {
-    const unsupported = normalizeGoogleCalendarEvent(
+  test('maps the birthday variant as a normal all-day event with series linkage (live evidence shape)', () => {
+    const result = normalizeGoogleCalendarEvent(
       {
-        id: 'birthday',
+        id: 'birthday-instance_20260207',
         status: 'confirmed',
         eventType: 'birthday',
-        start: { date: '2026-07-16' },
-        end: { date: '2026-07-17' },
-        updated: '2026-07-16T00:00:00Z',
+        start: { date: '2026-02-07' },
+        end: { date: '2026-02-08' },
+        recurringEventId: '4rhj7ttiai2rj77s7n6258p3u8',
+        originalStartTime: { date: '2026-02-07' },
+        visibility: 'private',
+        transparency: 'transparent',
+        birthdayProperties: { contact: 'people/c123', type: 'birthday' },
+        summary: 'Birthday',
+        updated: '2026-01-01T00:00:00Z',
       },
       sourceId,
       'primary',
     )
-    expect(unsupported.resource).toBeUndefined()
-    expect(unsupported.providerEventId).toBe('birthday')
-    expect(unsupported.warnings).toEqual([
-      {
-        code: 'google_calendar_unsupported_event',
-        message:
-          'Google Calendar event birthday uses unsupported variant birthday.',
-        ref: 'ctx://01J00000000000000000000000/event/birthday',
+    expect(result.warnings).toEqual([])
+    expect(result.resource?.payload).toMatchObject({
+      provider: 'google',
+      providerEventId: 'birthday-instance_20260207',
+      timing: {
+        kind: 'all-day',
+        startDate: '2026-02-07',
+        endDate: '2026-02-08',
       },
-    ])
+      status: 'confirmed',
+      series: {
+        providerEventId: '4rhj7ttiai2rj77s7n6258p3u8',
+        originalStart: { kind: 'all-day', date: '2026-02-07' },
+      },
+    })
+    expect(result.resource?.payload).not.toHaveProperty('birthdayProperties')
+  })
+
+  test('returns deterministic warnings instead of malformed resources for unsupported variants', () => {
+    for (const eventType of ['workingLocation', 'fromGmail']) {
+      const unsupported = normalizeGoogleCalendarEvent(
+        {
+          id: 'excluded',
+          status: 'confirmed',
+          eventType,
+          start: { date: '2026-07-16' },
+          end: { date: '2026-07-17' },
+          updated: '2026-07-16T00:00:00Z',
+        },
+        sourceId,
+        'primary',
+      )
+      expect(unsupported.resource).toBeUndefined()
+      expect(unsupported.providerEventId).toBe('excluded')
+      expect(unsupported.warnings).toEqual([
+        {
+          code: 'google_calendar_unsupported_event',
+          message: `Google Calendar event excluded uses unsupported variant ${eventType}.`,
+          ref: 'ctx://01J00000000000000000000000/event/excluded',
+        },
+      ])
+    }
 
     const malformed = normalizeGoogleCalendarEvent(
       { id: 'broken', status: 'confirmed', start: { date: '2026-07-16' } },

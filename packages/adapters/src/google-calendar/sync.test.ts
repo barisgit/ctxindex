@@ -427,7 +427,7 @@ describe('Google Calendar sync', () => {
               },
               {
                 ...event('unsupported'),
-                eventType: 'birthday',
+                eventType: 'workingLocation',
               },
             ],
             nextSyncToken: 'sync-1',
