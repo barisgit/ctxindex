@@ -47,4 +47,59 @@ describe('search CLI arguments', () => {
       kind: 'unknown',
     })
   })
+
+  test('accepts filter-only enumeration without query text', () => {
+    expect(
+      parseSearchArgs(['--realm', 'work', '--limit', '20', '--json']),
+    ).toEqual({
+      kind: 'search',
+      json: true,
+      refs: false,
+      input: { realms: ['work'], limit: 20 },
+    })
+    expect(
+      parseSearchArgs(['--kind', 'communication.message', '--offset', '20']),
+    ).toEqual({
+      kind: 'search',
+      json: false,
+      refs: false,
+      input: { kind: 'communication.message', offset: 20 },
+    })
+  })
+
+  test('rejects bare search, query-less --remote, and non-local --offset', () => {
+    expect(parseSearchArgs([])).toMatchObject({
+      kind: 'unknown',
+      message:
+        'search: provide <query> or at least one filter (--realm/--adapter/--source/--kind/--field/--since/--until)',
+    })
+    expect(parseSearchArgs(['--json'])).toMatchObject({ kind: 'unknown' })
+    expect(parseSearchArgs(['--realm', 'work', '--remote'])).toMatchObject({
+      kind: 'unknown',
+      message:
+        'search: --remote requires <query>; filter-only remote enumeration is not supported',
+    })
+    expect(parseSearchArgs(['x', '--offset', '5'])).toMatchObject({
+      kind: 'unknown',
+      message:
+        'search: --offset requires local execution; omit <query> or add --local-only',
+    })
+    expect(
+      parseSearchArgs(['x', '--local-only', '--offset', '5']),
+    ).toMatchObject({
+      kind: 'search',
+      input: { text: 'x', localOnly: true, offset: 5 },
+    })
+    for (const bad of ['-1', '1.5', 'abc']) {
+      expect(
+        parseSearchArgs(['--realm', 'work', '--offset', bad]),
+      ).toMatchObject({
+        kind: 'unknown',
+        message: `search: invalid --offset: ${bad}`,
+      })
+    }
+    expect(parseSearchArgs(['--realm', 'work', '--limit', '-1'])).toMatchObject(
+      { kind: 'unknown', message: 'search: invalid --limit: -1' },
+    )
+  })
 })

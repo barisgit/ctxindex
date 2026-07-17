@@ -68,6 +68,7 @@ export const searchCommand = defineCommand({
     since: { type: 'string', description: 'Start ISO date' },
     until: { type: 'string', description: 'End ISO date' },
     limit: { type: 'string', description: 'Result limit' },
+    offset: { type: 'string', description: 'Local pagination offset' },
     refs: { type: 'boolean', description: 'Print Resource Refs only' },
     'local-only': {
       type: 'boolean',

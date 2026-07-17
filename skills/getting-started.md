@@ -22,6 +22,26 @@ Use an explicit Realm filter to keep personal and work retrieval exact. Inspect
 `account list` and `source list` rather than inferring provider identity from a
 Source label.
 
+## Browsing without a query
+
+The `search` query text is optional when at least one filter (`--realm`,
+`--adapter`, `--source`, `--kind`, `--field`, `--since`, `--until`) is present.
+A filter-only search enumerates matching local Resources newest first
+(`occurredAt` descending, tie-broken by Ref), so "the latest 20 work emails" is
+`search --realm work --kind <email-kind> --limit 20` with no query string.
+Filter-only enumeration is local-only: it never contacts providers, and
+`--remote` without query text is an error. A bare `search` with neither query
+nor filters is also an error.
+
+## Paginating results
+
+Local executions (filter-only searches, or query searches with `--local-only`)
+accept `--offset <n>` alongside `--limit <n>`. The JSON envelope reports
+`pagination: { offset, limit, hasMore }`; while `hasMore` is true, repeat the
+same command with `--offset` advanced by `--limit` to fetch the next page.
+Ordering is deterministic against an unchanged index, so pages neither overlap
+nor skip Resources.
+
 ## Calendar events
 
 Calendar Sources are indexed: synchronize the selected calendar, search with

@@ -31,6 +31,15 @@ source remove <label|id>
 
 Every Source belongs to exactly one Realm. Omitting a realm filter searches all Realms; an explicit filter is exact. Client labels are unique per provider, while Account and Source labels are globally unique bare handles.
 
+`search` accepts query text, filters, or both. With at least one filter
+(`--realm`, `--adapter`, `--source`, `--kind`, `--field`, `--since`, `--until`)
+the query is optional: a filter-only search enumerates local Resources newest
+first and never routes to providers. Local executions (filter-only, or a query
+with `--local-only`) paginate with `--limit`/`--offset`; the JSON result
+includes `pagination: { offset, limit, hasMore }` — advance `--offset` by
+`--limit` while `hasMore` is true. Remote enumeration and remote pagination are
+not supported: `--remote` requires query text and rejects `--offset`.
+
 Indexed calendar Sources use the same `sync`, `search`, and `get` verbs as
 other context. Their event Refs remain distinct across Sources even when a
 provider event id overlaps. Loaded Calendar Adapters declare no mutation
