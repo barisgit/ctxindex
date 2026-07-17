@@ -1,5 +1,6 @@
 // CLDR windowsZones.xml territory="001" primary mappings (Windows -> canonical IANA).
-// Source: unicode-org/cldr common/supplemental/windowsZones.xml.
+// Source: unicode-org/cldr common/supplemental/windowsZones.xml, with CLDR's
+// deprecated aliases replaced by their current canonical IANA names.
 const WINDOWS_TO_IANA = new Map<string, string>([
   ['Dateline Standard Time', 'Etc/GMT+12'],
   ['UTC-11', 'Etc/GMT+11'],
@@ -38,7 +39,7 @@ const WINDOWS_TO_IANA = new Map<string, string>([
   ['E. South America Standard Time', 'America/Sao_Paulo'],
   ['SA Eastern Standard Time', 'America/Cayenne'],
   ['Argentina Standard Time', 'America/Buenos_Aires'],
-  ['Greenland Standard Time', 'America/Godthab'],
+  ['Greenland Standard Time', 'America/Nuuk'],
   ['Montevideo Standard Time', 'America/Montevideo'],
   ['Magallanes Standard Time', 'America/Punta_Arenas'],
   ['Saint Pierre Standard Time', 'America/Miquelon'],
@@ -64,7 +65,7 @@ const WINDOWS_TO_IANA = new Map<string, string>([
   ['Syria Standard Time', 'Asia/Damascus'],
   ['West Bank Standard Time', 'Asia/Hebron'],
   ['South Africa Standard Time', 'Africa/Johannesburg'],
-  ['FLE Standard Time', 'Europe/Kiev'],
+  ['FLE Standard Time', 'Europe/Kyiv'],
   ['Israel Standard Time', 'Asia/Jerusalem'],
   ['South Sudan Standard Time', 'Africa/Juba'],
   ['Kaliningrad Standard Time', 'Europe/Kaliningrad'],
@@ -92,13 +93,13 @@ const WINDOWS_TO_IANA = new Map<string, string>([
   ['Ekaterinburg Standard Time', 'Asia/Yekaterinburg'],
   ['Pakistan Standard Time', 'Asia/Karachi'],
   ['Qyzylorda Standard Time', 'Asia/Qyzylorda'],
-  ['India Standard Time', 'Asia/Calcutta'],
+  ['India Standard Time', 'Asia/Kolkata'],
   ['Sri Lanka Standard Time', 'Asia/Colombo'],
-  ['Nepal Standard Time', 'Asia/Katmandu'],
+  ['Nepal Standard Time', 'Asia/Kathmandu'],
   ['Central Asia Standard Time', 'Asia/Bishkek'],
   ['Bangladesh Standard Time', 'Asia/Dhaka'],
   ['Omsk Standard Time', 'Asia/Omsk'],
-  ['Myanmar Standard Time', 'Asia/Rangoon'],
+  ['Myanmar Standard Time', 'Asia/Yangon'],
   ['SE Asia Standard Time', 'Asia/Bangkok'],
   ['Altai Standard Time', 'Asia/Barnaul'],
   ['W. Mongolia Standard Time', 'Asia/Hovd'],

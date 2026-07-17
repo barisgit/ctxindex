@@ -144,6 +144,9 @@ function instantInZone(
   try {
     const guess = wall - zoneOffsetMs(new Date(wall), zone)
     const exact = wall - zoneOffsetMs(new Date(guess), zone)
+    // A nonexistent local time (DST spring-forward gap) never round-trips to
+    // the requested wall time; refuse to guess an instant for it.
+    if (exact + zoneOffsetMs(new Date(exact), zone) !== wall) return undefined
     return new Date(exact).toISOString()
   } catch {
     return undefined
@@ -417,7 +420,7 @@ export function normalizeMicrosoftCalendarEvent(
     warnings.push(
       warning(
         'microsoft_calendar_unresolved_series_start',
-        `Microsoft Calendar event ${providerEventId} had an occurrence start whose provider time zone could not be resolved; series identity was omitted.`,
+        `Microsoft Calendar event ${providerEventId} had an occurrence start that could not be resolved to a valid instant in its provider time zone; series identity was omitted.`,
         ref,
       ),
     )

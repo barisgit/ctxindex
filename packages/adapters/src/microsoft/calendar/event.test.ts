@@ -196,6 +196,32 @@ describe('Microsoft Calendar event normalization', () => {
     })
   })
 
+  test('warns instead of resolving a nonexistent local occurrence start (DST gap)', () => {
+    const result = normalizeMicrosoftCalendarEvent(
+      {
+        id: 'dst-gap-occurrence',
+        isAllDay: false,
+        start: {
+          dateTime: '2026-03-08T10:30:00.0000000',
+          timeZone: 'UTC',
+        },
+        end: {
+          dateTime: '2026-03-08T11:30:00.0000000',
+          timeZone: 'UTC',
+        },
+        seriesMasterId: 'timed-series',
+        originalStart: '2026-03-08T02:30:00.0000000',
+        originalStartTimeZone: 'Pacific Standard Time',
+      },
+      sourceId,
+      'team',
+    )
+    expect(result.resource?.payload).not.toHaveProperty('series')
+    expect(result.warnings.map(({ code }) => code)).toEqual([
+      'microsoft_calendar_unresolved_series_start',
+    ])
+  })
+
   test('warns instead of guessing an all-day series date for an unresolvable provider zone', () => {
     const result = normalizeMicrosoftCalendarEvent(
       {
