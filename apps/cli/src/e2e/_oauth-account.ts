@@ -1,4 +1,4 @@
-import { chmod, mkdir, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 export async function installLoopbackBrowser(dir: string): Promise<string> {
@@ -21,5 +21,7 @@ export async function installLoopbackBrowser(dir: string): Promise<string> {
     ].join('\n'),
   )
   await chmod(path, 0o755)
+  // Linux launches 'xdg-open'; expose the same mock under both names.
+  await symlink(path, join(bin, 'xdg-open'))
   return bin
 }
