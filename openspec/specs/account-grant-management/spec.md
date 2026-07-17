@@ -137,3 +137,12 @@ Authorized provider reads SHALL use the linked Grant, reuse an unexpired access 
 #### Scenario: Action receives unauthorized response
 - **WHEN** a Draft mutation returns 401
 - **THEN** ctxindex reports authentication failure and performs no automatic second mutation
+
+### Requirement: Mailbox Account identities
+The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.
+
+Core SHOULD track account identities for mailbox accounts so sources can classify messages as sent, received, or self-authored across Google and Microsoft accounts.
+
+#### Scenario: Mailbox classification uses tracked Account identities
+- **WHEN** a conforming implementation exercises this contract
+- **THEN** it satisfies every applicable MUST and MUST NOT clause and treats SHOULD, SHOULD NOT, and MAY clauses according to their normative meanings

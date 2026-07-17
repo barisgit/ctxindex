@@ -1,7 +1,7 @@
 # ctxindex v1 showcase report — cli-and-e2e
 
 > Archived prototype showcase. Any “V1” labels below refer to an abandoned
-> prototype plan, not the current V1 scope in `V1.md`. Commands and evidence are
+> prototype plan, not the current V1 scope in `docs/milestones/V1.md`. Commands and evidence are
 > retained only as implementation history.
 
 
@@ -50,10 +50,10 @@ Source files: `.pi/charters/8d28cb6d-7eef-4a16-b1bc-f5846176e722/charter.md` and
 | VAL-TEST-LANES | `bunfig.toml` declares the unit-default lane via `pathIgnorePatterns`; `package.json` scripts declare `test:integration` and `test:e2e` using `bun test --path-ignore-patterns '__none__' <substring>` syntax (Bun ≥1.0; sentinel ignores nothing, positional substring filters). Each lane runs a non-empty distinct set of tests on a clean tree. | pass | subagent | work/f04-test-lanes/evidence/2026-05-22T13-45-16-694Z/evidence.json |
 | VAL-DOTENV-EXAMPLE | `.env.example` at repo root lists every key in `getEnv()` schema (excluding `XDG_*`) with a one-line comment and either a placeholder value or `# no default`. A test diffs the schema key set against the file. | pass | subagent | work/f01-env-loader/evidence/2026-05-22T10-23-15-720Z-2/evidence.json |
 | VAL-TURBO-ENV | Root `turbo.json` includes `globalDependencies: ['**/.env', '**/.env.*', '**/bunfig.toml']`. Per-workspace `turbo.json` extends `//` with `env:` arrays per task. `apps/cli/turbo.json` `test:e2e` env lists all `CTXINDEX_GMAIL_*` envs. | pass | subagent | work/f05-turbo-env/evidence/2026-05-22T13-45-16-680Z/evidence.json |
-| VAL-V1-EXIT-CRITERIA | Meta-test enumerates V1.md §4 criteria 1-14, opens the file responsible for each (test or verifier script), and asserts the file contains the right kind of binary invocation: Bun-test files (`*.test.ts`) must contain `Bun.spawn` or `spawnSync` invoking `apps/cli/bin/ctxindex.mjs` or `ctxindex` (linked binary); shell scripts (`*.sh`) must invoke `ctxindex` or `bun apps/cli/bin/ctxindex.mjs` directly. Library-only tests at any path satisfy NO criterion. Criterion 14 (meta-criterion itself) is satisfied by the meta-test file's existence + the per-criterion file-type-aware assertion logic. | pass | subagent | work/f22-v1-coverage-meta/evidence/2026-05-22T13-45-16-577Z/evidence.json |
+| VAL-V1-EXIT-CRITERIA | Meta-test enumerates docs/milestones/V1.md §4 criteria 1-14, opens the file responsible for each (test or verifier script), and asserts the file contains the right kind of binary invocation: Bun-test files (`*.test.ts`) must contain `Bun.spawn` or `spawnSync` invoking `apps/cli/bin/ctxindex.mjs` or `ctxindex` (linked binary); shell scripts (`*.sh`) must invoke `ctxindex` or `bun apps/cli/bin/ctxindex.mjs` directly. Library-only tests at any path satisfy NO criterion. Criterion 14 (meta-criterion itself) is satisfied by the meta-test file's existence + the per-criterion file-type-aware assertion logic. | pass | subagent | work/f22-v1-coverage-meta/evidence/2026-05-22T13-45-16-577Z/evidence.json |
 | VAL-CI-GREEN | `bash scripts/verify/ci.sh` exits 0 covering install + biome + tsgo + unit + integration + e2e. Cross-cutting across every milestone — m1 wires lanes (early evidence), m5 confirms final state. | pass | subagent | work/f04-test-lanes/evidence/2026-05-22T13-45-16-694Z-1/evidence.json |
 | VAL-AGENT-HOWTOS | `skills/reference/e2e-howto.md` documents (a) running full e2e, (b) provisioning Google OAuth + obtaining `CTXINDEX_GMAIL_REFRESH_TOKEN`, (c) interpreting exit codes 0/2/10/20/30/40/50/124/130. `skills/getting-started.md` cross-links. | pass | subagent | work/f23-agent-howtos/evidence/2026-05-22T13-45-16-665Z/evidence.json |
-| VAL-EXIT-CODES | SPEC §12 exit codes (0 ok, 2 usage, 10 needs_auth, 20 transient, 30 conflict, 40 io, 50 timeout, 124 wall-timeout, 130 SIGINT) are emitted by the real binary in the matched scenarios. A meta-test cross-references every claimed exit code to the test file that proves it. | pass | subagent | work/f03-with-timeout/evidence/2026-05-22T13-45-16-645Z-1/evidence.json |
+| VAL-EXIT-CODES | the stable exit codes in [`error-taxonomy/spec.md`](../../openspec/specs/error-taxonomy/spec.md) (0 ok, 2 usage, 10 needs_auth, 20 transient, 30 conflict, 40 io, 50 timeout, 124 wall-timeout, 130 SIGINT) are emitted by the real binary in the matched scenarios. A meta-test cross-references every claimed exit code to the test file that proves it. | pass | subagent | work/f03-with-timeout/evidence/2026-05-22T13-45-16-645Z-1/evidence.json |
 | VAL-QA-CLI-SURFACE | An independent `charter-qa` subagent runs the full v1 CLI binary against the documented happy paths from a clean sandbox (init → realm add → source add local.directory → sync → search → status → skills list/get/path → auth headless) and records a QA report. Surfaces touched: `apps/cli/src/commands/*`, `apps/cli/src/main.ts`, `skills/`, `skills/reference/`. QA brief: `qa-briefs/cli-surface.md`. | pass | subagent | work/f26-qa-cli-surface/evidence/2026-05-22T13-45-16-585Z/evidence.json |
 
 ## 3. CLI walkthrough
@@ -652,8 +652,8 @@ The raw `git diff` and `git status` snapshots are intentionally omitted from the
 M	.gitignore
 M	IMPLEMENTATION.md
 A	README.md
-M	SPEC.md
-M	V1.md
+M	openspec/specs/core-model/spec.md
+M	docs/milestones/V1.md
 A	apps/cli/bin/ctxindex.mjs
 A	apps/cli/package.json
 A	apps/cli/src/auth/headless-google.test.ts
@@ -798,7 +798,7 @@ Sync is adapter-driven. The local-directory adapter walks files, chunks text, wr
 
 Search is SQLite FTS over normalized content. `ctxindex search` returns ranked item/chunk excerpts and accepts realm/source/adapter/kind/time/deleted/explain filters. `ctxindex status --json` reports per-source sync state, last run, errors, and cursor. `ctxindex skills` exposes bundled agent-facing docs so new developers and agents can discover the intended flows.
 
-This architecture matches the durable docs in `SPEC.md` (normative model, storage, secret URI grammar, sync locks, exit codes) and `IMPLEMENTATION.md` (Bun/TypeScript runtime, SQLite/Drizzle stack, migrations, XDG/env behavior, and binary-spawn e2e strategy).
+This architecture matches the durable capability specs in [`openspec/specs/core-model/spec.md`](../../openspec/specs/core-model/spec.md), [`generic-storage/spec.md`](../../openspec/specs/generic-storage/spec.md), [`secret-backend-operations/spec.md`](../../openspec/specs/secret-backend-operations/spec.md), [`sync-operations/spec.md`](../../openspec/specs/sync-operations/spec.md), and [`error-taxonomy/spec.md`](../../openspec/specs/error-taxonomy/spec.md), plus the capability `implementation.md` sidecars under `openspec/specs/` for the Bun/TypeScript runtime, SQLite/Drizzle stack, migrations, XDG/env behavior, and binary-spawn e2e strategy.
 
 ## 8. Audit-trail caveat
 

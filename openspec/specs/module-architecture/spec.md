@@ -4,7 +4,7 @@
 TBD - created by archiving change deepen-module-architecture. Update Purpose after archive.
 ## Requirements
 ### Requirement: Implementation follows explicit module ownership
-The repository MUST organize implementation by the domain owner of the behavior, as detailed by `IMPLEMENTATION.md`, and MUST keep composition roots free of provider-specific schemas and operation implementations.
+The repository MUST organize implementation by the domain owner of the behavior, as detailed by the capability `implementation.md` sidecars under `openspec/specs/`, and MUST keep composition roots free of provider-specific schemas and operation implementations.
 
 #### Scenario: Built-in Source Adapter locality
 - **WHEN** a maintainer inspects a built-in Source Adapter
@@ -31,5 +31,21 @@ Production modules and runtime dependency manifests MUST exclude unreachable pro
 
 #### Scenario: Repository health verification
 - **WHEN** the architecture and package gates run
-- **THEN** no legacy sync-operation implementation, forbidden Adapter-table cleanup path, dead provider client surface, or unused direct runtime dependency remains
+- **THEN** no unreachable prototype sync-operation implementation, forbidden Adapter-table cleanup path, dead provider client surface, or unused direct runtime dependency remains
 
+### Requirement: CLI and core module boundaries
+The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.
+
+`apps/cli` is a thin shell around `@ctxindex/core` services. Command files under `apps/cli/src/commands/**/*.ts` MUST limit themselves to parsing arguments, calling a core service, formatting the result, mapping typed errors, and returning an exit code.
+
+Code under `apps/cli/src/**` MUST NOT import `bun:sqlite` or `drizzle-orm/*`. It MUST NOT contain raw SQL literals for `INSERT`, `UPDATE`, `DELETE`, or `SELECT` statements.
+
+Code under `apps/cli/src/**` MUST NOT issue `fetch()` calls to provider APIs such as OAuth, Google, or Microsoft endpoints. Provider HTTP behavior belongs in `@ctxindex/core` or `@ctxindex/adapters`.
+
+Code under `apps/cli/src/**` MUST NOT generate ULIDs or UUIDs and MUST NOT encode schema column names. Identity assignment and schema knowledge are core concerns.
+
+The OAuth host flow MAY bind a loopback-only socket and explicitly open a browser. State, callback, timeout, PKCE, token exchange, provider identity, and secret persistence MUST be owned by a provider-neutral `@ctxindex/core/auth` module; the CLI only selects definitions and invokes that module.
+
+#### Scenario: CLI commands delegate runtime behavior to core services
+- **WHEN** a conforming implementation exercises this contract
+- **THEN** it satisfies every applicable MUST and MUST NOT clause and treats SHOULD, SHOULD NOT, and MAY clauses according to their normative meanings

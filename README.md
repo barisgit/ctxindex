@@ -11,7 +11,7 @@ Agent ───── CLI ────> ctxindex ──> Sources ──> provide
                          └── Resources / Refs / Relations / Artifacts
 ```
 
-V1 is under active development. The code currently in the repository is disposable pre-release implementation; it is not an earlier released version and receives no schema or CLI compatibility treatment. Product scope is owned by `V1.md`; use `openspec list` for the authoritative active-change inventory.
+V1 and V1.1 are shipped. The project remains pre-alpha but functional: it provides multi-provider mail and calendar workflows through `search`, `sync`, `get`, `thread`, and `export`, plus reversible Draft actions. The implementation receives no schema or CLI compatibility treatment until a released version creates that obligation. Current behavior is owned by the capability specs under `openspec/specs/`; use `openspec list` for the authoritative active-change inventory.
 
 ## Development
 
@@ -37,12 +37,14 @@ paths.
 
 | Document | Owns |
 |---|---|
+| `CONTRIBUTING.md` | Issue taxonomy and branch, OpenSpec, verification, and pull-request workflow |
+| `BACKLOG.md` | Non-normative candidate roadmap and promotion into issues and OpenSpec changes |
 | `CONTEXT.md` | Ubiquitous language and domain relationships |
-| `SPEC.md` | Timeless normative behavior and Adapter/Extension contracts |
-| `V1.md` | First-release scope, deferrals, and implementation slices |
-| `IMPLEMENTATION.md` | Reference implementation choices |
+| `SYSTEM.md` | Non-normative, agent-synthesized readable system projection |
+| `openspec/specs/` | Canonical normative capability behavior and selective non-normative interface-first implementation doctrine |
+| `docs/milestones/` | Completed V1 and V1.1 historical milestone records |
 | `docs/design/2026-07-13-context-access-layer.md` | Decisions D1–D22 and cross-cutting rationale |
 | `docs/design/architecture-explainer.md` / `.html` | Narrative architecture explainer |
-| `openspec/changes/v1-context-access-layer/` | Active capability specs and tasks |
-| `docs/AGENT-HOWTOS.md` | Recipes for driving the current prototype while V1 is built |
+| `openspec/changes/` | Active and archived change proposals, artifacts, and tasks |
+| `docs/AGENT-HOWTOS.md` | Development and operator recipes |
 | `skills/` | Agent-facing usage docs shipped with the CLI |

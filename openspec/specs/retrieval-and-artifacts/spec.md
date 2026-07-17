@@ -6,7 +6,7 @@ Define complete Resource and thread retrieval plus managed Artifact retention, d
 ## Requirements
 
 ### Requirement: Complete Resource retrieval by Ref
-For V1, `get <ref>` SHALL implement SPEC §10f by returning a complete Resource from local materialization when available and otherwise invoking the owning Source Adapter's `retrieve` capability. Provider-retrieved Resources MUST retain the requested Ref and SHALL be cached as purgeable `adhoc` materializations.
+For V1, `get <ref>` SHALL return a complete Resource from local materialization when available and otherwise invoke the owning Source Adapter's `retrieve` capability. Provider-retrieved Resources MUST retain the requested Ref and SHALL be cached as purgeable `adhoc` materializations.
 
 #### Scenario: Locally materialized Resource is returned
 - **WHEN** `get` receives a Ref whose complete Resource is stored locally
@@ -17,7 +17,7 @@ For V1, `get <ref>` SHALL implement SPEC §10f by returning a complete Resource 
 - **THEN** the Adapter retrieves the complete Resource and core returns and caches it as `adhoc`
 
 ### Requirement: Thread retrieval uses generic Relations
-For V1, `thread get <ref>` SHALL return the union of provider conversation membership and bidirectional `parent` Relation traversal required by SPEC §10f. It MUST present a tree when parent edges exist and otherwise a flat date-ordered list.
+For V1, `thread get <ref>` SHALL return the union of provider conversation membership and bidirectional `parent` Relation traversal. It MUST present a tree when parent edges exist and otherwise a flat date-ordered list.
 
 #### Scenario: Reply tree is assembled across arrival order
 - **WHEN** related Gmail messages have conversation membership and parent Relations that were stored in any order
@@ -28,7 +28,7 @@ For V1, `thread get <ref>` SHALL return the union of provider conversation membe
 - **THEN** `thread get` returns a flat list ordered by date
 
 ### Requirement: Managed Artifact lifecycle
-For V1, Artifact bytes SHALL use the content-addressed managed store defined in SPEC §10f, with media type, size, origin Ref, and retention metadata. Download MUST use cached bytes when present and otherwise the Adapter's `download` capability; `--output` MUST copy bytes without transferring store ownership. Sync MUST NOT fetch all Artifact bytes by default, and the store SHALL support explicit purge and disk accounting.
+For V1, Artifact bytes SHALL use a content-addressed managed store with media type, size, origin Ref, and retention metadata. Download MUST use cached bytes when present and otherwise the Adapter's `download` capability; `--output` MUST copy bytes without transferring store ownership. Sync MUST NOT fetch all Artifact bytes by default, and the store SHALL support explicit purge and disk accounting.
 
 #### Scenario: Uncached Artifact is downloaded and copied
 - **WHEN** a caller downloads an uncached Artifact to an output path
@@ -50,7 +50,7 @@ For V1, every materialized Artifact byte object SHALL use the retention class `c
 - **THEN** managed Artifact bytes and cache metadata are removed while owning Resources and their Artifact descriptors remain available for a later re-download
 
 ### Requirement: Profile-declared export
-For V1, `export <ref> --format <f>` SHALL resolve formats from the Resource Profile's export map and stream its rendered representation as specified in SPEC §10f. Core MUST NOT maintain domain-specific conversion pipelines, and validated payload JSON MUST always be exportable without a Profile declaration.
+For V1, `export <ref> --format <f>` SHALL resolve formats from the Resource Profile's export map and stream its rendered representation. Core MUST NOT maintain domain-specific conversion pipelines, and validated payload JSON MUST always be exportable without a Profile declaration.
 
 #### Scenario: Declared export format is rendered
 - **WHEN** a caller requests a format declared by the Resource's Profile
@@ -78,3 +78,29 @@ For V1, `microsoft.mailbox` Resources SHALL use the existing complete Resource r
 #### Scenario: Outlook message exports through its Profile
 - **WHEN** a caller exports a normalized Outlook message as EML or JSON
 - **THEN** the existing communication Profile renderer/fallback streams the representation without Microsoft conversion code in core
+
+### Requirement: Attachment materialization
+The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.
+
+Mail and calendar attachments SHOULD become separate resources when their content is extractable, linked to the parent resource by relations. Non-extractable attachments remain artifact descriptors on the parent resource.
+
+#### Scenario: Extractable and non-extractable attachments use the correct representation
+- **WHEN** a conforming implementation exercises this contract
+- **THEN** it satisfies every applicable MUST and MUST NOT clause and treats SHOULD, SHOULD NOT, and MAY clauses according to their normative meanings
+
+### Requirement: Retrieval, Artifact, and export contract
+The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.
+
+Retrieval: `get <ref>` MUST return the complete resource, serving from local rows when present and invoking the adapter's `retrieve` capability otherwise. Retrieved resources are cached as `adhoc` rows ([generic storage](../generic-storage/spec.md)).
+
+Thread retrieval: `thread get <ref>` MUST return the union of provider conversation membership and the reply-tree walk over `parent` relations in both directions, presenting a tree when parent edges exist and a flat, date-ordered list otherwise.
+
+Artifacts: artifact bytes MUST live in a content-addressed store with recorded media type, size, origin ref, and retention class. Downloads MUST be served from the store when present (cache) and via the adapter's `download` capability otherwise. `--output` copies bytes to a caller path; the store remains the system of record. Artifact retention during sync is policy-driven and MUST NOT default to fetching all bytes. The store MUST support purge and disk accounting.
+
+Export: `export <ref> --format <f>` resolves the resource's profile, looks up `f` in its export map, and streams the rendered representation. Valid formats per kind are exactly the profile-declared export map keys. Core MUST NOT implement format conversion pipelines; a JSON export of the validated payload is always available without profile declaration.
+
+Search results, Source descriptions, and describe output SHOULD carry machine-readable affordances (available operations and Actions derived from capability flags, Profile vocabulary, and Adapter bindings) so callers never need provider-specific knowledge.
+
+#### Scenario: Retrieval and Artifact operations follow Source capabilities and Profile formats
+- **WHEN** a conforming implementation exercises this contract
+- **THEN** it satisfies every applicable MUST and MUST NOT clause and treats SHOULD, SHOULD NOT, and MAY clauses according to their normative meanings

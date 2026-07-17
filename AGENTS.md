@@ -2,23 +2,30 @@
 
 ## Documentation ownership — never duplicate truth
 
-- `CONTEXT.md` — ubiquitous language and domain relationships. Terminology resolves here first.
-- `SPEC.md` — timeless normative behavior, contracts, and stable exit codes.
-- `V1.md` — first-release scope, deferrals, slices, and exit criteria.
-- `IMPLEMENTATION.md` — intended reference code/package/storage choices.
+- `CONTEXT.md` — canonical ubiquitous language and domain relationships. Terminology resolves here first.
+- `openspec/specs/<capability>/spec.md` — canonical normative behavior and contracts, split across 18 capabilities.
+- `openspec/specs/<capability>/implementation.md` — selective, interface-first implementation doctrine; behavior remains owned by the adjacent `spec.md`.
+- `SYSTEM.md` — non-normative, agent-synthesized readable projection; refresh it via the `system-reference` skill.
+- `docs/milestones/V1.md` and `V1_1.md` — completed historical milestone records, not current scope.
+- `CONTRIBUTING.md` — issue taxonomy and the branch, OpenSpec, verification, and pull-request workflow.
 - `docs/design/2026-07-13-context-access-layer.md` — accepted decisions D1–D22 and cross-cutting rationale.
-- `openspec/` — spec-driven change management. Use `openspec list` for the authoritative active-change inventory; multiple completed changes may intentionally remain active pending an explicit archive request. Capability specs reference `SPEC.md` sections rather than duplicating them.
-- `docs/CURRENT-STATE.md`, `docs/OPEN-QUESTIONS.md`, `docs/reference-study*.md`, and `docs/release/` — archived prototype material; internal `v1` labels do not describe the current V1 product scope.
+- `openspec/` — spec-driven change management. Use `openspec list` for the authoritative active-change inventory and let `openspec/config.yaml` determine artifact order. Completed changes may remain active until explicitly archived.
+- `docs/CURRENT-STATE.md`, `docs/OPEN-QUESTIONS.md`, `docs/reference-study*.md`, and `docs/release/` — archived prototype material; internal `v1` labels do not describe current product scope.
 
 ## Working rules
 
-- The repository is pre-alpha. Prototype code and local databases are disposable; do not add schema migration, CLI compatibility, or deprecated aliases unless a later released version creates that obligation.
-- Non-trivial behavior changes go through an OpenSpec change (`openspec new change`, then proposal → specs → design → tasks). Trivial fixes do not.
-- Apply OpenSpec tasks in dependency order. A task is complete only after its focused checks pass; every `tasks.md` Slice gate is mandatory before the next slice. At a Human checkpoint, prepare isolated state and pause for user login/consent/UI verification without requesting secrets; resume and continue after explicit confirmation. Continue end to end until a real blocker, then run the final project gate and `openspec-verify-change` before archive.
-- Make the smallest independently verifiable slice listed in the active milestone (`V1.md`, then `V1_1.md`); do not implement later slices speculatively.
+- Work from GitHub issues and follow `CONTRIBUTING.md`. Non-trivial behavior changes require an OpenSpec change; trivial fixes do not.
+- Apply OpenSpec tasks in dependency order. Pass every focused task and Slice gate before continuing. At Human checkpoints, prepare isolated state and pause for consent/UI verification without requesting secrets.
+- The final project gate is `bun run ci` plus `bunx openspec validate --all --strict`; then run `openspec-verify-change` before archive.
+- Bug fixes start with a failing reproduction test. New behavior lands with focused tests before or with its implementation.
+- Make the smallest independently verifiable change; do not implement speculative later work.
+- The repository is pre-alpha. Do not add schema migrations, CLI compatibility, or deprecated aliases until a released version creates that obligation.
 - Profiles define domain semantics and typed Actions; Adapters perform provider I/O; Extensions only bundle definitions.
-- Every Source belongs to one user-created Realm. There is no special `global` Realm and explicit realm filters are exact.
-- V1 provider mutations stop at reversible email Draft create/update. Sending and other provider Actions are deferred.
-- The CLI is invoked only via `bun cli` / `bun run cli`; there is no `bun link`. `docs/AGENT-HOWTOS.md` describes the current prototype harness.
+- Every Source belongs to one user-created Realm. There is no special `global` Realm, and explicit realm filters are exact.
+- Provider mutations stop at reversible email Draft create/update. Never send email or add other provider mutations.
+- Invoke the CLI only via `bun cli` / `bun run cli`; there is no `bun link`. See `docs/AGENT-HOWTOS.md` for the prototype harness.
 - Bun is pinned to 1.3.14. Keep `scripts/spikes/d3-compiled-extension/run.sh` green.
-- Exit codes are stable API; see `SPEC.md` §12.
+- Exit codes are stable API; see `openspec/specs/error-taxonomy/spec.md`.
+- Never commit secrets or `.env` files. Local databases under `~/.local/share/ctxindex` are user data; do not delete them without consent.
+- Do not push directly to `main` unless explicitly asked.
+- After non-trivial structural changes, refresh affected `codemap.md` files via the `cartography` skill.

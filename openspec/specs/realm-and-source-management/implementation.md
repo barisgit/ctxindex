@@ -1,0 +1,167 @@
+# Realm and Source Management Implementation Doctrine
+
+> This sidecar records intended-implementation doctrine. It is reference-level, not normative behavior; behavioral requirements live in [spec.md](spec.md).
+
+## Interfaces
+
+These listings are trimmed from the current source. Imports and implementation bodies are omitted; names, parameters, return types, and key data shapes are kept.
+
+### `packages/core/src/realm/types.ts`
+
+```ts
+export interface RealmRow {
+  readonly id: string
+  readonly slug: string
+  readonly label: string | null
+  readonly created_at: number
+}
+
+export interface CreateRealmInput {
+  readonly slug: string
+  readonly displayName?: string
+}
+
+export interface CreateRealmResult {
+  readonly realmId: string
+}
+
+export interface RealmServiceDeps {
+  readonly db: CtxindexDatabase
+  readonly logger: Logger
+}
+
+export interface RealmService {
+  createRealm(input: CreateRealmInput): CreateRealmResult
+  listRealms(): RealmRow[]
+  getRealmBySlug(slug: string): RealmRow | null
+  findRealmBySlug(slug: string): RealmRow | null
+  deleteRealm(slug: string): void
+}
+```
+
+### `packages/core/src/source/types.ts`
+
+```ts
+export type SourceAvailability = 'available' | 'extension_unavailable'
+
+export interface SourceRow {
+  readonly id: string
+  readonly realm_id: string
+  readonly realm_slug?: string
+  readonly adapter_id: string
+  readonly adapter_version: number
+  readonly label: string
+  readonly config_json: string | null
+  readonly sync_enabled: boolean
+  readonly search_routing?: SearchRouting | null
+  readonly grant_id?: string | null
+  readonly created_at: number
+  readonly availability: SourceAvailability
+  readonly last_status?: string | null
+  readonly last_run_at?: number | null
+  readonly errors_count?: number | null
+  readonly items_count?: number
+  readonly chunks_count?: number
+  readonly sample_uri?: string | null
+  readonly account_email?: string | null
+}
+
+export interface AddSourceInput {
+  readonly adapterId: string
+  readonly realmSlug?: string
+  readonly adapterVersion?: number
+  readonly label?: string
+  readonly configJson?: string
+  readonly grantId?: string
+  readonly searchRouting?: SearchRouting
+}
+
+export interface AddSourceResult {
+  readonly sourceId: string
+  readonly realmId: string
+}
+
+export interface ListSourcesInput {
+  readonly realmSlug?: string
+}
+
+export interface StatusRow {
+  readonly sourceId: string
+  readonly adapterId: string
+  readonly realmSlug: string
+  readonly availability: SourceAvailability
+  readonly lastStatus: string
+  readonly lastRunAt: number | null
+  readonly errorsCount: number
+  readonly lastError: string | null
+  readonly cursor: unknown
+}
+
+export interface SourceServiceDeps {
+  readonly db: CtxindexDatabase
+  readonly logger: Logger
+  readonly registry: ExtensionRegistry
+  readonly realmService?: RealmService
+}
+
+export interface SourceService {
+  addSource(input: AddSourceInput): AddSourceResult
+  listSources(input?: ListSourcesInput): SourceRow[]
+  resolveSourceId(reference: string): string
+  findSourceById(sourceId: string): SourceRow | null
+  removeSource(sourceId: string): void
+  getStatus(input?: { sourceId?: string }): StatusRow[]
+}
+```
+
+### `packages/core/src/source/provider-context.ts`
+
+```ts
+export type SourceProviderFetch = (
+  url: string,
+  init?: RequestInit,
+) => Promise<Response>
+
+export interface SourceProviderContext {
+  readonly adapter: AnyAdapterDefinition
+  readonly source: AdapterSourceContext
+  readonly fetch: typeof fetch
+  readonly logger: AdapterLogger
+}
+
+export interface CreateSourceProviderContextInput {
+  readonly db: CtxindexDatabase
+  readonly sourceId: string
+  readonly registry: ExtensionRegistry
+  readonly authService: Pick<AuthService, 'resolveLinkedGrantAccessToken'>
+  readonly logger: AdapterLogger
+  readonly fetch?: SourceProviderFetch
+  readonly retryUnauthorized?: boolean
+}
+
+export async function createSourceProviderContext(
+  input: CreateSourceProviderContextInput,
+): Promise<SourceProviderContext>;
+```
+
+### `packages/core/src/realm/service.ts`
+
+```ts
+export function createRealmService(deps: RealmServiceDeps): RealmService;
+```
+
+### `packages/core/src/source/service.ts`
+
+```ts
+export function createSourceService(deps: SourceServiceDeps): SourceService;
+```
+
+## Implementation doctrine
+
+`packages/core/src/realm` owns Realm rows and exact slug lookup. `packages/core/src/source` owns Source creation/list/status/removal, Adapter/config validation, Grant compatibility, and provider-context construction. Every Source stores one Adapter version, one Realm, one config payload, and an explicit Grant when required.
+
+Availability is derived by resolving the stored Adapter binding against the loaded registry, not from sync status. Provider contexts expose only Source metadata, scoped logger, and host-allowlisted authorized fetch. Core seeds no special Realm.
+
+## Verification
+
+Realm/Source service tests cover exact lookup, labels, config validation, Grant compatibility, availability, removal, and status. Provider-context tests cover host allowlists, token use, retry policy, and redaction; CLI tests cover registry-derived Source arguments.

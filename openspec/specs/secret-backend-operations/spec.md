@@ -48,3 +48,28 @@ The CLI MUST NOT accept a secret-store passphrase, refresh token, access token, 
 #### Scenario: File backend uses prepared key material
 - **WHEN** the caller explicitly selects file storage with supported environment or private key-file material
 - **THEN** the encrypted file backend becomes usable without a passphrase appearing in argv
+
+### Requirement: Secret storage and typed references
+The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.
+
+ctxindex MUST store OAuth tokens, API keys, and other secrets outside SQLite by default, using the OS keychain where available.
+
+SQLite and declarative config MUST store secret references, not raw secrets.
+
+An encrypted local secret-store fallback MAY exist for environments without a usable OS keychain.
+
+The configured backend MUST be the only destination for new secret writes. Runtime MUST NOT silently fall back to another backend when it is unavailable. Reads and deletes MUST resolve an existing secret according to its typed reference so an interrupted explicit backend move cannot strand mixed references.
+
+An explicit backend move MUST copy and validate target entries before changing durable references or configured backend, retain source entries until the target is selected durably, and be safely retryable after interruption. Secret values, keys, access/refresh tokens, client secrets, and encryption passphrases MUST NOT appear in command output, logs, or literal process arguments.
+
+Secret references in declarative config (TOML or otherwise) MUST be one of the following typed URI forms:
+
+- `keychain:<service>/<account>/<key>` — OS keychain entry.
+- `file:<absolute-or-config-relative-path>#<key>` — entry inside an encrypted secrets file.
+- `env:<VAR_NAME>` or `env://<VAR_NAME>` — environment variable, resolved through the central env loader (no direct `process.env` reads outside the loader). The variable name MUST match `^[A-Z_][A-Z0-9_]*$`.
+
+A bare secret string in config (no URI scheme) MUST be rejected at config-load time with an actionable error.
+
+#### Scenario: Secrets stay outside SQLite and resolve through typed references
+- **WHEN** a conforming implementation exercises this contract
+- **THEN** it satisfies every applicable MUST and MUST NOT clause and treats SHOULD, SHOULD NOT, and MAY clauses according to their normative meanings

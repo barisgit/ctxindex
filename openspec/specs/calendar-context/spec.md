@@ -58,7 +58,7 @@ Each indexed calendar Source SHALL expose registry-derived past/future coverage 
 - **THEN** the next synchronization performs a full reconciliation using the declared wider window
 
 ### Requirement: Calendar Sources are read-only
-The calendar Profile SHALL declare no provider mutation Action in this increment, and Google/Microsoft calendar Adapters MUST NOT call create, update, delete, RSVP, invite, or notification endpoints.
+The calendar Profile SHALL declare no provider mutation Action in V1, and Google/Microsoft calendar Adapters MUST NOT call create, update, delete, RSVP, invite, or notification endpoints.
 
 #### Scenario: Registry is inspected
 - **WHEN** an agent describes `calendar.event` and its implementing Adapters
@@ -67,3 +67,27 @@ The calendar Profile SHALL declare no provider mutation Action in this increment
 #### Scenario: Sync observes a provider deletion
 - **WHEN** an event disappears or is cancelled according to the provider incremental contract
 - **THEN** the Adapter emits a local tombstone and performs no provider mutation
+
+### Requirement: Recurring event storage and expansion
+The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.
+
+A recurring calendar event MUST be modeled as a single series resource plus stored exception resources for occurrences that differ from the series or are cancelled. Standard, unmodified recurring occurrences MUST NOT be materialized as separate resources in storage. This modeling lives in the `calendar.event` profile, not in core.
+
+Time-window views of recurring events SHOULD be produced by runtime expansion of the series recurrence rule over a bounded query window, not by precomputed per-occurrence rows.
+
+Cancellation of a single occurrence MUST be represented as a stored exception, not as a separate cancelled event row. Cancellation of an entire series MUST be represented by tombstoning the series resource.
+
+#### Scenario: Recurring event instances are represented without materializing ordinary occurrences
+- **WHEN** a conforming implementation exercises this contract
+- **THEN** it satisfies every applicable MUST and MUST NOT clause and treats SHOULD, SHOULD NOT, and MAY clauses according to their normative meanings
+
+### Requirement: Calendar timezone and all-day representation
+The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.
+
+Timed calendar event payloads MUST store the IANA timezone string (`Europe/Ljubljana`, `UTC`, etc.) alongside their RFC 3339 start and end instants so display can round-trip the original timezone. Recurrence rules MUST be stored as their iCal RRULE strings; runtime expansion uses the timezone field.
+
+All-day event payloads MUST store ISO local start dates and exclusive end dates and MUST NOT invent UTC-midnight instants. A timing discriminator MUST preserve date-only semantics so display can avoid timezone shifts.
+
+#### Scenario: Calendar display round-trips timezone and all-day semantics
+- **WHEN** a conforming implementation exercises this contract
+- **THEN** it satisfies every applicable MUST and MUST NOT clause and treats SHOULD, SHOULD NOT, and MAY clauses according to their normative meanings

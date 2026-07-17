@@ -4,7 +4,7 @@
 Define the public Profile, Adapter, and Extension vocabulary contracts and require user and agent interfaces to derive from loaded definitions.
 ## Requirements
 ### Requirement: Public definition factories and validated registries
-For V1, the system SHALL expose `defineProfile`, `defineAdapter`, and `defineExtension` as public factories for plain versioned definitions, and SHALL build runtime-validated registries in accordance with SPEC §3a and §3d. Registry binding MUST use `(id, version)` rather than object identity, and duplicate or invalid definitions MUST be rejected before activation.
+For V1, the system SHALL expose `defineProfile`, `defineAdapter`, and `defineExtension` as public factories for plain versioned definitions, and SHALL build runtime-validated Profile and [Extension](../extension-loading/spec.md) registries. Registry binding MUST use `(id, version)` rather than object identity, and duplicate or invalid definitions MUST be rejected before activation.
 
 #### Scenario: Valid bundled and external definitions use one contract
 - **WHEN** equivalent valid definitions are supplied by a bundled Extension and by a trusted external Extension
@@ -15,7 +15,7 @@ For V1, the system SHALL expose `defineProfile`, `defineAdapter`, and `defineExt
 - **THEN** the system rejects it before the definition becomes available to operations
 
 ### Requirement: Profiles own pure domain vocabulary
-For V1, Profile definitions SHALL provide the schema-backed domain vocabulary described in SPEC §3a, including the slots needed for search extraction, typed fields, Relations, Artifact descriptors, exports, Actions, aliases, and documentation. The bundled vocabulary SHALL include strict provider-neutral `communication.message@1`, `file@1`, and `calendar.event@1` Profiles. Core MUST NOT add provider- or domain-specific vocabulary paths, and ordinary vocabulary functions MUST remain pure over validated payloads.
+For V1, Profile definitions SHALL provide schema-backed domain vocabulary, including the slots needed for search extraction, typed fields, Relations, Artifact descriptors, exports, Actions, aliases, and documentation. The bundled vocabulary SHALL include strict provider-neutral `communication.message@1`, `file@1`, and `calendar.event@1` Profiles. Core MUST NOT add provider- or domain-specific vocabulary paths, and ordinary vocabulary functions MUST remain pure over validated payloads.
 
 #### Scenario: Fake Profile drives generic behavior
 - **WHEN** a Resource using a valid fake Profile is stored and queried
@@ -30,7 +30,7 @@ For V1, Profile definitions SHALL provide the schema-backed domain vocabulary de
 - **THEN** core accepts and indexes the envelope, emits a warning, and does not fail the operation
 
 ### Requirement: Registry-derived interface and documentation
-For V1, valid kinds and aliases, typed field filters, export formats, Source configuration, Actions, CLI affordances, and generated agent documentation SHALL derive from loaded registries as required by SPEC §3d and §10b. Parallel hand-maintained declarations of the same command vocabulary MUST NOT exist. Generic Citty help MUST remain concise and SHALL point agents to registry discovery rather than append the complete loaded interface. Registry discovery SHALL use compact list output by default, full readable detail for an exact definition id, and an explicit full-snapshot option. JSON detail and full-snapshot output MUST retain exact registry schemas, while text and Markdown detail MUST render Action input properties, requiredness, constraints, bindings, and examples structurally rather than as a single serialized schema line.
+For V1, valid kinds and aliases, typed field filters, export formats, Source configuration, Actions, CLI affordances, and generated agent documentation SHALL derive from loaded registries as required by [Extension loading](../extension-loading/spec.md) and [the CLI surface](../cli-surface/spec.md). Parallel hand-maintained declarations of the same command vocabulary MUST NOT exist. Generic Citty help MUST remain concise and SHALL point agents to registry discovery rather than append the complete loaded interface. Registry discovery SHALL use compact list output by default, full readable detail for an exact definition id, and an explicit full-snapshot option. JSON detail and full-snapshot output MUST retain exact registry schemas, while text and Markdown detail MUST render Action input properties, requiredness, constraints, bindings, and examples structurally rather than as a single serialized schema line.
 
 #### Scenario: Loaded definition changes the described interface
 - **WHEN** an Extension declaring a kind, field, format, Source option, or Action is activated
@@ -56,3 +56,26 @@ For V1, valid kinds and aliases, typed field filters, export formats, Source con
 - **WHEN** a registry-derived command requires input
 - **THEN** the command accepts that input through arguments, environment variables, or declared stdin and does not require a TTY prompt
 
+### Requirement: Complete Profile vocabulary contract
+The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.
+
+A profile declares, at minimum: an id, an integer version, and a payload schema. It MAY declare vocabulary slots:
+
+- **search mapping** — pure extractors for title, occurred-at, and FTS chunks;
+- **fields** — TYPED declarations (`type` + pure extractor) that populate the generic field index and define valid `--field` filters and aggregations;
+- **relations** — pure extractors producing edges to refs or natural keys ([Resource identity, deletion, and Relations](../core-model/spec.md));
+- **artifacts** — pure extractor producing artifact descriptors (bytes fetched lazily);
+- **exports** — a map of format name to media type + render function;
+- **actions** — typed provider-mutation contracts (stable id, input schema, output contract, effect classification, docs, and examples) whose I/O implementations belong to adapters;
+- **docs** — human summaries, kind aliases, and examples, from which agent-facing documentation is derived.
+
+Vocabulary rules (normative):
+
+1. Vocabulary functions MUST be pure over the validated payload; no I/O. The one exception is export render functions, which MAY receive core-resolved declared dependencies (e.g. related resources by relation type). Action declarations are pure contracts; their provider I/O is never a profile vocabulary function.
+2. Vocabulary slots are versioned. An implementation encountering an unknown slot MUST ignore it with a diagnostic and continue.
+3. When an adapter emits a payload for an unknown profile id or version, core MUST accept the resource at envelope level, index what the envelope carries, and surface a warning (degraded acceptance). Sync MUST NOT fail on unknown profiles.
+4. Bundled canonical profiles (`communication.message`, `communication.conversation`, `calendar.event`, `task`, `file`, `artifact`) MUST be expressible through the same public profile API as extension profiles.
+
+#### Scenario: A Profile supplies domain semantics through pure versioned vocabulary
+- **WHEN** a conforming implementation exercises this contract
+- **THEN** it satisfies every applicable MUST and MUST NOT clause and treats SHOULD, SHOULD NOT, and MAY clauses according to their normative meanings

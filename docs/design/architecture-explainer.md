@@ -15,7 +15,7 @@ The original CONTEXT.md defined ctxindex as “a local-first personal context in
 The forcing use cases came from replacing a hand-built agent CLI (the Hermes context-hub skill): search mail and find threads, download whole threads as files and attachments, calendar search, sender-frequency aggregation, plus arbitrary future Extensions. Workflow policy — composition, approval conversation, digests, and triage — stays in agent skills. ctxindex validates and performs provider operations. V1 Actions stop at reversible provider-persisted email Draft create/update; sending comes later.
 
 {% depth title="Evidence: what the old scope excluded that agents actually needed" %}
-The pre-redesign SPEC §1 explicitly excluded “dynamic third-party plugin loading” and “file export as a primary provider storage contract.” Both exclusions are reversed. The old Source definition — “a configured place that ctxindex syncs from” — made a never-synced Gmail account (query remotely, pull one attachment) unrepresentable. Decision D6 redefines Source as a configured connection; sync is a per-source setting.
+The pre-redesign monolithic specification's §1 explicitly excluded “dynamic third-party plugin loading” and “file export as a primary provider storage contract.” Both exclusions are reversed. The old Source definition — “a configured place that ctxindex syncs from” — made a never-synced Gmail account (query remotely, pull one attachment) unrepresentable. Decision D6 redefines Source as a configured connection; sync is a per-source setting.
 {% /depth %}
 {% /section %}
 
@@ -142,7 +142,7 @@ Remaining questions are owned by later slices: field-index encoding and query gr
 {% /section %}
 
 {% section claim="V1 is implemented as tiny vertical slices, not one architecture rewrite." %}
-CONTEXT.md owns the sharpened language; SPEC.md owns normative access and Action contracts; V1.md owns first-release scope and slice order; IMPLEMENTATION.md describes the intended fresh implementation; and OpenSpec carries testable capability deltas and tasks. There is no predecessor version to migrate or preserve.
+CONTEXT.md owns the sharpened language; [`openspec/specs/core-model/spec.md`](../../openspec/specs/core-model/spec.md), [`provider-actions/spec.md`](../../openspec/specs/provider-actions/spec.md), and the other capability specs under `openspec/specs/` own normative access and Action contracts; docs/milestones/V1.md owns first-release scope and slice order; selective `openspec/specs/<capability>/implementation.md` sidecars describe intended technical shape; and OpenSpec changes carry testable capability deltas and tasks. There is no predecessor version to migrate or preserve.
 
 {% timeline %}
 {% step when="Done — D3 spike" %}Bun 1.3.14 compiled binary loaded an external `.ts` factory, relative `.ts` helper, and extension-owned dependency after relocation.{% /step %}

@@ -4,7 +4,7 @@
 Define unified local and provider search planning, exact filtering, routing overrides, ranking, and graceful degradation.
 ## Requirements
 ### Requirement: Unified local and provider search contract
-For V1, search SHALL use one normalized query, typed filter grammar, result envelope, and deterministic JSON shape across local full-text and provider-side origins as required by SPEC §10 and §10e. Local full-text search over Resource and chunk content MUST remain the baseline, and field validity and value parsing MUST derive from Profile declarations. The query positional SHALL be optional when at least one filter (`--realm`, `--adapter`, `--source`, `--kind`, `--field`, `--since`, `--until`) is present; a bare `search` with neither query text nor filters MUST fail as invalid usage (exit 2).
+For V1, search SHALL use one normalized query, typed filter grammar, result envelope, and deterministic JSON shape across local full-text and provider-side origins. Local full-text search over Resource and chunk content MUST remain the baseline, and field validity and value parsing MUST derive from Profile declarations. The query positional SHALL be optional when at least one filter (`--realm`, `--adapter`, `--source`, `--kind`, `--field`, `--since`, `--until`) is present; a bare `search` with neither query text nor filters MUST fail as invalid usage (exit 2).
 
 #### Scenario: Local search uses Profile-derived projections
 - **WHEN** a query matches a stored Resource envelope, chunk, or typed field
@@ -19,7 +19,7 @@ For V1, search SHALL use one normalized query, typed filter grammar, result enve
 - **THEN** the CLI exits 2 with an actionable usage error naming the accepted filters
 
 ### Requirement: Per-Source routing and overrides
-For V1, search planning SHALL follow the precedence in SPEC §3c and §10e: a `--local-only` or `--remote` request overrides per-Source configuration, which overrides the Adapter routing decision. Indexed Sources and hybrid hot windows MUST use local search; federated Sources and hybrid queries outside local coverage MUST use declared `search-remote` implementations.
+For V1, search planning SHALL follow the precedence in [Adapter capabilities](../extension-loading/spec.md): a `--local-only` or `--remote` request overrides per-Source configuration, which overrides the Adapter routing decision. Indexed Sources and hybrid hot windows MUST use local search; federated Sources and hybrid queries outside local coverage MUST use declared `search-remote` implementations.
 
 #### Scenario: Local-only override suppresses provider search
 - **WHEN** a query requests `--local-only` across Sources that support remote search
@@ -30,7 +30,7 @@ For V1, search planning SHALL follow the precedence in SPEC §3c and §10e: a `-
 - **THEN** the planner invokes Gmail provider search and returns normalized results with stable `ctx://` Refs
 
 ### Requirement: Exact Realm and Source filtering
-For V1, an omitted Realm filter SHALL search all available Realms, while every explicit Realm or Source filter MUST be exact as required by SPEC §10a. The planner MUST NOT implicitly include a `global` or any additional Realm.
+For V1, an omitted Realm filter SHALL search all available Realms, while every explicit Realm or Source filter MUST be exact as required by [Realm and Source management](../realm-and-source-management/spec.md). The planner MUST NOT implicitly include a `global` or any additional Realm.
 
 #### Scenario: Omitted Realm spans all Realms
 - **WHEN** a caller searches without a Realm filter
@@ -41,7 +41,7 @@ For V1, an omitted Realm filter SHALL search all available Realms, while every e
 - **THEN** only Sources belonging to the `company` Realm are planned
 
 ### Requirement: Mixed-origin ranking and graceful degradation
-For V1, merged search results SHALL be ranked within each origin and interleaved without numerically comparing local and provider scores, in accordance with SPEC §10e. A provider failure or timeout MUST preserve successful local results and SHALL produce a per-origin warning; explain output MUST identify each result's origin.
+For V1, merged search results SHALL be ranked within each origin and interleaved without numerically comparing local and provider scores. A provider failure or timeout MUST preserve successful local results and SHALL produce a per-origin warning; explain output MUST identify each result's origin.
 
 #### Scenario: Provider failure preserves local results
 - **WHEN** local search succeeds and one remote origin fails because it is offline, unauthorized, timed out, or unavailable
@@ -67,7 +67,7 @@ For V1, the bundled `google.mailbox`, `google.calendar`, `microsoft.mailbox`, `m
 - **THEN** every eligible configured Source across all Accounts and unauthenticated local Sources participates according to its routing declaration
 
 ### Requirement: Filter-only local enumeration
-When the query positional is absent and at least one filter is present, search SHALL enumerate matching Resources from local projections only, ordered by `occurredAt` descending with NULL timestamps last, tie-broken by `ref` ascending. A query-less search MUST NOT invoke any `search-remote` Adapter operation, and `--remote` without query text MUST fail as invalid usage (exit 2). Filter-only remote enumeration and remote pagination are DEFERRED beyond this change.
+When the query positional is absent and at least one filter is present, search SHALL enumerate matching Resources from local projections only, ordered by `occurredAt` descending with NULL timestamps last, tie-broken by `ref` ascending. A query-less search MUST NOT invoke any `search-remote` Adapter operation, and `--remote` without query text MUST fail as invalid usage (exit 2). Filter-only remote enumeration and remote pagination are not supported in V1.
 
 #### Scenario: Filter-only enumeration returns newest first
 - **WHEN** a caller runs `search --kind email.message --realm work` with no query text
@@ -75,7 +75,7 @@ When the query positional is absent and at least one filter is present, search S
 
 #### Scenario: Query-less remote request is rejected
 - **WHEN** a caller runs `search --remote --kind email.message` with no query text
-- **THEN** the CLI exits 2 with an actionable error stating that `--remote` requires query text because remote enumeration is deferred
+- **THEN** the CLI exits 2 with an actionable error stating that `--remote` requires query text because remote enumeration is unsupported in V1
 
 #### Scenario: Federated Sources are skipped without remote calls
 - **WHEN** a filter-only search plans Sources whose Adapter routing is `federated` or `hybrid`
@@ -93,9 +93,59 @@ Search SHALL accept `--offset <n>` (a non-negative integer, default 0) for local
 - **THEN** the CLI exits 2 with an actionable error explaining that pagination is local-only
 
 ### Requirement: Skills teach enumeration and pagination
-The bundled skills (SPEC §10c) SHALL document filter-only enumeration and the local pagination idiom: `getting-started` and `reference/cli-overview` MUST show how to enumerate without query text using filters and how to page with `--limit`/`--offset` driven by `hasMore`.
+The bundled skills defined by [the CLI surface](../cli-surface/spec.md) SHALL document filter-only enumeration and the local pagination idiom: `getting-started` and `reference/cli-overview` MUST show how to enumerate without query text using filters and how to page with `--limit`/`--offset` driven by `hasMore`.
 
 #### Scenario: Bundled skills document the pagination idiom
 - **WHEN** an agent reads the bundled `getting-started` or `reference/cli-overview` skill
 - **THEN** it finds guidance for filter-only enumeration and for advancing `--offset` by `--limit` while `hasMore` is true
 
+### Requirement: Local search baseline and optional semantic search
+The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.
+
+ctxindex MUST provide full-text search over normalized resource and chunk content, plus typed field filtering and aggregation over profile-declared fields. Full-text search is the mandatory baseline and MUST remain usable even when vector or semantic features are unavailable.
+
+Full-text search SHOULD use BM25-style ranking where supported by the local search backend.
+
+Full-text search SHOULD index chunks for body/content search and resource envelopes for title, summary, path, and other envelope metadata. Search SHOULD return resources with their best matching chunks.
+
+Vector search, when implemented, SHOULD be optional and attach embeddings to chunks, not whole resources. Embedding support SHOULD include embedding job tracking and chunk embedding storage.
+
+When full-text and vector results are combined, hybrid search SHOULD use reciprocal rank fusion with `k = 60` as the default merge strategy unless later evidence justifies a different default.
+
+Search results SHOULD support filtering by source, source adapter, extension, account, realm, kind (primary profile id or declared alias), profile-declared typed fields, time range, and deleted/tombstoned state. Field filter validity per kind derives from the profile registry ([Extension loading](../extension-loading/spec.md)).
+
+Search SHOULD provide an explain/debug mode that shows which index paths contributed to a result and enough ranking information to debug poor matches.
+
+#### Scenario: Search remains usable through normalized full-text indexes
+- **WHEN** a conforming implementation exercises this contract
+- **THEN** it satisfies every applicable MUST and MUST NOT clause and treats SHOULD, SHOULD NOT, and MAY clauses according to their normative meanings
+
+### Requirement: Search routing and remote search
+The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.
+
+Search routing follows the precedence in [Adapter capabilities and operations](../extension-loading/spec.md): CLI flag over per-source configuration over adapter decision. Remote-search support is declared by the `search-remote` capability flag plus an adapter routing choice that MAY consult sync coverage. The following descriptions define the coverage patterns an adapter MAY implement:
+
+- **`indexed`** — the adapter fully replicates searchable content into the local database. All search for its sources is served by local full-text search. This is the required mode for local filesystem sources.
+- **`federated`** — the source does not bulk-replicate content. Its adapter MUST implement `search-remote`, translating ctxindex queries into the provider's native search API. Results are normalized into envelope-level resources at query time.
+- **`hybrid`** — the adapter maintains a **bounded local hot window** of recent/pinned content in the local index and implements the adapter search capability for content outside that window.
+
+Pattern requirements:
+
+- A fully-`indexed` source does not require the `search-remote` capability. A `federated` or `hybrid` source's adapter MUST declare and implement it.
+- A `hybrid` adapter's local window MUST be bounded by per-source configuration (for example a trailing time window or label set). Full-mailbox or full-corpus replication MUST NOT be the default for `hybrid` adapters.
+- A `hybrid` source's window sync MUST reconcile the window on each successful run: resources that fall out of the window MAY be demoted to envelope-only rather than tombstoned, since the canonical record still exists at the provider.
+- Federated search calls MUST go through the central network egress chokepoint and are limited to the adapter's declared provider hosts ([the security posture](../core-model/spec.md)).
+- Federated and hybrid adapters SHOULD support the `retrieve` capability for on-demand hydration: fetching full content for a specific resource at read time. Hydrated content is cached as `adhoc` rows ([generic storage](../generic-storage/spec.md)) and MUST be treated as purgeable.
+- Every adapter MUST use the ref grammar (`ctx://<source-id>/<suffix>`) identically for synced and provider-search results. Search origin MUST NOT alter resource identity or ref.
+
+Search planning:
+
+- The search service MUST serve queries for `indexed` sources (and hybrid hot windows) from the local full-text index, and MUST fan out to the adapter search capability for `federated` sources and for `hybrid` sources when the query is not satisfiable from the local window alone.
+- Merged results MUST be ranked per origin and interleaved; implementations MUST NOT compare raw scores across origins (local BM25 scores and provider relevance are not commensurable).
+- When a federated origin fails (offline, auth expired, provider error), search MUST still return local results and MUST surface a per-origin warning rather than failing the whole query.
+- Explain/debug output MUST report each result's origin (local index vs. provider search).
+- Offline behavior: with no network, `indexed` sources and hybrid hot windows remain fully searchable; federated origins degrade with a warning.
+
+#### Scenario: Search planning combines local and provider origins safely
+- **WHEN** a conforming implementation exercises this contract
+- **THEN** it satisfies every applicable MUST and MUST NOT clause and treats SHOULD, SHOULD NOT, and MAY clauses according to their normative meanings

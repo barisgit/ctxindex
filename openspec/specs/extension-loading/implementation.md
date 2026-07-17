@@ -1,0 +1,165 @@
+# Extension Loading Implementation Doctrine
+
+> This sidecar records intended-implementation doctrine. It is reference-level, not normative behavior; behavioral requirements live in [spec.md](spec.md).
+
+## Interfaces
+
+These listings are trimmed from the current source. Imports and implementation bodies are omitted; names, parameters, return types, and key data shapes are kept.
+
+### `packages/extension-sdk/src/extension.ts`
+
+```ts
+export interface ExtensionDefinition<
+  TId extends string = string,
+  TVersion extends number = number,
+  TProfiles extends
+    readonly AnyProfileDefinition[] = readonly AnyProfileDefinition[],
+  TAdapters extends
+    readonly AnyAdapterDefinition[] = readonly AnyAdapterDefinition[],
+> {
+  readonly id: TId
+  readonly version: TVersion
+  readonly profiles: TProfiles
+  readonly adapters: TAdapters
+  readonly docs?: { readonly summary: string }
+}
+
+export type AnyExtensionDefinition = ExtensionDefinition
+
+export interface ExtensionAuthoringHost {
+  readonly z: typeof import('zod').z
+  readonly defineProfile: typeof defineProfile
+  readonly defineAdapter: typeof defineAdapter
+  readonly defineExtension: typeof defineExtension
+}
+
+export function defineExtension<
+  const TId extends string,
+  const TVersion extends number,
+  const TProfiles extends readonly AnyProfileDefinition[],
+  const TAdapters extends readonly AnyAdapterDefinition[],
+>(
+  definition: ExtensionDefinition<TId, TVersion, TProfiles, TAdapters>,
+): ExtensionDefinition<TId, TVersion, TProfiles, TAdapters>;
+```
+
+### `packages/core/src/extension/loader.ts`
+
+```ts
+export interface ExtensionLoadDiagnostic {
+  readonly path: string
+  readonly message: string
+}
+
+export interface LoadExtensionsInput {
+  readonly config: CtxindexConfig
+  readonly builtins: readonly AnyExtensionDefinition[]
+}
+
+export interface LoadExtensionsResult {
+  readonly registry: ExtensionRegistry
+  readonly diagnostics: readonly ExtensionLoadDiagnostic[]
+}
+
+export async function loadExtensions(
+  input: LoadExtensionsInput,
+): Promise<LoadExtensionsResult>;
+```
+
+### `packages/core/src/registry/profile-registry.ts`
+
+```ts
+export interface UnknownProfileWarning {
+  readonly code: 'unknown_profile_version'
+  readonly profileId: string
+  readonly profileVersion: number
+}
+
+export type ProfileResolution =
+  | { readonly status: 'known'; readonly profile: AnyProfileDefinition }
+  | {
+      readonly status: 'degraded'
+      readonly id: string
+      readonly version: number
+    }
+
+export type KindResolution =
+  | {
+      readonly status: 'known'
+      readonly id: string
+      readonly profiles: readonly AnyProfileDefinition[]
+    }
+  | {
+      readonly status: 'ambiguous'
+      readonly kind: string
+      readonly candidates: readonly string[]
+    }
+  | { readonly status: 'unknown'; readonly kind: string }
+
+export interface ProfileRegistryOptions {
+  readonly onWarning?: (warning: UnknownProfileWarning) => void
+}
+
+export class ProfileRegistry {
+  readonly #profiles = new Map<string, AnyProfileDefinition>()
+  constructor(
+      profiles: readonly AnyProfileDefinition[],
+      readonly options: ProfileRegistryOptions = {},
+    );
+  list(): readonly AnyProfileDefinition[];
+  get(reference: ProfileReference): AnyProfileDefinition | undefined;
+  resolveKind(value: string): KindResolution;
+  resolve(reference: ProfileReference): ProfileResolution;
+}
+
+export function createProfileRegistry(
+  profiles: readonly AnyProfileDefinition[],
+  options?: ProfileRegistryOptions,
+): ProfileRegistry;
+```
+
+### `packages/core/src/registry/definition-registries.ts`
+
+```ts
+export class AdapterRegistry {
+  readonly #adapters = new Map<string, AnyAdapterDefinition>()
+  readonly #oauthProviders = new Map<string, OAuthProviderSpec>()
+  constructor(
+      readonly profiles: ProfileRegistry,
+      adapters: readonly AnyAdapterDefinition[],
+    );
+  list(): readonly AnyAdapterDefinition[];
+  get(reference: ProfileReference): AnyAdapterDefinition | undefined;
+  getOAuthProvider(id: string): OAuthProviderSpec | undefined;
+}
+
+export function createAdapterRegistry(
+  profiles: ProfileRegistry,
+  adapters: readonly AnyAdapterDefinition[],
+): AdapterRegistry;
+
+export class ExtensionRegistry {
+  #extensions: readonly AnyExtensionDefinition[]
+  #profiles: ProfileRegistry
+  #adapters: AdapterRegistry
+  constructor(extensions: readonly AnyExtensionDefinition[]);
+  get profiles(): ProfileRegistry;
+  get adapters(): AdapterRegistry;
+  list(): readonly AnyExtensionDefinition[];
+  register(extension: AnyExtensionDefinition): void;
+}
+
+export function createExtensionRegistry(
+  extensions: readonly AnyExtensionDefinition[] = [],
+): ExtensionRegistry;
+```
+
+## Implementation doctrine
+
+`packages/core/src/extension/loader.ts` loads only explicit `config.extensions.paths` entries. Each trusted module default-exports a factory receiving `ExtensionAuthoringHost`; runtime facilities are host-supplied, while type-only imports and Extension-local dependencies remain possible. There is no V1 filesystem auto-discovery layer.
+
+Built-ins register first. Import, factory, schema, duplicate-id, or capability-consistency failures become path-scoped diagnostics and activate none of the failing Extension. Registry binding uses `(id, version)`, never object identity. Missing Extensions leave locally stored Resources readable while provider operations report unavailability.
+
+## Verification
+
+Loader and registry tests cover atomic validation, duplicate/version behavior, host factories, and diagnostics. The relocated external-Extension e2e and D3 compiled-loader spike cover TypeScript, relative imports, and Extension-local dependencies under Bun 1.3.14.

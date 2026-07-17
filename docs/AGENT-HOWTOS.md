@@ -120,4 +120,4 @@ bun run ci
 openspec validate --all --strict
 ```
 
-Stable exit meanings and agent responses are owned by `SPEC.md` §12; do not maintain a second exit-code table here.
+Stable exit meanings and agent responses are owned by [`openspec/specs/error-taxonomy/spec.md`](../openspec/specs/error-taxonomy/spec.md); do not maintain a second exit-code table here.

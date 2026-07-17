@@ -478,9 +478,9 @@ Example verb collapse: the Hermes CLI's bespoke `mail senders` becomes
 ## 11. Documentation ownership
 
 - `CONTEXT.md` owns the ubiquitous language and resolved relationships.
-- `SPEC.md` owns timeless normative behavior and the public Adapter/Extension contract.
-- `V1.md` owns first-release scope and vertical slices.
-- `IMPLEMENTATION.md` owns reference runtime/package/storage choices.
+- [`openspec/specs/core-model/spec.md`](../../openspec/specs/core-model/spec.md), [`profile-vocabulary/spec.md`](../../openspec/specs/profile-vocabulary/spec.md), [`extension-loading/spec.md`](../../openspec/specs/extension-loading/spec.md), and the other capability specs under `openspec/specs/` own timeless normative behavior and the public Adapter/Extension contract.
+- `docs/milestones/V1.md` owns first-release scope and vertical slices.
+- Selective `openspec/specs/<capability>/implementation.md` sidecars own reference implementation doctrine; the module-architecture sidecar owns cross-cutting runtime, package, and testing choices.
 - This document owns cross-cutting rationale and decisions D1–D22.
 - `openspec/changes/v1-context-access-layer/` owns active capability specs and tasks.
 

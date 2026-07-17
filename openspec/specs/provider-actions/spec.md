@@ -6,7 +6,7 @@ Define typed, Source-bound provider Actions while limiting V1 email mutations to
 ## Requirements
 
 ### Requirement: Typed Profile Action contracts and Adapter bindings
-For V1, Profiles SHALL support declarations of the typed provider Actions defined by SPEC §3a and §10g, including stable id, input schema, output contract, effect classification, documentation, and examples. Adapters SHALL bind implementations only for declared Actions of supported Profiles, and registry validation MUST reject declared-but-unimplemented, undeclared, or schema-incompatible bindings.
+For V1, Profiles SHALL support declarations of typed provider Actions under [Profile vocabulary](../profile-vocabulary/spec.md) and this provider-independent Action contract, including stable id, input schema, output contract, effect classification, documentation, and examples. Adapters SHALL bind implementations only for declared Actions of supported Profiles, and registry validation MUST reject declared-but-unimplemented, undeclared, or schema-incompatible bindings.
 
 #### Scenario: Valid Action binding becomes available
 - **WHEN** a loaded Adapter binds an implementation compatible with an Action declared by a supported Profile
@@ -60,3 +60,22 @@ For V1, the system MUST NOT implement email sending, calendar mutations, other i
 #### Scenario: Conversation text is not provider state
 - **WHEN** an agent composes message text without running a Draft Action
 - **THEN** ctxindex creates no Draft Resource or provider mutation
+
+### Requirement: Provider-independent typed Actions
+The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.
+
+Profiles MAY declare typed Actions. Each Action MUST have a stable id, input schema, output contract, effect classification (`reversible` or `irreversible`), and documentation. Action declarations MUST remain provider-independent; Source Adapters bind provider implementations to the Profile Action ids they support.
+
+`action describe <action-id>` MUST derive its input and availability from the loaded registries. `action run <action-id>` MUST require an explicit Source, validate the complete input before provider I/O, execute only when that Source's Adapter implements the Action, and return the declared normalized result with Resource Refs where applicable.
+
+An Action result that creates or changes addressable provider context SHOULD be returned as a Resource and MAY be materialized locally as an `adhoc` row. External services remain canonical. Agent reasoning, content composition, approval conversations, and multi-step workflow policy remain outside ctxindex.
+
+An irreversible Action MUST require an explicit non-interactive confirmation signal and MUST NOT be automatically retried after an ambiguous provider outcome. Milestone documents MAY ship only reversible Actions.
+
+A provider-persisted email Draft is a `communication.message` Resource produced by a reversible Action. Text composed only in an agent conversation is not a provider Draft and requires no ctxindex operation.
+
+When a milestone ships Draft Actions without sending, its Adapters MUST NOT bind a send Action, call a send endpoint, or request a send-only permission. A broader provider permission that is the narrowest available permission capable of Draft persistence MUST be paired with registry, request, and acceptance checks proving no send capability.
+
+#### Scenario: An Action validates input and executes only through an explicit supporting Source
+- **WHEN** a conforming implementation exercises this contract
+- **THEN** it satisfies every applicable MUST and MUST NOT clause and treats SHOULD, SHOULD NOT, and MAY clauses according to their normative meanings
