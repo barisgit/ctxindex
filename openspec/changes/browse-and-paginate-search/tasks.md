@@ -17,4 +17,4 @@
 ## 4. Final verification
 
 - [x] 4.1 Run the full project gate: `bun run ci` (all gates pass except 11 pre-existing OAuth loopback-timeout e2e failures also present on the untouched base commit and main checkout; all search suites green)
-- [ ] 4.2 Run `openspec-verify-change` against `browse-and-paginate-search` and fix findings
+- [x] 4.2 Run `openspec-verify-change` against `browse-and-paginate-search` and fix findings

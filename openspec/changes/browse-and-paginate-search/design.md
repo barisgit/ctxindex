@@ -32,7 +32,7 @@ Rationale: the local index is a single SQLite snapshot on one machine; there is 
 
 When the query positional is absent and at least one filter is present, the planner runs ONLY the local leg for all planned Sources (equivalent to `--local-only`), regardless of Adapter routing. A query-less search MUST NOT invoke `search-remote`. `--remote` without a query is an actionable usage error (exit 2). Bare `search` with neither query nor filters remains an error (exit 2).
 
-Enumeration ordering: primary `occurred_at` DESC with NULL timestamps last, tiebreak `ref` ascending (bytewise). This is stable, index-friendly, and matches the "latest N" agent use case. Queryful local search keeps its existing rank-then-ref order (already deterministic), so offset pagination composes with both orders.
+Enumeration ordering: primary `occurred_at` DESC with NULL timestamps last, tiebreak `ref` ascending (same `localeCompare` tiebreak the queryful path already uses). This is stable, index-friendly, and matches the "latest N" agent use case. Queryful local search keeps its existing rank-then-ref order (already deterministic), so offset pagination composes with both orders.
 
 ### D4: Pagination metadata in the result envelope
 
