@@ -76,6 +76,7 @@ export function parseSearchArgs(args: string[]): SearchArgs {
   if (hasHelpFlag(args)) return { kind: 'help' }
   const { flags, positional } = parseFlags(args, {
     booleanFlags: ['json', 'refs', 'explain', 'local-only', 'remote'],
+    valueFlags: ['limit', 'offset'],
   })
   const text = positional.join(' ').trim()
   if (flags['local-only'] === true && flags.remote === true) {

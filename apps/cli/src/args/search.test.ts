@@ -93,7 +93,13 @@ describe('search CLI arguments', () => {
     for (const bad of ['-1', '1.5', 'abc']) {
       expect(
         parseSearchArgs(['--realm', 'work', '--offset', bad]),
-      ).toMatchObject({ kind: 'unknown' })
+      ).toMatchObject({
+        kind: 'unknown',
+        message: `search: invalid --offset: ${bad}`,
+      })
     }
+    expect(parseSearchArgs(['--realm', 'work', '--limit', '-1'])).toMatchObject(
+      { kind: 'unknown', message: 'search: invalid --limit: -1' },
+    )
   })
 })
