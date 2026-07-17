@@ -1,0 +1,119 @@
+name: spec-driven-with-implementation
+version: 1
+description: Spec-driven workflow with stable implementation doctrine between design and tasks
+artifacts:
+  - id: proposal
+    generates: proposal.md
+    description: Initial proposal defining why the change is needed and which capabilities are affected
+    template: proposal.md
+    instruction: |
+      Create proposal.md to establish WHY this change is needed.
+
+      Include:
+      - **Why**: the problem or opportunity and why it matters now.
+      - **What Changes**: concrete behavior or contract changes; mark breaking changes explicitly.
+      - **Capabilities**: exact new or modified capability names. Each capability maps to
+        `openspec/specs/<capability>/spec.md` and, after doctrine migration, its paired
+        `openspec/specs/<capability>/implementation.md`.
+      - **Impact**: affected packages, interfaces, dependencies, data, security boundaries, or systems.
+
+      Keep implementation choices out of the proposal. They belong in design.md and implementation.md.
+    requires: []
+
+  - id: specs
+    generates: "specs/**/*.md"
+    description: Testable behavioral deltas for affected capabilities
+    template: spec.md
+    instruction: |
+      Create one delta specification at `specs/<capability>/spec.md` for each new or modified
+      capability named in proposal.md.
+
+      Delta operations use these exact level-two headers:
+      - **ADDED Requirements** for new requirements.
+      - **MODIFIED Requirements** for changed behavior; copy the complete existing requirement
+        before editing it.
+      - **REMOVED Requirements** with explicit Reason and Migration sections.
+      - **RENAMED Requirements** using FROM:/TO: format.
+
+      Each requirement uses `### Requirement: <name>`, normative MUST/SHALL language, and at
+      least one `#### Scenario:` with WHEN/THEN clauses. Specifications define WHAT the system
+      does, not package structure or implementation choices.
+    requires:
+      - proposal
+
+  - id: design
+    generates: design.md
+    description: Change-local decisions, rationale, alternatives, and risks
+    template: design.md
+    instruction: |
+      Create design.md to explain the consequential decisions and WHY the selected approach wins.
+
+      Include:
+      - **Context**: current state, constraints, and stakeholders.
+      - **Goals / Non-Goals**: explicit scope boundaries.
+      - **Decisions**: key choices, rationale, and alternatives considered.
+      - **Risks / Trade-offs**: known limitations and mitigations.
+      - **Migration Plan** when persistent or deployed state is affected.
+      - **Open Questions** that must be resolved before implementation.
+
+      Keep stable module ownership, interface shape, data flow, and verification doctrine out of
+      this file; those belong in implementation.md. Keep normative behavior in capability specs.
+    requires:
+      - proposal
+
+  - id: implementation
+    generates: implementation.md
+    description: Stable technical doctrine to promote into canonical capability sidecars
+    template: implementation.md
+    instruction: |
+      Create implementation.md to define the stable technical shape required to realize the specs.
+      This artifact sits between change-local design rationale and executable tasks.
+
+      Ground it in the current codebase and organize it by affected capability. For each target,
+      name the canonical destination `openspec/specs/<capability>/implementation.md` and describe:
+      - module ownership and dependency direction;
+      - public and internal interfaces that must remain stable;
+      - data flow, injected effects, storage/state ownership, and failure boundaries;
+      - security, egress, compatibility, and observability constraints where relevant;
+      - focused and cross-cutting verification gates.
+
+      Do not repeat behavioral requirements from spec.md, decision rationale from design.md, or a
+      checkbox/file-by-file execution plan from tasks.md. If the change introduces no durable
+      implementation doctrine, say so explicitly and explain why no canonical sidecar update is needed.
+
+      End with Promotion Notes listing exactly what must be merged into each canonical capability
+      implementation.md before the change can be archived.
+    requires:
+      - specs
+      - design
+
+  - id: tasks
+    generates: tasks.md
+    description: Dependency-ordered, independently verifiable implementation slices
+    template: tasks.md
+    instruction: |
+      Create tasks.md as an implementation checklist derived from specs, design, and implementation.
+
+      Requirements:
+      - Group work under numbered headings.
+      - Every task uses `- [ ] X.Y <description>` so OpenSpec can track it.
+      - Order tasks by dependency and prefer independently verifiable vertical slices.
+      - Each slice includes its focused tests/gates before the next slice starts.
+      - Include a final task to promote applicable implementation doctrine into each canonical
+        `openspec/specs/<capability>/implementation.md` named in implementation.md.
+      - Include the final project validation and OpenSpec verification gates.
+
+      Tasks describe execution and proof, not new design decisions.
+    requires:
+      - specs
+      - design
+      - implementation
+
+apply:
+  requires: [tasks]
+  tracks: tasks.md
+  instruction: |
+    Read proposal.md, all delta specs, design.md, implementation.md, and tasks.md before editing code.
+    Work through tasks in dependency order, test each slice before continuing, and keep task status current.
+    Promote stable implementation doctrine into the named canonical sidecars before final verification.
+    Pause only for a real blocker or an explicit Human checkpoint.
