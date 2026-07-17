@@ -66,6 +66,18 @@ function invalidFilter(message: string): never {
   throw new CtxindexValidationError('invalid_filter', message)
 }
 
+function enumerationOrder(
+  left: LocalSearchResult,
+  right: LocalSearchResult,
+): number {
+  const a = left.envelope.occurredAt
+  const b = right.envelope.occurredAt
+  if (a === null && b === null) return left.ref.localeCompare(right.ref)
+  if (a === null) return 1
+  if (b === null) return -1
+  return b - a || left.ref.localeCompare(right.ref)
+}
+
 function parseFieldValue(
   filter: LocalSearchFieldFilter,
   type: FieldType,
@@ -116,6 +128,14 @@ export class LocalSearchExecutor {
 
   search(query: LocalSearchQuery): readonly LocalSearchResult[] {
     const filter = this.buildFilter(query)
+    const limit = Math.max(0, query.limit ?? 20)
+    const offset = Math.max(0, query.offset ?? 0)
+    if (query.text === undefined) {
+      return [...this.allResources(filter).values()]
+        .map((candidate) => this.result(candidate))
+        .sort(enumerationOrder)
+        .slice(offset, offset + limit)
+    }
     const sanitized = sanitizeQuery(query.text)
     const strict =
       sanitized.strict === '""'
@@ -125,7 +145,6 @@ export class LocalSearchExecutor {
       strict.size === 0 && sanitized.relaxed !== sanitized.strict
         ? this.match(sanitized.relaxed, filter)
         : strict
-    const limit = Math.max(0, query.limit ?? 20)
 
     return [...candidates.values()]
       .map((candidate) => this.result(candidate))
@@ -134,7 +153,7 @@ export class LocalSearchExecutor {
           ? left.ref.localeCompare(right.ref)
           : left.evidence.rank - right.evidence.rank,
       )
-      .slice(0, limit)
+      .slice(offset, offset + limit)
   }
 
   private buildFilter(query: LocalSearchQuery): SqlFilter {

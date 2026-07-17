@@ -24,4 +24,16 @@ describe('search JSON output', () => {
       '{"results":[{"ref":"ctx://source/item/1","profile":{"id":"fake.item","version":1},"sourceId":"source","origin":"local","originRank":0,"title":"Title","summary":null,"occurredAt":null,"chunks":[]}],"warnings":[]}',
     )
   })
+
+  test('reports pagination deterministically for local executions', () => {
+    expect(
+      formatSearchJson({
+        results: [],
+        pagination: { offset: 20, limit: 20, hasMore: true },
+        warnings: [],
+      }),
+    ).toBe(
+      '{"results":[],"pagination":{"offset":20,"limit":20,"hasMore":true},"warnings":[]}',
+    )
+  })
 })

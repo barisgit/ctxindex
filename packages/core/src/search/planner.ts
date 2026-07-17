@@ -10,8 +10,9 @@ import { resolveSearchQuery } from './preflight'
 import type { LocalSearchFieldFilter, LocalSearchResult } from './types'
 
 export interface SearchPlannerInput {
-  readonly text: string
+  readonly text?: string
   readonly limit?: number
+  readonly offset?: number
   readonly realms?: readonly string[]
   readonly sourceIds?: readonly string[]
   readonly adapterId?: string
@@ -60,9 +61,16 @@ export interface SourceSearchExplain {
   readonly coverage: 'local' | 'remote' | 'local+remote'
 }
 
+export interface SearchPagination {
+  readonly offset: number
+  readonly limit: number
+  readonly hasMore: boolean
+}
+
 export interface SearchPlannerResult {
   readonly results: readonly UnifiedSearchResult[]
   readonly warnings: readonly SearchPlannerWarning[]
+  readonly pagination?: SearchPagination
   readonly explain?: { readonly sources: readonly SourceSearchExplain[] }
 }
 
@@ -166,8 +174,31 @@ export class SearchPlanner {
     const limit = input.limit ?? 20
     if (!Number.isInteger(limit) || limit <= 0)
       invalid('limit must be a positive integer')
+    const hasFilter =
+      (input.realms?.length ?? 0) > 0 ||
+      (input.sourceIds?.length ?? 0) > 0 ||
+      input.adapterId !== undefined ||
+      input.kind !== undefined ||
+      (input.fields?.length ?? 0) > 0 ||
+      input.since !== undefined ||
+      input.until !== undefined
+    if (input.text === undefined) {
+      if (!hasFilter) invalid('query text or at least one filter is required')
+      if (input.remote)
+        invalid(
+          'remote requires query text; filter-only remote enumeration is deferred',
+        )
+    }
+    const localExecution = input.text === undefined || input.localOnly === true
+    const offset = input.offset ?? 0
+    if (!Number.isInteger(offset) || offset < 0)
+      invalid('offset must be a non-negative integer')
+    if (input.offset !== undefined && !localExecution)
+      invalid(
+        'offset requires local execution: omit query text or pass --local-only',
+      )
     const resolved = resolveSearchQuery(this.deps.registry.profiles, {
-      text: input.text,
+      text: input.text ?? '',
       limit,
       ...(input.kind === undefined ? {} : { kind: input.kind }),
       ...(input.fields === undefined ? {} : { fields: input.fields }),
@@ -176,7 +207,13 @@ export class SearchPlanner {
     })
     const selected = this.selectSources(input, resolved.kind)
     const warnings: SearchPlannerWarning[] = []
-    const plans = selected.map((row) => this.plan(row, input, warnings))
+    const plans = selected.map((row) =>
+      this.plan(
+        row,
+        localExecution ? { ...input, localOnly: true } : input,
+        warnings,
+      ),
+    )
 
     const localIds = plans
       .filter((plan) => plan.legs.includes('local'))
@@ -185,17 +222,19 @@ export class SearchPlanner {
       localIds.length === 0
         ? []
         : this.#local.search({
-            text: resolved.text,
-            limit,
+            ...(input.text === undefined ? {} : { text: resolved.text }),
+            limit: localExecution ? limit + 1 : limit,
+            offset,
             sourceIds: localIds,
             ...(resolved.kind === undefined ? {} : { kind: resolved.kind }),
             ...(input.fields === undefined ? {} : { fields: input.fields }),
             ...(resolved.since === undefined ? {} : { since: resolved.since }),
             ...(resolved.until === undefined ? {} : { until: resolved.until }),
           })
-    const localUnified = localResults.map((result, originRank) =>
-      this.localResult(result, originRank),
-    )
+    const hasMore = localExecution && localResults.length > limit
+    const localUnified = (
+      localExecution ? localResults.slice(0, limit) : localResults
+    ).map((result, originRank) => this.localResult(result, originRank))
 
     const outcome = new Map<string, SourceSearchExplain['outcome']>()
     const remotePlans = plans
@@ -287,6 +326,7 @@ export class SearchPlanner {
     }))
     return {
       results,
+      ...(localExecution ? { pagination: { offset, limit, hasMore } } : {}),
       warnings: warnings.sort(
         (a, b) =>
           a.sourceId.localeCompare(b.sourceId) || a.code.localeCompare(b.code),

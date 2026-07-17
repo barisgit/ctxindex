@@ -6,8 +6,9 @@ export interface LocalSearchFieldFilter {
 }
 
 export interface LocalSearchQuery {
-  readonly text: string
+  readonly text?: string
   readonly limit?: number
+  readonly offset?: number
   readonly realms?: readonly string[]
   readonly sourceIds?: readonly string[]
   readonly kind?: string

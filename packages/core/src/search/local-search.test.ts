@@ -379,4 +379,74 @@ describe('LocalSearchExecutor', () => {
     ])
     expect(() => search.search({ text: '"()[]{}^*?!~' })).not.toThrow()
   })
+
+  test('enumerates without text ordered by occurredAt desc, NULLs last, ref tiebreak', async () => {
+    const db = await freshDb()
+    const profiles = createProfileRegistry([searchProfile])
+    const store = new ResourceStore(db, profiles)
+    const upsert = (suffix: string, occurredAt: Date) =>
+      store.upsert({
+        ref: ref(suffix),
+        sourceId,
+        profile: { id: searchProfile.id, version: searchProfile.version },
+        origin: 'synced',
+        completeness: 'complete',
+        payload: { ...payload(`title ${suffix}`, []), occurredAt },
+      })
+    upsert('old', new Date('2026-01-01T00:00:00.000Z'))
+    upsert('new', new Date('2026-03-01T00:00:00.000Z'))
+    upsert('tie-b', new Date('2026-02-01T00:00:00.000Z'))
+    upsert('tie-a', new Date('2026-02-01T00:00:00.000Z'))
+    upsert('nul', new Date('2026-04-01T00:00:00.000Z'))
+    db.prepare('UPDATE resources SET occurred_at = NULL WHERE ref = ?').run(
+      ref('nul'),
+    )
+
+    const search = new LocalSearchExecutor(db, profiles)
+    expect(search.search({ limit: 10 }).map((item) => item.ref)).toEqual([
+      ref('new'),
+      ref('tie-a'),
+      ref('tie-b'),
+      ref('old'),
+      ref('nul'),
+    ])
+  })
+
+  test('applies offset windows with no overlap or gap for enumeration and text search', async () => {
+    const db = await freshDb()
+    const profiles = createProfileRegistry([searchProfile])
+    const store = new ResourceStore(db, profiles)
+    for (let index = 0; index < 5; index += 1) {
+      store.upsert({
+        ref: ref(`page-${index}`),
+        sourceId,
+        profile: { id: searchProfile.id, version: searchProfile.version },
+        origin: 'synced',
+        completeness: 'complete',
+        payload: {
+          ...payload('alpha', []),
+          occurredAt: new Date(2026, 0, index + 1),
+        },
+      })
+    }
+    const search = new LocalSearchExecutor(db, profiles)
+
+    const first = search.search({ limit: 2 }).map((item) => item.ref)
+    const second = search
+      .search({ limit: 2, offset: 2 })
+      .map((item) => item.ref)
+    const third = search.search({ limit: 2, offset: 4 }).map((item) => item.ref)
+    expect([...first, ...second, ...third]).toEqual(
+      search.search({ limit: 10 }).map((item) => item.ref),
+    )
+
+    const all = search.search({ text: 'alpha', limit: 10 }).map((i) => i.ref)
+    const paged = [
+      ...search.search({ text: 'alpha', limit: 3 }).map((i) => i.ref),
+      ...search
+        .search({ text: 'alpha', limit: 3, offset: 3 })
+        .map((i) => i.ref),
+    ]
+    expect(paged).toEqual(all)
+  })
 })

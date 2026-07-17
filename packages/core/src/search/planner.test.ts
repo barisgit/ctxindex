@@ -531,4 +531,111 @@ describe('SearchPlanner', () => {
       mixed.results.length,
     )
   })
+
+  test('filter-only enumeration is local-only and never invokes remote search', async () => {
+    const db = await database()
+    addSource(db, ids.indexed, 'fake.indexed')
+    addSource(db, ids.federated, 'fake.federated')
+    const store = new ResourceStore(db, registry.profiles)
+    for (const [suffix, occurredAt] of [
+      ['a', 3000],
+      ['b', 1000],
+      ['c', 2000],
+    ] as const) {
+      store.upsert({
+        ref: `ctx://${ids.indexed}/item/${suffix}`,
+        sourceId: ids.indexed,
+        profile: { id: 'fake.item', version: 1 },
+        origin: 'synced',
+        completeness: 'complete',
+        occurredAt,
+        payload: { title: `enum ${suffix}` },
+      })
+    }
+    const service = planner(db)
+
+    const result = await service.search({ realms: ['work'], explain: true })
+    expect(calls).toEqual([])
+    expect(result.results.map((item) => item.ref)).toEqual([
+      `ctx://${ids.indexed}/item/a`,
+      `ctx://${ids.indexed}/item/c`,
+      `ctx://${ids.indexed}/item/b`,
+    ])
+    expect(result.pagination).toEqual({ offset: 0, limit: 20, hasMore: false })
+    for (const source of result.explain?.sources ?? []) {
+      expect(source.legs).toEqual(['local'])
+    }
+  })
+
+  test('paginates local execution deterministically with hasMore boundaries', async () => {
+    const db = await database()
+    addSource(db, ids.indexed, 'fake.indexed')
+    const store = new ResourceStore(db, registry.profiles)
+    for (let index = 0; index < 5; index += 1) {
+      store.upsert({
+        ref: `ctx://${ids.indexed}/item/p${index}`,
+        sourceId: ids.indexed,
+        profile: { id: 'fake.item', version: 1 },
+        origin: 'synced',
+        completeness: 'complete',
+        occurredAt: 1000 + index,
+        payload: { title: `page ${index}` },
+      })
+    }
+    const service = planner(db)
+
+    const first = await service.search({ realms: ['work'], limit: 2 })
+    const second = await service.search({
+      realms: ['work'],
+      limit: 2,
+      offset: 2,
+    })
+    const third = await service.search({
+      realms: ['work'],
+      limit: 2,
+      offset: 4,
+    })
+    expect(first.pagination).toEqual({ offset: 0, limit: 2, hasMore: true })
+    expect(second.pagination).toEqual({ offset: 2, limit: 2, hasMore: true })
+    expect(third.pagination).toEqual({ offset: 4, limit: 2, hasMore: false })
+    const refs = [first, second, third].flatMap((page) =>
+      page.results.map((item) => item.ref),
+    )
+    expect(new Set(refs).size).toBe(5)
+
+    const localOnly = await service.search({
+      text: 'page',
+      localOnly: true,
+      limit: 2,
+      offset: 2,
+    })
+    expect(localOnly.pagination).toEqual({ offset: 2, limit: 2, hasMore: true })
+    expect(localOnly.results).toHaveLength(2)
+  })
+
+  test('rejects bare search, query-less remote, and non-local offset', async () => {
+    const db = await database()
+    addSource(db, ids.indexed, 'fake.indexed')
+    addSource(db, ids.federated, 'fake.federated')
+    const service = planner(db)
+
+    await expect(service.search({})).rejects.toThrow(
+      'query text or at least one filter is required',
+    )
+    await expect(
+      service.search({ realms: ['work'], remote: true }),
+    ).rejects.toThrow('remote requires query text')
+    await expect(service.search({ text: 'x', offset: 5 })).rejects.toThrow(
+      'offset requires local execution',
+    )
+    await expect(
+      service.search({ text: 'x', remote: true, offset: 5 }),
+    ).rejects.toThrow('offset requires local execution')
+    for (const offset of [-1, 1.5, Number.NaN]) {
+      await expect(
+        service.search({ realms: ['work'], offset }),
+      ).rejects.toThrow('offset must be a non-negative integer')
+    }
+    expect(calls).toEqual([])
+  })
 })
