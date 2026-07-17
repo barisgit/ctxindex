@@ -5,6 +5,7 @@ import {
 } from '@ctxindex/core/errors'
 import type { SearchContext } from '@ctxindex/extension-sdk'
 import { microsoftMailboxAdapterDefinition } from './definition'
+import { IMMUTABLE_ID_PREFERENCE } from './transport'
 
 const sourceId = '01kxhbnecdah1t4mj38x88epfj'
 const logger = { trace() {}, debug() {}, info() {}, warn() {}, error() {} }
@@ -82,11 +83,10 @@ describe('Microsoft mailbox search', () => {
     expect(new URL(requests[0]?.url ?? '').searchParams.get('$search')).toBe(
       '"quarterly \\"review\\" AND from:boss@example.com AND received>=06/01/2026 AND received<07/02/2026"',
     )
-    expect(
-      requests.every(
-        (request) => request.headers.get('prefer') === 'IdType="ImmutableId"',
-      ),
-    ).toBe(true)
+    expect(requests.length).toBeGreaterThan(1)
+    for (const request of requests) {
+      expect(request.headers.get('prefer')).toBe(IMMUTABLE_ID_PREFERENCE)
+    }
     expect(result.resources.map((resource) => resource.ref)).toEqual([
       `ctx://${sourceId.toUpperCase()}/message/message-1`,
       `ctx://${sourceId.toUpperCase()}/message/message-2`,
