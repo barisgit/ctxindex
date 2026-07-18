@@ -50,6 +50,10 @@ export const sourceCommand = defineCommand({
           type: 'string',
           description: 'indexed, federated, or hybrid routing override',
         },
+        'no-sync': {
+          type: 'boolean',
+          description: 'Disable synchronization for this Source',
+        },
         'adapter-id': { type: 'positional', required: false },
         realm: sourceOptionArgs.realm,
         ...generatedSourceConfigArgs(

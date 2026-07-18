@@ -18,7 +18,11 @@ const source: SourceRow = {
 
 test('source output exposes availability without replacing lastStatus', () => {
   expect(JSON.parse(formatSources([source], { json: true }))).toMatchObject([
-    { availability: 'extension_unavailable', lastStatus: 'failed' },
+    {
+      availability: 'extension_unavailable',
+      lastStatus: 'failed',
+      syncEnabled: true,
+    },
   ])
   expect(formatSources([source], { json: false, format: 'compact' })).toContain(
     'status=extension_unavailable',

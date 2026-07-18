@@ -36,6 +36,7 @@ export interface AddSourceInput {
   readonly configJson?: string
   readonly grantId?: string
   readonly searchRouting?: SearchRouting
+  readonly syncEnabled?: boolean
 }
 
 export interface AddSourceResult {

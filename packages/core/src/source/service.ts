@@ -167,7 +167,11 @@ function withAvailability(
   deps: SourceServiceDeps,
   source: Omit<SourceRow, 'availability'>,
 ): SourceRow {
-  return { ...source, availability: sourceAvailability(deps, source) }
+  return {
+    ...source,
+    sync_enabled: Boolean(source.sync_enabled),
+    availability: sourceAvailability(deps, source),
+  }
 }
 
 function parseCursor(cursorJson: string | null): unknown {
@@ -296,8 +300,8 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
         .prepare(
           `INSERT INTO sources (
              id, realm_id, adapter_id, adapter_version, label, config_json,
-             grant_id, search_routing, created_at, updated_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             grant_id, search_routing, sync_enabled, created_at, updated_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           sourceId,
@@ -308,6 +312,7 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
           JSON.stringify(parsedConfig.data),
           grantId,
           input.searchRouting ?? null,
+          input.syncEnabled ?? true,
           now,
           now,
         )

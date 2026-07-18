@@ -169,6 +169,26 @@ describe('sync command', () => {
     expect(setup.closed()).toBe(true)
   })
 
+  test('fails fast for an explicitly targeted disabled Source without provider calls', async () => {
+    const error = spyOn(console, 'error').mockImplementation(() => {})
+    const setup = harness({
+      sources: [source('source-disabled', undefined, false)],
+    })
+
+    expect(
+      await handleSyncCommand(
+        ['--source', 'source-disabled'],
+        setup.open,
+        setup.services,
+      ),
+    ).toBe(2)
+    expect(setup.calls).toEqual([])
+    expect(String(error.mock.calls[0]?.[0])).toBe(
+      'Source is not sync-enabled: "source-disabled"',
+    )
+    expect(setup.closed()).toBe(true)
+  })
+
   test('explicit Source reports a loaded non-sync Adapter as unsupported', async () => {
     const log = spyOn(console, 'log').mockImplementation(() => {})
     const setup = harness({

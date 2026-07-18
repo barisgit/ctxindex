@@ -153,10 +153,10 @@ export async function handleSyncCommand(
 
 The SDK exposes cursor-driven emissions through `SyncContext`; there is no separate emit capability. Core `SyncCoordinator` validates emissions, owns run/lock/checkpoint state, buffers transactional writes, and applies cursor changes only with successful work. `syncSource` binds a stored Source to its loaded Adapter and provider context.
 
-Warnings may stream without invalidating committed state. Diff mode exercises the same validation and rolls back data/cursor changes. CLI sync orchestration selects Sources, invokes injected services, and keeps per-Source success/failure output deterministic.
+Warnings may stream without invalidating committed state. Diff mode exercises the same validation and rolls back data/cursor changes. CLI sync orchestration selects Sources, excludes stored `sync_enabled: false` Sources from all-Source runs, rejects a targeted disabled Source before invoking `syncSource`, invokes injected services, and keeps per-Source success/failure output deterministic.
 
 The thin CLI owns the closed sync argv grammar and preserves help precedence. The root boundary rejects option-like tokens placed before the selected `sync` command before command selection can discard them, while preserving valid global options. The command descriptor forwards mode as an unvalidated string so the parser remains the sole mode-value boundary after command selection. The parser rejects invalid input through the `SyncArgs` union before runtime dependencies open, Source labels resolve, sync execution begins, or storage and provider effects become reachable.
 
 ## Verification
 
-Emission and coordinator tests cover validation, checkpoints, warnings, cancellation, locking, rollback, tombstones, and run summaries. Source sync tests cover registry/auth/provider-context binding. CLI sync tests cover strict argument rejection before side effects, selection, concurrency output, JSON/readable streams, and partial failure.
+Emission and coordinator tests cover validation, checkpoints, warnings, cancellation, locking, rollback, tombstones, and run summaries. Source sync tests cover registry/auth/provider-context binding. CLI sync tests cover strict argument rejection before side effects, selection including disabled-Source all-run exclusion and targeted zero-provider failure, concurrency output, JSON/readable streams, and partial failure.

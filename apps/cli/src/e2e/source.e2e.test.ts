@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { access, mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createSandbox, type Sandbox } from '@ctxindex/core/testing'
 
@@ -78,6 +78,33 @@ describe('source e2e', () => {
       expect(result.exitCode).toBe(2)
       expect(result.stderr).toContain(`unknown option ${flag}`)
       expect(await Bun.file(dbPath(sandbox)).exists()).toBe(false)
+    } finally {
+      await sandbox.cleanup()
+    }
+  })
+
+  test('invalid --no-sync forms fail before persistent state is opened', async () => {
+    const sandbox = await createSandbox()
+    try {
+      for (const suffix of [
+        ['--no-sync=false'],
+        ['--no-sync', '--no-sync'],
+        ['--no-sync', 'false'],
+        ['--no_sync'],
+      ]) {
+        const result = await sandbox.run([
+          'source',
+          'add',
+          'local.directory',
+          '--realm',
+          'work',
+          '--config-root-path',
+          '/tmp',
+          ...suffix,
+        ])
+        expect(result.exitCode, suffix.join(' ')).toBe(2)
+      }
+      await expect(access(dbPath(sandbox))).rejects.toThrow()
     } finally {
       await sandbox.cleanup()
     }
@@ -223,6 +250,62 @@ describe('source e2e', () => {
     })
   })
 
+  test('source add --no-sync forwards and persists the disabled policy', async () => {
+    await withInitializedSandbox(async (sandbox) => {
+      const root = join(sandbox.dir, 'disabled-source-root')
+      await mkdir(root, { recursive: true })
+
+      const result = await sandbox.run([
+        'source',
+        'add',
+        'local.directory',
+        '--realm',
+        'global',
+        '--config-root-path',
+        root,
+        '--no-sync',
+      ])
+
+      expect(result.stderr).toBe('')
+      expect(result.exitCode).toBe(0)
+      const sourceId = parseSourceId(result.stdout)
+      const db = new Database(dbPath(sandbox), { readonly: true })
+      try {
+        expect(
+          db
+            .prepare('SELECT sync_enabled FROM sources WHERE id = ?')
+            .get(sourceId),
+        ).toEqual({ sync_enabled: 0 })
+      } finally {
+        db.close()
+      }
+      const list = await sandbox.run(['source', 'list', '--json'])
+      expect(list.exitCode).toBe(0)
+      expect(JSON.parse(list.stdout)).toMatchObject([
+        { id: sourceId, syncEnabled: false },
+      ])
+
+      const allSync = await sandbox.run(['sync', '--json'])
+      expect(allSync.exitCode).toBe(0)
+      expect(JSON.parse(allSync.stdout)).toMatchObject({ results: [] })
+
+      const targetedSync = await sandbox.run(['sync', '--source', sourceId])
+      expect(targetedSync.exitCode).toBe(2)
+      expect(targetedSync.stderr).toContain('not sync-enabled')
+
+      const verificationDb = new Database(dbPath(sandbox), { readonly: true })
+      try {
+        expect(
+          verificationDb
+            .prepare('SELECT count(*) AS count FROM sync_runs')
+            .get(),
+        ).toEqual({ count: 0 })
+      } finally {
+        verificationDb.close()
+      }
+    })
+  })
+
   test('source list shows added source', async () => {
     await withInitializedSandbox(async (sandbox) => {
       const root = join(sandbox.dir, 'source-root')
@@ -265,6 +348,7 @@ describe('source e2e', () => {
         ref: string
         availability: string
         itemsCount: number
+        syncEnabled: boolean
       }>
       expect(rows[0]).toMatchObject({
         label: 'repo-under-test',
@@ -272,6 +356,7 @@ describe('source e2e', () => {
         ref: root,
         availability: 'available',
         itemsCount: 1,
+        syncEnabled: true,
       })
 
       const compact = await sandbox.run([
