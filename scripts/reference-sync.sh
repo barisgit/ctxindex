@@ -16,10 +16,10 @@ while IFS="$(printf '\t')" read -r name type target; do
   case "$type" in
     git)
       if [ -d ".reference/$name/.git" ]; then
-        git -C ".reference/$name" fetch --depth 1 origin
+        git -C ".reference/$name" fetch --depth 1 --no-tags origin
         git -C ".reference/$name" reset --hard FETCH_HEAD --quiet
       else
-        git clone --depth 1 "$target" ".reference/$name"
+        git clone --depth 1 --single-branch --no-tags "$target" ".reference/$name"
       fi
       printf '%s\tgit\t%s\n' "$name" "$(git -C ".reference/$name" rev-parse --short=12 HEAD)"
       ;;

@@ -53,7 +53,7 @@ fi
 
 2. Resolve the merged view and reuse existing references when they match the task.
 3. Materialize only the references the task needs.
-4. Git entries clone or update idempotently in `.reference/<name>/`.
+4. Git entries clone or update idempotently in `.reference/<name>/`, always shallow: `--depth 1` on clone and fetch, single-branch, no tags. One commit, no other objects. Never unshallow a reference; if history is genuinely needed, say so and inspect it on the remote (e.g. GitHub) instead.
 5. Dir entries are used in place via their `path`, not symlinked into `.reference/`. In-place use avoids symlink surprises, stale links, and accidental commits of machine-specific paths.
 6. When quoting or relying on a Git reference, record the commit and dirty state.
 7. Keep commands to shell, `jq`, `git`, and task-specific tools. Do not add Python helpers.
@@ -133,9 +133,10 @@ case "$type" in
     url="$(printf '%s\n' "$entry" | jq -r '.url')"
     mkdir -p .reference
     if [ -d ".reference/$name/.git" ]; then
-      git -C ".reference/$name" pull --ff-only
+      git -C ".reference/$name" fetch --depth 1 --no-tags origin
+      git -C ".reference/$name" reset --hard FETCH_HEAD --quiet
     else
-      git clone "$url" ".reference/$name"
+      git clone --depth 1 --single-branch --no-tags "$url" ".reference/$name"
     fi
     git -C ".reference/$name" rev-parse --short=12 HEAD
     git -C ".reference/$name" status --short
