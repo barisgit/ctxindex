@@ -19,7 +19,7 @@ ctxindex defines:
 - a stable ref grammar addressing resources independent of index state;
 - normalized resource/chunk/tombstone operations emitted by source adapters;
 - local full-text and field search over normalized content, with optional provider-side (remote) search;
-- a managed content-addressed artifact store for attachments, raw records, and rendered exports;
+- Source-scoped Profile-derived Artifact descriptors and a managed content-addressed cache for Artifact bytes downloaded on demand;
 - export of resources to portable formats declared by profiles;
 - local account, grant, realm, source, sync, search, and Action behavior.
 
@@ -60,13 +60,23 @@ The system MUST preserve the following contract without changing the normative f
 - A **resource** is one unit of context emitted by a source: an envelope (ref, primary profile id+version, title, times, origin) plus validated profile payload(s). The envelope kind IS the primary profile id.
 - A **ref** is the stable locator `ctx://<source-id>/<adapter-opaque-suffix>` for one resource, valid whether or not the resource is indexed. The suffix is adapter-owned and opaque to core. Provider-native URIs are envelope metadata, never addressing input.
 - A **chunk** is one searchable segment of a resource's extracted content.
-- An **artifact** is downloadable bytes (attachment, original record, rendered export) in the managed artifact store.
+- An **artifact** is a Source-scoped descriptor derived by a Resource's Profile for downloadable bytes associated with that Resource. Artifact bytes enter the managed content-addressed cache only when download is requested. Purging the Artifact cache removes cached bytes and cache metadata while preserving the owning Resource and its descriptor.
 
-A source adapter MUST emit normalized core operations for searchable data. Adapters MUST NOT own database tables; all persistence flows through the generic core storage model ([generic storage](../generic-storage/spec.md)). Adapter-specific state lives in the sync cursor and the artifact store.
+Profile exports are rendered and streamed representations and MUST NOT be inserted into the Artifact cache or described as Artifacts unless a future explicit contract defines that behavior. Optional raw provider payload retention is separate support data and MUST NOT be represented as Artifact storage.
+
+A source adapter MUST emit normalized core operations for searchable data. Adapters MUST NOT own database tables; all persistence flows through the generic core storage model ([generic storage](../generic-storage/spec.md)). Adapter-specific state lives in the sync cursor; downloaded Artifact bytes live in the managed content-addressed cache.
 
 #### Scenario: Core entities preserve their defined meanings and relationships
 - **WHEN** a conforming implementation exercises this contract
 - **THEN** it satisfies every applicable MUST and MUST NOT clause and treats SHOULD, SHOULD NOT, and MAY clauses according to their normative meanings
+
+#### Scenario: Artifact purge preserves descriptor identity
+- **WHEN** cached bytes and metadata for an Artifact are explicitly purged
+- **THEN** the owning Resource and its Profile-derived Artifact descriptor remain available for a later download
+
+#### Scenario: Export and raw payload paths remain separate
+- **WHEN** a Profile export is rendered or optional raw provider payload support is used
+- **THEN** neither representation is inserted into the Artifact cache or described as an Artifact without a separate explicit contract
 
 ### Requirement: Resource identity, deletion, and Relations
 The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.

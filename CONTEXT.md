@@ -79,8 +79,8 @@ A typed, traversable edge from one Resource to another Ref or natural key.
 _Avoid_: Join table, embedded provider link
 
 **Artifact**:
-Downloadable bytes associated with context, such as an attachment, original record, or rendered export.
-_Avoid_: Resource, arbitrary file, blob
+A Source-scoped, Profile-derived descriptor for downloadable bytes associated with one Resource. Provider bytes are fetched and cached only on download; the descriptor remains when cached bytes are purged.
+_Avoid_: Resource, arbitrary file, blob, cached byte object
 
 **Materialization**:
 A local, purgeable representation of provider context produced by ad-hoc retrieval or Sync.
@@ -103,8 +103,8 @@ _Avoid_: Source, import
 - One **Account** owns exactly one stable **Grant** and may back multiple **Sources**; reauthorization updates the Grant in place, and multiple compatible Sources may explicitly share it.
 - An **Extension** bundles one or more **Profiles** and **Source Adapters**.
 - A **Profile** declares zero or more **Actions**; a **Source Adapter** implements the Actions it supports.
-- A **Source Adapter** emits **Resources**, **Relations**, and **Artifact** descriptors through sync, search, retrieval, and action results.
-- A **Resource** has one stable **Ref**, one primary **Profile**, and zero or more **Relations** and **Artifacts**.
+- A **Source Adapter** emits **Resources** through sync, search, retrieval, and action results; each **Resource**'s **Profile** derives **Relations** and **Artifact** descriptors from its validated payload, and the owning Adapter downloads provider bytes for an **Artifact** on demand.
+- A **Resource** has one stable **Ref**, one primary **Profile**, and zero or more **Relations** and Profile-derived **Artifact** descriptors.
 - A provider-persisted **Draft** is a **Resource** created or updated by an **Action**.
 
 ## Example dialogue
@@ -126,3 +126,4 @@ _Avoid_: Source, import
 - Resolved: typed **Actions** are part of ctxindex, while agent workflow policy and arbitrary extension commands are not.
 - Resolved: V1 provider mutations are limited to reversible email **Draft** creation and update; sending and other domain mutations come later.
 - Resolved: **Resource** supersedes the prototype term `Item`.
+- Resolved: Profile exports and optional raw provider payload retention are separate from **Artifacts**; exports are rendered or streamed, while retained raw payloads are support data.

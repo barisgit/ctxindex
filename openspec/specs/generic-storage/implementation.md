@@ -132,7 +132,7 @@ export class RelationStore {
 
 ## Implementation doctrine
 
-Core exclusively owns SQLite/Drizzle schema, migrations, `ResourceStore`, and `RelationStore`; Adapters own no tables. Resource upserts validate through the loaded Profile and transactionally replace derived fields, chunks, Relations, and Artifact descriptors. Synced rows participate in reconciliation/tombstones; ad-hoc rows are cache materializations.
+Core exclusively owns SQLite/Drizzle schema, migrations, `ResourceStore`, and `RelationStore`; Adapters own no tables. Resource upserts validate through the loaded Profile and transactionally replace derived fields, chunks, and Relations. Profiles derive Artifact descriptors on demand from the validated Resource payload; cached Artifact-byte metadata is written only by the download path. Synced rows participate in reconciliation/tombstones; ad-hoc rows are cache materializations.
 
 SQLite coordinates writers across processes. One core storage normalizer classifies busy and locked result families for database open/setup, migrations, and Resource batches, retaining the backend exception only as the typed error's cause. Database setup installs the five-second busy timeout before lock-sensitive pragmas. `ResourceStore.upsertMany()` validates every Ref and Source association before collapsing repeated valid Refs to their final input state, reserves the writer with one immediate transaction, and commits or rolls back every Resource envelope and derived projection together; `upsert()` shares that path for one Resource.
 
