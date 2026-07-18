@@ -1,0 +1,24 @@
+---
+title: ctxindex init
+description: Initialize ctxindex directories and its SQLite database.
+---
+
+`init` sets up ctxindex config, data, state, cache, logs, and SQLite. It does not create an implicit Realm.
+
+## Usage
+
+```sh
+ctxindex init
+```
+
+## Options
+
+`init` has no command-specific flags.
+
+## JSON output
+
+`init` does not accept `--json`; it prints a readable initialization confirmation.
+
+<Callout title="Stable exit codes">
+Exit codes are API: `0` success; `2` invalid usage; `10` `needs_auth`; `20` rate limited; `30` network/provider; `40` permission denied; `50` other sync failure; `130` cancelled by SIGINT.
+</Callout>

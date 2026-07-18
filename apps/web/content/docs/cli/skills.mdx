@@ -1,0 +1,32 @@
+---
+title: ctxindex skills
+description: Discover bundled, release-versioned agent skill documentation.
+---
+
+Bundled skills provide workflow guidance that ships with the ctxindex release. Registry-derived interface facts still come from `ctxindex describe`.
+
+## Usage
+
+```sh
+ctxindex skills list [--json]
+ctxindex skills get [--inline] [--json] <name>
+ctxindex skills path
+```
+
+## Commands and flags
+
+| Command or flag | Purpose |
+| --- | --- |
+| `list` | List skill names and summaries. |
+| `get <name>` | Print one bundled skill. |
+| `--inline` | Inline files referenced by the selected skill. |
+| `path` | Print the bundled-skills location. |
+| `--json` | Print JSON for `list` or `get`. |
+
+## JSON output
+
+`skills list` and `skills get` accept `--json`. `skills path` prints the filesystem location as text.
+
+<Callout title="Stable exit codes">
+Exit codes are API: `0` success; `2` invalid usage; `10` `needs_auth`; `20` rate limited; `30` network/provider; `40` permission denied; `50` other sync failure; `130` cancelled by SIGINT.
+</Callout>

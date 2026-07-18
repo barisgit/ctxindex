@@ -1,0 +1,80 @@
+---
+title: Calendar workflows
+description: Sync and search Google and Microsoft calendars through one read-only event vocabulary.
+---
+
+Google Calendar and Microsoft Calendar Sources normalize events into the provider-neutral `calendar.event` Profile. Calendar Sources are indexed and read-only: sync materializes a rolling local window, then generic search and retrieval operate across providers.
+
+## Inspect and configure calendar Sources
+
+Use registry output instead of assuming provider options:
+
+```sh
+ctxindex describe adapter google.calendar --json
+ctxindex describe adapter microsoft.calendar --json
+ctxindex account list --json
+```
+
+Each calendar Source selects one provider calendar. For example:
+
+```sh
+ctxindex source add google.calendar \
+  --realm company \
+  --account work-google \
+  --label work-calendar \
+  --config-calendar-id primary \
+  --config-past-days 365 \
+  --config-future-days 730
+```
+
+The generated calendar flags and defaults come from the loaded Adapter schema. A second Source can select another calendar or Account without changing the search commands.
+
+## Sync before searching
+
+```sh
+ctxindex sync --source work-calendar --json
+ctxindex status --source work-calendar --json
+```
+
+The configured past and future windows define indexed coverage. Incremental sync retains its anchored window and records provider deletions; only a complete reconciliation advances the anchor. Choose wider history in the Source configuration when the workflow needs it.
+
+## Find upcoming Calendar Events
+
+A query is optional when at least one filter is present, so an agent can enumerate an interval without inventing search text:
+
+```sh
+ctxindex search \
+  --kind events \
+  --realm company \
+  --since '<START_DATE>' \
+  --until '<END_DATE>' \
+  --json
+```
+
+Add text or typed fields to narrow the result set:
+
+```sh
+ctxindex search "planning" \
+  --kind events \
+  --realm company \
+  --field allDay=false \
+  --since '<START_DATE>' \
+  --until '<END_DATE>' \
+  --json
+```
+
+Replace `<START_DATE>` and `<END_DATE>` with the upcoming ISO date interval for the current run. Omit `--realm` to search all configured Google and Microsoft calendar Sources. An explicit Realm is exact.
+
+## Retrieve one Calendar Event
+
+Use the Ref returned by search rather than reconstructing provider IDs:
+
+```sh
+ctxindex get 'ctx://01J00000000000000000000000/event/stable-event-id' --json
+```
+
+Timed Calendar Events preserve their RFC 3339 instants and timezone. All-day Calendar Events preserve local start dates and exclusive end dates rather than inventing UTC-midnight timestamps. Keep that distinction when presenting an agenda.
+
+<Callout>
+Calendar Sources are read-only. ctxindex can sync, search, and retrieve Calendar Events, but it does not create, update, accept, decline, or delete them.
+</Callout>

@@ -1,0 +1,84 @@
+@import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+:root {
+  --color-fd-primary: hsl(32 95% 44%);
+  --ctx-amber: #f59e0b;
+  --ctx-amber-dim: #b45309;
+}
+
+.dark {
+  --color-fd-primary: hsl(38 92% 50%);
+  --color-fd-background: hsl(220 14% 6%);
+  --color-fd-card: hsl(220 13% 8%);
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0px;
+  --removed-body-scroll-bar-size: 0px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes ctx-fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .ctx-fade-up {
+    animation: ctx-fade-up 0.6s ease-out both;
+  }
+
+  @keyframes ctx-blink {
+    0%,
+    49% {
+      opacity: 1;
+    }
+    50%,
+    100% {
+      opacity: 0;
+    }
+  }
+
+  .ctx-cursor {
+    animation: ctx-blink 1.1s step-end infinite;
+  }
+}
+
+.ctx-hero-glow {
+  background: radial-gradient(
+    ellipse 60% 50% at 50% 0%,
+    color-mix(in srgb, var(--ctx-amber) 10%, transparent),
+    transparent 70%
+  );
+}
+
+.ctx-grid-bg {
+  background-image:
+    linear-gradient(
+      to right,
+      color-mix(in srgb, currentcolor 6%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, currentcolor 6%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 40px 40px;
+}

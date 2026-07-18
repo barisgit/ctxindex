@@ -1,0 +1,75 @@
+---
+title: Profiles and Actions
+description: How Profiles define portable semantics and Source Adapters implement provider operations and typed mutations.
+---
+
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+**Profiles** define domain meaning. **Source Adapters** perform provider or filesystem I/O. **Extensions** distribute both through one validated registry contract.
+
+<Tabs items={['Profile', 'Source Adapter', 'Extension']}>
+  <Tab value="Profile">
+    A versioned, schema-backed domain contract for a Resource shape and its vocabulary: projections, typed fields, Relations, Artifact descriptors, exports, aliases, documentation, and Actions.
+  </Tab>
+  <Tab value="Source Adapter">
+    Provider-facing code that declares capabilities, authentication and configuration, emits normalized Resources, and implements supported Profile Actions for a Source.
+  </Tab>
+  <Tab value="Extension">
+    A distributable bundle of Profiles and Source Adapters. An Extension does not introduce its own command surface.
+  </Tab>
+</Tabs>
+
+## Profiles keep domain semantics portable
+
+Profiles are the only mechanism through which domain semantics reach core. Their vocabulary functions derive searchable text, chunks, typed **Field Index** values, Relations, and Artifact descriptors from validated payloads.
+
+This keeps one Profile usable across providers. For example, Google and Microsoft calendar Adapters can both emit `calendar.event@1`; storage, search, and retrieval then use the same Profile-owned vocabulary.
+
+Profile ids and vocabulary are versioned. If a Resource names an unloaded Profile version, core preserves and indexes its envelope, emits a warning, and omits vocabulary it cannot derive. The operation does not fail solely because the Profile is unavailable.
+
+## Adapters implement operations
+
+A Source Adapter owns provider transport, response validation, normalization, and implementations. It can declare these operation capabilities:
+
+- `sync`
+- `search-remote`
+- `retrieve`
+- `download`
+
+Actions are separate Profile-specific bindings, not capabilities. Registry construction rejects missing capability implementations and inconsistent Action bindings before an invalid Extension activates.
+
+Adapters receive scoped operation context from the host. They return normalized Resources, Relations, Artifact descriptors, warnings, bytes, and Action results; they do not write core SQLite tables or pass provider DTOs through the core contract.
+
+## Actions are typed and Source-bound
+
+An **Action** is a typed provider-side mutation declared by a Profile and implemented by a Source Adapter. Its contract includes a stable id, input schema, output contract, effect classification, documentation, and examples.
+
+Running an Action requires one explicit Source. Core validates the complete input before provider I/O, verifies that the Source's Adapter binds the Action, and invokes it through that Source and its linked Grant. The normalized result includes a Resource Ref when applicable.
+
+```text
+Profile declares Action contract
+              │
+              v
+Source Adapter binds implementation
+              │
+              v
+Explicit Source selects provider collection + Grant
+              │
+              v
+Provider mutation returns normalized Resource
+```
+
+<Callout>
+  An Action is not an arbitrary Extension command, an agent workflow, or a raw provider API call. Approval policy and workflow wording stay outside ctxindex.
+</Callout>
+
+## Drafts are persisted Resources
+
+A **Draft** is a reversible, provider-persisted proposed change. Text composed only in an agent conversation is not a Draft.
+
+V1 exposes exactly two provider-independent email Actions:
+
+- `communication.message.draft.create`
+- `communication.message.draft.update`
+
+Both produce a `communication.message` Resource. Standalone updates replace complete addressed content while preserving the Ref. Threaded reply branches derive recipient, subject, and thread state from a complete local parent; updates preserve the immutable parent and replace only body text. ctxindex does not send email: no send, reply-send, forward-send, calendar mutation, or other provider mutation ships in V1.

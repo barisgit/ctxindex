@@ -1,0 +1,42 @@
+---
+title: ctxindex action
+description: Describe and run typed, Source-bound provider Actions.
+---
+
+Actions are declared by Profiles and implemented by Source Adapters. V1 provider mutations stop at reversible email Draft create and update; sending and calendar mutations are not available.
+
+## Usage
+
+```sh
+ctxindex action describe [--source <source>] [--json] <action-id>
+ctxindex action run --source <source> --input <json-or-file> [--json] <action-id>
+```
+
+## Commands and flags
+
+| Command or flag | Purpose |
+| --- | --- |
+| `describe <action-id>` | Show the registry schema, effect, docs, and Source availability. |
+| `run <action-id>` | Validate complete input, then invoke the Action through one Source. |
+| `--source <source>` | Select an exact Source label or ID. Required for `run`. |
+| `--input <json-or-file>` | Pass an inline JSON object or a UTF-8 JSON file path. |
+| `--confirm-irreversible` | Explicitly confirm an irreversible Action. No irreversible Action ships in V1. |
+| `--json` | Print deterministic JSON. |
+
+```sh
+ctxindex action describe communication.message.draft.create --source work-mail --json
+ctxindex action run communication.message.draft.create \
+  --source work-mail \
+  --input ./draft.json \
+  --json
+```
+
+Invalid input and unsupported Sources fail before provider mutation. Ambiguous mutation outcomes are not automatically retried.
+
+## JSON output
+
+Both `action describe` and `action run` accept `--json`. A successful Action returns its declared normalized result, including a Resource Ref when applicable.
+
+<Callout title="Stable exit codes">
+Exit codes are API: `0` success; `2` invalid usage or invalid Action input; `10` `needs_auth`; `20` rate limited; `30` network/provider; `40` permission denied; `50` other sync failure; `130` cancelled by SIGINT.
+</Callout>

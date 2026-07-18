@@ -1,0 +1,39 @@
+---
+title: ctxindex export
+description: Stream a Resource using a Profile-declared export format.
+---
+
+`export` resolves the Resource's Profile and streams the selected representation to stdout. Valid formats come from the loaded Profile registry; JSON is always available.
+
+## Usage
+
+```sh
+ctxindex export --format <format> <ref>
+```
+
+## Flags
+
+| Flag | Purpose |
+| --- | --- |
+| `--format <format>` | Select a Profile-declared format or the always-available `json` format. |
+
+Discover formats before exporting:
+
+```sh
+ctxindex describe profile communication.message
+ctxindex export 'ctx://01J00000000000000000000000/message/stable-message-id' --format json
+```
+
+Redirect stdout when a file is required:
+
+```sh
+ctxindex export <ref> --format <format> > output.bin
+```
+
+## JSON output
+
+`export` does not accept `--json`. Use `--format json` to stream the validated payload's JSON export. Export bytes go to stdout; warnings go to stderr.
+
+<Callout title="Stable exit codes">
+Exit codes are API: `0` success; `2` invalid usage or an unsupported format; `10` `needs_auth`; `20` rate limited; `30` network/provider; `40` permission denied; `50` other sync failure; `130` cancelled by SIGINT.
+</Callout>

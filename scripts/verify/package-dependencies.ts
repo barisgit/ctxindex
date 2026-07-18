@@ -2,7 +2,7 @@
 import type { Dirent } from 'node:fs'
 import { readdir, readFile } from 'node:fs/promises'
 import { builtinModules } from 'node:module'
-import { extname, join, resolve } from 'node:path'
+import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import ts from 'typescript'
 
 const sourceExtensions = new Set([
@@ -15,7 +15,21 @@ const sourceExtensions = new Set([
   '.ts',
   '.tsx',
 ])
-const ignoredDirectories = new Set(['.git', 'dist', 'node_modules'])
+const ignoredDirectories = new Set([
+  '.git',
+  '.next',
+  '.source',
+  'build',
+  'coverage',
+  'dist',
+  'node_modules',
+  'out',
+])
+const ignoredFrameworkSpecifiers = new Set(['mdx/types'])
+const frameworkSpecifierPeers = new Map([
+  ['fumadocs-core/source/lucide-icons', ['lucide-react']],
+])
+const frameworkPackagePeers = new Map([['next', ['react', 'react-dom']]])
 const builtins = new Set(
   builtinModules.map((name) => name.replace(/^node:/, '')),
 )
@@ -46,6 +60,7 @@ export function packageNameFromSpecifier(
 export function extractPackageImports(
   source: string,
   fileName: string,
+  localSpecifierPatterns: readonly string[] = [],
 ): string[] {
   const sourceFile = ts.createSourceFile(
     fileName,
@@ -57,6 +72,20 @@ export function extractPackageImports(
 
   const addSpecifier = (node: ts.Expression | undefined): void => {
     if (!node || !ts.isStringLiteralLike(node)) return
+    if (
+      ignoredFrameworkSpecifiers.has(node.text) ||
+      localSpecifierPatterns.some((pattern) => {
+        const wildcard = pattern.indexOf('*')
+        if (wildcard === -1) return node.text === pattern
+        return (
+          node.text.startsWith(pattern.slice(0, wildcard)) &&
+          node.text.endsWith(pattern.slice(wildcard + 1))
+        )
+      })
+    )
+      return
+    for (const peer of frameworkSpecifierPeers.get(node.text) ?? [])
+      imports.add(peer)
     const packageName = packageNameFromSpecifier(node.text)
     if (packageName) imports.add(packageName)
   }
@@ -101,6 +130,13 @@ interface RootPackageJson {
   workspaces?: string[] | { packages?: string[] }
 }
 
+interface TsConfig {
+  compilerOptions?: {
+    baseUrl?: string
+    paths?: Record<string, string[]>
+  }
+}
+
 export interface WorkspacePackage {
   name: string
   directory: string
@@ -126,6 +162,67 @@ async function discoverSourceFiles(directory: string): Promise<string[]> {
   }
 
   return files
+}
+
+function isWorkspaceLocalTarget(
+  directory: string,
+  baseDirectory: string,
+  target: string,
+): boolean {
+  const resolvedTarget = resolve(
+    baseDirectory,
+    target.replace('*', '__alias_target__'),
+  )
+  const relativeTarget = relative(directory, resolvedTarget)
+  return (
+    relativeTarget !== '..' &&
+    !relativeTarget.startsWith(`..${sep}`) &&
+    !isAbsolute(relativeTarget) &&
+    !relativeTarget.split(sep).includes('node_modules')
+  )
+}
+
+async function readLocalSpecifierPatterns(
+  directory: string,
+): Promise<string[]> {
+  let config: TsConfig
+  try {
+    const configPath = join(directory, 'tsconfig.json')
+    const parsed = ts.parseConfigFileTextToJson(
+      configPath,
+      await readFile(configPath, 'utf8'),
+    )
+    if (parsed.error || !parsed.config) return []
+    config = parsed.config as TsConfig
+  } catch {
+    return []
+  }
+  const baseDirectory = resolve(
+    directory,
+    config.compilerOptions?.baseUrl ?? '.',
+  )
+
+  return Object.entries(config.compilerOptions?.paths ?? {})
+    .filter(
+      ([, targets]) =>
+        targets.length > 0 &&
+        targets.every((target) =>
+          isWorkspaceLocalTarget(directory, baseDirectory, target),
+        ),
+    )
+    .map(([pattern]) => pattern)
+    .sort(compareStrings)
+}
+
+function addDeclaredFrameworkPeers(
+  imports: Set<string>,
+  declared: ReadonlySet<string>,
+): void {
+  for (const dependency of [...imports]) {
+    if (!declared.has(dependency)) continue
+    for (const peer of frameworkPackagePeers.get(dependency) ?? [])
+      if (declared.has(peer)) imports.add(peer)
+  }
 }
 
 export async function discoverWorkspacePackages(
@@ -223,10 +320,14 @@ export async function verifyWorkspaceDependencies(
 
   for (const workspacePackage of packages) {
     const imports = new Set<string>()
+    const localSpecifierPatterns = await readLocalSpecifierPatterns(
+      workspacePackage.directory,
+    )
     for (const file of workspacePackage.files) {
       for (const dependency of extractPackageImports(
         await readFile(file, 'utf8'),
         file,
+        localSpecifierPatterns,
       ))
         imports.add(dependency)
     }
@@ -234,6 +335,7 @@ export async function verifyWorkspaceDependencies(
     const declared = new Set(
       Object.keys(workspacePackage.manifest.dependencies ?? {}),
     )
+    addDeclaredFrameworkPeers(imports, declared)
     imports.delete(workspacePackage.name)
 
     for (const dependency of imports) {

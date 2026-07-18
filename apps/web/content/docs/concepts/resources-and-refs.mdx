@@ -1,0 +1,76 @@
+---
+title: Resources and Refs
+description: The stable identity, relations, artifacts, and local materializations of context in ctxindex.
+---
+
+import { Step, Steps } from 'fumadocs-ui/components/steps';
+
+A **Resource** is one addressable unit of context. A **Ref** identifies it whether or not its complete contents are currently stored locally.
+
+## Resource envelope and payload
+
+Every Resource has a common envelope that includes its Ref, primary Profile id and version, title, times, and origin. It may also carry a payload validated against that Profile.
+
+The primary Profile supplies the Resource's domain meaning. Core stores the same generic envelope for messages, Calendar Events, files, and extension-defined domains; it does not add a provider-specific table or code path for each kind.
+
+A Resource may be complete, or it may be only an envelope returned by remote search. `get` returns complete local state when available and otherwise asks the owning Source Adapter to retrieve it.
+
+## Refs are stable locators
+
+A Ref has this shape:
+
+```text
+ctx://<source-id>/<adapter-opaque-suffix>
+```
+
+The Source id selects the owning Source. The remaining suffix is opaque to core and interpreted by that Source's Adapter.
+
+<Callout>
+  A Ref is not a provider URL or an internal SQLite row id. Do not parse the adapter-opaque suffix or construct provider behavior from it.
+</Callout>
+
+Ref identity is independent of local materialization. The same Ref can be discovered through the local index, returned by provider search, hydrated by retrieval, evicted from an ad-hoc cache, and materialized again.
+
+Source identity is part of the Ref. If two Sources expose the same provider record, ctxindex keeps two Resources rather than silently collapsing them. Relations can connect them when a declared natural key establishes the relationship.
+
+## Relations connect Resources
+
+A **Relation** is a typed, traversable edge from one Resource to another Ref or natural key. Examples of relation roles include parent links and conversation membership, but Relation storage and traversal remain generic.
+
+Relations have two useful target forms:
+
+- **Ref target:** resolves directly to one Resource.
+- **Natural-key target:** may remain unresolved until a matching Resource arrives, including from another Source or Realm.
+
+Arrival order does not determine whether a Relation can resolve. Traversal is bidirectional, and a temporarily missing or evicted target can resolve again after materialization.
+
+## Artifacts represent associated bytes
+
+An **Artifact** is downloadable bytes associated with context, such as an attachment, original record, or rendered export. It is not a Resource and not an arbitrary local file.
+
+Resources keep Artifact descriptors. The bytes are fetched lazily and stored in a managed, content-addressed cache:
+
+<Steps>
+  <Step>
+    Sync, search, or retrieval emits an Artifact descriptor without downloading every byte.
+  </Step>
+  <Step>
+    The first download asks the owning Source Adapter for the bytes and writes them to the managed cache.
+  </Step>
+  <Step>
+    Later downloads reuse cached bytes. Purging the cache removes bytes but leaves the descriptor available for refetch.
+  </Step>
+</Steps>
+
+Profile-declared exports are separate representations of a Resource. Their valid formats come from the Resource's Profile; JSON for the validated payload is always available.
+
+## Materializations are local and purgeable
+
+A **Materialization** is a local representation produced by Sync or ad-hoc access. It never transfers canonical ownership from the provider or filesystem.
+
+| Origin | Meaning |
+| --- | --- |
+| `synced` | Materialized by Sync and maintained through Source cursor state. Provider deletion becomes a tombstone. |
+| `adhoc` | Cached from remote search, retrieval, or an Action result. It may be evicted instead of tombstoned. |
+
+Syncing a Ref already present as `adhoc` upgrades the same Resource row to `synced`; it does not create a second identity.

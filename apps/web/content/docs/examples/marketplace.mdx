@@ -1,0 +1,48 @@
+---
+title: Local Git Catalog
+description: Discover and install trusted Extension versions from Git Catalogs.
+---
+
+<Callout>
+ctxindex does not operate a hosted marketplace. Catalog discovery, snapshots, installation records, and Extension loading all happen on the local machine.
+</Callout>
+
+Catalogs are explicitly added credential-free public HTTPS or absolute local Git repositories. Each Catalog is pinned to an immutable commit snapshot and contributes its entries to one merged local discovery surface.
+
+## Add and inspect a Catalog
+
+Adding a repository requires an explicit trust acknowledgement:
+
+```sh
+ctxindex extensions catalog add community https://example.com/ctxindex-catalog.git \
+  --ref refs/heads/main \
+  --trust \
+  --json
+
+ctxindex extensions catalog list --json
+ctxindex extensions catalog show community --json
+ctxindex extensions catalog show community example.extension@1.0.0 --json
+```
+
+`catalog list` and `catalog show` refresh configured repositories before reading them. If a refresh fails, the command reports the failure rather than silently using stale data. Pass `--no-refresh` when you intentionally want the persisted snapshot offline; output includes snapshot age when stored data is used.
+
+```sh
+ctxindex extensions catalog list --no-refresh --json
+ctxindex extensions catalog show community --no-refresh --json
+ctxindex extensions catalog refresh community --json
+```
+
+## Install and uninstall an Extension
+
+Installing code has a separate trust gate from adding its Catalog. The exact `<id>@<version>` selector is required:
+
+```sh
+ctxindex extensions install community example.extension@1.0.0 --trust --json
+ctxindex extensions list --json
+ctxindex describe --full --json
+ctxindex extensions uninstall example.extension@1.0.0 --json
+```
+
+Install refreshes its Catalog by default. Add `--no-refresh` to install from the stored snapshot. Startup, ordinary registry loading, `extensions list`, and uninstall do not fetch from Git.
+
+External Extension modules execute in-process with full trust. Catalog validation checks metadata and registry consistency; it does not sandbox the installed code or make a hosted service responsible for it. Remove an unused Catalog with `ctxindex extensions catalog remove community --json`.
