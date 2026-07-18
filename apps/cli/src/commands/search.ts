@@ -69,6 +69,10 @@ export const searchCommand = defineCommand({
     until: { type: 'string', description: 'End ISO date' },
     limit: { type: 'string', description: 'Result limit' },
     offset: { type: 'string', description: 'Local pagination offset' },
+    'include-deleted': {
+      type: 'boolean',
+      description: 'Include deleted local Resources',
+    },
     refs: { type: 'boolean', description: 'Print Resource Refs only' },
     'local-only': {
       type: 'boolean',

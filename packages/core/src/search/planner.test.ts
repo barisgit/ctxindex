@@ -567,6 +567,80 @@ describe('SearchPlanner', () => {
     }
   })
 
+  test('includes local tombstones only when requested and exposes their deletion time', async () => {
+    const db = await database()
+    addSource(db, ids.indexed, 'fake.indexed')
+    const store = new ResourceStore(db, registry.profiles)
+    store.upsert({
+      ref: `ctx://${ids.indexed}/item/active`,
+      sourceId: ids.indexed,
+      profile: { id: 'fake.item', version: 1 },
+      origin: 'synced',
+      completeness: 'complete',
+      occurredAt: 1000,
+      payload: { title: 'active' },
+    })
+    const deletedRef = `ctx://${ids.indexed}/item/deleted`
+    store.upsert({
+      ref: deletedRef,
+      sourceId: ids.indexed,
+      profile: { id: 'fake.item', version: 1 },
+      origin: 'synced',
+      completeness: 'complete',
+      occurredAt: 2000,
+      payload: { title: 'deleted' },
+    })
+    store.remove({ ref: deletedRef, sourceId: ids.indexed, deletedAt: 1234 })
+    const service = planner(db)
+    const filters = {
+      realms: ['work'],
+      sourceIds: [ids.indexed],
+      kind: 'item',
+    } as const
+
+    const ordinary = await service.search(filters)
+    expect(ordinary.results).toEqual([
+      expect.objectContaining({
+        ref: `ctx://${ids.indexed}/item/active`,
+      }),
+    ])
+    expect(ordinary.results[0]).not.toHaveProperty('deletedAt')
+
+    const included = await service.search({ ...filters, includeDeleted: true })
+    expect(included.results).toEqual([
+      expect.objectContaining({ ref: deletedRef, deletedAt: 1234 }),
+      expect.objectContaining({
+        ref: `ctx://${ids.indexed}/item/active`,
+      }),
+    ])
+    expect(included.results[1]).not.toHaveProperty('deletedAt')
+    expect(included.pagination).toEqual({
+      offset: 0,
+      limit: 20,
+      hasMore: false,
+    })
+
+    const includedWithoutOtherFilters = await service.search({
+      includeDeleted: true,
+    })
+    expect(includedWithoutOtherFilters.results).toEqual(included.results)
+
+    addSource(db, ids.federated, 'fake.federated')
+    const remote = await service.search({
+      text: 'remote',
+      sourceIds: [ids.federated],
+      remote: true,
+      includeDeleted: true,
+    })
+    expect(calls).toEqual([ids.federated])
+    expect(remote.results.every((result) => result.origin === 'provider')).toBe(
+      true,
+    )
+    expect(remote.results.every((result) => !('deletedAt' in result))).toBe(
+      true,
+    )
+  })
+
   test('paginates local execution deterministically with hasMore boundaries', async () => {
     const db = await database()
     addSource(db, ids.indexed, 'fake.indexed')

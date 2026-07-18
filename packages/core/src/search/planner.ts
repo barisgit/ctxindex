@@ -20,6 +20,7 @@ export interface SearchPlannerInput {
   readonly fields?: readonly LocalSearchFieldFilter[]
   readonly since?: number
   readonly until?: number
+  readonly includeDeleted?: boolean
   readonly localOnly?: boolean
   readonly remote?: boolean
   readonly explain?: boolean
@@ -36,6 +37,7 @@ export interface UnifiedSearchResult {
   readonly title: string | null
   readonly summary: string | null
   readonly occurredAt: number | null
+  readonly deletedAt?: number
   readonly chunks: readonly {
     readonly index: number
     readonly snippet: string
@@ -181,7 +183,8 @@ export class SearchPlanner {
       input.kind !== undefined ||
       (input.fields?.length ?? 0) > 0 ||
       input.since !== undefined ||
-      input.until !== undefined
+      input.until !== undefined ||
+      input.includeDeleted === true
     if (input.text === undefined) {
       if (!hasFilter) invalid('query text or at least one filter is required')
       if (input.remote)
@@ -230,6 +233,7 @@ export class SearchPlanner {
             ...(input.fields === undefined ? {} : { fields: input.fields }),
             ...(resolved.since === undefined ? {} : { since: resolved.since }),
             ...(resolved.until === undefined ? {} : { until: resolved.until }),
+            ...(input.includeDeleted ? { deleted: 'include' as const } : {}),
           })
     const hasMore = localExecution && localResults.length > limit
     const localUnified = (
@@ -485,6 +489,9 @@ export class SearchPlanner {
       title: result.envelope.title,
       summary: result.envelope.summary,
       occurredAt: result.envelope.occurredAt,
+      ...(result.envelope.deletedAt === null
+        ? {}
+        : { deletedAt: result.envelope.deletedAt }),
       chunks: result.chunks.map((chunk) => ({
         index: chunk.index,
         snippet: chunk.snippet,

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createSandbox } from '@ctxindex/core/testing'
 
@@ -115,6 +115,37 @@ test('binary CLI enumerates filter-only searches locally and paginates determini
       ...pageOne.results.map((result: { ref: string }) => result.ref),
       ...pageTwo.results.map((result: { ref: string }) => result.ref),
     ]).toEqual(allRefs)
+
+    await rename(join(root, 'a.txt'), join(root, 'renamed-a.txt'))
+    const resynced = await sandbox.run(
+      ['sync', '--source', sourceId, '--json'],
+      { env },
+    )
+    expect(resynced.exitCode, resynced.stderr).toBe(0)
+    const withDeleted = await sandbox.run(
+      ['search', '--include-deleted', '--json'],
+      { env },
+    )
+    expect(withDeleted.exitCode, withDeleted.stderr).toBe(0)
+    const includedResults = JSON.parse(withDeleted.stdout).results as Array<{
+      ref: string
+      deletedAt?: number
+    }>
+    expect(includedResults.map((result) => result.ref).sort()).toEqual(
+      ['a.txt', 'b.txt', 'c.txt', 'renamed-a.txt'].map(refOf).sort(),
+    )
+    expect(
+      includedResults.find((result) => result.ref === refOf('a.txt')),
+    ).toEqual(
+      expect.objectContaining({
+        deletedAt: expect.any(Number),
+      }),
+    )
+    expect(
+      includedResults
+        .filter((result) => result.ref !== refOf('a.txt'))
+        .every((result) => !('deletedAt' in result)),
+    ).toBe(true)
 
     const bare = await sandbox.run(['search'], { env })
     expect(bare.exitCode).toBe(2)
