@@ -16,6 +16,7 @@ export type SourceArgs =
       readonly configJson?: string
       readonly account?: string
       readonly searchRouting?: 'indexed' | 'federated' | 'hybrid'
+      readonly syncEnabled?: boolean
     }
   | {
       readonly kind: 'list'
@@ -28,7 +29,7 @@ export type SourceArgs =
   | { readonly kind: 'unknown'; readonly message: string }
 
 export const sourceUsage =
-  'source add <adapter-id> [--realm <slug>] [--label <label>] [--account <label|account-id|grant-id>] [--config-json <json>|--config-* <value>] [--search-routing indexed|federated|hybrid] | source list [--realm <slug>] [--format table|compact] [--json] | source remove <label|source-id>'
+  'source add <adapter-id> [--realm <slug>] [--label <label>] [--account <label|account-id|grant-id>] [--config-json <json>|--config-* <value>] [--search-routing indexed|federated|hybrid] [--no-sync] | source list [--realm <slug>] [--format table|compact] [--json] | source remove <label|source-id>'
 
 function parsePrimitive(value: string, type: string): unknown {
   if (type === 'json') {
@@ -124,8 +125,23 @@ export function parseSourceArgs(
   const valueFlags = sources.flatMap((source) =>
     source.configOptions.map((option) => option.flag.slice(2)),
   )
-  const { flags, positional } = parseFlags(rest, { valueFlags })
   if (subcommand === 'add') {
+    if (rest.some((arg) => arg.startsWith('--no-sync='))) {
+      return {
+        kind: 'unknown',
+        message: 'source add: --no-sync does not take a value',
+      }
+    }
+    if (rest.filter((arg) => arg === '--no-sync').length > 1) {
+      return {
+        kind: 'unknown',
+        message: 'source add: --no-sync cannot be repeated',
+      }
+    }
+    const { flags, positional } = parseFlags(rest, {
+      valueFlags,
+      booleanFlags: ['no-sync'],
+    })
     if (positional.length > 1)
       return {
         kind: 'unknown',
@@ -152,6 +168,7 @@ export function parseSourceArgs(
       'account',
       'config-json',
       'search-routing',
+      'no-sync',
       ...(source?.configOptions.map((option) => option.flag.slice(2)) ?? []),
     ])
     const unknown = Object.keys(flags).find((flag) => !allowed.has(flag))
@@ -161,7 +178,10 @@ export function parseSourceArgs(
         message: `source add: unknown option --${unknown}`,
       }
     const valueFlag = Object.entries(flags).find(
-      ([flag, value]) => allowed.has(flag) && (value === true || value === ''),
+      ([flag, value]) =>
+        flag !== 'no-sync' &&
+        allowed.has(flag) &&
+        (value === true || value === ''),
     )
     if (valueFlag)
       return {
@@ -212,8 +232,10 @@ export function parseSourceArgs(
       }
     }
     if (searchRouting) result = { ...result, searchRouting }
+    if (flags['no-sync'] === true) result = { ...result, syncEnabled: false }
     return result
   }
+  const { flags, positional } = parseFlags(rest, { valueFlags })
   if (subcommand === 'list') {
     if (positional.length > 0)
       return {

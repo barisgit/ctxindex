@@ -200,6 +200,38 @@ describe('source add generated Adapter config options', () => {
 })
 
 describe('source option validation', () => {
+  test('accepts one bare --no-sync flag', () => {
+    expect(
+      parseSourceArgs(
+        ['add', 'external.adapter', '--realm', 'work', '--no-sync'],
+        [externalSource],
+      ),
+    ).toEqual({
+      kind: 'add',
+      adapterId: 'external.adapter',
+      realmSlug: 'work',
+      syncEnabled: false,
+    })
+  })
+
+  test.each([
+    [['--no-sync=false'], '--no-sync does not take a value'],
+    [['--no-sync', '--no-sync'], '--no-sync cannot be repeated'],
+    [['--no-sync', 'false'], 'unexpected positional'],
+    [['--no_sync'], '--no_sync'],
+    [['--no-sync-extra'], '--no-sync-extra'],
+  ] as const)('rejects malformed no-sync argv %j', (suffix, message) => {
+    expect(
+      parseSourceArgs(
+        ['add', 'external.adapter', '--realm', 'work', ...suffix],
+        [externalSource],
+      ),
+    ).toMatchObject({
+      kind: 'unknown',
+      message: expect.stringContaining(message),
+    })
+  })
+
   test.each([
     [['add', 'external.adapter', '--root', '/tmp'], '--root'],
     [['add', 'external.adapter', '--path', '/tmp'], '--path'],

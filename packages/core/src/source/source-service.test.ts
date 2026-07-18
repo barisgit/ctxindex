@@ -255,6 +255,37 @@ afterEach(() => {
 })
 
 describe('source service', () => {
+  test('persists the requested Source sync policy and defaults to enabled', () => {
+    const realmService = createRealmService({ db, logger })
+    realmService.createRealm({ slug: 'work' })
+    const service = createSourceService({ db, logger, realmService, registry })
+
+    const defaulted = service.addSource({
+      adapterId: 'local.directory',
+      realmSlug: 'work',
+      label: 'defaulted',
+      configJson: '{"root_path":"/tmp/defaulted"}',
+    })
+    const disabled = service.addSource({
+      adapterId: 'local.directory',
+      realmSlug: 'work',
+      label: 'disabled',
+      configJson: '{"root_path":"/tmp/disabled"}',
+      syncEnabled: false,
+    })
+    const enabled = service.addSource({
+      adapterId: 'local.directory',
+      realmSlug: 'work',
+      label: 'enabled',
+      configJson: '{"root_path":"/tmp/enabled"}',
+      syncEnabled: true,
+    })
+
+    expect(service.findSourceById(defaulted.sourceId)?.sync_enabled).toBe(true)
+    expect(service.findSourceById(disabled.sourceId)?.sync_enabled).toBe(false)
+    expect(service.findSourceById(enabled.sourceId)?.sync_enabled).toBe(true)
+  })
+
   test('defaults Source labels verbatim and rejects global collisions', () => {
     const realmService = createRealmService({ db, logger })
     realmService.createRealm({ slug: 'work' })

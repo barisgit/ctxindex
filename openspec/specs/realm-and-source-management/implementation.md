@@ -74,6 +74,7 @@ export interface AddSourceInput {
   readonly configJson?: string
   readonly grantId?: string
   readonly searchRouting?: SearchRouting
+  readonly syncEnabled?: boolean
 }
 
 export interface AddSourceResult {
@@ -158,10 +159,10 @@ export function createSourceService(deps: SourceServiceDeps): SourceService;
 
 ## Implementation doctrine
 
-`@ctxindex/core` owns Realm rows and exact slug lookup plus Source creation, listing, status, removal, Adapter/config validation, Grant compatibility, and provider-context construction. Every Source stores one Adapter version, one Realm, one config payload, and an explicit Grant when required.
+`@ctxindex/core` owns Realm rows and exact slug lookup plus Source creation, listing, status, removal, Adapter/config validation, Grant compatibility, sync policy, and provider-context construction. Every Source stores one Adapter version, one Realm, one config payload, an explicit sync-enabled boolean, and an explicit Grant when required. Source creation writes the requested sync policy or true when omitted; public Source rows normalize the SQLite value to a boolean.
 
-Availability is derived by resolving the stored Adapter binding against the loaded registry, not from sync status. Provider contexts expose only Source metadata, scoped logger, and host-allowlisted authorized fetch. Core seeds no special Realm.
+Availability is derived by resolving the stored Adapter binding against the loaded registry, not from sync status. Provider contexts expose only Source metadata, scoped logger, and host-allowlisted authorized fetch. The CLI validates generic Source flags before opening state and maps stored snake-case fields to camel-case JSON, including `syncEnabled`. Core seeds no special Realm.
 
 ## Verification
 
-Realm/Source service tests cover exact lookup, labels, config validation, Grant compatibility, availability, removal, and status. Provider-context tests cover host allowlists, token use, retry policy, and redaction; CLI tests cover registry-derived Source arguments.
+Realm/Source service tests cover exact lookup, labels, config validation, Grant compatibility, sync policy persistence/defaulting, availability, removal, and status. Provider-context tests cover host allowlists, token use, retry policy, and redaction; CLI tests cover registry-derived Source arguments, strict generic flag parsing, delegation, and JSON inventory.

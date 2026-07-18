@@ -63,6 +63,9 @@ export async function handleSourceCommand(args: string[]): Promise<number> {
         ...(parsed.searchRouting
           ? { searchRouting: parsed.searchRouting }
           : {}),
+        ...(parsed.syncEnabled !== undefined
+          ? { syncEnabled: parsed.syncEnabled }
+          : {}),
       })
       console.log(formatSourceAdded(sourceId))
     } else if (parsed.kind === 'list') {
