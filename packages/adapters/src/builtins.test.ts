@@ -34,7 +34,15 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
     expect(design).toContain(
       'V1 uses one primary Profile plus Artifact descriptors per Resource',
     )
-    expect(design).not.toMatch(/communication\.conversation|`mbox`|`ics`/)
+    const bundledProfileLine = design
+      .split('\n')
+      .find((line) =>
+        line.startsWith('Canonical Profiles bundled with the binary:'),
+      )
+    expect(bundledProfileLine).toBeDefined()
+    expect(bundledProfileLine).not.toMatch(
+      /communication\.conversation|`task`|`artifact`|`mbox`|`ics`/,
+    )
   })
 
   test('describes declarative Google, Microsoft, and local Source definitions', () => {
