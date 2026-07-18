@@ -1,4 +1,5 @@
 import { CTXINDEX_BUILTIN_EXTENSIONS } from '@ctxindex/adapters'
+import { CatalogStore } from '@ctxindex/core/catalog'
 import { type CtxindexConfig, getEnv, readConfig } from '@ctxindex/core/config'
 import {
   type LoadExtensionsResult,
@@ -16,9 +17,11 @@ export interface CliDefinitions extends LoadExtensionsResult {
 
 export async function loadCliDefinitions(): Promise<CliDefinitions> {
   const config = await readConfig()
+  const installed = await new CatalogStore().readInstalled()
   const loaded = await loadExtensions({
     config,
     builtins: CTXINDEX_BUILTIN_EXTENSIONS,
+    installed,
   })
   return { ...loaded, config, description: describeRegistry(loaded.registry) }
 }

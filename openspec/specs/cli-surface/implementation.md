@@ -205,8 +205,50 @@ export function parseExportArgs(args: string[]): ExportArgs;
 ### @ctxindex/cli — Extension arguments
 
 ```ts
+export interface ExtensionSelector {
+  readonly id: string
+  readonly version: number
+}
+
 export type ExtensionsArgs =
   | { readonly kind: 'list'; readonly json: boolean }
+  | {
+      readonly kind: 'catalog-add'
+      readonly name: string
+      readonly repository: string
+      readonly ref: string
+      readonly trust: true
+      readonly json: boolean
+    }
+  | { readonly kind: 'catalog-list'; readonly json: boolean }
+  | {
+      readonly kind: 'catalog-show'
+      readonly name: string
+      readonly extension?: ExtensionSelector
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'catalog-refresh'
+      readonly name: string
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'catalog-remove'
+      readonly name: string
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'install'
+      readonly catalog: string
+      readonly extension: ExtensionSelector
+      readonly trust: true
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'uninstall'
+      readonly extension: ExtensionSelector
+      readonly json: boolean
+    }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
 
@@ -390,6 +432,8 @@ export function parsePurgeArtifactsArgs(args: string[]): PurgeArtifactsArgs;
 
 Parser unions are the command boundary. Registry-derived Source config, fields, kinds, exports, and Actions are resolved before service calls rather than duplicated as provider branches. Structured output writes data to stdout and human diagnostics to stderr; credential values and secret-store passphrases never enter argv.
 
+The Extension command adapter delegates repository, manifest, persistence, and install behavior to `CatalogService`. Its parser owns only the closed nested command grammar, exact selectors, and required independent trust flags; pure formatters render Catalog records and loaded origin provenance. Only add/refresh can cross the Git acquisition boundary because no other CLI path calls that core effect.
+
 ## Verification
 
-Argument tests cover every discriminated parser and invalid form. Command tests inject dependency/service interfaces. CLI e2e tests cover readable/JSON stream separation, stable exits, registry-derived help/describe behavior, bundled skills, and relocated compiled execution.
+Argument tests cover every discriminated parser and invalid form. Command tests inject dependency/service interfaces. CLI e2e tests cover readable/JSON stream separation, stable exits, registry-derived help/describe behavior, bundled skills, local Catalog trust and offline behavior, and relocated compiled execution.

@@ -14,7 +14,7 @@ Packages the Bun-executed `ctxindex` command-line application, from its executab
 
 1. Bun starts `apps/cli/bin/ctxindex.mjs` with process argv.
 2. The shim calls `apps/cli/src/main.ts#runCli(process.argv.slice(2))`.
-3. `runCli` dispatches through the command tree; handlers parse arguments, load dependencies and definitions, invoke core behavior, and format output. `client` imports declared environment credentials once, `account` performs consent with a persisted client, and labeled Sources bind the resulting stable Grant. `init` asks core to select a backend only for a fresh config, while `secrets status` and `secrets backend set` use focused secret dependencies.
+3. `runCli` dispatches through the command tree; handlers parse arguments, load dependencies and definitions, invoke core behavior, and format output. `extensions catalog` delegates explicit Git acquisition and offline install provenance to core. `client` imports declared environment credentials once, `account` performs consent with a persisted client, and labeled Sources bind the resulting stable Grant. `init` asks core to select a backend only for a fresh config, while `secrets status` and `secrets backend set` use focused secret dependencies.
 4. The returned numeric status is assigned to `process.exitCode` by the shim.
 
 ## Integration points

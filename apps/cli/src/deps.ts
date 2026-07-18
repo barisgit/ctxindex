@@ -5,6 +5,7 @@ import {
 } from '@ctxindex/core/account'
 import { ArtifactService } from '@ctxindex/core/artifact'
 import { type AuthService, createAuthService } from '@ctxindex/core/auth'
+import { CatalogStore } from '@ctxindex/core/catalog'
 import {
   createOAuthClientService,
   type OAuthClientService,
@@ -118,8 +119,13 @@ export async function loadAuthDefinitionDeps(): Promise<{
   readonly registry: ExtensionRegistry
 }> {
   const config = await readConfig()
+  const installed = await new CatalogStore().readInstalled()
   const registry = (
-    await loadExtensions({ config, builtins: CTXINDEX_BUILTIN_EXTENSIONS })
+    await loadExtensions({
+      config,
+      builtins: CTXINDEX_BUILTIN_EXTENSIONS,
+      installed,
+    })
   ).registry
   return { config, registry }
 }
@@ -133,6 +139,7 @@ export async function openDeps(
   const db = await getDb()
   const log = await createLogger(cliLogLevel ? { level: cliLogLevel } : {})
   const config = opts.config ?? (await readConfig())
+  const installed = await new CatalogStore().readInstalled()
   const realmService = createRealmService({ db, logger: log })
   const registry =
     opts.registry ??
@@ -140,6 +147,7 @@ export async function openDeps(
       await loadExtensions({
         config,
         builtins: CTXINDEX_BUILTIN_EXTENSIONS,
+        installed,
       })
     ).registry
   const threadService = createThreadService({ db, profiles: registry.profiles })

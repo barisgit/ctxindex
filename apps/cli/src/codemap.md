@@ -10,6 +10,7 @@ Implements the CLI application layer: registers the citty command tree, parses a
 - `args/` is pure parsing, `commands/` is the thin citty adapter layer, workflow folders own multi-step orchestration, and `format/` owns presentation and exit mapping.
 - `deps.ts` constructs one shared secret runtime and wires `OAuthClientService`, `AuthService`, `AccountService`, `SourceService`, registry, and provider-operation services.
 - `definitions.ts` loads configured Extensions; `describe` and generated Source options derive runtime truth from those registries.
+- `extensions/` exposes explicit trusted Git Catalog lifecycle commands while core owns acquisition, persistence, and install behavior; `definitions.ts` includes offline installed provenance in registry loading.
 
 ## Data & control flow
 
@@ -17,9 +18,9 @@ Implements the CLI application layer: registers the citty command tree, parses a
 2. `client add --from-env` validates a loaded OAuth provider before reading declared environment names, then persists typed secret refs and metadata.
 3. `account add` resolves one persisted same-provider client, requests all loaded same-provider Adapter scopes, and creates or updates one stable Grant; `account remove` clears bound Source grants and deletes Account/Grant state.
 4. `source` commands accept required global labels; sync, status, search, Action, and removal accept a Source label or ID and resolve the stable ID before core execution.
-5. Results flow through `format/`; failures flow through `mapErrorToExit` / `runWithExit`.
+5. Catalog add/refresh are the only Extension commands that acquire Git snapshots; install/list/startup operate from persisted offline provenance. Results flow through `format/`; failures flow through `mapErrorToExit` / `runWithExit`.
 
 ## Integration points
 
 - Executed by `apps/cli/bin/ctxindex.mjs` and consumes public `@ctxindex/core/*` seams plus built-in Extensions.
-- Submaps: `account/`, `action/`, `args/`, `artifact/`, `client/`, `commands/`, `format/`, `skills/`, `source/`, and `sync/`.
+- Submaps: `account/`, `action/`, `args/`, `artifact/`, `client/`, `commands/`, `extensions/`, `format/`, `skills/`, `source/`, and `sync/`.

@@ -1,10 +1,13 @@
 import { Database } from 'bun:sqlite'
 import { afterEach, describe, expect, test } from 'bun:test'
-import { resolve } from 'node:path'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
 import { defineAdapter, defineExtension } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
+import { catalogSnapshotPath, type InstalledExtensionRecord } from '../catalog'
 import { defaultConfig } from '../config'
 import { runMigrations } from '../storage'
+import { createSandbox } from '../testing'
 import { loadExtensions } from './loader'
 
 const databases: Database[] = []
@@ -175,5 +178,170 @@ describe('loadExtensions', () => {
     ).rejects.toThrow(
       'loadExtensions requires an explicit complete builtins list',
     )
+  })
+
+  test('loads exact installed Catalog provenance offline', async () => {
+    const sandbox = await createSandbox()
+    try {
+      const commit = 'a'.repeat(40)
+      const snapshot = catalogSnapshotPath(
+        sandbox.env.CTXINDEX_DATA_HOME,
+        'fixture',
+        commit,
+      )
+      await mkdir(snapshot, { recursive: true })
+      await writeFile(
+        join(snapshot, 'extension.ts'),
+        `export default ({ defineExtension }) => defineExtension({ id: 'fixture.installed', version: 1, profiles: [], adapters: [] })\n`,
+      )
+      await writeFile(
+        join(snapshot, 'ctxindex-catalog.json'),
+        JSON.stringify({
+          schemaVersion: 1,
+          catalog: { id: 'fixture.catalog', name: 'Fixture' },
+          extensions: [
+            {
+              id: 'fixture.installed',
+              version: 1,
+              source: { kind: 'inline', path: 'extension.ts' },
+            },
+          ],
+        }),
+      )
+      const installed: InstalledExtensionRecord = {
+        id: 'fixture.installed',
+        version: 1,
+        catalog_name: 'fixture',
+        catalog_id: 'fixture.catalog',
+        repository: '/local/catalog.git',
+        commit,
+        source_path: 'extension.ts',
+      }
+
+      const result = await loadExtensions({
+        config: defaultConfig(),
+        builtins: [],
+        installed: [installed],
+        dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
+      })
+
+      expect(result.registry.list().map(({ id }) => id)).toEqual([
+        'fixture.installed',
+      ])
+      expect(result.diagnostics).toEqual([])
+      expect(result.provenance).toEqual([
+        {
+          id: 'fixture.installed',
+          version: 1,
+          kind: 'catalog',
+          catalog: 'fixture',
+          catalogId: 'fixture.catalog',
+          repository: '/local/catalog.git',
+          commit,
+          sourcePath: 'extension.ts',
+        },
+      ])
+    } finally {
+      await sandbox.cleanup()
+    }
+  })
+
+  test('keeps built-ins active when an installed Catalog identity conflicts', async () => {
+    const sandbox = await createSandbox()
+    try {
+      const commit = 'c'.repeat(40)
+      const snapshot = catalogSnapshotPath(
+        sandbox.env.CTXINDEX_DATA_HOME,
+        'fixture',
+        commit,
+      )
+      await mkdir(snapshot, { recursive: true })
+      await writeFile(
+        join(snapshot, 'extension.ts'),
+        `export default ({ defineExtension }) => defineExtension({ id: 'fixture.builtin', version: 1, profiles: [], adapters: [] })\n`,
+      )
+      await writeFile(
+        join(snapshot, 'ctxindex-catalog.json'),
+        JSON.stringify({
+          schemaVersion: 1,
+          catalog: { id: 'fixture.catalog', name: 'Fixture' },
+          extensions: [
+            {
+              id: 'fixture.builtin',
+              version: 1,
+              source: { kind: 'inline', path: 'extension.ts' },
+            },
+          ],
+        }),
+      )
+      const builtin = defineExtension({
+        id: 'fixture.builtin',
+        version: 1,
+        profiles: [],
+        adapters: [],
+      })
+
+      const result = await loadExtensions({
+        config: defaultConfig(),
+        builtins: [builtin],
+        installed: [
+          {
+            id: 'fixture.builtin',
+            version: 1,
+            catalog_name: 'fixture',
+            catalog_id: 'fixture.catalog',
+            repository: '/local/catalog.git',
+            commit,
+            source_path: 'extension.ts',
+          },
+        ],
+        dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
+      })
+
+      expect(result.registry.list()).toEqual([builtin])
+      expect(result.provenance).toEqual([
+        { id: 'fixture.builtin', version: 1, kind: 'builtin' },
+      ])
+      expect(result.diagnostics).toEqual([
+        {
+          path: join(snapshot, 'extension.ts'),
+          message: 'Duplicate Extension fixture.builtin@1',
+        },
+      ])
+    } finally {
+      await sandbox.cleanup()
+    }
+  })
+
+  test('reports missing installed snapshots without fetching or activating', async () => {
+    const sandbox = await createSandbox()
+    try {
+      const commit = 'b'.repeat(40)
+      const result = await loadExtensions({
+        config: defaultConfig(),
+        builtins: [],
+        installed: [
+          {
+            id: 'fixture.missing',
+            version: 1,
+            catalog_name: 'missing',
+            catalog_id: 'missing.catalog',
+            repository: 'https://example.invalid/catalog.git',
+            commit,
+            source_path: 'extension.ts',
+          },
+        ],
+        dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
+      })
+
+      expect(result.registry.list()).toEqual([])
+      expect(result.provenance).toEqual([])
+      expect(result.diagnostics).toHaveLength(1)
+      expect(result.diagnostics[0]?.message).toContain(
+        'missing ctxindex-catalog.json',
+      )
+    } finally {
+      await sandbox.cleanup()
+    }
   })
 })
