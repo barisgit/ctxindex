@@ -49,7 +49,12 @@ export interface MockGoogleCalendarServer {
   upsertEvent(calendarId: string, event: MockGoogleCalendarEvent): void
   cancelEvent(calendarId: string, eventId: string): void
   expireNextSyncToken(calendarId: string): void
+  invalidateNextSyncTokenPermanently(calendarId: string): void
   stop(): void
+}
+
+export interface MockGoogleCalendarOptions {
+  readonly pageSize?: number
 }
 
 interface CalendarState {
@@ -60,6 +65,8 @@ interface CalendarState {
   }[]
   revision: number
   expireNextToken: boolean
+  invalidateNextTokenPermanently: boolean
+  readonly invalidSyncTokens: Set<string>
 }
 
 function cloneEvent(event: MockGoogleCalendarEvent): MockGoogleCalendarEvent {
@@ -114,6 +121,7 @@ function sortedEvents(
 
 export function startMockGoogleCalendar(
   initial: Readonly<Record<string, readonly MockGoogleCalendarEvent[]>> = {},
+  options: MockGoogleCalendarOptions = {},
 ): MockGoogleCalendarServer {
   const calendars = new Map<string, CalendarState>()
   const requests: MockGoogleCalendarRequest[] = []
@@ -126,6 +134,8 @@ export function startMockGoogleCalendar(
         changes: [],
         revision: 0,
         expireNextToken: false,
+        invalidateNextTokenPermanently: false,
+        invalidSyncTokens: new Set(),
       }
       calendars.set(calendarId, state)
     }
@@ -141,6 +151,8 @@ export function startMockGoogleCalendar(
     state.changes.length = 0
     state.revision = 0
     state.expireNextToken = false
+    state.invalidateNextTokenPermanently = false
+    state.invalidSyncTokens.clear()
     for (const event of events) state.events.set(event.id, cloneEvent(event))
   }
 
@@ -181,7 +193,40 @@ export function startMockGoogleCalendar(
       }
 
       const syncToken = url.searchParams.get('syncToken')
+      const pageToken = url.searchParams.get('pageToken')
+      const pageIndex = pageToken === null ? 0 : Number(pageToken)
+      const pageSize = options.pageSize
+      if (
+        !Number.isInteger(pageIndex) ||
+        pageIndex < 0 ||
+        (pageSize !== undefined && pageSize < 1)
+      ) {
+        return Response.json({ error: 'invalid_page_token' }, { status: 400 })
+      }
+      const page = (items: readonly MockGoogleCalendarEvent[]) => {
+        if (pageSize === undefined) {
+          return { items, nextSyncToken: `sync-${state.revision}` }
+        }
+        const offset = pageIndex * pageSize
+        const selected = items.slice(offset, offset + pageSize)
+        return {
+          items: selected,
+          ...(offset + pageSize < items.length
+            ? { nextPageToken: String(pageIndex + 1) }
+            : { nextSyncToken: `sync-${state.revision}` }),
+        }
+      }
       if (syncToken !== null) {
+        if (state.invalidateNextTokenPermanently) {
+          state.invalidateNextTokenPermanently = false
+          state.invalidSyncTokens.add(syncToken)
+        }
+        if (state.invalidSyncTokens.has(syncToken)) {
+          return Response.json(
+            { error: { errors: [{ reason: 'fullSyncRequired' }] } },
+            { status: 410 },
+          )
+        }
         if (state.expireNextToken) {
           state.expireNextToken = false
           return Response.json(
@@ -202,18 +247,16 @@ export function startMockGoogleCalendar(
             latest.set(change.event.id, change.event)
           }
         }
-        return Response.json({
-          items: sortedEvents(latest.values()),
-          nextSyncToken: `sync-${state.revision}`,
-        })
+        return Response.json(page(sortedEvents(latest.values())))
       }
 
-      return Response.json({
-        items: sortedEvents(state.events.values()).filter((event) =>
-          inWindow(event, url),
+      return Response.json(
+        page(
+          sortedEvents(state.events.values()).filter((event) =>
+            inWindow(event, url),
+          ),
         ),
-        nextSyncToken: `sync-${state.revision}`,
-      })
+      )
     },
   })
 
@@ -253,6 +296,9 @@ export function startMockGoogleCalendar(
     },
     expireNextSyncToken(calendarId) {
       stateFor(calendarId).expireNextToken = true
+    },
+    invalidateNextSyncTokenPermanently(calendarId) {
+      stateFor(calendarId).invalidateNextTokenPermanently = true
     },
     stop() {
       server.stop(true)
