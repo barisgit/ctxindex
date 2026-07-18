@@ -8,7 +8,7 @@ Owns the shared Microsoft identity and Graph transport layer plus the Microsoft 
 
 - `provider.ts` declares the provider-neutral `microsoftOAuthProvider` once for reuse by Microsoft Adapters: the `common` v2 OAuth endpoints support personal and organizational Accounts, PKCE is mandatory, the public client has no secret, and Graph `/me` supplies subject, label, email, and principal identities.
 - Provider policy centralizes base scopes, fixed account-selection prompting, the add-time `CTXINDEX_MICROSOFT_CLIENT_ID` key, and the only allowed OAuth/identity hosts; refresh tokens are persisted with Grants rather than declared as environment input.
-- `transport.ts` is the provider-root Graph boundary shared by both child Adapters: canonical v1.0/mock URL construction, immutable-ID/text-body preferences, JSON and HTTP error translation with retry metadata, and same-origin/path validation for opaque continuation links.
+- `transport.ts` is the provider-root Graph boundary shared by both child Adapters: canonical v1.0/mock URL construction, immutable-ID/text-body preferences, bounded JSON and HTTP error translation with retry metadata plus redacted provider diagnostics, and same-origin/path validation for opaque continuation links.
 - `calendar/` implements indexed read-only event sync/retrieval against the `calendar.event@1` Profile; `mailbox/` implements federated Outlook message operations and reversible standalone or threaded-reply Draft Actions. See their child codemaps.
 
 ## Data & control flow

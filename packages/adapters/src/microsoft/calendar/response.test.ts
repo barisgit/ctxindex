@@ -90,4 +90,43 @@ describe('Microsoft Calendar Graph pages', () => {
       ),
     ).rejects.toMatchObject({ name: 'MicrosoftCalendarDeltaExpiredError' })
   })
+
+  test('bounds oversized delta-expiry error bodies before inspecting their code', async () => {
+    const bytes = new TextEncoder().encode(
+      JSON.stringify({
+        error: {
+          code: 'SyncStateNotFound',
+          message: 'private provider detail '.repeat(4_096),
+        },
+      }),
+    )
+    let offset = 0
+    let pulls = 0
+    let cancelled = false
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1
+        if (offset >= bytes.byteLength) {
+          controller.close()
+          return
+        }
+        const next = bytes.slice(offset, offset + 1_024)
+        offset += next.byteLength
+        controller.enqueue(next)
+      },
+      cancel() {
+        cancelled = true
+      },
+    })
+
+    await expect(
+      microsoftCalendarPage(
+        new Response(body, { status: 400 }),
+        'delta',
+        '/v1.0/me/calendarView/delta',
+      ),
+    ).rejects.toMatchObject({ code: 'provider_bad_response' })
+    expect(cancelled).toBe(true)
+    expect(pulls).toBeLessThanOrEqual(18)
+  })
 })

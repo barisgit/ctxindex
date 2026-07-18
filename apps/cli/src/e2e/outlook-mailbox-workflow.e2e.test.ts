@@ -8,6 +8,7 @@ import { installLoopbackBrowser } from './_oauth-account'
 
 const createDraftActionId = 'communication.message.draft.create'
 const updateDraftActionId = 'communication.message.draft.update'
+const syntheticReplyId = `${'R'.repeat(143)}=`
 
 function parseSourceId(stdout: string): string {
   const match = /^source added: (.+)$/m.exec(stdout)
@@ -63,7 +64,7 @@ const messages: readonly MockGraphMessage[] = [
     categories: ['Inbox'],
   },
   {
-    id: 'outlook-reply',
+    id: syntheticReplyId,
     conversationId: 'conversation-1',
     internetMessageId: '<outlook-reply@example.test>',
     inReplyTo: '<outlook-root@example.test>',
@@ -81,6 +82,7 @@ const messages: readonly MockGraphMessage[] = [
         name: 'report.txt',
         contentType: 'text/plain',
         bytes: new TextEncoder().encode('exact outlook bytes\n'),
+        reportedSize: 24,
       },
       {
         id: 'forwarded-1',
@@ -224,7 +226,8 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
 
     const authority = workSourceId.toUpperCase()
     const rootRef = `ctx://${authority}/message/outlook-root`
-    const replyRef = `ctx://${authority}/message/outlook-reply`
+    const replyRef = `ctx://${authority}/message/${encodeURIComponent(syntheticReplyId)}`
+    expect(searchJson.results.map(({ ref }) => ref)).toContain(replyRef)
     graph.setMessages(
       messages.map((message) =>
         message.id === 'outlook-root'
@@ -238,10 +241,10 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
     )
     expect(moved.exitCode, moved.stderr).toBe(0)
     expect(
-      (JSON.parse(moved.stdout) as { results: { ref: string }[] }).results.some(
-        ({ ref }) => ref === rootRef,
+      (JSON.parse(moved.stdout) as { results: { ref: string }[] }).results.map(
+        ({ ref }) => ref,
       ),
-    ).toBe(true)
+    ).toEqual(expect.arrayContaining([rootRef, replyRef]))
 
     const thread = await sandbox.run(['thread', 'get', replyRef, '--json'], {
       env,
@@ -286,11 +289,45 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
       graph
         .readRequests()
         .some(({ pathname, prefer }) =>
-          pathname.endsWith('/messages/outlook-reply')
+          pathname.endsWith(`/messages/${encodeURIComponent(syntheticReplyId)}`)
             ? prefer?.includes('outlook.body-content-type="text"')
             : false,
         ),
     ).toBe(true)
+    const attachmentRequests = graph
+      .readRequests()
+      .filter(({ pathname }) => pathname.endsWith('/attachments'))
+    expect(attachmentRequests).toHaveLength(2)
+    expect(
+      attachmentRequests.every(
+        ({ search }) =>
+          new URLSearchParams(search).get('$select') ===
+          'id,name,contentType,isInline',
+      ),
+    ).toBe(true)
+    expect(
+      attachmentRequests.map(({ search }) =>
+        new URLSearchParams(search).get('$skiptoken'),
+      ),
+    ).toEqual([null, '1'])
+
+    const requestsBeforeArtifactList = graph.readRequests().length
+    const listed = await sandbox.run(['artifact', 'list', replyRef, '--json'], {
+      env,
+    })
+    expect(listed.exitCode, listed.stderr).toBe(0)
+    expect(JSON.parse(listed.stdout)).toEqual({
+      resourceRef: replyRef,
+      artifacts: [
+        {
+          ref: artifactRef,
+          filename: 'report.txt',
+          mediaType: 'text/plain',
+        },
+      ],
+      warnings: [],
+    })
+    expect(graph.readRequests()).toHaveLength(requestsBeforeArtifactList)
 
     const getRequests = graph.readRequests().length
     const cached = await sandbox.run(['get', replyRef, '--json'], { env })
@@ -337,7 +374,7 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
     })
     expect(json.exitCode, json.stderr).toBe(0)
     expect(JSON.parse(json.stdout)).toMatchObject({
-      providerMessageId: 'outlook-reply',
+      providerMessageId: syntheticReplyId,
       bodyText: 'The complete reply body.',
     })
     expect(graph.readRequests()).toHaveLength(beforeExports)

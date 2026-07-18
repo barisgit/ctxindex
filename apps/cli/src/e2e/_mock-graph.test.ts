@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'bun:test'
 import {
   type MockGraphCalendarEvent,
+  type MockGraphMessage,
   type MockGraphServer,
   startMockGraph,
 } from './_mock-graph'
@@ -39,6 +40,68 @@ async function calendarGet(url: string): Promise<Response> {
     },
   })
 }
+
+test('Microsoft mock rejects annotation selection and pages attachments', async () => {
+  const messageId = `${'M'.repeat(143)}=`
+  const message: MockGraphMessage = {
+    id: messageId,
+    conversationId: 'synthetic-conversation',
+    internetMessageId: '<synthetic@example.test>',
+    subject: 'Synthetic attachment replay',
+    bodyPreview: 'Synthetic preview',
+    body: 'Synthetic body',
+    from: { address: 'sender@example.test' },
+    to: [{ address: 'recipient@example.test' }],
+    receivedDateTime: '2026-07-18T10:00:00Z',
+    lastModifiedDateTime: '2026-07-18T10:00:00Z',
+    attachments: [
+      {
+        id: 'file-1',
+        name: 'first.txt',
+        contentType: 'text/plain',
+        bytes: new TextEncoder().encode('first'),
+      },
+      {
+        id: 'file-2',
+        name: 'second.txt',
+        contentType: 'text/plain',
+        bytes: new TextEncoder().encode('second'),
+      },
+    ],
+  }
+  const server = startMockGraph({ messages: [message] })
+  servers.push(server)
+  const route = `${server.baseUrl}/v1.0/me/messages/${encodeURIComponent(messageId)}/attachments`
+  const headers = { prefer: 'IdType="ImmutableId"' }
+
+  const rejected = await fetch(
+    `${route}?$select=id,name,contentType,size,isInline,@odata.type`,
+    { headers },
+  )
+  expect(rejected.status).toBe(400)
+  expect(await rejected.json()).toMatchObject({
+    error: { code: 'BadRequest' },
+  })
+
+  const firstResponse = await fetch(
+    `${route}?$select=id,name,contentType,size,isInline`,
+    { headers },
+  )
+  expect(firstResponse.status).toBe(200)
+  const first = (await firstResponse.json()) as {
+    value: Array<{ id: string }>
+    '@odata.nextLink': string
+  }
+  expect(first.value.map(({ id }) => id)).toEqual(['file-1'])
+  const second = (await (
+    await fetch(first['@odata.nextLink'], { headers })
+  ).json()) as {
+    value: Array<{ id: string }>
+    '@odata.nextLink'?: string
+  }
+  expect(second.value.map(({ id }) => id)).toEqual(['file-2'])
+  expect(second['@odata.nextLink']).toBeUndefined()
+})
 
 test('Microsoft mock pages default delta and named scans with stateful changes and expiry', async () => {
   const server = startMockGraph({

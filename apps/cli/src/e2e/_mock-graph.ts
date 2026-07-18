@@ -26,6 +26,7 @@ export interface MockGraphAttachment {
   readonly name: string
   readonly contentType: string
   readonly bytes: Uint8Array
+  readonly reportedSize?: number
   readonly kind?: 'file' | 'item' | 'reference'
   readonly isInline?: boolean
 }
@@ -195,7 +196,7 @@ function attachmentMetadata(attachment: MockGraphAttachment) {
     id: attachment.id,
     name: attachment.name,
     contentType: attachment.contentType,
-    size: attachment.bytes.byteLength,
+    size: attachment.reportedSize ?? attachment.bytes.byteLength,
     isInline: attachment.isInline ?? false,
   }
 }
@@ -719,14 +720,51 @@ export function startMockGraph(
         /^\/v1\.0\/me\/messages\/([^/]+)\/attachments$/,
       )
       if (attachmentList?.[1]) {
+        if (
+          url.searchParams
+            .get('$select')
+            ?.split(',')
+            .some((field) => field.trim() === '@odata.type')
+        )
+          return Response.json(
+            {
+              error: {
+                code: 'BadRequest',
+                message:
+                  "Parsing OData Select and Expand failed: Term '@odata.type' is not valid in a $select or $expand expression.",
+                innerError: {
+                  'request-id': 'synthetic-request-id',
+                  'client-request-id': 'synthetic-client-request-id',
+                },
+              },
+            },
+            {
+              status: 400,
+              headers: {
+                'request-id': 'synthetic-request-id',
+                'client-request-id': 'synthetic-client-request-id',
+              },
+            },
+          )
         const message = messages.find(
           (candidate) =>
             candidate.id === decodeURIComponent(attachmentList[1] ?? ''),
         )
         if (!message)
           return Response.json({ error: 'not_found' }, { status: 404 })
+        const token = url.searchParams.get('$skiptoken')
+        if (token !== null && !/^\d+$/.test(token))
+          return Response.json({ error: 'invalid_skiptoken' }, { status: 400 })
+        const offset = token === null ? 0 : Number(token)
+        const attachments = message.attachments ?? []
+        const nextOffset = offset + 1
+        const nextLink = new URL(url)
+        nextLink.searchParams.set('$skiptoken', String(nextOffset))
         return Response.json({
-          value: (message.attachments ?? []).map(attachmentMetadata),
+          value: attachments.slice(offset, nextOffset).map(attachmentMetadata),
+          ...(nextOffset < attachments.length
+            ? { '@odata.nextLink': nextLink.toString() }
+            : {}),
         })
       }
 

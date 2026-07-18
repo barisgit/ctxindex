@@ -2,7 +2,7 @@ import { CtxindexSyncError } from '@ctxindex/core/errors'
 import { z } from 'zod'
 import {
   graphJson,
-  graphResponseError,
+  graphResponseFailure,
   validateGraphOpaqueLink,
 } from '../transport'
 
@@ -19,30 +19,24 @@ export interface MicrosoftCalendarPage {
   readonly deltaLink?: string
 }
 
-async function expired(response: Response): Promise<boolean> {
-  if (response.status === 410) return true
-  if (response.status < 400 || response.status >= 500) return false
-  try {
-    const body = (await response.clone().json()) as {
-      error?: { code?: unknown }
-    }
-    const code = body.error?.code
-    return (
-      typeof code === 'string' &&
-      ['syncstatenotfound', 'resyncrequired'].includes(code.toLowerCase())
-    )
-  } catch {
-    return false
-  }
-}
 export async function microsoftCalendarPage(
   response: Response,
   strategy: MicrosoftCalendarStrategy,
   routePath: string,
 ): Promise<MicrosoftCalendarPage> {
   if (!response.ok) {
-    if (await expired(response)) throw new MicrosoftCalendarDeltaExpiredError()
-    throw graphResponseError(response)
+    if (response.status === 410) throw new MicrosoftCalendarDeltaExpiredError()
+    const failure = await graphResponseFailure(response)
+    if (
+      response.status >= 400 &&
+      response.status < 500 &&
+      failure.code &&
+      ['syncstatenotfound', 'resyncrequired'].includes(
+        failure.code.toLowerCase(),
+      )
+    )
+      throw new MicrosoftCalendarDeltaExpiredError()
+    throw failure.error
   }
   const body = await graphJson(response)
   const parsed = z

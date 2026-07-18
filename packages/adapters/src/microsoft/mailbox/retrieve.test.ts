@@ -54,7 +54,7 @@ function graphMessage() {
 }
 
 describe('Microsoft mailbox retrieve', () => {
-  test('retrieves complete text message and paged file attachment descriptors', async () => {
+  test('retrieves complete messages without treating approximate Graph attachment size as exact', async () => {
     const requests: Request[] = []
     const resources: RetrievedResource[] = []
     const artifacts: ArtifactDescriptor[] = []
@@ -162,13 +162,11 @@ describe('Microsoft mailbox retrieve', () => {
               ref: `${ref}/attachment/attachment%2F1`,
               filename: 'report.txt',
               mediaType: 'text/plain',
-              byteSize: 4,
             },
             {
               ref: `${ref}/attachment/inline-1`,
               filename: 'pixel.png',
               mediaType: 'image/png',
-              byteSize: 2,
             },
           ],
         }),
@@ -179,13 +177,11 @@ describe('Microsoft mailbox retrieve', () => {
         ref: `${ref}/attachment/attachment%2F1`,
         filename: 'report.txt',
         mediaType: 'text/plain',
-        byteSize: 4,
       },
       {
         ref: `${ref}/attachment/inline-1`,
         filename: 'pixel.png',
         mediaType: 'image/png',
-        byteSize: 2,
       },
     ])
     expect(warnings).toEqual([
@@ -243,6 +239,78 @@ describe('Microsoft mailbox retrieve', () => {
       emitArtifact() {},
     })
     expect(resources[0]?.ref).toBe(opaqueRef)
+  })
+
+  test('hydrates attachments for a padded synthetic immutable id', async () => {
+    const messageId = `${'A'.repeat(143)}=`
+    const opaqueRef = `ctx://${sourceId.toUpperCase()}/message/${encodeURIComponent(messageId)}`
+    const requests: Request[] = []
+    const resources: RetrievedResource[] = []
+    const artifacts: ArtifactDescriptor[] = []
+    let messageRetrieved = false
+
+    await operation()({
+      source: { id: sourceId, config: {} },
+      ref: opaqueRef,
+      signal: new AbortController().signal,
+      fetch: (async (
+        input: Parameters<typeof fetch>[0],
+        init?: RequestInit,
+      ) => {
+        const request = new Request(String(input), init)
+        requests.push(request)
+        const url = new URL(request.url)
+        if (!url.pathname.endsWith('/attachments')) {
+          messageRetrieved = true
+          return Response.json({
+            ...graphMessage(),
+            id: messageId,
+          })
+        }
+        expect(messageRetrieved).toBe(true)
+        if (url.searchParams.get('$select')?.includes('@odata.type'))
+          return Response.json(
+            {
+              error: {
+                code: 'BadRequest',
+                message:
+                  "Parsing OData Select and Expand failed: Term '@odata.type' is not valid in a $select or $expand expression.",
+              },
+            },
+            { status: 400 },
+          )
+        return Response.json({
+          value: [
+            {
+              '@odata.type': '#microsoft.graph.fileAttachment',
+              id: 'file-1',
+              name: 'fixture.txt',
+              contentType: 'text/plain',
+              size: 4,
+              isInline: false,
+            },
+          ],
+        })
+      }) as unknown as typeof fetch,
+      logger: { trace() {}, debug() {}, info() {}, warn() {}, error() {} },
+      emitResource(value) {
+        resources.push(value)
+      },
+      emitArtifact(value) {
+        artifacts.push(value)
+      },
+    })
+
+    expect(requests).toHaveLength(2)
+    expect(requests[0]?.url).toContain(encodeURIComponent(messageId))
+    expect(resources[0]?.ref).toBe(opaqueRef)
+    expect(artifacts).toEqual([
+      {
+        ref: `${opaqueRef}/attachment/file-1`,
+        filename: 'fixture.txt',
+        mediaType: 'text/plain',
+      },
+    ])
   })
 
   test.each([
