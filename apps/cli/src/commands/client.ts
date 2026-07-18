@@ -23,6 +23,9 @@ export const clientCommand = defineCommand({
     }),
     list: defineCommand({
       meta: { name: 'list', description: 'List configured OAuth clients.' },
+      args: {
+        json: { type: 'boolean', description: 'Output JSON' },
+      },
       run: ({ rawArgs }) =>
         runWithExit(() => handleClientCommand(['list', ...rawArgs])),
     }),

@@ -69,8 +69,8 @@ export function createOAuthClientService(
 
 `@ctxindex/core` owns OAuth Client add, list, remove, and resolve behavior. SQLite stores provider, label, timestamps, and typed client credential references; values live only in the routing Secret Vault.
 
-`client add --from-env` reads Adapter-declared environment names once and persists the values. Authorization resolves one provider-matched stored Client and does not reread client credentials from the environment. Inventory omits values and references; failed adds clean temporary secrets.
+`client add --from-env` reads Adapter-declared environment names once and persists the values. Authorization resolves one provider-matched stored Client and does not reread client credentials from the environment. Inventory omits values and references; the CLI's JSON inventory uses an explicit projection of provider, label, and timestamps from `OAuthClientRecord` so future service-record expansion cannot expose new metadata unintentionally. Failed adds clean temporary secrets.
 
 ## Verification
 
-Client service tests cover provider/label uniqueness, deterministic resolution, cleanup, removal, and non-sensitive inventory. CLI/e2e tests cover one-time environment ingestion and authorization through persisted Client state.
+Client service tests cover provider/label uniqueness, deterministic resolution, cleanup, removal, and non-sensitive inventory. CLI/e2e tests cover one-time environment ingestion, authorization through persisted Client state, and JSON inventory shape, empty state, deterministic ordering, credential redaction, and text-output compatibility.

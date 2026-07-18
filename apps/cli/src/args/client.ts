@@ -2,7 +2,7 @@ import { hasHelpFlag, parseFlags, stringFlag } from './flags'
 
 export type ClientArgs =
   | { readonly kind: 'add'; readonly provider: string; readonly label?: string }
-  | { readonly kind: 'list' }
+  | { readonly kind: 'list'; readonly json: boolean }
   | {
       readonly kind: 'remove'
       readonly provider: string
@@ -12,7 +12,7 @@ export type ClientArgs =
   | { readonly kind: 'unknown'; readonly message: string }
 
 export const clientUsage =
-  'client add <provider> [--label <label>] --from-env | client list | client remove <provider> <label>'
+  'client add <provider> [--label <label>] --from-env | client list [--json] | client remove <provider> <label>'
 
 export function parseClientArgs(args: string[]): ClientArgs {
   if (hasHelpFlag(args)) return { kind: 'help' }
@@ -57,8 +57,17 @@ export function parseClientArgs(args: string[]): ClientArgs {
     }
   }
   if (subcommand === 'list') {
-    if (rest.length === 0) return { kind: 'list' }
-    return { kind: 'unknown', message: 'client list: unexpected argument' }
+    if (
+      positional.length > 0 ||
+      Object.keys(flags).some((flag) => flag !== 'json')
+    )
+      return { kind: 'unknown', message: 'client list: unexpected argument' }
+    if (flags.json !== undefined && flags.json !== true)
+      return {
+        kind: 'unknown',
+        message: 'client list: --json does not take a value',
+      }
+    return { kind: 'list', json: flags.json === true }
   }
   if (subcommand === 'remove') {
     if (Object.keys(flags).length > 0)

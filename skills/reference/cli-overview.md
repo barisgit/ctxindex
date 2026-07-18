@@ -19,7 +19,7 @@ The fixed access lifecycle is:
 
 ```text
 client add <provider> [--label <label>] --from-env
-client list
+client list [--json]
 client remove <provider> <label>
 account add <provider> [--label <label>] [--client <label>]
 account list [--json]
