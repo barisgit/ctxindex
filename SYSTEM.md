@@ -4,7 +4,7 @@
 >
 > **Last refreshed:** 2026-07-18
 >
-> **Sources consulted:** `CONTEXT.md`; all 18 capability specifications; all 17 implementation sidecars present on 2026-07-18 (`core-model` has none); accepted decisions D1–D22 in `docs/design/2026-07-13-context-access-layer.md`; and the CLI walkthrough in `.agents/skills/repo-development/SKILL.md`, checked against current CLI help and registry output. Section 13 is the full source index.
+> **Sources consulted:** `README.md`; `CONTEXT.md`; all 18 capability specs and all 17 sidecars present on 2026-07-18 (`core-model` has none); decisions D1–D22 in `docs/design/2026-07-13-context-access-layer.md`; `.agents/skills/repo-development/SKILL.md`; and current CLI help/registry output. Section 13 is the full index.
 
 ## 1. 10-minute tour
 
@@ -46,7 +46,7 @@ Expected output shapes, omitting generated ids and timestamps:
 | `init` | Readable initialization confirmation. It creates no implicit Realm. |
 | `describe adapter … --json` | Adapter `id`, `version`, Profiles, routing, auth, capabilities, config JSON Schema, and generated config options such as `--config-root-path`. |
 | `source list --json` | Array of Sources with id, label, Realm, Adapter, config, availability, Grant link, and sync counts. This Source has `grantId: null`. |
-| `sync … --json` | `{ "mode": "sync", "results": [{ "sourceId": "…", "status": "completed", "run": { "runId": "…", "added": 1, "updated": 0, "deleted": 0, "warnings": [] } }], "warnings": [] }` |
+| `sync … --json` | `{ "mode": "sync", "results": [{ "sourceId": "…", "status": "completed", "run": { "runId": "…", "mode": "sync", "status": "completed", "added": 1, "updated": 0, "deleted": 0, "errorsCount": 0, "warnings": [] } }], "warnings": [] }` |
 | `search … --json` | `{ "results": [{ "ref": "ctx://…/file/plan.txt", "profile": { "id": "file", "version": 1 }, "origin": "local", "title": "plan.txt", "chunks": [{ "index": 0, "snippet": "…planning…" }] }], "pagination": { "offset": 0, "limit": 20, "hasMore": false }, "warnings": [] }` |
 | `get … --json` | `{ "resource": { "ref": "ctx://…", "realmId": "work", "profile": { "id": "file", "version": 1 }, "origin": "synced", "payload": { "path": "plan.txt", "mediaType": "text/plain", "text": "…" } }, "warnings": [] }` |
 | `status … --json` | Array with Source availability, last status/run, error count, last error, and opaque Adapter cursor. |
@@ -95,7 +95,7 @@ Internal row ids are not Refs. The same provider record exposed by two Sources r
 
 ## 4. Trust boundaries and security model
 
-Indexed content is local, while providers and files remain canonical. Local directory Sources index in place. SQLite and config store typed secret references, not cleartext; values live in the configured OS Keychain or optional encrypted file backend. Recognized references are `keychain:<service>/<account>/<key>`, `file:<path>#<key>`, and centrally loaded `env:<VAR>`/`env://<VAR>`. Bare secrets are rejected.
+Indexed content stays in local SQLite under the user's home; providers and files remain canonical, and local directory Sources index in place. SQLite, logs, and the secrets store are user-controlled; secrets-related files use `0600` and parent directories use `0700` where feasible. SQLite and config hold typed secret references, not cleartext; values live in the configured OS Keychain or optional encrypted file backend. Recognized references are `keychain:<service>/<account>/<key>`, `file:<path>#<key>`, and centrally loaded `env:<VAR>`/`env://<VAR>`. Bare secrets are rejected.
 
 Client credentials are read from Adapter-declared environment variables only during `client add --from-env`, then persisted. Authorization and refresh use stored Client/Grant state. Tokens, client secrets, passphrases, and authorization codes do not enter literal command arguments.
 
@@ -206,7 +206,7 @@ Remote envelopes, retrieved payloads, and synced content share Resource tables. 
 
 Artifact descriptors remain with Resources while bytes are lazy. First download streams bytes into a SHA-256 content-addressed store and records metadata under the sole `cached` retention class. Later downloads reuse it; `--output` copies without transferring cache ownership. `purge artifacts` removes bytes but leaves descriptors for refetch. No automatic eviction exists.
 
-Core bookkeeping timestamps use UTC Unix-epoch milliseconds; Profile payloads may preserve domain forms such as RFC 3339 instants or local dates. Exports resolve formats from Profiles rather than a core conversion pipeline. A basic backup stops Sync, then copies SQLite and the encrypted secret file when that backend is used. External systems remain canonical. Prototype databases have no compatibility obligation; cross-source deduplication, Extension-private tables, and payload-version migration are deferred.
+Core bookkeeping timestamps use UTC Unix-epoch milliseconds; Profile payloads may preserve RFC 3339 instants or local dates. Opaque ctxindex-owned primary keys are client-generated ULIDs; a Realm uses its human slug as primary key, or a ULID without one. Provider IDs are never core primary keys. Exports resolve formats from Profiles, not a core conversion pipeline. A basic backup stops Sync, then copies SQLite and the encrypted secret file when used. External systems remain canonical. Prototype databases have no compatibility obligation; cross-source deduplication, Extension-private tables, and payload-version migration are deferred.
 
 ## 11. CLI surface and stable exit codes
 
@@ -220,14 +220,14 @@ Generic verbs cover initialization, Client/Account/Realm/Source management, sync
 | ---: | --- | --- |
 | `0` | Success | Consume stdout; inspect warnings. |
 | `2` | Invalid usage | Correct arguments, schema input, filter, label, or selection. |
-| `10` | Authentication required/revoked or backend problem | Reauthorize or repair secrets. |
+| `10` | `needs_auth` | Reauthorize the affected Account. |
 | `20` | Rate limited | Back off; use `retryAfterMs` when present. |
 | `30` | Network/provider failure | Preserve local results and apply workflow retry policy. |
 | `40` | Permission denied | Correct provider permission or Grant scope. |
 | `50` | Other sync failure | Inspect status and diagnostics. |
 | `130` | SIGINT cancellation | Treat as interrupted; prior durable cursor remains valid. |
 
-Persisted state maps auth failures to `needs_auth`, successful runs to `idle`, cancellation to `cancelled`, and other terminal errors to `failed`. Non-fatal warnings increment counts/summaries without overturning a completed run.
+Sync Run history records `completed`, `cancelled` for cancellation, and `failed` otherwise. Current Source state becomes `idle` after completion, `needs_auth` for expired/revoked auth, and `failed` for cancellation and other terminal errors; only the CLI sets `disabled`. Warnings increment counts/summaries without overturning a completed run.
 
 ## 12. Known limitations and deferrals
 
@@ -252,7 +252,7 @@ Capability specifications are normative. Sidecars and design/skill documents exp
 
 | Section | Exact sources distilled |
 | --- | --- |
-| 1 | `CONTEXT.md`; `openspec/specs/core-model/spec.md`; `openspec/specs/cli-surface/spec.md`; `openspec/specs/realm-and-source-management/spec.md`; `openspec/specs/search-routing/spec.md`; `openspec/specs/sync-operations/spec.md`; `openspec/specs/retrieval-and-artifacts/spec.md`; `.agents/skills/repo-development/SKILL.md` |
+| 1 | `README.md`; `CONTEXT.md`; `openspec/specs/core-model/spec.md`; `openspec/specs/cli-surface/spec.md`; `openspec/specs/cli-surface/implementation.md`; `openspec/specs/realm-and-source-management/spec.md`; `openspec/specs/realm-and-source-management/implementation.md`; `openspec/specs/search-routing/spec.md`; `openspec/specs/search-routing/implementation.md`; `openspec/specs/sync-operations/spec.md`; `openspec/specs/sync-operations/implementation.md`; `openspec/specs/retrieval-and-artifacts/spec.md`; `openspec/specs/retrieval-and-artifacts/implementation.md`; `.agents/skills/repo-development/SKILL.md` |
 | 2 | `openspec/specs/core-model/spec.md`; `openspec/specs/module-architecture/spec.md`; `openspec/specs/module-architecture/implementation.md`; `docs/design/2026-07-13-context-access-layer.md`; `README.md` |
 | 3 | `CONTEXT.md`; `openspec/specs/core-model/spec.md`; `openspec/specs/generic-storage/spec.md`; `openspec/specs/generic-storage/implementation.md`; `openspec/specs/profile-vocabulary/spec.md`; `openspec/specs/profile-vocabulary/implementation.md`; `openspec/specs/realm-and-source-management/spec.md` |
 | 4 | `openspec/specs/core-model/spec.md`; `openspec/specs/secret-backend-operations/spec.md`; `openspec/specs/secret-backend-operations/implementation.md`; `openspec/specs/account-grant-management/spec.md`; `openspec/specs/account-grant-management/implementation.md`; `openspec/specs/extension-loading/spec.md`; `openspec/specs/extension-loading/implementation.md`; `docs/design/2026-07-13-context-access-layer.md` |
