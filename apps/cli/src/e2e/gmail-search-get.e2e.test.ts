@@ -157,7 +157,7 @@ test('Gmail get rejects malformed and nonexistent provider Refs', async () => {
       ['get', '--json', `ctx://${sourceId}/message/does-not-exist`],
       { env },
     )
-    expect(missing.exitCode).toBe(2)
+    expect(missing.exitCode).toBe(50)
     expect(missing.stderr).toContain('status 404')
     expect(mock.readRequests()).toEqual([
       {

@@ -21,7 +21,6 @@ export function mapErrorToExit(err: unknown): number {
 
   if (err instanceof CtxindexAuthError) return authErrorExit(err)
   if (err instanceof CtxindexSyncError) {
-    if (err.code === 'not_found') return 2
     if (err.code === 'unknown' || err.code === 'not_implemented_yet') return 50
     return mapSyncErrorCode(err.code).exitCode
   }
