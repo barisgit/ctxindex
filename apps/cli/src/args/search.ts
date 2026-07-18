@@ -17,6 +17,7 @@ export interface ExecuteSearchInput {
   readonly until?: number
   readonly limit?: number
   readonly offset?: number
+  readonly includeDeleted?: boolean
   readonly explain?: boolean
   readonly localOnly?: boolean
   readonly remote?: boolean
@@ -33,7 +34,7 @@ export type SearchArgs =
   | { readonly kind: 'unknown'; readonly message: string }
 
 export const searchUsage =
-  'search [query] [--realm <slug>] [--adapter <id>] [--source <id>] [--kind <kind>] [--field <name=value> ...] [--since <iso>] [--until <iso>] [--limit <n>] [--offset <n>] [--local-only|--remote] [--explain] [--refs] [--json] (query optional when a filter is present; --offset requires filter-only or --local-only)'
+  'search [query] [--realm <slug>] [--adapter <id>] [--source <id>] [--kind <kind>] [--field <name=value> ...] [--since <iso>] [--until <iso>] [--limit <n>] [--offset <n>] [--include-deleted] [--local-only|--remote] [--explain] [--refs] [--json] (query optional when a filter is present; --offset requires filter-only or --local-only)'
 
 function parseDateFlag(
   name: string,
@@ -75,7 +76,14 @@ function parseField(
 export function parseSearchArgs(args: string[]): SearchArgs {
   if (hasHelpFlag(args)) return { kind: 'help' }
   const { flags, positional } = parseFlags(args, {
-    booleanFlags: ['json', 'refs', 'explain', 'local-only', 'remote'],
+    booleanFlags: [
+      'json',
+      'refs',
+      'include-deleted',
+      'explain',
+      'local-only',
+      'remote',
+    ],
     valueFlags: ['limit', 'offset'],
   })
   const text = positional.join(' ').trim()
@@ -165,6 +173,7 @@ export function parseSearchArgs(args: string[]): SearchArgs {
       ...(until.value === undefined ? {} : { until: until.value }),
       ...(limit.value === undefined ? {} : { limit: limit.value }),
       ...(offset.value === undefined ? {} : { offset: offset.value }),
+      ...(flags['include-deleted'] === true ? { includeDeleted: true } : {}),
       ...(flags.explain === true ? { explain: true } : {}),
       ...(flags['local-only'] === true ? { localOnly: true } : {}),
       ...(flags.remote === true ? { remote: true } : {}),

@@ -39,6 +39,17 @@ describe('search CLI arguments', () => {
     })
   })
 
+  test('parses the include-deleted local search flag', () => {
+    expect(parseSearchArgs(['project', '--include-deleted', '--json'])).toEqual(
+      {
+        kind: 'search',
+        json: true,
+        refs: false,
+        input: { text: 'project', includeDeleted: true },
+      },
+    )
+  })
+
   test('rejects fields without kind and conflicting routing overrides', () => {
     expect(parseSearchArgs(['x', '--field', 'sender=a'])).toMatchObject({
       kind: 'unknown',
