@@ -2,6 +2,41 @@ import { expect, test } from 'bun:test'
 import { exists } from 'node:fs/promises'
 import { CTXINDEX_BUILTIN_EXTENSIONS } from '@ctxindex/adapters'
 
+const requiredDiscoverySnippets = [
+  'ctxindex --help',
+  'ctxindex describe',
+  'ctxindex describe <profile|adapter|action> <id> --json',
+  'ctxindex extensions list',
+  'ctxindex skills list',
+  'ctxindex skills get <name>',
+] as const
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function containsRegistryInventory(prose: string, term: string): boolean {
+  const escaped = escapeRegExp(term)
+  const identifierBoundary = `(?<![A-Za-z0-9_.])${escaped}(?![A-Za-z0-9_.])`
+
+  if (
+    (term.includes('.') || /[A-Z]/.test(term)) &&
+    new RegExp(identifierBoundary).test(prose)
+  ) {
+    return true
+  }
+
+  if (new RegExp(`\`[^\`\\n]*${identifierBoundary}[^\`\\n]*\``).test(prose)) {
+    return true
+  }
+
+  return new RegExp(
+    `^\\s*(?:(?:[-*+]\\s+|\\d+[.)]\\s+|#{1,6}\\s+|\\|\\s*))?` +
+      `[\`'"]?${escaped}[\`'"]?\\s*(?::|\\||$)`,
+    'm',
+  ).test(prose)
+}
+
 test('legacy private registry vocabulary is removed from the public core', async () => {
   for (const path of [
     'packages/core/src/registry/types.ts',
@@ -14,11 +49,11 @@ test('legacy private registry vocabulary is removed from the public core', async
 })
 
 test('workflow skills point to runtime vocabulary instead of declaring it', async () => {
-  const prose = await Promise.all([
-    Bun.file('skills/getting-started.md').text(),
-    Bun.file('skills/reference/cli-overview.md').text(),
-    Bun.file('.agents/skills/repo-development/SKILL.md').text(),
-  ]).then((parts) => parts.join('\n'))
+  const prose = await Bun.file('skills/getting-started.md').text()
+  const proseWithoutDiscovery = requiredDiscoverySnippets.reduce(
+    (current, snippet) => current.replaceAll(snippet, ''),
+    prose,
+  )
   const forbidden = new Set<string>()
   for (const extension of CTXINDEX_BUILTIN_EXTENSIONS) {
     for (const profile of extension.profiles) {
@@ -32,11 +67,30 @@ test('workflow skills point to runtime vocabulary instead of declaring it', asyn
         forbidden.add(action)
     }
   }
-  for (const term of forbidden) expect(prose).not.toContain(`\`${term}\``)
+  for (const term of forbidden) {
+    expect(containsRegistryInventory(proseWithoutDiscovery, term)).toBe(false)
+  }
   expect(prose).toContain(
     'ctxindex describe <profile|adapter|action> <id> --json',
   )
-  expect(prose).toContain('ctxindex describe --full --format markdown')
+  expect(prose).toContain('ctxindex --help')
+  expect(prose).toContain('ctxindex describe')
   expect(prose).toContain('ctxindex extensions list')
+  expect(prose).toContain('ctxindex skills list')
+  expect(prose).toContain('ctxindex skills get <name>')
   expect(prose).not.toContain('--config-root-path')
+})
+
+test('registry vocabulary guard catches identifiers without relying on backticks', () => {
+  expect(
+    containsRegistryInventory('communication.message', 'communication.message'),
+  ).toBe(true)
+  expect(containsRegistryInventory('- sender: message author', 'sender')).toBe(
+    true,
+  )
+  expect(containsRegistryInventory('| unread | boolean |', 'unread')).toBe(true)
+  expect(containsRegistryInventory('`organizer`', 'organizer')).toBe(true)
+  expect(
+    containsRegistryInventory('A sender can be useful context.', 'sender'),
+  ).toBe(false)
 })

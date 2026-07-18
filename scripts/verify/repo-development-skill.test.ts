@@ -5,8 +5,17 @@ import { fileURLToPath } from 'node:url'
 
 const repoRoot = resolve(fileURLToPath(new URL('../../', import.meta.url)))
 const skillPath = join(repoRoot, '.agents/skills/repo-development/SKILL.md')
+const bundledSkillPath = join(repoRoot, 'skills/getting-started.md')
 const cliOverviewPath = join(repoRoot, 'skills/reference/cli-overview.md')
 const cliMainPath = join(repoRoot, 'apps/cli/src/main.ts')
+const requiredDiscoverySnippets = [
+  'ctxindex --help',
+  'ctxindex describe',
+  'ctxindex describe <profile|adapter|action> <id> --json',
+  'ctxindex extensions list',
+  'ctxindex skills list',
+  'ctxindex skills get <name>',
+] as const
 
 interface CtxindexInvocation {
   readonly subcommand: string
@@ -21,8 +30,8 @@ async function readCliMain(): Promise<string> {
   return readFile(cliMainPath, 'utf8')
 }
 
-async function readCliOverview(): Promise<string> {
-  return readFile(cliOverviewPath, 'utf8')
+async function readBundledSkill(): Promise<string> {
+  return readFile(bundledSkillPath, 'utf8')
 }
 
 function fencedCodeBlocks(markdown: string): string[] {
@@ -36,6 +45,62 @@ function fencedCodeBlocks(markdown: string): string[] {
   }
 
   return blocks
+}
+
+function inlineCodeSpans(markdown: string): string[] {
+  const withoutFences = markdown.replace(/```[\s\S]*?```/g, '')
+  return [...withoutFences.matchAll(/`([^`\n]+)`/g)].map(
+    (match) => match[1] ?? '',
+  )
+}
+
+function fenceOpeningLines(markdown: string): string[] {
+  return markdown
+    .split('\n')
+    .filter((line) => /^(?: {0,3})(?:`{3,}|~{3,})/.test(line))
+}
+
+function staticCommandInventory(
+  markdown: string,
+  commands: ReadonlySet<string>,
+): string[] {
+  const lines = markdown.split('\n')
+  const inventory = new Set<string>()
+  const commandEntries: number[] = []
+
+  for (const [index, line] of lines.entries()) {
+    const bareLine = line
+      .trim()
+      .replace(/^(?:[-*+]\s+|\d+[.)]\s+)/, '')
+      .replace(/^`/, '')
+
+    for (const command of commands) {
+      const match = new RegExp(`^${command}(.*)$`).exec(bareLine)
+      if (match === null) continue
+
+      const remainder = match[1] ?? ''
+      if (
+        remainder === '' ||
+        /^\s*[/|]/.test(remainder) ||
+        /^\s{2,}\S/.test(remainder)
+      ) {
+        inventory.add(line)
+      } else if (/^\s+\S/.test(remainder)) {
+        commandEntries.push(index)
+      }
+      break
+    }
+  }
+
+  for (let index = 1; index < commandEntries.length; index += 1) {
+    const previous = commandEntries[index - 1]
+    const current = commandEntries[index]
+    if (previous === undefined || current !== previous + 1) continue
+    inventory.add(lines[previous] ?? '')
+    inventory.add(lines[current] ?? '')
+  }
+
+  return [...inventory]
 }
 
 function extractCtxindexInvocations(markdown: string): CtxindexInvocation[] {
@@ -134,17 +199,60 @@ test('no stale commands', async () => {
   expect(stale).toEqual([])
 })
 
-test('bundled CLI overview inventories every root command', async () => {
-  const [overview, mainSource] = await Promise.all([
-    readCliOverview(),
+test('bundled skill is concise orientation to live discovery', async () => {
+  const [orientation, mainSource] = await Promise.all([
+    readBundledSkill(),
     readCliMain(),
   ])
-  const inventory = fencedCodeBlocks(overview).join('\n')
-  for (const command of implementedCommands(mainSource)) {
-    expect(inventory).toMatch(
-      new RegExp(`(^|[\\s/])${command}(?=$|[\\s/])`, 'm'),
-    )
+
+  for (const discovery of requiredDiscoverySnippets) {
+    expect(orientation).toContain(discovery)
   }
+
+  expect(inlineCodeSpans(orientation)).toEqual(requiredDiscoverySnippets)
+  expect(fenceOpeningLines(orientation)).toEqual([])
+  expect(
+    staticCommandInventory(orientation, implementedCommands(mainSource)),
+  ).toEqual([])
+
+  for (const command of implementedCommands(mainSource)) {
+    if (['describe', 'extensions', 'skills'].includes(command)) continue
+    expect(orientation).not.toMatch(new RegExp(`ctxindex\\s+${command}\\b`))
+  }
+
+  expect(orientation).not.toMatch(
+    /--from-env|client add|account add|source add|provider console|credential/i,
+  )
+  expect(await Bun.file(cliOverviewPath).exists()).toBe(false)
+})
+
+test('bundled orientation guard rejects static inventories and schemas', async () => {
+  const mainSource = await readCliMain()
+  const commands = implementedCommands(mainSource)
+
+  expect(
+    staticCommandInventory('init  initialize local state', commands),
+  ).toEqual(['init  initialize local state'])
+  expect(
+    staticCommandInventory('realm / client / account / source', commands),
+  ).toEqual(['realm / client / account / source'])
+  expect(
+    staticCommandInventory('- search helps an agent find context.', commands),
+  ).toEqual([])
+  expect(
+    staticCommandInventory('init initialize\nrealm configure', commands),
+  ).toEqual(['init initialize', 'realm configure'])
+  expect(
+    fencedCodeBlocks('```json\n{"title":{"type":"string"}}\n```'),
+  ).not.toEqual([])
+  expect(fencedCodeBlocks('```yaml\nsender:\n  type: string\n```')).not.toEqual(
+    [],
+  )
+  expect(fenceOpeningLines('~~~json\n{"sender":"value"}\n~~~')).not.toEqual([])
+  expect(fenceOpeningLines('```yaml\nsender:\n  type: string')).not.toEqual([])
+  expect(inlineCodeSpans('`ctxindex init`')).not.toEqual(
+    requiredDiscoverySnippets,
+  )
 })
 
 test('OAuth guidance derives provider vocabulary from describe output', async () => {

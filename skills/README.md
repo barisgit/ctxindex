@@ -1,9 +1,7 @@
 # ctxindex bundled skills
 
-This directory contains workflow guidance shipped with ctxindex so agents can use the CLI without external documentation.
+This directory contains concise agent orientation shipped with ctxindex. Bundled skills explain what ctxindex is, when it is useful, and where to discover the installed interface; they do not duplicate command trees, provider setup, loaded vocabulary, or workflow logic.
 
-Repository contributor guidance lives in [`.agents/skills/repo-development/SKILL.md`](../.agents/skills/repo-development/SKILL.md); this directory contains only skills bundled with the product.
+The running CLI is authoritative. Use `ctxindex --help` for the current command surface, `ctxindex describe` and exact-definition JSON output for loaded vocabulary, `ctxindex extensions list` for active Extensions, `ctxindex skills list` to discover bundled orientation, and `ctxindex skills get <name>` to read one skill.
 
-Domain-specific facts — Profile kinds, fields, formats, Source configuration, and Actions — are generated from loaded definitions rather than maintained here. Hand-written skills explain workflows and safety boundaries.
-
-The current files target V1.1. See `docs/milestones/V1_1.md` for milestone scope and [`openspec/specs/cli-surface/spec.md`](../openspec/specs/cli-surface/spec.md) for the skills contract.
+Repository contributor guidance lives in [`.agents/skills/repo-development/SKILL.md`](../.agents/skills/repo-development/SKILL.md). The normative bundled-skills contract lives in [`openspec/specs/cli-surface/spec.md`](../openspec/specs/cli-surface/spec.md).
