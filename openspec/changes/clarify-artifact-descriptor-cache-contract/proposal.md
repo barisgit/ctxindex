@@ -21,6 +21,7 @@ None.
 ### Modified Capabilities
 
 - `core-model`: Align the timeless Artifact definition and product-scope summary with the established retrieval-and-artifacts lifecycle.
+- `generic-storage`: Distinguish Profile-derived descriptors from download-only cached-byte metadata in the canonical persistence contract.
 
 ## Impact
 

@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 
 const currentFacingPaths = [
   'openspec/specs/core-model/spec.md',
+  'openspec/specs/generic-storage/spec.md',
   'openspec/specs/generic-storage/implementation.md',
   'CONTEXT.md',
   'SYSTEM.md',
@@ -14,10 +15,13 @@ async function read(
 }
 
 test('current-facing docs distinguish Artifact descriptors from cached bytes', async () => {
-  const [coreModel, genericStorage, context, system] = await Promise.all(
-    currentFacingPaths.map(read),
-  )
-  const prose = [coreModel, genericStorage, context, system].join('\n')
+  const [
+    coreModel,
+    genericStorageSpec,
+    genericStorageImplementation,
+    context,
+    system,
+  ] = await Promise.all(currentFacingPaths.map(read))
 
   for (const document of [coreModel, context, system]) {
     expect(document).toMatch(/Profile-derived (?:Artifact )?descriptor/i)
@@ -30,28 +34,47 @@ test('current-facing docs distinguish Artifact descriptors from cached bytes', a
   )
   expect(context).toMatch(/bytes are fetched and cached only on download/i)
   expect(system).toMatch(/provider bytes.*on demand.*content-addressed cache/is)
-  expect(genericStorage).toMatch(
+  expect(genericStorageSpec).toMatch(
+    /Profile-derived Artifact descriptors are not sync-owned rows/i,
+  )
+  expect(genericStorageSpec).toMatch(
+    /cached byte metadata is written only by the download path/i,
+  )
+  expect(genericStorageSpec).toMatch(
+    /Profile exports are rendered or streamed separately and do not enter the Artifact cache/i,
+  )
+  expect(genericStorageImplementation).toMatch(
     /Profiles derive Artifact descriptors on demand from the validated Resource payload/i,
   )
-  expect(genericStorage).toMatch(
+  expect(genericStorageImplementation).toMatch(
     /cached Artifact-byte metadata is written only by the download path/i,
   )
 
-  expect(prose).toMatch(
+  expect(coreModel).toMatch(
     /purge[\s\S]{0,180}(?:preserv|leav)[\s\S]{0,180}(?:Resource|descriptor)/i,
   )
-  expect(prose).toMatch(
+  expect(coreModel).toMatch(
     /Profile exports[\s\S]{0,180}(?:rendered|streamed)[\s\S]{0,180}(?:not|without)[\s\S]{0,120}Artifact/i,
   )
-  expect(prose).toMatch(
+  expect(coreModel).toMatch(
     /raw provider payload[\s\S]{0,180}(?:separate|not)[\s\S]{0,120}Artifact/i,
   )
 
-  expect(prose).not.toContain(
-    'managed content-addressed artifact store for attachments, raw records, and rendered exports',
+  for (const document of [
+    coreModel,
+    genericStorageSpec,
+    genericStorageImplementation,
+    context,
+    system,
+  ]) {
+    expect(document).not.toContain(
+      'managed content-addressed artifact store for attachments, raw records, and rendered exports',
+    )
+    expect(document).not.toMatch(
+      /Artifact[^.\n]{0,40}(?:is|means) downloadable bytes associated with context/i,
+    )
+  }
+  expect(genericStorageImplementation).not.toMatch(
+    /replace[^.\n]*Artifact descriptors/i,
   )
-  expect(prose).not.toMatch(
-    /Artifact[^.\n]{0,40}(?:is|means) downloadable bytes associated with context/i,
-  )
-  expect(genericStorage).not.toMatch(/replace[^.\n]*Artifact descriptors/i)
 })

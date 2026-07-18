@@ -20,7 +20,7 @@ The retrieval-and-artifacts capability already distinguishes Profile-derived des
 ## Decisions
 
 1. `core-model` will adopt the descriptor-first definition already exercised by retrieval and download. This preserves Artifact identity before bytes are cached and explains why purge does not remove discoverability.
-2. “Managed content-addressed cache” will name the byte-storage layer. The term Artifact will not stand in for a cache row or CAS object.
+2. “Managed content-addressed cache” will name the byte-storage layer. The term Artifact will not stand in for a cache row or CAS object. Generic storage will describe descriptor derivation as Resource/Profile behavior and cached-byte metadata as download-path state.
 3. Profile exports remain a sibling representation path. They are rendered and streamed; treating them as cached Artifacts would require a future explicit contract.
 4. Optional raw provider payload retention remains generic support data and will not be described as Artifact storage.
 5. Static verification will assert the required descriptor/cache/export distinctions and reject the known contradictory phrases in current-facing documentation.

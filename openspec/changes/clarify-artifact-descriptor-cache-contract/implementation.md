@@ -21,7 +21,7 @@ No trust, egress, secret, compatibility, migration, or provider changes. The cla
 
 ## Verification
 
-A focused static repository test checks current-facing terminology across the canonical core model, generic-storage implementation doctrine, `CONTEXT.md`, and `SYSTEM.md`. Existing strict OpenSpec validation and full CI remain the cross-cutting gates.
+A focused static repository test checks current-facing terminology across the canonical core model, canonical generic-storage behavior, generic-storage implementation doctrine, `CONTEXT.md`, and `SYSTEM.md`. Existing strict OpenSpec validation and full CI remain the cross-cutting gates.
 
 ## Promotion Notes
 
