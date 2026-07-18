@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const repoRoot = resolve(fileURLToPath(new URL('../../', import.meta.url)))
-const docPath = join(repoRoot, 'docs/AGENT-HOWTOS.md')
+const skillPath = join(repoRoot, '.agents/skills/repo-development/SKILL.md')
 const cliOverviewPath = join(repoRoot, 'skills/reference/cli-overview.md')
 const cliMainPath = join(repoRoot, 'apps/cli/src/main.ts')
 
@@ -13,8 +13,8 @@ interface CtxindexInvocation {
   readonly line: string
 }
 
-async function readDoc(): Promise<string> {
-  return readFile(docPath, 'utf8')
+async function readSkill(): Promise<string> {
+  return readFile(skillPath, 'utf8')
 }
 
 async function readCliMain(): Promise<string> {
@@ -76,16 +76,43 @@ function implementedCommands(mainSource: string): Set<string> {
   )
 }
 
-test('agent-howtos doc exists', async () => {
-  const doc = await readDoc()
+test('repo-development skill exists', async () => {
+  const skill = await readSkill()
 
-  expect(doc.trim().length).toBeGreaterThan(0)
-  expect(doc.length).toBeGreaterThan(500)
+  expect(skill.trim().length).toBeGreaterThan(0)
+  expect(skill.length).toBeGreaterThan(500)
+  expect(skill).toContain('name: repo-development')
+})
+
+test('repo-development skill keeps the supported CLI walkthrough', async () => {
+  const skill = await readSkill()
+  for (const command of [
+    'bun cli extensions list',
+    'bun cli describe',
+    'bun cli init',
+    'bun cli realm add',
+    'bun cli source add',
+    'bun cli sync',
+    'bun cli search',
+    'bun cli get',
+    'bun cli thread get',
+    'bun cli artifact list',
+    'bun cli artifact download',
+    'bun cli export',
+    'bun cli action describe',
+    'bun cli action run',
+    'bun cli skills list',
+    'bun cli secrets status',
+    'bun cli client add',
+    'bun cli account add',
+  ]) {
+    expect(skill).toContain(command)
+  }
 })
 
 test('documented commands match implemented commands', async () => {
-  const [doc, mainSource] = await Promise.all([readDoc(), readCliMain()])
-  const invocations = extractCtxindexInvocations(doc)
+  const [skill, mainSource] = await Promise.all([readSkill(), readCliMain()])
+  const invocations = extractCtxindexInvocations(skill)
   const commands = implementedCommands(mainSource)
 
   expect(invocations.length).toBeGreaterThan(0)
@@ -98,9 +125,9 @@ test('documented commands match implemented commands', async () => {
 })
 
 test('no stale commands', async () => {
-  const [doc, mainSource] = await Promise.all([readDoc(), readCliMain()])
+  const [skill, mainSource] = await Promise.all([readSkill(), readCliMain()])
   const supported = implementedCommands(mainSource)
-  const stale = extractCtxindexInvocations(doc).filter(
+  const stale = extractCtxindexInvocations(skill).filter(
     ({ subcommand }) => !supported.has(subcommand),
   )
 
@@ -121,13 +148,13 @@ test('bundled CLI overview inventories every root command', async () => {
 })
 
 test('OAuth guidance derives provider vocabulary from describe output', async () => {
-  const doc = await readDoc()
-  expect(doc).toContain('bun cli describe adapter <adapter-id>')
-  expect(doc).toContain('bun cli client add <provider> --from-env')
-  expect(doc).toContain('bun cli account add <provider>')
-  expect(doc).toContain('bun cli account list --json')
-  expect(doc).not.toMatch(
+  const skill = await readSkill()
+  expect(skill).toContain('bun cli describe adapter <adapter-id>')
+  expect(skill).toContain('bun cli client add <provider> --from-env')
+  expect(skill).toContain('bun cli account add <provider>')
+  expect(skill).toContain('bun cli account list --json')
+  expect(skill).not.toMatch(
     /\bauth add\b|--client-secret|--auth-code|--refresh-token/,
   )
-  expect(doc).not.toMatch(/CTXINDEX_(?:GOOGLE|MICROSOFT|GMAIL)_/)
+  expect(skill).not.toMatch(/CTXINDEX_(?:GOOGLE|MICROSOFT|GMAIL)_/)
 })

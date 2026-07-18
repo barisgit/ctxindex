@@ -20,6 +20,22 @@ without requiring live accounts in normal automated tests. An opt-in live soak
 can complement deterministic replay when longer-running provider validation is
 useful.
 
+## Single-owner local daemon
+
+Run the stateful ctxindex runtime in a long-lived local daemon that is the only
+production process to open SQLite. The daemon should own runtime composition,
+loaded Extensions, provider access, and background synchronization, while the
+CLI communicates with it through a typed local RPC interface. Bundled skills
+remain small orientation files that point agents to the CLI's live help; they
+contain no runtime integration.
+
+This removes cross-process database contention and creates one interface that a
+future local web UI could also consume. The initial change should establish
+single-instance ownership, local-only communication, lifecycle and health
+handling, graceful cancellation, and parity with existing CLI behavior. A web
+UI, remote access, and operating-system-specific service installation remain
+separate work.
+
 ## Indexed mailbox synchronization
 
 Allow mailbox Sources to maintain local projections rather than relying only
@@ -27,12 +43,11 @@ on provider-side discovery. The eventual design should cover incremental
 updates, deletions, reconciliation, threads, attachments, and clear consistency
 semantics between local and remote retrieval.
 
-## Agent workflow guidance
+## Agent orientation guidance
 
-Continue improving bundled skills as the primary agent-facing workflow layer.
-Guidance should help agents discover loaded capabilities and safely perform
-common multi-step tasks while deriving exact fields, Actions, authentication
-requirements, and configuration from runtime definitions wherever possible.
+Keep bundled skills lightweight: briefly explain what ctxindex is, when it is
+useful, and direct agents to the CLI's live help and discovery surfaces. Do not
+duplicate commands, schemas, provider setup, or workflow logic in skill files.
 
 ## Additional provider coverage
 
@@ -53,7 +68,8 @@ a combined change genuinely smaller.
 Explore provider webhooks or change notifications to reduce polling and keep
 local projections fresher. This should follow dependable cursor,
 reconciliation, locking, and recovery behavior so push delivery remains an
-optimization rather than a second source of truth.
+optimization rather than a second source of truth. Notifications should wake
+daemon-owned synchronization rather than introduce another write path.
 
 ## Git-backed extension marketplaces
 

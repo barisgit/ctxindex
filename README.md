@@ -46,5 +46,5 @@ paths.
 | `docs/design/2026-07-13-context-access-layer.md` | Decisions D1–D22 and cross-cutting rationale |
 
 | `openspec/changes/` | Active and archived change proposals, artifacts, and tasks |
-| `docs/AGENT-HOWTOS.md` | Development and operator recipes |
+| `.agents/skills/repo-development/SKILL.md` | Triggered repository development and CLI walkthrough |
 | `skills/` | Agent-facing usage docs shipped with the CLI |

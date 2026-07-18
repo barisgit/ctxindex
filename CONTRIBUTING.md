@@ -24,15 +24,17 @@ do not add parallel `in-progress` labels.
 
 1. Start from a GitHub issue with runtime evidence, an expected outcome,
    acceptance criteria, and explicit non-goals.
-2. Create a short issue-linked branch. Codex-created branches use
+2. Create a short issue-linked branch named `<type>/<short-slug>`, where
+   `<type>` is `feature`, `fix`, `docs`, or `chore` (for example
+   `feature/browse-and-paginate-search`). Codex-created branches instead use
    `codex/<issue-number>-<short-slug>`.
 3. For a non-trivial behavior change, create the OpenSpec change on that branch
    before implementation. The issue owns the user-visible problem; the
    OpenSpec proposal, delta specs, design, and tasks own the solution contract.
 4. Implement the smallest independently verifiable task slice and pass every
    task gate before continuing.
-5. Run the focused checks plus the repository gates documented in
-   [`docs/AGENT-HOWTOS.md`](docs/AGENT-HOWTOS.md).
+5. Run the focused checks plus the repository gates documented in the
+   [`repo-development` skill](.agents/skills/repo-development/SKILL.md).
 6. Open one pull request that links and closes the issue. Include the observed
    behavior change, verification evidence, remaining risk, and any human
    checkpoint still required.

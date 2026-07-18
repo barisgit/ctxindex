@@ -17,7 +17,7 @@ test('workflow skills point to runtime vocabulary instead of declaring it', asyn
   const prose = await Promise.all([
     Bun.file('skills/getting-started.md').text(),
     Bun.file('skills/reference/cli-overview.md').text(),
-    Bun.file('docs/AGENT-HOWTOS.md').text(),
+    Bun.file('.agents/skills/repo-development/SKILL.md').text(),
   ]).then((parts) => parts.join('\n'))
   const forbidden = new Set<string>()
   for (const extension of CTXINDEX_BUILTIN_EXTENSIONS) {

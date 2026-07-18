@@ -373,12 +373,15 @@ test('core subpaths target capability indexes without root shims', async () => {
 
   expect(
     await Bun.file(
-      new URL('../../scripts/verify/agent-howtos.test.ts', import.meta.url),
+      new URL(
+        '../../scripts/verify/repo-development-skill.test.ts',
+        import.meta.url,
+      ),
     ).exists(),
   ).toBe(true)
   expect(
     await Bun.file(
-      new URL('meta/agent-howtos.test.ts', coreSourceRoot),
+      new URL('meta/repo-development-skill.test.ts', coreSourceRoot),
     ).exists(),
   ).toBe(false)
 })

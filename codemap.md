@@ -14,6 +14,7 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 ## Entry points
 
 - `package.json` — workspace manifest and root commands; `bun cli` invokes the application, while build/typecheck/test/CI compose repository gates.
+- `.agents/skills/repo-development/SKILL.md` — triggered contributor doctrine, CLI workflow, and verification guidance.
 - `apps/cli/bin/ctxindex.mjs` — executable shim forwarding argv to `runCli` and assigning its exit code.
 - `packages/core/src/index.ts` — core domain services and runtime infrastructure export surface.
 - `packages/extension-sdk/src/index.ts` — public Profile, Adapter, Extension, OAuth, and operation contracts.
