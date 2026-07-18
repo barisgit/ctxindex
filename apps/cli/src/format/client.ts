@@ -6,7 +6,20 @@ export function formatClientAdded(client: OAuthClientRecord): string {
 
 export function formatClientInventory(
   clients: readonly OAuthClientRecord[],
+  json: boolean,
 ): string {
+  if (json) {
+    return JSON.stringify(
+      clients.map(({ provider, label, createdAt, updatedAt }) => ({
+        provider,
+        label,
+        createdAt,
+        updatedAt,
+      })),
+      null,
+      2,
+    )
+  }
   if (clients.length === 0) return 'No OAuth clients configured.'
   return clients
     .map(

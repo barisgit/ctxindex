@@ -63,7 +63,10 @@ export async function handleClientCommand(args: string[]): Promise<number> {
       deps = await openDeps()
       if (parsed.kind === 'list') {
         console.log(
-          formatClientInventory(deps.oauthClientService.listClients()),
+          formatClientInventory(
+            deps.oauthClientService.listClients(),
+            parsed.json,
+          ),
         )
       } else {
         await deps.oauthClientService.removeClient(
