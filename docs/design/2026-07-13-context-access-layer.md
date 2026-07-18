@@ -61,7 +61,7 @@ Profile Actions are in scope; arbitrary Extension subcommands are not.
 | D7 | Search default | Hybrid orchestration; adapter decides per source with sync-coverage knowledge; `--local-only` / `--remote` override | PROVISIONAL — validate by dogfooding partial Gmail sync |
 | D8 | Artifacts | Managed content-addressed store; V1 has one `cached` retention class, retained until explicit purge; `--output` copies out | No automatic age, quota, or pressure eviction in V1 |
 | D9 | Data shape | Minimal resource envelope + profiles; arbitrary payload allowed | |
-| D10 | Profile composability | Permitted by API; V1 uses one primary Profile (+ `artifact`) per resource | |
+| D10 | Profile composability | Permitted by API; V1 uses one primary Profile plus Artifact descriptors per Resource | |
 | D11 | Definition style | Declarative `defineExtension`/`defineAdapter`/`defineProfile` factories; typed registries internally | pi-style authoring, lume/sessionloom-style registries |
 | D12 | Unknown profile version on emit | Accept envelope-only, index degraded, warn | Matches provider-failure philosophy |
 | D13 | Storage | Six generic core tables; NO per-profile tables, NO Adapter-private tables in V1 | `ctx.storage` is a future additive API |
@@ -192,10 +192,11 @@ Rules:
 4. **No speculative migration (D22)** — V1 records version `1`, but no payload
    migration mechanism exists until a second real Profile version requires one.
 
-Canonical profiles bundled with the binary: `communication.message`,
-`communication.conversation` (carries the `mbox` export, whose render deps
-request members via the inverse `conversation` relation), `calendar.event`
-(carries `ics` export), `task`, `file`, `artifact`.
+Canonical Profiles bundled with the binary: `communication.message@1`, `calendar.event@1`, and `file@1`.
+External Extensions may define additional Profiles through the same public API;
+V1 does not pre-select future task or conversation Profile domains or additional
+export formats. Conversation behavior uses message Relations, and Artifacts are
+Profile-extracted descriptors rather than an `artifact` Profile.
 Forcing function: **if the mail profile cannot be expressed through the public
 profile API, the API is too weak.**
 
