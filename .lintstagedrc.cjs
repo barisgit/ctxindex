@@ -1,5 +1,8 @@
 module.exports = {
-  '*.{js,jsx,ts,tsx,cjs,mjs,json,jsonc,css,md,yaml,yml}':
+  '*.{js,jsx,cjs,mjs,json,jsonc,css,md,yaml,yml}':
     'biome check --write --no-errors-on-unmatched',
-  '*.{ts,tsx}': () => 'bun run typecheck',
+  '*.{ts,tsx}': [
+    'biome check --write --no-errors-on-unmatched',
+    () => 'bun run typecheck',
+  ],
 }
