@@ -51,4 +51,4 @@ The repository is pre-alpha. Implementation starts from the fresh schema and add
 
 ## Verification
 
-Use Bun's colocated unit/integration/e2e tests. Storage tests create fresh sandboxes; provider tests use loopback-only authorized HTTP. `scripts/verify/architecture-lint.ts`, package-dependency checks, relocated compiled-CLI tests, and `scripts/spikes/d3-compiled-extension/run.sh` enforce this shape.
+Use Bun's colocated unit/integration/e2e tests. Storage tests create fresh sandboxes; provider tests use loopback-only authorized HTTP. `scripts/verify/architecture-lint.ts`, package-dependency checks, and relocated compiled-host and CLI tests enforce this shape.

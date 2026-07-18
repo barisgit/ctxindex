@@ -54,7 +54,7 @@ Profile Actions are in scope; arbitrary Extension subcommands are not.
 |---|----------|--------|-------|
 | D1 | Extension power | Adapters with open `kind`/profiles, canonical operations. No arbitrary CLI subcommands | Revisit arbitrary commands only with demonstrated need |
 | D2 | Extension loading | In-process dynamic `import()` of TS/JS, full trust, factory-receives-API | Bun executes TS natively; out-of-process protocol deferred |
-| D3 | Binary distribution | Compiled Bun binary retained; extensions never import runtime code — type-only imports + host-provided API object | Verified with Bun 1.3.13/1.3.14; 1.3.12 fails, so the project is pinned to 1.3.14. Repeatable spike at `scripts/spikes/d3-compiled-extension/` |
+| D3 | Binary distribution | Compiled Bun binary retained; extensions never import runtime code — type-only imports + host-provided API object | Verified with Bun 1.3.13/1.3.14; 1.3.12 fails, so the project is pinned to 1.3.14. Regression test at `apps/cli/src/e2e/compiled-extension.e2e.test.ts` |
 | D4 | Universal ref | `ctx://<source-id>/<adapter-opaque-suffix>` for every resource, indexed or not | Provider-native URIs kept as metadata |
 | D5 | Auth ownership | Declarative specs (oauth2/api-key/basic/none) run by core + minimal namespaced secret bucket as escape hatch | OAuth refresh, `needs_auth`, exit 10 stay uniform |
 | D6 | Source concept | Source = configured connection; sync is optional per-source | One noun; `source add --no-sync` |
@@ -392,7 +392,7 @@ timeout degrades stragglers to warnings.
 external `.ts` extension through a `file:` URL. The extension used TypeScript
 syntax, a type-only authoring import, a relative `.ts` runtime import, its own
 `node_modules` dependency, and the host-provided factory API. The retained
-regression check is `scripts/spikes/d3-compiled-extension/run.sh`. Bun 1.3.12
+regression check is `apps/cli/src/e2e/compiled-extension.e2e.test.ts`. Bun 1.3.12
 was killed with exit 137 at dynamic import; 1.3.13 and 1.3.14 passed. The root
 toolchain pin is therefore Bun 1.3.14.
 

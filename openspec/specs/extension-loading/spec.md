@@ -28,10 +28,10 @@ For V1, core SHALL validate an Extension as a unit before activation, including 
 - **THEN** the containing Extension is rejected with a capability-consistency diagnostic
 
 ### Requirement: Compiled binary loads external TypeScript
-For V1, the compiled Bun binary SHALL load explicit-path external TypeScript Extensions while running outside the project tree. The project MUST remain pinned to Bun 1.3.14, and `scripts/spikes/d3-compiled-extension/run.sh` SHALL pass.
+For V1, the compiled Bun binary SHALL load explicit-path external TypeScript Extensions while running outside the project tree. The project MUST remain pinned to Bun 1.3.14, and `apps/cli/src/e2e/compiled-extension.e2e.test.ts` SHALL pass.
 
 #### Scenario: Relocated binary loads an external Extension
-- **WHEN** `scripts/spikes/d3-compiled-extension/run.sh` runs a relocated compiled binary from outside the repository against an external TypeScript Extension with its own dependencies
+- **WHEN** the compiled Extension e2e test runs a relocated compiled binary from outside the repository against an external TypeScript Extension with its own dependencies
 - **THEN** the Extension loads successfully under Bun 1.3.14
 
 ### Requirement: Missing Extension preserves materialized data

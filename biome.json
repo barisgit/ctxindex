@@ -7,13 +7,7 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": [
-      "**",
-      "!**/migrations",
-      "!**/node_modules",
-      "!.charters",
-      "!docs/design/architecture-explainer.html"
-    ]
+    "includes": ["**", "!**/migrations", "!**/node_modules", "!.charters"]
   },
   "formatter": {
     "enabled": true,

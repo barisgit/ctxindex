@@ -44,7 +44,7 @@ paths.
 | `openspec/specs/` | Canonical normative capability behavior and selective non-normative interface-first implementation doctrine |
 | `docs/milestones/` | Completed V1 and V1.1 historical milestone records |
 | `docs/design/2026-07-13-context-access-layer.md` | Decisions D1–D22 and cross-cutting rationale |
-| `docs/design/architecture-explainer.md` / `.html` | Narrative architecture explainer |
+
 | `openspec/changes/` | Active and archived change proposals, artifacts, and tasks |
 | `docs/AGENT-HOWTOS.md` | Development and operator recipes |
 | `skills/` | Agent-facing usage docs shipped with the CLI |

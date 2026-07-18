@@ -116,7 +116,7 @@ bun test
 bun run test:integration
 bun run test:e2e
 bun run ci
-./scripts/spikes/d3-compiled-extension/run.sh
+bun test --path-ignore-patterns '__none__' apps/cli/src/e2e/compiled-extension.e2e.test.ts
 openspec validate --all --strict
 ```
 

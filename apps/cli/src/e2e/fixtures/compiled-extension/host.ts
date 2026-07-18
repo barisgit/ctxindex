@@ -17,7 +17,7 @@ if (typeof loaded.default !== 'function') {
 }
 
 const api: HostApi = {
-  version: 'spike-host-v1',
+  version: 'fixture-host-v1',
   defineAdapter: (definition) => definition,
 }
 const extension = await loaded.default(api)

@@ -425,7 +425,7 @@ The raw `git diff` and `git status` snapshots are intentionally omitted from the
  M apps/cli/src/main.ts
  M apps/cli/src/skills/loader.ts
  M bunfig.toml
- M docs/OPEN-QUESTIONS.md
+
  M package.json
  M packages/adapters/package.json
  M packages/adapters/src/google-mailbox/api.ts
@@ -625,9 +625,9 @@ The raw `git diff` and `git status` snapshots are intentionally omitted from the
 
 ### docs
 - `docs/AGENT-HOWTOS.md`
-- `docs/CURRENT-STATE.md`
-- `docs/OPEN-QUESTIONS.md`
-- `docs/reference-study-2026-05.md`
+
+
+
 
 ### skills
 - `skills/getting-started.md`
@@ -676,9 +676,9 @@ A	apps/cli/tsconfig.json
 A	biome.json
 A	bun.lock
 A	bunfig.toml
-A	docs/CURRENT-STATE.md
-A	docs/OPEN-QUESTIONS.md
-A	docs/reference-study-2026-05.md
+
+
+
 A	package.json
 A	packages/adapters/package.json
 A	packages/adapters/src/google-mailbox/api.ts
