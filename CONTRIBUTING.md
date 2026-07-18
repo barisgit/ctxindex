@@ -35,9 +35,10 @@ do not add parallel `in-progress` labels.
    task gate before continuing.
 5. Run the focused checks plus the repository gates documented in the
    [`repo-development` skill](.agents/skills/repo-development/SKILL.md).
-6. Open one pull request that links and closes the issue. Include the observed
-   behavior change, verification evidence, remaining risk, and any human
-   checkpoint still required.
+6. Open one pull request that links and closes the issue. Pull requests into
+   `main` run the repository's `bun run ci` gate automatically. Include the
+   observed behavior change, verification evidence, remaining risk, and any
+   human checkpoint still required.
 7. Run `openspec-verify-change` after implementation. Archive a completed
    OpenSpec change only when explicitly requested.
 

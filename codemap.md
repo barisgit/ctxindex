@@ -14,6 +14,7 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 ## Entry points
 
 - `package.json` — workspace manifest and root commands; `bun cli` invokes the application, while build/typecheck/test/CI compose repository gates.
+- `.github/workflows/ci.yml` — least-privilege pull-request CI that runs the repository gate with the pinned Bun version.
 - `.agents/skills/repo-development/SKILL.md` — triggered contributor doctrine, CLI workflow, and verification guidance.
 - `apps/cli/bin/ctxindex.mjs` — executable shim forwarding argv to `runCli` and assigning its exit code.
 - `packages/core/src/index.ts` — core domain services and runtime infrastructure export surface.
@@ -35,6 +36,7 @@ CLI input is parsed and dispatched by `apps/cli/` into core services. The access
 
 | Directory | Responsibility | Detailed map |
 | --- | --- | --- |
+| `.github/` | GitHub pull-request automation for the repository CI gate. | Workflow-local configuration. |
 | `apps/` | Deployable application workspaces, currently the Bun-based `ctxindex` CLI. | [`apps/codemap.md`](apps/codemap.md) |
 | `packages/` | Core runtime, extension contract, provider-neutral Profiles, and built-in Google/Microsoft/filesystem Adapters. | [`packages/codemap.md`](packages/codemap.md) |
 | `examples/` | External Extension examples using only the public authoring boundary. | [`examples/codemap.md`](examples/codemap.md) |
