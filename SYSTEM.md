@@ -85,7 +85,7 @@ A message composed only in a conversation with an agent is not a Draft. It becom
 
 | Term | Meaning |
 |---|---|
-| **Resource** | One addressable unit of context: a common envelope plus payload conforming to one primary Profile. |
+| **Resource** | One addressable unit of context: a common envelope naming one primary Profile, with an optional payload conforming to that Profile. |
 | **Ref** | The stable ctxindex locator for a Resource, independent of local materialization. |
 | **Relation** | A typed traversable edge to another Ref or to a declared natural key. |
 | **Artifact** | Downloadable bytes associated with context, such as an attachment, original record, or rendered export. |
@@ -337,7 +337,7 @@ Sending, calendar mutation, other irreversible provider mutation, arbitrary Exte
 
 All domains share generic core storage:
 
-- Resources containing envelope fields and payload JSON;
+- Resources containing envelope fields and optional payload JSON;
 - typed Field Index rows;
 - chunks and full-text indexes;
 - Relations;
