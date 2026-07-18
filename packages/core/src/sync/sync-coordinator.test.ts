@@ -224,6 +224,32 @@ test('warnings complete with separate bounded warning accounting', async () => {
   })
 })
 
+test('bounds the persisted warning snapshot without changing runtime diagnostics', async () => {
+  const { db, coordinator } = await setup()
+  const warning = {
+    code: `code-${'c'.repeat(3_000)}`,
+    message: `message-${'m'.repeat(3_000)}`,
+    ref: `ctx://${sourceId}/records/${'r'.repeat(3_000)}`,
+  }
+
+  const result = await coordinator.run(
+    { sourceId, mode: 'sync', signal: new AbortController().signal },
+    async ({ emit }) => {
+      await emit({ type: 'warning', ...warning })
+    },
+  )
+
+  expect(result.lastWarning).toEqual(warning)
+  const persisted = db
+    .prepare('SELECT last_warning_json FROM sync_runs')
+    .get() as { last_warning_json: string }
+  expect(JSON.parse(persisted.last_warning_json)).toEqual({
+    code: warning.code.slice(0, 2_048),
+    message: warning.message.slice(0, 2_048),
+    ref: warning.ref.slice(0, 2_048),
+  })
+})
+
 test('terminal failure preserves prior warnings and records one error', async () => {
   const { db, coordinator } = await setup()
   const error = new Error('boom')

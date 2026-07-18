@@ -85,7 +85,12 @@ function parseEmissionRef(ref: string): ReturnType<typeof parseRef> {
 }
 
 function warningJson(warning: SyncWarning | null): string | null {
-  return warning === null ? null : JSON.stringify(warning)
+  if (warning === null) return null
+  return JSON.stringify({
+    code: bounded(warning.code),
+    message: bounded(warning.message),
+    ...(warning.ref === undefined ? {} : { ref: bounded(warning.ref) }),
+  })
 }
 
 export interface SyncCoordinatorOptions {

@@ -7,7 +7,7 @@ Core currently folds non-fatal warning emissions into `errors_count` and a text 
 **Goals:**
 
 - Keep warning and error severity distinct throughout aggregation, persistence, and presentation.
-- Retain the last warning as the original structured diagnostic and keep total counts bounded.
+- Retain the last warning as a structured diagnostic, bounding persisted fields while keeping the original runtime diagnostic, and keep total counts bounded.
 - Preserve warning evidence when a later terminal failure occurs.
 - Keep stable terminal status and exit mappings unchanged.
 
@@ -19,7 +19,7 @@ Core currently folds non-fatal warning emissions into `errors_count` and a text 
 
 ## Decisions
 
-1. Store `warnings_count` and `last_warning_json` alongside existing error bookkeeping on both Sync Runs and current Source sync state. A structured JSON value preserves stable `code`, `message`, and optional `ref`; counts plus one last value bound storage.
+1. Store `warnings_count` and `last_warning_json` alongside existing error bookkeeping on both Sync Runs and current Source sync state. A structured JSON value retains bounded prefixes of `code`, `message`, and optional `ref`; counts plus one last bounded value limit storage while runtime results keep the original diagnostic.
 2. Treat warning emissions as warning diagnostics only. A thrown terminal sync failure contributes exactly one error and does not erase prior warning aggregation.
 3. Project the structured warning through core and CLI as `lastWarning`, with `warningsCount` adjacent to existing `errorsCount`/`lastError`. This keeps machine output explicit and readable output compact.
 4. Update the canonical initial schema directly. The project has no released compatibility obligation, and adding speculative migration paths would contradict current storage doctrine.

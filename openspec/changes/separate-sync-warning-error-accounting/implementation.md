@@ -13,11 +13,11 @@
 
 `SyncWarning` remains the structured warning shape. `SyncRunResult` adds `warningsCount` and `lastWarning` while retaining the complete ephemeral `warnings` array used by one command invocation. A core-owned weak failure-diagnostics channel associates the same bounded warning/error summary with the original thrown object without wrapping it or changing exit mapping. `SourceRow` and `StatusRow` add warning projections, with `StatusRow.lastWarning` retaining the structured value; Source inventory also projects the joined run's error summary as `lastError`.
 
-The coordinator increments a local warning count as validated warning emissions arrive and tracks the last value. On successful completion it writes zero errors plus warning fields and returns the same aggregates. On failure it writes one error plus the already accumulated warning fields, associates bounded diagnostics with the original error object, and rethrows that same cause. CLI output directly projects those values, uses a safe public `lastError` message rather than raw provider/runtime detail, and preserves existing failure exit mapping.
+The coordinator increments a local warning count as validated warning emissions arrive and tracks the last value. On successful completion it writes zero errors plus a field-bounded warning snapshot and returns the original aggregates. On failure it writes one error plus the already accumulated warning fields, associates bounded diagnostics with the original error object, and rethrows that same cause. CLI output directly projects those values, uses a safe public `lastError` message rather than raw provider/runtime detail, and preserves existing failure exit mapping.
 
 ## Storage and State
 
-`sync_runs` and `source_sync_state` each own `warnings_count INTEGER NOT NULL DEFAULT 0` and nullable `last_warning_json TEXT`; current Source state also owns existing error status while the run row retains its bounded error summary. Core serializes exactly one `SyncWarning` and parses it defensively at read boundaries. The canonical initial migration and Drizzle schemas stay aligned.
+`sync_runs` and `source_sync_state` each own `warnings_count INTEGER NOT NULL DEFAULT 0` and nullable `last_warning_json TEXT`; current Source state also owns existing error status while the run row retains its bounded error summary. Core serializes exactly one `SyncWarning` with each string field bounded to the diagnostic summary limit and parses it defensively at read boundaries. The canonical initial migration and Drizzle schemas stay aligned.
 
 ## Security and Compatibility
 
