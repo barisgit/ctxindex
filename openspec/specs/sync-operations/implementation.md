@@ -76,9 +76,22 @@ export interface SyncRunResult {
   readonly added: number
   readonly updated: number
   readonly deleted: number
+  readonly warningsCount: number
+  readonly lastWarning: SyncWarning | null
   readonly errorsCount: number
   readonly warnings: readonly SyncWarning[]
 }
+
+export interface SyncRunFailureDiagnostics {
+  readonly warningsCount: number
+  readonly lastWarning: SyncWarning | null
+  readonly errorsCount: 1
+  readonly lastError: string
+}
+
+export function getSyncRunFailureDiagnostics(
+  error: unknown,
+): SyncRunFailureDiagnostics | null;
 
 export interface SyncCoordinatorOptions {
   readonly isProcessAlive?: (pid: number) => boolean
@@ -153,10 +166,10 @@ export async function handleSyncCommand(
 
 The SDK exposes cursor-driven emissions through `SyncContext`; there is no separate emit capability. Core `SyncCoordinator` validates emissions, owns run/lock/checkpoint state, buffers transactional writes, and applies cursor changes only with successful work. `syncSource` binds a stored Source to its loaded Adapter and provider context.
 
-Warnings may stream without invalidating committed state. Diff mode exercises the same validation and rolls back data/cursor changes. CLI sync orchestration selects Sources, excludes stored `sync_enabled: false` Sources from all-Source runs, rejects a targeted disabled Source before invoking `syncSource`, invokes injected services, and keeps per-Source success/failure output deterministic.
+Warnings may stream without invalidating committed state. `SyncCoordinator` is the severity boundary: it aggregates warning emissions independently, retains the original last structured warning at runtime, persists a field-bounded snapshot, and records a terminal thrown failure as one error without discarding earlier warnings. A lock-conflicted attempt records its own run as failed `sync busy`; only explicit cancellation records a cancelled run. Failed-run diagnostics are associated with the original thrown object through a bounded weak channel, preserving error identity and exit translation while allowing the invoking CLI to report the summary. Diff mode exercises the same validation and rolls back data/cursor changes, including current Source sync state. CLI sync orchestration selects Sources, excludes stored `sync_enabled: false` Sources from all-Source runs, rejects a targeted disabled Source before invoking `syncSource`, invokes injected services, and keeps per-Source success/failure output deterministic.
 
 The thin CLI owns the closed sync argv grammar and preserves help precedence. The root boundary rejects option-like tokens placed before the selected `sync` command before command selection can discard them, while preserving valid global options. The command descriptor forwards mode as an unvalidated string so the parser remains the sole mode-value boundary after command selection. The parser rejects invalid input through the `SyncArgs` union before runtime dependencies open, Source labels resolve, sync execution begins, or storage and provider effects become reachable.
 
 ## Verification
 
-Emission and coordinator tests cover validation, checkpoints, warnings, cancellation, locking, rollback, tombstones, and run summaries. Source sync tests cover registry/auth/provider-context binding. CLI sync tests cover strict argument rejection before side effects, selection including disabled-Source all-run exclusion and targeted zero-provider failure, concurrency output, JSON/readable streams, and partial failure.
+Emission and coordinator tests cover validation, checkpoints, warning-only aggregation, last-warning retention across terminal failure, cancellation, locking, rollback, tombstones, and run summaries. Source sync tests cover registry/auth/provider-context binding. CLI sync tests cover strict argument rejection before side effects, selection including disabled-Source all-run exclusion and targeted zero-provider failure, concurrency output, JSON/readable streams, warning-only success, and partial failure.

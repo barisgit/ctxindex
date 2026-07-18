@@ -82,7 +82,11 @@ test('binary CLI syncs local files through generic search, get, and Ref contract
             added: 1,
             updated: 0,
             deleted: 0,
-            errorsCount: 2,
+            warningsCount: 2,
+            lastWarning: expect.objectContaining({
+              code: 'oversize_skipped',
+            }),
+            errorsCount: 0,
             warnings: [
               expect.objectContaining({ code: 'binary_skipped' }),
               expect.objectContaining({ code: 'oversize_skipped' }),
@@ -95,6 +99,36 @@ test('binary CLI syncs local files through generic search, get, and Ref contract
         expect.objectContaining({ sourceId, code: 'oversize_skipped' }),
       ],
     })
+
+    const status = await sandbox.run(
+      ['status', '--source', sourceId, '--json'],
+      {
+        env,
+      },
+    )
+    expect(status.exitCode, status.stderr).toBe(0)
+    expect(JSON.parse(status.stdout)).toEqual([
+      expect.objectContaining({
+        sourceId,
+        lastStatus: 'idle',
+        warningsCount: 2,
+        lastWarning: expect.objectContaining({ code: 'oversize_skipped' }),
+        errorsCount: 0,
+        lastError: null,
+      }),
+    ])
+
+    const inventory = await sandbox.run(['source', 'list', '--json'], { env })
+    expect(inventory.exitCode, inventory.stderr).toBe(0)
+    expect(JSON.parse(inventory.stdout)).toEqual([
+      expect.objectContaining({
+        id: sourceId,
+        warningsCount: 2,
+        lastWarning: expect.objectContaining({ code: 'oversize_skipped' }),
+        errorsCount: 0,
+        lastError: null,
+      }),
+    ])
 
     const searched = await sandbox.run(
       [

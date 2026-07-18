@@ -11,6 +11,8 @@ type StatusRow = {
   availability: 'available' | 'extension_unavailable'
   lastStatus: string
   lastRunAt: number | null
+  warningsCount: number
+  lastWarning: { code: string; message: string; ref?: string } | null
   errorsCount: number
   lastError: string | null
   cursor: unknown
@@ -139,7 +141,8 @@ test('compact output includes a real unavailable-Adapter failure summary', async
     expect(result.stdout).toContain(sourceId)
     expect(result.stdout).toContain('adapter=missing.adapter')
     expect(result.stdout).toContain('status=extension_unavailable')
-    expect(result.stdout).toContain('errors=0')
+    expect(result.stdout).toContain('warnings=0')
+    expect(result.stdout).toContain('errors=1')
     expect(result.stdout).toContain(
       'error=Source_Adapter_definition_is_unavailable',
     )
@@ -167,6 +170,8 @@ test('json output reflects the generic cursor from a real sync', async () => {
       availability: 'available',
       lastStatus: 'idle',
       lastRunAt: expect.any(Number),
+      warningsCount: 0,
+      lastWarning: null,
       errorsCount: 0,
       lastError: null,
       cursor: {

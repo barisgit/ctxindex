@@ -120,6 +120,8 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
             added: 2,
             updated: 0,
             deleted: 0,
+            warningsCount: 0,
+            lastWarning: null,
             errorsCount: 0,
             warnings: [],
           },

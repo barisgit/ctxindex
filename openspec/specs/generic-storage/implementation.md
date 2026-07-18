@@ -136,8 +136,10 @@ Core exclusively owns SQLite/Drizzle schema, migrations, `ResourceStore`, and `R
 
 SQLite coordinates writers across processes. One core storage normalizer classifies busy and locked result families for database open/setup, migrations, and Resource batches, retaining the backend exception only as the typed error's cause. Database setup installs the five-second busy timeout before lock-sensitive pragmas. `ResourceStore.upsertMany()` validates every Ref and Source association before collapsing repeated valid Refs to their final input state, reserves the writer with one immediate transaction, and commits or rolls back every Resource envelope and derived projection together; `upsert()` shares that path for one Resource.
 
+Core sync bookkeeping stores bounded diagnostics on both historical Sync Runs and current Source sync state. Warning state is a count plus nullable JSON for one `SyncWarning`; error state is a count plus one nullable bounded last error. Core owns serialization and defensive parsing, and no diagnostic history table or Adapter-owned diagnostic storage exists. Runtime sync results retain the original warning.
+
 `field_index` stores one native TEXT, REAL, or INTEGER value per scalar/array ordinal. Logical Relations and cached zero-to-many resolutions stay separate. Ref suffixes are validated and preserved byte-for-byte without core assigning provider meaning.
 
 ## Verification
 
-Schema, migrator, `ResourceStore`, and `RelationStore` tests cover fresh bootstrap, typed-value checks, projection replacement, Ref/source consistency before deduplication, Relation resolution, synced/ad-hoc lifecycle, batch rollback, and typed bounded contention during setup, migration, and Resource writes. Integration tests use a fresh sandbox database.
+Schema, migrator, `ResourceStore`, and `RelationStore` tests cover fresh bootstrap, bounded warning/error columns, typed-value checks, projection replacement, Ref/source consistency before deduplication, Relation resolution, synced/ad-hoc lifecycle, batch rollback, and typed bounded contention during setup, migration, and Resource writes. Integration tests use a fresh sandbox database.

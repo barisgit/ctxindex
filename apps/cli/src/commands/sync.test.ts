@@ -16,7 +16,9 @@ const completed: SyncRunResult = {
   added: 2,
   updated: 1,
   deleted: 0,
-  errorsCount: 1,
+  warningsCount: 1,
+  lastWarning: { code: 'binary', message: 'Skipped binary file' },
+  errorsCount: 0,
   warnings: [{ code: 'binary', message: 'Skipped binary file' }],
 }
 
@@ -112,13 +114,60 @@ describe('sync command', () => {
     }
 
     expect(formatSyncOutput(output, 'summary', false)).toBe(
-      'source-a\tcompleted\tadded=2\tupdated=1\tdeleted=0\terrors=1\n' +
+      'source-a\tcompleted\tadded=2\tupdated=1\tdeleted=0\twarnings=1\terrors=0\n' +
         'source-a\twarning\tbinary\tSkipped binary file',
     )
     expect(formatSyncOutput(output, 'compact', false)).toBe(
-      'source-a completed +2 ~1 -0 !1\n' +
+      'source-a completed +2 ~1 -0 warnings=1 errors=0\n' +
         'source-a warning=binary Skipped binary file',
     )
+  })
+
+  test('renders warning-then-failure diagnostics in JSON, summary, compact, and events output', () => {
+    const failed = {
+      sourceId: 'source-a',
+      status: 'failed' as const,
+      warningsCount: 1,
+      lastWarning: {
+        code: 'degraded',
+        message: 'partial provider response',
+      },
+      errorsCount: 1,
+      lastError: 'Sync failed for Source "source-a" (network)',
+      error: {
+        code: 'network',
+        message: 'Sync failed for Source "source-a" (network)',
+      },
+      exitCode: 30,
+    }
+    const output: SyncOutput = {
+      mode: 'sync',
+      results: [failed],
+      warnings: [
+        {
+          sourceId: 'source-a',
+          code: 'degraded',
+          message: 'partial provider response',
+        },
+      ],
+    }
+
+    expect(JSON.parse(formatSyncOutput(output, 'summary', true))).toEqual(
+      output,
+    )
+    expect(formatSyncOutput(output, 'summary', false)).toBe(
+      'source-a\tfailed\twarnings=1\terrors=1\tcode=network\texit=30\tSync failed for Source "source-a" (network)\n' +
+        'source-a\twarning\tdegraded\tpartial provider response',
+    )
+    expect(formatSyncOutput(output, 'compact', false)).toBe(
+      'source-a failed warnings=1 errors=1 code=network exit=30 error=Sync_failed_for_Source_"source-a"_(network)\n' +
+        'source-a warning=degraded partial provider response',
+    )
+    const { status: _status, ...failedEvent } = failed
+    expect(JSON.parse(formatSyncOutput(output, 'events', false))).toEqual({
+      type: 'source.failed',
+      ...failedEvent,
+    })
   })
 
   test('syncs one explicit Source through the public core service and closes deps', async () => {
@@ -209,6 +258,10 @@ describe('sync command', () => {
     expect(JSON.parse(String(log.mock.calls[0]?.[0])).results[0]).toEqual({
       sourceId: 'source-a',
       status: 'failed',
+      warningsCount: 0,
+      lastWarning: null,
+      errorsCount: 1,
+      lastError: 'Sync failed for Source "source-a" (sync_unsupported)',
       error: {
         code: 'sync_unsupported',
         message: 'Sync failed for Source "source-a" (sync_unsupported)',
@@ -255,6 +308,10 @@ describe('sync command', () => {
     expect(output.results[0]).toEqual({
       sourceId: 'source-b',
       status: 'failed',
+      warningsCount: 0,
+      lastWarning: null,
+      errorsCount: 1,
+      lastError: 'Sync failed for Source "source-b" (adapter_unavailable)',
       error: {
         code: 'adapter_unavailable',
         message: 'Sync failed for Source "source-b" (adapter_unavailable)',
@@ -291,6 +348,10 @@ describe('sync command', () => {
       {
         type: 'source.failed',
         sourceId: 'source-a',
+        warningsCount: 0,
+        lastWarning: null,
+        errorsCount: 1,
+        lastError: 'Sync failed for Source "source-a" (cancelled)',
         error: {
           code: 'cancelled',
           message: 'Sync failed for Source "source-a" (cancelled)',
@@ -300,6 +361,10 @@ describe('sync command', () => {
       {
         type: 'source.failed',
         sourceId: 'source-b',
+        warningsCount: 0,
+        lastWarning: null,
+        errorsCount: 1,
+        lastError: 'Sync failed for Source "source-b" (network)',
         error: {
           code: 'network',
           message: 'Sync failed for Source "source-b" (network)',

@@ -27,6 +27,10 @@ export const syncRuns = sqliteTable('sync_runs', {
   resourcesDeleted: integer('resources_deleted', { mode: 'number' })
     .notNull()
     .default(0),
+  warningsCount: integer('warnings_count', { mode: 'number' })
+    .notNull()
+    .default(0),
+  lastWarningJson: text('last_warning_json'),
   errorsCount: integer('errors_count', { mode: 'number' }).notNull().default(0),
   errorSummary: text('error_summary'),
 })
