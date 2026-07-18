@@ -7,7 +7,7 @@ A profile declares, at minimum: an id, an integer version, and a payload schema.
 
 - **search mapping** — pure extractors for title, occurred-at, and FTS chunks;
 - **fields** — TYPED declarations (`type` + pure extractor) that populate the generic field index and define valid `--field` filters and aggregations;
-- **relations** — pure extractors producing edges to refs or natural keys ([Resource identity, deletion, and Relations](../../../../specs/core-model/spec.md));
+- **relations** — pure extractors producing edges to refs or natural keys ([Resource identity, deletion, and Relations](../../../../../openspec/specs/core-model/spec.md));
 - **artifacts** — pure extractor producing artifact descriptors (bytes fetched lazily);
 - **exports** — a map of format name to media type + render function;
 - **actions** — typed provider-mutation contracts (stable id, input schema, output contract, effect classification, docs, and examples) whose I/O implementations belong to adapters;
