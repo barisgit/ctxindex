@@ -73,8 +73,26 @@ test('relocated compiled CLI serves embedded bundled skills', async () => {
     const get = await run(['skills', 'get', 'getting-started'])
     expect(get.exitCode).toBe(0)
     expect(get.stdout).toContain('# Getting started with ctxindex')
-    expect(get.stdout).toContain('ctxindex client add <provider> --from-env')
-    expect(get.stdout).not.toMatch(/ctxindex auth\b/)
+    expect(get.stdout).toContain('ctxindex --help')
+    expect(get.stdout).toContain(
+      'ctxindex describe <profile|adapter|action> <id> --json',
+    )
+    expect(get.stdout).toContain('ctxindex extensions list')
+    expect(get.stdout).toContain('ctxindex skills list')
+    expect(get.stdout).toContain('ctxindex skills get <name>')
+    expect(get.stdout).not.toMatch(/--from-env|client add|account add/)
+    expect(get.stdout).not.toContain('```')
+    expect(get.stdout).not.toMatch(
+      /^(?:\s*[-*+]\s+)?(?:init|realm|client|account|source)(?:\s|$|[/|])/m,
+    )
+
+    const getInline = await run([
+      'skills',
+      'get',
+      'getting-started',
+      '--inline',
+    ])
+    expect(getInline).toEqual(get)
 
     const getJson = await run([
       'skills',
@@ -85,10 +103,9 @@ test('relocated compiled CLI serves embedded bundled skills', async () => {
     ])
     expect(getJson.exitCode).toBe(0)
     const document = JSON.parse(getJson.stdout) as { content: string }
-    expect(document.content).toContain(
-      '--- inlined: reference/cli-overview ---',
-    )
-    expect(document.content).toContain('# CLI overview')
+    expect(document.content).toContain('ctxindex --help')
+    expect(document.content).not.toContain('--- inlined:')
+    expect(document.content).not.toContain('reference/cli-overview')
 
     const path = await run(['skills', 'path'])
     expect(path).toEqual({

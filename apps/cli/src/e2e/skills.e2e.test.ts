@@ -25,9 +25,19 @@ test('skills get returns markdown', async () => {
     expect(result.exitCode).toBe(0)
     expect(result.stderr).toBe('')
     expect(result.stdout).toMatch(/^# Getting started with ctxindex/m)
-    expect(result.stdout).toContain('ctxindex client add <provider> --from-env')
-    expect(result.stdout).toContain('ctxindex account add <provider>')
-    expect(result.stdout).not.toMatch(/ctxindex auth\b/)
+    expect(result.stdout).toContain('ctxindex --help')
+    expect(result.stdout).toContain('ctxindex describe')
+    expect(result.stdout).toContain(
+      'ctxindex describe <profile|adapter|action> <id> --json',
+    )
+    expect(result.stdout).toContain('ctxindex extensions list')
+    expect(result.stdout).toContain('ctxindex skills list')
+    expect(result.stdout).toContain('ctxindex skills get <name>')
+    expect(result.stdout).not.toMatch(/--from-env|client add|account add/)
+    expect(result.stdout).not.toContain('```')
+    expect(result.stdout).not.toMatch(
+      /^(?:\s*[-*+]\s+)?(?:init|realm|client|account|source)(?:\s|$|[/|])/m,
+    )
   } finally {
     await sandbox.cleanup()
   }
@@ -60,7 +70,7 @@ test('unknown skill name exits 2', async () => {
   }
 })
 
-test('inline flag inlines references', async () => {
+test('inline flag preserves a standalone skill', async () => {
   const sandbox = await createSandbox()
   try {
     const normal = await sandbox.run(['skills', 'get', 'getting-started'])
@@ -74,9 +84,8 @@ test('inline flag inlines references', async () => {
     expect(normal.exitCode).toBe(0)
     expect(inline.exitCode).toBe(0)
     expect(inline.stderr).toBe('')
-    expect(inline.stdout.length).toBeGreaterThan(normal.stdout.length)
-    expect(inline.stdout).toContain('--- inlined: reference/cli-overview ---')
-    expect(inline.stdout).toContain('# CLI overview')
+    expect(inline.stdout).toBe(normal.stdout)
+    expect(inline.stdout).not.toContain('--- inlined:')
   } finally {
     await sandbox.cleanup()
   }

@@ -41,21 +41,27 @@ test('skills get returns bundled markdown', async () => {
   expect(result.exitCode).toBe(0)
   expect(result.stderr).toBe('')
   expect(result.stdout).toContain('# Getting started with ctxindex')
-  expect(result.stdout).toContain('./reference/cli-overview.md')
+  expect(result.stdout).toContain('ctxindex --help')
+  expect(result.stdout).toContain(
+    'ctxindex describe <profile|adapter|action> <id> --json',
+  )
+  expect(result.stdout).not.toContain('reference/cli-overview')
+  expect(result.stdout).not.toContain('```')
+  expect(result.stdout).not.toMatch(
+    /^(?:\s*[-*+]\s+)?(?:init|realm|client|account|source)(?:\s|$|[/|])/m,
+  )
 })
 
-test('skills get --inline merges referenced markdown', async () => {
-  const result = await runCtxindex([
-    'skills',
-    'get',
-    'getting-started',
-    '--inline',
+test('skills get --inline preserves standalone orientation', async () => {
+  const [normal, inline] = await Promise.all([
+    runCtxindex(['skills', 'get', 'getting-started']),
+    runCtxindex(['skills', 'get', 'getting-started', '--inline']),
   ])
 
-  expect(result.exitCode).toBe(0)
-  expect(result.stderr).toBe('')
-  expect(result.stdout).toContain('--- inlined: reference/cli-overview ---')
-  expect(result.stdout).toContain('# CLI overview')
+  expect(inline.exitCode).toBe(0)
+  expect(inline.stderr).toBe('')
+  expect(inline.stdout).toBe(normal.stdout)
+  expect(inline.stdout).not.toContain('--- inlined:')
 })
 
 test('skills path returns an existing directory', async () => {

@@ -1,62 +1,13 @@
 # Getting started with ctxindex
 
-Use ctxindex to discover, retrieve, and materialize personal context across configured Sources, organized into Realms such as `personal`, `company`, and `university`.
+ctxindex is a local personal-context gateway for agents. Use it when you need to discover, retrieve, or materialize context across configured Sources and Realms, or invoke a typed provider Action through the same deterministic CLI.
 
-Start with the [CLI overview](./reference/cli-overview.md).
+The installed CLI's live help and loaded definitions are authoritative. Start with:
 
-## Core workflow
+- `ctxindex --help` for the current command surface and command-specific help.
+- `ctxindex describe` for the compact index of loaded Profiles, Adapters, and Actions.
+- `ctxindex describe <profile|adapter|action> <id> --json` for one exact loaded definition and its available vocabulary.
+- `ctxindex extensions list` for the Extensions active in this installation.
+- `ctxindex skills list` to discover bundled orientation and `ctxindex skills get <name>` to read one skill.
 
-1. Initialize ctxindex.
-2. Create a Realm.
-3. For an OAuth Adapter, add a provider client from its declared environment values.
-4. Authorize the provider Account with that persisted client.
-5. Add a Source to that Realm.
-6. Search remotely immediately, or sync when the Source supports a local projection.
-7. Retrieve complete Resources by their stable `ctx://` Ref.
-8. Download Artifacts or export Profile-supported representations when needed.
-
-Discover the provider id and client environment names with `ctxindex describe adapter <adapter-id> --json`, then run `ctxindex client add <provider> --from-env` once and `ctxindex account add <provider>`. The environment is read only by `client add`; authorization resolves the persisted client and never accepts credentials on argv. Client labels default to the provider id and are unique per provider; use `--client <label>` when several exist. Account labels default to the verified provider identity, and Source labels default to `<account-label>-<adapter-tail>` or `<adapter-tail>` without an Account. Account and Source labels are globally unique verbatim handles; collisions exit 2 without prompting or automatic suffixes. Use `client remove <provider> <label>` and `account remove <label>` for explicit cleanup.
-
-An unscoped search spans all configured Accounts and unauthenticated Sources.
-Use an explicit Realm filter to keep personal and work retrieval exact. Inspect
-`account list` and `source list` rather than inferring provider identity from a
-Source label.
-
-## Browsing without a query
-
-The `search` query text is optional when at least one filter (`--realm`,
-`--adapter`, `--source`, `--kind`, `--field`, `--since`, `--until`) is present.
-A filter-only search enumerates matching local Resources newest first
-(`occurredAt` descending, tie-broken by Ref), so "the latest 20 work emails" is
-`search --realm work --kind <email-kind> --limit 20` with no query string.
-Filter-only enumeration is local-only: it never contacts providers, and
-`--remote` without query text is an error. A bare `search` with neither query
-nor filters is also an error.
-
-## Paginating results
-
-Local executions (filter-only searches, or query searches with `--local-only`)
-accept `--offset <n>` alongside `--limit <n>`. The JSON envelope reports
-`pagination: { offset, limit, hasMore }`; while `hasMore` is true, repeat the
-same command with `--offset` advanced by `--limit` to fetch the next page.
-Ordering is deterministic against an unchanged index, so pages neither overlap
-nor skip Resources.
-
-## Calendar events
-
-Calendar Sources are indexed: synchronize the selected calendar, search with
-the generated event alias, then retrieve complete events by their stable
-Source-scoped Ref.
-One stable Grant is shared by compatible mailbox and calendar Sources for the
-same provider Account and is updated in place on reauthorization. Account labels
-cannot overlap globally; identical cross-provider default identities require
-distinct explicit `--label` values, and collisions exit 2. Inspect the Adapter
-definition for generated configuration flags and exact scopes.
-
-Calendar Adapters are read-only and expose no mutation Actions.
-
-## Email Drafts
-
-The agent may compose proposed text without calling ctxindex. Before persisting a provider Draft, list loaded reversible Actions with `ctxindex describe action`, inspect the applicable definition with `ctxindex describe action <action-id> --json`, and invoke it through an explicit mailbox Source.
-
-V1 does not send email. Sending and other consequential provider mutations are deferred.
+Prefer these live surfaces over copied command lists, schemas, or provider-specific instructions: they reflect the installed ctxindex release and its loaded Extensions.
