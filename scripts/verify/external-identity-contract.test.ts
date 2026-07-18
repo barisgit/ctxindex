@@ -12,6 +12,16 @@ async function read(
   return Bun.file(path).text()
 }
 
+function expectIndependentIdentityContract(document: string): void {
+  expect(document).toMatch(/communication\.message.*rfcMessageId/is)
+  expect(document).toMatch(/zero-to-many.*across Sources/is)
+  expect(document).toMatch(/Source-scoped (?:Resource )?Ref/i)
+  expect(document).toMatch(/cross-Source Resource collapse.*deferred/is)
+  expect(document).toMatch(/canonical identity.*deferred/is)
+  expect(document).toMatch(/merge policy.*deferred/is)
+  expect(document).not.toContain('external_refs')
+}
+
 test('current-facing docs use typed natural keys without a separate external-reference store', async () => {
   const [coreModel, genericStorage, system] = await Promise.all(
     currentFacingPaths.map(read),
@@ -19,10 +29,7 @@ test('current-facing docs use typed natural keys without a separate external-ref
   const prose = [coreModel, genericStorage, system].join('\n')
 
   for (const document of [coreModel, system]) {
-    expect(document).toMatch(/communication\.message.*rfcMessageId/is)
-    expect(document).toMatch(/zero-to-many.*across Sources/is)
-    expect(document).toMatch(/Source-scoped (?:Resource )?Ref/i)
-    expect(document).toMatch(/cross-Source.*(?:collapse|identity).*deferred/is)
+    expectIndependentIdentityContract(document)
   }
 
   expect(prose).toMatch(/typed Profile field/i)
@@ -46,4 +53,29 @@ test('current-facing docs use typed natural keys without a separate external-ref
     'External identity uniqueness is scoped by Source, external kind, and external id.',
   )
   expect(prose).not.toContain('source_id + external_kind + external_id')
+})
+
+test('guard rejects each missing deferral and external_refs in each identity document', async () => {
+  const [coreModel, , system] = await Promise.all(currentFacingPaths.map(read))
+
+  const removals = [
+    [/cross-Source Resource collapse/i, 'cross-Source duplicate handling'],
+    [/canonical identity/i, 'canonical record selection'],
+    [/merge policy/i, 'merge behavior'],
+  ] as const
+
+  for (const document of [coreModel, system]) {
+    for (const [pattern, replacement] of removals) {
+      expect(document).toMatch(pattern)
+      expect(() =>
+        expectIndependentIdentityContract(
+          document.replace(pattern, replacement),
+        ),
+      ).toThrow()
+    }
+
+    expect(() =>
+      expectIndependentIdentityContract(`${document}\nexternal_refs`),
+    ).toThrow()
+  }
 })
