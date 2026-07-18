@@ -205,7 +205,7 @@ test.each([
   })
 })
 
-test('attaches an existing typed branch and reports an absent branch', async () => {
+test('attaches existing local and remote typed branches and reports an absent branch', async () => {
   const root = await makeRepository()
   expect(
     (await run(['git', 'branch', 'feature/existing-work'], root)).exitCode,
@@ -225,6 +225,45 @@ test('attaches an existing typed branch and reports an absent branch', async () 
       join(root, '.worktrees/feature-existing-work/.ctxindex/worktree'),
     ).exists(),
   ).toBe(true)
+
+  const remote = await mkdtemp(join(tmpdir(), 'ctxindex-worktree-remote-'))
+  tempDirs.push(remote)
+  expect((await run(['git', 'init', '--bare'], remote)).exitCode).toBe(0)
+  expect(
+    (await run(['git', 'remote', 'add', 'origin', remote], root)).exitCode,
+  ).toBe(0)
+  expect(
+    (
+      await run(
+        ['git', 'push', 'origin', 'HEAD:refs/heads/feature/remote-work'],
+        root,
+      )
+    ).exitCode,
+  ).toBe(0)
+  expect((await run(['git', 'fetch', 'origin'], root)).exitCode).toBe(0)
+
+  const remoteAttached = await run(
+    ['bash', scriptPath, '--existing', 'feature/remote-work'],
+    root,
+  )
+
+  expect(remoteAttached.exitCode).toBe(0)
+  expect(remoteAttached.stdout).toContain(
+    'Attaching to remote-tracking branch: origin/feature/remote-work',
+  )
+  expect(
+    await Bun.file(
+      join(root, '.worktrees/feature-remote-work/.ctxindex/worktree'),
+    ).exists(),
+  ).toBe(true)
+  expect(
+    (
+      await run(
+        ['git', 'branch', '--show-current'],
+        join(root, '.worktrees/feature-remote-work'),
+      )
+    ).stdout.trim(),
+  ).toBe('feature/remote-work')
 
   const absent = await run(
     ['bash', scriptPath, '--existing', 'fix/absent-branch'],
