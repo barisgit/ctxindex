@@ -7,6 +7,44 @@ import {
 import { CTXINDEX_BUILTIN_EXTENSIONS } from './index'
 
 describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
+  test('keeps the canonical docs aligned with the bundled Profile inventory', async () => {
+    const [specification, design] = await Promise.all([
+      Bun.file(
+        new URL(
+          '../../../openspec/specs/profile-vocabulary/spec.md',
+          import.meta.url,
+        ),
+      ).text(),
+      Bun.file(
+        new URL(
+          '../../../docs/design/2026-07-13-context-access-layer.md',
+          import.meta.url,
+        ),
+      ).text(),
+    ])
+    const inventory =
+      '`communication.message@1`, `calendar.event@1`, and `file@1`'
+
+    expect(specification).toContain(
+      `The V1 bundled canonical Profiles MUST be ${inventory}.`,
+    )
+    expect(design).toContain(
+      `Canonical Profiles bundled with the binary: ${inventory}.`,
+    )
+    expect(design).toContain(
+      'V1 uses one primary Profile plus Artifact descriptors per Resource',
+    )
+    const bundledProfileLine = design
+      .split('\n')
+      .find((line) =>
+        line.startsWith('Canonical Profiles bundled with the binary:'),
+      )
+    expect(bundledProfileLine).toBeDefined()
+    expect(bundledProfileLine).not.toMatch(
+      /communication\.conversation|`task`|`artifact`|`mbox`|`ics`/,
+    )
+  })
+
   test('describes declarative Google, Microsoft, and local Source definitions', () => {
     const registry = createExtensionRegistry(CTXINDEX_BUILTIN_EXTENSIONS)
     const description = describeRegistry(registry)
