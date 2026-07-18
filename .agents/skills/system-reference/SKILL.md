@@ -28,7 +28,7 @@ Aim for a great technical narrative, not a flattened set of requirements.
 - Do not translate specification language into prose with `SHALL`, `MUST`, or close rephrasings. Preserve the behavior and its strength through concrete explanations, boundaries, and examples instead of spec-speak.
 - Prefer a short **10-minute tour** up front, then deepen the model in later sections. The complete document should normally be about 25–30 KB; compress repetition rather than padding to the target.
 - Include at least one worked end-to-end example with a real ctxindex command sequence. Show the expected shape of each important readable or JSON result without inventing exact provider data.
-- Include two or three small diagrams in ASCII or Mermaid. At minimum, diagram the Client → Account → Grant → Source authorization layering and the distinct sync versus remote-search data flows.
+- Include two or three small Mermaid diagrams (fenced ```mermaid blocks; never ASCII art). At minimum, diagram the Client → Account → Grant → Source authorization layering and the distinct sync versus remote-search data flows.
 - Name implementation locations at the module level (`@ctxindex/cli`, `@ctxindex/core`, `@ctxindex/extension-sdk`, `@ctxindex/profiles`, and `@ctxindex/adapters`). File layout belongs to `codemap.md`; do not narrate implementation ownership with source-file paths. Exact spec, sidecar, and explanatory-document paths remain appropriate in the source index because they identify consulted evidence.
 
 ## Required Header

@@ -10,10 +10,14 @@
 
 ctxindex gives agents one command vocabulary for context spread across providers and local files. A message, calendar event, and file all become **Resources** with stable `ctx://` **Refs**. Providers and files remain canonical; ctxindex keeps local projections and caches for search, retrieval, Relations, export, and narrowly typed **Actions**.
 
-```text
-agent -> CLI -> provider-neutral core -> Source -> Source Adapter -> provider/files
-                 |                       |
-                 +-> SQLite + cache      +-> one Realm, optional Account Grant
+```mermaid
+flowchart LR
+  A[Agent] --> CLI --> Core[Provider-neutral core]
+  Core --> DB[(SQLite + cache)]
+  Core --> S[Source]
+  S --> AD[Source Adapter] --> P[Provider / files]
+  R[Realm] -. contains .-> S
+  G[Account Grant] -. optional .-> S
 ```
 
 Sync transactionally materializes a Source; live search/retrieval returns the same Ref shape and may leave purgeable ad-hoc cache entries.
@@ -119,10 +123,13 @@ If an Extension disappears, Sources become `extension_unavailable`. Existing loc
 
 ## 6. Accounts, Clients, Grants, and Realms
 
-```text
-Client -> authorizes -> Account -> owns one -> Grant -> binds explicitly -> Source -> Adapter
-  | provider-local label  | global label       | scopes + secret refs      | global label
-Realm ------------------------- contains exactly one ----------------------> Source
+```mermaid
+flowchart LR
+  C["Client\n(provider-local label)"] -- authorizes --> A["Account\n(global label)"]
+  A -- owns exactly one --> G["Grant\n(scopes + secret refs)"]
+  G -- binds explicitly --> S["Source\n(global label)"]
+  R[Realm] -- contains exactly one Realm per Source --> S
+  S --> AD[Source Adapter]
 ```
 
 A Client’s verbatim default label is the provider id and uniqueness is provider-local. Inventory hides values and references. Removal deletes Client metadata and credentials while existing Grants retain refresh state.
@@ -139,16 +146,20 @@ Removing an Account deletes its Grant and secrets but leaves Sources configured 
 
 ## 7. Search and sync behavior
 
-```text
-SYNC                                           SEARCH / RETRIEVE
-Adapter iterator -> validated emissions        normalized query -> core planner
-                         |                                     /          \
-                 one transaction                         local FTS     remote Adapter
-              / fields/chunks/Relations                     \             /
-       Resources/tombstones/cursor                        interleave + dedupe
-                                                                  |
-                                                        get Ref: local first,
-                                                        else retrieve + adhoc cache
+```mermaid
+flowchart TB
+  subgraph Sync
+    AI[Adapter iterator] --> VE[Validated emissions] --> TX[One transaction]
+    TX --> M["Resources, fields, chunks,\nRelations, tombstones, cursor"]
+  end
+  subgraph Search & retrieve
+    Q[Normalized query] --> PL[Core planner]
+    PL --> FTS[Local FTS]
+    PL --> RA[Remote Adapter search]
+    FTS --> IX[Interleave + dedupe]
+    RA --> IX
+    IX --> GET["get Ref: local first,\nelse retrieve + adhoc cache"]
+  end
 ```
 
 Search accepts text, filters, or both. Query-less search needs a filter, stays local, and enumerates projections; bare `search` is invalid. Profile-defined kinds, aliases, fields, and typed values reject bad filters before I/O.
