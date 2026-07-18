@@ -11,6 +11,17 @@ Agent ───── CLI ────> ctxindex ──> Sources ──> provide
                          └── Resources / Refs / Relations / Artifacts
 ```
 
+## Agent integration
+
+The CLI is the integration surface: any code-executing agent can use ctxindex
+with zero integration work. Codex CLI, OpenClaw, Claude Code, and similar
+agents compose `search`, `get`, `thread`, `export`, and `action` directly from
+a shell, including from Hermes-driven OpenClaw sessions. There is no MCP
+server and none is required; deterministic commands, `--json` output, and
+stable exit codes are the contract. ctxindex was originally built to give a
+personal OpenClaw agent governed, realm-scoped access to mail and calendar
+across multiple accounts.
+
 V1 and V1.1 are shipped. The project remains pre-alpha but functional: it provides multi-provider mail and calendar workflows through `search`, `sync`, `get`, `thread`, and `export`, plus reversible Draft actions. The implementation receives no schema or CLI compatibility treatment until a released version creates that obligation. Current behavior is owned by the capability specs under `openspec/specs/`; use `openspec list` for the authoritative active-change inventory.
 
 ## Development
