@@ -137,6 +137,7 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
 
   test('declares canonical Google OAuth and strict token-free configs', () => {
     const registry = createExtensionRegistry(CTXINDEX_BUILTIN_EXTENSIONS)
+    const description = describeRegistry(registry)
     const calendar = registry.adapters.get({
       id: 'google.calendar',
       version: 1,
@@ -227,6 +228,11 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
     expect(
       gmail?.configSchema.safeParse({ access_token: 'malicious' }).success,
     ).toBe(false)
+    expect(gmail?.configSchema.parse({})).toEqual({})
+    expect(
+      description.sources.find(({ id }) => id === 'google.mailbox')
+        ?.configOptions,
+    ).toEqual([])
     expect(microsoft?.auth).toMatchObject({
       kind: 'oauth2',
       provider: { id: 'microsoft' },

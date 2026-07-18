@@ -57,6 +57,32 @@ function parseSourceId(stdout: string): string {
 }
 
 describe('source e2e', () => {
+  test.each([
+    ['--config-raw-records-enabled', 'true'],
+    ['--config-labels-include', 'INBOX'],
+    ['--config-labels-exclude', 'SPAM'],
+    ['--config-sync-window-days', '30'],
+  ])('source add Gmail rejects former option %s before opening state', async (flag, value) => {
+    const sandbox = await createSandbox()
+    try {
+      const result = await sandbox.run([
+        'source',
+        'add',
+        'google.mailbox',
+        '--realm',
+        'work',
+        flag,
+        value,
+      ])
+
+      expect(result.exitCode).toBe(2)
+      expect(result.stderr).toContain(`unknown option ${flag}`)
+      expect(await Bun.file(dbPath(sandbox)).exists()).toBe(false)
+    } finally {
+      await sandbox.cleanup()
+    }
+  })
+
   test('source add Gmail rejects token-bearing config', async () => {
     await withInitializedSandbox(async (sandbox) => {
       const result = await sandbox.run([

@@ -156,6 +156,7 @@ test('interpreted registry interface follows an explicit external Extension', as
     expect(JSON.parse(googleAuthJson.stdout)).toMatchObject({
       id: 'google.mailbox',
       providerApiHosts: ['gmail.googleapis.com'],
+      configOptions: [],
       auth: {
         provider: {
           environment: {
@@ -164,6 +165,7 @@ test('interpreted registry interface follows an explicit external Extension', as
         },
       },
     })
+    expect(googleAuth.stdout).not.toContain('--config-')
 
     const microsoftMailbox = await run([
       'describe',
