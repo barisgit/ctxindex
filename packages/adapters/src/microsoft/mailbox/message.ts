@@ -38,6 +38,7 @@ export const graphMessageSchema = z
       .optional()
       .nullable(),
     from: recipientSchema.optional().nullable(),
+    replyTo: z.array(recipientSchema).optional().nullable(),
     toRecipients: z.array(recipientSchema).optional().nullable(),
     ccRecipients: z.array(recipientSchema).optional().nullable(),
     bccRecipients: z.array(recipientSchema).optional().nullable(),
@@ -78,6 +79,13 @@ function header(message: GraphMessage, name: string): string | undefined {
   )?.value
 }
 
+function references(message: GraphMessage): string[] | undefined {
+  const value = header(message, 'References')
+  if (!value?.trim()) return undefined
+  const ids = value.match(/<[^<>]+>/g) ?? value.trim().split(/\s+/)
+  return ids.length > 0 ? [...new Set(ids)] : undefined
+}
+
 export function parseGraphMessage(value: unknown): GraphMessage {
   const parsed = graphMessageSchema.safeParse(value)
   if (!parsed.success)
@@ -110,6 +118,10 @@ function payload(
       : {}),
     ...(normalizeMessageId(header(message, 'In-Reply-To'))
       ? { inReplyTo: normalizeMessageId(header(message, 'In-Reply-To')) }
+      : {}),
+    ...(references(message) ? { references: references(message) } : {}),
+    ...(addresses(message.replyTo)
+      ? { replyTo: addresses(message.replyTo) }
       : {}),
     ...(message.subject !== null && message.subject !== undefined
       ? { subject: message.subject }

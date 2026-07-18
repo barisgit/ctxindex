@@ -127,6 +127,25 @@ export function defineProfile<
 ): ProfileDefinition<TId, TVersion, TSchema>;
 ```
 
+### @ctxindex/profiles — communication reply vocabulary
+
+```ts
+export type CommunicationMessage = z.infer<typeof communicationMessageSchema>
+
+export function deriveCommunicationMessageReplyRecipient(
+  payload: CommunicationMessage,
+): string | undefined;
+
+export function deriveCommunicationMessageReplySubject(
+  subject: string | undefined,
+): string;
+
+export function deriveCommunicationMessageReplyReferences(
+  references: readonly string[] | undefined,
+  rfcMessageId: string,
+): string[];
+```
+
 ### @ctxindex/profiles — calendar event vocabulary
 
 ```ts

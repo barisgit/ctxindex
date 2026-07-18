@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-Packages ctxindex's built-in provider integration layer, exposing production Adapter, OAuth provider, and Extension definitions—including indexed Microsoft Calendar and Gmail/Microsoft Graph Outlook Draft handlers—from `packages/adapters/src/` as the private workspace package `@ctxindex/adapters`.
+Packages ctxindex's built-in provider integration layer, exposing production Adapter, OAuth provider, and Extension definitions—including indexed Microsoft Calendar and thread-aware Gmail/Microsoft Graph Outlook Draft handlers—from `packages/adapters/src/` as the private workspace package `@ctxindex/adapters`.
 
 ## Design/patterns
 
@@ -14,7 +14,7 @@ Packages ctxindex's built-in provider integration layer, exposing production Ada
 
 1. A host imports `CTXINDEX_BUILTIN_EXTENSIONS` or individual definitions from `@ctxindex/adapters`.
 2. Core registers the bundled Profiles and five Adapters, then invokes capability-specific operations with SDK contexts.
-3. Adapter code translates Google, Microsoft Graph, or filesystem data into Profile-shaped resources, streamed emissions, Artifacts, warnings, checkpoints, or Action results for core to validate and persist. Microsoft calendar and mailbox operations share the provider-root Graph transport; Draft implementations consume the shared communication Action schemas, issue exactly one provider create/update mutation, and return a canonical Draft Resource; no send Action is registered.
+3. Adapter code translates Google, Microsoft Graph, or filesystem data into Profile-shaped resources, streamed emissions, Artifacts, warnings, checkpoints, or Action results for core to validate and persist. Microsoft calendar and mailbox operations share the provider-root Graph transport; Draft implementations consume the shared communication Action schemas, derive replies from complete local parent Resources, enforce immutable reply associations, issue exactly one provider mutation, and return a canonical Draft Resource; no send Action is registered.
 
 ## Integration points
 

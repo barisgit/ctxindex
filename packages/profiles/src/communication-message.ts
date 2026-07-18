@@ -15,7 +15,7 @@ const headerValueSchema = z
   .min(1)
   .regex(/^[^\r\n]*$/)
 
-const communicationMessageDraftContentShape = {
+const communicationMessageDraftStandaloneContentShape = {
   to: z.array(headerValueSchema).min(1),
   cc: z.array(headerValueSchema).optional(),
   bcc: z.array(headerValueSchema).optional(),
@@ -23,16 +23,40 @@ const communicationMessageDraftContentShape = {
   bodyText: z.string(),
 }
 
-export const communicationMessageDraftCreateInputSchema = z
-  .object(communicationMessageDraftContentShape)
+const communicationMessageDraftReplyContentShape = {
+  replyToRef: z.string().min(1),
+  bodyText: z.string(),
+}
+
+const communicationMessageDraftStandaloneCreateInputSchema = z
+  .object(communicationMessageDraftStandaloneContentShape)
+  .strict()
+const communicationMessageDraftReplyCreateInputSchema = z
+  .object(communicationMessageDraftReplyContentShape)
   .strict()
 
-export const communicationMessageDraftUpdateInputSchema = z
+export const communicationMessageDraftCreateInputSchema = z.union([
+  communicationMessageDraftStandaloneCreateInputSchema,
+  communicationMessageDraftReplyCreateInputSchema,
+])
+
+const communicationMessageDraftStandaloneUpdateInputSchema = z
   .object({
     ref: z.string().min(1),
-    ...communicationMessageDraftContentShape,
+    ...communicationMessageDraftStandaloneContentShape,
   })
   .strict()
+const communicationMessageDraftReplyUpdateInputSchema = z
+  .object({
+    ref: z.string().min(1),
+    ...communicationMessageDraftReplyContentShape,
+  })
+  .strict()
+
+export const communicationMessageDraftUpdateInputSchema = z.union([
+  communicationMessageDraftStandaloneUpdateInputSchema,
+  communicationMessageDraftReplyUpdateInputSchema,
+])
 
 function sanitizeHeader(value: string): string {
   return value.replace(/[\r\n]+/g, ' ')
@@ -75,6 +99,9 @@ export const communicationMessageSchema = z
     conversationKey: z.string().min(1).optional(),
     rfcMessageId: z.string().min(1).optional(),
     inReplyTo: z.string().min(1).optional(),
+    references: z.array(z.string().min(1)).optional(),
+    replyTo: z.array(z.string().min(1)).optional(),
+    replyToRef: z.string().min(1).optional(),
     subject: z.string().optional(),
     from: z.array(z.string()).optional(),
     to: z.array(z.string()).optional(),
@@ -88,6 +115,28 @@ export const communicationMessageSchema = z
     attachments: z.array(artifactDescriptorSchema).optional(),
   })
   .strict()
+
+export type CommunicationMessage = z.infer<typeof communicationMessageSchema>
+
+export function deriveCommunicationMessageReplyRecipient(
+  payload: CommunicationMessage,
+): string | undefined {
+  return payload.replyTo?.[0] ?? payload.from?.[0]
+}
+
+export function deriveCommunicationMessageReplySubject(
+  subject: string | undefined,
+): string {
+  const base = (subject ?? '').replace(/^(?:\s*re\s*:\s*)+/i, '').trim()
+  return base ? `Re: ${base}` : 'Re:'
+}
+
+export function deriveCommunicationMessageReplyReferences(
+  references: readonly string[] | undefined,
+  rfcMessageId: string,
+): string[] {
+  return [...new Set([...(references ?? []), rfcMessageId])]
+}
 
 export const communicationMessageProfile = defineProfile({
   id: 'communication.message',
@@ -105,6 +154,11 @@ export const communicationMessageProfile = defineProfile({
           subject: 'Project update',
           bodyText: 'The project is on track.',
         },
+        {
+          replyToRef:
+            'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/stable-message-id',
+          bodyText: 'Thanks for the update.',
+        },
       ],
     },
     'communication.message.draft.update': {
@@ -118,6 +172,12 @@ export const communicationMessageProfile = defineProfile({
           to: ['recipient@example.com'],
           subject: 'Updated project status',
           bodyText: 'The project is ready for review.',
+        },
+        {
+          ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/stable-draft-id',
+          replyToRef:
+            'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/stable-message-id',
+          bodyText: 'Updated reply text.',
         },
       ],
     },

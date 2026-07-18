@@ -110,6 +110,7 @@ describe('Microsoft Outlook Draft Actions', () => {
       }) as unknown as typeof fetch,
       logger,
       signal: new AbortController().signal,
+      resolveResource: () => null,
     }).catch((caught: unknown) => caught)
 
     expect(error).toMatchObject({ code: 'invalid_action_input' })
@@ -131,6 +132,7 @@ describe('Microsoft Outlook Draft Actions', () => {
       }) as unknown as typeof fetch,
       logger,
       signal: new AbortController().signal,
+      resolveResource: () => null,
     }).catch((caught: unknown) => caught)
 
     expect(error).toMatchObject({ code: 'invalid_action_input' })
@@ -293,6 +295,7 @@ describe('Microsoft Outlook Draft Actions', () => {
       }) as unknown as typeof fetch,
       logger,
       signal: new AbortController().signal,
+      resolveResource: () => null,
     })
 
     expect(fetchCalls).toBe(1)
@@ -485,6 +488,7 @@ describe('Microsoft Outlook Draft Actions', () => {
       }) as unknown as typeof fetch,
       logger,
       signal: new AbortController().signal,
+      resolveResource: () => null,
     }).catch((caught: unknown) => caught)
 
     expect(error).toMatchObject({ code })
@@ -509,6 +513,7 @@ describe('Microsoft Outlook Draft Actions', () => {
       }) as unknown as typeof fetch,
       logger,
       signal: new AbortController().signal,
+      resolveResource: () => null,
     }).catch((caught: unknown) => caught)
 
     expect(error).toMatchObject({ code: 'invalid_action_input' })

@@ -38,9 +38,19 @@ export interface AdapterActionBinding<
 ### @ctxindex/extension-sdk — Action operation context
 
 ```ts
+export interface ActionResource {
+  readonly ref: string
+  readonly sourceId: string
+  readonly profile: ProfileReference
+  readonly completeness: 'partial' | 'complete'
+  readonly deletedAt: number | null
+  readonly payload: unknown | null
+}
+
 export interface ActionContext<TInput = unknown> extends ProviderContext {
   readonly input: TInput
   readonly signal: AbortSignal
+  readonly resolveResource: (ref: string) => ActionResource | null
 }
 ```
 
@@ -165,9 +175,9 @@ export async function handleActionCommand(
 
 ## Implementation doctrine
 
-Profiles own Action ids, input schemas, output Profile, effect, docs, and examples. Adapters bind implementations only for declared Actions. Core resolves the Source-bound binding, validates input before provider I/O, enforces effect confirmation, invokes one operation context, validates the returned Ref/Profile/payload, and stores complete ad-hoc output. Automatic 401 retry is disabled.
+Profiles own Action ids, input schemas, output Profile, effect, docs, and examples. Adapters bind implementations only for declared Actions. Core resolves the Source-bound binding, validates input before provider I/O, enforces effect confirmation, and injects a generic Source-scoped local Resource resolver before creating the provider context. The resolver exposes stored completeness and deletion state, rejects cross-Source Refs, and never retrieves or authenticates. Core validates the returned Ref/Profile/payload and stores complete ad-hoc output. Automatic 401 retry is disabled.
 
-Gmail Draft identity uses the immutable Draft id; Outlook requests immutable Graph ids. Updates build complete replacement recipients, subject, and body. The CLI exposes only registry-derived `action describe` and `action run`; no provider-specific parallel command family or send route exists.
+Gmail Draft identity uses the immutable Draft id; Outlook requests immutable Graph ids. Portable strict union inputs keep standalone content replacement unchanged while reply branches accept only local parent Ref and body text. A standalone update rejects a locally stored target that already carries reply context. Reply creation derives recipient, subject, and threading state locally; update preserves the stored Draft context while validating parent and provider identity before one provider mutation. MIME header values reject CR/LF. The CLI recursively renders each strict union branch and exposes only registry-derived `action describe` and `action run`; no provider-specific parallel command family or send route exists.
 
 ## Verification
 

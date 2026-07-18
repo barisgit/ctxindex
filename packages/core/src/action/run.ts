@@ -121,6 +121,31 @@ export async function runAction(
     )
   }
 
+  const store = new ResourceStore(input.db, input.registry.profiles)
+  const resolveResource = (ref: string) => {
+    const parsed = parseRef(ref)
+    if (parsed.sourceId !== input.sourceId) {
+      throw new CtxindexValidationError(
+        'ref_source_mismatch',
+        `Ref "${ref}" does not belong to Source "${input.sourceId}"`,
+      )
+    }
+    const resource = store.get(ref, { includeDeleted: true })
+    return resource
+      ? {
+          ref: resource.ref,
+          sourceId: resource.sourceId,
+          profile: resource.profile,
+          completeness:
+            resource.hydratedAt === null
+              ? ('partial' as const)
+              : ('complete' as const),
+          deletedAt: resource.deletedAt,
+          payload: resource.payload,
+        }
+      : null
+  }
+
   const provider = await createSourceProviderContext({
     db: input.db,
     sourceId: input.sourceId,
@@ -136,6 +161,7 @@ export async function runAction(
     logger: provider.logger,
     input: parsedInput.data,
     signal: input.signal,
+    resolveResource,
   })
 
   const parsedResult = resultSchema.safeParse(returned)
@@ -163,7 +189,6 @@ export async function runAction(
     throw invalidResult(input.actionId)
   }
 
-  const store = new ResourceStore(input.db, input.registry.profiles)
   const materialized = store.upsert({
     ref: parsedResult.data.ref,
     sourceId: input.sourceId,

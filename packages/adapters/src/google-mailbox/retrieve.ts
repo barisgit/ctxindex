@@ -14,9 +14,11 @@ import {
   type GmailMessage,
   type GmailPayload,
   gmailHeader,
+  gmailHeaderAddresses,
   gmailHeaderDate,
   gmailOccurredAt,
   normalizeGmailMessageId,
+  normalizeGmailReferences,
 } from './message'
 import { gmailJson } from './response'
 import { gmailApiUrl } from './url'
@@ -157,6 +159,10 @@ function retrievedResource(
     gmailHeader(message, 'Message-ID'),
   )
   const inReplyTo = normalizeGmailMessageId(gmailHeader(message, 'In-Reply-To'))
+  const references = normalizeGmailReferences(
+    gmailHeader(message, 'References'),
+  )
+  const replyTo = gmailHeaderAddresses(gmailHeader(message, 'Reply-To'))
   const timestamp = gmailOccurredAt(message)
   const date = gmailHeaderDate(message)
   const body = bodyText(message.payload)
@@ -172,6 +178,8 @@ function retrievedResource(
       : {}),
     ...(rfcMessageId ? { rfcMessageId } : {}),
     ...(inReplyTo ? { inReplyTo } : {}),
+    ...(references ? { references } : {}),
+    ...(replyTo ? { replyTo } : {}),
     ...(subject ? { subject } : {}),
     ...(from ? { from: [from] } : {}),
     ...(to ? { to: [to] } : {}),

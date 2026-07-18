@@ -14,7 +14,7 @@ Application service for discovering and executing typed profile Actions against 
 
 1. `describeAction()` resolves `actionId` through `describeRegistry()`, queries Source adapter coordinates from SQLite, and reports whether each registered adapter exposes the Action.
 2. `runAction()` resolves the declaring profile, validates `actionInput`, checks effect confirmation, and loads the Source's adapter binding.
-3. `createSourceProviderContext()` supplies authenticated provider dependencies; `binding.run()` performs provider I/O.
+3. Core injects a Source-scoped local Resource resolver that exposes completeness/deletion state without provider I/O, then `createSourceProviderContext()` supplies authenticated provider dependencies and `binding.run()` performs provider I/O.
 4. The returned Ref, Source ownership, output profile, and payload are validated before `ResourceStore.upsert()` persists a complete `adhoc` Resource; the stored Resource and profile warnings are returned.
 
 ## Integration points

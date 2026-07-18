@@ -96,17 +96,18 @@ test('interpreted registry interface follows an explicit external Extension', as
       'communication.message.draft.create',
     ])
     expect(actionDetail.exitCode, actionDetail.stderr).toBe(0)
+    expect(actionDetail.stdout).toContain('  input:\n    branch 1:')
     expect(actionDetail.stdout).toContain(
-      '  input:\n    to <string[]> required',
+      '      to <string[]> required\n        min items: 1',
     )
-    expect(actionDetail.stdout).toContain('      min items: 1')
     expect(actionDetail.stdout).toContain(
-      '      items: <string>; min length: 1; pattern:',
+      '    branch 2:\n      replyToRef <string> required',
     )
-    expect(actionDetail.stdout).toContain('    subject <string> required')
     expect(actionDetail.stdout).toContain(
-      '    additional properties: not allowed',
+      '      additional properties: not allowed',
     )
+    expect(actionDetail.stdout).toContain('"to": [')
+    expect(actionDetail.stdout).toContain('"replyToRef":')
     expect(actionDetail.stdout).not.toContain('input: {"$schema"')
 
     const actionJson = await run([
@@ -120,12 +121,24 @@ test('interpreted registry interface follows an explicit external Extension', as
       id: 'communication.message.draft.create',
       input: {
         $schema: 'https://json-schema.org/draft/2020-12/schema',
-        properties: {
-          to: { type: 'array', minItems: 1 },
-          subject: { type: 'string' },
-        },
-        required: ['to', 'subject', 'bodyText'],
-        additionalProperties: false,
+        anyOf: [
+          {
+            properties: {
+              to: { type: 'array', minItems: 1 },
+              subject: { type: 'string' },
+            },
+            required: ['to', 'subject', 'bodyText'],
+            additionalProperties: false,
+          },
+          {
+            properties: {
+              replyToRef: { type: 'string', minLength: 1 },
+              bodyText: { type: 'string' },
+            },
+            required: ['replyToRef', 'bodyText'],
+            additionalProperties: false,
+          },
+        ],
       },
     })
 
@@ -134,6 +147,18 @@ test('interpreted registry interface follows an explicit external Extension', as
     expect(markdown.stdout).toContain('## Profiles (4)')
     expect(markdown.stdout).toContain('`enarocanje.tender@1`')
     expect(markdown.stdout).not.toContain('`reference` (string)')
+    const actionMarkdown = await run([
+      'describe',
+      'action',
+      'communication.message.draft.create',
+      '--format',
+      'markdown',
+    ])
+    expect(actionMarkdown.exitCode, actionMarkdown.stderr).toBe(0)
+    expect(actionMarkdown.stdout).toContain('##### Branch 1')
+    expect(actionMarkdown.stdout).toContain('| `to` | `string[]` | yes |')
+    expect(actionMarkdown.stdout).toContain('##### Branch 2')
+    expect(actionMarkdown.stdout).toContain('| `replyToRef` | `string` | yes |')
 
     const googleAuth = await run(['describe', 'adapter', 'google.mailbox'])
     expect(googleAuth.exitCode, googleAuth.stderr).toBe(0)

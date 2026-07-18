@@ -99,9 +99,16 @@ const googleDriver: MailboxReplayDriver = {
       const env = server.env(sandbox, isolatedEnv(stateDir, browserBin))
       const metadataParams = [
         ['fields', 'id,threadId,labelIds,snippet,internalDate,payload/headers'],
-        ...['Subject', 'From', 'To', 'Date', 'Message-ID', 'In-Reply-To'].map(
-          (name) => ['metadataHeaders', name] as const,
-        ),
+        ...[
+          'Subject',
+          'From',
+          'To',
+          'Date',
+          'Message-ID',
+          'In-Reply-To',
+          'References',
+          'Reply-To',
+        ].map((name) => ['metadataHeaders', name] as const),
       ] as const
       return {
         env,
@@ -180,7 +187,7 @@ const microsoftDriver: MailboxReplayDriver = {
           safeGet(messagePath, [
             [
               '$select',
-              'id,conversationId,internetMessageId,internetMessageHeaders,subject,bodyPreview,body,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,lastModifiedDateTime,isRead,isDraft,categories,hasAttachments',
+              'id,conversationId,internetMessageId,internetMessageHeaders,subject,bodyPreview,body,from,replyTo,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,lastModifiedDateTime,isRead,isDraft,categories,hasAttachments',
             ],
           ]),
           {

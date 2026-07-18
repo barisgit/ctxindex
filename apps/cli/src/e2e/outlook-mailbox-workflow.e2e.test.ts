@@ -495,6 +495,72 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
       subject: '',
       bodyText: updateInput.bodyText,
     })
+
+    const completeParent = await sandbox.run(['get', rootRef, '--json'], {
+      env,
+    })
+    expect(completeParent.exitCode, completeParent.stderr).toBe(0)
+    graph.resetRequests()
+    const replyCreated = await sandbox.run(
+      [
+        'action',
+        'run',
+        createDraftActionId,
+        '--source',
+        workSourceLabel,
+        '--input',
+        JSON.stringify({ replyToRef: rootRef, bodyText: 'Native reply body.' }),
+        '--json',
+      ],
+      { env },
+    )
+    expect(replyCreated.exitCode, replyCreated.stderr).toBe(0)
+    const replyDraftRef = `ctx://${authority}/draft/outlook-draft-2`
+    expect(JSON.parse(replyCreated.stdout)).toMatchObject({
+      resource: {
+        ref: replyDraftRef,
+        title: 'Re: Quarterly outlook review',
+        payload: {
+          to: ['Alex <alex@example.test>'],
+          subject: 'Re: Quarterly outlook review',
+          bodyText: 'Native reply body.',
+          replyToRef: rootRef,
+        },
+      },
+    })
+    expect(
+      graph
+        .readRequests()
+        .map(({ method, pathname }) => ({ method, pathname })),
+    ).toEqual([
+      {
+        method: 'POST',
+        pathname: '/v1.0/me/messages/outlook-root/createReply',
+      },
+    ])
+
+    graph.resetRequests()
+    const changedParent = await sandbox.run(
+      [
+        'action',
+        'run',
+        updateDraftActionId,
+        '--source',
+        workSourceLabel,
+        '--input',
+        JSON.stringify({
+          ref: replyDraftRef,
+          replyToRef: replyRef,
+          bodyText: 'Must not change parent',
+        }),
+        '--json',
+      ],
+      { env },
+    )
+    expect(changedParent.exitCode).toBe(2)
+    expect(changedParent.stderr).toContain('cannot change replyToRef')
+    expect(graph.readRequests()).toEqual([])
+
     const unknownSend = await sandbox.run(
       [
         'action',

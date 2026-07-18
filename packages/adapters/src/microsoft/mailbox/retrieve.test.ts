@@ -27,11 +27,18 @@ function graphMessage() {
     internetMessageId: ' <child@example.com> ',
     internetMessageHeaders: [
       { name: 'In-Reply-To', value: 'noise <parent@example.com> trailing' },
+      {
+        name: 'References',
+        value: '<root@example.com> <parent@example.com> <root@example.com>',
+      },
     ],
     subject: 'Complete message',
     bodyPreview: 'Preview',
     body: { contentType: 'text', content: 'Plain body' },
     from: { emailAddress: { name: 'Alice', address: 'alice@example.com' } },
+    replyTo: [
+      { emailAddress: { name: 'Replies', address: 'reply@example.com' } },
+    ],
     toRecipients: [{ emailAddress: { address: 'to@example.com' } }],
     ccRecipients: [
       { emailAddress: { name: 'Copy', address: 'copy@example.com' } },
@@ -143,6 +150,8 @@ describe('Microsoft mailbox retrieve', () => {
           conversationKey: `${sourceId.toUpperCase()}:conversation-1`,
           rfcMessageId: '<child@example.com>',
           inReplyTo: '<parent@example.com>',
+          references: ['<root@example.com>', '<parent@example.com>'],
+          replyTo: ['Replies <reply@example.com>'],
           bodyText: 'Plain body',
           from: ['Alice <alice@example.com>'],
           to: ['to@example.com'],
@@ -187,6 +196,31 @@ describe('Microsoft mailbox retrieve', () => {
         ref,
       },
     ])
+  })
+
+  test('omits empty reply metadata', async () => {
+    const resources: RetrievedResource[] = []
+    await operation()({
+      source: { id: sourceId, config: {} },
+      ref,
+      fetch: (async () =>
+        Response.json({
+          ...graphMessage(),
+          internetMessageHeaders: [{ name: 'References', value: '   ' }],
+          replyTo: [],
+          hasAttachments: false,
+        })) as unknown as typeof fetch,
+      signal: new AbortController().signal,
+      logger: { trace() {}, debug() {}, info() {}, warn() {}, error() {} },
+      emitResource(value) {
+        resources.push(value)
+      },
+      emitArtifact() {},
+    })
+
+    expect(resources).toHaveLength(1)
+    expect(resources[0]?.payload).not.toHaveProperty('references')
+    expect(resources[0]?.payload).not.toHaveProperty('replyTo')
   })
 
   test('accepts an opaque immutable id containing an encoded slash', async () => {

@@ -8,8 +8,10 @@ import { communicationMessageSchema } from '@ctxindex/profiles'
 import {
   type GmailMessage,
   gmailHeader,
+  gmailHeaderAddresses,
   gmailOccurredAt,
   normalizeGmailMessageId,
+  normalizeGmailReferences,
 } from './message'
 import { gmailJson } from './response'
 import { gmailApiUrl } from './url'
@@ -95,6 +97,10 @@ function resource(
     gmailHeader(message, 'Message-ID'),
   )
   const inReplyTo = normalizeGmailMessageId(gmailHeader(message, 'In-Reply-To'))
+  const references = normalizeGmailReferences(
+    gmailHeader(message, 'References'),
+  )
+  const replyTo = gmailHeaderAddresses(gmailHeader(message, 'Reply-To'))
   const timestamp = gmailOccurredAt(message)
   const payload = communicationMessageSchema.parse({
     providerMessageId: message.id,
@@ -104,6 +110,8 @@ function resource(
       : {}),
     ...(rfcMessageId ? { rfcMessageId } : {}),
     ...(inReplyTo ? { inReplyTo } : {}),
+    ...(references ? { references } : {}),
+    ...(replyTo ? { replyTo } : {}),
     ...(subject ? { subject } : {}),
     ...(from ? { from: [from] } : {}),
     ...(to ? { to: [to] } : {}),
@@ -175,6 +183,8 @@ export async function gmailSearchRemote(
       'Date',
       'Message-ID',
       'In-Reply-To',
+      'References',
+      'Reply-To',
     ]) {
       metadataUrl.searchParams.append('metadataHeaders', name)
     }

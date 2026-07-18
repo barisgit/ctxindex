@@ -223,7 +223,7 @@ export async function exportSourceResource(
 
 ## Implementation doctrine
 
-Source retrieval parses the Ref, checks `ResourceStore`, invokes the bound Adapter only when complete local state is absent, requires exactly one matching Resource, validates it through the Profile, and stores complete ad-hoc state. Thread traversal follows generic membership/parent Relations in both directions.
+Source retrieval parses the Ref, checks `ResourceStore`, invokes the bound Adapter only when complete local state is absent, requires exactly one matching Resource, validates it through the Profile, and stores complete ad-hoc state. Complete mailbox retrieval preserves portable Reply-To addresses, RFC References/message identity, and provider conversation identity so later reply Actions require no provider read before mutation. Thread traversal follows generic membership/parent Relations in both directions.
 
 Profiles derive Artifact descriptors. `ArtifactService` streams Adapter downloads into `ArtifactStore`; the store hashes while writing and commits immutable SHA-256 CAS objects plus SQLite metadata. V1 uses `cached` retention until explicit purge. Output copies do not transfer store ownership.
 

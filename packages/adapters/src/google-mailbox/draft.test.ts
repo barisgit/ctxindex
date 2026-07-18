@@ -21,6 +21,7 @@ const logger = {
 function context(
   input: unknown,
   mockedFetch: typeof fetch,
+  resolveResource: ActionContext['resolveResource'] = () => null,
 ): ActionContext<never> {
   return {
     source: { id: sourceId, config: {} },
@@ -28,6 +29,7 @@ function context(
     signal,
     fetch: mockedFetch,
     logger,
+    resolveResource,
   }
 }
 
@@ -104,6 +106,187 @@ describe('buildGmailDraftRaw', () => {
 })
 
 describe('gmailDraftCreate', () => {
+  test('creates one native threaded reply Draft with exact Gmail thread headers', async () => {
+    const calls: { init?: Parameters<typeof fetch>[1] }[] = []
+    const parentRef = `ctx://${sourceId}/message/parent-1`
+    const resource = await gmailDraftCreate(
+      context(
+        { replyToRef: parentRef, bodyText: 'Reply body' },
+        (async (
+          _input: Parameters<typeof fetch>[0],
+          init?: Parameters<typeof fetch>[1],
+        ) => {
+          calls.push({ init })
+          return Response.json({
+            id: 'reply-draft-1',
+            message: {
+              id: 'reply-message-1',
+              threadId: 'thread-1',
+              labelIds: ['DRAFT'],
+            },
+          })
+        }) as unknown as typeof fetch,
+        (ref) =>
+          ref === parentRef
+            ? {
+                ref,
+                sourceId,
+                profile: { id: 'communication.message', version: 1 },
+                completeness: 'complete',
+                deletedAt: null,
+                payload: {
+                  providerMessageId: 'parent-1',
+                  threadId: 'thread-1',
+                  rfcMessageId: '<parent@example.com>',
+                  references: ['<root@example.com>'],
+                  replyTo: ['Reply Person <reply@example.com>'],
+                  from: ['Sender <sender@example.com>'],
+                  subject: 'RE: Project',
+                },
+              }
+            : null,
+      ),
+    )
+
+    const body = JSON.parse(String(calls[0]?.init?.body))
+    expect(body.message.threadId).toBe('thread-1')
+    expect(decodeRaw(body.message.raw)).toBe(
+      [
+        'To: Reply Person <reply@example.com>',
+        'Subject: Re: Project',
+        'In-Reply-To: <parent@example.com>',
+        'References: <root@example.com> <parent@example.com>',
+        'MIME-Version: 1.0',
+        'Content-Type: text/plain; charset=UTF-8',
+        'Content-Transfer-Encoding: 8bit',
+        '',
+        'Reply body',
+      ].join('\r\n'),
+    )
+    expect(resource).toMatchObject({
+      ref: `ctx://${sourceId}/draft/reply-draft-1`,
+      title: 'Re: Project',
+      payload: {
+        to: ['Reply Person <reply@example.com>'],
+        subject: 'Re: Project',
+        inReplyTo: '<parent@example.com>',
+        references: ['<root@example.com>', '<parent@example.com>'],
+        replyToRef: parentRef,
+        threadId: 'thread-1',
+      },
+    })
+    expect(calls).toHaveLength(1)
+  })
+
+  test('rejects a missing local reply parent before fetch', async () => {
+    let fetchCalls = 0
+    const error = await gmailDraftCreate(
+      context(
+        { replyToRef: `ctx://${sourceId}/message/missing`, bodyText: '' },
+        (async () => {
+          fetchCalls += 1
+          throw new Error('must not fetch')
+        }) as unknown as typeof fetch,
+      ),
+    ).catch((caught) => caught)
+    expect(error).toMatchObject({ code: 'invalid_action_input' })
+    expect(String(error)).toContain('ctxindex get')
+    expect(fetchCalls).toBe(0)
+  })
+
+  test.each([
+    { replyTo: ['safe@example.test\r\nBcc: injected@example.test'] },
+    { subject: 'Safe\r\nBcc: injected@example.test' },
+    { rfcMessageId: '<parent@example.test>\r\nBcc: injected@example.test' },
+    { references: ['<root@example.test>\r\nBcc: injected@example.test'] },
+  ])('rejects unsafe derived reply headers before fetch', async (override) => {
+    const parentRef = `ctx://${sourceId}/message/parent`
+    let fetchCalls = 0
+    const error = await gmailDraftCreate(
+      context(
+        { replyToRef: parentRef, bodyText: '' },
+        (async () => {
+          fetchCalls += 1
+          throw new Error('must not fetch')
+        }) as unknown as typeof fetch,
+        () => ({
+          ref: parentRef,
+          sourceId,
+          profile: { id: 'communication.message', version: 1 },
+          completeness: 'complete',
+          deletedAt: null,
+          payload: {
+            providerMessageId: 'parent',
+            threadId: 'thread-1',
+            rfcMessageId: '<parent@example.test>',
+            from: ['sender@example.test'],
+            subject: 'Safe',
+            ...override,
+          },
+        }),
+      ),
+    ).catch((caught) => caught)
+    expect(error).toMatchObject({ code: 'invalid_action_input' })
+    expect(fetchCalls).toBe(0)
+  })
+
+  test.each([
+    [
+      'incomplete',
+      {
+        completeness: 'partial' as const,
+        deletedAt: null,
+        providerDraftId: undefined,
+      },
+    ],
+    [
+      'deleted',
+      {
+        completeness: 'complete' as const,
+        deletedAt: 1,
+        providerDraftId: undefined,
+      },
+    ],
+    [
+      'Draft',
+      {
+        completeness: 'complete' as const,
+        deletedAt: null,
+        providerDraftId: 'draft-1',
+      },
+    ],
+  ])('rejects a %s reply parent before fetch', async (_name, state) => {
+    const parentRef = `ctx://${sourceId}/message/parent`
+    let fetchCalls = 0
+    const error = await gmailDraftCreate(
+      context(
+        { replyToRef: parentRef, bodyText: '' },
+        (async () => {
+          fetchCalls += 1
+          throw new Error('must not fetch')
+        }) as unknown as typeof fetch,
+        () => ({
+          ref: parentRef,
+          sourceId,
+          profile: { id: 'communication.message', version: 1 },
+          completeness: state.completeness,
+          deletedAt: state.deletedAt,
+          payload: {
+            providerMessageId: 'parent',
+            ...(state.providerDraftId
+              ? { providerDraftId: state.providerDraftId }
+              : {}),
+            threadId: 'thread-1',
+            rfcMessageId: '<parent@example.test>',
+            from: ['sender@example.test'],
+          },
+        }),
+      ),
+    ).catch((caught) => caught)
+    expect(error).toMatchObject({ code: 'invalid_action_input' })
+    expect(fetchCalls).toBe(0)
+  })
+
   test('is bound declaratively and performs one exact POST with a stable Draft Resource', async () => {
     const calls: { url: string; init?: Parameters<typeof fetch>[1] }[] = []
     const mockedFetch = (async (
@@ -265,6 +448,252 @@ describe('gmailDraftCreate', () => {
 })
 
 describe('gmailDraftUpdate', () => {
+  test('rejects standalone update of a locally stored reply Draft before fetch', async () => {
+    const parentRef = `ctx://${sourceId}/message/parent-1`
+    const draftRef = `ctx://${sourceId}/draft/reply-draft-1`
+    let fetchCalls = 0
+    const error = await gmailDraftUpdate(
+      context(
+        {
+          ref: draftRef,
+          to: ['replacement@example.com'],
+          subject: 'Replacement',
+          bodyText: 'Replacement body',
+        },
+        (async () => {
+          fetchCalls += 1
+          throw new Error('must not fetch')
+        }) as unknown as typeof fetch,
+        (ref) =>
+          ref === draftRef
+            ? {
+                ref,
+                sourceId,
+                profile: { id: 'communication.message', version: 1 },
+                completeness: 'complete',
+                deletedAt: null,
+                payload: {
+                  providerMessageId: 'reply-message-1',
+                  providerDraftId: 'reply-draft-1',
+                  replyToRef: parentRef,
+                },
+              }
+            : null,
+      ),
+    ).catch((caught) => caught)
+
+    expect(error).toMatchObject({ code: 'invalid_action_input' })
+    expect(fetchCalls).toBe(0)
+  })
+
+  test('updates one threaded reply Draft with immutable parent and exact thread headers', async () => {
+    const parentRef = `ctx://${sourceId}/message/parent-1`
+    const draftRef = `ctx://${sourceId}/draft/reply-draft-1`
+    const resources = new Map([
+      [
+        parentRef,
+        {
+          ref: parentRef,
+          sourceId,
+          profile: { id: 'communication.message', version: 1 } as const,
+          completeness: 'complete' as const,
+          deletedAt: null,
+          payload: {
+            providerMessageId: 'parent-1',
+            threadId: 'thread-1',
+            rfcMessageId: '<parent@example.com>',
+            from: ['sender@example.com'],
+            subject: 'Project',
+          },
+        },
+      ],
+      [
+        draftRef,
+        {
+          ref: draftRef,
+          sourceId,
+          profile: { id: 'communication.message', version: 1 } as const,
+          completeness: 'complete' as const,
+          deletedAt: null,
+          payload: {
+            providerMessageId: 'reply-message-1',
+            providerDraftId: 'reply-draft-1',
+            replyToRef: parentRef,
+            to: ['sender@example.com'],
+            subject: 'Re: Project',
+            threadId: 'thread-1',
+            inReplyTo: '<parent@example.com>',
+            references: ['<parent@example.com>'],
+          },
+        },
+      ],
+    ])
+    const calls: { init?: Parameters<typeof fetch>[1] }[] = []
+    const resource = await gmailDraftUpdate(
+      context(
+        { ref: draftRef, replyToRef: parentRef, bodyText: 'Updated reply' },
+        (async (
+          _input: Parameters<typeof fetch>[0],
+          init?: Parameters<typeof fetch>[1],
+        ) => {
+          calls.push({ init })
+          return Response.json({
+            id: 'reply-draft-1',
+            message: { id: 'reply-message-2', threadId: 'thread-1' },
+          })
+        }) as unknown as typeof fetch,
+        (ref) => resources.get(ref) ?? null,
+      ),
+    )
+    const request = JSON.parse(String(calls[0]?.init?.body))
+    expect(request.message.threadId).toBe('thread-1')
+    expect(decodeRaw(request.message.raw)).toContain(
+      'In-Reply-To: <parent@example.com>\r\nReferences: <parent@example.com>',
+    )
+    expect(resource.payload).toMatchObject({
+      replyToRef: parentRef,
+      bodyText: 'Updated reply',
+      threadId: 'thread-1',
+    })
+    expect(calls).toHaveLength(1)
+  })
+
+  test('preserves stored reply context when parent metadata drifts after creation', async () => {
+    const parentRef = `ctx://${sourceId}/message/parent-1`
+    const draftRef = `ctx://${sourceId}/draft/reply-draft-1`
+    const resources = new Map([
+      [
+        parentRef,
+        {
+          ref: parentRef,
+          sourceId,
+          profile: { id: 'communication.message', version: 1 } as const,
+          completeness: 'complete' as const,
+          deletedAt: null,
+          payload: {
+            providerMessageId: 'parent-1',
+            threadId: 'drifted-thread',
+            rfcMessageId: '<drifted@example.com>',
+            references: ['<drifted-root@example.com>'],
+            replyTo: ['drifted@example.com'],
+            subject: 'Drifted subject',
+          },
+        },
+      ],
+      [
+        draftRef,
+        {
+          ref: draftRef,
+          sourceId,
+          profile: { id: 'communication.message', version: 1 } as const,
+          completeness: 'complete' as const,
+          deletedAt: null,
+          payload: {
+            providerMessageId: 'reply-message-1',
+            providerDraftId: 'reply-draft-1',
+            replyToRef: parentRef,
+            to: ['original@example.com'],
+            subject: 'Re: Original subject',
+            threadId: 'original-thread',
+            inReplyTo: '<original@example.com>',
+            references: [
+              '<original-root@example.com>',
+              '<original@example.com>',
+            ],
+          },
+        },
+      ],
+    ])
+    const calls: { init?: Parameters<typeof fetch>[1] }[] = []
+
+    const resource = await gmailDraftUpdate(
+      context(
+        { ref: draftRef, replyToRef: parentRef, bodyText: 'Updated reply' },
+        (async (
+          _input: Parameters<typeof fetch>[0],
+          init?: Parameters<typeof fetch>[1],
+        ) => {
+          calls.push({ init })
+          return Response.json({
+            id: 'reply-draft-1',
+            message: { id: 'reply-message-2', threadId: 'original-thread' },
+          })
+        }) as unknown as typeof fetch,
+        (ref) => resources.get(ref) ?? null,
+      ),
+    )
+
+    const request = JSON.parse(String(calls[0]?.init?.body))
+    expect(request.message.threadId).toBe('original-thread')
+    expect(decodeRaw(request.message.raw)).toContain(
+      [
+        'To: original@example.com',
+        'Subject: Re: Original subject',
+        'In-Reply-To: <original@example.com>',
+        'References: <original-root@example.com> <original@example.com>',
+      ].join('\r\n'),
+    )
+    expect(resource.payload).toMatchObject({
+      to: ['original@example.com'],
+      subject: 'Re: Original subject',
+      threadId: 'original-thread',
+      inReplyTo: '<original@example.com>',
+      references: ['<original-root@example.com>', '<original@example.com>'],
+      replyToRef: parentRef,
+    })
+    expect(calls).toHaveLength(1)
+  })
+
+  test('rejects unsafe stored reply headers on update before fetch', async () => {
+    const parentRef = `ctx://${sourceId}/message/parent-1`
+    const draftRef = `ctx://${sourceId}/draft/reply-draft-1`
+    let fetchCalls = 0
+    const error = await gmailDraftUpdate(
+      context(
+        { ref: draftRef, replyToRef: parentRef, bodyText: '' },
+        (async () => {
+          fetchCalls += 1
+          throw new Error('must not fetch')
+        }) as unknown as typeof fetch,
+        (ref) =>
+          ref === draftRef
+            ? {
+                ref,
+                sourceId,
+                profile: { id: 'communication.message', version: 1 },
+                completeness: 'complete',
+                deletedAt: null,
+                payload: {
+                  providerMessageId: 'reply-message-1',
+                  providerDraftId: 'reply-draft-1',
+                  replyToRef: parentRef,
+                  to: ['sender@example.test'],
+                  subject: 'Safe\r\nBcc: injected@example.test',
+                  threadId: 'thread-1',
+                  inReplyTo: '<parent@example.test>',
+                  references: ['<parent@example.test>'],
+                },
+              }
+            : {
+                ref,
+                sourceId,
+                profile: { id: 'communication.message', version: 1 },
+                completeness: 'complete',
+                deletedAt: null,
+                payload: {
+                  providerMessageId: 'parent-1',
+                  threadId: 'thread-1',
+                  rfcMessageId: '<parent@example.test>',
+                  from: ['sender@example.test'],
+                  subject: 'Safe',
+                },
+              },
+      ),
+    ).catch((caught) => caught)
+    expect(error).toMatchObject({ code: 'invalid_action_input' })
+    expect(fetchCalls).toBe(0)
+  })
+
   test('is bound declaratively and performs one exact PUT with complete replacement content', async () => {
     const calls: { url: string; init?: Parameters<typeof fetch>[1] }[] = []
     const mockedFetch = (async (
