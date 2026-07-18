@@ -79,6 +79,7 @@ export interface MockGraphServer {
     events: readonly MockGraphCalendarEvent[],
   ): void
   expireDefaultCalendarDeltaOnce(): void
+  invalidateNextDefaultCalendarDeltaPermanently(): void
   setGraphStatus(status: number | undefined): void
   waitForSearchBarrier(): Promise<void>
   releaseSearchBarrier(): void
@@ -269,6 +270,8 @@ export function startMockGraph(
     ],
   ])
   let expireDefaultDelta = false
+  let invalidateNextDefaultDeltaPermanently = false
+  const invalidDefaultDeltaTokens = new Set<string>()
   let graphStatus: number | undefined
   let draftSequence = 0
   let searchArrivals = 0
@@ -375,10 +378,20 @@ export function startMockGraph(
       if (url.pathname === '/v1.0/me/calendarView/delta') {
         const deltaToken = url.searchParams.get('$deltatoken')
         const skipToken = url.searchParams.get('$skiptoken')
+        if (deltaToken !== null && invalidateNextDefaultDeltaPermanently) {
+          invalidateNextDefaultDeltaPermanently = false
+          invalidDefaultDeltaTokens.add(deltaToken)
+        }
+        if (deltaToken !== null && invalidDefaultDeltaTokens.has(deltaToken)) {
+          const restart = new URL('/v1.0/me/calendarView/delta', url.origin)
+          return Response.json(
+            { error: { code: 'syncStateNotFound', message: 'expired' } },
+            { status: 410, headers: { location: restart.toString() } },
+          )
+        }
         if (deltaToken !== null && expireDefaultDelta) {
           expireDefaultDelta = false
           const restart = new URL('/v1.0/me/calendarView/delta', url.origin)
-          restart.searchParams.set('$deltatoken', '')
           return Response.json(
             { error: { code: 'syncStateNotFound', message: 'expired' } },
             { status: 410, headers: { location: restart.toString() } },
@@ -772,6 +785,9 @@ export function startMockGraph(
     },
     expireDefaultCalendarDeltaOnce() {
       expireDefaultDelta = true
+    },
+    invalidateNextDefaultCalendarDeltaPermanently() {
+      invalidateNextDefaultDeltaPermanently = true
     },
     setGraphStatus(status) {
       graphStatus = status
