@@ -1,0 +1,37 @@
+import { expect, test } from 'bun:test'
+
+const codemapPaths = [
+  'packages/profiles/codemap.md',
+  'packages/profiles/src/codemap.md',
+] as const
+
+test('profile codemaps describe bundled Adapter parity', async () => {
+  const codemaps = await Promise.all(
+    codemapPaths.map((path) => Bun.file(path).text()),
+  )
+
+  for (const codemap of codemaps) {
+    const normalizedCodemap = codemap.replace(/\s+/g, ' ')
+
+    expect(normalizedCodemap).toMatch(
+      /Google and Microsoft mailbox Adapters target `communication\.message@1`/,
+    )
+    expect(normalizedCodemap).toMatch(
+      /bind the same `communication\.message\.draft\.create` and `communication\.message\.draft\.update` Actions/,
+    )
+    expect(normalizedCodemap).toMatch(
+      /Google and Microsoft calendar Adapters target `calendar\.event@1`/,
+    )
+    expect(normalizedCodemap).toMatch(/local-directory Adapter targets `file@1`/)
+  }
+
+  expect(codemaps.join('\n')).not.toMatch(/binds? Gmail Draft Actions/)
+
+  const sourceCodemap = codemaps[1]
+  expect(sourceCodemap).toContain('`packages/adapters/src/google-mailbox/`')
+  expect(sourceCodemap).toContain('`packages/adapters/src/microsoft/mailbox/`')
+  expect(sourceCodemap).toMatch(
+    /Google and Microsoft provider modules.*create and consume communication-message payloads.*local-directory emits file payloads/s,
+  )
+  expect(sourceCodemap).not.toMatch(/Gmail provider modules under/)
+})

@@ -22,7 +22,7 @@ Provides ctxindex's bundled, provider-neutral Profile definitions and their publ
 ## Integration points
 
 - Depends on `defineProfile` from `packages/extension-sdk/src/index.ts` and Zod.
-- `packages/adapters/src/builtins.ts` bundles `calendarEventProfile`, `communicationMessageProfile`, and `fileProfile` into `ctxindexBuiltinExtension`; its Gmail Adapter binds the Draft schemas, while its local-directory Adapter targets `file@1`.
-- Gmail provider modules under `packages/adapters/src/google-mailbox/` create and consume communication-message payloads; local-directory emits file payloads and reuses the exported path predicate.
+- `packages/adapters/src/builtins.ts` bundles `calendarEventProfile`, `communicationMessageProfile`, and `fileProfile` into `ctxindexBuiltinExtension`; Google and Microsoft mailbox Adapters target `communication.message@1` and bind the same `communication.message.draft.create` and `communication.message.draft.update` Actions; Google and Microsoft calendar Adapters target `calendar.event@1`; the local-directory Adapter targets `file@1`.
+- Google and Microsoft provider modules under `packages/adapters/src/google-mailbox/` and `packages/adapters/src/microsoft/mailbox/` create and consume communication-message payloads; local-directory emits file payloads and reuses the exported path predicate.
 - Core Profile registries and resource/search/relation/export/action services consume the declarative hooks through the SDK interfaces.
 - Exported as `@ctxindex/profiles`, `@ctxindex/profiles/calendar-event`, `@ctxindex/profiles/communication-message`, and `@ctxindex/profiles/file` by `packages/profiles/package.json`.
