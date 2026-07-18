@@ -3,6 +3,7 @@ import type { Logger } from '../logger'
 import type { RealmService } from '../realm'
 import type { ExtensionRegistry } from '../registry'
 import type { CtxindexDatabase } from '../storage'
+import type { SyncWarning } from '../sync'
 
 export type SourceAvailability = 'available' | 'extension_unavailable'
 
@@ -21,7 +22,10 @@ export interface SourceRow {
   readonly availability: SourceAvailability
   readonly last_status?: string | null
   readonly last_run_at?: number | null
+  readonly warnings_count?: number | null
+  readonly last_warning?: SyncWarning | null
   readonly errors_count?: number | null
+  readonly last_error?: string | null
   readonly items_count?: number
   readonly chunks_count?: number
   readonly sample_uri?: string | null
@@ -55,6 +59,8 @@ export interface StatusRow {
   readonly availability: SourceAvailability
   readonly lastStatus: string
   readonly lastRunAt: number | null
+  readonly warningsCount: number
+  readonly lastWarning: SyncWarning | null
   readonly errorsCount: number
   readonly lastError: string | null
   readonly cursor: unknown

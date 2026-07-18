@@ -6,7 +6,10 @@ import { CtxindexAuthError } from '../errors'
 import { createProfileRegistry } from '../registry/profile-registry'
 import { applyPragmas } from '../storage/db'
 import { runMigrations } from '../storage/migrator'
-import { SyncCoordinator } from './sync-coordinator'
+import {
+  getSyncRunFailureDiagnostics,
+  SyncCoordinator,
+} from './sync-coordinator'
 
 const sourceId = '01ARZ3NDEKTSV4RRFFQ69G5FAV'
 const otherSourceId = '01ARZ3NDEKTSV4RRFFQ69G5FAW'
@@ -176,7 +179,7 @@ test('counts an upsert followed by removal in emission order', async () => {
   })
 })
 
-test('warnings complete and are persisted as nonfatal errors', async () => {
+test('warnings complete with separate bounded warning accounting', async () => {
   const { db, coordinator } = await setup()
   const result = await coordinator.run(
     { sourceId, mode: 'sync', signal: new AbortController().signal },
@@ -185,16 +188,98 @@ test('warnings complete and are persisted as nonfatal errors', async () => {
       await emit({ type: 'warning', code: 'skip_a', message: 'first' })
     },
   )
-  expect(result.errorsCount).toBe(2)
+  expect(result.errorsCount).toBe(0)
+  expect(result.warningsCount).toBe(2)
+  expect(result.lastWarning).toEqual({ code: 'skip_a', message: 'first' })
   expect(result.warnings).toHaveLength(2)
   expect(
     db
-      .prepare('SELECT status, errors_count, error_summary FROM sync_runs')
+      .prepare(
+        'SELECT status, warnings_count, last_warning_json, errors_count, error_summary FROM sync_runs',
+      )
       .get(),
   ).toEqual({
     status: 'completed',
-    errors_count: 2,
-    error_summary: `skip_b: second (${ref})\nskip_a: first`,
+    warnings_count: 2,
+    last_warning_json: JSON.stringify({
+      code: 'skip_a',
+      message: 'first',
+    }),
+    errors_count: 0,
+    error_summary: null,
+  })
+  expect(
+    db
+      .prepare(
+        'SELECT last_status, warnings_count, last_warning_json FROM source_sync_state',
+      )
+      .get(),
+  ).toEqual({
+    last_status: 'idle',
+    warnings_count: 2,
+    last_warning_json: JSON.stringify({
+      code: 'skip_a',
+      message: 'first',
+    }),
+  })
+})
+
+test('terminal failure preserves prior warnings and records one error', async () => {
+  const { db, coordinator } = await setup()
+  const error = new Error('boom')
+  await expect(
+    coordinator.run(
+      { sourceId, mode: 'sync', signal: new AbortController().signal },
+      async ({ emit }) => {
+        await emit({
+          type: 'warning',
+          code: 'degraded',
+          message: 'partial provider response',
+          ref,
+        })
+        throw error
+      },
+    ),
+  ).rejects.toThrow('boom')
+  expect(getSyncRunFailureDiagnostics(error)).toEqual({
+    warningsCount: 1,
+    lastWarning: {
+      code: 'degraded',
+      message: 'partial provider response',
+      ref,
+    },
+    errorsCount: 1,
+    lastError: 'boom',
+  })
+
+  const expectedWarning = JSON.stringify({
+    code: 'degraded',
+    message: 'partial provider response',
+    ref,
+  })
+  expect(
+    db
+      .prepare(
+        'SELECT status, warnings_count, last_warning_json, errors_count, error_summary FROM sync_runs',
+      )
+      .get(),
+  ).toEqual({
+    status: 'failed',
+    warnings_count: 1,
+    last_warning_json: expectedWarning,
+    errors_count: 1,
+    error_summary: 'boom',
+  })
+  expect(
+    db
+      .prepare(
+        'SELECT last_status, warnings_count, last_warning_json FROM source_sync_state',
+      )
+      .get(),
+  ).toEqual({
+    last_status: 'failed',
+    warnings_count: 1,
+    last_warning_json: expectedWarning,
   })
 })
 
@@ -289,6 +374,7 @@ test('diff validates and counts operations without durable writes', async () => 
   const result = await coordinator.run(
     { sourceId, mode: 'diff', signal: new AbortController().signal },
     async ({ emit }) => {
+      await emit({ type: 'warning', code: 'diff_warning', message: 'preview' })
       await emit({ type: 'checkpoint', cursor: { page: 9 } })
       await emit({ type: 'upsertResource', resource: resource() })
       await emit({ type: 'removeResource', ref })
@@ -305,6 +391,15 @@ test('diff validates and counts operations without durable writes', async () => 
   ).toEqual({ count: 0 })
   expect(db.prepare('SELECT cursor_after_json FROM sync_runs').get()).toEqual({
     cursor_after_json: null,
+  })
+  expect(
+    db.prepare('SELECT warnings_count, last_warning_json FROM sync_runs').get(),
+  ).toEqual({
+    warnings_count: 1,
+    last_warning_json: JSON.stringify({
+      code: 'diff_warning',
+      message: 'preview',
+    }),
   })
   expect(
     JSON.stringify(
@@ -329,7 +424,12 @@ test('failing diff audits the run without changing current Source state', async 
   await expect(
     coordinator.run(
       { sourceId, mode: 'diff', signal: new AbortController().signal },
-      async () => {
+      async ({ emit }) => {
+        await emit({
+          type: 'warning',
+          code: 'diff_warning',
+          message: 'preview',
+        })
         throw new Error('diff failed')
       },
     ),
@@ -343,8 +443,21 @@ test('failing diff audits the run without changing current Source state', async 
     ),
   ).toBe(stateBefore)
   expect(
-    db.prepare('SELECT status, error_summary FROM sync_runs').get(),
-  ).toEqual({ status: 'failed', error_summary: 'diff failed' })
+    db
+      .prepare(
+        'SELECT status, warnings_count, last_warning_json, errors_count, error_summary FROM sync_runs',
+      )
+      .get(),
+  ).toEqual({
+    status: 'failed',
+    warnings_count: 1,
+    last_warning_json: JSON.stringify({
+      code: 'diff_warning',
+      message: 'preview',
+    }),
+    errors_count: 1,
+    error_summary: 'diff failed',
+  })
   expect(db.prepare('SELECT count(*) AS count FROM sync_locks').get()).toEqual({
     count: 0,
   })

@@ -360,6 +360,8 @@ export type SyncArgs =
 export function parseSyncArgs(args: string[]): SyncArgs;
 ```
 
+Sync, status, and Source inventory formatters project core-owned `warningsCount`, `lastWarning`, `errorsCount`, and `lastError` values directly. Failed sync formatting reads bounded diagnostics from core's failure channel while retaining the safe public error message and stable exit. The CLI labels the two severities independently in JSON and readable output and does not reconstruct severity from diagnostic text.
+
 ### @ctxindex/cli — thread arguments
 
 ```ts

@@ -13,5 +13,9 @@ export const sourceSyncState = sqliteTable('source_sync_state', {
     .default('pending'),
   lastRunId: text('last_run_id'),
   cursorJson: text('cursor_json'),
+  warningsCount: integer('warnings_count', { mode: 'number' })
+    .notNull()
+    .default(0),
+  lastWarningJson: text('last_warning_json'),
   updatedAt: integer('updated_at', { mode: 'number' }).notNull(),
 })

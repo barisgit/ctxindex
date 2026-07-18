@@ -38,8 +38,27 @@ export interface SyncRunResult {
   readonly added: number
   readonly updated: number
   readonly deleted: number
+  readonly warningsCount: number
+  readonly lastWarning: SyncWarning | null
   readonly errorsCount: number
   readonly warnings: readonly SyncWarning[]
+}
+
+export interface SyncRunFailureDiagnostics {
+  readonly warningsCount: number
+  readonly lastWarning: SyncWarning | null
+  readonly errorsCount: 1
+  readonly lastError: string
+}
+
+const failureDiagnostics = new WeakMap<object, SyncRunFailureDiagnostics>()
+
+export function getSyncRunFailureDiagnostics(
+  error: unknown,
+): SyncRunFailureDiagnostics | null {
+  return typeof error === 'object' && error !== null
+    ? (failureDiagnostics.get(error) ?? null)
+    : null
 }
 
 const SUMMARY_LIMIT = 2048
@@ -65,16 +84,8 @@ function parseEmissionRef(ref: string): ReturnType<typeof parseRef> {
   }
 }
 
-function warningSummary(warnings: readonly SyncWarning[]): string | null {
-  if (warnings.length === 0) return null
-  return bounded(
-    warnings
-      .map(
-        (warning) =>
-          `${warning.code}: ${warning.message}${warning.ref ? ` (${warning.ref})` : ''}`,
-      )
-      .join('\n'),
-  )
+function warningJson(warning: SyncWarning | null): string | null {
+  return warning === null ? null : JSON.stringify(warning)
 }
 
 export interface SyncCoordinatorOptions {
@@ -147,7 +158,8 @@ export class SyncCoordinator {
         this.db
           .prepare(`
             UPDATE sync_runs
-            SET status = 'failed', completed_at = ?, error_summary = ?
+            SET status = 'failed', completed_at = ?, errors_count = 1,
+                error_summary = ?
             WHERE id = ? AND status = 'running'
           `)
           .run(Date.now(), bounded('sync interrupted'), globalLock.run_id)
@@ -193,7 +205,8 @@ export class SyncCoordinator {
         this.db
           .prepare(`
           UPDATE sync_runs
-          SET status = 'cancelled', completed_at = ?, error_summary = 'sync busy'
+          SET status = 'cancelled', completed_at = ?, errors_count = 1,
+              error_summary = 'sync busy'
           WHERE id = ?
         `)
           .run(Date.now(), runId)
@@ -217,8 +230,13 @@ export class SyncCoordinator {
         emit: async (value) => {
           if (input.signal.aborted) throw cancelled()
           const emission = parseSyncEmission(value)
-          if (emission.type === 'warning') warnings.push(emission)
-          else emissions.push(emission)
+          if (emission.type === 'warning') {
+            warnings.push({
+              code: emission.code,
+              message: emission.message,
+              ...(emission.ref ? { ref: emission.ref } : {}),
+            })
+          } else emissions.push(emission)
           if (emission.type === 'checkpoint') {
             cursorAfterJson = JSON.stringify(emission.cursor)
           }
@@ -307,20 +325,32 @@ export class SyncCoordinator {
           this.db
             .prepare(`
           INSERT INTO source_sync_state (
-            source_id, last_status, last_run_id, cursor_json, updated_at
-          ) VALUES (?, 'idle', ?, ?, ?)
+            source_id, last_status, last_run_id, cursor_json, warnings_count,
+            last_warning_json, updated_at
+          ) VALUES (?, 'idle', ?, ?, ?, ?, ?)
           ON CONFLICT(source_id) DO UPDATE SET
             last_status = 'idle', last_run_id = excluded.last_run_id,
-            cursor_json = excluded.cursor_json, updated_at = excluded.updated_at
+            cursor_json = excluded.cursor_json,
+            warnings_count = excluded.warnings_count,
+            last_warning_json = excluded.last_warning_json,
+            updated_at = excluded.updated_at
         `)
-            .run(input.sourceId, runId, cursorAfterJson, completedAt)
+            .run(
+              input.sourceId,
+              runId,
+              cursorAfterJson,
+              warnings.length,
+              warningJson(warnings.at(-1) ?? null),
+              completedAt,
+            )
         }
         this.db
           .prepare(`
           UPDATE sync_runs
           SET status = 'completed', completed_at = ?, cursor_after_json = ?,
               resources_added = ?, resources_updated = ?, resources_deleted = ?,
-              errors_count = ?, error_summary = ?
+              warnings_count = ?, last_warning_json = ?,
+              errors_count = 0, error_summary = NULL
           WHERE id = ?
         `)
           .run(
@@ -330,7 +360,7 @@ export class SyncCoordinator {
             updated,
             deleted,
             warnings.length,
-            warningSummary(warnings),
+            warningJson(warnings.at(-1) ?? null),
             runId,
           )
         this.db
@@ -347,11 +377,16 @@ export class SyncCoordinator {
         added,
         updated,
         deleted,
-        errorsCount: warnings.length,
+        warningsCount: warnings.length,
+        lastWarning: warnings.at(-1) ?? null,
+        errorsCount: 0,
         warnings,
       }
     } catch (cause) {
       const completedAt = Date.now()
+      const lastError = bounded(
+        cause instanceof Error ? cause.message : String(cause),
+      )
       let runStatus: 'failed' | 'cancelled' = 'failed'
       let lastStatus: 'needs_auth' | 'failed' = 'failed'
       if (cause instanceof CtxindexSyncError) {
@@ -368,22 +403,30 @@ export class SyncCoordinator {
       this.db.transaction(() => {
         this.db
           .prepare(`
-          UPDATE sync_runs SET status = ?, completed_at = ?, error_summary = ? WHERE id = ?
+          UPDATE sync_runs
+          SET status = ?, completed_at = ?, warnings_count = ?,
+              last_warning_json = ?, errors_count = 1, error_summary = ?
+          WHERE id = ?
         `)
           .run(
             runStatus,
             completedAt,
-            bounded(cause instanceof Error ? cause.message : String(cause)),
+            warnings.length,
+            warningJson(warnings.at(-1) ?? null),
+            lastError,
             runId,
           )
         if (input.mode !== 'diff') {
           this.db
             .prepare(`
           INSERT INTO source_sync_state (
-            source_id, last_status, last_run_id, cursor_json, updated_at
-          ) VALUES (?, ?, ?, ?, ?)
+            source_id, last_status, last_run_id, cursor_json, warnings_count,
+            last_warning_json, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(source_id) DO UPDATE SET
             last_status = excluded.last_status, last_run_id = excluded.last_run_id,
+            warnings_count = excluded.warnings_count,
+            last_warning_json = excluded.last_warning_json,
             updated_at = excluded.updated_at
         `)
             .run(
@@ -391,6 +434,8 @@ export class SyncCoordinator {
               lastStatus,
               runId,
               cursorBeforeJson,
+              warnings.length,
+              warningJson(warnings.at(-1) ?? null),
               completedAt,
             )
         }
@@ -400,6 +445,14 @@ export class SyncCoordinator {
           )
           .run(runId)
       })()
+      if (typeof cause === 'object' && cause !== null) {
+        failureDiagnostics.set(cause, {
+          warningsCount: warnings.length,
+          lastWarning: warnings.at(-1) ?? null,
+          errorsCount: 1,
+          lastError,
+        })
+      }
       throw cause
     }
   }

@@ -19,6 +19,9 @@ function compactValue(value: string | number | null | undefined): string {
 }
 
 function compactSource(source: SourceRow): string {
+  const warning = source.last_warning
+    ? `${source.last_warning.code}:${source.last_warning.message.replace(/\s+/g, '_')}${source.last_warning.ref ? `:ref=${source.last_warning.ref}` : ''}`
+    : null
   return [
     source.id,
     `label=${compactValue(source.label)}`,
@@ -28,8 +31,15 @@ function compactSource(source: SourceRow): string {
     `status=${compactValue(displayStatus(source))}`,
     `items=${source.items_count ?? 0}`,
     `chunks=${source.chunks_count ?? 0}`,
+    `warnings=${source.warnings_count ?? 0}`,
+    warning ? `warning=${warning}` : null,
     `errors=${source.errors_count ?? 0}`,
-  ].join(' ')
+    source.last_error
+      ? `error=${source.last_error.replace(/\s+/g, '_')}`
+      : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(' ')
 }
 
 export function formatSourceRemoved(sourceId: string): string {
@@ -101,7 +111,10 @@ export function formatSources(
       availability: source.availability,
       lastStatus: source.last_status ?? null,
       lastRunAt: source.last_run_at ?? null,
+      warningsCount: source.warnings_count ?? 0,
+      lastWarning: source.last_warning ?? null,
       errorsCount: source.errors_count ?? 0,
+      lastError: source.last_error ?? null,
       itemsCount: source.items_count ?? 0,
       chunksCount: source.chunks_count ?? 0,
     }))
@@ -118,11 +131,14 @@ export function formatSources(
       'Status',
       'Items',
       'Chunks',
+      'Warn',
+      'Last warning',
       'Err',
+      'Last error',
       'Last run',
       'ID',
     ],
-    colWidths: [18, 17, 12, 32, 24, 9, 9, 6, 18, 28],
+    colWidths: [18, 17, 12, 32, 24, 9, 9, 6, 48, 6, 32, 18, 28],
     colAligns: [
       'left',
       'left',
@@ -132,6 +148,9 @@ export function formatSources(
       'right',
       'right',
       'right',
+      'left',
+      'right',
+      'left',
       'left',
       'left',
     ],
@@ -148,7 +167,12 @@ export function formatSources(
       displayStatus(source),
       String(source.items_count ?? 0),
       String(source.chunks_count ?? 0),
+      String(source.warnings_count ?? 0),
+      source.last_warning
+        ? `${source.last_warning.code}: ${source.last_warning.message}${source.last_warning.ref ? ` (${source.last_warning.ref})` : ''}`
+        : '-',
       String(source.errors_count ?? 0),
+      source.last_error ?? '-',
       lastRun(source),
       source.id,
     ])

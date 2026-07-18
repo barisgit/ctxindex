@@ -5,6 +5,7 @@ import {
   CtxindexNotFoundError,
   CtxindexValidationError,
 } from '../errors'
+import type { SyncWarning } from '../sync'
 import type {
   AddSourceInput,
   AddSourceResult,
@@ -146,6 +147,8 @@ interface StatusDbRow {
   readonly realmSlug: string
   readonly lastStatus: string
   readonly lastRunAt: number | null
+  readonly warningsCount: number | null
+  readonly lastWarningJson: string | null
   readonly errorsCount: number | null
   readonly cursorJson: string | null
   readonly errorJson: string | null
@@ -197,6 +200,27 @@ function parseLastError(errorJson: string | null): string | null {
   return errorJson
 }
 
+function parseLastWarning(warningJson: string | null): SyncWarning | null {
+  if (!warningJson) return null
+  try {
+    const parsed = JSON.parse(warningJson) as Record<string, unknown>
+    if (
+      typeof parsed.code !== 'string' ||
+      typeof parsed.message !== 'string' ||
+      (parsed.ref !== undefined && typeof parsed.ref !== 'string')
+    ) {
+      return null
+    }
+    return {
+      code: parsed.code,
+      message: parsed.message,
+      ...(typeof parsed.ref === 'string' ? { ref: parsed.ref } : {}),
+    }
+  } catch {
+    return null
+  }
+}
+
 function selectSourceColumns(): string {
   return 'id, realm_id, adapter_id, adapter_version, label, config_json, sync_enabled, grant_id, search_routing, created_at'
 }
@@ -215,7 +239,10 @@ function sourceListSelect(): string {
                  s.created_at,
                  sss.last_status,
                  sr.completed_at AS last_run_at,
+                 COALESCE(sss.warnings_count, 0) AS warnings_count,
+                 sss.last_warning_json,
                  COALESCE(sr.errors_count, 0) AS errors_count,
+                 sr.error_summary AS last_error_json,
                  (SELECT COUNT(*) FROM resources resource WHERE resource.source_id = s.id AND resource.deleted_at IS NULL) AS items_count,
                  (SELECT COUNT(*)
                     FROM chunks c
@@ -334,12 +361,36 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
              ORDER BY s.created_at`,
           )
           .all(input.realmSlug) as Omit<SourceRow, 'availability'>[]
-        return rows.map((source) => withAvailability(deps, source))
+        return rows.map((source) =>
+          withAvailability(deps, {
+            ...source,
+            last_warning: parseLastWarning(
+              (source as typeof source & { last_warning_json?: string | null })
+                .last_warning_json ?? null,
+            ),
+            last_error: parseLastError(
+              (source as typeof source & { last_error_json?: string | null })
+                .last_error_json ?? null,
+            ),
+          }),
+        )
       }
       const rows = deps.db
         .prepare(`${select} ORDER BY s.created_at`)
         .all() as Omit<SourceRow, 'availability'>[]
-      return rows.map((source) => withAvailability(deps, source))
+      return rows.map((source) =>
+        withAvailability(deps, {
+          ...source,
+          last_warning: parseLastWarning(
+            (source as typeof source & { last_warning_json?: string | null })
+              .last_warning_json ?? null,
+          ),
+          last_error: parseLastError(
+            (source as typeof source & { last_error_json?: string | null })
+              .last_error_json ?? null,
+          ),
+        }),
+      )
     },
 
     resolveSourceId(reference: string): string {
@@ -395,6 +446,8 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
                r.slug AS realmSlug,
                COALESCE(sss.last_status, 'pending') AS lastStatus,
                sr.completed_at AS lastRunAt,
+               sss.warnings_count AS warningsCount,
+               sss.last_warning_json AS lastWarningJson,
                sr.errors_count AS errorsCount,
                sss.cursor_json AS cursorJson,
                sr.error_summary AS errorJson
@@ -423,6 +476,8 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
         }),
         lastStatus: row.lastStatus,
         lastRunAt: row.lastRunAt,
+        warningsCount: row.warningsCount ?? 0,
+        lastWarning: parseLastWarning(row.lastWarningJson),
         errorsCount: row.errorsCount ?? 0,
         lastError: parseLastError(row.errorJson),
         cursor: parseCursor(row.cursorJson),

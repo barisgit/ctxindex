@@ -137,11 +137,58 @@ test('status includes never-synced Sources with pending sync status', () => {
       availability: 'available',
       lastStatus: 'pending',
       lastRunAt: null,
+      warningsCount: 0,
+      lastWarning: null,
       errorsCount: 0,
       lastError: null,
       cursor: null,
     },
   ])
+})
+
+test('status and Source inventory project separate warning and error diagnostics', () => {
+  const realmService = createRealmService({ db, logger })
+  realmService.createRealm({ slug: 'work' })
+  const service = createSourceService({ db, logger, realmService, registry })
+  const added = service.addSource({
+    adapterId: 'local.directory',
+    realmSlug: 'work',
+    configJson: '{"root_path":"/tmp"}',
+  })
+  const warning = {
+    code: 'degraded',
+    message: 'partial provider response',
+  }
+  db.prepare(
+    `INSERT INTO sync_runs (
+       id, source_id, realm_id, mode, status, started_at, completed_at,
+       warnings_count, last_warning_json, errors_count, error_summary
+     ) VALUES ('run-1', ?, ?, 'sync', 'failed', 1, 2, 2, ?, 1, ?)`,
+  ).run(
+    added.sourceId,
+    added.realmId,
+    JSON.stringify(warning),
+    'provider request failed',
+  )
+  db.prepare(
+    `INSERT INTO source_sync_state (
+       source_id, last_status, last_run_id, warnings_count, last_warning_json,
+       updated_at
+     ) VALUES (?, 'failed', 'run-1', 2, ?, 2)`,
+  ).run(added.sourceId, JSON.stringify(warning))
+
+  expect(service.getStatus()[0]).toMatchObject({
+    warningsCount: 2,
+    lastWarning: warning,
+    errorsCount: 1,
+    lastError: 'provider request failed',
+  })
+  expect(service.listSources()[0]).toMatchObject({
+    warnings_count: 2,
+    last_warning: warning,
+    errors_count: 1,
+    last_error: 'provider request failed',
+  })
 })
 
 test('missing and restored Adapters preserve historical sync status', () => {
@@ -190,6 +237,8 @@ test('missing and restored Adapters preserve historical sync status', () => {
     last_status: 'failed',
     last_run_id: null,
     cursor_json: '{"page":3}',
+    warnings_count: 0,
+    last_warning_json: null,
     updated_at: 42,
   })
 })

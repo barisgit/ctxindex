@@ -93,7 +93,9 @@ describe('local.directory built-in service integration', () => {
       added: 1,
       updated: 0,
       deleted: 0,
-      errorsCount: 3,
+      warningsCount: 3,
+      lastWarning: expect.objectContaining({ code: 'oversize_skipped' }),
+      errorsCount: 0,
     })
     expect(first.warnings).toHaveLength(3)
     expect(fetchCalled).toBe(false)
@@ -134,13 +136,24 @@ describe('local.directory built-in service integration', () => {
       'path',
       'size',
     ])
-    expect(
-      db
-        .prepare(
-          'SELECT status, errors_count FROM sync_runs ORDER BY started_at DESC LIMIT 1',
-        )
-        .get(),
-    ).toEqual({ status: 'completed', errors_count: 3 })
+    const persistedRun = db
+      .prepare(
+        'SELECT status, warnings_count, last_warning_json, errors_count FROM sync_runs ORDER BY started_at DESC LIMIT 1',
+      )
+      .get() as {
+      status: string
+      warnings_count: number
+      last_warning_json: string
+      errors_count: number
+    }
+    expect(persistedRun).toMatchObject({
+      status: 'completed',
+      warnings_count: 3,
+      errors_count: 0,
+    })
+    expect(JSON.parse(persistedRun.last_warning_json)).toEqual(
+      first.lastWarning,
+    )
     expect(
       db.prepare('SELECT ref FROM resources WHERE ref LIKE ?').all('%ignored%'),
     ).toEqual([])

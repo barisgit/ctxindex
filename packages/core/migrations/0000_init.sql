@@ -162,6 +162,8 @@ CREATE TABLE source_sync_state (
     last_status TEXT NOT NULL DEFAULT 'pending' CHECK(last_status IN ('pending', 'idle', 'needs_auth', 'failed', 'disabled')),
   last_run_id TEXT,
   cursor_json TEXT,
+  warnings_count INTEGER NOT NULL DEFAULT 0,
+  last_warning_json TEXT,
   updated_at INTEGER NOT NULL
 );
 
@@ -178,6 +180,8 @@ CREATE TABLE sync_runs (
   resources_added INTEGER NOT NULL DEFAULT 0,
   resources_updated INTEGER NOT NULL DEFAULT 0,
   resources_deleted INTEGER NOT NULL DEFAULT 0,
+  warnings_count INTEGER NOT NULL DEFAULT 0,
+  last_warning_json TEXT,
   errors_count INTEGER NOT NULL DEFAULT 0,
   error_summary TEXT
 );
