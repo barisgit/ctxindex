@@ -14,7 +14,7 @@ Contains reusable workspace libraries defining ctxindex's provider-neutral domai
 
 1. Profiles and Adapters are authored against `@ctxindex/extension-sdk` and bundled as Extensions.
 2. Core loads and validates definitions and OAuth declarations, persists provider-scoped client records, maintains one stable Grant per Account, and dispatches Source, authorization, search, sync, retrieval, Artifact, and Action operations through SDK contexts; indexed Calendar handlers sync and retrieve normalized events, while provider-owned Draft handlers perform one create or update mutation and return canonical Resources without exposing send.
-3. Adapter outputs flow through core validation and resource/relation/artifact/search services into SQLite where workflows require local persistence.
+3. Adapter outputs flow through core validation and resource/relation/artifact/search services into SQLite where workflows require local persistence; remote-search cache batches coordinate concurrent processes through SQLite and preserve provider results when optional materialization exhausts its bound.
 4. Core configuration, secrets, paths, networking, logging, and migrations surround those workflows; declared environment keys are one-time OAuth client inputs while runtime refresh uses Grant-owned typed secret references.
 
 ## Integration points

@@ -12,7 +12,25 @@ import type {
   UnknownProfileWarning,
 } from '../registry/profile-registry'
 import { RelationStore, type RelationWrite } from '../relation/relation-store'
+import { normalizeStorageError } from '../storage/contention'
 import type { CtxindexDatabase } from '../storage/db'
+
+declare const __CTXINDEX_E2E_TRACE_STORAGE_ACQUIRE__: boolean | undefined
+
+const STORAGE_ACQUIRE_TRACE = '[ctxindex-e2e] storage-acquire\n'
+
+function traceStorageAcquireForE2e(): void {
+  if (
+    typeof __CTXINDEX_E2E_TRACE_STORAGE_ACQUIRE__ === 'undefined' ||
+    !__CTXINDEX_E2E_TRACE_STORAGE_ACQUIRE__
+  )
+    return
+  try {
+    process.stderr.write(STORAGE_ACQUIRE_TRACE)
+  } catch {
+    // Test-only observation must never alter Resource persistence.
+  }
+}
 
 export type ResourceOrigin = 'synced' | 'adhoc'
 
@@ -169,43 +187,49 @@ export class ResourceStore {
   }
 
   upsert(input: ResourceUpsert): ResourceUpsertResult {
-    const parsedRef = parseRef(input.ref)
-    if (parsedRef.sourceId !== input.sourceId) {
-      throw new CtxindexValidationError(
-        'ref_source_mismatch',
-        `Ref Source "${parsedRef.sourceId}" does not match operation Source "${input.sourceId}"`,
-      )
-    }
-    return this.db.transaction(() => {
-      const existing = this.db
-        .prepare('SELECT hydrated_at FROM resources WHERE ref = ?')
-        .get(input.ref) as { hydrated_at: number | null } | null
-      if (existing?.hydrated_at != null && input.completeness === 'partial') {
-        return { resourceId: this.write(input), warnings: [] }
-      }
+    const result = this.upsertMany([input])[0]
+    if (!result) throw new Error('Resource batch produced no result')
+    return result
+  }
 
-      const resolution = this.profiles.resolve(input.profile)
-      const warnings: UnknownProfileWarning[] = []
-      if (resolution.status === 'degraded') {
-        warnings.push({
-          code: 'unknown_profile_version',
-          profileId: resolution.id,
-          profileVersion: resolution.version,
-        })
+  upsertMany(
+    inputs: readonly ResourceUpsert[],
+  ): readonly ResourceUpsertResult[] {
+    const deduplicated = new Map<string, ResourceUpsert>()
+    for (const input of inputs) {
+      const parsedRef = parseRef(input.ref)
+      if (parsedRef.sourceId !== input.sourceId) {
+        throw new CtxindexValidationError(
+          'ref_source_mismatch',
+          `Ref Source "${parsedRef.sourceId}" does not match operation Source "${input.sourceId}"`,
+        )
       }
-      const payload =
-        resolution.status === 'known' && input.payload !== undefined
-          ? resolution.profile.schema.parse(input.payload)
-          : undefined
-      return {
-        resourceId: this.write(
-          input,
-          resolution.status === 'known' ? resolution.profile : undefined,
-          payload,
-        ),
-        warnings,
+      deduplicated.set(input.ref, input)
+    }
+    if (deduplicated.size === 0) return []
+
+    const writeBatch = () =>
+      [...deduplicated.values()].map((input) => this.upsertOne(input))
+    if (this.db.inTransaction) {
+      try {
+        return this.db.transaction(writeBatch)()
+      } catch (error) {
+        normalizeStorageError(error)
       }
-    })()
+    }
+
+    let began = false
+    try {
+      traceStorageAcquireForE2e()
+      this.db.exec('BEGIN IMMEDIATE')
+      began = true
+      const results = writeBatch()
+      this.db.exec('COMMIT')
+      return results
+    } catch (error) {
+      if (began && this.db.inTransaction) this.db.exec('ROLLBACK')
+      normalizeStorageError(error)
+    }
   }
 
   get(
@@ -214,13 +238,15 @@ export class ResourceStore {
   ): StoredResource | null {
     parseRef(ref)
     const row = this.db
-      .prepare(`
+      .prepare(
+        `
         SELECT id, ref, source_id, realm_id, profile_id, profile_version,
                origin, title, summary, occurred_at, provider_updated_at,
                deleted_at, hydrated_at, payload_json, created_at, updated_at
         FROM resources
         WHERE ref = ? ${options.includeDeleted ? '' : 'AND deleted_at IS NULL'}
-      `)
+      `,
+      )
       .get(ref) as {
       id: string
       ref: string
@@ -289,6 +315,37 @@ export class ResourceStore {
     })()
   }
 
+  private upsertOne(input: ResourceUpsert): ResourceUpsertResult {
+    const existing = this.db
+      .prepare('SELECT hydrated_at FROM resources WHERE ref = ?')
+      .get(input.ref) as { hydrated_at: number | null } | null
+    if (existing?.hydrated_at != null && input.completeness === 'partial') {
+      return { resourceId: this.write(input), warnings: [] }
+    }
+
+    const resolution = this.profiles.resolve(input.profile)
+    const warnings: UnknownProfileWarning[] = []
+    if (resolution.status === 'degraded') {
+      warnings.push({
+        code: 'unknown_profile_version',
+        profileId: resolution.id,
+        profileVersion: resolution.version,
+      })
+    }
+    const payload =
+      resolution.status === 'known' && input.payload !== undefined
+        ? resolution.profile.schema.parse(input.payload)
+        : undefined
+    return {
+      resourceId: this.write(
+        input,
+        resolution.status === 'known' ? resolution.profile : undefined,
+        payload,
+      ),
+      warnings,
+    }
+  }
+
   private write(
     input: ResourceUpsert,
     profile?: AnyProfileDefinition,
@@ -338,7 +395,8 @@ export class ResourceStore {
 
     if (preserveContent) {
       this.db
-        .prepare(`
+        .prepare(
+          `
           UPDATE resources SET
             source_id = ?,
             realm_id = ?,
@@ -350,7 +408,8 @@ export class ResourceStore {
             origin = ?,
             updated_at = ?
           WHERE id = ?
-        `)
+        `,
+        )
         .run(
           input.sourceId,
           source.realm_id,
@@ -366,7 +425,8 @@ export class ResourceStore {
     }
 
     this.db
-      .prepare(`
+      .prepare(
+        `
       INSERT INTO resources (
         id, ref, source_id, realm_id, profile_id, profile_version, title, summary,
         occurred_at, provider_updated_at, deleted_at, hydrated_at, origin,
@@ -386,7 +446,8 @@ export class ResourceStore {
         origin = excluded.origin,
         payload_json = excluded.payload_json,
         updated_at = excluded.updated_at
-    `)
+    `,
+      )
       .run(
         resourceId,
         input.ref,

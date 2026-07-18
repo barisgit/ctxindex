@@ -1,5 +1,8 @@
 import { Database } from 'bun:sqlite'
 import { afterEach, describe, expect, test } from 'bun:test'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   defineAdapter,
   defineExtension,
@@ -47,7 +50,10 @@ const adapter = defineAdapter({
       return {
         resources: [
           {
-            ref: `ctx://${source.id}/item/provider-1`,
+            ref:
+              query.text === 'invalid-ref'
+                ? 'not-a-ref'
+                : `ctx://${source.id}/item/provider-1`,
             profile: { id: 'fake.remote', version: 1 },
             title: 'provider title',
             occurredAt: 1234,
@@ -88,9 +94,10 @@ const authService = {
   },
 } as Pick<AuthService, 'resolveLinkedGrantAccessToken'>
 const dbs: Database[] = []
+const tempDirs: string[] = []
 
-async function freshDb(): Promise<Database> {
-  const db = new Database(':memory:')
+async function freshDb(path = ':memory:'): Promise<Database> {
+  const db = new Database(path, { create: true })
   dbs.push(db)
   applyPragmas(db)
   await runMigrations(db)
@@ -115,9 +122,206 @@ async function freshDb(): Promise<Database> {
 
 afterEach(() => {
   for (const db of dbs.splice(0)) db.close()
+  return Promise.all(
+    tempDirs
+      .splice(0)
+      .map((directory) => rm(directory, { recursive: true, force: true })),
+  )
 })
 
 describe('searchSourceRemote', () => {
+  test('preserves cancellation before optional cache materialization', async () => {
+    const db = await freshDb()
+    const controller = new AbortController()
+    controller.abort(new DOMException('cancelled', 'AbortError'))
+
+    await expect(
+      searchSourceRemote({
+        db,
+        sourceId,
+        registry,
+        authService,
+        logger,
+        query: { text: 'cancelled', limit: 5 },
+        signal: controller.signal,
+        fetch: async () => new Response(),
+      }),
+    ).rejects.toMatchObject({ name: 'AbortError', message: 'cancelled' })
+    expect(db.prepare('SELECT count(*) AS count FROM resources').get()).toEqual(
+      { count: 0 },
+    )
+  })
+
+  test('propagates non-contention storage failures', async () => {
+    const db = await freshDb()
+
+    await expect(
+      searchSourceRemote({
+        db,
+        sourceId,
+        registry,
+        authService,
+        logger,
+        query: { text: 'invalid-ref', limit: 5 },
+        signal: new AbortController().signal,
+        fetch: async () => new Response(),
+      }),
+    ).rejects.toMatchObject({ code: 'invalid_ref' })
+    expect(db.prepare('SELECT count(*) AS count FROM resources').get()).toEqual(
+      { count: 0 },
+    )
+  })
+
+  test('preserves provider results when optional cache materialization exhausts contention', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'ctxindex-remote-busy-'))
+    tempDirs.push(directory)
+    const path = join(directory, 'ctxindex.sqlite')
+    const db = await freshDb(path)
+    db.exec('PRAGMA busy_timeout = 10')
+    const holder = new Database(path)
+    dbs.push(holder)
+    applyPragmas(holder)
+    holder.exec('BEGIN IMMEDIATE')
+
+    let result: Awaited<ReturnType<typeof searchSourceRemote>>
+    try {
+      result = await searchSourceRemote({
+        db,
+        sourceId,
+        registry,
+        authService,
+        logger,
+        query: { text: 'contended', limit: 5 },
+        signal: new AbortController().signal,
+        fetch: async () => new Response(),
+      })
+    } finally {
+      holder.exec('ROLLBACK')
+    }
+
+    expect(result.resources).toEqual([
+      expect.objectContaining({
+        ref: `ctx://${sourceId}/item/provider-1`,
+        payload: { text: 'contended' },
+      }),
+    ])
+    expect(result.warnings).toEqual([
+      { code: 'provider_warning', message: 'provider result was partial' },
+      {
+        code: 'storage_busy',
+        message: expect.stringContaining('try again'),
+      },
+    ])
+    expect(result.warnings[1]?.message).not.toMatch(
+      /SQLITE|database.*lock|busy/i,
+    )
+  })
+
+  test('cancellation wins when scheduled during exhausted cache contention', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'ctxindex-remote-abort-'))
+    tempDirs.push(directory)
+    const path = join(directory, 'ctxindex.sqlite')
+    const db = await freshDb(path)
+    db.exec('PRAGMA busy_timeout = 50')
+    const holder = new Database(path)
+    dbs.push(holder)
+    applyPragmas(holder)
+    holder.exec('BEGIN IMMEDIATE')
+    const controller = new AbortController()
+    const abortTimer = setTimeout(
+      () => controller.abort(new DOMException('cancelled', 'AbortError')),
+      10,
+    )
+
+    let caught: unknown
+    try {
+      await searchSourceRemote({
+        db,
+        sourceId,
+        registry,
+        authService,
+        logger,
+        query: { text: 'cancelled while busy', limit: 5 },
+        signal: controller.signal,
+        fetch: async () => new Response(),
+      })
+    } catch (error) {
+      caught = error
+    } finally {
+      clearTimeout(abortTimer)
+      holder.exec('ROLLBACK')
+    }
+
+    expect(caught).toMatchObject({ name: 'AbortError', message: 'cancelled' })
+    expect(caught).not.toMatchObject({ code: 'storage_busy' })
+    expect(db.prepare('SELECT count(*) AS count FROM resources').get()).toEqual(
+      { count: 0 },
+    )
+  })
+
+  test('cancellation wins when scheduled during a successful cache wait', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'ctxindex-remote-wait-'))
+    tempDirs.push(directory)
+    const path = join(directory, 'ctxindex.sqlite')
+    const readyPath = join(directory, 'ready')
+    const db = await freshDb(path)
+    const holder = Bun.spawn({
+      cmd: [
+        process.execPath,
+        '-e',
+        `import { Database } from 'bun:sqlite';
+         import { writeFileSync } from 'node:fs';
+         const db = new Database(process.argv[1]);
+         db.exec('PRAGMA busy_timeout = 5000; BEGIN IMMEDIATE;');
+         writeFileSync(process.argv[2], 'ready');
+         setTimeout(() => { db.exec('ROLLBACK'); db.close(); }, 300);`,
+        path,
+        readyPath,
+      ],
+      stdout: 'pipe',
+      stderr: 'pipe',
+    })
+
+    try {
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        if (await Bun.file(readyPath).exists()) break
+        await Bun.sleep(10)
+      }
+      expect(await Bun.file(readyPath).exists()).toBeTrue()
+      const controller = new AbortController()
+      const abortTimer = setTimeout(
+        () => controller.abort(new DOMException('cancelled', 'AbortError')),
+        10,
+      )
+      let caught: unknown
+      try {
+        await searchSourceRemote({
+          db,
+          sourceId,
+          registry,
+          authService,
+          logger,
+          query: { text: 'cancelled after wait', limit: 5 },
+          signal: controller.signal,
+          fetch: async () => new Response(),
+        })
+      } catch (error) {
+        caught = error
+      } finally {
+        clearTimeout(abortTimer)
+      }
+
+      expect(caught).toMatchObject({
+        name: 'AbortError',
+        message: 'cancelled',
+      })
+      expect(caught).not.toMatchObject({ code: 'storage_busy' })
+      expect(await holder.exited).toBe(0)
+    } finally {
+      holder.kill()
+    }
+  })
+
   test('materializes provider resources idempotently and preserves warnings', async () => {
     const db = await freshDb()
     const authorizations: string[] = []

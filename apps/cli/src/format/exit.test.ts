@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   CtxindexAuthError,
+  CtxindexError,
   CtxindexSyncError,
   CtxindexValidationError,
 } from '@ctxindex/core/errors'
@@ -28,6 +29,17 @@ describe('mapErrorToExit', () => {
 
   test('maps an unavailable Extension Adapter to other sync failure', () => {
     expect(mapErrorToExit({ code: 'adapter_unavailable' })).toBe(50)
+  })
+
+  test('maps terminal storage contention to the existing exit 50', () => {
+    expect(
+      mapErrorToExit(
+        new CtxindexError(
+          'Local storage remained unavailable; try again',
+          'storage_busy',
+        ),
+      ),
+    ).toBe(50)
   })
 
   test.each([

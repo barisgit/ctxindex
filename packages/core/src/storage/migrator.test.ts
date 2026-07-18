@@ -1,6 +1,10 @@
 import { Database } from 'bun:sqlite'
 import { afterEach, expect, test } from 'bun:test'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { getTableConfig } from 'drizzle-orm/sqlite-core'
+import { CtxindexError } from '../errors'
 import { sources } from '../schema/sources'
 import { syncRuns } from '../schema/sync_runs'
 import { applyPragmas } from './db'
@@ -42,6 +46,60 @@ test('refuses the prototype 0000 marker without the V1 schema', async () => {
     'Prototype database detected: ctxindex_migrations_core records 0000_init.sql but the V1 resources table is missing; delete or move this database and initialize a fresh one',
   )
   expect(tableNames(db)).not.toContain('resources')
+})
+
+test('normalizes contention while creating migration state', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'ctxindex-migration-busy-'))
+  const path = join(directory, 'ctxindex.sqlite')
+  const holder = new Database(path, { create: true })
+  const contender = new Database(path, { create: true })
+  try {
+    applyPragmas(holder)
+    applyPragmas(contender)
+    contender.exec('PRAGMA busy_timeout = 10')
+    holder.exec('BEGIN IMMEDIATE')
+
+    let caught: unknown
+    try {
+      await runMigrations(contender)
+    } catch (error) {
+      caught = error
+    }
+
+    expect(caught).toBeInstanceOf(CtxindexError)
+    expect(caught).toMatchObject({
+      code: 'storage_busy',
+      cause: expect.any(Error),
+    })
+    expect((caught as Error).message).toContain('try again')
+    expect((caught as Error).message).not.toMatch(/SQLITE|database.*lock|busy/i)
+  } finally {
+    if (holder.inTransaction) holder.exec('ROLLBACK')
+    contender.close()
+    holder.close()
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
+test('current migration state remains read-only while another writer is active', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'ctxindex-migration-current-'))
+  const path = join(directory, 'ctxindex.sqlite')
+  const holder = new Database(path, { create: true })
+  const current = new Database(path, { create: true })
+  try {
+    applyPragmas(holder)
+    applyPragmas(current)
+    await runMigrations(holder)
+    current.exec('PRAGMA busy_timeout = 10')
+    holder.exec('BEGIN IMMEDIATE')
+
+    await expect(runMigrations(current)).resolves.toBeUndefined()
+  } finally {
+    if (holder.inTransaction) holder.exec('ROLLBACK')
+    current.close()
+    holder.close()
+    await rm(directory, { recursive: true, force: true })
+  }
 })
 
 function tableNames(db: Database): string[] {

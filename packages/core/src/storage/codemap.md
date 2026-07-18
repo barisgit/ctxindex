@@ -6,7 +6,8 @@ Owns Bun SQLite database creation, runtime pragmas, first-run filesystem/bootstr
 
 ## Design/patterns
 
-- `db.ts` is the connection factory and defines `CtxindexDatabase` as `bun:sqlite` `Database`; `applyPragmas()` centralizes WAL, foreign keys, synchronous mode, and busy timeout.
+- `db.ts` is the connection factory and defines `CtxindexDatabase` as `bun:sqlite` `Database`; `applyPragmas()` installs the five-second busy timeout before lock-sensitive WAL setup, then enables foreign keys and normal synchronous mode.
+- `contention.ts` centrally classifies SQLite busy/locked result families and normalizes setup, migration, and Resource write exhaustion to typed `storage_busy` without exposing backend text.
 - `init.ts` implements an idempotent bootstrap sequence for private application directories, default config, secret-file permissions, database opening, and migration.
 - `migrator.ts` uses a migration ledger (`coreMigrations.migrationsTable`) and wraps each unapplied migration plus ledger insert in a transaction.
 - Prototype/non-fresh database guards fail before applying the V1 schema rather than attempting compatibility migration.
@@ -15,7 +16,7 @@ Owns Bun SQLite database creation, runtime pragmas, first-run filesystem/bootstr
 
 1. `bootstrapDatabase()` creates config/data/state/cache/log directories with mode `0700`, writes config if absent, normalizes secret material to `0600`, and opens the default database.
 2. `openDatabase()` creates the parent directory, opens `ctxindex.sqlite`, and applies connection pragmas.
-3. `runMigrations()` inspects the migration ledger and existing user tables, rejects prototype or unmanaged databases, creates the ledger if needed, then applies pending `coreMigrations` transactionally.
+3. `runMigrations()` inspects the migration ledger and existing user tables, rejects prototype or unmanaged databases, creates the ledger only when absent, then applies pending `coreMigrations` transactionally; lock exhaustion is normalized through the shared storage helper.
 4. Bootstrap always closes the database in `finally`; other services receive an open `CtxindexDatabase` and manage their own query lifetime.
 
 ## Integration points

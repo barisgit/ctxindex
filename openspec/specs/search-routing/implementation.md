@@ -251,6 +251,8 @@ Core search owns query normalization, Source selection, routing plans, local exe
 
 The planner applies exact Realm/Source filters before execution, chooses local/remote legs from CLI, compatible Source overrides, Adapter routing, and indexed coverage, and preserves local results when an Extension or provider fails. It round-robin interleaves independent origin rankings and deduplicates by Ref; unrelated scores are never compared.
 
+Remote execution post-filters and Ref-deduplicates one Adapter result before asking `ResourceStore.upsertMany()` to materialize that origin as a single optional cache batch. Exhausted storage contention becomes one safe `storage_busy` origin warning while the verified provider Resources remain available. After a synchronous successful or exhausted storage wait, execution yields one event-loop turn before its signal check so a scheduled operation abort takes precedence; non-contention storage failures remain terminal.
+
 ## Verification
 
-Planner tests cover routing precedence, exact filters, hybrid coverage, degradation, interleaving, deduplication, and explain output. Local-search tests cover FTS, typed filters, deterministic enumeration, and offset pagination. Adapter tests cover provider query translation.
+Planner tests cover routing precedence, exact filters, hybrid coverage, degradation, interleaving, deduplication, and explain output. Local-search tests cover FTS, typed filters, deterministic enumeration, and offset pagination. Adapter tests cover provider query translation. Focused remote tests schedule cancellation during both successful and exhausted storage waits. A compiled CLI e2e test synchronizes separate remote-search processes with provider and externally held SQLite barriers, then verifies complete provider results plus atomic, deduplicated projections.

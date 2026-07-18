@@ -41,7 +41,10 @@ export interface MockGraphMessage {
   readonly from: { readonly name?: string; readonly address: string }
   readonly to: readonly { readonly name?: string; readonly address: string }[]
   readonly cc?: readonly { readonly name?: string; readonly address: string }[]
-  readonly bcc?: readonly { readonly name?: string; readonly address: string }[]
+  readonly bcc?: readonly {
+    readonly name?: string
+    readonly address: string
+  }[]
   readonly receivedDateTime: string
   readonly lastModifiedDateTime: string
   readonly isRead?: boolean
@@ -56,6 +59,7 @@ export interface MockGraphOptions {
     Record<string, readonly MockGraphCalendarEvent[]>
   >
   readonly tokenScopes?: string
+  readonly searchBarrierCount?: number
 }
 
 export interface MockGraphServer {
@@ -76,6 +80,8 @@ export interface MockGraphServer {
   ): void
   expireDefaultCalendarDeltaOnce(): void
   setGraphStatus(status: number | undefined): void
+  waitForSearchBarrier(): Promise<void>
+  releaseSearchBarrier(): void
   stop(): void
 }
 
@@ -265,6 +271,19 @@ export function startMockGraph(
   let expireDefaultDelta = false
   let graphStatus: number | undefined
   let draftSequence = 0
+  let searchArrivals = 0
+  let markSearchBarrierReached: (() => void) | undefined
+  const searchBarrierReached = options.searchBarrierCount
+    ? new Promise<void>((resolve) => {
+        markSearchBarrierReached = resolve
+      })
+    : Promise.resolve()
+  let releaseSearchResponses: (() => void) | undefined
+  const searchResponseBarrier = options.searchBarrierCount
+    ? new Promise<void>((resolve) => {
+        releaseSearchResponses = resolve
+      })
+    : Promise.resolve()
 
   const server = Bun.serve({
     hostname: '127.0.0.1',
@@ -575,6 +594,16 @@ export function startMockGraph(
       }
 
       if (url.pathname === '/v1.0/me/messages' && request.method === 'GET') {
+        if (
+          options.searchBarrierCount &&
+          searchArrivals < options.searchBarrierCount
+        ) {
+          searchArrivals += 1
+          if (searchArrivals === options.searchBarrierCount) {
+            markSearchBarrierReached?.()
+          }
+          await searchResponseBarrier
+        }
         return Response.json({ value: messages.map(graphMessage) })
       }
 
@@ -746,6 +775,12 @@ export function startMockGraph(
     },
     setGraphStatus(status) {
       graphStatus = status
+    },
+    waitForSearchBarrier() {
+      return searchBarrierReached
+    },
+    releaseSearchBarrier() {
+      releaseSearchResponses?.()
     },
     stop() {
       server.stop(true)
