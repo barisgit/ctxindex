@@ -25,7 +25,10 @@ export async function microsoftCalendarPage(
   routePath: string,
 ): Promise<MicrosoftCalendarPage> {
   if (!response.ok) {
-    if (response.status === 410) throw new MicrosoftCalendarDeltaExpiredError()
+    if (response.status === 410) {
+      await response.body?.cancel().catch(() => undefined)
+      throw new MicrosoftCalendarDeltaExpiredError()
+    }
     const failure = await graphResponseFailure(response)
     if (
       response.status >= 400 &&
