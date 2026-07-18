@@ -99,6 +99,14 @@ jq -s '
 rm "$local_manifest"
 ```
 
+## Materialize everything
+
+`scripts/reference-sync.sh` shallow-clones or updates every Git reference into `.reference/<name>/` and lists dir references. Use it to hydrate the full inventory in one step; use the per-reference flow below when only one is needed.
+
+```bash
+bash scripts/reference-sync.sh
+```
+
 ## Materialize one reference
 
 Set `name` to the reference needed for the task. Git references clone/update under `.reference/<name>/`; dir references print the real path to use.
