@@ -99,6 +99,27 @@ function context(
 }
 
 describe('Microsoft threaded reply Drafts', () => {
+  test('rejects standalone update of a locally stored reply Draft before fetch', async () => {
+    let fetchCalls = 0
+    const error = await microsoftDraftUpdate(
+      context(
+        {
+          ref: draftRef,
+          to: ['replacement@example.test'],
+          subject: 'Replacement',
+          bodyText: 'Replacement body',
+        },
+        (async () => {
+          fetchCalls += 1
+          throw new Error('must not fetch')
+        }) as unknown as typeof fetch,
+      ),
+    ).catch((caught) => caught)
+
+    expect(error).toMatchObject({ code: 'invalid_action_input' })
+    expect(fetchCalls).toBe(0)
+  })
+
   test('creates one native reply Draft with MIME content and no provider read', async () => {
     const calls: { url: string; init?: Parameters<typeof fetch>[1] }[] = []
     const resource = await microsoftDraftCreate(
@@ -145,6 +166,52 @@ describe('Microsoft threaded reply Drafts', () => {
         replyToRef: parentRef,
       },
     })
+  })
+
+  test('attests reply bodies with semantically equivalent line endings', async () => {
+    const resource = await microsoftDraftCreate(
+      context(
+        { replyToRef: parentRef, bodyText: 'line one\nline two' },
+        (async () =>
+          Response.json(graphDraft('line one\r\nline two'), {
+            status: 201,
+          })) as unknown as typeof fetch,
+      ),
+    )
+
+    expect(resource.payload).toMatchObject({
+      bodyText: 'line one\nline two',
+      replyToRef: parentRef,
+    })
+  })
+
+  test.each([
+    { rfcMessageId: '<parent@example.test>\r\nBcc: injected@example.test' },
+    { references: ['<root@example.test>\nBcc: injected@example.test'] },
+  ])('rejects unsafe derived reply message headers before fetch', async (override) => {
+    let fetchCalls = 0
+    const storedParent = parent()
+    const error = await microsoftDraftCreate(
+      context(
+        { replyToRef: parentRef, bodyText: 'Reply body' },
+        (async () => {
+          fetchCalls += 1
+          throw new Error('must not fetch')
+        }) as unknown as typeof fetch,
+        [
+          {
+            ...storedParent,
+            payload: {
+              ...(storedParent.payload as Record<string, unknown>),
+              ...override,
+            },
+          },
+        ],
+      ),
+    ).catch((caught) => caught)
+
+    expect(error).toMatchObject({ code: 'invalid_action_input' })
+    expect(fetchCalls).toBe(0)
   })
 
   test('updates one reply Draft only after proving immutable replyToRef locally', async () => {

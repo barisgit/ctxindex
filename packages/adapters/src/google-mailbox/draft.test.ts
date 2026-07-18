@@ -448,6 +448,44 @@ describe('gmailDraftCreate', () => {
 })
 
 describe('gmailDraftUpdate', () => {
+  test('rejects standalone update of a locally stored reply Draft before fetch', async () => {
+    const parentRef = `ctx://${sourceId}/message/parent-1`
+    const draftRef = `ctx://${sourceId}/draft/reply-draft-1`
+    let fetchCalls = 0
+    const error = await gmailDraftUpdate(
+      context(
+        {
+          ref: draftRef,
+          to: ['replacement@example.com'],
+          subject: 'Replacement',
+          bodyText: 'Replacement body',
+        },
+        (async () => {
+          fetchCalls += 1
+          throw new Error('must not fetch')
+        }) as unknown as typeof fetch,
+        (ref) =>
+          ref === draftRef
+            ? {
+                ref,
+                sourceId,
+                profile: { id: 'communication.message', version: 1 },
+                completeness: 'complete',
+                deletedAt: null,
+                payload: {
+                  providerMessageId: 'reply-message-1',
+                  providerDraftId: 'reply-draft-1',
+                  replyToRef: parentRef,
+                },
+              }
+            : null,
+      ),
+    ).catch((caught) => caught)
+
+    expect(error).toMatchObject({ code: 'invalid_action_input' })
+    expect(fetchCalls).toBe(0)
+  })
+
   test('updates one threaded reply Draft with immutable parent and exact thread headers', async () => {
     const parentRef = `ctx://${sourceId}/message/parent-1`
     const draftRef = `ctx://${sourceId}/draft/reply-draft-1`

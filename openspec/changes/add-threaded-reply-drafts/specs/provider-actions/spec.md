@@ -16,6 +16,8 @@ The existing Draft create and update Actions SHALL support provider-native reply
 
 The reply recipient MUST be the first Reply-To address when present and otherwise the first From address. Reply-all MUST NOT be performed. The subject MUST be derived deterministically from the parent and MUST NOT be caller-overridable. Missing locally required recipient, identity, reference-chain, conversation, or provider-thread data MUST fail with guidance to retrieve the message first.
 
+A locally stored reply Draft MUST NOT be updated through the standalone branch. Update validation MUST preserve its stored reply context even when the caller omits `replyToRef`.
+
 Each valid create or update MUST perform exactly one reversible provider mutation with no automatic retry, return a complete reply Draft Resource under a stable Ref, and preserve immutable `replyToRef`. No send Action, send endpoint, or send-only permission may be added.
 
 #### Scenario: Valid local parent creates one reply Draft
@@ -28,6 +30,10 @@ Each valid create or update MUST perform exactly one reversible provider mutatio
 
 #### Scenario: Reply parent cannot change on update
 - **WHEN** reply update supplies a `replyToRef` different from the locally stored Draft parent
+- **THEN** the Action fails before provider I/O and leaves the Draft unchanged
+
+#### Scenario: Standalone update cannot erase reply context
+- **WHEN** standalone update addresses a locally stored reply Draft without its `replyToRef`
 - **THEN** the Action fails before provider I/O and leaves the Draft unchanged
 
 #### Scenario: Reply overrides are unavailable

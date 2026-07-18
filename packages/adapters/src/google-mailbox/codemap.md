@@ -9,14 +9,14 @@ Owns the complete `google.mailbox` Adapter module: configuration and definition,
 - `config.ts` owns `gmailSourceConfigSchema`; `definition.ts` binds the shared `googleOAuthProvider`, Gmail operation scopes, `gmail.googleapis.com` API-host authority, Profile-owned Draft schemas, and the module's operations into `gmailAdapterDefinition`.
 - `message.ts` owns the provider DTO plus header, address, date, Message-ID, and References helpers; `response.ts` owns JSON decoding and HTTP-status-to-`CtxindexSyncError` mapping.
 - `url.ts` provides `gmailApiUrl()` and accepts non-production mock routing only through loopback `127.0.0.1`.
-- Capability files keep provider request construction and payload validation local to search, retrieve, download, and Draft behavior.
+- Capability files keep provider request construction and payload validation local to search, retrieve, download, and Draft behavior. `draft.ts` derives reply recipient, subject, References, and Gmail thread identity from a complete local parent and requires updates of stored reply Drafts to carry their immutable `replyToRef`.
 
 ## Data & control flow
 
 1. Core invokes an operation from `gmailAdapterDefinition` with an SDK context whose `fetch` implementation permits only the Adapter-declared `gmail.googleapis.com` host (plus non-production loopback mocks).
 2. The operation builds its Gmail endpoint through `gmailApiUrl()` and sends the provider request through `context.fetch`.
 3. `gmailJson()` maps non-success statuses to stable sync errors and decodes JSON; each operation validates the payload it owns.
-4. Draft reply branches resolve a complete eligible parent locally, reject CR/LF in every derived MIME header value, and perform exactly one `drafts.create` or `drafts.update` mutation with the parent `threadId`; operations return Profile-shaped resources, artifacts, or reversible Draft Action results.
+4. Draft reply branches resolve a complete eligible parent locally, reject CR/LF in every derived MIME header value, and perform exactly one `drafts.create` or `drafts.update` mutation with the parent `threadId`. Reply update rejects an omitted or changed stored parent before provider I/O; Gmail must return the requested thread before the canonical Draft Resource is materialized.
 
 ## Integration points
 

@@ -175,10 +175,18 @@ function replyDetails(
   }
   recipient(replyRecipient)
   const subject = deriveCommunicationMessageReplySubject(parent.subject)
-  if (/\r|\n/.test(subject))
+  const inReplyTo = parent.rfcMessageId
+  const references = inReplyTo
+    ? deriveCommunicationMessageReplyReferences(parent.references, inReplyTo)
+    : [...(parent.references ?? [])]
+  if (
+    [subject, ...(inReplyTo ? [inReplyTo] : []), ...references].some((value) =>
+      /[\r\n]/.test(value),
+    )
+  )
     throw new CtxindexValidationError(
       'invalid_action_input',
-      `Reply parent "${replyToRef}" contains an unsafe subject`,
+      `Reply parent "${replyToRef}" contains unsafe Microsoft header values`,
     )
   return {
     replyToRef,
@@ -186,13 +194,8 @@ function replyDetails(
     threadId: parent.threadId,
     recipient: replyRecipient,
     subject,
-    ...(parent.rfcMessageId ? { inReplyTo: parent.rfcMessageId } : {}),
-    references: parent.rfcMessageId
-      ? deriveCommunicationMessageReplyReferences(
-          parent.references,
-          parent.rfcMessageId,
-        )
-      : [...(parent.references ?? [])],
+    ...(inReplyTo ? { inReplyTo } : {}),
+    references,
   }
 }
 
@@ -207,6 +210,24 @@ function validateReplyUpdate(
       `Reply Draft "${input.ref}" cannot change replyToRef`,
     )
   return replyDetails(context, input.replyToRef)
+}
+
+function rejectStoredReplyDraftUpdate(
+  context: ActionContext<unknown>,
+  ref: string,
+): void {
+  const resource = context.resolveResource(ref)
+  if (
+    resource?.profile.id !== 'communication.message' ||
+    resource.profile.version !== 1
+  )
+    return
+  const draft = communicationMessageSchema.safeParse(resource.payload)
+  if (draft.success && draft.data.providerDraftId && draft.data.replyToRef)
+    throw new CtxindexValidationError(
+      'invalid_action_input',
+      `Reply Draft "${ref}" must be updated with its immutable replyToRef`,
+    )
 }
 
 function replyReplacement(details: MicrosoftReplyDetails, bodyText: string) {
@@ -235,6 +256,10 @@ function replyMime(details: MicrosoftReplyDetails, bodyText: string): string {
   return Buffer.from(`${headers.join('\r\n')}\r\n\r\n${body}`).toString(
     'base64',
   )
+}
+
+function normalizeBodyLineEndings(value: string): string {
+  return value.replace(/\r\n|\r/g, '\n')
 }
 
 function draftResource(
@@ -267,7 +292,8 @@ function draftResource(
   if (
     reply &&
     (basePayload.subject !== reply.details.subject ||
-      basePayload.bodyText !== reply.bodyText ||
+      normalizeBodyLineEndings(basePayload.bodyText ?? '') !==
+        normalizeBodyLineEndings(reply.bodyText) ||
       basePayload.threadId !== reply.details.threadId ||
       JSON.stringify(basePayload.to ?? []) !==
         JSON.stringify([reply.details.recipient]) ||
@@ -349,6 +375,7 @@ export async function microsoftDraftUpdate(
 ): Promise<RetrievedResource> {
   const input = parseUpdateInput(context.input)
   const draftId = parseDraftRef(input.ref, context.source.id)
+  if (!isReplyInput(input)) rejectStoredReplyDraftUpdate(context, input.ref)
   const details = isReplyInput(input)
     ? validateReplyUpdate(context, input)
     : undefined

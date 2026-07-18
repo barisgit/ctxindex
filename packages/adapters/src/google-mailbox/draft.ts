@@ -167,6 +167,24 @@ function validateReplyUpdate(
   return replyDetails(context, input.replyToRef)
 }
 
+function rejectStoredReplyDraftUpdate(
+  context: ActionContext<unknown>,
+  ref: string,
+): void {
+  const resource = context.resolveResource(ref)
+  if (
+    resource?.profile.id !== 'communication.message' ||
+    resource.profile.version !== 1
+  )
+    return
+  const draft = communicationMessageSchema.safeParse(resource.payload)
+  if (draft.success && draft.data.providerDraftId && draft.data.replyToRef)
+    throw new CtxindexValidationError(
+      'invalid_action_input',
+      `Reply Draft "${ref}" must be updated with its immutable replyToRef`,
+    )
+}
+
 function parseDraftUpdateInput(input: unknown): GmailDraftUpdateInput {
   const parsed = communicationMessageDraftUpdateInputSchema.safeParse(input)
   if (!parsed.success) {
@@ -250,6 +268,7 @@ export async function gmailDraftUpdate(
 ): Promise<RetrievedResource> {
   const input = parseDraftUpdateInput(context.input)
   const addressedDraftId = providerDraftId(input.ref, context.source.id)
+  if (!isReplyInput(input)) rejectStoredReplyDraftUpdate(context, input.ref)
   const details = isReplyInput(input)
     ? validateReplyUpdate(context, input)
     : undefined
