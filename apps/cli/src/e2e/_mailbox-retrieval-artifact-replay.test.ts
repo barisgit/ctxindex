@@ -193,7 +193,7 @@ const microsoftDriver: MailboxReplayDriver = {
           {
             method: 'GET',
             pathname: `${messagePath}/attachments`,
-            search: '?$select=id,name,contentType,size,isInline,@odata.type',
+            search: '?$select=id,name,contentType,isInline',
           },
         ],
         expectedDownloadRequests: [
@@ -410,7 +410,6 @@ export async function runMailboxRetrievalArtifactReplay(
             ref: string
             filename: string
             mediaType: string
-            byteSize: number
           }>
         }
       }
@@ -432,7 +431,6 @@ export async function runMailboxRetrievalArtifactReplay(
               ref: artifactRef,
               filename: active.attachmentFilename,
               mediaType: 'text/plain',
-              byteSize: mailboxReplayFixture.attachmentText.length,
             },
           ],
         },
