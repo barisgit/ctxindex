@@ -36,7 +36,7 @@ export async function microsoftMailboxDownload(
     ),
     { headers: graphHeaders(), signal: context.signal },
   )
-  if (!response.ok) throw graphResponseError(response)
+  if (!response.ok) throw await graphResponseError(response)
   const expectedSize = context.artifact.byteSize
   const lengthHeader = response.headers.get('content-length')
   if (lengthHeader !== null) {

@@ -21,7 +21,6 @@ const fileAttachmentSchema = z
     id: z.string().min(1),
     name: z.string().min(1),
     contentType: z.string().min(1),
-    size: z.number().int().nonnegative(),
     isInline: z.boolean(),
   })
   .passthrough()
@@ -45,7 +44,7 @@ async function attachmentDescriptors(
 ): Promise<ArtifactDescriptor[]> {
   const descriptors: ArtifactDescriptor[] = []
   let next: string | undefined = graphUrl(
-    `/me/messages/${encodeURIComponent(messageId)}/attachments?$select=id,name,contentType,size,isInline,@odata.type`,
+    `/me/messages/${encodeURIComponent(messageId)}/attachments?$select=id,name,contentType,isInline`,
   )
   let pages = 0
   while (next) {
@@ -98,7 +97,6 @@ async function attachmentDescriptors(
         ref: `${context.ref}/attachment/${encodeURIComponent(attachment.id)}`,
         filename: attachment.name,
         mediaType: attachment.contentType,
-        byteSize: attachment.size,
       })
     }
     next = page.data['@odata.nextLink']

@@ -69,7 +69,7 @@ describe('Microsoft Calendar Graph pages', () => {
       ).rejects.toMatchObject({ code: 'provider_bad_response' })
   })
 
-  test('recognizes expired delta errors from 410 and documented error codes', async () => {
+  test('recognizes expired delta errors from documented error codes', async () => {
     for (const code of [
       'syncStateNotFound',
       'SyncStateNotFound',
@@ -82,12 +82,67 @@ describe('Microsoft Calendar Graph pages', () => {
           '/v1.0/me/calendarView/delta',
         ),
       ).rejects.toMatchObject({ name: 'MicrosoftCalendarDeltaExpiredError' })
+  })
+
+  test('cancels 410 response bodies without leaking provider details', async () => {
+    const privateDetail = 'private provider detail'
+    let cancelled = false
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new TextEncoder().encode(privateDetail))
+      },
+      cancel() {
+        cancelled = true
+      },
+    })
+
+    const error = await microsoftCalendarPage(
+      new Response(body, { status: 410 }),
+      'delta',
+      '/v1.0/me/calendarView/delta',
+    ).catch((cause: unknown) => cause)
+
+    expect(error).toMatchObject({ name: 'MicrosoftCalendarDeltaExpiredError' })
+    expect(String(error)).not.toContain(privateDetail)
+    expect(cancelled).toBe(true)
+  })
+
+  test('bounds oversized delta-expiry error bodies before inspecting their code', async () => {
+    const bytes = new TextEncoder().encode(
+      JSON.stringify({
+        error: {
+          code: 'SyncStateNotFound',
+          message: 'private provider detail '.repeat(4_096),
+        },
+      }),
+    )
+    let offset = 0
+    let pulls = 0
+    let cancelled = false
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1
+        if (offset >= bytes.byteLength) {
+          controller.close()
+          return
+        }
+        const next = bytes.slice(offset, offset + 1_024)
+        offset += next.byteLength
+        controller.enqueue(next)
+      },
+      cancel() {
+        cancelled = true
+      },
+    })
+
     await expect(
       microsoftCalendarPage(
-        new Response('{}', { status: 410 }),
+        new Response(body, { status: 400 }),
         'delta',
         '/v1.0/me/calendarView/delta',
       ),
-    ).rejects.toMatchObject({ name: 'MicrosoftCalendarDeltaExpiredError' })
+    ).rejects.toMatchObject({ code: 'provider_bad_response' })
+    expect(cancelled).toBe(true)
+    expect(pulls).toBeLessThanOrEqual(18)
   })
 })
