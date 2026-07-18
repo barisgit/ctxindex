@@ -127,16 +127,15 @@ export async function runProviderSyncReplay<TRequest>(
     }
   }
   const readCursor = () =>
-    readDatabase(
-      (database) =>
-        (
-          database
-            .query(
-              'SELECT cursor_json FROM source_sync_state WHERE source_id = ?',
-            )
-            .get(sourceId) as { readonly cursor_json: string | null }
-        ).cursor_json,
-    )
+    readDatabase((database) => {
+      const row = database
+        .query('SELECT cursor_json FROM source_sync_state WHERE source_id = ?')
+        .get(sourceId) as { readonly cursor_json: string | null } | null
+      if (row === null) {
+        throw new Error(`missing sync cursor row for source ${sourceId}`)
+      }
+      return row.cursor_json
+    })
   const readResources = () =>
     readDatabase((database) =>
       database

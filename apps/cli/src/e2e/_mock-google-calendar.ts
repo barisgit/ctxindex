@@ -199,7 +199,10 @@ export function startMockGoogleCalendar(
       if (
         !Number.isInteger(pageIndex) ||
         pageIndex < 0 ||
-        (pageSize !== undefined && pageSize < 1)
+        (pageSize !== undefined &&
+          (!Number.isFinite(pageSize) ||
+            !Number.isInteger(pageSize) ||
+            pageSize < 1))
       ) {
         return Response.json({ error: 'invalid_page_token' }, { status: 400 })
       }

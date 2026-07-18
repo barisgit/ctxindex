@@ -365,7 +365,6 @@ export function startMockGraph(
         }
         if (deltaToken !== null && invalidDefaultDeltaTokens.has(deltaToken)) {
           const restart = new URL('/v1.0/me/calendarView/delta', url.origin)
-          restart.searchParams.set('$deltatoken', '')
           return Response.json(
             { error: { code: 'syncStateNotFound', message: 'expired' } },
             { status: 410, headers: { location: restart.toString() } },
@@ -374,7 +373,6 @@ export function startMockGraph(
         if (deltaToken !== null && expireDefaultDelta) {
           expireDefaultDelta = false
           const restart = new URL('/v1.0/me/calendarView/delta', url.origin)
-          restart.searchParams.set('$deltatoken', '')
           return Response.json(
             { error: { code: 'syncStateNotFound', message: 'expired' } },
             { status: 410, headers: { location: restart.toString() } },
