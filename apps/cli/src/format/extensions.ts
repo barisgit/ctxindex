@@ -1,10 +1,14 @@
 import type { ExtensionLoadProvenance } from '@ctxindex/core/extension'
 import { compareReferences } from '@ctxindex/core/registry'
 
-function provenanceText(provenance: ExtensionLoadProvenance): string {
+type ProvenanceWithAge = ExtensionLoadProvenance & {
+  readonly snapshotAgeMs?: number
+}
+
+function provenanceText(provenance: ProvenanceWithAge): string {
   if (provenance.kind === 'builtin') return 'builtin'
   if (provenance.kind === 'path') return `path ${provenance.path}`
-  return `catalog ${provenance.catalog} ${provenance.commit} ${provenance.repository} ${provenance.sourcePath}`
+  return `catalog ${provenance.catalog} ${provenance.commit} ${provenance.repository} ${provenance.sourcePath}${provenance.snapshotAgeMs === undefined ? '' : ` age ${provenance.snapshotAgeMs}ms`}`
 }
 
 export function formatExtensions(
@@ -19,9 +23,18 @@ export function formatExtensions(
   },
   jsonOutput: boolean,
   provenance: readonly ExtensionLoadProvenance[] = [],
+  now = Date.now(),
 ): string {
   const provenanceByIdentity = new Map(
-    provenance.map((item) => [`${item.id}@${item.version}`, item]),
+    provenance.map((item) => [
+      `${item.id}@${item.version}`,
+      item.kind === 'catalog'
+        ? {
+            ...item,
+            snapshotAgeMs: Math.max(0, now - item.snapshotAcquiredAt),
+          }
+        : item,
+    ]),
   )
   const extensions = [...registry.list()]
     .sort(compareReferences)

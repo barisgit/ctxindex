@@ -59,7 +59,7 @@ async function createCatalogRepository(sandbox: Sandbox): Promise<string> {
   return repository
 }
 
-test('trusted local Git Catalog lifecycle is deterministic and offline after add', async () => {
+test('trusted local Git Catalog lifecycle refreshes on command and keeps startup offline', async () => {
   const sandbox = await createSandbox()
   try {
     const repository = await createCatalogRepository(sandbox)
@@ -95,14 +95,58 @@ test('trusted local Git Catalog lifecycle is deterministic and offline after add
       ref: 'refs/heads/main',
     })
     expect(catalog.commit).toMatch(/^[0-9a-f]{40}$/)
+    expect(catalog.snapshot_acquired_at).toBeNumber()
+    expect(catalog.snapshot_age_ms).toBeGreaterThanOrEqual(0)
 
-    const listed = await sandbox.run([
+    await writeFile(join(repository, 'SETUP.md'), 'List refresh\n')
+    await git(repository, ['add', 'SETUP.md'])
+    await git(repository, [
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      'commit',
+      '-m',
+      'list refresh',
+    ])
+
+    const staleListed = await sandbox.run([
       'extensions',
       'catalog',
       'list',
+      '--no-refresh',
       '--json',
     ])
-    expect(JSON.parse(listed.stdout)).toEqual([catalog])
+    expect(JSON.parse(staleListed.stdout)[0]).toMatchObject({
+      commit: catalog.commit,
+      snapshot_acquired_at: catalog.snapshot_acquired_at,
+    })
+    expect(JSON.parse(staleListed.stdout)[0].snapshot_age_ms).toBeNumber()
+    const listed = JSON.parse(
+      (await sandbox.run(['extensions', 'catalog', 'list', '--json'])).stdout,
+    )[0]
+    expect(listed.commit).not.toBe(catalog.commit)
+
+    await writeFile(join(repository, 'SETUP.md'), 'Show refresh\n')
+    await git(repository, ['add', 'SETUP.md'])
+    await git(repository, [
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      'commit',
+      '-m',
+      'show refresh',
+    ])
+    const staleShown = await sandbox.run([
+      'extensions',
+      'catalog',
+      'show',
+      'fixture',
+      '--no-refresh',
+      '--json',
+    ])
+    expect(JSON.parse(staleShown.stdout).commit).toBe(listed.commit)
     const shown = await sandbox.run([
       'extensions',
       'catalog',
@@ -113,13 +157,30 @@ test('trusted local Git Catalog lifecycle is deterministic and offline after add
     ])
     expect(JSON.parse(shown.stdout)).toMatchObject({
       catalog: 'fixture',
-      commit: catalog.commit,
       extension: {
         id: 'fixture.catalog-extension',
         version: 1,
         source_path: 'extension.ts',
       },
     })
+    const shownValue = JSON.parse(shown.stdout)
+    expect(shownValue.commit).not.toBe(listed.commit)
+    expect(shownValue.snapshot_age_ms).toBeNumber()
+
+    await writeFile(
+      join(repository, 'extension.ts'),
+      `export default ({ defineExtension }) => defineExtension({ id: 'fixture.catalog-extension', version: 1, profiles: [], adapters: [], docs: { summary: 'Refreshed Catalog fixture' } })\n`,
+    )
+    await git(repository, ['add', 'extension.ts'])
+    await git(repository, [
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      'commit',
+      '-m',
+      'install refresh',
+    ])
 
     const missingInstallTrust = await sandbox.run([
       'extensions',
@@ -141,7 +202,35 @@ test('trusted local Git Catalog lifecycle is deterministic and offline after add
     expect(JSON.parse(installed.stdout)).toMatchObject({
       action: 'installed',
       id: 'fixture.catalog-extension',
-      commit: catalog.commit,
+    })
+    const installedValue = JSON.parse(installed.stdout)
+    expect(installedValue.commit).not.toBe(shownValue.commit)
+    expect(installedValue.snapshot_age_ms).toBeNumber()
+
+    await writeFile(join(repository, 'SETUP.md'), 'Not refreshed on install\n')
+    await git(repository, ['add', 'SETUP.md'])
+    await git(repository, [
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      'commit',
+      '-m',
+      'remain stored for no-refresh install',
+    ])
+    const storedInstall = await sandbox.run([
+      'extensions',
+      'install',
+      'fixture',
+      'fixture.catalog-extension@1',
+      '--trust',
+      '--no-refresh',
+      '--json',
+    ])
+    expect(storedInstall.exitCode).toBe(0)
+    expect(JSON.parse(storedInstall.stdout)).toMatchObject({
+      commit: installedValue.commit,
+      snapshot_age_ms: expect.any(Number),
     })
 
     const offlineBin = join(sandbox.dir, 'offline-bin')
@@ -159,10 +248,28 @@ test('trusted local Git Catalog lifecycle is deterministic and offline after add
       provenance: {
         kind: 'catalog',
         catalog: 'fixture',
-        commit: catalog.commit,
+        commit: installedValue.commit,
         repository,
         sourcePath: 'extension.ts',
+        snapshotAcquiredAt: installedValue.snapshot_acquired_at,
+        snapshotAgeMs: expect.any(Number),
       },
+    })
+
+    const failedRefresh = await sandbox.run(
+      ['extensions', 'catalog', 'show', 'fixture', '--json'],
+      { env: { PATH: offlineBin } },
+    )
+    expect(failedRefresh.exitCode).toBe(30)
+    expect(failedRefresh.stdout).toBe('')
+    const offlineStored = await sandbox.run(
+      ['extensions', 'catalog', 'show', 'fixture', '--no-refresh', '--json'],
+      { env: { PATH: offlineBin } },
+    )
+    expect(offlineStored.exitCode).toBe(0)
+    expect(JSON.parse(offlineStored.stdout)).toMatchObject({
+      commit: installedValue.commit,
+      snapshot_age_ms: expect.any(Number),
     })
 
     const blockedRemoval = await sandbox.run([
@@ -206,4 +313,4 @@ test('trusted local Git Catalog lifecycle is deterministic and offline after add
   } finally {
     await sandbox.cleanup()
   }
-})
+}, 15_000)

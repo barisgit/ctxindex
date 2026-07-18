@@ -6,13 +6,13 @@ External Extensions currently load only from configured local paths. Issue #23 p
 
 **Goals:**
 - Register multiple explicitly trusted public HTTPS or absolute local Git repositories and resolve a full ref or exact object ID to one commit.
-- Materialize immutable local snapshots only during explicit add/refresh, then perform all inspection, installation, startup loading, and uninstall work offline.
+- Materialize immutable local snapshots during add, explicit refresh, and default command-time refresh for Catalog discovery/install; keep `--no-refresh`, startup loading, loaded-Extension listing, and uninstall offline.
 - Validate a small strict manifest, bounded paths/files, repository containment, and exact Extension identity before activation.
 - Persist portable Catalog and installed provenance without absolute snapshot paths, and make refresh independent from explicit install replacement.
 - Disable ambient Git credential, prompt, hook, filter, submodule, and external-protocol behavior.
 
 **Non-Goals:**
-- SSH, credentials, private repositories, cross-repository entries, nested Catalogs, automatic refresh, polling, daemon integration, package managers, dependency resolution, build hooks, Git LFS, submodules, or external protocol helpers.
+- SSH, credentials, private repositories, cross-repository entries, nested Catalogs, ambient/startup refresh, polling, daemon integration, package managers, dependency resolution, build hooks, Git LFS, submodules, or external protocol helpers.
 - Hosted marketplace features, publication workflows, signatures, transparency logs, sandboxing, or out-of-process execution.
 - Catalog-owned authentication, scopes, hosts, Adapter configuration, automatic Source creation, or provider authorization.
 
@@ -22,7 +22,7 @@ External Extensions currently load only from configured local paths. Issue #23 p
 
 2. **Snapshots are derived storage, records are portable configuration.** Strict TOML documents under ctxindex configuration own Catalog and installed records. Snapshot locations are derived as `data/catalogs/<local-name>/<commit>` and absolute snapshot paths are never persisted. This keeps relocations deterministic and allows missing snapshots to degrade through loader diagnostics.
 
-3. **Explicit add/refresh are the only acquisition boundary.** Remote acquisition uses system Git in a temporary candidate directory with terminal prompts, credential helpers, hooks, filters, submodule recursion, and external protocols disabled. The candidate commit tree is archived into a newly created immutable snapshot directory; no checkout executes repository configuration or hooks. Install and startup read only committed snapshot bytes.
+3. **Acquisition is command-bound, never ambient.** Add, explicit refresh, and default refresh inside Catalog discovery/install commands use system Git in a temporary candidate directory with terminal prompts, credential helpers, hooks, filters, submodule recursion, and external protocols disabled. `--no-refresh` selects the stored snapshot. Startup, loaded-Extension listing, and uninstall never acquire. A default refresh failure fails the requesting command instead of silently serving stale discovery. The candidate commit tree is archived into a newly created immutable snapshot directory; no checkout executes repository configuration or hooks.
 
 4. **Remote repository policy is syntactic and credential-free.** Only HTTPS URLs without userinfo, query, or fragment components are accepted. Localhost names, including root-dot spellings, and literal loopback, private, link-local, unspecified, and multicast IP destinations are rejected before Git. DNS resolution is not used as an authorization mechanism; redirects and network policy remain Git/host concerns. Absolute local repositories are accepted, while relative local paths and non-committed working-tree content are rejected.
 
@@ -31,6 +31,8 @@ External Extensions currently load only from configured local paths. Issue #23 p
 6. **Replacement is validate-then-switch.** Install loads and validates the requested Extension from the pinned snapshot and verifies its definition identity before atomically rewriting installed provenance. A different provenance for the same Extension identity replaces the old record only after validation succeeds. Snapshots are retained because uninstall/removal are metadata operations and Sources or Resources may still refer to older definitions.
 
 7. **Catalog behavior lives in provider-neutral core.** CLI code performs parsing, output formatting, and service delegation only. The existing Extension loader consumes installed provenance and the normal registry validation seam, allowing missing or invalid snapshots to produce diagnostics without any fetch.
+
+8. **Snapshot age is portable provenance.** Catalog and installed records store the acquisition time of their exact commit snapshot. Read and install output derives an age from that timestamp, and loaded Catalog provenance carries it through the offline loader. This avoids filesystem-mtime dependence after relocation.
 
 ## Risks / Trade-offs
 

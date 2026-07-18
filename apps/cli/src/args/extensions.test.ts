@@ -24,6 +24,7 @@ describe('parseExtensionsArgs Catalog surface', () => {
     })
     expect(parseExtensionsArgs(['catalog', 'list', '--json'])).toEqual({
       kind: 'catalog-list',
+      noRefresh: false,
       json: true,
     })
     expect(
@@ -38,6 +39,7 @@ describe('parseExtensionsArgs Catalog surface', () => {
       kind: 'catalog-show',
       name: 'team',
       extension: { id: 'fixture.extension', version: 2 },
+      noRefresh: false,
       json: true,
     })
     expect(parseExtensionsArgs(['catalog', 'refresh', 'team'])).toEqual({
@@ -66,6 +68,7 @@ describe('parseExtensionsArgs Catalog surface', () => {
       catalog: 'team',
       extension: { id: 'fixture.extension', version: 1 },
       trust: true,
+      noRefresh: false,
       json: true,
     })
     expect(
@@ -74,6 +77,36 @@ describe('parseExtensionsArgs Catalog surface', () => {
       kind: 'uninstall',
       extension: { id: 'fixture.extension', version: 1 },
       json: true,
+    })
+  })
+
+  test('parses explicit stored-snapshot discovery and install', () => {
+    expect(
+      parseExtensionsArgs(['catalog', 'list', '--no-refresh', '--json']),
+    ).toEqual({ kind: 'catalog-list', noRefresh: true, json: true })
+    expect(
+      parseExtensionsArgs(['catalog', 'show', 'team', '--no-refresh']),
+    ).toEqual({
+      kind: 'catalog-show',
+      name: 'team',
+      noRefresh: true,
+      json: false,
+    })
+    expect(
+      parseExtensionsArgs([
+        'install',
+        'team',
+        'fixture.extension@1',
+        '--trust',
+        '--no-refresh',
+      ]),
+    ).toEqual({
+      kind: 'install',
+      catalog: 'team',
+      extension: { id: 'fixture.extension', version: 1 },
+      trust: true,
+      noRefresh: true,
+      json: false,
     })
   })
 

@@ -8,7 +8,8 @@ ctxindex can load trusted Extension code only from explicit local paths, so user
 - Add a strict schema-version-1 `ctxindex-catalog.json` manifest for inline Extension source and optional prose setup guidance, with deterministic bounds and path containment checks.
 - Persist Catalog and installed Extension provenance as strict TOML records and activate installed Catalog Extensions through the existing validated Extension loader.
 - Add deterministic Catalog add/list/show/refresh/remove and Extension install/uninstall CLI commands with separate repository and execution trust acknowledgements.
-- Keep startup, listing, showing, install, uninstall, and Extension loading offline; only explicit Catalog add and refresh may access a remote repository.
+- Refresh Catalog discovery and install commands by default, with `--no-refresh` as the explicit stored-snapshot path and Catalog age surfaced whenever stored snapshot data is used.
+- Keep startup, loaded-Extension listing, uninstall, and Extension loading offline; command-time refresh failure is observable and does not silently fall back to stale discovery.
 - Reject authentication-bearing repositories, unsafe destinations and Git behavior, cross-repository entries, package/build hooks, and Catalog-declared provider authority.
 
 ## Capabilities

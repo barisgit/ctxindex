@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Deterministic Git Catalog command surface
-The CLI SHALL provide `extensions catalog add <name> <repository> --ref <full-ref-or-oid> --trust`, Catalog `list`, `show`, `refresh`, and `remove`, `extensions install <catalog> <id>@<version> --trust`, and `extensions uninstall <id>@<version>`. Text and JSON output MUST be deterministic and business behavior MUST be delegated to provider-neutral core.
+The CLI SHALL provide `extensions catalog add <name> <repository> --ref <full-ref-or-oid> --trust`, Catalog `list`, `show`, `refresh`, and `remove`, `extensions install <catalog> <id>@<version> --trust`, and `extensions uninstall <id>@<version>`. Catalog list/show and Extension install MUST refresh the involved Catalogs by default and accept `--no-refresh` to use stored snapshots. Text and JSON output MUST be deterministic, MUST surface stored snapshot age, and business behavior MUST be delegated to provider-neutral core.
 
 #### Scenario: Catalog lifecycle is requested as JSON
 - **WHEN** an agent invokes a supported Catalog inspection or mutation command with `--json`
@@ -10,6 +10,10 @@ The CLI SHALL provide `extensions catalog add <name> <repository> --ref <full-re
 #### Scenario: Exact extension selector is invalid
 - **WHEN** an install, uninstall, or show selector does not contain a valid exact `<id>@<version>`
 - **THEN** the CLI returns a usage error with exit code 2 before service mutation
+
+#### Scenario: Default refresh fails
+- **WHEN** Catalog list/show or Extension install cannot refresh an involved Catalog
+- **THEN** the CLI returns the mapped acquisition failure and emits no stale success result
 
 ### Requirement: Separate trust acknowledgements
 Catalog add MUST require repository trust acknowledgement and Extension install MUST independently require execution trust acknowledgement. Missing either required `--trust` MUST fail with exit code 2 before repository access, dynamic import, or persisted mutation.

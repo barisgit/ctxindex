@@ -11,7 +11,7 @@ Pure argv parsing into typed discriminated command unions.
 - `account.ts` accepts provider authorization with optional Account/client labels, deterministic inventory, and label removal.
 - `source.ts` derives `--config-*` values from registry descriptions, accepts `--label` and Account label/Account ID/Grant ID references, and rejects removed `--name` / `--display-name` forms.
 - Ref-bearing parsers validate stable `ctx://` / Artifact Refs; search/sync/status/Action source flags remain strings for later label-or-ID resolution.
-- `extensions.ts` owns the closed Catalog lifecycle grammar, exact `<id>@<version>` selectors, and separate repository/install trust acknowledgements.
+- `extensions.ts` owns the closed Catalog lifecycle grammar, exact `<id>@<version>` selectors, separate repository/install trust acknowledgements, and `--no-refresh` on Catalog list/show and install; absence of that flag leaves command-time refresh enabled.
 
 ## Data & control flow
 

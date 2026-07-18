@@ -17,6 +17,7 @@ const catalog: CatalogRecord = {
   repository: '/tmp/fixture.git',
   ref: 'refs/heads/main',
   commit,
+  snapshot_acquired_at: 1,
   catalog_id: 'fixture.catalog',
   catalog_name: 'Fixture Catalog',
   extensions: [
@@ -36,6 +37,7 @@ const installed: InstalledExtensionRecord = {
   catalog_id: 'fixture.catalog',
   repository: '/tmp/fixture.git',
   commit,
+  snapshot_acquired_at: 1,
   source_path: 'extension.ts',
   setup_path: 'SETUP.md',
 }
@@ -53,7 +55,7 @@ describe('CatalogStore', () => {
       expect(await store.readCatalogs()).toEqual([catalog])
       expect(await store.readInstalled()).toEqual([installed])
       const text = await Bun.file(store.installedPath).text()
-      expect(text).not.toContain('snapshot')
+      expect(text).not.toContain('snapshot_path')
       expect(text).not.toContain(sandbox.env.CTXINDEX_DATA_HOME)
     } finally {
       await sandbox.cleanup()

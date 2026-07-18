@@ -57,7 +57,7 @@ Expected output shapes, omitting generated ids and timestamps:
 
 OAuth Sources add `client add`, `account add`, and `--account` on `source add`. Before mutating provider state, inspect `action describe <id> --source <source> --json`. V1 only creates or updates email Drafts; it never sends them.
 
-Trusted Git Catalogs use a separate acquisition and execution acknowledgement. Add or refresh resolves one full ref to an immutable commit snapshot; install validates and activates one exact Extension without changing it on later refreshes. Ordinary loading and inspection stay offline:
+Trusted Git Catalogs use a separate acquisition and execution acknowledgement. Add and command-time refresh resolve one full ref to an immutable commit snapshot; install validates and activates one exact Extension without changing it on later refreshes. Catalog list/show/install refresh by default, while `--no-refresh` uses the stored snapshot and reports its age. Startup and loaded-Extension listing stay offline:
 
 ```sh
 bun cli extensions catalog add team /absolute/catalog-repo --ref refs/heads/main --trust
@@ -116,7 +116,7 @@ A backend move copies and verifies target entries before switching durable refer
 
 Provider requests pass through central authorized fetch with declared host restrictions. Logs redact known sensitive fields, and the reference system emits no telemetry or update pings.
 
-External Extensions are explicitly configured TypeScript/JavaScript loaded in-process with full trust. Runtime validation protects registry consistency, not the host from malicious code. Explicit Catalog add and refresh are the only repository acquisition operations; they accept credential-free public HTTPS or absolute local Git repositories, pin a commit, and use hardened system Git without prompts, credentials, hooks, submodules, filters, or external protocol helpers. Remote URLs reject userinfo, query, fragment, localhost, and literal loopback, private, link-local, unspecified, or multicast destinations. Installing an exact Catalog Extension requires a separate execution-trust acknowledgement. A Realm scopes reasoning and search, not credentials or filesystem access; auth isolation comes from Account, Grant, Source binding, and host restrictions.
+External Extensions are explicitly configured TypeScript/JavaScript loaded in-process with full trust. Runtime validation protects registry consistency, not the host from malicious code. Catalog add, explicit refresh, and default list/show/install refresh are the only repository acquisition operations; they accept credential-free public HTTPS or absolute local Git repositories, pin a commit, and use hardened system Git without prompts, credentials, hooks, submodules, filters, or external protocol helpers. Remote URLs reject userinfo, query, fragment, localhost, and literal loopback, IPv4-mapped, private, unique-local, link-local, site-local, unspecified, or multicast destinations. `--no-refresh`, startup, loaded-Extension listing, uninstall, and removal never acquire. Installing an exact Catalog Extension requires a separate execution-trust acknowledgement. A Realm scopes reasoning and search, not credentials or filesystem access; auth isolation comes from Account, Grant, Source binding, and host restrictions.
 
 ## 5. Extension architecture
 
@@ -130,7 +130,7 @@ V1 loads trusted `.ts`/`.js` Extensions from explicit local paths and exact inst
 
 If an Extension disappears, Sources become `extension_unavailable`. Existing local Resources remain searchable, degrading to their envelope when vocabulary is missing; provider operations stop. Restoring the Extension restores availability without deleting data.
 
-A Git Catalog root contains one strict, bounded `ctxindex-catalog.json` with inline source entries and optional prose setup files. Add and refresh validate committed files and contained paths before atomically switching the Catalog pin. Installed provenance separately records Catalog identity, repository, commit, exact `(id, version)`, and relative source path, so refresh never upgrades or executes installed code. Install uses the normal Extension import and registry-validation seam before activation; identical provenance is idempotent, while invalid replacements preserve the prior record. Missing installed snapshots produce diagnostics without fetching. Uninstall removes activation metadata only, and Catalog removal is blocked while an installed record references it; snapshots, Sources, and Resources remain intact.
+A Git Catalog root contains one strict, bounded `ctxindex-catalog.json` with inline source entries and optional prose setup files. Acquisition validates committed files and contained paths before atomically switching the Catalog pin. Installed provenance separately records Catalog identity, repository, commit, snapshot acquisition time, exact `(id, version)`, and relative source path, so refresh never upgrades or executes installed code. Install validates the replacement against the runtime-complete registry before activation; only exact prior Catalog provenance is replaceable, while built-in/path conflicts and other invalid replacements preserve the prior record. Identical provenance is idempotent. Missing installed snapshots produce diagnostics without fetching. Uninstall removes activation metadata only, and Catalog removal is blocked while an installed record references it; snapshots, Sources, and Resources remain intact.
 
 ## 6. Accounts, Clients, Grants, and Realms
 
@@ -230,7 +230,7 @@ Artifact descriptors remain with Resources while bytes are lazy. First download 
 
 Core bookkeeping timestamps use UTC Unix-epoch milliseconds; Profile payloads may preserve RFC 3339 instants or local dates. Opaque ctxindex-owned primary keys are client-generated ULIDs; a Realm uses its human slug as primary key, or a ULID without one. Provider IDs are never core primary keys. Exports resolve formats from Profiles, not a core conversion pipeline. A basic backup stops Sync, then copies SQLite and the encrypted secret file when used. External systems remain canonical. Prototype databases have no compatibility obligation; cross-Source Resource collapse, canonical identity, merge policy, Extension-private tables, and payload-version migration are deferred.
 
-Catalog and installed-Extension records are strict TOML with portable repository, ref, commit, and relative source/setup fields. Absolute snapshot paths are never persisted: locations derive under `data/catalogs/<catalog-name>/<commit>` and remain retained immutable data rather than SQLite domain records.
+Catalog and installed-Extension records are strict TOML with portable repository, ref, commit, snapshot acquisition time, and relative source/setup fields. Output derives stored snapshot age from that timestamp. Absolute snapshot paths are never persisted: locations derive under `data/catalogs/<catalog-name>/<commit>` and remain retained immutable data rather than SQLite domain records.
 
 ## 11. CLI surface and stable exit codes
 
@@ -240,7 +240,7 @@ Readable output is compact; JSON goes to stdout and diagnostics to stderr. Regis
 
 Generic verbs cover initialization, Client/Account/Realm/Source management, sync, search, get, threads, Artifacts, exports, Actions, status, purge, Extensions, secrets, and bundled skills. Exact labels/ids resolve without auto-creation. Bundled skills provide concise orientation to what ctxindex is, when to use it, and the live discovery surfaces; generated help and loaded-definition output remain authoritative for interface facts.
 
-Catalog distribution adds deterministic `extensions catalog add|list|show|refresh|remove`, `extensions install`, and `extensions uninstall` commands. Add requires repository trust; install independently requires execution trust. Missing trust or an invalid exact `<id>@<version>` selector exits `2` before repository access, dynamic import, or state mutation. Listings include exact persisted Catalog provenance.
+Catalog distribution adds deterministic `extensions catalog add|list|show|refresh|remove`, `extensions install`, and `extensions uninstall` commands. Add requires repository trust; install independently requires execution trust. List/show/install refresh involved Catalogs by default; `--no-refresh` explicitly uses stored state and every stored-snapshot output includes age. Refresh failure fails the command without stale success output. Missing trust or an invalid exact `<id>@<version>` selector exits `2` before repository access, dynamic import, or state mutation. Loaded-Extension listing reports exact persisted provenance and age without refreshing.
 
 | Exit | Stable meaning | Caller response |
 | ---: | --- | --- |
@@ -265,7 +265,7 @@ Sync Run history records `completed`, `cancelled` for cancellation, and `failed`
 - Remote filter-only enumeration, remote pagination, and mixed-search offset pagination are unsupported.
 - `resync` and `diff` depend on Adapter support; `sync` is baseline.
 - Artifacts have one cached retention class and no automatic eviction. Raw provider payloads are optional and off by default.
-- External Extensions are trusted in-process explicit-path or installed Catalog code. Sandboxing, ambient discovery, arbitrary commands, private/credentialed or SSH Catalogs, nested or cross-repository entries, submodules, Git LFS, dependency resolution, package managers, build hooks, automatic refresh, and non-TypeScript/out-of-process Adapters are unsupported.
+- External Extensions are trusted in-process explicit-path or installed Catalog code. Sandboxing, ambient discovery or startup refresh, arbitrary commands, private/credentialed or SSH Catalogs, nested or cross-repository entries, submodules, Git LFS, dependency resolution, package managers, build hooks, polling, and non-TypeScript/out-of-process Adapters are unsupported.
 - Per-Extension storage, multiple primary Profiles, cross-source identity collapse, and payload migration await demonstrated need.
 - There is no SaaS canonical store, MCP server, workflow-policy engine, or universal sync protocol.
 - Realms organize context but do not isolate credentials or Relation resolution.

@@ -15,11 +15,16 @@ export type ExtensionsArgs =
       readonly trust: true
       readonly json: boolean
     }
-  | { readonly kind: 'catalog-list'; readonly json: boolean }
+  | {
+      readonly kind: 'catalog-list'
+      readonly noRefresh: boolean
+      readonly json: boolean
+    }
   | {
       readonly kind: 'catalog-show'
       readonly name: string
       readonly extension?: ExtensionSelector
+      readonly noRefresh: boolean
       readonly json: boolean
     }
   | {
@@ -37,6 +42,7 @@ export type ExtensionsArgs =
       readonly catalog: string
       readonly extension: ExtensionSelector
       readonly trust: true
+      readonly noRefresh: boolean
       readonly json: boolean
     }
   | {
@@ -78,6 +84,36 @@ function parseSimple(
   return { positional: parsed.positional, json: parsed.flags.json === true }
 }
 
+function parseCatalogRead(
+  context: string,
+  args: string[],
+  positionalCount: number,
+):
+  | {
+      readonly positional: string[]
+      readonly noRefresh: boolean
+      readonly json: boolean
+    }
+  | ExtensionsArgs {
+  const parsed = parseFlags(args, {
+    booleanFlags: ['no-refresh', 'json'],
+    strict: true,
+  })
+  if (parsed.error !== undefined) {
+    return unknown(
+      `${context}: ${parsed.error.kind} option ${parsed.error.flag}`,
+    )
+  }
+  if (parsed.positional.length !== positionalCount) {
+    return unknown(`${context}: invalid arguments`)
+  }
+  return {
+    positional: parsed.positional,
+    noRefresh: parsed.flags['no-refresh'] === true,
+    json: parsed.flags.json === true,
+  }
+}
+
 function parseCatalogArgs(args: string[]): ExtensionsArgs {
   const [subcommand, ...rest] = args
   if (subcommand === 'add') {
@@ -112,12 +148,16 @@ function parseCatalogArgs(args: string[]): ExtensionsArgs {
     }
   }
   if (subcommand === 'list') {
-    const parsed = parseSimple('extensions catalog list', rest, 0)
+    const parsed = parseCatalogRead('extensions catalog list', rest, 0)
     if ('kind' in parsed) return parsed
-    return { kind: 'catalog-list', json: parsed.json }
+    return {
+      kind: 'catalog-list',
+      noRefresh: parsed.noRefresh,
+      json: parsed.json,
+    }
   }
   if (subcommand === 'show') {
-    const parsed = parseSimple(
+    const parsed = parseCatalogRead(
       'extensions catalog show',
       rest,
       rest.filter((item) => !item.startsWith('--')).length,
@@ -139,6 +179,7 @@ function parseCatalogArgs(args: string[]): ExtensionsArgs {
       kind: 'catalog-show',
       name: parsed.positional[0] ?? '',
       ...(selector === undefined ? {} : { extension: selector }),
+      noRefresh: parsed.noRefresh,
       json: parsed.json,
     }
   }
@@ -167,7 +208,7 @@ export function parseExtensionsArgs(args: string[]): ExtensionsArgs {
   if (subcommand === 'catalog') return parseCatalogArgs(rest)
   if (subcommand === 'install') {
     const parsed = parseFlags(rest, {
-      booleanFlags: ['trust', 'json'],
+      booleanFlags: ['trust', 'no-refresh', 'json'],
       strict: true,
     })
     if (parsed.error !== undefined) {
@@ -192,6 +233,7 @@ export function parseExtensionsArgs(args: string[]): ExtensionsArgs {
       catalog: parsed.positional[0] ?? '',
       extension: selector,
       trust: true,
+      noRefresh: parsed.flags['no-refresh'] === true,
       json: parsed.flags.json === true,
     }
   }

@@ -8,7 +8,7 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 
 - Bun/Turborepo monorepo split into a user-facing application (`apps/`), reusable runtime and contract packages (`packages/`), external authoring examples (`examples/`), and repository tooling (`scripts/`).
 - Layered boundaries keep CLI presentation separate from provider-neutral core services and Profiles: calendar and communication Profiles own shared vocabulary and Draft Action contracts, while Adapters own provider-specific Google, Microsoft Graph, and filesystem I/O.
-- Extensions bundle declarative Profiles and Source Adapters; core registries validate definitions and OAuth provider declarations before workflows dispatch operations and persist local state. Explicitly trusted Git Catalogs add commit-pinned inline Extension provenance without a background marketplace or daemon.
+- Extensions bundle declarative Profiles and Source Adapters; core registries validate definitions and OAuth provider declarations before workflows dispatch operations and persist local state. Explicitly trusted Git Catalogs add commit-pinned inline Extension provenance with default command-time discovery refresh, explicit offline stored-snapshot reads, and offline startup, without a background marketplace or daemon.
 - OAuth client records persist credential values through typed secret references, Accounts own one stable updatable Grant, and central typed environment capture keeps OAuth client credentials limited to explicit client-import and test-routing boundaries.
 
 ## Entry points

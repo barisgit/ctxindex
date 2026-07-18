@@ -29,6 +29,7 @@ function forbiddenIpv6(hostname: string): boolean {
     normalized.startsWith('fc') ||
     normalized.startsWith('fd') ||
     /^fe[89ab]/.test(normalized) ||
+    /^fe[c-f]/.test(normalized) ||
     normalized.startsWith('ff')
   )
 }

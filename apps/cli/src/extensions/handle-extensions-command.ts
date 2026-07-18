@@ -40,19 +40,30 @@ export async function handleExtensionsCommand(
       return 0
     }
     if (parsed.kind === 'catalog-list') {
-      console.log(formatCatalogs(await catalogs.list(), parsed.json))
+      console.log(
+        formatCatalogs(
+          await catalogs.list({ refresh: !parsed.noRefresh }),
+          parsed.json,
+        ),
+      )
       return 0
     }
     if (parsed.kind === 'catalog-show') {
       if (parsed.extension === undefined) {
         console.log(
-          formatCatalog(await catalogs.show(parsed.name), parsed.json),
+          formatCatalog(
+            await catalogs.show(parsed.name, {
+              refresh: !parsed.noRefresh,
+            }),
+            parsed.json,
+          ),
         )
       } else {
         const shown = await catalogs.showExtension(
           parsed.name,
           parsed.extension.id,
           parsed.extension.version,
+          { refresh: !parsed.noRefresh },
         )
         console.log(
           formatCatalogExtension(shown.catalog, shown.extension, parsed.json),
@@ -76,6 +87,14 @@ export async function handleExtensionsCommand(
       return 0
     }
     if (parsed.kind === 'install') {
+      const loaded = await loadCliDefinitions()
+      printExtensionDiagnostics(loaded.diagnostics)
+      const replaceableCatalog = loaded.provenance.find(
+        (provenance) =>
+          provenance.kind === 'catalog' &&
+          provenance.id === parsed.extension.id &&
+          provenance.version === parsed.extension.version,
+      )
       console.log(
         formatInstalledExtension(
           'Installed',
@@ -84,6 +103,16 @@ export async function handleExtensionsCommand(
             id: parsed.extension.id,
             version: parsed.extension.version,
             trust: parsed.trust,
+            registry: loaded.registry,
+            refresh: !parsed.noRefresh,
+            ...(replaceableCatalog?.kind === 'catalog'
+              ? {
+                  replaceableCatalog: {
+                    catalog: replaceableCatalog.catalog,
+                    commit: replaceableCatalog.commit,
+                  },
+                }
+              : {}),
           }),
           parsed.json,
         ),

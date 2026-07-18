@@ -112,7 +112,32 @@ test('relocated compiled CLI installs and loads a local Git Catalog Extension', 
       '--json',
     ])
     expect(added.exitCode, added.stderr).toBe(0)
-    const commit = JSON.parse(added.stdout).commit
+    const addedCommit = JSON.parse(added.stdout).commit
+    await writeFile(
+      join(repository, 'extension.ts'),
+      `export default ({ defineExtension }) => defineExtension({ id: 'fixture.compiled-catalog', version: 1, profiles: [], adapters: [], docs: { summary: 'Refreshed compiled fixture' } })\n`,
+    )
+    expect(
+      (await runProcess(['git', 'add', 'extension.ts'], { cwd: repository }))
+        .exitCode,
+    ).toBe(0)
+    expect(
+      (
+        await runProcess(
+          [
+            'git',
+            '-c',
+            'user.name=Fixture',
+            '-c',
+            'user.email=fixture@example.invalid',
+            'commit',
+            '-m',
+            'refresh compiled fixture',
+          ],
+          { cwd: repository },
+        )
+      ).exitCode,
+    ).toBe(0)
     const installed = await run([
       'extensions',
       'install',
@@ -122,17 +147,21 @@ test('relocated compiled CLI installs and loads a local Git Catalog Extension', 
       '--json',
     ])
     expect(installed.exitCode, installed.stderr).toBe(0)
-    expect(JSON.parse(installed.stdout).commit).toBe(commit)
+    const installedValue = JSON.parse(installed.stdout)
+    expect(installedValue.commit).not.toBe(addedCommit)
+    expect(installedValue.snapshot_age_ms).toBeNumber()
     const list = await run(['extensions', 'list', '--json'])
     expect(list.exitCode, list.stderr).toBe(0)
     expect(JSON.parse(list.stdout)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           id: 'fixture.compiled-catalog',
+          summary: 'Refreshed compiled fixture',
           provenance: expect.objectContaining({
             kind: 'catalog',
             catalog: 'fixture',
-            commit,
+            commit: installedValue.commit,
+            snapshotAgeMs: expect.any(Number),
           }),
         }),
       ]),

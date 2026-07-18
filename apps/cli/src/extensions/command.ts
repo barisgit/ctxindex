@@ -7,6 +7,10 @@ const trustArg = {
   type: 'boolean' as const,
   description: 'Acknowledge the explicit trust boundary',
 }
+const noRefreshArg = {
+  type: 'boolean' as const,
+  description: 'Use the stored Catalog snapshot without refreshing',
+}
 
 export const extensionsCommand = defineCommand({
   meta: { name: 'extensions', description: 'Inspect and manage Extensions.' },
@@ -36,7 +40,7 @@ export const extensionsCommand = defineCommand({
         }),
         list: defineCommand({
           meta: { name: 'list', description: 'List Git Catalogs.' },
-          args: { json: jsonArg },
+          args: { noRefresh: noRefreshArg, json: jsonArg },
           run: ({ rawArgs }) =>
             runWithExit(() =>
               handleExtensionsCommand(['catalog', 'list', ...rawArgs]),
@@ -47,6 +51,7 @@ export const extensionsCommand = defineCommand({
           args: {
             name: { type: 'positional', required: true },
             extension: { type: 'positional', required: false },
+            noRefresh: noRefreshArg,
             json: jsonArg,
           },
           run: ({ rawArgs }) =>
@@ -84,6 +89,7 @@ export const extensionsCommand = defineCommand({
         catalog: { type: 'positional', required: true },
         extension: { type: 'positional', required: true },
         trust: trustArg,
+        noRefresh: noRefreshArg,
         json: jsonArg,
       },
       run: ({ rawArgs }) =>

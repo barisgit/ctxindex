@@ -333,5 +333,27 @@ describe('extensions list interface', () => {
         summary: 'External proof',
       },
     ])
+    expect(
+      JSON.parse(
+        formatExtensions(
+          registry,
+          true,
+          [
+            {
+              id: 'external',
+              version: 1,
+              kind: 'catalog',
+              catalog: 'fixture',
+              catalogId: 'fixture.catalog',
+              repository: '/tmp/fixture.git',
+              commit: 'a'.repeat(40),
+              snapshotAcquiredAt: 1_000,
+              sourcePath: 'extension.ts',
+            },
+          ],
+          4_000,
+        ),
+      )[0].provenance,
+    ).toMatchObject({ snapshotAcquiredAt: 1_000, snapshotAgeMs: 3_000 })
   })
 })

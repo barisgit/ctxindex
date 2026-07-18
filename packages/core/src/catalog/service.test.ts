@@ -1,9 +1,13 @@
 import { describe, expect, test } from 'bun:test'
 import { mkdir, readdir, writeFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
+import { defineExtension, defineProfile } from '@ctxindex/extension-sdk'
 import * as TOML from '@iarna/toml'
+import { z } from 'zod'
+import { createExtensionRegistry } from '../registry'
 import { createSandbox, type Sandbox } from '../testing'
 import {
+  acquireCatalogSnapshot,
   CatalogService,
   catalogSnapshotPath,
   validateCatalogRef,
@@ -30,14 +34,14 @@ function processEnv(): Record<string, string> {
   return process.env.PATH === undefined ? {} : { PATH: process.env.PATH }
 }
 
-async function createRepository(sandbox: Sandbox): Promise<string> {
+async function createRepository(
+  sandbox: Sandbox,
+  extensionSource = `export default ({ defineExtension }) => defineExtension({ id: 'fixture.extension', version: 1, profiles: [], adapters: [] })\n`,
+): Promise<string> {
   const repository = join(sandbox.dir, 'catalog-repository')
   await mkdir(repository, { recursive: true })
   await git(repository, ['init', '-b', 'main'])
-  await writeFile(
-    join(repository, 'extension.ts'),
-    `export default ({ defineExtension }) => defineExtension({ id: 'fixture.extension', version: 1, profiles: [], adapters: [] })\n`,
-  )
+  await writeFile(join(repository, 'extension.ts'), extensionSource)
   await writeFile(join(repository, 'SETUP.md'), 'Fixture setup\n')
   await writeFile(
     join(repository, 'ctxindex-catalog.json'),
@@ -67,10 +71,11 @@ async function createRepository(sandbox: Sandbox): Promise<string> {
   return repository
 }
 
-function service(sandbox: Sandbox): CatalogService {
+function service(sandbox: Sandbox, now?: () => number): CatalogService {
   return new CatalogService({
     configRoot: sandbox.env.CTXINDEX_CONFIG_HOME,
     dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
+    ...(now === undefined ? {} : { now }),
   })
 }
 
@@ -86,6 +91,13 @@ describe('Catalog repository policy', () => {
     'https://10.0.0.1/catalog.git',
     'https://169.254.1.2/catalog.git',
     'https://[::1]/catalog.git',
+    'https://[::ffff:127.0.0.1]/catalog.git',
+    'https://[fc00::1]/catalog.git',
+    'https://[fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff]/catalog.git',
+    'https://[fe80::1]/catalog.git',
+    'https://[febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff]/catalog.git',
+    'https://[fec0::1]/catalog.git',
+    'https://[feff:ffff:ffff:ffff:ffff:ffff:ffff:ffff]/catalog.git',
     'relative/catalog.git',
   ])('rejects unsafe repository %s', (repository) => {
     expect(() => validateCatalogRepository(repository)).toThrow()
@@ -130,6 +142,28 @@ describe('Catalog repository policy', () => {
 })
 
 describe('CatalogService lifecycle', () => {
+  test('treats concurrent publication of the same immutable snapshot as success', async () => {
+    const sandbox = await createSandbox()
+    try {
+      const repository = await createRepository(sandbox)
+      const acquire = () =>
+        acquireCatalogSnapshot({
+          repository,
+          ref: 'refs/heads/main',
+          name: 'fixture',
+          dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
+        })
+
+      const [first, second] = await Promise.all([acquire(), acquire()])
+
+      expect(second.commit).toBe(first.commit)
+      expect(second.path).toBe(first.path)
+      expect(second.manifest).toEqual(first.manifest)
+    } finally {
+      await sandbox.cleanup()
+    }
+  })
+
   test('rejects corrupted persisted acquisition fields before invoking Git', async () => {
     const sandbox = await createSandbox()
     try {
@@ -144,6 +178,7 @@ describe('CatalogService lifecycle', () => {
               repository: 'https://user@example.com/catalog.git',
               ref: '--upload-pack=credential-helper',
               commit: 'a'.repeat(40),
+              snapshot_acquired_at: 1,
               catalog_id: 'fixture.catalog',
               catalog_name: 'Fixture Catalog',
               extensions: [
@@ -198,6 +233,29 @@ describe('CatalogService lifecycle', () => {
       expect((await service(sandbox).list()).map(({ name }) => name)).toEqual([
         'fixture',
       ])
+    } finally {
+      await sandbox.cleanup()
+    }
+  })
+
+  test('persists the acquisition time of each exact snapshot', async () => {
+    const sandbox = await createSandbox()
+    let currentTime = 1_000
+    try {
+      const repository = await createRepository(sandbox)
+      const catalogs = service(sandbox, () => currentTime)
+
+      const added = await catalogs.add({
+        name: 'fixture',
+        repository,
+        ref: 'refs/heads/main',
+        trust: true,
+      })
+      expect(added.snapshot_acquired_at).toBe(1_000)
+
+      currentTime = 2_000
+      const refreshed = await catalogs.refresh({ name: 'fixture' })
+      expect(refreshed.snapshot_acquired_at).toBe(2_000)
     } finally {
       await sandbox.cleanup()
     }
@@ -293,6 +351,40 @@ describe('CatalogService lifecycle', () => {
     }
   })
 
+  test('refreshes Catalog reads only when the caller requests fresh discovery', async () => {
+    const sandbox = await createSandbox()
+    try {
+      const repository = await createRepository(sandbox)
+      const catalogs = service(sandbox)
+      const added = await catalogs.add({
+        name: 'fixture',
+        repository,
+        ref: 'refs/heads/main',
+        trust: true,
+      })
+      await writeFile(join(repository, 'SETUP.md'), 'Updated setup\n')
+      await git(repository, ['add', 'SETUP.md'])
+      await git(repository, [
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.invalid',
+        'commit',
+        '-m',
+        'update catalog',
+      ])
+
+      expect((await catalogs.list({ refresh: false }))[0]?.commit).toBe(
+        added.commit,
+      )
+      expect((await catalogs.list({ refresh: true }))[0]?.commit).not.toBe(
+        added.commit,
+      )
+    } finally {
+      await sandbox.cleanup()
+    }
+  })
+
   test('remove refuses installed references and retains snapshots', async () => {
     const sandbox = await createSandbox()
     try {
@@ -312,6 +404,7 @@ describe('CatalogService lifecycle', () => {
           catalog_id: 'fixture.catalog',
           repository,
           commit: added.commit,
+          snapshot_acquired_at: added.snapshot_acquired_at,
           source_path: 'extension.ts',
           setup_path: 'SETUP.md',
         },
@@ -356,6 +449,7 @@ describe('CatalogService lifecycle', () => {
           id: 'fixture.extension',
           version: 1,
           trust: false,
+          registry: createExtensionRegistry(),
         }),
       ).rejects.toThrow('--trust')
 
@@ -364,12 +458,14 @@ describe('CatalogService lifecycle', () => {
         id: 'fixture.extension',
         version: 1,
         trust: true,
+        registry: createExtensionRegistry(),
       })
       const second = await catalogs.install({
         catalog: 'fixture',
         id: 'fixture.extension',
         version: 1,
         trust: true,
+        registry: createExtensionRegistry(),
       })
       expect(second).toEqual(first)
       expect(first.commit).toBe(catalog.commit)
@@ -383,6 +479,157 @@ describe('CatalogService lifecycle', () => {
       await catalogs.uninstall({ id: 'fixture.extension', version: 1 })
       expect(await catalogs.store.readInstalled()).toEqual([])
       expect(await Bun.file(join(snapshot, 'extension.ts')).exists()).toBe(true)
+    } finally {
+      await sandbox.cleanup()
+    }
+  })
+
+  test('validates install against the complete runtime registry', async () => {
+    const sandbox = await createSandbox()
+    try {
+      const repository = await createRepository(
+        sandbox,
+        `export default ({ defineAdapter, defineExtension, z }) => defineExtension({
+  id: 'fixture.extension',
+  version: 1,
+  profiles: [],
+  adapters: [defineAdapter({
+    id: 'fixture.adapter',
+    version: 1,
+    configSchema: z.object({}),
+    auth: { kind: 'none' },
+    profiles: [{ id: 'fixture.shared', version: 1 }],
+    routing: 'indexed',
+    capabilities: [],
+    operations: {},
+    actions: {},
+  })],
+})\n`,
+      )
+      const catalogs = service(sandbox)
+      await catalogs.add({
+        name: 'fixture',
+        repository,
+        ref: 'refs/heads/main',
+        trust: true,
+      })
+      const sharedProfile = defineProfile({
+        id: 'fixture.shared',
+        version: 1,
+        schema: z.object({}),
+        docs: { summary: 'Shared runtime Profile' },
+      })
+      const registry = createExtensionRegistry([
+        defineExtension({
+          id: 'fixture.runtime',
+          version: 1,
+          profiles: [sharedProfile],
+          adapters: [],
+        }),
+      ])
+
+      await expect(
+        catalogs.install({
+          catalog: 'fixture',
+          id: 'fixture.extension',
+          version: 1,
+          trust: true,
+          registry,
+        }),
+      ).resolves.toMatchObject({ id: 'fixture.extension', version: 1 })
+    } finally {
+      await sandbox.cleanup()
+    }
+  })
+
+  test.each([
+    'builtin',
+    'path',
+  ] as const)('rejects install identity conflicts with a loaded %s Extension', async () => {
+    const sandbox = await createSandbox()
+    try {
+      const repository = await createRepository(sandbox)
+      const catalogs = service(sandbox)
+      await catalogs.add({
+        name: 'fixture',
+        repository,
+        ref: 'refs/heads/main',
+        trust: true,
+      })
+      const conflicting = defineExtension({
+        id: 'fixture.extension',
+        version: 1,
+        profiles: [],
+        adapters: [],
+      })
+
+      await expect(
+        catalogs.install({
+          catalog: 'fixture',
+          id: 'fixture.extension',
+          version: 1,
+          trust: true,
+          registry: createExtensionRegistry([conflicting]),
+        }),
+      ).rejects.toThrow('Duplicate Extension fixture.extension@1')
+      expect(await catalogs.store.readInstalled()).toEqual([])
+    } finally {
+      await sandbox.cleanup()
+    }
+  })
+
+  test('replaces only the exact previously loaded Catalog provenance', async () => {
+    const sandbox = await createSandbox()
+    try {
+      const repository = await createRepository(sandbox)
+      const catalogs = service(sandbox)
+      await catalogs.add({
+        name: 'fixture',
+        repository,
+        ref: 'refs/heads/main',
+        trust: true,
+      })
+      const original = await catalogs.install({
+        catalog: 'fixture',
+        id: 'fixture.extension',
+        version: 1,
+        trust: true,
+        registry: createExtensionRegistry(),
+      })
+      await writeFile(join(repository, 'SETUP.md'), 'Re-pinned setup\n')
+      await git(repository, ['add', 'SETUP.md'])
+      await git(repository, [
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.invalid',
+        'commit',
+        '-m',
+        're-pin extension',
+      ])
+      const refreshed = await catalogs.refresh({ name: 'fixture' })
+      const loadedCatalogDefinition = defineExtension({
+        id: 'fixture.extension',
+        version: 1,
+        profiles: [],
+        adapters: [],
+      })
+
+      const replacement = await catalogs.install({
+        catalog: 'fixture',
+        id: 'fixture.extension',
+        version: 1,
+        trust: true,
+        registry: createExtensionRegistry([loadedCatalogDefinition]),
+        replaceableCatalog: {
+          catalog: original.catalog_name,
+          commit: original.commit,
+        },
+      })
+
+      expect(replacement.commit).toBe(refreshed.commit)
+      expect(replacement.commit).not.toBe(original.commit)
+      expect(await catalogs.store.readInstalled()).toEqual([replacement])
     } finally {
       await sandbox.cleanup()
     }
@@ -404,6 +651,7 @@ describe('CatalogService lifecycle', () => {
         id: 'fixture.extension',
         version: 1,
         trust: true,
+        registry: createExtensionRegistry(),
       })
       await writeFile(
         join(repository, 'extension.ts'),
@@ -429,6 +677,7 @@ describe('CatalogService lifecycle', () => {
           id: 'fixture.extension',
           version: 1,
           trust: true,
+          registry: createExtensionRegistry(),
         }),
       ).rejects.toThrow('identity')
       expect(await catalogs.store.readInstalled()).toEqual([originalInstall])

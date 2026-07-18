@@ -1,7 +1,11 @@
 import { join } from 'node:path'
 import { importExtensionDefinition } from '../extension/import'
 import { dataDir } from '../paths'
-import { createExtensionRegistry } from '../registry'
+import {
+  createExtensionRegistry,
+  DefinitionRegistryError,
+  type ExtensionRegistry,
+} from '../registry'
 import { acquireCatalogSnapshot } from './git'
 import { catalogSnapshotPath, validateCatalogSnapshot } from './paths'
 import { validateCatalogRef, validateCatalogRepository } from './repository'
@@ -26,6 +30,7 @@ function recordFromManifest(input: {
   readonly repository: string
   readonly ref: string
   readonly commit: string
+  readonly snapshotAcquiredAt: number
   readonly manifest: CatalogManifest
 }): CatalogRecord {
   return {
@@ -33,6 +38,7 @@ function recordFromManifest(input: {
     repository: input.repository,
     ref: input.ref,
     commit: input.commit,
+    snapshot_acquired_at: input.snapshotAcquiredAt,
     catalog_id: input.manifest.catalog.id,
     catalog_name: input.manifest.catalog.name,
     ...(input.manifest.catalog.summary === undefined
@@ -50,11 +56,17 @@ function recordFromManifest(input: {
 export interface CatalogServiceOptions {
   readonly configRoot?: string
   readonly dataRoot?: string
+  readonly now?: () => number
+}
+
+export interface CatalogReadOptions {
+  readonly refresh?: boolean
 }
 
 export class CatalogService {
   readonly store: CatalogStore
   readonly dataRoot: string
+  readonly now: () => number
 
   constructor(options: CatalogServiceOptions = {}) {
     this.store = new CatalogStore({
@@ -63,13 +75,25 @@ export class CatalogService {
         : { configRoot: options.configRoot }),
     })
     this.dataRoot = options.dataRoot ?? dataDir()
+    this.now = options.now ?? Date.now
   }
 
-  async list(): Promise<readonly CatalogRecord[]> {
+  async list(
+    options: CatalogReadOptions = {},
+  ): Promise<readonly CatalogRecord[]> {
+    if (options.refresh === true) {
+      for (const catalog of await this.store.readCatalogs()) {
+        await this.refresh({ name: catalog.name })
+      }
+    }
     return this.store.readCatalogs()
   }
 
-  async show(name: string): Promise<CatalogRecord> {
+  async show(
+    name: string,
+    options: CatalogReadOptions = {},
+  ): Promise<CatalogRecord> {
+    if (options.refresh === true) return this.refresh({ name })
     const record = (await this.store.readCatalogs()).find(
       (catalog) => catalog.name === name,
     )
@@ -81,11 +105,12 @@ export class CatalogService {
     name: string,
     id: string,
     version: number,
+    options: CatalogReadOptions = {},
   ): Promise<{
     readonly catalog: CatalogRecord
     readonly extension: CatalogRecord['extensions'][number]
   }> {
-    const catalog = await this.show(name)
+    const catalog = await this.show(name, options)
     const extension = catalog.extensions.find(
       (candidate) => candidate.id === id && candidate.version === version,
     )
@@ -120,6 +145,7 @@ export class CatalogService {
       repository,
       ref,
       commit: acquired.commit,
+      snapshotAcquiredAt: this.now(),
       manifest: acquired.manifest,
     })
     const duplicateId = existing.find(
@@ -149,6 +175,7 @@ export class CatalogService {
       repository: current.repository,
       ref: current.ref,
       commit: acquired.commit,
+      snapshotAcquiredAt: this.now(),
       manifest: acquired.manifest,
     })
     const duplicateId = existing.find(
@@ -190,9 +217,17 @@ export class CatalogService {
     readonly id: string
     readonly version: number
     readonly trust: boolean
+    readonly registry: ExtensionRegistry
+    readonly refresh?: boolean
+    readonly replaceableCatalog?: {
+      readonly catalog: string
+      readonly commit: string
+    }
   }): Promise<InstalledExtensionRecord> {
     if (input.trust !== true) invalid('Extension install requires --trust')
-    const catalog = await this.show(input.catalog)
+    const catalog = await this.show(input.catalog, {
+      refresh: input.refresh === true,
+    })
     const recordedEntry = catalog.extensions.find(
       (entry) => entry.id === input.id && entry.version === input.version,
     )
@@ -228,13 +263,40 @@ export class CatalogService {
     const definition = await importExtensionDefinition(
       join(snapshot, entry.source.path),
     )
-    const validationRegistry = createExtensionRegistry()
-    validationRegistry.register(definition)
     if (definition.id !== entry.id || definition.version !== entry.version) {
       throw new TypeError(
         `Catalog Extension identity mismatch: expected ${entry.id}@${entry.version}, loaded ${definition.id}@${definition.version}`,
       )
     }
+    const current = await this.store.readInstalled()
+    const existing = current.find(
+      (candidate) =>
+        candidate.id === entry.id && candidate.version === entry.version,
+    )
+    const replacesLoadedCatalog =
+      existing !== undefined &&
+      input.replaceableCatalog?.catalog === existing.catalog_name &&
+      input.replaceableCatalog.commit === existing.commit
+    const runtimeDefinitions = input.registry
+      .list()
+      .filter(
+        (candidate) =>
+          !replacesLoadedCatalog ||
+          candidate.id !== entry.id ||
+          candidate.version !== entry.version,
+      )
+    if (
+      runtimeDefinitions.some(
+        (candidate) =>
+          candidate.id === entry.id && candidate.version === entry.version,
+      )
+    ) {
+      throw new DefinitionRegistryError(
+        `Duplicate Extension ${entry.id}@${entry.version}`,
+        'duplicate_definition',
+      )
+    }
+    createExtensionRegistry([...runtimeDefinitions, definition])
     const installed: InstalledExtensionRecord = {
       id: entry.id,
       version: entry.version,
@@ -242,15 +304,10 @@ export class CatalogService {
       catalog_id: catalog.catalog_id,
       repository: catalog.repository,
       commit: catalog.commit,
+      snapshot_acquired_at: catalog.snapshot_acquired_at,
       source_path: entry.source.path,
       ...(entry.setup === undefined ? {} : { setup_path: entry.setup.path }),
     }
-    const current = await this.store.readInstalled()
-    const existing = current.find(
-      (candidate) =>
-        candidate.id === installed.id &&
-        candidate.version === installed.version,
-    )
     if (
       existing !== undefined &&
       JSON.stringify(existing) === JSON.stringify(installed)

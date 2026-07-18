@@ -44,13 +44,24 @@ async function run(
   args: readonly string[],
   options: { readonly cwd?: string } = {},
 ): Promise<string> {
-  const child = Bun.spawn([executable, ...args], {
-    ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
-    env: gitEnvironment(),
-    stdin: 'ignore',
-    stdout: 'pipe',
-    stderr: 'pipe',
-  })
+  const child = (() => {
+    try {
+      return Bun.spawn([executable, ...args], {
+        ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+        env: gitEnvironment(),
+        stdin: 'ignore',
+        stdout: 'pipe',
+        stderr: 'pipe',
+      })
+    } catch (cause) {
+      throw Object.assign(
+        new Error(`Catalog acquisition failed: ${executable} could not start`, {
+          cause,
+        }),
+        { code: 'network' },
+      )
+    }
+  })()
   const [exitCode, stdout, stderr] = await Promise.all([
     child.exited,
     new Response(child.stdout).text(),
@@ -135,7 +146,8 @@ export async function acquireCatalogSnapshot(input: {
     try {
       await rename(candidate, target)
     } catch (cause) {
-      if ((cause as NodeJS.ErrnoException).code !== 'EEXIST') throw cause
+      const code = (cause as NodeJS.ErrnoException).code
+      if (code !== 'EEXIST' && code !== 'ENOTEMPTY') throw cause
       await validateCatalogSnapshot(target)
     }
     return { commit, path: target, manifest }

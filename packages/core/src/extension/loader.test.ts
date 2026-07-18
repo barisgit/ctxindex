@@ -215,6 +215,7 @@ describe('loadExtensions', () => {
         catalog_id: 'fixture.catalog',
         repository: '/local/catalog.git',
         commit,
+        snapshot_acquired_at: 1,
         source_path: 'extension.ts',
       }
 
@@ -238,6 +239,7 @@ describe('loadExtensions', () => {
           catalogId: 'fixture.catalog',
           repository: '/local/catalog.git',
           commit,
+          snapshotAcquiredAt: 1,
           sourcePath: 'extension.ts',
         },
       ])
@@ -292,6 +294,7 @@ describe('loadExtensions', () => {
             catalog_id: 'fixture.catalog',
             repository: '/local/catalog.git',
             commit,
+            snapshot_acquired_at: 1,
             source_path: 'extension.ts',
           },
         ],
@@ -328,6 +331,7 @@ describe('loadExtensions', () => {
             catalog_id: 'missing.catalog',
             repository: 'https://example.invalid/catalog.git',
             commit,
+            snapshot_acquired_at: 1,
             source_path: 'extension.ts',
           },
         ],

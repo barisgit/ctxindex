@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Installed Catalog Extension loading and provenance
-The system SHALL load installed Catalog Extensions from their exact persisted Catalog ID, commit, and inline source path through the same runtime validation and atomic registry activation used by explicit-path Extensions. Extension listings MUST include installed Catalog provenance sufficient to identify the Catalog, repository, commit, and manifest entry while retaining deterministic ordering.
+The system SHALL load installed Catalog Extensions from their exact persisted Catalog ID, commit, and inline source path through the same runtime validation and atomic registry activation used by explicit-path Extensions. Extension listings MUST include installed Catalog provenance sufficient to identify the Catalog, repository, commit, manifest entry, and stored snapshot age while retaining deterministic ordering. Startup and loaded-Extension listing MUST NOT refresh Catalogs.
 
 #### Scenario: Installed Catalog Extension loads offline
 - **WHEN** valid installed provenance and its immutable snapshot exist at startup
@@ -13,4 +13,3 @@ If installed Catalog provenance refers to a missing or invalid snapshot, source 
 #### Scenario: Installed snapshot is missing at startup
 - **WHEN** an installed provenance record refers to a snapshot absent from local data
 - **THEN** the loader reports an unavailable Extension diagnostic, performs no repository access, and preserves materialized data
-

@@ -78,6 +78,7 @@ export type ExtensionLoadProvenance =
       readonly catalogId: string
       readonly repository: string
       readonly commit: string
+      readonly snapshotAcquiredAt: number
       readonly sourcePath: string
     }
 
@@ -188,7 +189,7 @@ export function createExtensionRegistry(
 
 `@ctxindex/core` loads explicit `config.extensions.paths` entries and exact installed Catalog provenance. Each trusted module default-exports a factory receiving `ExtensionAuthoringHost`; runtime facilities are host-supplied, while type-only imports and Extension-local dependencies remain possible. `importExtensionDefinition()` is the single authoring-host seam shared by startup and pre-install validation.
 
-Built-ins register first, followed by explicit paths and then installed Catalog entries. Catalog locations derive from portable provenance and validate their snapshot manifest, exact source path, and `(id, version)` before registry activation. Import, factory, schema, duplicate-id, provenance, or capability-consistency failures become path-scoped diagnostics and activate none of the failing Extension. The loader never acquires or mutates Catalog state. Registry binding uses `(id, version)`, never object identity. Missing Extensions leave locally stored Resources readable while provider operations report unavailability.
+Built-ins register first, followed by explicit paths and then installed Catalog entries. Catalog locations derive from portable provenance and validate their snapshot manifest, exact source path, and `(id, version)` before registry activation. Import, factory, schema, duplicate-id, provenance, or capability-consistency failures become path-scoped diagnostics and activate none of the failing Extension. The loader never acquires or mutates Catalog state; loaded Catalog provenance carries snapshot acquisition time so formatting can surface age offline. Registry binding uses `(id, version)`, never object identity. Missing Extensions leave locally stored Resources readable while provider operations report unavailability.
 
 ## Verification
 

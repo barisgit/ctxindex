@@ -42,6 +42,7 @@ export type ExtensionLoadProvenance =
       readonly catalogId: string
       readonly repository: string
       readonly commit: string
+      readonly snapshotAcquiredAt: number
       readonly sourcePath: string
     }
 
@@ -127,6 +128,7 @@ export async function loadExtensions(
         catalogId: installed.catalog_id,
         repository: installed.repository,
         commit: installed.commit,
+        snapshotAcquiredAt: installed.snapshot_acquired_at,
         sourcePath: installed.source_path,
       })
     } catch (cause) {

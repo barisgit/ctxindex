@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Explicit trusted Catalog acquisition
-The system SHALL register multiple Catalogs from credential-free public HTTPS repositories or absolute local Git repositories only after explicit repository trust. Add and refresh SHALL resolve a full branch ref, full tag ref, or exact object ID exactly once to an exact commit and SHALL be the only operations allowed to contact a remote repository. Local acquisition MUST read committed Git objects rather than working-tree bytes.
+The system SHALL register multiple Catalogs from credential-free public HTTPS repositories or absolute local Git repositories only after explicit repository trust. Add and command-time refresh SHALL resolve a full branch ref, full tag ref, or exact object ID exactly once to an exact commit and SHALL be the only operations allowed to contact a remote repository. Local acquisition MUST read committed Git objects rather than working-tree bytes.
 
 #### Scenario: Full ref resolves to immutable snapshot
 - **WHEN** a user adds a valid Catalog with `--trust` and a full ref
@@ -11,9 +11,21 @@ The system SHALL register multiple Catalogs from credential-free public HTTPS re
 - **WHEN** a user attempts Catalog add without repository trust acknowledgement
 - **THEN** the request fails as usage error with exit code 2 before repository access
 
-#### Scenario: Ordinary operations remain offline
-- **WHEN** a user lists, shows, installs, uninstalls, removes, starts, or loads Extensions
-- **THEN** the system uses only persisted records and snapshots and performs no repository network access
+#### Scenario: Discovery and install refresh by default
+- **WHEN** a user lists configured Catalogs, shows a Catalog or exact entry, or installs an Extension without `--no-refresh`
+- **THEN** the involved Catalog is refreshed before the command reads or installs from its newly pinned snapshot
+
+#### Scenario: Explicit stored-snapshot use remains offline
+- **WHEN** a user passes `--no-refresh` to Catalog list/show or Extension install
+- **THEN** the command uses only persisted records and snapshots, performs no repository access, and surfaces the age of the stored snapshot
+
+#### Scenario: Refresh failure is observable
+- **WHEN** default command-time refresh fails
+- **THEN** the command fails without silently falling back to stale Catalog discovery or changing installed provenance
+
+#### Scenario: Startup remains offline
+- **WHEN** ctxindex starts, loads Extensions, lists loaded Extensions, uninstalls, or removes a Catalog
+- **THEN** it uses only persisted records and snapshots and performs no repository access
 
 ### Requirement: Strict bounded Catalog manifest
 Each snapshot MUST contain a UTF-8 `ctxindex-catalog.json` at repository root of at most 256 KiB. The manifest MUST be strict schema version `1`, MUST reject unknown fields at every level, and MUST contain only `schemaVersion`, `catalog` with `id`, `name`, and optional `summary`, and at most 256 `extensions` entries with `id`, `version`, `source` `{ "kind": "inline", "path": ... }`, and optional `setup` `{ "path": ... }`. It MUST reject forbidden authentication, scopes, configuration, hosts, installers, and equivalent provider-authority fields. Catalog IDs MUST be unique across configured Catalogs and `(id, version)` extension tuples MUST be unique within a manifest.
@@ -71,7 +83,7 @@ Catalog removal MUST fail while any installed Extension record references that C
 - **THEN** its activation record is removed while Sources, Resources, and snapshots are retained
 
 ### Requirement: Strict portable persistence
-Catalog and installed Extension records MUST be persisted in strict TOML alongside existing ctxindex configuration paths. Unknown or invalid fields MUST be rejected. Snapshot paths MUST be derived under `data/catalogs/<catalog-name>/<commit>` and absolute snapshot paths MUST NOT be persisted.
+Catalog and installed Extension records MUST be persisted in strict TOML alongside existing ctxindex configuration paths. Unknown or invalid fields MUST be rejected. Snapshot paths MUST be derived under `data/catalogs/<catalog-name>/<commit>` and absolute snapshot paths MUST NOT be persisted. Records MUST preserve the snapshot acquisition time so Catalog inspection, install output, and loaded Catalog provenance can surface snapshot age without repository access.
 
 #### Scenario: State is relocated
 - **WHEN** the configured ctxindex data directory changes while portable records and snapshots are moved together

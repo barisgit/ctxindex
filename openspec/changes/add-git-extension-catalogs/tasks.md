@@ -25,3 +25,10 @@
 - [x] 5.1 Refresh affected codemaps via cartography and refresh `SYSTEM.md` via system-reference.
 - [x] 5.2 Promote applicable doctrine into canonical `extension-catalogs`, `extension-loading`, and `cli-surface` implementation sidecars.
 - [x] 5.3 Run `bun run ci`, `bunx openspec validate --all --strict`, and `openspec-verify-change`; resolve every failure without archiving the change.
+
+## 6. Review repairs and command-time freshness
+
+- [x] 6.1 Add red/green regressions for concurrent immutable snapshot publication, complete forbidden IPv6 ranges, and install validation against the runtime-complete registry; implement the smallest safe fixes.
+- [x] 6.2 Add red/green core and parser tests for portable snapshot acquisition time, derived age, default refresh policy, `--no-refresh`, and observable refresh failure; implement provider-neutral service behavior and thin CLI delegation.
+- [x] 6.3 Extend local and relocated compiled CLI coverage for default refresh, explicit stored-snapshot use with age, failed refresh without stale fallback, and offline startup/loaded-Extension listing.
+- [x] 6.4 Refresh affected codemaps and `SYSTEM.md`, then run focused Slice gates, egress/diff checks, `bun run ci`, strict all-OpenSpec validation, and `openspec-verify-change` without archiving.

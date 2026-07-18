@@ -97,6 +97,7 @@ export const catalogRecordSchema = z
     repository: catalogRepositorySchema,
     ref: catalogRefSchema,
     commit: z.string().regex(/^[0-9a-f]{40,64}$/),
+    snapshot_acquired_at: z.number().int().nonnegative(),
     catalog_id: identifierSchema,
     catalog_name: z.string().min(1),
     summary: z.string().min(1).optional(),
@@ -138,6 +139,7 @@ export const installedExtensionRecordSchema = z
     catalog_id: identifierSchema,
     repository: catalogRepositorySchema,
     commit: z.string().regex(/^[0-9a-f]{40,64}$/),
+    snapshot_acquired_at: z.number().int().nonnegative(),
     source_path: catalogRelativePathSchema,
     setup_path: catalogRelativePathSchema.optional(),
   })
