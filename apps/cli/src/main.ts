@@ -71,6 +71,22 @@ function syncCommandPrefixError(args: string[]): string | undefined {
   return `sync: option must follow command: ${flag}`
 }
 
+function preserveRealmNameShortHelpValue(args: string[]): string[] {
+  if (args[0] !== 'realm' || args[1] !== 'add') return args
+
+  const normalized: string[] = []
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] === '--name' && args[index + 1] === '-h') {
+      normalized.push('--name=-h')
+      index += 1
+    } else {
+      const arg = args[index]
+      if (arg !== undefined) normalized.push(arg)
+    }
+  }
+  return normalized
+}
+
 /**
  * Extracts the global `--log-level <level>` / `--log-level=<level>` flag and
  * strips it from the args so per-command parsers never see it (V1 §1.8).
@@ -192,7 +208,8 @@ export async function runCli(args: string[]): Promise<number> {
   const restoreExit = captureProcessExit()
   try {
     await runMain(rootCommand, {
-      rawArgs: rest.length === 0 ? ['--help'] : rest,
+      rawArgs:
+        rest.length === 0 ? ['--help'] : preserveRealmNameShortHelpValue(rest),
       showUsage: async (command, parent) => {
         await showUsage(command, parent)
         console.log(`\n${formatInterfaceUsage()}`)

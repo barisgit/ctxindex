@@ -19,7 +19,10 @@ export async function handleRealmCommand(args: string[]): Promise<number> {
   try {
     const deps = await openDeps()
     if (parsed.kind === 'add') {
-      deps.realmService.createRealm({ slug: parsed.slug })
+      deps.realmService.createRealm({
+        slug: parsed.slug,
+        ...(parsed.name !== undefined ? { displayName: parsed.name } : {}),
+      })
       console.log(formatRealmAdded(parsed.slug))
       return 0
     }
@@ -38,7 +41,10 @@ export const realmCommand = defineCommand({
   subCommands: {
     add: defineCommand({
       meta: { name: 'add', description: 'Add a realm.' },
-      args: { slug: { type: 'positional', required: false } },
+      args: {
+        slug: { type: 'positional', required: false },
+        name: { type: 'string', description: 'Realm display name' },
+      },
       run: ({ rawArgs }) =>
         runWithExit(() => handleRealmCommand(['add', ...rawArgs])),
     }),
