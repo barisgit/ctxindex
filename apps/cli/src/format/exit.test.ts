@@ -45,7 +45,7 @@ describe('mapErrorToExit', () => {
   test.each([
     ['auth_expired', 10],
     ['permission_denied', 40],
-    ['not_found', 2],
+    ['not_found', 50],
     ['rate_limited', 20],
     ['provider_unavailable', 30],
     ['provider_bad_response', 30],
