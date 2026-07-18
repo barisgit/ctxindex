@@ -20,5 +20,5 @@ Publishes ctxindex's bundled provider-neutral vocabularies: the `calendar.event@
 ## Integration points
 
 - Depends on `@ctxindex/extension-sdk` definition helpers and Zod.
-- `packages/adapters/src/builtins.ts` bundles all three Profiles and binds Gmail Draft Actions to message schemas and local-directory sync to `file@1`.
+- `packages/adapters/src/builtins.ts` bundles all three Profiles: Google and Microsoft mailbox Adapters target `communication.message@1` and bind the same `communication.message.draft.create` and `communication.message.draft.update` Actions; Google and Microsoft calendar Adapters target `calendar.event@1`; the local-directory Adapter targets `file@1`.
 - Core registry, resource, search, relation, artifact, export, and Action services consume the Profile hooks through SDK contracts.
