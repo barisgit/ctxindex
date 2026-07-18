@@ -2,6 +2,7 @@ import { expect } from 'bun:test'
 import { chmod, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { Sandbox } from '@ctxindex/core/testing'
 import { startMockGmail } from './_mock-gmail'
 import { startMockGraph } from './_mock-graph'
@@ -51,7 +52,7 @@ export interface MailboxReplayDriver {
   start(stateDir: string): Promise<ActiveMailboxReplayDriver>
 }
 
-const repoRoot = new URL('../../../../', import.meta.url).pathname
+const repoRoot = fileURLToPath(new URL('../../../../', import.meta.url))
 const unreachableLoopback = 'http://127.0.0.1:1'
 const realm = 'invented-mailbox-replay'
 const foreignSourceId = '01ARZ3NDEKTSV4RRFFQ69G5FAV'
@@ -93,52 +94,57 @@ const googleDriver: MailboxReplayDriver = {
         mailboxReplayFixture.replyProviderId,
       ],
     })
-    const browserBin = await installLoopbackBrowser(stateDir)
-    const env = server.env(sandbox, isolatedEnv(stateDir, browserBin))
-    const metadataParams = [
-      ['fields', 'id,threadId,labelIds,snippet,internalDate,payload/headers'],
-      ...['Subject', 'From', 'To', 'Date', 'Message-ID', 'In-Reply-To'].map(
-        (name) => ['metadataHeaders', name] as const,
-      ),
-    ] as const
-    return {
-      env,
-      attachmentFilename: 'mock.txt',
-      attachmentSuffix: `${mailboxReplayFixture.replyProviderId}-attachment`,
-      expectedSearchRequests: [
-        safeGet('/gmail/v1/users/me/messages', [
-          ['q', `${mailboxReplayFixture.query} -in:drafts`],
-          ['maxResults', '20'],
-        ]),
-        ...[
-          mailboxReplayFixture.rootProviderId,
-          mailboxReplayFixture.replyProviderId,
-        ].map((id) =>
-          safeGet(`/gmail/v1/users/me/messages/${id}`, [
-            ['format', 'metadata'],
-            ...metadataParams,
+    try {
+      const browserBin = await installLoopbackBrowser(stateDir)
+      const env = server.env(sandbox, isolatedEnv(stateDir, browserBin))
+      const metadataParams = [
+        ['fields', 'id,threadId,labelIds,snippet,internalDate,payload/headers'],
+        ...['Subject', 'From', 'To', 'Date', 'Message-ID', 'In-Reply-To'].map(
+          (name) => ['metadataHeaders', name] as const,
+        ),
+      ] as const
+      return {
+        env,
+        attachmentFilename: 'mock.txt',
+        attachmentSuffix: `${mailboxReplayFixture.replyProviderId}-attachment`,
+        expectedSearchRequests: [
+          safeGet('/gmail/v1/users/me/messages', [
+            ['q', `${mailboxReplayFixture.query} -in:drafts`],
+            ['maxResults', '20'],
           ]),
-        ),
-      ],
-      expectedRetrieveRequests: [
-        safeGet(
-          `/gmail/v1/users/me/messages/${mailboxReplayFixture.replyProviderId}`,
-          [['format', 'full']],
-        ),
-      ],
-      expectedDownloadRequests: [
-        safeGet(
-          `/gmail/v1/users/me/messages/${mailboxReplayFixture.replyProviderId}/attachments/${mailboxReplayFixture.replyProviderId}-attachment`,
-        ),
-      ],
-      safeRequests: () => server.readRequests(),
-      resetRequests: () => server.resetRequests(),
-      offlineEnv: () => ({
-        ...env,
-        CTXINDEX_GMAIL_MOCK_BASE_URL: unreachableLoopback,
-        CTXINDEX_OAUTH_MOCK_BASE_URL: unreachableLoopback,
-      }),
-      stop: () => server.stop(),
+          ...[
+            mailboxReplayFixture.rootProviderId,
+            mailboxReplayFixture.replyProviderId,
+          ].map((id) =>
+            safeGet(`/gmail/v1/users/me/messages/${id}`, [
+              ['format', 'metadata'],
+              ...metadataParams,
+            ]),
+          ),
+        ],
+        expectedRetrieveRequests: [
+          safeGet(
+            `/gmail/v1/users/me/messages/${mailboxReplayFixture.replyProviderId}`,
+            [['format', 'full']],
+          ),
+        ],
+        expectedDownloadRequests: [
+          safeGet(
+            `/gmail/v1/users/me/messages/${mailboxReplayFixture.replyProviderId}/attachments/${mailboxReplayFixture.replyProviderId}-attachment`,
+          ),
+        ],
+        safeRequests: () => server.readRequests(),
+        resetRequests: () => server.resetRequests(),
+        offlineEnv: () => ({
+          ...env,
+          CTXINDEX_GMAIL_MOCK_BASE_URL: unreachableLoopback,
+          CTXINDEX_OAUTH_MOCK_BASE_URL: unreachableLoopback,
+        }),
+        stop: () => server.stop(),
+      }
+    } catch (error) {
+      server.stop()
+      throw error
     }
   },
 }
@@ -152,52 +158,59 @@ const microsoftDriver: MailboxReplayDriver = {
       messages: microsoftMailboxReplayMessages,
       tokenScopes: 'Calendars.Read Mail.ReadWrite User.Read',
     })
-    const browserBin = await installLoopbackBrowser(stateDir)
-    const env = server.env(sandbox, isolatedEnv(stateDir, browserBin))
-    const messagePath = `/v1.0/me/messages/${mailboxReplayFixture.replyProviderId}`
-    return {
-      env,
-      attachmentFilename: 'invented-mailbox-replay.txt',
-      attachmentSuffix: 'invented-replay-attachment',
-      expectedSearchRequests: [
-        safeGet('/v1.0/me/messages', [
-          ['$search', `"${mailboxReplayFixture.query}"`],
-          ['$top', '20'],
-          [
-            '$select',
-            'id,conversationId,internetMessageId,subject,bodyPreview,from,toRecipients,receivedDateTime,sentDateTime,lastModifiedDateTime,isRead,isDraft,categories',
-          ],
-        ]),
-      ],
-      expectedRetrieveRequests: [
-        safeGet(messagePath, [
-          [
-            '$select',
-            'id,conversationId,internetMessageId,internetMessageHeaders,subject,bodyPreview,body,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,lastModifiedDateTime,isRead,isDraft,categories,hasAttachments',
-          ],
-        ]),
-        {
-          method: 'GET',
-          pathname: `${messagePath}/attachments`,
-          search: '?$select=id,name,contentType,size,isInline,@odata.type',
-        },
-      ],
-      expectedDownloadRequests: [
-        safeGet(`${messagePath}/attachments/invented-replay-attachment/$value`),
-      ],
-      safeRequests: () =>
-        server.readRequests().map(({ method, pathname, search }) => ({
-          method,
-          pathname,
-          search,
-        })),
-      resetRequests: () => server.resetRequests(),
-      offlineEnv: () => ({
-        ...env,
-        CTXINDEX_GRAPH_MOCK_BASE_URL: unreachableLoopback,
-        CTXINDEX_OAUTH_MOCK_BASE_URL: unreachableLoopback,
-      }),
-      stop: () => server.stop(),
+    try {
+      const browserBin = await installLoopbackBrowser(stateDir)
+      const env = server.env(sandbox, isolatedEnv(stateDir, browserBin))
+      const messagePath = `/v1.0/me/messages/${mailboxReplayFixture.replyProviderId}`
+      return {
+        env,
+        attachmentFilename: 'invented-mailbox-replay.txt',
+        attachmentSuffix: 'invented-replay-attachment',
+        expectedSearchRequests: [
+          safeGet('/v1.0/me/messages', [
+            ['$search', `"${mailboxReplayFixture.query}"`],
+            ['$top', '20'],
+            [
+              '$select',
+              'id,conversationId,internetMessageId,subject,bodyPreview,from,toRecipients,receivedDateTime,sentDateTime,lastModifiedDateTime,isRead,isDraft,categories',
+            ],
+          ]),
+        ],
+        expectedRetrieveRequests: [
+          safeGet(messagePath, [
+            [
+              '$select',
+              'id,conversationId,internetMessageId,internetMessageHeaders,subject,bodyPreview,body,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,lastModifiedDateTime,isRead,isDraft,categories,hasAttachments',
+            ],
+          ]),
+          {
+            method: 'GET',
+            pathname: `${messagePath}/attachments`,
+            search: '?$select=id,name,contentType,size,isInline,@odata.type',
+          },
+        ],
+        expectedDownloadRequests: [
+          safeGet(
+            `${messagePath}/attachments/invented-replay-attachment/$value`,
+          ),
+        ],
+        safeRequests: () =>
+          server.readRequests().map(({ method, pathname, search }) => ({
+            method,
+            pathname,
+            search,
+          })),
+        resetRequests: () => server.resetRequests(),
+        offlineEnv: () => ({
+          ...env,
+          CTXINDEX_GRAPH_MOCK_BASE_URL: unreachableLoopback,
+          CTXINDEX_OAUTH_MOCK_BASE_URL: unreachableLoopback,
+        }),
+        stop: () => server.stop(),
+      }
+    } catch (error) {
+      server.stop()
+      throw error
     }
   },
 }
@@ -320,10 +333,11 @@ export async function runMailboxRetrievalArtifactReplay(
   const stateDir = await mkdtemp(
     join(tmpdir(), `ctxindex-${driver.provider}-mailbox-replay-`),
   )
-  const active = await driver.start(stateDir)
-  const accountLabel = `invented-${driver.provider}-replay`
-  const sourceLabel = `${accountLabel}-mailbox`
+  let active: ActiveMailboxReplayDriver | undefined
   try {
+    active = await driver.start(stateDir)
+    const accountLabel = `invented-${driver.provider}-replay`
+    const sourceLabel = `${accountLabel}-mailbox`
     for (const command of [
       ['init'],
       ['realm', 'add', realm],
@@ -580,7 +594,7 @@ export async function runMailboxRetrievalArtifactReplay(
     }
     expect(providerRequests(driver, active)).toEqual([])
   } finally {
-    active.stop()
+    active?.stop()
     await rm(stateDir, { recursive: true, force: true })
   }
 }

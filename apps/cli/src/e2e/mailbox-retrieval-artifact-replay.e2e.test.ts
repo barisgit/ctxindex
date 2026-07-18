@@ -7,7 +7,7 @@ import {
   runMailboxRetrievalArtifactReplay,
 } from './_mailbox-retrieval-artifact-replay.test'
 
-let harness: CompiledCliHarness
+let harness: CompiledCliHarness | undefined
 
 test('compiled child environment excludes ambient credential and config keys', () => {
   const ambientKey = 'CTXINDEX_AMBIENT_AUTH_TOKEN'
@@ -43,13 +43,12 @@ beforeAll(async () => {
 }, 30_000)
 
 afterAll(async () => {
-  await harness.cleanup()
+  await harness?.cleanup()
 })
 
 for (const driver of mailboxReplayDrivers) {
-  test(
-    `compiled CLI replays provider-neutral retrieval and Artifacts for ${driver.adapterId}`,
-    async () => runMailboxRetrievalArtifactReplay(harness, driver),
-    60_000,
-  )
+  test(`compiled CLI replays provider-neutral retrieval and Artifacts for ${driver.adapterId}`, async () => {
+    if (!harness) throw new Error('Compiled CLI harness was not initialized')
+    await runMailboxRetrievalArtifactReplay(harness, driver)
+  }, 60_000)
 }
