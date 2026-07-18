@@ -59,6 +59,18 @@ async function makeRepository(): Promise<string> {
   await copyFile(join(repoRoot, 'scripts/cli.sh'), join(root, 'scripts/cli.sh'))
   await mkdir(join(root, 'apps/cli/bin'), { recursive: true })
   await writeFile(
+    join(root, 'apps/cli/package.json'),
+    `${JSON.stringify(
+      {
+        name: '@ctxindex/cli',
+        private: true,
+        scripts: { cli: 'bash ../../scripts/cli.sh' },
+      },
+      null,
+      2,
+    )}\n`,
+  )
+  await writeFile(
     join(root, 'package.json'),
     `${JSON.stringify(
       {
@@ -108,7 +120,7 @@ function conflictingPathEnvironment(
   return env
 }
 
-test('a typed worktree automatically isolates root-level bun cli state', async () => {
+test('a typed worktree automatically isolates every supported bun cli invocation', async () => {
   const root = await makeRepository()
   const branch = 'feature/worktree-isolation'
   const worktree = join(root, '.worktrees/feature-worktree-isolation')
@@ -125,15 +137,15 @@ test('a typed worktree automatically isolates root-level bun cli state', async (
     cache: join(canonicalWorktree, '.ctxindex/cache'),
   }
 
-  for (const invocation of [
-    [process.execPath, 'cli'],
-    [process.execPath, 'run', 'cli'],
+  for (const { command, cwd } of [
+    { command: [process.execPath, 'cli'], cwd: worktree },
+    { command: [process.execPath, 'run', 'cli'], cwd: worktree },
+    {
+      command: [process.execPath, 'run', 'cli'],
+      cwd: join(worktree, 'apps/cli'),
+    },
   ]) {
-    const cli = await run(
-      invocation,
-      worktree,
-      conflictingPathEnvironment(root),
-    )
+    const cli = await run(command, cwd, conflictingPathEnvironment(root))
     expect(cli.exitCode).toBe(0)
     expect(JSON.parse(cli.stdout)).toEqual(expected)
   }
@@ -224,20 +236,19 @@ test('attaches an existing typed branch and reports an absent branch', async () 
   )
 })
 
-test('rejects an existing branch without marker-aware CLI wiring before attach', async () => {
+test('rejects an existing branch with incomplete marker-aware CLI wiring before attach', async () => {
   const root = await makeRepository()
   expect(
     (await run(['git', 'switch', '-c', 'fix/pre-launcher-branch'], root))
       .exitCode,
   ).toBe(0)
-  await rm(join(root, 'scripts/cli.sh'))
   await writeFile(
-    join(root, 'package.json'),
+    join(root, 'apps/cli/package.json'),
     `${JSON.stringify(
       {
-        name: 'worktree-fixture',
+        name: '@ctxindex/cli',
         private: true,
-        scripts: { cli: 'bun apps/cli/bin/ctxindex.mjs' },
+        scripts: { cli: 'bun bin/ctxindex.mjs' },
       },
       null,
       2,

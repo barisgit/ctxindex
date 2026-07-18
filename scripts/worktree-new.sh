@@ -32,6 +32,8 @@ ref_supports_worktree_isolation() {
   local ref="$1"
   local package_json
   local cli_command
+  local workspace_package_json
+  local workspace_cli_command
   local launcher
   local required
 
@@ -41,6 +43,13 @@ ref_supports_worktree_isolation() {
       "$package_json" 2>/dev/null
   )" || return 1
   [[ "$cli_command" == "bash scripts/cli.sh" ]] || return 1
+
+  workspace_package_json="$(git show "${ref}:apps/cli/package.json" 2>/dev/null)" || return 1
+  workspace_cli_command="$(
+    bun -e 'process.stdout.write(JSON.parse(process.argv[1]).scripts?.cli ?? "")' \
+      "$workspace_package_json" 2>/dev/null
+  )" || return 1
+  [[ "$workspace_cli_command" == "bash ../../scripts/cli.sh" ]] || return 1
 
   launcher="$(git show "${ref}:scripts/cli.sh" 2>/dev/null)" || return 1
   for required in \
@@ -63,7 +72,7 @@ require_worktree_isolation() {
 
   if ! ref_supports_worktree_isolation "$ref"; then
     echo "error: branch '$BRANCH' lacks marker-aware CLI wiring" >&2
-    echo "expected package.json scripts.cli and scripts/cli.sh to support worktree isolation" >&2
+    echo "expected both package CLI scripts and scripts/cli.sh to support worktree isolation" >&2
     exit 1
   fi
 }
@@ -143,7 +152,7 @@ else
   fi
 fi
 
-# Per-worktree isolated XDG dirs so supported root-level `bun cli` invocations
+# Per-worktree isolated XDG dirs so supported `bun cli` invocations
 # never touch the user's real ~/.config/ctxindex, ~/.local/share/ctxindex, etc.
 mkdir -p \
   "${WORKTREE_DIR}/.ctxindex/config" \
@@ -151,7 +160,7 @@ mkdir -p \
   "${WORKTREE_DIR}/.ctxindex/state" \
   "${WORKTREE_DIR}/.ctxindex/cache"
 
-# The root CLI launcher uses this ignored marker to force isolated paths.
+# The shared CLI launcher uses this ignored marker to force isolated paths.
 touch "${WORKTREE_DIR}/.ctxindex/worktree"
 
 # Bootstrap deps if a lockfile is already present (post-init runs).

@@ -13,7 +13,7 @@
     "test": "bun test",
     "test:integration": "bun test --path-ignore-patterns '__none__' --pass-with-no-tests integration.test",
     "test:e2e": "bun run ../../scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' --pass-with-no-tests e2e.test",
-    "cli": "bun bin/ctxindex.mjs"
+    "cli": "bash ../../scripts/cli.sh"
   },
   "dependencies": {
     "@ctxindex/adapters": "workspace:*",

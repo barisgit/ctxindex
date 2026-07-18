@@ -33,7 +33,9 @@ bun cli --help
 bun run cli --help
 ```
 
-There is no `bun link` development path. Both commands dispatch to `apps/cli/bin/ctxindex.mjs`.
+There is no `bun link` development path. The root and package-local scripts both
+dispatch through `scripts/cli.sh` to `apps/cli/bin/ctxindex.mjs` so
+helper-created worktrees use isolated state.
 
 ## Packaging
 
