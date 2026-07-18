@@ -133,6 +133,39 @@ test('Graph transport withholds unknown or malformed provider wording', async ()
   )
 })
 
+test('Graph transport cancels declared oversized diagnostic bodies', async () => {
+  const privateRequestId = 'private-response-id'
+  const privateClientRequestId = 'private-client-response-id'
+  let cancelled = false
+  const body = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      controller.enqueue(new Uint8Array(1))
+    },
+    cancel() {
+      cancelled = true
+    },
+  })
+
+  const error = await graphResponseError(
+    new Response(body, {
+      status: 400,
+      headers: {
+        'content-length': String(16 * 1024 + 1),
+        'request-id': privateRequestId,
+        'client-request-id': privateClientRequestId,
+      },
+    }),
+  )
+
+  expect(error).toMatchObject({ code: 'provider_bad_response' })
+  expect(error.message).toBe(
+    'Microsoft Graph request failed with status 400 (request-id [redacted]; client-request-id [redacted])',
+  )
+  expect(error.message).not.toContain(privateRequestId)
+  expect(error.message).not.toContain(privateClientRequestId)
+  expect(cancelled).toBe(true)
+})
+
 test('Graph transport preserves status and retry classification', async () => {
   for (const [status, code] of [
     [401, 'auth_expired'],

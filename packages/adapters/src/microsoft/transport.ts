@@ -82,8 +82,10 @@ async function boundedJson(response: Response): Promise<unknown> {
   if (
     Number.isFinite(declaredLength) &&
     declaredLength > MAX_GRAPH_DIAGNOSTIC_BYTES
-  )
+  ) {
+    await response.body?.cancel().catch(() => undefined)
     return undefined
+  }
   if (!response.body) return undefined
   const reader = response.body.getReader()
   const chunks: Uint8Array[] = []
