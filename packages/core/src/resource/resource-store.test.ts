@@ -1,7 +1,11 @@
 import { Database } from 'bun:sqlite'
 import { afterEach, describe, expect, test } from 'bun:test'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { defineProfile } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
+import { CtxindexError } from '../errors'
 import { createProfileRegistry } from '../registry/profile-registry'
 import { applyPragmas } from '../storage/db'
 import { runMigrations } from '../storage/migrator'
@@ -10,6 +14,7 @@ import { ResourceStore } from './resource-store'
 const sourceId = '01ARZ3NDEKTSV4RRFFQ69G5FAV'
 const ref = `ctx://${sourceId}/records/one`
 const dbs: Database[] = []
+const tempDirs: string[] = []
 
 const fakeProfile = defineProfile({
   id: 'fake.record',
@@ -144,9 +149,340 @@ async function freshDb(): Promise<Database> {
 
 afterEach(() => {
   for (const db of dbs.splice(0)) db.close()
+  return Promise.all(
+    tempDirs
+      .splice(0)
+      .map((directory) => rm(directory, { recursive: true, force: true })),
+  )
 })
 
 describe('ResourceStore', () => {
+  test('atomically materializes a Ref-deduplicated batch with complete projections', async () => {
+    const db = await freshDb()
+    const store = new ResourceStore(db, createProfileRegistry([fakeProfile]))
+    const secondRef = `ctx://${sourceId}/records/two`
+
+    const results = store.upsertMany([
+      {
+        ref,
+        sourceId,
+        profile: { id: 'fake.record', version: 1 },
+        origin: 'adhoc',
+        completeness: 'complete',
+        payload: {
+          name: 'Superseded',
+          score: 1,
+          active: false,
+          at: new Date(1),
+          tags: ['old'],
+          body: 'old body',
+        },
+      },
+      {
+        ref: secondRef,
+        sourceId,
+        profile: { id: 'fake.record', version: 1 },
+        origin: 'adhoc',
+        completeness: 'complete',
+        payload: {
+          name: 'Second',
+          score: 2,
+          active: true,
+          at: new Date(2),
+          tags: ['second'],
+          body: 'second body',
+        },
+      },
+      {
+        ref,
+        sourceId,
+        profile: { id: 'fake.record', version: 1 },
+        origin: 'adhoc',
+        completeness: 'complete',
+        payload: {
+          name: 'Final',
+          score: 3,
+          active: true,
+          at: new Date(3),
+          tags: ['final'],
+          body: 'final body',
+        },
+      },
+    ])
+
+    expect(results).toHaveLength(2)
+    expect(store.get(ref)).toMatchObject({
+      title: 'Final',
+      payload: { name: 'Final', body: 'final body' },
+    })
+    expect(store.get(secondRef)).toMatchObject({
+      title: 'Second',
+      payload: { name: 'Second', body: 'second body' },
+    })
+    expect(db.prepare('SELECT ref FROM resources ORDER BY ref').all()).toEqual([
+      { ref },
+      { ref: secondRef },
+    ])
+    expect(
+      db
+        .prepare(
+          `SELECT resources.ref, chunks.content
+           FROM chunks JOIN resources ON resources.id = chunks.resource_id
+           ORDER BY resources.ref`,
+        )
+        .all(),
+    ).toEqual([
+      { ref, content: 'final body' },
+      { ref: secondRef, content: 'second body' },
+    ])
+    expect(
+      db
+        .prepare(
+          `SELECT resources.ref, field_index.value_text
+           FROM field_index JOIN resources ON resources.id = field_index.resource_id
+           WHERE field_index.field = 'name'
+           ORDER BY resources.ref`,
+        )
+        .all(),
+    ).toEqual([
+      { ref, value_text: 'Final' },
+      { ref: secondRef, value_text: 'Second' },
+    ])
+    expect(
+      db
+        .prepare(
+          `SELECT resources.ref, relations.target_value
+           FROM relations JOIN resources ON resources.id = relations.source_resource_id
+           ORDER BY resources.ref`,
+        )
+        .all(),
+    ).toEqual([
+      { ref, target_value: 'final' },
+      { ref: secondRef, target_value: 'second' },
+    ])
+  })
+
+  test('validates every batch input before last-occurrence deduplication', async () => {
+    const db = await freshDb()
+    const store = new ResourceStore(db, createProfileRegistry([fakeProfile]))
+    const valid = {
+      ref,
+      sourceId,
+      profile: { id: 'fake.record', version: 1 } as const,
+      origin: 'adhoc' as const,
+      completeness: 'complete' as const,
+      payload: {
+        name: 'Final',
+        score: 1,
+        active: true,
+        at: new Date(1),
+        tags: ['final'],
+        body: 'final body',
+      },
+    }
+
+    expect(() =>
+      store.upsertMany([
+        { ...valid, sourceId: '01ARZ3NDEKTSV4RRFFQ69G5FAA' },
+        valid,
+      ]),
+    ).toThrow('does not match operation Source')
+    for (const table of ['resources', 'chunks', 'field_index', 'relations']) {
+      expect(
+        db.prepare(`SELECT count(*) AS count FROM ${table}`).get(),
+      ).toEqual({ count: 0 })
+    }
+  })
+
+  test('rolls back every Resource when one batch projection fails', async () => {
+    const db = await freshDb()
+    const broken = defineProfile({
+      ...fakeProfile,
+      search: {
+        ...fakeProfile.search,
+        chunks: (payload) =>
+          payload.name === 'Broken'
+            ? [payload.body, 42 as unknown as string]
+            : [payload.body],
+      },
+    })
+    const store = new ResourceStore(db, createProfileRegistry([broken]))
+
+    expect(() =>
+      store.upsertMany([
+        {
+          ref,
+          sourceId,
+          profile: { id: 'fake.record', version: 1 },
+          origin: 'adhoc',
+          completeness: 'complete',
+          payload: {
+            name: 'Valid',
+            score: 1,
+            active: true,
+            at: new Date(1),
+            tags: ['valid'],
+            body: 'valid body',
+          },
+        },
+        {
+          ref: `ctx://${sourceId}/records/broken`,
+          sourceId,
+          profile: { id: 'fake.record', version: 1 },
+          origin: 'adhoc',
+          completeness: 'complete',
+          payload: {
+            name: 'Broken',
+            score: 2,
+            active: false,
+            at: new Date(2),
+            tags: ['broken'],
+            body: 'broken body',
+          },
+        },
+      ]),
+    ).toThrow('non-string')
+    expect(db.prepare('SELECT count(*) AS count FROM resources').get()).toEqual(
+      { count: 0 },
+    )
+    expect(db.prepare('SELECT count(*) AS count FROM chunks').get()).toEqual({
+      count: 0,
+    })
+    expect(
+      db.prepare('SELECT count(*) AS count FROM field_index').get(),
+    ).toEqual({ count: 0 })
+    expect(db.prepare('SELECT count(*) AS count FROM relations').get()).toEqual(
+      { count: 0 },
+    )
+  })
+
+  test('normalizes exhausted cross-connection write contention without leaking SQLite text', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'ctxindex-resource-busy-'))
+    tempDirs.push(directory)
+    const path = join(directory, 'ctxindex.sqlite')
+    const holder = new Database(path, { create: true })
+    const contender = new Database(path, { create: true })
+    dbs.push(holder, contender)
+    applyPragmas(holder)
+    await runMigrations(holder)
+    holder.exec("INSERT INTO realms VALUES ('personal', 'personal', NULL, 1)")
+    holder
+      .prepare(
+        'INSERT INTO sources (id, realm_id, adapter_id, adapter_version, label, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      )
+      .run(sourceId, 'personal', 'fake', 1, sourceId, '{}', 1, 1)
+    applyPragmas(contender)
+    contender.exec('PRAGMA busy_timeout = 10')
+    holder.exec('BEGIN IMMEDIATE')
+
+    let caught: unknown
+    try {
+      new ResourceStore(
+        contender,
+        createProfileRegistry([fakeProfile]),
+      ).upsertMany([
+        {
+          ref,
+          sourceId,
+          profile: { id: 'fake.record', version: 1 },
+          origin: 'adhoc',
+          completeness: 'complete',
+          payload: {
+            name: 'Contended',
+            score: 1,
+            active: true,
+            at: new Date(1),
+            tags: [],
+            body: 'body',
+          },
+        },
+      ])
+    } catch (error) {
+      caught = error
+    } finally {
+      holder.exec('ROLLBACK')
+    }
+
+    expect(caught).toBeInstanceOf(CtxindexError)
+    expect(caught).toMatchObject({
+      code: 'storage_busy',
+      cause: expect.any(Error),
+    })
+    expect((caught as Error).message).toContain('try again')
+    expect((caught as Error).message).not.toMatch(/SQLITE|database.*lock|busy/i)
+  })
+
+  test('normalizes an extended SQLite busy snapshot code', async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), 'ctxindex-resource-snapshot-'),
+    )
+    tempDirs.push(directory)
+    const path = join(directory, 'ctxindex.sqlite')
+    const staleReader = new Database(path, { create: true })
+    const writer = new Database(path, { create: true })
+    dbs.push(staleReader, writer)
+    applyPragmas(staleReader)
+    await runMigrations(staleReader)
+    staleReader.exec(
+      "INSERT INTO realms VALUES ('personal', 'personal', NULL, 1)",
+    )
+    staleReader
+      .prepare(
+        'INSERT INTO sources (id, realm_id, adapter_id, adapter_version, label, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      )
+      .run(sourceId, 'personal', 'fake', 1, sourceId, '{}', 1, 1)
+    applyPragmas(writer)
+    staleReader.exec('BEGIN')
+    staleReader.query('SELECT COUNT(*) FROM resources').get()
+    new ResourceStore(writer, createProfileRegistry([fakeProfile])).upsert({
+      ref: `ctx://${sourceId}/records/writer`,
+      sourceId,
+      profile: { id: 'fake.record', version: 1 },
+      origin: 'adhoc',
+      completeness: 'complete',
+      payload: {
+        name: 'Writer',
+        score: 1,
+        active: true,
+        at: new Date(1),
+        tags: [],
+        body: 'writer',
+      },
+    })
+
+    let caught: unknown
+    try {
+      new ResourceStore(
+        staleReader,
+        createProfileRegistry([fakeProfile]),
+      ).upsert({
+        ref,
+        sourceId,
+        profile: { id: 'fake.record', version: 1 },
+        origin: 'adhoc',
+        completeness: 'complete',
+        payload: {
+          name: 'Stale',
+          score: 2,
+          active: false,
+          at: new Date(2),
+          tags: [],
+          body: 'stale',
+        },
+      })
+    } catch (error) {
+      caught = error
+    } finally {
+      staleReader.exec('ROLLBACK')
+    }
+
+    expect(caught).toMatchObject({
+      code: 'storage_busy',
+      cause: expect.objectContaining({ code: 'SQLITE_BUSY_SNAPSHOT' }),
+    })
+    expect((caught as Error).message).not.toMatch(/SQLITE|database.*lock|busy/i)
+  })
+
   test('materializes a generic Profile-derived summary', async () => {
     const db = await freshDb()
     const store = new ResourceStore(db, createProfileRegistry([fakeProfile]))

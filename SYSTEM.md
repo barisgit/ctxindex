@@ -13,6 +13,7 @@
 - `CONTEXT.md`, for canonical domain language and relationships.
 - All 18 canonical capability specs under `openspec/specs/*/spec.md`, listed in the Source Index.
 - The 17 capability `implementation.md` sidecars present at refresh time, listed in the Source Index. No `core-model/implementation.md` sidecar was present or required.
+- The active `make-concurrent-remote-search-cache-writes-safe` delta specs and implementation artifact for the implemented concurrent cache-write contract.
 - `docs/design/2026-07-13-context-access-layer.md`, for accepted cross-cutting rationale. Normative claims below come from capability specs, not from the design note.
 
 Implementation sidecars describe intended TypeScript surfaces and inter-module seams. They are selective and non-normative. Historical milestone documents are not treated as the timeless system contract.
@@ -249,6 +250,8 @@ Indexed Sources and covered hybrid windows use local search. Federated Sources a
 
 Results are ranked within each origin and then interleaved. Raw local BM25 and provider relevance scores are not compared numerically. Explain output identifies the origin of each result. A provider timeout or failure preserves successful local results and adds a per-origin warning. Offline operation therefore keeps indexed content and hybrid hot windows searchable while federated origins degrade.
 
+Verified hits from one remote origin are Ref-deduplicated and offered to local storage as one atomic cache batch. If that optional batch cannot acquire SQLite within the configured contention bound, the provider hits are still returned successfully with one `storage_busy` warning for the origin. Remote execution yields after synchronous storage waits before its final signal check so scheduled cancellation keeps its existing outcome, and backend-specific SQLite codes or lock messages are not exposed.
+
 Full-text search should use BM25-style ranking where available and return the best matching chunks with Resources. Vector search is optional rather than a dependency of baseline discovery. If hybrid full-text/vector ranking is implemented, the recommended default is reciprocal rank fusion with `k = 60`.
 
 ### Retrieval and ad-hoc materialization
@@ -358,6 +361,8 @@ Resource origin is either:
 
 When extracted content changes, chunks and field rows should be replaced wholesale. Tombstoned Resources remain in storage and are hidden from ordinary search unless explicitly requested.
 
+Resource batches reserve the SQLite writer before materialization, collapse repeated Refs to one final stored identity, and commit the envelopes, fields, chunks, and Relations together. A projection failure rolls back the entire batch, so concurrent readers never observe a partially materialized origin.
+
 ### Relations, Artifacts, and exports
 
 Relations point to a Ref or a Profile-declared natural key. Unresolved and dangling Relations are valid and queryable. Resolution can occur when a matching Resource arrives or at query time. Core supports forward and reverse traversal without knowing domain semantics.
@@ -376,7 +381,7 @@ A local directory Source indexes files in place and does not copy every original
 
 The baseline backup procedure is to stop active syncs and copy the SQLite file, plus the secrets-store file when the file backend is used. Beginning with the first released V1 schema, core migrations keep released databases upgradable. Pre-V1 prototype databases have no migration guarantee.
 
-SQLite runs with WAL, foreign keys enabled, `synchronous = NORMAL`, and a configured busy timeout.
+SQLite installs a five-second busy timeout before lock-sensitive setup, then runs with WAL, foreign keys enabled, and `synchronous = NORMAL`. It is the cross-process writer coordinator; no separate lock service is involved. One core storage boundary normalizes exhausted contention during database setup, migration, and Resource writes to the actionable symbolic error `storage_busy`. Required operations use existing exit 50, with raw SQLite details retained only as an internal cause.
 
 ## 10. CLI surface and stable exit codes
 
@@ -419,10 +424,12 @@ Bundled agent skills are versioned with the release. The CLI should list skill n
 | `20` | Provider rate limit. |
 | `30` | Network failure or provider unavailable/bad response. |
 | `40` | Permission denied or scope mismatch. |
-| `50` | Other sync failure. |
+| `50` | Other failure, including terminal `storage_busy`. |
 | `130` | Cancelled by SIGINT. |
 
 Adapters report typed failures such as expired or revoked auth, rate limits, network errors, provider errors, bad responses, quota, not found, permission denial, cancellation, and unknown failure. Only the sync runner maps those errors to persisted run and Source status. Non-fatal warning operations can increment error counts without aborting a run.
+
+Optional remote-search cache contention is not terminal: it returns provider results, emits `storage_busy`, and exits 0. A required storage operation using the same symbolic error exits 50; cancellation remains exit 130.
 
 ## 11. Known limitations and deferrals
 
@@ -450,7 +457,7 @@ This section distinguishes explicit boundaries from missing documentation. It sh
 
 ## 12. Source index
 
-The table maps each section to the sources it distills. Capability specs are normative; sidecars and docs are supporting references only.
+The table maps each section to the sources it distills. Capability specs are normative; sidecars and docs are supporting references only. Sections 6, 9, and 10 also incorporate the active change sources under `openspec/changes/make-concurrent-remote-search-cache-writes-safe/`: the three delta `spec.md` files plus `implementation.md`.
 
 | SYSTEM.md section | Canonical sources | Implementation sidecars consulted | Explanatory sources |
 |---|---|---|---|

@@ -7,6 +7,10 @@ import { CtxindexError } from '../errors'
 import type { ProfileRegistry } from '../registry'
 import { ResourceStore } from '../resource'
 import {
+  isStorageContention,
+  STORAGE_BUSY_MESSAGE,
+} from '../storage/contention'
+import {
   type CreateSourceProviderContextInput,
   createSourceProviderContext,
 } from './provider-context'
@@ -82,6 +86,10 @@ function matchesQuery(
   return { matches: true }
 }
 
+function nextEventLoopTurn(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
 export async function searchSourceRemote(
   input: SearchSourceRemoteInput,
 ): Promise<SearchRemoteResult> {
@@ -124,30 +132,57 @@ export async function searchSourceRemote(
     ...result.warnings,
     ...filterWarnings,
   ]
-  for (const resource of verified) {
-    const materialized = resources.upsert({
-      ref: resource.ref,
-      sourceId: input.sourceId,
-      profile: resource.profile,
-      origin: 'adhoc',
-      completeness: 'partial',
-      ...(resource.title !== undefined ? { title: resource.title } : {}),
-      ...(resource.summary !== undefined ? { summary: resource.summary } : {}),
-      ...(resource.occurredAt !== undefined
-        ? { occurredAt: resource.occurredAt }
-        : {}),
-      ...(resource.providerUpdatedAt !== undefined
-        ? { providerUpdatedAt: resource.providerUpdatedAt }
-        : {}),
-      ...(resource.payload !== undefined ? { payload: resource.payload } : {}),
-    })
-    for (const warning of materialized.warnings) {
-      warnings.push({
-        code: warning.code,
-        message: `Resource ${resource.ref} uses unavailable Profile ${warning.profileId}@${warning.profileVersion}`,
+  input.signal.throwIfAborted()
+  const uniqueResources = new Map<string, (typeof verified)[number]>()
+  for (const resource of verified) uniqueResources.set(resource.ref, resource)
+  const materializationResources = [...uniqueResources.values()]
+  try {
+    const materialized = resources.upsertMany(
+      materializationResources.map((resource) => ({
         ref: resource.ref,
-      })
+        sourceId: input.sourceId,
+        profile: resource.profile,
+        origin: 'adhoc',
+        completeness: 'partial',
+        ...(resource.title !== undefined ? { title: resource.title } : {}),
+        ...(resource.summary !== undefined
+          ? { summary: resource.summary }
+          : {}),
+        ...(resource.occurredAt !== undefined
+          ? { occurredAt: resource.occurredAt }
+          : {}),
+        ...(resource.providerUpdatedAt !== undefined
+          ? { providerUpdatedAt: resource.providerUpdatedAt }
+          : {}),
+        ...(resource.payload !== undefined
+          ? { payload: resource.payload }
+          : {}),
+      })),
+    )
+    await nextEventLoopTurn()
+    input.signal.throwIfAborted()
+    for (const [index, result] of materialized.entries()) {
+      const resource = materializationResources[index]
+      if (!resource) continue
+      for (const warning of result.warnings) {
+        warnings.push({
+          code: warning.code,
+          message: `Resource ${resource.ref} uses unavailable Profile ${warning.profileId}@${warning.profileVersion}`,
+          ref: resource.ref,
+        })
+      }
     }
+  } catch (error) {
+    await nextEventLoopTurn()
+    input.signal.throwIfAborted()
+    if (!isStorageContention(error)) throw error
+    warnings.push({
+      code: 'storage_busy',
+      message:
+        error instanceof CtxindexError && error.code === 'storage_busy'
+          ? error.message
+          : STORAGE_BUSY_MESSAGE,
+    })
   }
   return { resources: verified, warnings }
 }
