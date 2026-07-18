@@ -7,9 +7,8 @@ export const syncCommand = defineCommand({
   args: {
     source: { type: 'string', description: 'Source label or ID' },
     mode: {
-      type: 'enum',
-      options: ['sync', 'resync', 'diff'],
-      description: 'Sync mode',
+      type: 'string',
+      description: 'Sync mode (sync|resync|diff)',
     },
     json: { type: 'boolean', description: 'Print JSON' },
     format: { type: 'string', description: 'Output format' },

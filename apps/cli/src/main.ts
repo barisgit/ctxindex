@@ -58,6 +58,19 @@ function isLogLevelName(value: string): value is LogLevelName {
   return (LOG_LEVELS as readonly string[]).includes(value)
 }
 
+function syncCommandPrefixError(args: string[]): string | undefined {
+  if (args.includes('--help') || args.includes('-h')) return undefined
+
+  const commandIndex = args.findIndex((arg) => !arg.startsWith('-'))
+  if (commandIndex < 1 || args[commandIndex] !== 'sync') return undefined
+
+  const option = args[0]
+  if (option === undefined) return undefined
+  const equalsIndex = option.indexOf('=')
+  const flag = equalsIndex === -1 ? option : option.slice(0, equalsIndex)
+  return `sync: option must follow command: ${flag}`
+}
+
 /**
  * Extracts the global `--log-level <level>` / `--log-level=<level>` flag and
  * strips it from the args so per-command parsers never see it (V1 §1.8).
@@ -165,6 +178,11 @@ export async function runCli(args: string[]): Promise<number> {
   const { rest, level, error } = extractLogLevel(args)
   if (error) {
     console.error(error)
+    return 2
+  }
+  const prefixError = syncCommandPrefixError(rest)
+  if (prefixError) {
+    console.error(prefixError)
     return 2
   }
   setCliLogLevel(
