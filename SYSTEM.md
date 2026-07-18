@@ -99,7 +99,7 @@ Package responsibilities are stable: `@ctxindex/cli` parses, composes, formats, 
 | **Resource** | Common envelope naming one primary Profile, with an optional payload conforming to it. |
 | **Ref** | `ctx://<source-id>/<adapter-opaque-suffix>`, stable independently of local materialization. |
 | **Relation** | Typed edge to a Ref or natural key that may resolve later. |
-| **Artifact** | Lazily downloaded bytes in the managed cache. |
+| **Artifact** | Source-scoped, Profile-derived descriptor for downloadable bytes associated with one Resource. Cached bytes are a separate, purgeable local representation. |
 | **Materialization** | Purgeable local projection from Sync or ad-hoc access. |
 | **Field Index** | Generic typed rows projected from Profile fields. |
 | **Sync Run** | One recorded refresh attempt, separate from current Source state. |
@@ -220,7 +220,7 @@ The generic model can describe irreversible Actions and requires explicit non-in
 
 ## 10. Storage model
 
-`@ctxindex/core` owns generic SQLite storage, schema changes, sync bookkeeping, and the Artifact store. Adapters own no tables. A Resource stores internal id, Ref, Source/Realm, Profile/version, `synced` or `adhoc` origin, completeness, envelope times/text, validated payload, and derived fields, chunks, Relations, and Artifact descriptors.
+`@ctxindex/core` owns generic SQLite storage, schema changes, sync bookkeeping, and the managed Artifact-byte cache. Adapters own no tables. A Resource stores internal id, Ref, Source/Realm, Profile/version, `synced` or `adhoc` origin, completeness, envelope times/text, validated payload, and derived fields, chunks, Relations, and Artifact descriptors.
 
 Field Index rows keep each scalar/array element in a native text, numeric, or integer slot with ordinal. Chunks feed full-text search. Updating a payload transactionally replaces all Profile-derived projections.
 
@@ -228,7 +228,7 @@ Relations store one logical edge and zero-to-many resolutions. Ref targets resol
 
 Remote envelopes, retrieved payloads, and synced content share Resource tables. `adhoc` is purgeable cache state; Sync upgrades an identical Ref to `synced`, while synced provider deletion creates a tombstone. Optional raw provider payloads are off by default, non-authoritative, and purgeable.
 
-Artifact descriptors remain with Resources while bytes are lazy. First download streams bytes into a SHA-256 content-addressed store and records metadata under the sole `cached` retention class. Later downloads reuse it; `--output` copies without transferring cache ownership. `purge artifacts` removes bytes but leaves descriptors for refetch. No automatic eviction exists.
+Artifact descriptors remain with Resources while provider bytes are fetched on demand. First download streams the bytes into a SHA-256 content-addressed cache and records metadata under the sole `cached` retention class. Later downloads reuse it; `--output` copies without transferring cache ownership. `purge artifacts` removes bytes and cache metadata but leaves Resources and their descriptors for refetch. No automatic eviction exists.
 
 Core bookkeeping timestamps use UTC Unix-epoch milliseconds; Profile payloads may preserve RFC 3339 instants or local dates. Opaque ctxindex-owned primary keys are client-generated ULIDs; a Realm uses its human slug as primary key, or a ULID without one. Provider IDs are never core primary keys. Exports resolve formats from Profiles, not a core conversion pipeline. A basic backup stops Sync, then copies SQLite and the encrypted secret file when used. External systems remain canonical. Prototype databases have no compatibility obligation; cross-Source Resource collapse, canonical identity, merge policy, Extension-private tables, and payload-version migration are deferred.
 
@@ -266,7 +266,7 @@ Sync Run history records `completed`, `cancelled` for cancellation, and `failed`
 - Full-text search is baseline; semantic/vector search, watch/notifications, and mature quota policy are optional or deferred.
 - Remote filter-only enumeration, remote pagination, and mixed-search offset pagination are unsupported.
 - `resync` and `diff` depend on Adapter support; `sync` is baseline.
-- Artifacts have one cached retention class and no automatic eviction. Raw provider payloads are optional and off by default.
+- Cached Artifact bytes have one retention class and no automatic eviction. Raw provider payloads are optional and off by default.
 - External Extensions are trusted in-process explicit-path or installed Catalog code. Sandboxing, ambient discovery or startup refresh, arbitrary commands, private/credentialed or SSH Catalogs, nested or cross-repository entries, submodules, Git LFS, dependency resolution, package managers, build hooks, polling, and non-TypeScript/out-of-process Adapters are unsupported.
 - Per-Extension storage, multiple primary Profiles, cross-source identity collapse, and payload migration await demonstrated need.
 - There is no SaaS canonical store, MCP server, workflow-policy engine, or universal sync protocol.
