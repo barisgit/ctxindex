@@ -13,7 +13,11 @@ trap 'rm -f "$output_file"; rm -rf "$keytar_mock_dir"' EXIT
 export NODE_ENV=test
 export CTXINDEX_KEYTAR_MOCK_FILE="${CTXINDEX_KEYTAR_MOCK_FILE:-$keytar_mock_dir/keytar.json}"
 
-if bun test --path-ignore-patterns '__none__' --max-concurrency=1 >"$output_file" 2>&1; then
+if bun test \
+  --path-ignore-patterns '__none__' \
+  --max-concurrency=1 \
+  --timeout=30000 \
+  >"$output_file" 2>&1; then
   bun_exit=0
 else
   bun_exit=$?

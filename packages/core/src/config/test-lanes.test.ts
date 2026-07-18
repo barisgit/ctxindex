@@ -31,6 +31,10 @@ async function readBunfig(): Promise<Bunfig> {
   ) as Bunfig
 }
 
+async function readFullTestSuite(): Promise<string> {
+  return Bun.file(join(repoRoot, 'scripts/verify/full-test-suite.sh')).text()
+}
+
 function asStringArray(value: unknown, label: string): string[] {
   expect(Array.isArray(value), `${label} should be an array`).toBe(true)
   const strings = value as unknown[]
@@ -87,6 +91,13 @@ test('e2e lane isolated', async () => {
   expect(command).toContain('__none__')
   expect(command).toContain('e2e.test')
   expect(command).not.toContain('integration.test')
+})
+
+test('full suite serializes tests with a hosted-runner timeout', async () => {
+  const command = await readFullTestSuite()
+
+  expect(command).toContain('--max-concurrency=1')
+  expect(command).toContain('--timeout=30000')
 })
 
 test('path-ignore-patterns honored', async () => {
