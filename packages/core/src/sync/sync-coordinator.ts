@@ -210,7 +210,7 @@ export class SyncCoordinator {
         this.db
           .prepare(`
           UPDATE sync_runs
-          SET status = 'cancelled', completed_at = ?, errors_count = 1,
+          SET status = 'failed', completed_at = ?, errors_count = 1,
               error_summary = 'sync busy'
           WHERE id = ?
         `)
@@ -331,13 +331,15 @@ export class SyncCoordinator {
             .prepare(`
           INSERT INTO source_sync_state (
             source_id, last_status, last_run_id, cursor_json, warnings_count,
-            last_warning_json, updated_at
-          ) VALUES (?, 'idle', ?, ?, ?, ?, ?)
+            last_warning_json, errors_count, last_error_json, updated_at
+          ) VALUES (?, 'idle', ?, ?, ?, ?, 0, NULL, ?)
           ON CONFLICT(source_id) DO UPDATE SET
             last_status = 'idle', last_run_id = excluded.last_run_id,
             cursor_json = excluded.cursor_json,
             warnings_count = excluded.warnings_count,
             last_warning_json = excluded.last_warning_json,
+            errors_count = excluded.errors_count,
+            last_error_json = excluded.last_error_json,
             updated_at = excluded.updated_at
         `)
             .run(
@@ -426,12 +428,14 @@ export class SyncCoordinator {
             .prepare(`
           INSERT INTO source_sync_state (
             source_id, last_status, last_run_id, cursor_json, warnings_count,
-            last_warning_json, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            last_warning_json, errors_count, last_error_json, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
           ON CONFLICT(source_id) DO UPDATE SET
             last_status = excluded.last_status, last_run_id = excluded.last_run_id,
             warnings_count = excluded.warnings_count,
             last_warning_json = excluded.last_warning_json,
+            errors_count = excluded.errors_count,
+            last_error_json = excluded.last_error_json,
             updated_at = excluded.updated_at
         `)
             .run(
@@ -441,6 +445,7 @@ export class SyncCoordinator {
               cursorBeforeJson,
               warnings.length,
               warningJson(warnings.at(-1) ?? null),
+              JSON.stringify(lastError),
               completedAt,
             )
         }

@@ -163,19 +163,23 @@ test('status and Source inventory project separate warning and error diagnostics
     `INSERT INTO sync_runs (
        id, source_id, realm_id, mode, status, started_at, completed_at,
        warnings_count, last_warning_json, errors_count, error_summary
-     ) VALUES ('run-1', ?, ?, 'sync', 'failed', 1, 2, 2, ?, 1, ?)`,
+     ) VALUES ('run-1', ?, ?, 'sync', 'failed', 1, 2, 2, ?, 7, ?)`,
   ).run(
     added.sourceId,
     added.realmId,
     JSON.stringify(warning),
-    'provider request failed',
+    'historical run error',
   )
   db.prepare(
     `INSERT INTO source_sync_state (
        source_id, last_status, last_run_id, warnings_count, last_warning_json,
-       updated_at
-     ) VALUES (?, 'failed', 'run-1', 2, ?, 2)`,
-  ).run(added.sourceId, JSON.stringify(warning))
+       errors_count, last_error_json, updated_at
+     ) VALUES (?, 'failed', 'run-1', 2, ?, 1, ?, 2)`,
+  ).run(
+    added.sourceId,
+    JSON.stringify(warning),
+    JSON.stringify('provider request failed'),
+  )
 
   expect(service.getStatus()[0]).toMatchObject({
     warningsCount: 2,
@@ -239,6 +243,8 @@ test('missing and restored Adapters preserve historical sync status', () => {
     cursor_json: '{"page":3}',
     warnings_count: 0,
     last_warning_json: null,
+    errors_count: 0,
+    last_error_json: null,
     updated_at: 42,
   })
 })

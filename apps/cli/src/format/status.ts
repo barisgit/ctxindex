@@ -26,7 +26,7 @@ export function formatStatus(
           `status=${displayStatus(row)}`,
           `warnings=${row.warningsCount}`,
           row.lastWarning
-            ? `warning=${row.lastWarning.code}:${row.lastWarning.message.replace(/\s+/g, '_')}${row.lastWarning.ref ? `:ref=${row.lastWarning.ref}` : ''}`
+            ? `warning=${row.lastWarning.code}:${row.lastWarning.message.replace(/\s+/g, '_')}${row.lastWarning.ref ? `:ref=${row.lastWarning.ref.replace(/\s+/g, '_')}` : ''}`
             : null,
           `errors=${row.errorsCount}`,
           row.lastError ? `error=${row.lastError.replace(/\s+/g, '_')}` : null,

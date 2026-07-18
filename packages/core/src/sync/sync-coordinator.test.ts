@@ -130,7 +130,7 @@ test('a second run is busy while the first drive is blocked', async () => {
         "SELECT status, error_summary FROM sync_runs WHERE error_summary = 'sync busy'",
       )
       .get(),
-  ).toEqual({ status: 'cancelled', error_summary: 'sync busy' })
+  ).toEqual({ status: 'failed', error_summary: 'sync busy' })
   release()
   await first
 })
@@ -181,6 +181,9 @@ test('counts an upsert followed by removal in emission order', async () => {
 
 test('warnings complete with separate bounded warning accounting', async () => {
   const { db, coordinator } = await setup()
+  db.prepare(
+    "UPDATE source_sync_state SET errors_count = 1, last_error_json = 'stale error' WHERE source_id = ?",
+  ).run(sourceId)
   const result = await coordinator.run(
     { sourceId, mode: 'sync', signal: new AbortController().signal },
     async ({ emit }) => {
@@ -211,7 +214,7 @@ test('warnings complete with separate bounded warning accounting', async () => {
   expect(
     db
       .prepare(
-        'SELECT last_status, warnings_count, last_warning_json FROM source_sync_state',
+        'SELECT last_status, warnings_count, last_warning_json, errors_count, last_error_json FROM source_sync_state',
       )
       .get(),
   ).toEqual({
@@ -221,6 +224,8 @@ test('warnings complete with separate bounded warning accounting', async () => {
       code: 'skip_a',
       message: 'first',
     }),
+    errors_count: 0,
+    last_error_json: null,
   })
 })
 
@@ -299,13 +304,15 @@ test('terminal failure preserves prior warnings and records one error', async ()
   expect(
     db
       .prepare(
-        'SELECT last_status, warnings_count, last_warning_json FROM source_sync_state',
+        'SELECT last_status, warnings_count, last_warning_json, errors_count, last_error_json FROM source_sync_state',
       )
       .get(),
   ).toEqual({
     last_status: 'failed',
     warnings_count: 1,
     last_warning_json: expectedWarning,
+    errors_count: 1,
+    last_error_json: JSON.stringify('boom'),
   })
 })
 

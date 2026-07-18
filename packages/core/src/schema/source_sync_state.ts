@@ -17,5 +17,7 @@ export const sourceSyncState = sqliteTable('source_sync_state', {
     .notNull()
     .default(0),
   lastWarningJson: text('last_warning_json'),
+  errorsCount: integer('errors_count', { mode: 'number' }).notNull().default(0),
+  lastErrorJson: text('last_error_json'),
   updatedAt: integer('updated_at', { mode: 'number' }).notNull(),
 })

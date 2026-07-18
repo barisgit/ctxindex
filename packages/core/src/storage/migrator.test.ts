@@ -193,10 +193,15 @@ test('fresh core migration creates only the generic V1 storage model', async () 
   expect(
     db
       .prepare(
-        "SELECT name FROM pragma_table_info('source_sync_state') WHERE name IN ('warnings_count', 'last_warning_json') ORDER BY cid",
+        "SELECT name FROM pragma_table_info('source_sync_state') WHERE name IN ('warnings_count', 'last_warning_json', 'errors_count', 'last_error_json') ORDER BY cid",
       )
       .all(),
-  ).toEqual([{ name: 'warnings_count' }, { name: 'last_warning_json' }])
+  ).toEqual([
+    { name: 'warnings_count' },
+    { name: 'last_warning_json' },
+    { name: 'errors_count' },
+    { name: 'last_error_json' },
+  ])
 })
 
 test('fresh Account schema requires stable provider identity and enforces its uniqueness', async () => {

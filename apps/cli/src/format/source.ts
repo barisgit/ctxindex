@@ -20,7 +20,7 @@ function compactValue(value: string | number | null | undefined): string {
 
 function compactSource(source: SourceRow): string {
   const warning = source.last_warning
-    ? `${source.last_warning.code}:${source.last_warning.message.replace(/\s+/g, '_')}${source.last_warning.ref ? `:ref=${source.last_warning.ref}` : ''}`
+    ? `${source.last_warning.code}:${source.last_warning.message.replace(/\s+/g, '_')}${source.last_warning.ref ? `:ref=${compactValue(source.last_warning.ref)}` : ''}`
     : null
   return [
     source.id,

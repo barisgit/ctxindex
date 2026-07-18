@@ -164,6 +164,8 @@ CREATE TABLE source_sync_state (
   cursor_json TEXT,
   warnings_count INTEGER NOT NULL DEFAULT 0,
   last_warning_json TEXT,
+  errors_count INTEGER NOT NULL DEFAULT 0,
+  last_error_json TEXT,
   updated_at INTEGER NOT NULL
 );
 

@@ -83,3 +83,23 @@ test('source JSON represents absent warning and error diagnostics explicitly', (
     },
   ])
 })
+
+test('compact source output normalizes whitespace in warning refs', () => {
+  expect(
+    formatSources(
+      [
+        {
+          ...source,
+          last_warning: {
+            code: 'degraded',
+            message: 'partial response',
+            ref: 'ctx://source-1/records/with whitespace',
+          },
+        },
+      ],
+      { json: false, format: 'compact' },
+    ),
+  ).toContain(
+    'warning=degraded:partial_response:ref=ctx://source-1/records/with_whitespace',
+  )
+})

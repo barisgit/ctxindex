@@ -241,8 +241,8 @@ function sourceListSelect(): string {
                  sr.completed_at AS last_run_at,
                  COALESCE(sss.warnings_count, 0) AS warnings_count,
                  sss.last_warning_json,
-                 COALESCE(sr.errors_count, 0) AS errors_count,
-                 sr.error_summary AS last_error_json,
+                 COALESCE(sss.errors_count, 0) AS errors_count,
+                 sss.last_error_json,
                  (SELECT COUNT(*) FROM resources resource WHERE resource.source_id = s.id AND resource.deleted_at IS NULL) AS items_count,
                  (SELECT COUNT(*)
                     FROM chunks c
@@ -448,9 +448,9 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
                sr.completed_at AS lastRunAt,
                sss.warnings_count AS warningsCount,
                sss.last_warning_json AS lastWarningJson,
-               sr.errors_count AS errorsCount,
+               sss.errors_count AS errorsCount,
                sss.cursor_json AS cursorJson,
-               sr.error_summary AS errorJson
+               sss.last_error_json AS errorJson
         FROM sources s
         JOIN realms r ON r.id = s.realm_id
         LEFT JOIN source_sync_state sss ON sss.source_id = s.id
