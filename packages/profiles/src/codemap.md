@@ -6,10 +6,10 @@ Provides ctxindex's bundled, provider-neutral Profile definitions and their publ
 
 ## Design / patterns
 
-- Schema-first definitions: `calendarEventSchema`, `communicationMessageSchema`, Draft input schemas, and `fileSchema` use strict Zod objects before being attached to `defineProfile` definitions.
+- Schema-first definitions: `calendarEventSchema`, `communicationMessageSchema`, strict standalone/reply Draft input unions, and `fileSchema` use Zod before being attached to `defineProfile` definitions.
 - `calendarEventProfile` normalizes timed and all-day events, participants, recurrence/series metadata, credential-free provider URLs, source-scoped canonical Refs, summary/chunk/field projections, and series relations; its `events` alias is registry-visible.
 - Declarative projections: each Profile supplies search title/time/chunk/field extractors; `communicationMessageProfile` additionally declares relation resolvers, attachment descriptors, reversible Draft Actions, and an EML export renderer.
-- Pure helpers: `chunkText` performs overlapping, boundary-aware text chunking; `isNormalizedRelativeFilePath` owns the file Profile's path invariant; `renderEml` and `sanitizeHeader` produce normalized RFC822-style text without external state.
+- Pure helpers: reply helpers derive recipient, subject, and RFC References from portable messages; `chunkText` performs overlapping, boundary-aware text chunking; `isNormalizedRelativeFilePath` owns the file Profile's path invariant; `renderEml` and `sanitizeHeader` produce normalized RFC822-style text without external state.
 - Facade exports: `packages/profiles/src/index.ts` re-exports the public definitions, schemas, `chunkText`, and `FileChunk` while package subpath exports permit direct Profile imports.
 
 ## Data & control flow

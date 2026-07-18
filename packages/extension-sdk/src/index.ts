@@ -19,6 +19,7 @@ export {
 
 export type {
   ActionContext,
+  ActionResource,
   AdapterLogger,
   AdapterSourceContext,
   DownloadContext,

@@ -39,6 +39,38 @@ export function normalizeGmailMessageId(
   return trimmed.match(/<[^<>]+>/)?.[0] ?? trimmed
 }
 
+export function normalizeGmailReferences(
+  value: string | undefined,
+): string[] | undefined {
+  if (!value?.trim()) return undefined
+  const ids = value.match(/<[^<>]+>/g) ?? value.trim().split(/\s+/)
+  return ids.length > 0 ? [...new Set(ids)] : undefined
+}
+
+export function gmailHeaderAddresses(
+  value: string | undefined,
+): string[] | undefined {
+  if (!value?.trim()) return undefined
+  const values: string[] = []
+  let start = 0
+  let quoted = false
+  let angleDepth = 0
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index]
+    if (character === '"' && value[index - 1] !== '\\') quoted = !quoted
+    if (!quoted && character === '<') angleDepth += 1
+    if (!quoted && character === '>') angleDepth = Math.max(0, angleDepth - 1)
+    if (!quoted && angleDepth === 0 && character === ',') {
+      const candidate = value.slice(start, index).trim()
+      if (candidate) values.push(candidate)
+      start = index + 1
+    }
+  }
+  const candidate = value.slice(start).trim()
+  if (candidate) values.push(candidate)
+  return values.length > 0 ? values : undefined
+}
+
 export function gmailOccurredAt(message: GmailMessage): number | undefined {
   const internalDate = Number(message.internalDate)
   if (Number.isFinite(internalDate) && internalDate >= 0) return internalDate

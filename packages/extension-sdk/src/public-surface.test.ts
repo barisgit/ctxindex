@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import type {
   ActionContext,
+  ActionResource,
   AdapterActionBinding,
   AdapterAuthSpec,
   AdapterCapability,
@@ -46,6 +47,7 @@ import * as runtimeSdk from './index'
 
 type PublicTypeSurface = {
   actionContext: ActionContext
+  actionResource: ActionResource
   adapterActionBinding: AdapterActionBinding
   adapterAuthSpec: AdapterAuthSpec
   adapterCapability: AdapterCapability
@@ -93,6 +95,7 @@ void publicTypeSurfaceCompiles
 
 const publicSymbolNames = [
   'ActionContext',
+  'ActionResource',
   'AdapterActionBinding',
   'AdapterAuthSpec',
   'AdapterCapability',

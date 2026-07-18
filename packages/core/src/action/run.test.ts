@@ -440,6 +440,40 @@ describe('runAction', () => {
     })
   })
 
+  test('provides a Source-scoped local Resource resolver before provider I/O', async () => {
+    const db = await freshDb()
+    const registry = registryWith((context) => {
+      expect(
+        context.resolveResource(`ctx://${sourceId}/message/parent`),
+      ).toMatchObject({
+        ref: `ctx://${sourceId}/message/parent`,
+        sourceId,
+        profile: { id: 'fake.message', version: 1 },
+        completeness: 'complete',
+        deletedAt: null,
+        payload: { subject: 'Parent', provider: 'fake' },
+      })
+      expect(
+        context.resolveResource(`ctx://${sourceId}/message/missing`),
+      ).toBeNull()
+      expect(() =>
+        context.resolveResource(`ctx://${otherSourceId}/message/parent`),
+      ).toThrow(/does not belong to Source/)
+      return result()
+    })
+    const store = new ResourceStore(db, registry.profiles)
+    store.upsert({
+      ref: `ctx://${sourceId}/message/parent`,
+      sourceId,
+      profile: { id: 'fake.message', version: 1 },
+      origin: 'synced',
+      completeness: 'complete',
+      payload: { subject: 'Parent', provider: 'fake' },
+    })
+
+    await runAction(input(db, registry))
+  })
+
   test.each([
     [
       'wrong output Profile',

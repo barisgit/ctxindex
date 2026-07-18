@@ -176,12 +176,30 @@ describe('Gmail searchRemote', () => {
       {
         format: 'metadata',
         fields: expect.stringContaining('payload/headers'),
-        headers: ['Subject', 'From', 'To', 'Date', 'Message-ID', 'In-Reply-To'],
+        headers: [
+          'Subject',
+          'From',
+          'To',
+          'Date',
+          'Message-ID',
+          'In-Reply-To',
+          'References',
+          'Reply-To',
+        ],
       },
       {
         format: 'metadata',
         fields: expect.stringContaining('payload/headers'),
-        headers: ['Subject', 'From', 'To', 'Date', 'Message-ID', 'In-Reply-To'],
+        headers: [
+          'Subject',
+          'From',
+          'To',
+          'Date',
+          'Message-ID',
+          'In-Reply-To',
+          'References',
+          'Reply-To',
+        ],
       },
     ])
     expect(result).toEqual({

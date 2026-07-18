@@ -5,6 +5,9 @@ import {
   communicationMessageDraftCreateInputSchema,
   communicationMessageDraftUpdateInputSchema,
   communicationMessageProfile,
+  deriveCommunicationMessageReplyRecipient,
+  deriveCommunicationMessageReplyReferences,
+  deriveCommunicationMessageReplySubject,
 } from './index'
 
 type Equal<TLeft, TRight> =
@@ -25,6 +28,9 @@ type _PayloadIsInferred = Assert<
       conversationKey?: string | undefined
       rfcMessageId?: string | undefined
       inReplyTo?: string | undefined
+      references?: string[] | undefined
+      replyTo?: string[] | undefined
+      replyToRef?: string | undefined
       subject?: string | undefined
       from?: string[] | undefined
       to?: string[] | undefined
@@ -55,6 +61,8 @@ describe('communication.message Profile v1', () => {
       conversationKey: 'SOURCE-1:gmail-thread-1',
       rfcMessageId: '<message@example.com>',
       inReplyTo: '<parent@example.com>',
+      references: ['<root@example.com>', '<parent@example.com>'],
+      replyTo: ['reply@example.com'],
       subject: 'Project update',
       from: ['sender@example.com'],
       to: ['recipient@example.com'],
@@ -93,6 +101,11 @@ describe('communication.message Profile v1', () => {
           to: ['recipient@example.com'],
           subject: 'Project update',
           bodyText: 'The project is on track.',
+        },
+        {
+          replyToRef:
+            'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/stable-message-id',
+          bodyText: 'Thanks for the update.',
         },
       ],
     })
@@ -161,6 +174,12 @@ describe('communication.message Profile v1', () => {
           subject: 'Updated project status',
           bodyText: 'The project is ready for review.',
         },
+        {
+          ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/stable-draft-id',
+          replyToRef:
+            'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/stable-message-id',
+          bodyText: 'Updated reply text.',
+        },
       ],
     })
     expect(
@@ -213,6 +232,90 @@ describe('communication.message Profile v1', () => {
         communicationMessageDraftUpdateInputSchema.safeParse(input).success,
       ).toBe(false)
     }
+  })
+
+  test('accepts only strict reply Draft branches and preserves standalone branches', () => {
+    expect(
+      communicationMessageDraftCreateInputSchema.parse({
+        replyToRef: 'ctx://SOURCE/message/parent',
+        bodyText: 'Reply body',
+      }),
+    ).toEqual({
+      replyToRef: 'ctx://SOURCE/message/parent',
+      bodyText: 'Reply body',
+    })
+    expect(
+      communicationMessageDraftUpdateInputSchema.parse({
+        ref: 'ctx://SOURCE/draft/one',
+        replyToRef: 'ctx://SOURCE/message/parent',
+        bodyText: 'Replacement reply body',
+      }),
+    ).toEqual({
+      ref: 'ctx://SOURCE/draft/one',
+      replyToRef: 'ctx://SOURCE/message/parent',
+      bodyText: 'Replacement reply body',
+    })
+    for (const input of [
+      {
+        replyToRef: 'ctx://SOURCE/message/parent',
+        bodyText: '',
+        to: ['override@example.com'],
+      },
+      {
+        replyToRef: 'ctx://SOURCE/message/parent',
+        bodyText: '',
+        subject: 'Override',
+      },
+      {
+        replyToRef: 'ctx://SOURCE/message/parent',
+        bodyText: '',
+        cc: ['override@example.com'],
+      },
+      {
+        replyToRef: 'ctx://SOURCE/message/parent',
+        bodyText: '',
+        bcc: ['override@example.com'],
+      },
+      {
+        replyToRef: 'ctx://SOURCE/message/parent',
+        bodyText: '',
+        providerMessageId: 'forbidden',
+      },
+    ]) {
+      expect(
+        communicationMessageDraftCreateInputSchema.safeParse(input).success,
+      ).toBe(false)
+    }
+  })
+
+  test('derives portable reply recipient, subject, and references deterministically', () => {
+    expect(
+      deriveCommunicationMessageReplyRecipient({
+        providerMessageId: 'parent',
+        replyTo: ['reply@example.com', 'second@example.com'],
+        from: ['from@example.com'],
+      }),
+    ).toBe('reply@example.com')
+    expect(
+      deriveCommunicationMessageReplyRecipient({
+        providerMessageId: 'parent',
+        from: ['from@example.com'],
+      }),
+    ).toBe('from@example.com')
+    expect(
+      deriveCommunicationMessageReplyRecipient({ providerMessageId: 'parent' }),
+    ).toBeUndefined()
+    expect(deriveCommunicationMessageReplySubject('Re: RE:  Project')).toBe(
+      'Re: Project',
+    )
+    expect(deriveCommunicationMessageReplySubject('')).toBe('Re:')
+    expect(deriveCommunicationMessageReplySubject(undefined)).toBe('Re:')
+    expect(
+      deriveCommunicationMessageReplyReferences(
+        ['<root@example.com>', '<parent@example.com>'],
+        '<parent@example.com>',
+      ),
+    ).toEqual(['<root@example.com>', '<parent@example.com>'])
   })
 
   test('extracts title, occurrence date, chunks, and typed fields purely', () => {

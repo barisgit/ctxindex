@@ -111,9 +111,21 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
     mock.resetRequests()
     mock.resetDraftState()
 
-    for (const [actionId, required] of [
-      [createActionId, ['to', 'subject', 'bodyText']],
-      [updateActionId, ['ref', 'to', 'subject', 'bodyText']],
+    for (const [actionId, requiredBranches] of [
+      [
+        createActionId,
+        [
+          ['to', 'subject', 'bodyText'],
+          ['replyToRef', 'bodyText'],
+        ],
+      ],
+      [
+        updateActionId,
+        [
+          ['ref', 'to', 'subject', 'bodyText'],
+          ['ref', 'replyToRef', 'bodyText'],
+        ],
+      ],
     ] as const) {
       const described = await sandbox.run(
         ['action', 'describe', actionId, '--source', sourceLabel, '--json'],
@@ -127,14 +139,16 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
         profile: description.profile,
         effect: description.effect,
         output: description.output,
-        required: description.input.required,
+        requiredBranches: description.input.anyOf?.map(
+          (branch: { required?: string[] }) => branch.required,
+        ),
         sources: description.sources,
       }).toEqual({
         id: actionId,
         profile: { id: 'communication.message', version: 1 },
         effect: 'reversible',
         output: { id: 'communication.message', version: 1 },
-        required,
+        requiredBranches,
         sources: [
           {
             id: sourceId,
@@ -338,6 +352,52 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
       warnings: [],
     })
     expect(mock.readRecordedRequests()).toEqual([])
+
+    const parentRef = `ctx://${sourceId}/message/msg-1`
+    const completeParent = await sandbox.run(['get', parentRef, '--json'], {
+      env,
+    })
+    expect(completeParent.exitCode, completeParent.stderr).toBe(0)
+    mock.resetRequests()
+    mock.resetDraftState()
+    const replyCreated = await sandbox.run(
+      [
+        'action',
+        'run',
+        createActionId,
+        '--source',
+        sourceLabel,
+        '--input',
+        JSON.stringify({ replyToRef: parentRef, bodyText: 'Reply body' }),
+        '--json',
+      ],
+      { env },
+    )
+    expect(replyCreated.exitCode, replyCreated.stderr).toBe(0)
+    expect(JSON.parse(replyCreated.stdout)).toMatchObject({
+      resource: {
+        ref,
+        title: 'Re: ctxindex mock hello',
+        payload: {
+          to: ['sender@example.test'],
+          subject: 'Re: ctxindex mock hello',
+          inReplyTo: '<msg-1@example.test>',
+          references: ['<msg-1@example.test>'],
+          replyToRef: parentRef,
+          threadId: 'thread-1',
+        },
+      },
+    })
+    const replyRequest = mock.readRecordedRequests()
+    expect(replyRequest).toHaveLength(1)
+    expect(JSON.parse(replyRequest[0]?.body ?? '{}').message.threadId).toBe(
+      'thread-1',
+    )
+    expect(decodeRaw(replyRequest[0]?.body ?? '')).toContain(
+      'In-Reply-To: <msg-1@example.test>\r\nReferences: <msg-1@example.test>',
+    )
+
+    mock.resetRequests()
 
     const unknown = await sandbox.run(
       [

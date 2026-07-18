@@ -99,7 +99,7 @@ test('mocked Gmail remote search and cached get use stable canonical Refs', asyn
         method: 'GET',
         pathname: '/gmail/v1/users/me/messages/msg-1',
         search:
-          '?format=metadata&fields=id%2CthreadId%2ClabelIds%2Csnippet%2CinternalDate%2Cpayload%2Fheaders&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Date&metadataHeaders=Message-ID&metadataHeaders=In-Reply-To',
+          '?format=metadata&fields=id%2CthreadId%2ClabelIds%2Csnippet%2CinternalDate%2Cpayload%2Fheaders&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Date&metadataHeaders=Message-ID&metadataHeaders=In-Reply-To&metadataHeaders=References&metadataHeaders=Reply-To',
       },
     ])
 

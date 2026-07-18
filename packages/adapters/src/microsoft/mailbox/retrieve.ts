@@ -118,7 +118,7 @@ export async function microsoftMailboxRetrieve(
   const url = new URL(graphUrl(`/me/messages/${encodeURIComponent(messageId)}`))
   url.searchParams.set(
     '$select',
-    'id,conversationId,internetMessageId,internetMessageHeaders,subject,bodyPreview,body,from,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,lastModifiedDateTime,isRead,isDraft,categories,hasAttachments',
+    'id,conversationId,internetMessageId,internetMessageHeaders,subject,bodyPreview,body,from,replyTo,toRecipients,ccRecipients,bccRecipients,receivedDateTime,sentDateTime,lastModifiedDateTime,isRead,isDraft,categories,hasAttachments',
   )
   const message = parseGraphMessage(
     await graphJson(

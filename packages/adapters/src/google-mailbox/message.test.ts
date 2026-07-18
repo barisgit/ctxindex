@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import { normalizeGmailMessageId } from './message'
+import {
+  gmailHeaderAddresses,
+  normalizeGmailMessageId,
+  normalizeGmailReferences,
+} from './message'
 
 describe('normalizeGmailMessageId', () => {
   test('trims and prefers the first angle-bracket Message-ID token', () => {
@@ -17,4 +21,17 @@ describe('normalizeGmailMessageId', () => {
     expect(normalizeGmailMessageId('  ')).toBeUndefined()
     expect(normalizeGmailMessageId(undefined)).toBeUndefined()
   })
+})
+
+test('normalizes ordered Reply-To addresses and RFC References', () => {
+  expect(
+    gmailHeaderAddresses(
+      '"Reply, Person" <reply@example.com>, second@example.com',
+    ),
+  ).toEqual(['"Reply, Person" <reply@example.com>', 'second@example.com'])
+  expect(
+    normalizeGmailReferences(
+      '<root@example.com> <parent@example.com> <parent@example.com>',
+    ),
+  ).toEqual(['<root@example.com>', '<parent@example.com>'])
 })

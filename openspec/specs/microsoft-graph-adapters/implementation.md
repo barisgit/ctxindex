@@ -121,7 +121,7 @@ export async function microsoftMailboxDownload(
 
 The Microsoft modules in `@ctxindex/adapters` own declarative OAuth metadata, shared Graph transport, provider DTOs, normalization, and operations. Core sees generic Resources, warnings, checkpoints, Artifacts, and Action results.
 
-Calendar requests use immutable-id/UTC preferences. The default collection can retain a final delta link; named calendars use complete scans plus manifests. Mailbox search/retrieve/download and Drafts use the shared transport. Draft mutations request immutable ids, normalize one response, and are never automatically retried.
+Calendar requests use immutable-id/UTC preferences. The default collection can retain a final delta link; named calendars use complete scans plus manifests. Mailbox search/retrieve/download and Drafts use the shared transport. Standalone Drafts use generic message create/update. Reply Draft creation uses one MIME `createReply` mutation against the locally resolved parent; reply update proves the stored parent Ref locally before one PATCH and performs no Graph read. Reply responses must normalize to the validated recipient, subject, body, and conversation before local fields are completed. Draft mutations request immutable ids, normalize one response, and are never automatically retried.
 
 ## Verification
 

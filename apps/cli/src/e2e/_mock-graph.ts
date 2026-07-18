@@ -35,6 +35,11 @@ export interface MockGraphMessage {
   readonly conversationId: string
   readonly internetMessageId: string
   readonly inReplyTo?: string
+  readonly references?: readonly string[]
+  readonly replyTo?: readonly {
+    readonly name?: string
+    readonly address: string
+  }[]
   readonly subject: string
   readonly bodyPreview: string
   readonly body: string
@@ -132,9 +137,14 @@ function graphMessage(message: MockGraphMessage) {
     id: message.id,
     conversationId: message.conversationId,
     internetMessageId: message.internetMessageId,
-    internetMessageHeaders: message.inReplyTo
-      ? [{ name: 'In-Reply-To', value: message.inReplyTo }]
-      : [],
+    internetMessageHeaders: [
+      ...(message.inReplyTo
+        ? [{ name: 'In-Reply-To', value: message.inReplyTo }]
+        : []),
+      ...(message.references
+        ? [{ name: 'References', value: message.references.join(' ') }]
+        : []),
+    ],
     subject: message.subject,
     bodyPreview: message.bodyPreview,
     body: { contentType: 'text', content: message.body },
@@ -144,6 +154,12 @@ function graphMessage(message: MockGraphMessage) {
         address: message.from.address,
       },
     },
+    replyTo: (message.replyTo ?? []).map((recipient) => ({
+      emailAddress: {
+        ...(recipient.name ? { name: recipient.name } : {}),
+        address: recipient.address,
+      },
+    })),
     toRecipients: message.to.map((recipient) => ({
       emailAddress: {
         ...(recipient.name ? { name: recipient.name } : {}),
@@ -536,6 +552,63 @@ export function startMockGraph(
         return event
           ? Response.json(event)
           : Response.json({ error: 'not_found' }, { status: 404 })
+      }
+
+      const createReply = url.pathname.match(
+        /^\/v1\.0\/me\/messages\/([^/]+)\/createReply$/,
+      )
+      if (createReply?.[1] && request.method === 'POST') {
+        const parent = messages.find(
+          (candidate) =>
+            candidate.id === decodeURIComponent(createReply[1] ?? ''),
+        )
+        if (!parent || request.headers.get('content-type') !== 'text/plain')
+          return Response.json({ error: 'invalid_reply' }, { status: 400 })
+        const mime = Buffer.from(body, 'base64').toString('utf8')
+        const [headerText = '', ...bodyParts] = mime.split('\r\n\r\n')
+        const headers = new Map(
+          headerText.split('\r\n').map((line) => {
+            const separator = line.indexOf(':')
+            return [line.slice(0, separator), line.slice(separator + 1).trim()]
+          }),
+        )
+        const to = headers.get('To')
+        const subject = headers.get('Subject')
+        if (!to || !subject)
+          return Response.json({ error: 'invalid_reply' }, { status: 400 })
+        const named = /^(.*?)\s*<([^<>]+)>$/.exec(to)
+        draftSequence += 1
+        const created: MockGraphMessage = {
+          id: `outlook-draft-${draftSequence}`,
+          conversationId: parent.conversationId,
+          internetMessageId: `<outlook-draft-${draftSequence}@example.test>`,
+          ...(headers.get('In-Reply-To')
+            ? { inReplyTo: headers.get('In-Reply-To') as string }
+            : {}),
+          ...(headers.get('References')
+            ? {
+                references: (headers.get('References') as string).split(/\s+/),
+              }
+            : {}),
+          subject,
+          bodyPreview: bodyParts.join('\r\n\r\n'),
+          body: bodyParts.join('\r\n\r\n'),
+          from: { address: 'work@example.test' },
+          to: [
+            named?.[2]
+              ? {
+                  ...(named[1]?.trim() ? { name: named[1].trim() } : {}),
+                  address: named[2],
+                }
+              : { address: to },
+          ],
+          receivedDateTime: '2026-07-18T12:00:00.000Z',
+          lastModifiedDateTime: '2026-07-18T12:00:00.000Z',
+          isRead: true,
+          isDraft: true,
+        }
+        messages.push(created)
+        return Response.json(graphMessage(created), { status: 201 })
       }
 
       if (url.pathname === '/v1.0/me/messages' && request.method === 'POST') {

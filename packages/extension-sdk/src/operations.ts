@@ -112,7 +112,17 @@ export interface DownloadContext extends ProviderContext {
   readonly write: (chunk: Uint8Array) => void | Promise<void>
 }
 
+export interface ActionResource {
+  readonly ref: string
+  readonly sourceId: string
+  readonly profile: ProfileReference
+  readonly completeness: 'partial' | 'complete'
+  readonly deletedAt: number | null
+  readonly payload: unknown | null
+}
+
 export interface ActionContext<TInput = unknown> extends ProviderContext {
   readonly input: TInput
   readonly signal: AbortSignal
+  readonly resolveResource: (ref: string) => ActionResource | null
 }

@@ -14,11 +14,10 @@ function markdownCell(value: string): string {
   return value.replaceAll('|', '\\|').replaceAll('\n', ' ')
 }
 
-function formatInputMarkdown(input: object): string[] {
-  const schema = record(input)
+function formatObjectInputMarkdown(schema: Record<string, unknown>): string[] {
   const properties = schema ? record(schema.properties) : undefined
-  if (!schema || schema.type !== 'object' || !properties)
-    return ['```json', prettyJson(input), '```']
+  if (schema.type !== 'object' || !properties)
+    return ['```json', prettyJson(schema), '```']
   const required = new Set(
     Array.isArray(schema.required)
       ? schema.required.filter(
@@ -61,6 +60,28 @@ function formatInputMarkdown(input: object): string[] {
   if (remainder)
     lines.push('', `Unrendered schema fragment: \`${json(remainder)}\``)
   return lines
+}
+
+function formatInputMarkdown(input: object): string[] {
+  const schema = record(input)
+  if (!schema) return ['```json', prettyJson(input), '```']
+  const alternatives = Array.isArray(schema.oneOf)
+    ? schema.oneOf
+    : Array.isArray(schema.anyOf)
+      ? schema.anyOf
+      : undefined
+  if (!alternatives) return formatObjectInputMarkdown(schema)
+  return alternatives.flatMap((value, index) => {
+    const alternative = record(value)
+    return [
+      `##### Branch ${index + 1}`,
+      '',
+      ...(alternative
+        ? formatObjectInputMarkdown(alternative)
+        : ['```json', prettyJson(value), '```']),
+      '',
+    ]
+  })
 }
 
 function markdownStringValues(value: unknown): string[] {

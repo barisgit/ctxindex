@@ -56,7 +56,16 @@ test('bundled communication.message enters the public registry path', () => {
         id: 'communication.message.draft.create',
         profile: { id: 'communication.message', version: 1 },
         effect: 'reversible',
-        input: expect.any(Object),
+        input: expect.objectContaining({
+          anyOf: expect.arrayContaining([
+            expect.objectContaining({
+              required: ['to', 'subject', 'bodyText'],
+            }),
+            expect.objectContaining({
+              required: ['replyToRef', 'bodyText'],
+            }),
+          ]),
+        }),
         output: { id: 'communication.message', version: 1 },
         docs: 'Create a Draft in the selected mailbox Source.',
         examples: [
@@ -65,6 +74,11 @@ test('bundled communication.message enters the public registry path', () => {
             subject: 'Project update',
             bodyText: 'The project is on track.',
           },
+          {
+            replyToRef:
+              'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/stable-message-id',
+            bodyText: 'Thanks for the update.',
+          },
         ],
         adapters: [],
       },
@@ -72,7 +86,16 @@ test('bundled communication.message enters the public registry path', () => {
         id: 'communication.message.draft.update',
         profile: { id: 'communication.message', version: 1 },
         effect: 'reversible',
-        input: expect.any(Object),
+        input: expect.objectContaining({
+          anyOf: expect.arrayContaining([
+            expect.objectContaining({
+              required: ['ref', 'to', 'subject', 'bodyText'],
+            }),
+            expect.objectContaining({
+              required: ['ref', 'replyToRef', 'bodyText'],
+            }),
+          ]),
+        }),
         output: { id: 'communication.message', version: 1 },
         docs: 'Replace the complete content of the addressed Draft in the selected mailbox Source.',
         examples: [
@@ -81,6 +104,12 @@ test('bundled communication.message enters the public registry path', () => {
             to: ['recipient@example.com'],
             subject: 'Updated project status',
             bodyText: 'The project is ready for review.',
+          },
+          {
+            ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/stable-draft-id',
+            replyToRef:
+              'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/stable-message-id',
+            bodyText: 'Updated reply text.',
           },
         ],
         adapters: [],

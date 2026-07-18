@@ -265,11 +265,15 @@ defineAdapter({
         const signal: AbortSignal = context.signal
         const fetch: typeof globalThis.fetch = context.fetch
         const logger = context.logger
+        const resolved = context.resolveResource(
+          'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/note/1',
+        )
         void sourceId
         void inputTitle
         void signal
         void fetch
         void logger
+        void resolved
         return actionResult
       },
     },

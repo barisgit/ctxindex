@@ -10,14 +10,15 @@ import {
   unrenderedSchema,
 } from './registry-schema'
 
-function formatInputText(input: object): string[] {
-  const schema = record(input)
-  if (!schema) return [`    schema: ${json(input)}`]
+function formatObjectInputText(
+  schema: Record<string, unknown>,
+  indent = '    ',
+): string[] {
   const properties = record(schema.properties)
   if (schema.type !== 'object' || !properties)
     return [
-      `    <${schemaType(schema)}>`,
-      ...schemaConstraints(schema).map((part) => `      ${part}`),
+      `${indent}<${schemaType(schema)}>`,
+      ...schemaConstraints(schema).map((part) => `${indent}  ${part}`),
     ]
   const required = new Set(
     Array.isArray(schema.required)
@@ -27,40 +28,63 @@ function formatInputText(input: object): string[] {
       : [],
   )
   const lines: string[] = []
-  if (typeof schema.title === 'string') lines.push(`    title: ${schema.title}`)
+  if (typeof schema.title === 'string')
+    lines.push(`${indent}title: ${schema.title}`)
   if (typeof schema.description === 'string')
-    lines.push(`    ${schema.description}`)
+    lines.push(`${indent}${schema.description}`)
   for (const [name, value] of Object.entries(properties)) {
     const property = record(value)
     if (!property) {
       lines.push(
-        `    ${name} <unknown>${required.has(name) ? ' required' : ''}`,
-        `      schema fragment: ${json(value)}`,
+        `${indent}${name} <unknown>${required.has(name) ? ' required' : ''}`,
+        `${indent}  schema fragment: ${json(value)}`,
       )
       continue
     }
     lines.push(
-      `    ${name} <${schemaType(property)}>${required.has(name) ? ' required' : ''}`,
+      `${indent}${name} <${schemaType(property)}>${required.has(name) ? ' required' : ''}`,
     )
-    lines.push(...schemaConstraints(property).map((part) => `      ${part}`))
+    lines.push(
+      ...schemaConstraints(property).map((part) => `${indent}  ${part}`),
+    )
     const remainder = unrenderedSchema(property)
-    if (remainder) lines.push(`      schema fragment: ${json(remainder)}`)
+    if (remainder) lines.push(`${indent}  schema fragment: ${json(remainder)}`)
   }
   if (schema.additionalProperties === false)
-    lines.push('    additional properties: not allowed')
+    lines.push(`${indent}additional properties: not allowed`)
   else if (schema.additionalProperties === true)
-    lines.push('    additional properties: allowed')
+    lines.push(`${indent}additional properties: allowed`)
   else if (record(schema.additionalProperties))
     lines.push(
-      `    additional properties: <${schemaType(record(schema.additionalProperties) as Record<string, unknown>)}>`,
+      `${indent}additional properties: <${schemaType(record(schema.additionalProperties) as Record<string, unknown>)}>`,
     )
   const remainder = unrenderedSchema(schema, [
     'properties',
     'required',
     'additionalProperties',
   ])
-  if (remainder) lines.push(`    schema fragment: ${json(remainder)}`)
+  if (remainder) lines.push(`${indent}schema fragment: ${json(remainder)}`)
   return lines
+}
+
+function formatInputText(input: object): string[] {
+  const schema = record(input)
+  if (!schema) return [`    schema: ${json(input)}`]
+  const alternatives = Array.isArray(schema.oneOf)
+    ? schema.oneOf
+    : Array.isArray(schema.anyOf)
+      ? schema.anyOf
+      : undefined
+  if (!alternatives) return formatObjectInputText(schema)
+  return alternatives.flatMap((value, index) => {
+    const alternative = record(value)
+    return alternative
+      ? [
+          `    branch ${index + 1}:`,
+          ...formatObjectInputText(alternative, '      '),
+        ]
+      : [`    branch ${index + 1}: schema ${json(value)}`]
+  })
 }
 
 function stringValues(value: unknown): string[] {

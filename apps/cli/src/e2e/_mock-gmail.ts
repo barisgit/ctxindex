@@ -25,6 +25,8 @@ export interface MockGmailMessage {
   readonly historyId: string
   readonly messageId?: string
   readonly inReplyTo?: string
+  readonly references?: readonly string[]
+  readonly replyTo?: readonly string[]
   readonly date?: string
   readonly attachmentText?: string
 }
@@ -112,6 +114,17 @@ function draftRaw(body: string): string | undefined {
   }
 }
 
+function draftThreadId(body: string): string | undefined {
+  try {
+    const parsed = JSON.parse(body) as { message?: { threadId?: unknown } }
+    return typeof parsed.message?.threadId === 'string'
+      ? parsed.message.threadId
+      : undefined
+  } catch {
+    return undefined
+  }
+}
+
 function fullMessage(message: MockGmailMessage): Record<string, unknown> {
   const headers = [
     { name: 'Subject', value: message.subject },
@@ -123,6 +136,12 @@ function fullMessage(message: MockGmailMessage): Record<string, unknown> {
     },
     ...(message.inReplyTo
       ? [{ name: 'In-Reply-To', value: message.inReplyTo }]
+      : []),
+    ...(message.references
+      ? [{ name: 'References', value: message.references.join(' ') }]
+      : []),
+    ...(message.replyTo
+      ? [{ name: 'Reply-To', value: message.replyTo.join(', ') }]
       : []),
     ...(message.date ? [{ name: 'Date', value: message.date }] : []),
   ]
@@ -177,6 +196,7 @@ export function startMockGmail(
   let authCodeMode: MockTokenMode = 'ok'
   let draftRawState: string | undefined
   let draftMessageVersion = 0
+  let draftThreadState = 'draft-thread-1'
   const accessToken = options.accessToken ?? defaultAccessToken
   const refreshToken = options.refreshToken ?? defaultRefreshToken
   const identitySubject = options.identitySubject ?? 'mock-google-subject'
@@ -287,12 +307,13 @@ export function startMockGmail(
           return json({ error: 'invalid_request' }, { status: 400 })
         }
         draftRawState = raw
+        draftThreadState = draftThreadId(body) ?? 'draft-thread-1'
         draftMessageVersion = 1
         return json({
           id: 'draft-1',
           message: {
             id: 'draft-message-1',
-            threadId: 'draft-thread-1',
+            threadId: draftThreadState,
             labelIds: ['DRAFT'],
           },
         })
@@ -310,12 +331,13 @@ export function startMockGmail(
           return json({ error: 'invalid_request' }, { status: 400 })
         }
         draftRawState = raw
+        draftThreadState = draftThreadId(body) ?? draftThreadState
         draftMessageVersion += 1
         return json({
           id: 'draft-1',
           message: {
             id: `draft-message-${draftMessageVersion}`,
-            threadId: 'draft-thread-1',
+            threadId: draftThreadState,
             labelIds: ['DRAFT'],
           },
         })
@@ -368,6 +390,7 @@ export function startMockGmail(
     resetDraftState() {
       draftRawState = undefined
       draftMessageVersion = 0
+      draftThreadState = 'draft-thread-1'
     },
     setRefreshMode(mode) {
       refreshMode = mode
