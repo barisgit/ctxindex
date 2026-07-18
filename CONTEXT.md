@@ -67,7 +67,7 @@ _Avoid_: Permission, Action
 ### Context records
 
 **Resource**:
-One addressable unit of context, represented by a common envelope and a payload conforming to one primary Profile.
+One addressable unit of context, represented by a common envelope that names one primary Profile and may carry a payload conforming to that Profile.
 _Avoid_: Item, raw object, provider record
 
 **Ref**:
