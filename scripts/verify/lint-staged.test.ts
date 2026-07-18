@@ -7,6 +7,7 @@ import {
   rm,
   writeFile,
 } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -18,6 +19,8 @@ const lintStagedPath = join(
 )
 const configPath = join(repoRoot, '.lintstagedrc.cjs')
 const tempDirs: string[] = []
+
+type LintStagedTask = string | Array<string | (() => string)>
 
 afterEach(async () => {
   await Promise.all(
@@ -44,6 +47,56 @@ async function run(command: string[], cwd: string): Promise<void> {
     )
   }
 }
+
+test('every configured Biome extension is processed by Biome', async () => {
+  const config = createRequire(import.meta.url)(configPath) as Record<
+    string,
+    LintStagedTask
+  >
+  const extensions = Object.entries(config).flatMap(([pattern, task]) => {
+    const commands = Array.isArray(task) ? task : [task]
+    if (!commands.some((command) => `${command}`.startsWith('biome '))) {
+      return []
+    }
+
+    return pattern.match(/\{([^}]+)\}/)?.[1]?.split(',') ?? []
+  })
+  const contents: Record<string, string> = {
+    css: 'a { color: red; }\n',
+    json: '{}\n',
+    jsonc: '{}\n',
+  }
+  const root = await mkdtemp(join(tmpdir(), 'ctxindex-biome-extensions-'))
+  tempDirs.push(root)
+  const paths = await Promise.all(
+    extensions.map(async (extension) => {
+      const path = join(root, `example.${extension}`)
+      await writeFile(path, contents[extension] ?? 'export const value = 1\n')
+      return path
+    }),
+  )
+
+  const proc = Bun.spawn(
+    [
+      join(repoRoot, 'node_modules/.bin/biome'),
+      'check',
+      '--verbose',
+      '--no-errors-on-unmatched',
+      ...paths,
+    ],
+    { cwd: root, stdout: 'pipe', stderr: 'pipe' },
+  )
+  const [stdout, stderr] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+    proc.exited,
+  ])
+  const output = `${stdout}${stderr}`
+
+  for (const extension of extensions) {
+    expect(output).toContain(`example.${extension}`)
+  }
+})
 
 test('staged TypeScript is formatted before typechecking', async () => {
   const root = await mkdtemp(join(tmpdir(), 'ctxindex-lint-staged-'))
