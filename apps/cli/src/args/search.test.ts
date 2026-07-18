@@ -48,6 +48,12 @@ describe('search CLI arguments', () => {
         input: { text: 'project', includeDeleted: true },
       },
     )
+    expect(parseSearchArgs(['--include-deleted', '--json'])).toEqual({
+      kind: 'search',
+      json: true,
+      refs: false,
+      input: { includeDeleted: true },
+    })
   })
 
   test('rejects fields without kind and conflicting routing overrides', () => {
@@ -82,7 +88,7 @@ describe('search CLI arguments', () => {
     expect(parseSearchArgs([])).toMatchObject({
       kind: 'unknown',
       message:
-        'search: provide <query> or at least one filter (--realm/--adapter/--source/--kind/--field/--since/--until)',
+        'search: provide <query> or at least one filter (--realm/--adapter/--source/--kind/--field/--since/--until/--include-deleted)',
     })
     expect(parseSearchArgs(['--json'])).toMatchObject({ kind: 'unknown' })
     expect(parseSearchArgs(['--realm', 'work', '--remote'])).toMatchObject({

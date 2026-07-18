@@ -183,7 +183,8 @@ export class SearchPlanner {
       input.kind !== undefined ||
       (input.fields?.length ?? 0) > 0 ||
       input.since !== undefined ||
-      input.until !== undefined
+      input.until !== undefined ||
+      input.includeDeleted === true
     if (input.text === undefined) {
       if (!hasFilter) invalid('query text or at least one filter is required')
       if (input.remote)

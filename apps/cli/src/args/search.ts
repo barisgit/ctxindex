@@ -133,12 +133,13 @@ export function parseSearchArgs(args: string[]): SearchArgs {
     kind !== undefined ||
     fields.length > 0 ||
     since.value !== undefined ||
-    until.value !== undefined
+    until.value !== undefined ||
+    flags['include-deleted'] === true
   if (!text && !hasFilter) {
     return {
       kind: 'unknown',
       message:
-        'search: provide <query> or at least one filter (--realm/--adapter/--source/--kind/--field/--since/--until)',
+        'search: provide <query> or at least one filter (--realm/--adapter/--source/--kind/--field/--since/--until/--include-deleted)',
     }
   }
   if (!text && flags.remote === true) {

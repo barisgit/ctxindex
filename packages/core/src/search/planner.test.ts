@@ -620,6 +620,11 @@ describe('SearchPlanner', () => {
       hasMore: false,
     })
 
+    const includedWithoutOtherFilters = await service.search({
+      includeDeleted: true,
+    })
+    expect(includedWithoutOtherFilters.results).toEqual(included.results)
+
     addSource(db, ids.federated, 'fake.federated')
     const remote = await service.search({
       text: 'remote',

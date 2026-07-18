@@ -123,16 +123,7 @@ test('binary CLI enumerates filter-only searches locally and paginates determini
     )
     expect(resynced.exitCode, resynced.stderr).toBe(0)
     const withDeleted = await sandbox.run(
-      [
-        'search',
-        'content',
-        '--kind',
-        'file',
-        '--source',
-        sourceId,
-        '--include-deleted',
-        '--json',
-      ],
+      ['search', '--include-deleted', '--json'],
       { env },
     )
     expect(withDeleted.exitCode, withDeleted.stderr).toBe(0)
@@ -140,15 +131,16 @@ test('binary CLI enumerates filter-only searches locally and paginates determini
       ref: string
       deletedAt?: number
     }>
-    expect(includedResults).toEqual([
+    expect(includedResults.map((result) => result.ref).sort()).toEqual(
+      ['a.txt', 'b.txt', 'c.txt', 'renamed-a.txt'].map(refOf).sort(),
+    )
+    expect(
+      includedResults.find((result) => result.ref === refOf('a.txt')),
+    ).toEqual(
       expect.objectContaining({
-        ref: refOf('a.txt'),
         deletedAt: expect.any(Number),
       }),
-      expect.objectContaining({ ref: refOf('b.txt') }),
-      expect.objectContaining({ ref: refOf('c.txt') }),
-      expect.objectContaining({ ref: refOf('renamed-a.txt') }),
-    ])
+    )
     expect(
       includedResults
         .filter((result) => result.ref !== refOf('a.txt'))
