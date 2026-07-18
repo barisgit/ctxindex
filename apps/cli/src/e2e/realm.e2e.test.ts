@@ -38,13 +38,35 @@ function parseRealmList(stdout: string): RealmRow[] {
   return JSON.parse(stdout) as RealmRow[]
 }
 
-test('realm add and list', async () => {
+test('realm add persists optional display names without changing text output', async () => {
   const sandbox = await initSandbox()
   try {
-    const add = await sandbox.run(['realm', 'add', 'foo'])
-    expect(add.exitCode).toBe(0)
-    expect(add.stderr).toBe('')
-    expect(add.stdout).toBe('realm added: foo\n')
+    const named = await sandbox.run([
+      'realm',
+      'add',
+      'personal',
+      '--name',
+      'Personal',
+    ])
+    expect(named.exitCode).toBe(0)
+    expect(named.stderr).toBe('')
+    expect(named.stdout).toBe('realm added: personal\n')
+
+    const shortHelpNamed = await sandbox.run([
+      'realm',
+      'add',
+      'short-help',
+      '--name',
+      '-h',
+    ])
+    expect(shortHelpNamed.exitCode).toBe(0)
+    expect(shortHelpNamed.stderr).toBe('')
+    expect(shortHelpNamed.stdout).toBe('realm added: short-help\n')
+
+    const unnamed = await sandbox.run(['realm', 'add', 'work'])
+    expect(unnamed.exitCode).toBe(0)
+    expect(unnamed.stderr).toBe('')
+    expect(unnamed.stdout).toBe('realm added: work\n')
 
     const list = await sandbox.run(['realm', 'list', '--json'])
     expect(list.exitCode).toBe(0)
@@ -52,8 +74,20 @@ test('realm add and list', async () => {
 
     expect(parseRealmList(list.stdout)).toEqual([
       {
-        id: 'foo',
-        slug: 'foo',
+        id: 'personal',
+        slug: 'personal',
+        label: 'Personal',
+        createdAt: expect.any(Number),
+      },
+      {
+        id: 'short-help',
+        slug: 'short-help',
+        label: '-h',
+        createdAt: expect.any(Number),
+      },
+      {
+        id: 'work',
+        slug: 'work',
         label: null,
         createdAt: expect.any(Number),
       },
@@ -62,6 +96,30 @@ test('realm add and list', async () => {
     await sandbox.cleanup()
   }
 })
+
+test('invalid realm add input exits 2 without writing', async () => {
+  const sandbox = await initSandbox()
+  try {
+    for (const args of [
+      ['realm', 'add'],
+      ['realm', 'add', 'personal', '--name'],
+      ['realm', 'add', 'personal', '--name', 'Personal', '--name', 'Other'],
+      ['realm', 'add', 'personal', 'extra'],
+      ['realm', 'add', 'personal', '--unknown'],
+      ['realm', 'list', '--unknown'],
+    ]) {
+      const result = await sandbox.run(args)
+      expect(result.exitCode).toBe(2)
+      expect(result.stderr.length).toBeGreaterThan(0)
+    }
+
+    const list = await sandbox.run(['realm', 'list', '--json'])
+    expect(list.exitCode, list.stderr).toBe(0)
+    expect(parseRealmList(list.stdout)).toEqual([])
+  } finally {
+    await sandbox.cleanup()
+  }
+}, 15_000)
 
 test('realm row present', async () => {
   const sandbox = await initSandbox()

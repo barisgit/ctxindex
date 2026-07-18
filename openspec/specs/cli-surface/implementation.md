@@ -228,7 +228,7 @@ export function parseGetArgs(args: string[]): GetArgs;
 
 ```ts
 export type RealmArgs =
-  | { readonly kind: 'add'; readonly slug: string }
+  | { readonly kind: 'add'; readonly slug: string; readonly name?: string }
   | { readonly kind: 'list'; readonly json: boolean }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
