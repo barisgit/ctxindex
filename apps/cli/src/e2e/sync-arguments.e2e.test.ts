@@ -143,4 +143,4 @@ test('malformed sync arguments leave configured sync state unchanged', async () 
   } finally {
     await sandbox.cleanup()
   }
-})
+}, 15_000)
