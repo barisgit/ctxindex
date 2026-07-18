@@ -15,6 +15,6 @@ User argv enters `apps/cli/bin/ctxindex.mjs`, flows to `apps/cli/src/main.ts#run
 
 ## Integration points
 
-- Registered by the root `package.json` workspace pattern `apps/*`; the root `cli` script invokes `apps/cli/bin/ctxindex.mjs`.
+- Registered by the root `package.json` workspace pattern `apps/*`; root and package-local `cli` scripts share the marker-aware `scripts/cli.sh` launcher before invoking `apps/cli/bin/ctxindex.mjs`.
 - `apps/cli/` consumes public seams from `packages/core`, `packages/adapters`, and `packages/extension-sdk` through their workspace package names.
 - Detailed map: `apps/cli/codemap.md`.

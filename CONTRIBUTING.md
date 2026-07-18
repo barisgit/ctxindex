@@ -26,8 +26,7 @@ do not add parallel `in-progress` labels.
    acceptance criteria, and explicit non-goals.
 2. Create a short issue-linked branch named `<type>/<short-slug>`, where
    `<type>` is `feature`, `fix`, `docs`, or `chore` (for example
-   `feature/browse-and-paginate-search`). Codex-created branches instead use
-   `codex/<issue-number>-<short-slug>`.
+   `feature/browse-and-paginate-search`).
 3. For a non-trivial behavior change, create the OpenSpec change on that branch
    before implementation. The issue owns the user-visible problem; the
    OpenSpec proposal, delta specs, design, and tasks own the solution contract.

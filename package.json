@@ -17,7 +17,7 @@
     "test:e2e": "bun run scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' --pass-with-no-tests e2e.test",
     "with-timeout": "bun scripts/with-timeout.ts",
     "ci": "bash scripts/verify/ci.sh",
-    "cli": "bun apps/cli/bin/ctxindex.mjs"
+    "cli": "bash scripts/cli.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",

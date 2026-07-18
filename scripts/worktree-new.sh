@@ -11,21 +11,70 @@ set -euo pipefail
 #   --existing   Attach to an existing branch (local or remote-tracking).
 #
 # Branch must be typed: <type>/<name>. Allowed types:
-#   feature, fix, chore, docs, refactor, test, perf, ci, build, revert, spike
+#   feature, fix, docs, chore
 
 usage() {
   cat >&2 <<EOF
 Usage: $0 [--existing] <type/name>
-  Types: feature, fix, chore, docs, refactor, test, perf, ci, build, revert, spike
+  Types: feature, fix, docs, chore
   Example: $0 feature/v1-impl
 EOF
 }
 
 is_valid_branch_type() {
   case "$1" in
-    feature|fix|chore|docs|refactor|test|perf|ci|build|revert|spike) return 0 ;;
+    feature|fix|docs|chore) return 0 ;;
     *) return 1 ;;
   esac
+}
+
+ref_supports_worktree_isolation() {
+  local ref="$1"
+  local package_json
+  local cli_command
+  local workspace_package_json
+  local workspace_cli_command
+  local launcher
+  local required
+
+  package_json="$(git show "${ref}:package.json" 2>/dev/null)" || return 1
+  cli_command="$(
+    bun -e 'process.stdout.write(JSON.parse(process.argv[1]).scripts?.cli ?? "")' \
+      "$package_json" 2>/dev/null
+  )" || return 1
+  [[ "$cli_command" == "bash scripts/cli.sh" ]] || return 1
+
+  workspace_package_json="$(git show "${ref}:apps/cli/package.json" 2>/dev/null)" || return 1
+  workspace_cli_command="$(
+    bun -e 'process.stdout.write(JSON.parse(process.argv[1]).scripts?.cli ?? "")' \
+      "$workspace_package_json" 2>/dev/null
+  )" || return 1
+  [[ "$workspace_cli_command" == "bash ../../scripts/cli.sh" ]] || return 1
+
+  launcher="$(git show "${ref}:scripts/cli.sh" 2>/dev/null)" || return 1
+  for required in \
+    '.ctxindex/worktree' \
+    'CTXINDEX_CONFIG_HOME=' \
+    'CTXINDEX_DATA_HOME=' \
+    'CTXINDEX_STATE_HOME=' \
+    'CTXINDEX_CACHE_HOME=' \
+    'XDG_CONFIG_HOME=' \
+    'XDG_DATA_HOME=' \
+    'XDG_STATE_HOME=' \
+    'XDG_CACHE_HOME=' \
+    'apps/cli/bin/ctxindex.mjs'; do
+    [[ "$launcher" == *"$required"* ]] || return 1
+  done
+}
+
+require_worktree_isolation() {
+  local ref="$1"
+
+  if ! ref_supports_worktree_isolation "$ref"; then
+    echo "error: branch '$BRANCH' lacks marker-aware CLI wiring" >&2
+    echo "expected both package CLI scripts and scripts/cli.sh to support worktree isolation" >&2
+    exit 1
+  fi
 }
 
 MODE="new"
@@ -60,6 +109,10 @@ if ! is_valid_branch_type "$TYPE"; then
   echo "error: unknown branch type '$TYPE'" >&2
   usage
   exit 1
+elif [[ ! "$BRANCH" =~ ^[a-z]+/[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+  echo "error: unsafe branch name '$BRANCH'" >&2
+  usage
+  exit 1
 fi
 
 ROOT="$(git rev-parse --show-toplevel)"
@@ -78,9 +131,11 @@ if [[ "$MODE" == "existing" ]]; then
   git fetch origin "$BRANCH" 2>/dev/null || git fetch origin || true
 
   if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
+    require_worktree_isolation "refs/heads/$BRANCH"
     echo "Attaching to local branch: $BRANCH"
     git worktree add "$WORKTREE_DIR" "$BRANCH"
   elif git show-ref --verify --quiet "refs/remotes/origin/$BRANCH"; then
+    require_worktree_isolation "refs/remotes/origin/$BRANCH"
     echo "Attaching to remote-tracking branch: origin/$BRANCH"
     git worktree add -b "$BRANCH" "$WORKTREE_DIR" "origin/$BRANCH"
   else
@@ -88,13 +143,16 @@ if [[ "$MODE" == "existing" ]]; then
     exit 1
   fi
 else
+  if git show-ref --verify --quiet "refs/heads/$BRANCH"; then
+    require_worktree_isolation "refs/heads/$BRANCH"
+  fi
   if ! git worktree add -b "$BRANCH" "$WORKTREE_DIR" 2>/dev/null; then
     echo "branch creation failed; trying existing branch checkout" >&2
     git worktree add "$WORKTREE_DIR" "$BRANCH"
   fi
 fi
 
-# Per-worktree isolated XDG-like dirs so a worktree's `ctxindex` invocations
+# Per-worktree isolated XDG dirs so supported `bun cli` invocations
 # never touch the user's real ~/.config/ctxindex, ~/.local/share/ctxindex, etc.
 mkdir -p \
   "${WORKTREE_DIR}/.ctxindex/config" \
@@ -102,14 +160,8 @@ mkdir -p \
   "${WORKTREE_DIR}/.ctxindex/state" \
   "${WORKTREE_DIR}/.ctxindex/cache"
 
-cat > "${WORKTREE_DIR}/.envrc" <<'ENVRC'
-# Worktree-local XDG dirs so ctxindex stays sandboxed inside this checkout.
-# Activate with `direnv allow` or `source .envrc`.
-export XDG_CONFIG_HOME="$PWD/.ctxindex/config"
-export XDG_DATA_HOME="$PWD/.ctxindex/data"
-export XDG_STATE_HOME="$PWD/.ctxindex/state"
-export XDG_CACHE_HOME="$PWD/.ctxindex/cache"
-ENVRC
+# The shared CLI launcher uses this ignored marker to force isolated paths.
+touch "${WORKTREE_DIR}/.ctxindex/worktree"
 
 # Bootstrap deps if a lockfile is already present (post-init runs).
 if [[ -f "${WORKTREE_DIR}/bun.lock" || -f "${WORKTREE_DIR}/bun.lockb" ]]; then
@@ -125,6 +177,6 @@ Worktree ready:
 
 Next:
   cd ${WORKTREE_DIR}
-  source .envrc          # or: direnv allow
+  bun cli --help         # automatically uses the isolated XDG paths
   bun install            # if not auto-run above
 EOF
