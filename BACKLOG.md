@@ -20,6 +20,26 @@ without requiring live accounts in normal automated tests. An opt-in live soak
 can complement deterministic replay when longer-running provider validation is
 useful.
 
+## Git-backed extension marketplaces
+
+Allow users to add Git repositories that publish discoverable ctxindex
+Extensions through a small catalog convention. An official repository could
+host reusable Extensions that are useful to multiple users but too specific to
+bundle, while teams and individuals could use the same mechanism for their own
+repositories.
+
+Catalog entries may host Extension source inline in the catalog repository or
+reference Extensions published in other repositories or marketplaces, and users
+may configure multiple explicitly trusted catalog repositories without nested
+catalog-to-catalog resolution. Catalog entries should point to human setup
+guidance, including provider-console steps for obtaining required credentials.
+Exact authentication requirements, scopes, and configuration should continue
+to come from Adapter definitions rather than parallel marketplace metadata.
+Explicitly added repositories can initially be treated as trusted; hosted
+marketplace infrastructure, social or commercial features, and a package
+ecosystem are separate concerns. A future UI may render the same catalog and
+setup information without becoming its own source of truth.
+
 ## Single-owner local daemon
 
 Run the stateful ctxindex runtime in a long-lived local daemon that is the only
@@ -71,32 +91,24 @@ reconciliation, locking, and recovery behavior so push delivery remains an
 optimization rather than a second source of truth. Notifications should wake
 daemon-owned synchronization rather than introduce another write path.
 
-## Git-backed extension marketplaces
-
-Allow users to add Git repositories that publish discoverable ctxindex
-Extensions through a small catalog convention. An official repository could
-host reusable Extensions that are useful to multiple users but too specific to
-bundle, while teams and individuals could use the same mechanism for their own
-repositories.
-
-Catalog entries may host Extension source inline in the catalog repository or
-reference Extensions published in other repositories or marketplaces, and users
-may configure multiple explicitly trusted catalog repositories without nested
-catalog-to-catalog resolution. Catalog entries should point to human setup
-guidance, including provider-console steps for obtaining required credentials. Exact authentication requirements,
-scopes, and configuration should continue to come from Adapter definitions
-rather than parallel marketplace metadata. Explicitly added repositories can
-initially be treated as trusted; hosted marketplace infrastructure, social or
-commercial features, and a package ecosystem are separate concerns. A future
-UI may render the same catalog and setup information without becoming its own
-source of truth.
-
 ## Interoperability and export formats
 
 Add profile-owned export formats when they unlock a concrete external workflow,
 such as calendar interchange or mailbox archives. Prefer focused formats over a
 general conversion framework, and keep export semantics with the owning
 Profile.
+
+## Documentation site and landing page
+
+Replace the shrinking `docs/` folder with a hosted documentation site and a
+presentable landing page, using fumadocs or a comparable framework, or plain
+React/Next.js if that yields a better landing page. Repository files remain
+the source of truth: capability specs, `SYSTEM.md`, `CONTEXT.md`, and skills
+should feed the site through projection or import rather than hand-duplicated
+pages. The site owns presentation only — getting-started narrative, provider
+setup guides, and marketing surface. Selection of framework, hosting, and how
+much of `SYSTEM.md` is rendered verbatim versus rewritten for the web remain
+open until this item is promoted.
 
 ## Advanced retrieval and identity
 
