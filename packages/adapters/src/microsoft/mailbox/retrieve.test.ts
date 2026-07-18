@@ -218,6 +218,7 @@ describe('Microsoft mailbox retrieve', () => {
       emitArtifact() {},
     })
 
+    expect(resources).toHaveLength(1)
     expect(resources[0]?.payload).not.toHaveProperty('references')
     expect(resources[0]?.payload).not.toHaveProperty('replyTo')
   })
