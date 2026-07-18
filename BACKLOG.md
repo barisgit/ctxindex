@@ -79,8 +79,11 @@ host reusable Extensions that are useful to multiple users but too specific to
 bundle, while teams and individuals could use the same mechanism for their own
 repositories.
 
-Catalog entries should point to human setup guidance, including provider-console
-steps for obtaining required credentials. Exact authentication requirements,
+Catalog entries may host Extension source inline in the catalog repository or
+reference Extensions published in other repositories or marketplaces, and users
+may configure multiple explicitly trusted catalog repositories without nested
+catalog-to-catalog resolution. Catalog entries should point to human setup
+guidance, including provider-console steps for obtaining required credentials. Exact authentication requirements,
 scopes, and configuration should continue to come from Adapter definitions
 rather than parallel marketplace metadata. Explicitly added repositories can
 initially be treated as trusted; hosted marketplace infrastructure, social or
