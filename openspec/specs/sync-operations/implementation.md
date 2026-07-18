@@ -120,6 +120,19 @@ export function syncSource(input: SyncSourceInput): Promise<SyncRunResult>;
 ### @ctxindex/cli — sync command boundary
 
 ```ts
+export type SyncArgs =
+  | {
+      readonly kind: 'run'
+      readonly sourceId?: string
+      readonly mode: SyncMode
+      readonly json: boolean
+      readonly format: 'summary' | 'events' | 'compact'
+    }
+  | { readonly kind: 'help' }
+  | { readonly kind: 'unknown'; readonly message: string }
+
+export function parseSyncArgs(args: string[]): SyncArgs;
+
 export type SyncDeps = Pick<
   CliDeps,
   'db' | 'registry' | 'authService' | 'logger' | 'sourceService' | 'close'
@@ -142,6 +155,8 @@ The SDK exposes cursor-driven emissions through `SyncContext`; there is no separ
 
 Warnings may stream without invalidating committed state. Diff mode exercises the same validation and rolls back data/cursor changes. CLI sync orchestration selects Sources, invokes injected services, and keeps per-Source success/failure output deterministic.
 
+The thin CLI owns the closed sync argv grammar and preserves help precedence. The root boundary rejects option-like tokens placed before the selected `sync` command before command selection can discard them, while preserving valid global options. The command descriptor forwards mode as an unvalidated string so the parser remains the sole mode-value boundary after command selection. The parser rejects invalid input through the `SyncArgs` union before runtime dependencies open, Source labels resolve, sync execution begins, or storage and provider effects become reachable.
+
 ## Verification
 
-Emission and coordinator tests cover validation, checkpoints, warnings, cancellation, locking, rollback, tombstones, and run summaries. Source sync tests cover registry/auth/provider-context binding. CLI sync tests cover selection, concurrency output, JSON/readable streams, and partial failure.
+Emission and coordinator tests cover validation, checkpoints, warnings, cancellation, locking, rollback, tombstones, and run summaries. Source sync tests cover registry/auth/provider-context binding. CLI sync tests cover strict argument rejection before side effects, selection, concurrency output, JSON/readable streams, and partial failure.

@@ -23,7 +23,29 @@ function parseMode(value: string | undefined): SyncMode | null {
 
 export function parseSyncArgs(args: string[]): SyncArgs {
   if (hasHelpFlag(args)) return { kind: 'help' }
-  const { flags } = parseFlags(args)
+  const { flags, positional, error } = parseFlags(args, {
+    booleanFlags: ['json'],
+    valueFlags: ['source', 'mode', 'format'],
+    strict: true,
+  })
+  if (error) {
+    const detail =
+      error.kind === 'unknown'
+        ? `unknown flag ${error.flag}`
+        : error.kind === 'duplicate'
+          ? `duplicate ${error.flag}`
+          : `${error.flag} requires a non-empty value`
+    return { kind: 'unknown', message: `sync: ${detail}` }
+  }
+  if (args.filter((arg) => arg === '--json').length > 1) {
+    return { kind: 'unknown', message: 'sync: duplicate --json' }
+  }
+  if (positional.length > 0) {
+    return {
+      kind: 'unknown',
+      message: `sync: unexpected argument: ${positional[0]}`,
+    }
+  }
   const mode = parseMode(stringFlag(flags, 'mode'))
   if (!mode) {
     return {
