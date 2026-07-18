@@ -22,7 +22,9 @@ test('profile codemaps describe bundled Adapter parity', async () => {
     expect(normalizedCodemap).toMatch(
       /Google and Microsoft calendar Adapters target `calendar\.event@1`/,
     )
-    expect(normalizedCodemap).toMatch(/local-directory Adapter targets `file@1`/)
+    expect(normalizedCodemap).toMatch(
+      /local-directory Adapter targets `file@1`/,
+    )
   }
 
   expect(codemaps.join('\n')).not.toMatch(/binds? Gmail Draft Actions/)
