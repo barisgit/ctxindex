@@ -22,7 +22,7 @@ ctxindex does not define:
 
 - a SaaS service or remote canonical store;
 - agent workflow policy or arbitrary provider automation outside typed Profile Actions;
-- extension-registered arbitrary CLI subcommands (deferred by [accepted design decisions D1 and D18](../../../docs/design/2026-07-13-context-access-layer.md));
+- extension-registered arbitrary CLI subcommands (deferred by [accepted design decisions D1 and D18](../../../../../docs/design/2026-07-13-context-access-layer.md));
 - a universal sync protocol for arbitrary applications.
 
 Milestone documents (`docs/milestones/`) MAY further restrict the runtime feature set for a given release without weakening any normative requirement in this spec.
