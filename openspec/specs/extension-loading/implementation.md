@@ -54,16 +54,47 @@ export interface ExtensionLoadDiagnostic {
 export interface LoadExtensionsInput {
   readonly config: CtxindexConfig
   readonly builtins: readonly AnyExtensionDefinition[]
+  readonly installed?: readonly InstalledExtensionRecord[]
+  readonly dataRoot?: string
 }
+
+export type ExtensionLoadProvenance =
+  | {
+      readonly id: string
+      readonly version: number
+      readonly kind: 'builtin'
+    }
+  | {
+      readonly id: string
+      readonly version: number
+      readonly kind: 'path'
+      readonly path: string
+    }
+  | {
+      readonly id: string
+      readonly version: number
+      readonly kind: 'catalog'
+      readonly catalog: string
+      readonly catalogId: string
+      readonly repository: string
+      readonly commit: string
+      readonly snapshotAcquiredAt: number
+      readonly sourcePath: string
+    }
 
 export interface LoadExtensionsResult {
   readonly registry: ExtensionRegistry
   readonly diagnostics: readonly ExtensionLoadDiagnostic[]
+  readonly provenance: readonly ExtensionLoadProvenance[]
 }
 
 export async function loadExtensions(
   input: LoadExtensionsInput,
 ): Promise<LoadExtensionsResult>;
+
+export async function importExtensionDefinition(
+  extensionPath: string,
+): Promise<AnyExtensionDefinition>;
 ```
 
 ### @ctxindex/core — Profile resolution
@@ -156,10 +187,10 @@ export function createExtensionRegistry(
 
 ## Implementation doctrine
 
-`@ctxindex/core` loads only explicit `config.extensions.paths` entries. Each trusted module default-exports a factory receiving `ExtensionAuthoringHost`; runtime facilities are host-supplied, while type-only imports and Extension-local dependencies remain possible. There is no V1 filesystem auto-discovery layer.
+`@ctxindex/core` loads explicit `config.extensions.paths` entries and exact installed Catalog provenance. Each trusted module default-exports a factory receiving `ExtensionAuthoringHost`; runtime facilities are host-supplied, while type-only imports and Extension-local dependencies remain possible. `importExtensionDefinition()` is the single authoring-host seam shared by startup and pre-install validation.
 
-Built-ins register first. Import, factory, schema, duplicate-id, or capability-consistency failures become path-scoped diagnostics and activate none of the failing Extension. Registry binding uses `(id, version)`, never object identity. Missing Extensions leave locally stored Resources readable while provider operations report unavailability.
+Built-ins register first, followed by explicit paths and then installed Catalog entries. Catalog locations derive from portable provenance and validate their snapshot manifest, exact source path, and `(id, version)` before registry activation. Import, factory, schema, duplicate-id, provenance, or capability-consistency failures become path-scoped diagnostics and activate none of the failing Extension. The loader never acquires or mutates Catalog state; loaded Catalog provenance carries snapshot acquisition time so formatting can surface age offline. Registry binding uses `(id, version)`, never object identity. Missing Extensions leave locally stored Resources readable while provider operations report unavailability.
 
 ## Verification
 
-Loader and registry tests cover atomic validation, duplicate/version behavior, host factories, and diagnostics. The relocated external-Extension e2e and D3 compiled-loader spike cover TypeScript, relative imports, and Extension-local dependencies under Bun 1.3.14.
+Loader and registry tests cover atomic validation, duplicate/version behavior, host factories, Catalog provenance, missing snapshots, identity mismatches, and diagnostics. The relocated external-Extension and local-Git-Catalog e2e gates cover TypeScript, relative imports, installed provenance, and Extension-local dependencies under Bun 1.3.14.

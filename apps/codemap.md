@@ -11,7 +11,7 @@ Contains deployable/application-facing workspace packages. The selected producti
 
 ## Data & control flow
 
-User argv enters `apps/cli/bin/ctxindex.mjs`, flows to `apps/cli/src/main.ts#runCli`, then through citty command descriptors, typed parsers, dependency composition, core service calls, and output/exit adapters. Initialization selects and persists an available secret backend for a fresh config; the light `secrets` surface reports safe status or requests a crash-safe backend switch. OAuth onboarding follows the explicit `client` -> `account` -> `source` layering; the removed `auth` command has no alias. The application returns a numeric status to the executable shim.
+User argv enters `apps/cli/bin/ctxindex.mjs`, flows to `apps/cli/src/main.ts#runCli`, then through citty command descriptors, typed parsers, dependency composition, core service calls, and output/exit adapters. Trusted Git Catalog add and refresh acquire immutable snapshots; list/show/install refresh by default but accept `--no-refresh`, while startup stays offline. Initialization selects and persists an available secret backend for a fresh config; the light `secrets` surface reports safe status or requests a crash-safe backend switch. OAuth onboarding follows the explicit `client` -> `account` -> `source` layering; the removed `auth` command has no alias. The application returns a numeric status to the executable shim.
 
 ## Integration points
 

@@ -267,6 +267,12 @@ test('interpreted registry interface follows an explicit external Extension', as
       profiles: [{ id: 'enarocanje.tender', version: 1 }],
       adapters: [{ id: 'enarocanje.fixture', version: 1 }],
       summary: 'External tenders Extension proof.',
+      provenance: {
+        id: 'enarocanje.proof',
+        version: 1,
+        kind: 'path',
+        path: extensionPath,
+      },
     })
 
     const builtInHelp = await run(['source', 'add', '--help'])

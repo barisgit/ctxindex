@@ -205,8 +205,50 @@ export function parseExportArgs(args: string[]): ExportArgs;
 ### @ctxindex/cli — Extension arguments
 
 ```ts
+export interface ExtensionSelector {
+  readonly id: string
+  readonly version: number
+}
+
 export type ExtensionsArgs =
   | { readonly kind: 'list'; readonly json: boolean }
+  | {
+      readonly kind: 'catalog-add'
+      readonly name: string
+      readonly repository: string
+      readonly ref: string
+      readonly trust: true
+      readonly json: boolean
+    }
+  | { readonly kind: 'catalog-list'; readonly json: boolean }
+  | {
+      readonly kind: 'catalog-show'
+      readonly name: string
+      readonly extension?: ExtensionSelector
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'catalog-refresh'
+      readonly name: string
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'catalog-remove'
+      readonly name: string
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'install'
+      readonly catalog: string
+      readonly extension: ExtensionSelector
+      readonly trust: true
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'uninstall'
+      readonly extension: ExtensionSelector
+      readonly json: boolean
+    }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
 
@@ -390,6 +432,8 @@ export function parsePurgeArtifactsArgs(args: string[]): PurgeArtifactsArgs;
 
 Parser unions are the command boundary. Registry-derived Source config, fields, kinds, exports, and Actions are resolved before service calls rather than duplicated as provider branches. Structured output writes data to stdout and human diagnostics to stderr; credential values and secret-store passphrases never enter argv.
 
+The Extension command adapter delegates repository, manifest, persistence, refresh policy, and install behavior to `CatalogService`. Its parser owns only the closed nested command grammar, exact selectors, required independent trust flags, and `--no-refresh`; pure formatters render Catalog records and loaded origin provenance with non-negative snapshot age. Catalog list/show and install request refresh by default, while `--no-refresh` selects stored state. Startup and loaded-Extension listing never cross the Git acquisition boundary.
+
 ## Verification
 
-Argument tests cover every discriminated parser and invalid form. Command tests inject dependency/service interfaces. CLI e2e tests cover readable/JSON stream separation, stable exits, registry-derived help/describe behavior, bundled skills, and relocated compiled execution.
+Argument tests cover every discriminated parser and invalid form. Command tests inject dependency/service interfaces. CLI e2e tests cover readable/JSON stream separation, stable exits, registry-derived help/describe behavior, bundled skills, local Catalog trust, default command-time refresh, stored-snapshot age and `--no-refresh`, observable refresh failure, offline startup/loading, and relocated compiled execution.

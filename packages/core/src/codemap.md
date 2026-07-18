@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-Implements provider-neutral domain and application services: Extension registration, OAuth client/Account/Grant layering, Realm/Source lifecycle, constrained provider operations, generic storage, sync/search/retrieval, Actions, exports, Artifacts, and runtime infrastructure.
+Implements provider-neutral domain and application services: Extension registration and trusted Git Catalog provenance, OAuth client/Account/Grant layering, Realm/Source lifecycle, constrained provider operations, generic storage, sync/search/retrieval, Actions, exports, Artifacts, and runtime infrastructure.
 
 ## Design / patterns
 
@@ -14,10 +14,10 @@ Implements provider-neutral domain and application services: Extension registrat
 ## Data & control flow
 
 1. Config/paths and secrets initialize runtime state; storage applies the fresh schema.
-2. Extension loading builds registries. `client/` persists provider-scoped labeled clients; `account/` maintains globally labeled identities; `auth/` requests all loaded same-provider scopes and updates one stable Grant per Account.
+2. Extension loading builds registries from built-ins, paths, and offline installed Catalog provenance. `catalog/` acquires and race-safely publishes immutable Git snapshots, refreshes pins on request, and validates installs against the complete runtime registry; `client/` persists provider-scoped labeled clients; `account/` maintains globally labeled identities; `auth/` requests all loaded same-provider scopes and updates one stable Grant per Account.
 3. Realm/Source services persist required Source labels and explicit Grant bindings; Account removal marks bound Sources `needs_auth` and clears bindings.
 4. Sync/search/retrieval/Action/Artifact/export/thread services invoke constrained Adapter operations and persist validated generic results; remote-search origins use atomic SQLite-coordinated cache batches so optional contention cannot discard provider results.
 
 ## Integration points
 
-Public through `src/index.ts` and package subpaths; consumed primarily by `apps/cli/src/deps.ts` and Adapter operation hosts. Detailed capability maps live in child folders including `client/`, `account/`, `auth/`, `schema/`, and `source/`.
+Public through `src/index.ts` and package subpaths; consumed primarily by `apps/cli/src/deps.ts` and Adapter operation hosts. Detailed capability maps live in child folders including `catalog/`, `extension/`, `client/`, `account/`, `auth/`, `schema/`, and `source/`.
