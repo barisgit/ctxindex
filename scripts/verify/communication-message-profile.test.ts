@@ -57,14 +57,16 @@ test('bundled communication.message enters the public registry path', () => {
         profile: { id: 'communication.message', version: 1 },
         effect: 'reversible',
         input: expect.objectContaining({
-          anyOf: expect.arrayContaining([
+          anyOf: [
             expect.objectContaining({
+              additionalProperties: false,
               required: ['to', 'subject', 'bodyText'],
             }),
             expect.objectContaining({
+              additionalProperties: false,
               required: ['replyToRef', 'bodyText'],
             }),
-          ]),
+          ],
         }),
         output: { id: 'communication.message', version: 1 },
         docs: 'Create a Draft in the selected mailbox Source.',
@@ -87,14 +89,16 @@ test('bundled communication.message enters the public registry path', () => {
         profile: { id: 'communication.message', version: 1 },
         effect: 'reversible',
         input: expect.objectContaining({
-          anyOf: expect.arrayContaining([
+          anyOf: [
             expect.objectContaining({
+              additionalProperties: false,
               required: ['ref', 'to', 'subject', 'bodyText'],
             }),
             expect.objectContaining({
+              additionalProperties: false,
               required: ['ref', 'replyToRef', 'bodyText'],
             }),
-          ]),
+          ],
         }),
         output: { id: 'communication.message', version: 1 },
         docs: 'Replace the complete content of the addressed Draft in the selected mailbox Source.',

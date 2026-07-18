@@ -304,4 +304,35 @@ describe('Microsoft threaded reply Drafts', () => {
     expect(error).toMatchObject({ code: 'invalid_action_input' })
     expect(fetchCalls).toBe(0)
   })
+
+  test('rejects mismatched locally stored provider Draft identity before provider I/O', async () => {
+    let fetchCalls = 0
+    const storedDraft = draft()
+    const error = await microsoftDraftUpdate(
+      context(
+        {
+          ref: draftRef,
+          replyToRef: parentRef,
+          bodyText: 'Replacement reply',
+        },
+        (async () => {
+          fetchCalls += 1
+          throw new Error('must not fetch')
+        }) as unknown as typeof fetch,
+        [
+          parent(),
+          {
+            ...storedDraft,
+            payload: {
+              ...(storedDraft.payload as Record<string, unknown>),
+              providerDraftId: 'different-draft-id',
+            },
+          },
+        ],
+      ),
+    ).catch((caught) => caught)
+
+    expect(error).toMatchObject({ code: 'invalid_action_input' })
+    expect(fetchCalls).toBe(0)
+  })
 })

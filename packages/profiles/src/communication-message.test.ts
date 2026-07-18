@@ -286,6 +286,42 @@ describe('communication.message Profile v1', () => {
         communicationMessageDraftCreateInputSchema.safeParse(input).success,
       ).toBe(false)
     }
+    for (const input of [
+      {
+        ref: 'ctx://SOURCE/draft/one',
+        replyToRef: 'ctx://SOURCE/message/parent',
+        bodyText: '',
+        to: ['override@example.com'],
+      },
+      {
+        ref: 'ctx://SOURCE/draft/one',
+        replyToRef: 'ctx://SOURCE/message/parent',
+        bodyText: '',
+        subject: 'Override',
+      },
+      {
+        ref: 'ctx://SOURCE/draft/one',
+        replyToRef: 'ctx://SOURCE/message/parent',
+        bodyText: '',
+        cc: ['override@example.com'],
+      },
+      {
+        ref: 'ctx://SOURCE/draft/one',
+        replyToRef: 'ctx://SOURCE/message/parent',
+        bodyText: '',
+        bcc: ['override@example.com'],
+      },
+      {
+        ref: 'ctx://SOURCE/draft/one',
+        replyToRef: 'ctx://SOURCE/message/parent',
+        bodyText: '',
+        providerMessageId: 'forbidden',
+      },
+    ]) {
+      expect(
+        communicationMessageDraftUpdateInputSchema.safeParse(input).success,
+      ).toBe(false)
+    }
   })
 
   test('derives portable reply recipient, subject, and references deterministically', () => {

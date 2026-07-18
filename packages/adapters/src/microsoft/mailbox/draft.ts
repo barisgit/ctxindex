@@ -202,8 +202,14 @@ function replyDetails(
 function validateReplyUpdate(
   context: ActionContext<unknown>,
   input: MicrosoftReplyDraftUpdateInput,
+  expectedDraftId: string,
 ): MicrosoftReplyDetails {
   const draft = localMessage(context, input.ref, true)
+  if (draft.providerDraftId !== expectedDraftId)
+    throw new CtxindexValidationError(
+      'invalid_action_input',
+      `Reply Draft "${input.ref}" does not match its stored provider Draft identity`,
+    )
   if (draft.replyToRef !== input.replyToRef)
     throw new CtxindexValidationError(
       'invalid_action_input',
@@ -377,7 +383,7 @@ export async function microsoftDraftUpdate(
   const draftId = parseDraftRef(input.ref, context.source.id)
   if (!isReplyInput(input)) rejectStoredReplyDraftUpdate(context, input.ref)
   const details = isReplyInput(input)
-    ? validateReplyUpdate(context, input)
+    ? validateReplyUpdate(context, input, draftId)
     : undefined
   const standalone = details
     ? undefined

@@ -441,26 +441,48 @@ describe('runAction', () => {
   })
 
   test('provides a Source-scoped local Resource resolver before provider I/O', async () => {
-    const db = await freshDb()
-    const registry = registryWith((context) => {
-      expect(
-        context.resolveResource(`ctx://${sourceId}/message/parent`),
-      ).toMatchObject({
-        ref: `ctx://${sourceId}/message/parent`,
-        sourceId,
-        profile: { id: 'fake.message', version: 1 },
-        completeness: 'complete',
-        deletedAt: null,
-        payload: { subject: 'Parent', provider: 'fake' },
-      })
-      expect(
-        context.resolveResource(`ctx://${sourceId}/message/missing`),
-      ).toBeNull()
-      expect(() =>
-        context.resolveResource(`ctx://${otherSourceId}/message/parent`),
-      ).toThrow(/does not belong to Source/)
-      return result()
-    })
+    const auth = {
+      kind: 'oauth2' as const,
+      provider: testOAuthProvider({
+        id: 'google',
+        authorizationUrl: 'https://accounts.example/auth',
+        tokenUrl: 'https://oauth2.googleapis.com/token',
+      }),
+      scopes: ['scope:draft'],
+    }
+    const db = await freshDb({ auth, grantId: 'grant-local-resolver' })
+    let tokenCalls = 0
+    let fetchCalls = 0
+    const registry = registryWith(
+      (context) => {
+        expect({ tokenCalls, fetchCalls }).toEqual({
+          tokenCalls: 0,
+          fetchCalls: 0,
+        })
+        expect(
+          context.resolveResource(`ctx://${sourceId}/message/parent`),
+        ).toMatchObject({
+          ref: `ctx://${sourceId}/message/parent`,
+          sourceId,
+          profile: { id: 'fake.message', version: 1 },
+          completeness: 'complete',
+          deletedAt: null,
+          payload: { subject: 'Parent', provider: 'fake' },
+        })
+        expect(
+          context.resolveResource(`ctx://${sourceId}/message/missing`),
+        ).toBeNull()
+        expect(() =>
+          context.resolveResource(`ctx://${otherSourceId}/message/parent`),
+        ).toThrow(/does not belong to Source/)
+        expect({ tokenCalls, fetchCalls }).toEqual({
+          tokenCalls: 0,
+          fetchCalls: 0,
+        })
+        return result()
+      },
+      { auth },
+    )
     const store = new ResourceStore(db, registry.profiles)
     store.upsert({
       ref: `ctx://${sourceId}/message/parent`,
@@ -471,7 +493,20 @@ describe('runAction', () => {
       payload: { subject: 'Parent', provider: 'fake' },
     })
 
-    await runAction(input(db, registry))
+    await runAction(
+      input(db, registry, {
+        authService: authService(async () => {
+          tokenCalls += 1
+          return 'token'
+        }),
+        fetch: async () => {
+          fetchCalls += 1
+          return new Response()
+        },
+      }),
+    )
+
+    expect({ tokenCalls, fetchCalls }).toEqual({ tokenCalls: 0, fetchCalls: 0 })
   })
 
   test.each([

@@ -57,7 +57,13 @@ export function gmailHeaderAddresses(
   let angleDepth = 0
   for (let index = 0; index < value.length; index += 1) {
     const character = value[index]
-    if (character === '"' && value[index - 1] !== '\\') quoted = !quoted
+    if (character === '"') {
+      let precedingBackslashes = 0
+      while (value[index - precedingBackslashes - 1] === '\\') {
+        precedingBackslashes += 1
+      }
+      if (precedingBackslashes % 2 === 0) quoted = !quoted
+    }
     if (!quoted && character === '<') angleDepth += 1
     if (!quoted && character === '>') angleDepth = Math.max(0, angleDepth - 1)
     if (!quoted && angleDepth === 0 && character === ',') {

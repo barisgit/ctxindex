@@ -35,3 +35,14 @@ test('normalizes ordered Reply-To addresses and RFC References', () => {
     ),
   ).toEqual(['<root@example.com>', '<parent@example.com>'])
 })
+
+test('splits Gmail addresses after a quote preceded by an even backslash run', () => {
+  expect(
+    gmailHeaderAddresses(
+      String.raw`"Backslash \\" <first@example.com>, second@example.com`,
+    ),
+  ).toEqual([
+    String.raw`"Backslash \\" <first@example.com>`,
+    'second@example.com',
+  ])
+})

@@ -519,6 +519,11 @@ describe('gmailDraftUpdate', () => {
             providerMessageId: 'reply-message-1',
             providerDraftId: 'reply-draft-1',
             replyToRef: parentRef,
+            to: ['sender@example.com'],
+            subject: 'Re: Project',
+            threadId: 'thread-1',
+            inReplyTo: '<parent@example.com>',
+            references: ['<parent@example.com>'],
           },
         },
       ],
@@ -553,7 +558,93 @@ describe('gmailDraftUpdate', () => {
     expect(calls).toHaveLength(1)
   })
 
-  test('rejects unsafe derived reply headers on update before fetch', async () => {
+  test('preserves stored reply context when parent metadata drifts after creation', async () => {
+    const parentRef = `ctx://${sourceId}/message/parent-1`
+    const draftRef = `ctx://${sourceId}/draft/reply-draft-1`
+    const resources = new Map([
+      [
+        parentRef,
+        {
+          ref: parentRef,
+          sourceId,
+          profile: { id: 'communication.message', version: 1 } as const,
+          completeness: 'complete' as const,
+          deletedAt: null,
+          payload: {
+            providerMessageId: 'parent-1',
+            threadId: 'drifted-thread',
+            rfcMessageId: '<drifted@example.com>',
+            references: ['<drifted-root@example.com>'],
+            replyTo: ['drifted@example.com'],
+            subject: 'Drifted subject',
+          },
+        },
+      ],
+      [
+        draftRef,
+        {
+          ref: draftRef,
+          sourceId,
+          profile: { id: 'communication.message', version: 1 } as const,
+          completeness: 'complete' as const,
+          deletedAt: null,
+          payload: {
+            providerMessageId: 'reply-message-1',
+            providerDraftId: 'reply-draft-1',
+            replyToRef: parentRef,
+            to: ['original@example.com'],
+            subject: 'Re: Original subject',
+            threadId: 'original-thread',
+            inReplyTo: '<original@example.com>',
+            references: [
+              '<original-root@example.com>',
+              '<original@example.com>',
+            ],
+          },
+        },
+      ],
+    ])
+    const calls: { init?: Parameters<typeof fetch>[1] }[] = []
+
+    const resource = await gmailDraftUpdate(
+      context(
+        { ref: draftRef, replyToRef: parentRef, bodyText: 'Updated reply' },
+        (async (
+          _input: Parameters<typeof fetch>[0],
+          init?: Parameters<typeof fetch>[1],
+        ) => {
+          calls.push({ init })
+          return Response.json({
+            id: 'reply-draft-1',
+            message: { id: 'reply-message-2', threadId: 'original-thread' },
+          })
+        }) as unknown as typeof fetch,
+        (ref) => resources.get(ref) ?? null,
+      ),
+    )
+
+    const request = JSON.parse(String(calls[0]?.init?.body))
+    expect(request.message.threadId).toBe('original-thread')
+    expect(decodeRaw(request.message.raw)).toContain(
+      [
+        'To: original@example.com',
+        'Subject: Re: Original subject',
+        'In-Reply-To: <original@example.com>',
+        'References: <original-root@example.com> <original@example.com>',
+      ].join('\r\n'),
+    )
+    expect(resource.payload).toMatchObject({
+      to: ['original@example.com'],
+      subject: 'Re: Original subject',
+      threadId: 'original-thread',
+      inReplyTo: '<original@example.com>',
+      references: ['<original-root@example.com>', '<original@example.com>'],
+      replyToRef: parentRef,
+    })
+    expect(calls).toHaveLength(1)
+  })
+
+  test('rejects unsafe stored reply headers on update before fetch', async () => {
     const parentRef = `ctx://${sourceId}/message/parent-1`
     const draftRef = `ctx://${sourceId}/draft/reply-draft-1`
     let fetchCalls = 0
@@ -576,6 +667,11 @@ describe('gmailDraftUpdate', () => {
                   providerMessageId: 'reply-message-1',
                   providerDraftId: 'reply-draft-1',
                   replyToRef: parentRef,
+                  to: ['sender@example.test'],
+                  subject: 'Safe\r\nBcc: injected@example.test',
+                  threadId: 'thread-1',
+                  inReplyTo: '<parent@example.test>',
+                  references: ['<parent@example.test>'],
                 },
               }
             : {
@@ -589,7 +685,7 @@ describe('gmailDraftUpdate', () => {
                   threadId: 'thread-1',
                   rfcMessageId: '<parent@example.test>',
                   from: ['sender@example.test'],
-                  subject: 'Safe\r\nBcc: injected@example.test',
+                  subject: 'Safe',
                 },
               },
       ),

@@ -164,7 +164,39 @@ function validateReplyUpdate(
       `Reply Draft "${input.ref}" cannot change replyToRef`,
     )
   }
-  return replyDetails(context, input.replyToRef)
+  localMessage(context, input.replyToRef, false)
+  const recipient = draft.to?.[0]
+  if (
+    !recipient ||
+    draft.to?.length !== 1 ||
+    draft.subject === undefined ||
+    !draft.threadId ||
+    !draft.inReplyTo ||
+    !draft.references?.length
+  ) {
+    throw new CtxindexValidationError(
+      'invalid_action_input',
+      `Reply Draft "${input.ref}" lacks stored Gmail reply context. Retrieve it first with: ctxindex get ${input.ref} --json`,
+    )
+  }
+  if (
+    [recipient, draft.subject, draft.inReplyTo, ...draft.references].some(
+      (value) => /[\r\n]/.test(value),
+    )
+  ) {
+    throw new CtxindexValidationError(
+      'invalid_action_input',
+      `Reply Draft "${input.ref}" contains unsafe Gmail header values`,
+    )
+  }
+  return {
+    replyToRef: input.replyToRef,
+    threadId: draft.threadId,
+    recipient,
+    subject: draft.subject,
+    inReplyTo: draft.inReplyTo,
+    references: draft.references,
+  }
 }
 
 function rejectStoredReplyDraftUpdate(
