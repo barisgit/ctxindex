@@ -18,3 +18,7 @@ build/
 .charters/
 docs/release/run-logs/
 .operator-artifacts/
+
+# external references (reference-explorer skill)
+.reference/
+reference.local.json

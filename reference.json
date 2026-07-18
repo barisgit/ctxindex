@@ -1,0 +1,7 @@
+{
+  "pi": {
+    "type": "git",
+    "url": "https://github.com/earendil-works/pi",
+    "note": "Pi agent harness reference: skills/agents conventions, session and extension architecture."
+  }
+}
