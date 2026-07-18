@@ -4,9 +4,9 @@
 
 ## Interfaces
 
-These listings are trimmed from the current source. Imports and implementation bodies are omitted; names, parameters, return types, and key data shapes are kept.
+These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
 
-### `apps/cli/src/deps.ts`
+### @ctxindex/cli — service dependencies
 
 ```ts
 export interface CliDeps {
@@ -35,10 +35,6 @@ export interface SecretCliDeps {
   close(): Promise<void>
 }
 
-export async function openAccountDeps(): Promise<AccountCliDeps>;
-
-export async function openSecretDeps(): Promise<SecretCliDeps>;
-
 export async function openDeps(
   opts: {
     readonly config?: CtxindexConfig
@@ -47,7 +43,7 @@ export async function openDeps(
 ): Promise<CliDeps>;
 ```
 
-### `apps/cli/src/definitions.ts`
+### @ctxindex/cli — loaded definitions
 
 ```ts
 export interface CliDefinitions extends LoadExtensionsResult {
@@ -57,23 +53,15 @@ export interface CliDefinitions extends LoadExtensionsResult {
 
 export async function loadCliDefinitions(): Promise<CliDefinitions>;
 
-export function printExtensionDiagnostics(
-  diagnostics: CliDefinitions['diagnostics'],
-): void;
-
-export function redactExtensionDiagnostic(
-  message: string,
-  canary = getEnv().CTXINDEX_LOG_CANARY_TOKEN,
-): string;
 ```
 
-### `apps/cli/src/main.ts`
+### @ctxindex/cli — composition boundary
 
 ```ts
 export async function runCli(args: string[]): Promise<number>;
 ```
 
-### `apps/cli/src/args/flags.ts`
+### @ctxindex/cli — shared flag contracts
 
 ```ts
 export type FlagValue = boolean | string | readonly string[]
@@ -100,20 +88,9 @@ export function parseFlags(
   options: ParseFlagsOptions = {},
 ): ParsedFlags;
 
-export function hasHelpFlag(args: string[]): boolean;
-
-export function stringFlag(
-  flags: Record<string, FlagValue>,
-  key: string,
-): string | undefined;
-
-export function listFlag(
-  flags: Record<string, FlagValue>,
-  key: string,
-): readonly string[];
 ```
 
-### `apps/cli/src/args/account.ts`
+### @ctxindex/cli — Account arguments
 
 ```ts
 export type AccountArgs =
@@ -131,7 +108,7 @@ export type AccountArgs =
 export function parseAccountArgs(args: string[]): AccountArgs;
 ```
 
-### `apps/cli/src/args/action.ts`
+### @ctxindex/cli — Action arguments
 
 ```ts
 export type ActionArgs =
@@ -155,7 +132,7 @@ export type ActionArgs =
 export function parseActionArgs(args: string[]): ActionArgs;
 ```
 
-### `apps/cli/src/args/artifact.ts`
+### @ctxindex/cli — Artifact arguments
 
 ```ts
 export type ArtifactListArgs =
@@ -180,7 +157,7 @@ export function parseArtifactDownloadArgs(
 ): ArtifactDownloadArgs;
 ```
 
-### `apps/cli/src/args/client.ts`
+### @ctxindex/cli — Client arguments
 
 ```ts
 export type ClientArgs =
@@ -197,7 +174,7 @@ export type ClientArgs =
 export function parseClientArgs(args: string[]): ClientArgs;
 ```
 
-### `apps/cli/src/args/describe.ts`
+### @ctxindex/cli — describe arguments
 
 ```ts
 export type DescribeArgs =
@@ -214,7 +191,7 @@ export type DescribeArgs =
 export function parseDescribeArgs(args: string[]): DescribeArgs;
 ```
 
-### `apps/cli/src/args/export.ts`
+### @ctxindex/cli — export arguments
 
 ```ts
 export type ExportArgs =
@@ -225,7 +202,7 @@ export type ExportArgs =
 export function parseExportArgs(args: string[]): ExportArgs;
 ```
 
-### `apps/cli/src/args/extensions.ts`
+### @ctxindex/cli — Extension arguments
 
 ```ts
 export type ExtensionsArgs =
@@ -236,7 +213,7 @@ export type ExtensionsArgs =
 export function parseExtensionsArgs(args: string[]): ExtensionsArgs;
 ```
 
-### `apps/cli/src/args/get.ts`
+### @ctxindex/cli — retrieval arguments
 
 ```ts
 export type GetArgs =
@@ -247,7 +224,7 @@ export type GetArgs =
 export function parseGetArgs(args: string[]): GetArgs;
 ```
 
-### `apps/cli/src/args/realm.ts`
+### @ctxindex/cli — Realm arguments
 
 ```ts
 export type RealmArgs =
@@ -259,7 +236,7 @@ export type RealmArgs =
 export function parseRealmArgs(args: string[]): RealmArgs;
 ```
 
-### `apps/cli/src/args/search.ts`
+### @ctxindex/cli — search arguments
 
 ```ts
 export interface ExecuteSearchInput {
@@ -291,7 +268,7 @@ export type SearchArgs =
 export function parseSearchArgs(args: string[]): SearchArgs;
 ```
 
-### `apps/cli/src/args/secrets.ts`
+### @ctxindex/cli — secret arguments
 
 ```ts
 export type SecretsArgs =
@@ -303,7 +280,7 @@ export type SecretsArgs =
 export function parseSecretsArgs(args: string[]): SecretsArgs;
 ```
 
-### `apps/cli/src/args/skills.ts`
+### @ctxindex/cli — skill arguments
 
 ```ts
 export type SkillsArgs =
@@ -321,7 +298,7 @@ export type SkillsArgs =
 export function parseSkillsArgs(args: string[]): SkillsArgs;
 ```
 
-### `apps/cli/src/args/source.ts`
+### @ctxindex/cli — Source arguments
 
 ```ts
 export type SourceArgs =
@@ -350,7 +327,7 @@ export function parseSourceArgs(
 ): SourceArgs;
 ```
 
-### `apps/cli/src/args/status.ts`
+### @ctxindex/cli — status arguments
 
 ```ts
 export type StatusArgs =
@@ -366,7 +343,7 @@ export type StatusArgs =
 export function parseStatusArgs(args: string[]): StatusArgs;
 ```
 
-### `apps/cli/src/args/sync.ts`
+### @ctxindex/cli — sync arguments
 
 ```ts
 export type SyncArgs =
@@ -383,7 +360,7 @@ export type SyncArgs =
 export function parseSyncArgs(args: string[]): SyncArgs;
 ```
 
-### `apps/cli/src/args/thread-get.ts`
+### @ctxindex/cli — thread arguments
 
 ```ts
 export type ThreadGetArgs =
@@ -394,7 +371,7 @@ export type ThreadGetArgs =
 export function parseThreadGetArgs(args: string[]): ThreadGetArgs;
 ```
 
-### `apps/cli/src/args/purge.ts`
+### @ctxindex/cli — purge arguments
 
 ```ts
 export type PurgeArtifactsArgs =
@@ -407,7 +384,7 @@ export function parsePurgeArtifactsArgs(args: string[]): PurgeArtifactsArgs;
 
 ## Implementation doctrine
 
-`apps/cli/src/main.ts` is the composition root. `deps.ts` opens core services; `definitions.ts` loads the current registry once per command flow; `args/*` owns non-interactive parsing; focused handlers invoke deep-module services; `format/*` owns readable/JSON output and exit mapping.
+`@ctxindex/cli` is the composition root. It opens core services, loads the current registry once per command flow, parses non-interactively, invokes deep-module services through focused handlers, and owns readable/JSON output plus exit mapping.
 
 Parser unions are the command boundary. Registry-derived Source config, fields, kinds, exports, and Actions are resolved before service calls rather than duplicated as provider branches. Structured output writes data to stdout and human diagnostics to stderr; credential values and secret-store passphrases never enter argv.
 

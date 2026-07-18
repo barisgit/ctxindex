@@ -4,31 +4,9 @@
 
 ## Interfaces
 
-These listings are trimmed from the current source. Imports and implementation bodies are omitted; names, parameters, return types, and key data shapes are kept.
+These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
 
-### `packages/adapters/src/microsoft/transport.ts`
-
-```ts
-export const IMMUTABLE_ID_PREFERENCE = 'IdType="ImmutableId"'
-
-export const TEXT_BODY_PREFERENCE =
-  `${IMMUTABLE_ID_PREFERENCE}, outlook.body-content-type="text"`
-
-export function graphUrl(path: string): string;
-
-export function graphHeaders(prefer = IMMUTABLE_ID_PREFERENCE): Headers;
-
-export function graphResponseError(response: Response): CtxindexSyncError;
-
-export async function graphJson(response: Response): Promise<unknown>;
-
-export function validateGraphOpaqueLink(
-  value: string,
-  routePrefix: string,
-): string;
-```
-
-### `packages/adapters/src/microsoft/calendar/config.ts`
+### @ctxindex/adapters — Microsoft Calendar configuration
 
 ```ts
 export type MicrosoftCalendarSourceConfig = z.infer<
@@ -36,7 +14,7 @@ export type MicrosoftCalendarSourceConfig = z.infer<
 >
 ```
 
-### `packages/adapters/src/microsoft/calendar/event.ts`
+### @ctxindex/adapters — Microsoft Calendar normalization
 
 ```ts
 export interface MicrosoftCalendarWarning {
@@ -53,14 +31,9 @@ export interface NormalizedMicrosoftCalendarEvent {
   readonly warnings: readonly MicrosoftCalendarWarning[]
 }
 
-export function normalizeMicrosoftCalendarEvent(
-  input: unknown,
-  sourceId: string,
-  calendarId: string,
-): NormalizedMicrosoftCalendarEvent;
 ```
 
-### `packages/adapters/src/microsoft/calendar/response.ts`
+### @ctxindex/adapters — Microsoft Calendar response contracts
 
 ```ts
 export class MicrosoftCalendarDeltaExpiredError extends Error {
@@ -75,62 +48,32 @@ export interface MicrosoftCalendarPage {
   readonly deltaLink?: string
 }
 
-export async function microsoftCalendarPage(
-  response: Response,
-  strategy: MicrosoftCalendarStrategy,
-  routePath: string,
-): Promise<MicrosoftCalendarPage>;
 ```
 
-### `packages/adapters/src/microsoft/calendar/sync.ts`
+### @ctxindex/adapters — Microsoft Calendar sync
 
 ```ts
-export async function microsoftCalendarSyncAt(context: SyncContext, now: Date);
-
-export async function microsoftCalendarSync(context: SyncContext);
+export async function microsoftCalendarSync(
+  context: SyncContext,
+): Promise<void>;
 ```
 
-### `packages/adapters/src/microsoft/calendar/retrieve.ts`
+### @ctxindex/adapters — Microsoft Calendar retrieval
 
 ```ts
-export async function microsoftCalendarRetrieve(context: RetrieveContext);
+export async function microsoftCalendarRetrieve(
+  context: RetrieveContext,
+): Promise<void>;
 ```
 
-### `packages/adapters/src/microsoft/mailbox/message.ts`
+### @ctxindex/adapters — Microsoft mailbox messages
 
 ```ts
 export type GraphMessage = z.infer<typeof graphMessageSchema>
 
-export function parseGraphMessage(value: unknown): GraphMessage;
-
-export function searchResource(
-  sourceId: string,
-  message: GraphMessage,
-): SearchRemoteResource;
-
-export function retrievedResource(
-  ref: string,
-  sourceId: string,
-  message: GraphMessage,
-  attachments: readonly ArtifactDescriptor[],
-): RetrievedResource;
 ```
 
-### `packages/adapters/src/microsoft/mailbox/ref.ts`
-
-```ts
-export function parseDraftRef(ref: string, sourceId: string): string;
-
-export function parseMessageRef(ref: string, sourceId: string): string;
-
-export function parseAttachmentRef(
-  ref: string,
-  originRef: string,
-  sourceId: string,
-): { messageId: string; attachmentId: string };
-```
-
-### `packages/adapters/src/microsoft/mailbox/draft.ts`
+### @ctxindex/adapters — Microsoft Draft Actions
 
 ```ts
 export type MicrosoftDraftCreateInput = z.infer<
@@ -150,7 +93,7 @@ export async function microsoftDraftUpdate(
 ): Promise<RetrievedResource>;
 ```
 
-### `packages/adapters/src/microsoft/mailbox/search-remote.ts`
+### @ctxindex/adapters — Microsoft mailbox remote search
 
 ```ts
 export async function microsoftMailboxSearchRemote(
@@ -158,7 +101,7 @@ export async function microsoftMailboxSearchRemote(
 ): Promise<SearchRemoteResult>;
 ```
 
-### `packages/adapters/src/microsoft/mailbox/retrieve.ts`
+### @ctxindex/adapters — Microsoft mailbox retrieval
 
 ```ts
 export async function microsoftMailboxRetrieve(
@@ -166,7 +109,7 @@ export async function microsoftMailboxRetrieve(
 ): Promise<void>;
 ```
 
-### `packages/adapters/src/microsoft/mailbox/download.ts`
+### @ctxindex/adapters — Microsoft mailbox downloads
 
 ```ts
 export async function microsoftMailboxDownload(
@@ -174,19 +117,9 @@ export async function microsoftMailboxDownload(
 ): Promise<void>;
 ```
 
-### Definition exports
-
-```ts
-export { microsoftOAuthProvider }
-export { microsoftCalendarSourceConfigSchema }
-export { microsoftCalendarAdapterDefinition }
-export { microsoftMailboxSourceConfigSchema }
-export { microsoftMailboxAdapterDefinition }
-```
-
 ## Implementation doctrine
 
-`packages/adapters/src/microsoft` owns declarative OAuth metadata and shared Graph transport; `calendar` and `mailbox` submodules own provider DTOs, normalization, operations, and tests. Core sees generic Resources, warnings, checkpoints, Artifacts, and Action results.
+The Microsoft modules in `@ctxindex/adapters` own declarative OAuth metadata, shared Graph transport, provider DTOs, normalization, and operations. Core sees generic Resources, warnings, checkpoints, Artifacts, and Action results.
 
 Calendar requests use immutable-id/UTC preferences. The default collection can retain a final delta link; named calendars use complete scans plus manifests. Mailbox search/retrieve/download and Drafts use the shared transport. Draft mutations request immutable ids, normalize one response, and are never automatically retried.
 

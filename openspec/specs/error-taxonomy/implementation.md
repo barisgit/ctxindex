@@ -4,9 +4,9 @@
 
 ## Interfaces
 
-These listings are trimmed from the current source. Imports and implementation bodies are omitted; names, parameters, return types, and key data shapes are kept.
+These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
 
-### `packages/core/src/errors.ts`
+### @ctxindex/core — error families
 
 ```ts
 export type CtxindexSyncErrorCode =
@@ -129,7 +129,7 @@ export class CtxindexSyncError extends CtxindexError {
 }
 ```
 
-### `packages/core/src/secrets/types.ts`
+### @ctxindex/core — secret backend errors
 
 ```ts
 export type CtxindexSecretsErrorCode =
@@ -151,7 +151,7 @@ export class CtxindexSecretsError extends CtxindexError {
 }
 ```
 
-### `packages/core/src/registry/profile-registry.ts`
+### @ctxindex/core — registry errors
 
 ```ts
 export type DefinitionRegistryErrorCode =
@@ -171,7 +171,7 @@ export class DefinitionRegistryError extends Error {
 }
 ```
 
-### `packages/core/src/exit-codes.ts`
+### @ctxindex/core — stable exit mapping
 
 ```ts
 export type ExitCode = (typeof EXIT_CODES)[keyof typeof EXIT_CODES]
@@ -185,7 +185,7 @@ export interface ErrorMapping {
 export function mapSyncErrorCode(code: CtxindexSyncErrorCode): ErrorMapping;
 ```
 
-### `apps/cli/src/format/exit.ts`
+### @ctxindex/cli — final error translation
 
 ```ts
 export function mapErrorToExit(err: unknown): number;
@@ -199,7 +199,7 @@ export async function runWithExit(
 
 Core deep modules throw typed `CtxindexError` subclasses with stable machine codes and optional causes. Sync errors additionally carry retryability and bounded summaries. Secret and registry errors remain typed at their owning module seams and are translated only at orchestration boundaries.
 
-`packages/core/src/exit-codes.ts` maps sync codes to run/status state and stable exits. `apps/cli/src/format/exit.ts` is the final CLI translation point; command handlers do not invent independent mappings.
+`@ctxindex/core` maps sync codes to run/status state and stable exits. `@ctxindex/cli` is the final error-translation boundary; command handlers do not invent independent mappings.
 
 ## Verification
 

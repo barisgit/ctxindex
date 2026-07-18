@@ -4,9 +4,9 @@
 
 ## Interfaces
 
-These listings are trimmed from the current source. Imports and implementation bodies are omitted; names, parameters, return types, and key data shapes are kept.
+These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
 
-### `packages/core/src/storage/db.ts`
+### @ctxindex/core — database access
 
 ```ts
 export type CtxindexDatabase = Database
@@ -20,19 +20,19 @@ export async function openDatabase(
 export function applyPragmas(database: CtxindexDatabase): void;
 ```
 
-### `packages/core/src/storage/migrator.ts`
+### @ctxindex/core — schema migration
 
 ```ts
 export async function runMigrations(db: CtxindexDatabase): Promise<void>;
 ```
 
-### `packages/core/src/storage/init.ts`
+### @ctxindex/core — storage bootstrap
 
 ```ts
 export async function bootstrapDatabase(): Promise<void>;
 ```
 
-### `packages/core/src/resource/resource-store.ts`
+### @ctxindex/core — Resource persistence
 
 ```ts
 export type ResourceOrigin = 'synced' | 'adhoc'
@@ -93,7 +93,7 @@ export class ResourceStore {
 }
 ```
 
-### `packages/core/src/relation/relation-store.ts`
+### @ctxindex/core — Relation persistence
 
 ```ts
 export type RelationTarget = ProfileRelationTarget

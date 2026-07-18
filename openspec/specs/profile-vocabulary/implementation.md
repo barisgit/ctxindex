@@ -4,9 +4,9 @@
 
 ## Interfaces
 
-These listings are trimmed from the current source. Imports and implementation bodies are omitted; names, parameters, return types, and key data shapes are kept.
+These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
 
-### `packages/extension-sdk/src/reference.ts`
+### @ctxindex/extension-sdk — versioned references
 
 ```ts
 export type DefinitionVersion = number
@@ -20,7 +20,7 @@ export type ProfileReference<
 }
 ```
 
-### `packages/extension-sdk/src/profile.ts`
+### @ctxindex/extension-sdk — Profile contracts
 
 ```ts
 export type ProfileExportRenderResult = string | Uint8Array
@@ -127,7 +127,7 @@ export function defineProfile<
 ): ProfileDefinition<TId, TVersion, TSchema>;
 ```
 
-### `packages/profiles/src/calendar-event.ts`
+### @ctxindex/profiles — calendar event vocabulary
 
 ```ts
 export type CalendarEvent = z.infer<typeof calendarEventSchema>
@@ -138,7 +138,7 @@ export function calendarEventRef(
 ): string;
 ```
 
-### `packages/profiles/src/file.ts`
+### @ctxindex/profiles — file vocabulary
 
 ```ts
 export interface FileChunk {
@@ -151,28 +151,9 @@ export function chunkText(text: string): FileChunk[];
 export function isNormalizedRelativeFilePath(path: string): boolean;
 ```
 
-### Bundled Profile definition exports
-
-```ts
-// packages/profiles/src/calendar-event.ts
-export { calendarEventSchema, calendarEventProfile }
-export type { CalendarEvent }
-
-// packages/profiles/src/communication-message.ts
-export {
-  communicationMessageDraftCreateInputSchema,
-  communicationMessageDraftUpdateInputSchema,
-  communicationMessageSchema,
-  communicationMessageProfile,
-}
-
-// packages/profiles/src/file.ts
-export { fileSchema, fileProfile }
-```
-
 ## Implementation doctrine
 
-`packages/extension-sdk` owns plain versioned authoring contracts and const-generic factories; it creates no runtime class identity. `packages/profiles` owns bundled schemas and pure vocabulary. Core registries erase authored definitions to runtime-safe interfaces and bind by `(id, version)`.
+`@ctxindex/extension-sdk` owns plain versioned authoring contracts and const-generic factories; it creates no runtime class identity. `@ctxindex/profiles` owns bundled schemas and pure vocabulary. Core registries erase authored definitions to runtime-safe interfaces and bind by `(id, version)`.
 
 Profiles own validation, titles/summaries, chunks, typed fields, Relations, Artifact descriptors, exports, docs/aliases/examples, and Action declarations. Adapters own provider I/O. Loaded registry metadata drives describe, kind aliases, field parsing, Source config, exports, and Action discovery.
 

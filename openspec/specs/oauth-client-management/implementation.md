@@ -4,9 +4,9 @@
 
 ## Interfaces
 
-These listings are trimmed from the current source. Imports and implementation bodies are omitted; names, parameters, return types, and key data shapes are kept.
+These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
 
-### `packages/core/src/client/types.ts`
+### @ctxindex/core — OAuth Client records and service
 
 ```ts
 export interface OAuthClientRecord {
@@ -36,7 +36,7 @@ export interface OAuthClientService {
 }
 ```
 
-### `packages/core/src/client/resolution.ts`
+### @ctxindex/core — OAuth Client resolution
 
 ```ts
 export interface ResolveOAuthClientInput {
@@ -57,7 +57,7 @@ export async function resolveOAuthClient(
 ): Promise<ResolvedOAuthClient>;
 ```
 
-### `packages/core/src/client/service.ts`
+### @ctxindex/core — OAuth Client service boundary
 
 ```ts
 export function createOAuthClientService(
@@ -67,7 +67,7 @@ export function createOAuthClientService(
 
 ## Implementation doctrine
 
-`packages/core/src/client` owns add/list/remove/resolve behavior. SQLite stores provider, label, timestamps, and typed client credential references; values live only in the routing Secret Vault.
+`@ctxindex/core` owns OAuth Client add, list, remove, and resolve behavior. SQLite stores provider, label, timestamps, and typed client credential references; values live only in the routing Secret Vault.
 
 `client add --from-env` reads Adapter-declared environment names once and persists the values. Authorization resolves one provider-matched stored Client and does not reread client credentials from the environment. Inventory omits values and references; failed adds clean temporary secrets.
 

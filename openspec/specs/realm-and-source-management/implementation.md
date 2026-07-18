@@ -4,9 +4,9 @@
 
 ## Interfaces
 
-These listings are trimmed from the current source. Imports and implementation bodies are omitted; names, parameters, return types, and key data shapes are kept.
+These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
 
-### `packages/core/src/realm/types.ts`
+### @ctxindex/core — Realm contracts
 
 ```ts
 export interface RealmRow {
@@ -39,7 +39,7 @@ export interface RealmService {
 }
 ```
 
-### `packages/core/src/source/types.ts`
+### @ctxindex/core — Source contracts
 
 ```ts
 export type SourceAvailability = 'available' | 'extension_unavailable'
@@ -114,7 +114,7 @@ export interface SourceService {
 }
 ```
 
-### `packages/core/src/source/provider-context.ts`
+### @ctxindex/core — provider context construction
 
 ```ts
 export type SourceProviderFetch = (
@@ -144,13 +144,13 @@ export async function createSourceProviderContext(
 ): Promise<SourceProviderContext>;
 ```
 
-### `packages/core/src/realm/service.ts`
+### @ctxindex/core — Realm service boundary
 
 ```ts
 export function createRealmService(deps: RealmServiceDeps): RealmService;
 ```
 
-### `packages/core/src/source/service.ts`
+### @ctxindex/core — Source service boundary
 
 ```ts
 export function createSourceService(deps: SourceServiceDeps): SourceService;
@@ -158,7 +158,7 @@ export function createSourceService(deps: SourceServiceDeps): SourceService;
 
 ## Implementation doctrine
 
-`packages/core/src/realm` owns Realm rows and exact slug lookup. `packages/core/src/source` owns Source creation/list/status/removal, Adapter/config validation, Grant compatibility, and provider-context construction. Every Source stores one Adapter version, one Realm, one config payload, and an explicit Grant when required.
+`@ctxindex/core` owns Realm rows and exact slug lookup plus Source creation, listing, status, removal, Adapter/config validation, Grant compatibility, and provider-context construction. Every Source stores one Adapter version, one Realm, one config payload, and an explicit Grant when required.
 
 Availability is derived by resolving the stored Adapter binding against the loaded registry, not from sync status. Provider contexts expose only Source metadata, scoped logger, and host-allowlisted authorized fetch. Core seeds no special Realm.
 

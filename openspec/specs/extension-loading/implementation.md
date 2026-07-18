@@ -4,9 +4,9 @@
 
 ## Interfaces
 
-These listings are trimmed from the current source. Imports and implementation bodies are omitted; names, parameters, return types, and key data shapes are kept.
+These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
 
-### `packages/extension-sdk/src/extension.ts`
+### @ctxindex/extension-sdk — Extension authoring contracts
 
 ```ts
 export interface ExtensionDefinition<
@@ -43,7 +43,7 @@ export function defineExtension<
 ): ExtensionDefinition<TId, TVersion, TProfiles, TAdapters>;
 ```
 
-### `packages/core/src/extension/loader.ts`
+### @ctxindex/core — Extension loading
 
 ```ts
 export interface ExtensionLoadDiagnostic {
@@ -66,7 +66,7 @@ export async function loadExtensions(
 ): Promise<LoadExtensionsResult>;
 ```
 
-### `packages/core/src/registry/profile-registry.ts`
+### @ctxindex/core — Profile resolution
 
 ```ts
 export interface UnknownProfileWarning {
@@ -118,7 +118,7 @@ export function createProfileRegistry(
 ): ProfileRegistry;
 ```
 
-### `packages/core/src/registry/definition-registries.ts`
+### @ctxindex/core — definition registries
 
 ```ts
 export class AdapterRegistry {
@@ -156,7 +156,7 @@ export function createExtensionRegistry(
 
 ## Implementation doctrine
 
-`packages/core/src/extension/loader.ts` loads only explicit `config.extensions.paths` entries. Each trusted module default-exports a factory receiving `ExtensionAuthoringHost`; runtime facilities are host-supplied, while type-only imports and Extension-local dependencies remain possible. There is no V1 filesystem auto-discovery layer.
+`@ctxindex/core` loads only explicit `config.extensions.paths` entries. Each trusted module default-exports a factory receiving `ExtensionAuthoringHost`; runtime facilities are host-supplied, while type-only imports and Extension-local dependencies remain possible. There is no V1 filesystem auto-discovery layer.
 
 Built-ins register first. Import, factory, schema, duplicate-id, or capability-consistency failures become path-scoped diagnostics and activate none of the failing Extension. Registry binding uses `(id, version)`, never object identity. Missing Extensions leave locally stored Resources readable while provider operations report unavailability.
 

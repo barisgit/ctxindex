@@ -4,9 +4,9 @@
 
 ## Interfaces
 
-These listings are trimmed from the current source. Imports and implementation bodies are omitted; names, parameters, return types, and key data shapes are kept.
+These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
 
-### `packages/extension-sdk/src/operations.ts`
+### @ctxindex/extension-sdk — remote search contracts
 
 ```ts
 export interface SearchRemoteQuery {
@@ -50,7 +50,7 @@ export interface SearchContext extends ProviderContext {
 }
 ```
 
-### `packages/core/src/search/types.ts`
+### @ctxindex/core — local search contracts
 
 ```ts
 export interface LocalSearchFieldFilter {
@@ -105,7 +105,7 @@ export interface LocalSearchResult {
 }
 ```
 
-### `packages/core/src/search/preflight.ts`
+### @ctxindex/core — search preflight
 
 ```ts
 export interface SearchPreflightInput {
@@ -127,7 +127,7 @@ export function resolveSearchQuery(
 ): ResolvedSearchQuery;
 ```
 
-### `packages/core/src/search/planner.ts`
+### @ctxindex/core — search planning
 
 ```ts
 export interface SearchPlannerInput {
@@ -195,27 +195,6 @@ export interface SearchPlannerResult {
   readonly explain?: { readonly sources: readonly SourceSearchExplain[] }
 }
 
-interface SourcePlanRow {
-  readonly id: string
-  readonly realm_slug: string
-  readonly adapter_id: string
-  readonly adapter_version: number
-  readonly config_json: string
-  readonly sync_enabled: number
-  readonly search_routing: SearchRouting | null
-  readonly last_status: string | null
-  readonly last_run_status: string | null
-}
-
-interface PlannedSource {
-  readonly row: SourcePlanRow
-  readonly routing: SearchRouting
-  readonly decidedBy: SourceSearchExplain['decidedBy']
-  readonly legs: ('local' | 'remote')[]
-  readonly coverage: SourceSearchExplain['coverage']
-  readonly unavailable: boolean
-}
-
 export class SearchPlanner {
   readonly #local: LocalSearchExecutor
   constructor(
@@ -231,7 +210,7 @@ export class SearchPlanner {
 }
 ```
 
-### `packages/core/src/search/local-search.ts`
+### @ctxindex/core — local search execution
 
 ```ts
 export class LocalSearchExecutor {
@@ -243,7 +222,7 @@ export class LocalSearchExecutor {
 }
 ```
 
-### `packages/core/src/source/remote-search.ts`
+### @ctxindex/core — remote search execution
 
 ```ts
 export interface SearchSourceRemoteInput
@@ -257,7 +236,7 @@ export async function searchSourceRemote(
 ): Promise<SearchRemoteResult>;
 ```
 
-### `packages/core/src/search/sanitize.ts`
+### @ctxindex/core — query normalization
 
 ```ts
 export function sanitizeQuery(raw: string): {

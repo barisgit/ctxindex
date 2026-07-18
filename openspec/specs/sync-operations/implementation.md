@@ -4,9 +4,9 @@
 
 ## Interfaces
 
-These listings are trimmed from the current source. Imports and implementation bodies are omitted; names, parameters, return types, and key data shapes are kept.
+These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
 
-### `packages/extension-sdk/src/operations.ts`
+### @ctxindex/extension-sdk — sync contracts
 
 ```ts
 export type SyncMode = 'sync' | 'resync' | 'diff'
@@ -45,7 +45,7 @@ export interface SyncContext extends ProviderContext {
 }
 ```
 
-### `packages/core/src/sync/sync-coordinator.ts`
+### @ctxindex/core — sync coordination
 
 ```ts
 export interface SyncRunInput {
@@ -94,13 +94,13 @@ export class SyncCoordinator {
 }
 ```
 
-### `packages/core/src/sync/emission.ts`
+### @ctxindex/core — emission validation
 
 ```ts
 export function parseSyncEmission(value: unknown): SyncEmission;
 ```
 
-### `packages/core/src/source/sync-source.ts`
+### @ctxindex/core — Source sync execution
 
 ```ts
 export interface SyncSourceInput {
@@ -117,7 +117,7 @@ export interface SyncSourceInput {
 export function syncSource(input: SyncSourceInput): Promise<SyncRunResult>;
 ```
 
-### `apps/cli/src/sync/runner.ts`
+### @ctxindex/cli — sync command boundary
 
 ```ts
 export type SyncDeps = Pick<
@@ -127,25 +127,6 @@ export type SyncDeps = Pick<
 
 export interface SyncServices {
   readonly syncSource: typeof syncSource
-}
-
-export interface SyncOutput {
-  readonly mode: SyncRunResult['mode']
-  readonly results: readonly SourceSyncOutput[]
-  readonly warnings: readonly SyncWarningOutput[]
-}
-
-interface CompletedSourceSync {
-  readonly sourceId: string
-  readonly status: 'completed'
-  readonly run: SyncRunResult
-}
-
-interface FailedSourceSync {
-  readonly sourceId: string
-  readonly status: 'failed'
-  readonly error: { readonly code: string; readonly message: string }
-  readonly exitCode: number
 }
 
 export async function handleSyncCommand(

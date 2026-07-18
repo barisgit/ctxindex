@@ -4,9 +4,9 @@
 
 ## Interfaces
 
-These listings are trimmed from the current source. Imports and implementation bodies are omitted; names, parameters, return types, and key data shapes are kept.
+These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
 
-### `packages/core/src/account/types.ts`
+### @ctxindex/core — Account records and inventory
 
 ```ts
 export interface VerifiedAccountIdentityInput {
@@ -71,7 +71,7 @@ export interface AccountService {
 }
 ```
 
-### `packages/core/src/auth/types.ts`
+### @ctxindex/core — Grant and authorization contracts
 
 ```ts
 export interface GrantRow {
@@ -127,7 +127,7 @@ export interface AuthService {
 }
 ```
 
-### `packages/core/src/auth/authorize-provider.ts`
+### @ctxindex/core — provider authorization
 
 ```ts
 export interface AuthorizeProviderInput {
@@ -160,7 +160,7 @@ export async function authorizeProvider(
 ): Promise<AuthorizeProviderResult>;
 ```
 
-### `packages/core/src/auth/compatibility.ts`
+### @ctxindex/core — Grant compatibility
 
 ```ts
 export interface GrantCompatibilityInput {
@@ -176,7 +176,7 @@ export function isGrantCompatible(
 ): boolean;
 ```
 
-### `packages/core/src/source/provider-context.ts`
+### @ctxindex/core — authorized provider context
 
 ```ts
 export type SourceProviderFetch = (
@@ -206,19 +206,19 @@ export async function createSourceProviderContext(
 ): Promise<SourceProviderContext>;
 ```
 
-### `packages/core/src/account/service.ts`
+### @ctxindex/core — Account service boundary
 
 ```ts
 export function createAccountService(deps: AccountServiceDeps): AccountService;
 ```
 
-### `packages/core/src/auth/service.ts`
+### @ctxindex/core — authorization service boundary
 
 ```ts
 export function createAuthService(deps: AuthDependencies): AuthService;
 ```
 
-### `packages/core/src/auth/selection.ts`
+### @ctxindex/core — OAuth selection
 
 ```ts
 export interface OAuthSelection {
@@ -240,7 +240,7 @@ export function selectedOAuthScopes(
 ): readonly string[];
 ```
 
-### `packages/core/src/auth/oauth-token.ts`
+### @ctxindex/core — OAuth token exchange
 
 ```ts
 export interface OAuthTokenResponse {
@@ -259,7 +259,7 @@ export async function postOAuthToken(input: {
 }): Promise<OAuthTokenResponse>;
 ```
 
-### `packages/core/src/auth/loopback.ts`
+### @ctxindex/core — OAuth loopback
 
 ```ts
 export interface OAuthLoopbackResult {
@@ -283,7 +283,7 @@ export async function openOAuthLoopback(input: {
 
 ## Implementation doctrine
 
-`packages/core/src/account` owns Account upsert/inventory SQL. `packages/core/src/auth` owns provider-neutral authorization, scope selection, loopback PKCE/state, token/identity validation, Grant persistence, refresh, and authorized fetch. Adapters provide declarative provider metadata; provider response normalization remains Adapter-owned.
+`@ctxindex/core` owns Account persistence and inventory plus provider-neutral authorization, scope selection, loopback PKCE/state, token and identity validation, Grant persistence, refresh, and authorized fetch. Adapters provide declarative provider metadata; provider response normalization remains Adapter-owned.
 
 Secret values are written before the Account/Grant transaction and cleaned if persistence fails. Reauthorization updates the Account's stable Grant in place. Refresh rotation writes the replacement, transactionally updates references, then deletes superseded references. Read contexts may request one 401 refresh retry; Action contexts set `retryUnauthorized: false`.
 

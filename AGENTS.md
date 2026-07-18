@@ -9,7 +9,6 @@
 - `docs/milestones/V1.md` and `V1_1.md` are completed historical records, not current scope.
 - `docs/design/2026-07-13-context-access-layer.md` owns accepted decisions D1–D22 and cross-cutting rationale.
 - `openspec/` owns spec-driven changes; use `openspec list` for active inventory and `openspec/config.yaml` for artifact order.
-- `docs/release/` is archived prototype material; internal `v1` labels do not describe current product scope.
 - `.agents/skills/repo-development/SKILL.md` owns the triggered development and CLI walkthrough.
 
 ## Always-true working rules

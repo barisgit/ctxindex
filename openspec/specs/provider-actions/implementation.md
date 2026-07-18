@@ -4,9 +4,9 @@
 
 ## Interfaces
 
-These listings are trimmed from the current source. Imports and implementation bodies are omitted; names, parameters, return types, and key data shapes are kept.
+These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
 
-### `packages/extension-sdk/src/profile.ts`
+### @ctxindex/extension-sdk — Profile Action declarations
 
 ```ts
 export interface ProfileAction<TInput extends z.ZodTypeAny = z.ZodTypeAny> {
@@ -18,7 +18,7 @@ export interface ProfileAction<TInput extends z.ZodTypeAny = z.ZodTypeAny> {
 }
 ```
 
-### `packages/extension-sdk/src/adapter.ts`
+### @ctxindex/extension-sdk — Adapter Action bindings
 
 ```ts
 export interface AdapterActionBinding<
@@ -35,7 +35,7 @@ export interface AdapterActionBinding<
 }
 ```
 
-### `packages/extension-sdk/src/operations.ts`
+### @ctxindex/extension-sdk — Action operation context
 
 ```ts
 export interface ActionContext<TInput = unknown> extends ProviderContext {
@@ -44,7 +44,7 @@ export interface ActionContext<TInput = unknown> extends ProviderContext {
 }
 ```
 
-### `packages/core/src/action/describe.ts`
+### @ctxindex/core — Action discovery
 
 ```ts
 export interface ActionSourceAvailability {
@@ -70,7 +70,7 @@ export function describeAction(
 ): DescribeActionResult;
 ```
 
-### `packages/core/src/action/run.ts`
+### @ctxindex/core — Action execution
 
 ```ts
 export interface RunActionInput
@@ -101,7 +101,7 @@ export async function runAction(
 ): Promise<RunActionResult>;
 ```
 
-### `packages/adapters/src/google-mailbox/draft.ts`
+### @ctxindex/adapters — Gmail Draft contracts
 
 ```ts
 export type GmailDraftCreateInput = z.infer<
@@ -123,7 +123,7 @@ export async function gmailDraftCreate(
 ): Promise<RetrievedResource>;
 ```
 
-### `packages/adapters/src/microsoft/mailbox/draft.ts`
+### @ctxindex/adapters — Microsoft Draft contracts
 
 ```ts
 export type MicrosoftDraftCreateInput = z.infer<
@@ -143,7 +143,7 @@ export async function microsoftDraftUpdate(
 ): Promise<RetrievedResource>;
 ```
 
-### `apps/cli/src/action/handle-action-command.ts`
+### @ctxindex/cli — Action command boundary
 
 ```ts
 export type ActionDeps = Pick<
@@ -161,16 +161,6 @@ export async function handleActionCommand(
   open: OpenActionDeps = openDeps,
   services: ActionServices = actionServices,
 ): Promise<number>;
-```
-
-### Message Action definition exports
-
-```ts
-export {
-  communicationMessageDraftCreateInputSchema,
-  communicationMessageDraftUpdateInputSchema,
-  communicationMessageProfile,
-}
 ```
 
 ## Implementation doctrine

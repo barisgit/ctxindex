@@ -4,41 +4,108 @@
 
 ## Interfaces
 
-These listings are trimmed from the current source. Imports and implementation bodies are omitted; names, parameters, return types, and key data shapes are kept.
+These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
 
-### Workspace package seams
+### Workspace modules
 
 ```text
-apps/cli
-  entrypoint: apps/cli/bin/ctxindex.mjs
-  public export: . -> ./src/main.ts
-packages/core
-  public exports: ., ./paths, ./config, ./logger, ./artifact, ./export,
-                  ./auth, ./client, ./account, ./realm, ./source, ./secrets,
-                  ./schema, ./storage, ./testing, ./net, ./registry,
-                  ./extension, ./sync, ./search, ./thread, ./errors, ./ids,
-                  ./ref, ./migrations, ./action
-packages/extension-sdk
-  public authoring types and definition factories
-packages/profiles
+@ctxindex/cli
+  executable composition root and command/output boundary
+@ctxindex/core
+  provider-neutral runtime services, persistence, orchestration, and registries
+@ctxindex/extension-sdk
+  public authoring contracts and generic definition factories
+@ctxindex/profiles
   bundled provider-neutral Profile definitions
-packages/adapters
+@ctxindex/adapters
   bundled provider implementations
 ```
 
-### Composition and build entrypoints
+### @ctxindex/extension-sdk — capability-gated Adapter contract
 
 ```ts
-// apps/cli/src/main.ts
-export async function runCli(args: string[]): Promise<number>
+export type AdapterCapability =
+  | 'sync'
+  | 'search-remote'
+  | 'retrieve'
+  | 'download'
 
-// packages/core/src/storage/init.ts
-export async function bootstrapDatabase(): Promise<void>
+export type AdapterOperations = {
+  readonly sync?: (context: SyncContext) => void | Promise<void>
+  readonly searchRemote?: (
+    context: SearchContext,
+  ) => Promise<SearchRemoteResult>
+  readonly retrieve?: (context: RetrieveContext) => void | Promise<void>
+  readonly download?: (context: DownloadContext) => void | Promise<void>
+}
 
-// packages/core/src/extension/loader.ts
+export type AdapterOperationsFor<
+  TCapabilities extends readonly AdapterCapability[],
+> = CapabilityOperation<TCapabilities, 'sync', 'sync'> &
+  CapabilityOperation<TCapabilities, 'search-remote', 'searchRemote'> &
+  CapabilityOperation<TCapabilities, 'retrieve', 'retrieve'> &
+  CapabilityOperation<TCapabilities, 'download', 'download'>
+
+export interface AdapterDefinition<
+  TId extends string = string,
+  TVersion extends number = number,
+  TConfigSchema extends z.ZodTypeAny = z.ZodTypeAny,
+  TCapabilities extends
+    readonly AdapterCapability[] = readonly AdapterCapability[],
+  TActions extends Readonly<Record<string, AdapterActionBinding>> = Readonly<
+    Record<string, AdapterActionBinding>
+  >,
+  TAuth extends AdapterAuthSpec = AdapterAuthSpec,
+> {
+  readonly id: TId
+  readonly version: TVersion
+  readonly configSchema: TConfigSchema
+  readonly auth: TAuth
+  readonly providerApiHosts?: readonly string[]
+  readonly profiles: readonly ProfileReference[]
+  readonly routing: SearchRouting
+  readonly capabilities: TCapabilities
+  readonly operations: AdapterOperationsFor<TCapabilities>
+  readonly actions: TActions
+  readonly docs?: { readonly summary: string }
+}
+
+export function defineAdapter<
+  const TId extends string,
+  const TVersion extends number,
+  TConfigSchema extends z.ZodTypeAny,
+  const TCapabilities extends readonly AdapterCapability[],
+  const TActions extends Readonly<Record<string, AdapterActionBinding>>,
+  const TAuth extends AdapterAuthSpec,
+>(
+  definition: AdapterDefinition<
+    TId,
+    TVersion,
+    TConfigSchema,
+    TCapabilities,
+    TActions,
+    TAuth
+  >,
+): AdapterDefinition<
+  TId,
+  TVersion,
+  TConfigSchema,
+  TCapabilities,
+  TActions,
+  TAuth
+>;
+```
+
+### @ctxindex/cli and @ctxindex/core — composition entrypoints
+
+```ts
+export async function runCli(args: string[]): Promise<number>;
+
+export async function bootstrapDatabase(): Promise<void>;
+
 export async function loadExtensions(
   input: LoadExtensionsInput,
-): Promise<LoadExtensionsResult>
+): Promise<LoadExtensionsResult>;
 ```
 
 ## Implementation doctrine

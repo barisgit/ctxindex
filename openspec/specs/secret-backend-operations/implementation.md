@@ -4,9 +4,9 @@
 
 ## Interfaces
 
-These listings are trimmed from the current source. Imports and implementation bodies are omitted; names, parameters, return types, and key data shapes are kept.
+These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
 
-### `packages/core/src/secrets/types.ts`
+### @ctxindex/core — Secret Store contracts
 
 ```ts
 export interface SecretsStore {
@@ -39,7 +39,7 @@ export function fileRef(scope: string, key: string): string;
 export function parseSecretRef(ref: string): ParsedSecretRef;
 ```
 
-### `packages/core/src/secrets/vault.ts`
+### @ctxindex/core — routing Secret Vault
 
 ```ts
 export interface SecretVaultDeps {
@@ -55,7 +55,7 @@ export interface SecretVault extends SecretsStore {
 export function createSecretVault(deps: SecretVaultDeps): SecretVault;
 ```
 
-### `packages/core/src/secrets/initialize.ts`
+### @ctxindex/core — secret backend initialization
 
 ```ts
 export interface InitializeSecretBackendOptions {
@@ -69,23 +69,9 @@ export async function initializeSecretBackend(
 ): Promise<SecretBackend>;
 ```
 
-### `packages/core/src/secrets/backend-manager.ts`
+### @ctxindex/core — backend switching
 
 ```ts
-type SecretEntry = {
-  readonly ref: string
-  readonly scope: string
-  readonly key: string
-}
-
-type GrantSecretRow = {
-  readonly id: string
-  readonly client_id_ref: string | null
-  readonly client_secret_ref: string | null
-  readonly access_token_ref: string | null
-  readonly refresh_token_ref: string | null
-}
-
 export interface SecretBackendManagerDeps {
   readonly db: CtxindexDatabase
   readonly fileStore: SecretsStore
@@ -125,7 +111,7 @@ export function createSecretBackendManager(
 
 ## Implementation doctrine
 
-`packages/core/src/secrets` owns the routing Vault, Keychain/file stores, initialization, and backend manager. Typed reference prefixes route reads/deletes; new writes use the configured backend. Runtime failures never silently change selection, and values/passphrases stay out of argv and logs.
+`@ctxindex/core` owns the routing Secret Vault, Keychain/file stores, initialization, and backend manager. Typed reference prefixes route reads/deletes; new writes use the configured backend. Runtime failures never silently change selection, and values/passphrases stay out of argv and logs.
 
 Switching copies and verifies target values, transactionally updates database references, atomically commits config, then cleans old copies. Cleanup failure leaves usable target state and a pending warning. Prefix routing keeps mixed references readable across interruption.
 

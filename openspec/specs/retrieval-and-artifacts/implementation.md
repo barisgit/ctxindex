@@ -4,9 +4,9 @@
 
 ## Interfaces
 
-These listings are trimmed from the current source. Imports and implementation bodies are omitted; names, parameters, return types, and key data shapes are kept.
+These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
 
-### `packages/core/src/source/retrieve.ts`
+### @ctxindex/core — provider retrieval
 
 ```ts
 export interface SourceResourceWarning {
@@ -35,7 +35,7 @@ export async function getSourceResource(
 ): Promise<SourceResourceResult>;
 ```
 
-### `packages/core/src/artifact/artifact-store.ts`
+### @ctxindex/core — Artifact persistence
 
 ```ts
 export interface ArtifactMetadataInput {
@@ -102,7 +102,7 @@ export class ArtifactStore {
 }
 ```
 
-### `packages/core/src/artifact/artifact-service.ts`
+### @ctxindex/core — Artifact service boundary
 
 ```ts
 export interface ArtifactWarning {
@@ -148,7 +148,7 @@ export class ArtifactService {
 }
 ```
 
-### `packages/core/src/thread/thread-service.ts`
+### @ctxindex/core — thread retrieval
 
 ```ts
 export interface ThreadRelationNames {
@@ -186,7 +186,7 @@ export function createThreadService({
 }: CreateThreadServiceInput): ThreadService;
 ```
 
-### `packages/core/src/export/export-service.ts`
+### @ctxindex/core — Resource export
 
 ```ts
 export interface ExportResourceInput extends RetrieveSourceResourceInput {

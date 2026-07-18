@@ -19,6 +19,8 @@ Read these first unless already in context:
 
 `CONTEXT.md` owns terminology, capability specs own behavior, and `implementation.md` sidecars own selective interface-first doctrine. Do not turn this skill into another source of product truth.
 
+Implementation sidecars describe seams at the module/package level; `codemap.md` owns file layout. Never use source-file paths as locations. Prioritize interfaces, type aliases, discriminated or schema-derived types, and full generic signatures with every type parameter and constraint intact. Keep exported functions secondary and signature-only, prefer the types they consume and produce, and copy every listed member from current source; never publish an empty interface shell.
+
 ## Choose the owner
 
 | Change | Owner |

@@ -20,6 +20,17 @@ Use these sources according to their ownership:
 
 If `SYSTEM.md` conflicts with a capability spec, fix `SYSTEM.md`; do not edit the spec to match the projection. If two canonical sources genuinely conflict, report the conflict instead of choosing or inventing behavior.
 
+## Writing Standard
+
+Aim for a great technical narrative, not a flattened set of requirements.
+
+- Start with what a reader needs to understand and what happens when they run a command. Explain cause and effect across the system rather than walking requirement-by-requirement through the specs.
+- Do not translate specification language into prose with `SHALL`, `MUST`, or close rephrasings. Preserve the behavior and its strength through concrete explanations, boundaries, and examples instead of spec-speak.
+- Prefer a short **10-minute tour** up front, then deepen the model in later sections. The complete document should normally be about 25–30 KB; compress repetition rather than padding to the target.
+- Include at least one worked end-to-end example with a real ctxindex command sequence. Show the expected shape of each important readable or JSON result without inventing exact provider data.
+- Include two or three small diagrams in ASCII or Mermaid. At minimum, diagram the Client → Account → Grant → Source authorization layering and the distinct sync versus remote-search data flows.
+- Name implementation locations at the module level (`@ctxindex/cli`, `@ctxindex/core`, `@ctxindex/extension-sdk`, `@ctxindex/profiles`, and `@ctxindex/adapters`). File layout belongs to `codemap.md`; do not narrate implementation ownership with source-file paths. Exact spec, sidecar, and explanatory-document paths remain appropriate in the source index because they identify consulted evidence.
+
 ## Required Header
 
 Begin `SYSTEM.md` with a prominent header that states:
@@ -35,18 +46,19 @@ Name source groups precisely. Record which implementation sidecars were present,
 
 Write the following sections in this order. Merge subsections only when doing so improves readability without hiding the subject.
 
-1. **Overview and value proposition** — what ctxindex is, who it serves, which systems remain canonical, and what it deliberately is not.
-2. **Domain model** — distill the ubiquitous language from `CONTEXT.md`, including the important entity relationships. Use the canonical capitalized terms.
-3. **Trust boundaries and security model** — local data boundary, secret storage, approved network egress, logging/redaction, Extension trust, and why Realms are not security boundaries.
-4. **Extension architecture** — explain Profiles, Source Adapters, Extensions, registries, capabilities, host-provided contexts, degraded loading, and module ownership.
-5. **Accounts, Clients, Grants, and Realms** — explain identities, labels, OAuth selection and reauthorization, Source binding, Realm membership, and removal behavior.
-6. **Search and sync behavior** — explain local/federated/hybrid routing, exact filters, ranking and degradation, retrieval/materialization, sync transactions, cursors, locks, and tombstones.
-7. **Provider coverage and limitations** — state only provider and local-adapter behavior established by capability specs. Make read-only boundaries and missing dedicated capability contracts visible.
-8. **Typed Actions and Drafts** — explain registry-derived Actions, explicit Source selection, validation, effect classes, reversible email Draft scope, and deferred mutations.
-9. **Storage model** — explain generic resources, Refs, payloads, fields, chunks, Relations, Artifacts, origins, timestamps, identifiers, retention, backup, and canonical-source boundaries.
-10. **CLI surface and stable exit codes** — describe non-interactive behavior, derived command vocabulary, output expectations, entity resolution, bundled skill discovery, and every stable exit code.
-11. **Known limitations and deferrals** — gather explicit deferrals, optional future work, unsupported cases, and areas where specs intentionally stay silent. Do not turn optional behavior into a promise.
-12. **Source index** — map every preceding `SYSTEM.md` section to the exact capability specs, implementation sidecars, and explanatory docs it distills.
+1. **10-minute tour** — orient the reader with the value proposition, the shortest useful command journey, and the two principal data paths.
+2. **Overview and value proposition** — what ctxindex is, who it serves, which systems remain canonical, and what it deliberately is not.
+3. **Domain model** — distill the ubiquitous language from `CONTEXT.md`, including the important entity relationships. Use the canonical capitalized terms.
+4. **Trust boundaries and security model** — local data boundary, secret storage, approved network egress, logging/redaction, Extension trust, and why Realms are not security boundaries.
+5. **Extension architecture** — explain Profiles, Source Adapters, Extensions, registries, capabilities, host-provided contexts, degraded loading, and module ownership.
+6. **Accounts, Clients, Grants, and Realms** — explain identities, labels, OAuth selection and reauthorization, Source binding, Realm membership, and removal behavior.
+7. **Search and sync behavior** — explain local/federated/hybrid routing, exact filters, ranking and degradation, retrieval/materialization, sync transactions, cursors, locks, and tombstones.
+8. **Provider coverage and limitations** — state only provider and local-adapter behavior established by capability specs. Make read-only boundaries and missing dedicated capability contracts visible.
+9. **Typed Actions and Drafts** — explain registry-derived Actions, explicit Source selection, validation, effect classes, reversible email Draft scope, and deferred mutations.
+10. **Storage model** — explain generic resources, Refs, payloads, fields, chunks, Relations, Artifacts, origins, timestamps, identifiers, retention, backup, and canonical-source boundaries.
+11. **CLI surface and stable exit codes** — describe non-interactive behavior, derived command vocabulary, output expectations, entity resolution, bundled skill discovery, and every stable exit code.
+12. **Known limitations and deferrals** — gather explicit deferrals, optional future work, unsupported cases, and areas where specs intentionally stay silent. Do not turn optional behavior into a promise.
+13. **Source index** — map every preceding `SYSTEM.md` section to the exact capability specs, implementation sidecars, and explanatory docs it distills.
 
 ## Initial Authoring Workflow
 
@@ -87,6 +99,11 @@ Before finishing, confirm:
 - provider failures do not incorrectly imply all search fails when local results survive;
 - optional or recommended behavior is not described as shipped or guaranteed;
 - limitations are candid, especially where no dedicated capability spec exists;
+- the 10-minute tour is short, the full document is roughly 25–30 KB, and neither repeats later sections mechanically;
+- at least one real command sequence includes expected readable or JSON output shapes;
+- two or three small diagrams include both the Client → Account → Grant → Source layering and sync-versus-remote-search flow;
+- the narrative explains user-visible cause and effect without SHALL/MUST-style spec paraphrases;
+- implementation ownership uses package names rather than source-file paths;
 - the source index covers every section with exact paths;
 - no requirement appears only because it seemed desirable.
 

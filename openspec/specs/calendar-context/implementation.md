@@ -4,9 +4,9 @@
 
 ## Interfaces
 
-These listings are trimmed from the current source. Imports and implementation bodies are omitted; names, parameters, return types, and key data shapes are kept.
+These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
 
-### `packages/profiles/src/calendar-event.ts`
+### @ctxindex/profiles — calendar event vocabulary
 
 ```ts
 export type CalendarEvent = z.infer<typeof calendarEventSchema>
@@ -17,7 +17,7 @@ export function calendarEventRef(
 ): string;
 ```
 
-### `packages/adapters/src/google-calendar/event.ts`
+### @ctxindex/adapters — Google Calendar normalization
 
 ```ts
 export interface GoogleCalendarWarning {
@@ -39,7 +39,7 @@ export function normalizeGoogleCalendarEvent(
 ): NormalizedGoogleCalendarEvent;
 ```
 
-### `packages/adapters/src/microsoft/calendar/event.ts`
+### @ctxindex/adapters — Microsoft Calendar normalization
 
 ```ts
 export interface MicrosoftCalendarWarning {
@@ -63,21 +63,9 @@ export function normalizeMicrosoftCalendarEvent(
 ): NormalizedMicrosoftCalendarEvent;
 ```
 
-### Definition exports
-
-```ts
-// packages/profiles/src/calendar-event.ts
-export { calendarEventSchema, calendarEventProfile }
-export type { CalendarEvent }
-
-// Adapter definitions
-export { googleCalendarAdapterDefinition }
-export { microsoftCalendarAdapterDefinition }
-```
-
 ## Implementation doctrine
 
-`packages/profiles/src/calendar-event.ts` owns provider-neutral event validation and pure projections. Google and Microsoft event modules normalize provider responses and construct Source-scoped Refs; core storage, search, retrieval, and CLI code stay provider-neutral.
+`@ctxindex/profiles` owns provider-neutral event validation and pure projections. Google and Microsoft modules in `@ctxindex/adapters` normalize provider responses and construct Source-scoped Refs; core storage, search, retrieval, and CLI code stay provider-neutral.
 
 Calendar sync uses generic operation contexts. Adapter cursors retain an anchored window, provider cursor, and Source-local manifest; changing the window requires complete reconciliation before cursor replacement or removal emission. Calendar definitions bind no Actions.
 
