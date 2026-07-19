@@ -19,6 +19,6 @@ Publishes ctxindex's bundled provider-neutral vocabularies: the `calendar.event@
 
 ## Integration points
 
-- Depends on `@ctxindex/extension-sdk` definition helpers and Zod.
+- Depends on `@ctxindex/extension-sdk` definition helpers and Zod; its package manifest owns build, quality, test, and clean/fullclean tasks dispatched by root Turbo commands.
 - `packages/adapters/src/builtins.ts` bundles all three Profiles: Google and Microsoft mailbox Adapters target `communication.message@1` and bind the same `communication.message.draft.create` and `communication.message.draft.update` Actions; Google and Microsoft calendar Adapters target `calendar.event@1`; the local-directory Adapter targets `file@1`.
 - Core registry, resource, search, relation, artifact, export, and Action services consume the Profile hooks through SDK contracts.

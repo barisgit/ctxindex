@@ -1,0 +1,41 @@
+---
+title: ctxindex describe
+description: Inspect the loaded Profile, Adapter, and Action registry.
+---
+
+`describe` is the authoritative discovery surface for registry-derived kinds, fields, formats, Source options, OAuth declarations, and Action schemas.
+
+## Usage
+
+```sh
+ctxindex describe [profile|adapter|action] [id] [--full] [--format <format>] [--json]
+```
+
+Without a selector, it prints a compact grouped index. This remains compact with `--json`. A selector prints every matching full definition, while an exact ID prints one full definition.
+
+## Flags
+
+| Flag | Purpose |
+| --- | --- |
+| `--full` | Include complete detail for every matched definition. Do not combine it with an exact ID. |
+| `--format text` | Print readable text. This is the default. |
+| `--format markdown` | Print readable Markdown with structured schemas. |
+| `--format json` | Print exact registry JSON. |
+| `--json` | Alias for JSON output. It conflicts with a non-JSON `--format`. |
+
+```sh
+ctxindex describe
+ctxindex describe adapter local.directory
+ctxindex describe action communication.message.draft.create --json
+ctxindex describe --json
+ctxindex describe --full --json
+ctxindex describe --full --format markdown
+```
+
+## JSON output
+
+`--json` and `--format json` select deterministic JSON, but they do not change how much data is selected. Bare `describe --json` returns the compact grouped index. An exact ID returns that one complete definition. Use `describe --full --json` for the complete registry snapshot, or combine `--full` with a selector for every definition of that type.
+
+<Callout title="Stable exit codes">
+Exit codes are API: `0` success; `2` invalid usage or an unknown selector/ID; `10` `needs_auth`; `20` rate limited; `30` network/provider; `40` permission denied; `50` other sync failure; `130` cancelled by SIGINT.
+</Callout>

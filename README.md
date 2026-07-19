@@ -26,16 +26,35 @@ V1 and V1.1 are shipped. The project remains pre-alpha but functional: it provid
 
 ## Development
 
+Install once, then run workspace commands from the repository root. Turborepo
+dispatches package-owned tasks and keeps their cache and dependency ordering
+consistent.
+
 ```sh
 bun install
-bun cli --help
-# equivalently:
-bun run cli --help
+bun dev                 # web development server
+bun cli --help          # development CLI
+
+bun build               # all workspace builds
+bun build:web           # web only
+bun build:cli           # CLI only
+bun lint
+bun typecheck
+bun test
+bun test:integration
+bun test:e2e
+bun ci                  # complete repository gate
 ```
 
-There is no `bun link` development path. The root and package-local scripts both
-dispatch through `scripts/cli.sh` to `apps/cli/bin/ctxindex.mjs` so
-helper-created worktrees use isolated state.
+Use `bun clean` to remove workspace build output and caches while preserving
+installed dependencies and `bun.lock`. Use `bun fullclean` when dependency
+state itself must be rebuilt; run `bun install` afterward. `bun start` builds
+and starts the production web app. Package scripts remain independently
+runnable through Bun filters when a narrower command is needed.
+
+There is no `bun link` development path. `bun cli` dispatches through
+`scripts/cli.sh` to `apps/cli/bin/ctxindex.mjs` so helper-created worktrees use
+isolated state.
 
 ## Packaging
 

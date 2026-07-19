@@ -7,7 +7,7 @@ Packages the Bun-executed `ctxindex` command-line application, from its executab
 ## Design / patterns
 
 - `bin/ctxindex.mjs` is a minimal executable adapter; all registration, orchestration, and formatting live under `src/`.
-- `package.json` declares a private ESM workspace package, exports `src/main.ts`, and exposes build, lint, typecheck, test, and a marker-aware `cli` script shared with the repository root.
+- `package.json` declares a private ESM workspace package, exports `src/main.ts`, and owns the build, lint, format, typecheck, test, clean/fullclean, and marker-aware `cli` tasks dispatched from the repository root through Turbo or the shared CLI launcher.
 - The package follows a layered CLI architecture: executable shim -> citty composition root -> parser/handler/workflow modules -> core services -> output adapters; secret-backend policy remains in core rather than command handlers.
 
 ## Data & control flow
