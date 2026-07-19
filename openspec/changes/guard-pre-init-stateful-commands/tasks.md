@@ -13,5 +13,8 @@
 ## 3. Review fixes
 
 - [x] 3.1 Require both persisted config and database evidence, with config-only partial-init regression coverage.
-- [x] 3.2 Make initialization guidance installation-neutral and align Client flow documentation with provider-first validation.
+- [x] 3.2 Align Client flow documentation with provider-first validation.
 - [x] 3.3 Assert the synthetic Keychain mock path before checking its absence.
+- [x] 3.4 Standardize the exact `bun cli init` recovery guidance across runtime, focused tests, and change doctrine.
+- [x] 3.5 Assert file-secret artifacts remain absent after config-only rejection.
+- [x] 3.6 Specify and test provider validation before initialization.

@@ -22,7 +22,7 @@
 
 2. `getDb()` enforces the precondition centrally for all database-backed command paths. `client add` preserves provider validation on fresh state, then calls the same preflight before reading credential environments; list/remove call it before dependencies. This closes the credential-read ordering gap without weakening existing provider validation.
 
-3. The failure is a usage/precondition error with stable exit code 2 and the installation-neutral message `ctxindex is not initialized; run ctxindex init`. No native backend detail is exposed because no backend effect occurs.
+3. The failure is a usage/precondition error with stable exit code 2 and the fixed message `ctxindex is not initialized; run bun cli init`. No native backend detail is exposed because no backend effect occurs.
 
 ## Risks / Trade-offs
 

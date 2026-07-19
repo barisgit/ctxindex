@@ -16,7 +16,7 @@ export async function assertInitialized(): Promise<void> {
   ])
   if (hasConfig && hasDatabase) return
   throw new CtxindexError(
-    'ctxindex is not initialized; run ctxindex init',
+    'ctxindex is not initialized; run bun cli init',
     'invalid_args',
   )
 }

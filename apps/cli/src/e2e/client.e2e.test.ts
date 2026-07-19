@@ -17,7 +17,7 @@ test('client add requires explicit initialization before reading credentials or 
 
     expect(added.exitCode).toBe(2)
     expect(added.stderr).toContain(
-      'ctxindex is not initialized; run ctxindex init',
+      'ctxindex is not initialized; run bun cli init',
     )
     expect(`${added.stdout}${added.stderr}`).not.toContain(
       'microsoft-client-id-canary',
@@ -65,17 +65,40 @@ test('client add rejects config-only partial initialization without opening stat
 
     expect(added.exitCode).toBe(2)
     expect(added.stderr).toContain(
-      'ctxindex is not initialized; run ctxindex init',
+      'ctxindex is not initialized; run bun cli init',
     )
     expect(`${added.stdout}${added.stderr}`).not.toContain(
       'partial-client-id-canary',
     )
+    for (const path of [
+      join(sandbox.env.CTXINDEX_DATA_HOME, 'ctxindex.sqlite'),
+      join(sandbox.env.CTXINDEX_DATA_HOME, 'secrets.box'),
+      join(sandbox.env.CTXINDEX_CONFIG_HOME, 'secret.key'),
+      keytarMockFile,
+    ]) {
+      expect(await Bun.file(path).exists()).toBe(false)
+    }
+  } finally {
+    await sandbox.cleanup()
+  }
+})
+
+test('client add preserves provider validation before initialization', async () => {
+  const sandbox = await createSandbox()
+  try {
+    const unknown = await sandbox.run(
+      ['client', 'add', 'fastmail', '--from-env'],
+      { env: { FASTMAIL_SECRET: 'unknown-canary' } },
+    )
+
+    expect(unknown.exitCode).toBe(2)
+    expect(unknown.stderr).toContain('Unknown OAuth provider: fastmail')
+    expect(`${unknown.stdout}${unknown.stderr}`).not.toContain('unknown-canary')
     expect(
       await Bun.file(
         join(sandbox.env.CTXINDEX_DATA_HOME, 'ctxindex.sqlite'),
       ).exists(),
     ).toBe(false)
-    expect(await Bun.file(keytarMockFile).exists()).toBe(false)
   } finally {
     await sandbox.cleanup()
   }

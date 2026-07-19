@@ -60,7 +60,7 @@ test('database-backed commands require init while help and init remain available
     const realms = await sandbox.run(['realm', 'list', '--json'])
     expect(realms.exitCode).toBe(2)
     expect(realms.stderr).toContain(
-      'ctxindex is not initialized; run ctxindex init',
+      'ctxindex is not initialized; run bun cli init',
     )
     expect(await Bun.file(dbPath(sandbox)).exists()).toBe(false)
 
