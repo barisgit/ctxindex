@@ -20,4 +20,4 @@ Packages ctxindex's built-in provider integration layer, exposing production Ada
 
 - Depends on `@ctxindex/core`, `@ctxindex/extension-sdk`, and `@ctxindex/profiles` plus provider/parsing libraries declared in `packages/adapters/package.json`.
 - Consumed by core extension loading/registration and, transitively, CLI source, auth, search, retrieval, artifact, sync, and Action workflows.
-- Workspace build/typecheck/lint commands compile the TypeScript source directly through the package export.
+- The package manifest owns build, lint, format, typecheck, test-lane, and clean/fullclean tasks dispatched by root Turbo commands.

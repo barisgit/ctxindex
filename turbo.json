@@ -4,22 +4,47 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "start": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "persistent": true
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "outputs": []
+    },
+    "format": {
+      "cache": false
     },
     "typecheck": {
-      "dependsOn": ["^typecheck"]
+      "dependsOn": ["^typecheck"],
+      "outputs": []
     },
     "test": {
-      "dependsOn": ["^test"]
+      "dependsOn": ["^test"],
+      "outputs": []
     },
     "test:integration": {
-      "dependsOn": ["^test:integration"]
+      "dependsOn": ["^test:integration"],
+      "cache": false,
+      "outputs": []
     },
     "test:e2e": {
-      "dependsOn": ["^test:e2e"]
+      "dependsOn": ["^test:e2e"],
+      "cache": false,
+      "outputs": []
+    },
+    "clean": {
+      "cache": false
+    },
+    "fullclean": {
+      "cache": false
     }
-  }
+  },
+  "ui": "tui"
 }

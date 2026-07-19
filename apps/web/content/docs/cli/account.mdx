@@ -1,0 +1,34 @@
+---
+title: ctxindex account
+description: Authorize, list, and remove provider Accounts and their Grants.
+---
+
+An Account is one stable authenticated provider identity. Each Account owns one Grant and may back multiple Sources.
+
+## Usage
+
+```sh
+ctxindex account add [--label <label>] [--client <client>] <provider>
+ctxindex account list [--json]
+ctxindex account remove <label>
+```
+
+## Commands and flags
+
+| Command or flag | Purpose |
+| --- | --- |
+| `add <provider>` | Start explicit OAuth authorization for one provider Account. This may open a browser. |
+| `--label <label>` | Set the globally unique Account label. The verified provider identity is the default. |
+| `--client <client>` | Select a provider-scoped Client label. One Client is selected automatically; multiple require this flag. |
+| `list` | List Accounts with Grants and bound Sources. |
+| `remove <label>` | Remove the Account, Grant, and Grant secrets. Bound Sources remain configured and become `needs_auth`. |
+
+Reauthorizing the same provider identity updates its stable Account and Grant in place. Labels remain verbatim; collisions fail without prompting or automatic suffixes.
+
+## JSON output
+
+Only `account list` accepts `--json`. Its deterministic inventory excludes secret values.
+
+<Callout title="Stable exit codes">
+Exit codes are API: `0` success; `2` invalid usage or a label collision; `10` `needs_auth`; `20` rate limited; `30` network/provider; `40` permission denied; `50` other sync failure; `130` cancelled by SIGINT.
+</Callout>

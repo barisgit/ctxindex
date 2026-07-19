@@ -239,6 +239,209 @@ test('rejects undeclared and unused runtime dependencies', async () => {
   ])
 })
 
+test('checks web workspaces and reports ordinary undeclared imports', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/package.json'),
+    JSON.stringify({ name: 'web', dependencies: { next: 'latest' } }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/app/page.tsx'),
+    "import Link from 'next/link'; import 'undeclared-web-package'; export default Link",
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([
+    {
+      type: 'undeclared-dependency',
+      packageName: 'web',
+      dependency: 'undeclared-web-package',
+    },
+  ])
+})
+
+test('accepts web aliases, generated directories, framework imports, and declared peers', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/package.json'),
+    JSON.stringify({
+      name: 'web',
+      dependencies: {
+        'fumadocs-core': 'latest',
+        'lucide-react': 'latest',
+        next: 'latest',
+        react: 'latest',
+        'react-dom': 'latest',
+      },
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/tsconfig.json'),
+    JSON.stringify({
+      compilerOptions: {
+        paths: { '@/*': ['./*'], 'collections/*': ['./.source/*'] },
+      },
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/app/page.tsx'),
+    [
+      "import Link from 'next/link'",
+      "import { lucideIconsPlugin } from 'fumadocs-core/source/lucide-icons'",
+      "import local from '@/lib/local'",
+      "import generated from 'collections/server'",
+      "import type { MDXComponents } from 'mdx/types'",
+      'lucideIconsPlugin()',
+      'export default <Link href={local}>{generated as unknown as MDXComponents}</Link>',
+    ].join('\n'),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/.next/types/generated.ts'),
+    "import 'generated-only-package'",
+  )
+  await writeFixture(
+    join(fixtureRoot, 'node_modules/next/package.json'),
+    JSON.stringify({
+      name: 'next',
+      peerDependencies: { react: '*', 'react-dom': '*' },
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'node_modules/fumadocs-core/package.json'),
+    JSON.stringify({
+      name: 'fumadocs-core',
+      peerDependencies: { 'lucide-react': '*' },
+      peerDependenciesMeta: { 'lucide-react': { optional: true } },
+    }),
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([])
+})
+
+test('matches exact aliases without suppressing package-name prefixes', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/package.json'),
+    JSON.stringify({ name: 'web', dependencies: {} }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/tsconfig.json'),
+    JSON.stringify({ compilerOptions: { paths: { react: ['./shim.ts'] } } }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/app/page.ts'),
+    "import local from 'react'; import external from 'react-dom'; export { local, external }",
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([
+    {
+      type: 'undeclared-dependency',
+      packageName: 'web',
+      dependency: 'react-dom',
+    },
+  ])
+})
+
+test('reads local aliases from valid commented and trailing-comma tsconfig JSONC', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/package.json'),
+    JSON.stringify({ name: 'web', dependencies: {} }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/tsconfig.json'),
+    `{
+      // TypeScript configuration files use JSONC.
+      "compilerOptions": {
+        "paths": { "@/*": ["./*"] },
+      },
+    }`,
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/app/page.ts'),
+    "import local from '@/lib/local'; export default local",
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([])
+})
+
+test('does not exempt aliases targeting node_modules or sibling applications', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'apps/worker/package.json'),
+    JSON.stringify({ name: '@fixture/worker', dependencies: {} }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/worker/src/index.ts'),
+    'export const worker = true',
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/package.json'),
+    JSON.stringify({ name: 'web', dependencies: {} }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/tsconfig.json'),
+    JSON.stringify({
+      compilerOptions: {
+        baseUrl: '..',
+        paths: {
+          'external/*': ['web/node_modules/external/*'],
+          '@fixture/worker/*': ['worker/*'],
+        },
+      },
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/app/page.ts'),
+    "import 'external/value'; import '@fixture/worker/runtime'",
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([
+    {
+      type: 'undeclared-dependency',
+      packageName: 'web',
+      dependency: '@fixture/worker',
+    },
+    {
+      type: 'undeclared-dependency',
+      packageName: 'web',
+      dependency: 'external',
+    },
+    {
+      type: 'workspace-direction',
+      packageName: 'web',
+      dependency: '@fixture/worker',
+    },
+  ])
+})
+
+test('does not treat unrelated optional framework peers as used', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/package.json'),
+    JSON.stringify({
+      name: 'web',
+      dependencies: {
+        next: 'latest',
+        react: 'latest',
+        'react-dom': 'latest',
+        sass: 'latest',
+      },
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/app/page.ts'),
+    "import Link from 'next/link'; export default Link",
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([
+    {
+      type: 'unused-dependency',
+      packageName: 'web',
+      dependency: 'sass',
+    },
+  ])
+})
+
 test('rejects workspace dependencies outside the accepted direction', async () => {
   fixtureRoot = await createFixtureRoot()
   const manifests = [
