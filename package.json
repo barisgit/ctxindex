@@ -17,6 +17,7 @@
     "build:web": "turbo run build --filter web",
     "build:cli": "turbo run build --filter @ctxindex/cli",
     "lint": "turbo run lint",
+    "lint:staged": "lint-staged",
     "format": "turbo run format",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
@@ -26,12 +27,15 @@
     "fullclean": "turbo run fullclean && rm -rf node_modules .turbo dist build coverage && rm -f *.tsbuildinfo",
     "with-timeout": "bun scripts/with-timeout.ts",
     "ci": "bash scripts/verify/ci.sh",
-    "cli": "bash scripts/cli.sh"
+    "cli": "bash scripts/cli.sh",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",
     "@types/bun": "^1.3.14",
     "@typescript/native-preview": "^7.0.0-dev.20260519.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "turbo": "^2.9.14",
     "typescript": "^6.0.3"
   }
