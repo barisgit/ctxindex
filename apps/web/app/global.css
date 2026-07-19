@@ -82,3 +82,18 @@ html > body[data-scroll-locked] {
     );
   background-size: 40px 40px;
 }
+
+/* Keep docs navigation anchored to the viewport on wide displays. Fumadocs'
+   default grid centers the sidebar, article, and TOC as one bounded shell,
+   which turns the left gutter into a visually oversized sidebar at 4K. */
+@media (min-width: 48rem) {
+  #nd-docs-layout.ctx-docs-layout {
+    --fd-sidebar-width: 248px;
+  }
+}
+
+@media (min-width: 80rem) {
+  #nd-docs-layout.ctx-docs-layout {
+    --fd-toc-width: 240px;
+  }
+}
