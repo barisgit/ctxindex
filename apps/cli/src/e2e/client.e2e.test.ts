@@ -94,11 +94,20 @@ test('client add preserves provider validation before initialization', async () 
     expect(unknown.exitCode).toBe(2)
     expect(unknown.stderr).toContain('Unknown OAuth provider: fastmail')
     expect(`${unknown.stdout}${unknown.stderr}`).not.toContain('unknown-canary')
-    expect(
-      await Bun.file(
-        join(sandbox.env.CTXINDEX_DATA_HOME, 'ctxindex.sqlite'),
-      ).exists(),
-    ).toBe(false)
+    const keytarMockFile = sandbox.env.CTXINDEX_KEYTAR_MOCK_FILE
+    expect(keytarMockFile).toBeDefined()
+    if (keytarMockFile === undefined) {
+      throw new Error('sandbox Keychain mock path is required')
+    }
+    for (const path of [
+      join(sandbox.env.CTXINDEX_CONFIG_HOME, 'config.toml'),
+      join(sandbox.env.CTXINDEX_DATA_HOME, 'ctxindex.sqlite'),
+      join(sandbox.env.CTXINDEX_DATA_HOME, 'secrets.box'),
+      join(sandbox.env.CTXINDEX_CONFIG_HOME, 'secret.key'),
+      keytarMockFile,
+    ]) {
+      expect(await Bun.file(path).exists()).toBe(false)
+    }
   } finally {
     await sandbox.cleanup()
   }

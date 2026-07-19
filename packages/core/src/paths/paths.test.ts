@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from 'bun:test'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { resetEnvForTests } from '../config/env-loader'
+import { getEnv, resetEnvForTests } from '../config/env-loader'
 import { cacheDir, configDir, dataDir, logDir, stateDir } from '.'
 
 const savedEnv = { ...process.env }
@@ -74,4 +74,15 @@ test('home defaults are used when CTXINDEX and XDG vars are absent', () => {
   expect(stateDir()).toBe(join(homedir(), '.local/state', 'ctxindex'))
   expect(cacheDir()).toBe(join(homedir(), '.cache', 'ctxindex'))
   expect(logDir()).toBe(join(homedir(), '.local/state', 'ctxindex', 'logs'))
+})
+
+test('path resolution does not snapshot unrelated credential environments', () => {
+  clearPathEnv()
+  process.env.CTXINDEX_GOOGLE_CLIENT_SECRET = 'before-preflight'
+  resetEnvForTests()
+
+  configDir()
+  process.env.CTXINDEX_GOOGLE_CLIENT_SECRET = 'after-preflight'
+
+  expect(getEnv().CTXINDEX_GOOGLE_CLIENT_SECRET).toBe('after-preflight')
 })

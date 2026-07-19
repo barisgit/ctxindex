@@ -1,7 +1,7 @@
 // Biome lint note: this is ctxindex's only legal resolver; no other module should hand-roll config/data/state/cache/log paths.
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { type EnvSchemaKey, getEnv } from '../config/env-loader'
+import type { EnvSchemaKey } from '../config/env-loader'
 
 type CtxindexPathEnvKey = Extract<
   EnvSchemaKey,
@@ -21,11 +21,10 @@ function resolveDir(
   xdgEnv: XdgPathEnvKey,
   xdgDefault: string,
 ): string {
-  const env = getEnv()
-  const explicit = env[ctxindexEnv]
+  const explicit = process.env[ctxindexEnv]
   if (explicit) return explicit
 
-  const xdg = env[xdgEnv]
+  const xdg = process.env[xdgEnv]
   if (xdg) return join(xdg, 'ctxindex')
 
   return join(homedir(), xdgDefault, 'ctxindex')
