@@ -15,12 +15,22 @@ import {
 
 const MAX_PAGES = 3
 const MAX_ITEMS = 50
+const MAX_CONTINUATION_IDS = 1_000
 const pageSchema = z
   .object({
     value: z.array(z.unknown()),
     '@odata.nextLink': z.string().min(1).optional(),
   })
   .passthrough()
+const continuationSchema = z.object({
+  version: z.literal(1),
+  nextLink: z.string().min(1),
+  query: z.string().min(1),
+  limit: z.number().int().min(1),
+  seenIds: z.array(z.string().min(1)).max(MAX_CONTINUATION_IDS),
+})
+
+type MicrosoftMailboxContinuation = z.infer<typeof continuationSchema>
 
 function escaped(value: string): string {
   if (/\p{Cc}/u.test(value))
@@ -42,6 +52,12 @@ function kql(context: SearchContext): string {
       field.value.trim()
     ) {
       parts.push(`from:${escaped(field.value.trim())}`)
+    } else if (
+      field.name === 'unread' &&
+      field.type === 'boolean' &&
+      typeof field.value === 'boolean'
+    ) {
+      parts.push(`IsRead:${field.value ? 'false' : 'true'}`)
     } else {
       throw new CtxindexValidationError(
         'invalid_filter',
@@ -54,6 +70,84 @@ function kql(context: SearchContext): string {
   if (context.query.until !== undefined)
     parts.push(`received<${graphDate(context.query.until, true)}`)
   return `"${parts.length > 0 ? parts.join(' AND ') : '*'}"`
+}
+
+function continuationQueryIdentity(
+  context: SearchContext,
+  query: string,
+): string {
+  return JSON.stringify({
+    query,
+    text: context.query.text,
+    fields: context.query.fields ?? [],
+    since: context.query.since ?? null,
+    until: context.query.until ?? null,
+  })
+}
+
+function invalidContinuation(reason = 'is malformed'): never {
+  throw new CtxindexValidationError(
+    'invalid_filter',
+    `Microsoft mailbox continuation ${reason}`,
+  )
+}
+
+function decodeContinuation(
+  value: string,
+  query: string,
+  limit: number,
+): MicrosoftMailboxContinuation {
+  try {
+    const bytes = Buffer.from(value, 'base64url')
+    if (bytes.toString('base64url') !== value) invalidContinuation()
+    const parsed = continuationSchema.safeParse(
+      JSON.parse(bytes.toString('utf8')),
+    )
+    if (!parsed.success) invalidContinuation()
+    if (
+      parsed.data.query !== query ||
+      parsed.data.limit !== limit ||
+      new Set(parsed.data.seenIds).size !== parsed.data.seenIds.length
+    ) {
+      invalidContinuation('does not match this search')
+    }
+    let nextLink: string
+    try {
+      nextLink = validateGraphNextLink(
+        parsed.data.nextLink,
+        '/v1.0/me/messages',
+      )
+    } catch {
+      invalidContinuation('contains invalid provider progression')
+    }
+    return { ...parsed.data, nextLink }
+  } catch (error) {
+    if (error instanceof CtxindexValidationError) throw error
+    invalidContinuation()
+  }
+}
+
+function encodeContinuation(
+  nextLink: string,
+  query: string,
+  limit: number,
+  seenIds: ReadonlySet<string>,
+): string {
+  if (seenIds.size > MAX_CONTINUATION_IDS) {
+    throw new CtxindexSyncError(
+      'Microsoft Graph search exceeded its resumable result bound',
+      'provider_bad_response',
+    )
+  }
+  return Buffer.from(
+    JSON.stringify({
+      version: 1,
+      nextLink,
+      query,
+      limit,
+      seenIds: [...seenIds],
+    } satisfies MicrosoftMailboxContinuation),
+  ).toString('base64url')
 }
 
 function graphDate(timestamp: number, exclusiveUpper = false): string {
@@ -105,22 +199,36 @@ export async function microsoftMailboxSearchRemote(
       'Microsoft mailbox search bounds must be finite integers',
     )
   const query = kql(context)
+  const queryIdentity = continuationQueryIdentity(context, query)
   if (limit === 0) return { resources: [], warnings: [] }
-  const initial = new URL(graphUrl('/me/messages'))
-  initial.searchParams.set('$search', query)
-  initial.searchParams.set('$top', String(limit))
-  initial.searchParams.set(
-    '$select',
-    'id,conversationId,internetMessageId,subject,bodyPreview,from,toRecipients,receivedDateTime,sentDateTime,lastModifiedDateTime,isRead,isDraft,categories',
-  )
-  let next: string | undefined = initial.toString()
+  const continuation = context.query.continuation
+    ? decodeContinuation(
+        context.query.continuation,
+        queryIdentity,
+        context.query.limit,
+      )
+    : undefined
+  let next: string | undefined
+  if (continuation) {
+    next = continuation.nextLink
+  } else {
+    const initial = new URL(graphUrl('/me/messages'))
+    initial.searchParams.set('$search', query)
+    initial.searchParams.set('$top', String(limit))
+    initial.searchParams.set(
+      '$select',
+      'id,conversationId,internetMessageId,subject,bodyPreview,from,toRecipients,receivedDateTime,sentDateTime,lastModifiedDateTime,isRead,isDraft,categories',
+    )
+    next = initial.toString()
+  }
   const resources: SearchRemoteResult['resources'][number][] = []
-  const seen = new Set<string>()
+  const seen = new Set(continuation?.seenIds ?? [])
   let pages = 0
   while (next && pages < MAX_PAGES && resources.length < limit) {
+    const pageUrl: string = next
     const response = pageSchema.safeParse(
       await graphJson(
-        await context.fetch(next, {
+        await context.fetch(pageUrl, {
           // Immutable-id opt-in must hold on every page fetch so emitted
           // Refs stay stable; keep it explicit rather than a default.
           headers: graphHeaders(IMMUTABLE_ID_PREFERENCE),
@@ -134,33 +242,52 @@ export async function microsoftMailboxSearchRemote(
         'provider_bad_response',
         { cause: response.error },
       )
+    if (response.data.value.length > limit)
+      throw new CtxindexSyncError(
+        'Microsoft Graph returned an oversized message search page',
+        'provider_bad_response',
+      )
     pages += 1
+    let hasUnemittedEligibleMessage = false
     for (const candidate of response.data.value) {
       const message = parseGraphMessage(candidate)
       if (
-        message.isDraft ||
         seen.has(message.id) ||
+        message.isDraft ||
         !insideExactTimeBounds(message, context)
       )
         continue
+      if (resources.length === limit) {
+        hasUnemittedEligibleMessage = true
+        continue
+      }
       seen.add(message.id)
       resources.push(searchResource(context.source.id, message))
-      if (resources.length === limit) break
     }
-    next = response.data['@odata.nextLink']
+    const providerNext = response.data['@odata.nextLink']
       ? validateGraphNextLink(
           response.data['@odata.nextLink'],
           '/v1.0/me/messages',
         )
       : undefined
+    next = hasUnemittedEligibleMessage ? pageUrl : providerNext
   }
-  const warnings = next
+  const nextContinuation = next
+    ? encodeContinuation(next, queryIdentity, context.query.limit, seen)
+    : undefined
+  const warnings = nextContinuation
     ? [
         {
           code: 'truncated',
-          message: `Microsoft Graph remote search was truncated after ${resources.length} items and ${pages} pages`,
+          message: `Microsoft Graph remote search was truncated after ${resources.length} items and ${pages} ${pages === 1 ? 'page' : 'pages'}; resume with the returned continuation`,
         },
       ]
     : []
-  return { resources, warnings }
+  return {
+    resources,
+    warnings,
+    ...(nextContinuation === undefined
+      ? {}
+      : { continuation: nextContinuation }),
+  }
 }

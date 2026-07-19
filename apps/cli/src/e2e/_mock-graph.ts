@@ -189,6 +189,38 @@ function graphMessage(message: MockGraphMessage) {
   }
 }
 
+function messageMatchesSearch(
+  message: MockGraphMessage,
+  rawSearch: string | null,
+): boolean {
+  if (!rawSearch) return true
+  const expression =
+    rawSearch.startsWith('"') && rawSearch.endsWith('"')
+      ? rawSearch.slice(1, -1)
+      : rawSearch
+  const searchable = `${message.subject} ${message.bodyPreview}`.toLowerCase()
+  return expression.split(' AND ').every((rawClause) => {
+    const clause = rawClause.trim()
+    if (!clause || clause === '*') return true
+    const isRead = /^IsRead:(true|false)$/i.exec(clause)
+    if (isRead?.[1])
+      return (message.isRead ?? false) === (isRead[1].toLowerCase() === 'true')
+    const sender = /^from:(.+)$/i.exec(clause)
+    if (sender?.[1]) {
+      return message.from.address.toLowerCase() === sender[1].toLowerCase()
+    }
+    const received = /^received(>=|<)(\d{2}\/\d{2}\/\d{4})$/i.exec(clause)
+    if (received?.[1] && received[2]) {
+      const boundary = Date.parse(`${received[2]} UTC`)
+      const occurredAt = Date.parse(message.receivedDateTime)
+      return received[1] === '>='
+        ? occurredAt >= boundary
+        : occurredAt < boundary
+    }
+    return searchable.includes(clause.replace(/\\([\\"])/g, '$1').toLowerCase())
+  })
+}
+
 function attachmentMetadata(attachment: MockGraphAttachment) {
   const kind = attachment.kind ?? 'file'
   return {
@@ -691,7 +723,25 @@ export function startMockGraph(
           }
           await searchResponseBarrier
         }
-        return Response.json({ value: messages.map(graphMessage) })
+        const rawTop = Number(url.searchParams.get('$top') ?? '10')
+        if (!Number.isInteger(rawTop) || rawTop <= 0)
+          return Response.json({ error: 'invalid_top' }, { status: 400 })
+        const pageSize = Math.min(rawTop, 50)
+        const rawOffset = Number(url.searchParams.get('$skiptoken') ?? '0')
+        if (!Number.isInteger(rawOffset) || rawOffset < 0)
+          return Response.json({ error: 'invalid_skiptoken' }, { status: 400 })
+        const matching = messages.filter((message) =>
+          messageMatchesSearch(message, url.searchParams.get('$search')),
+        )
+        const nextOffset = rawOffset + pageSize
+        const nextLink = new URL(url)
+        nextLink.searchParams.set('$skiptoken', String(nextOffset))
+        return Response.json({
+          value: matching.slice(rawOffset, nextOffset).map(graphMessage),
+          ...(nextOffset < matching.length
+            ? { '@odata.nextLink': nextLink.toString() }
+            : {}),
+        })
       }
 
       const attachmentValue = url.pathname.match(

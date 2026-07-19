@@ -62,6 +62,7 @@ export interface SyncContext extends ProviderContext {
 export interface SearchRemoteQuery {
   readonly text: string
   readonly limit: number
+  readonly continuation?: string
   readonly since?: number
   readonly until?: number
   readonly fields?: readonly SearchFieldFilter[]
@@ -92,6 +93,7 @@ export interface SearchRemoteWarning {
 export interface SearchRemoteResult {
   readonly resources: readonly SearchRemoteResource[]
   readonly warnings: readonly SearchRemoteWarning[]
+  readonly continuation?: string
 }
 
 export interface SearchContext extends ProviderContext {

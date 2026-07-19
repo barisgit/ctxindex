@@ -13,6 +13,7 @@ export interface SearchPlannerInput {
   readonly text?: string
   readonly limit?: number
   readonly offset?: number
+  readonly continuation?: string
   readonly realms?: readonly string[]
   readonly sourceIds?: readonly string[]
   readonly adapterId?: string
@@ -69,10 +70,16 @@ export interface SearchPagination {
   readonly hasMore: boolean
 }
 
+export interface RemoteSearchPagination {
+  readonly limit: number
+  readonly hasMore: boolean
+  readonly continuation: string | null
+}
+
 export interface SearchPlannerResult {
   readonly results: readonly UnifiedSearchResult[]
   readonly warnings: readonly SearchPlannerWarning[]
-  readonly pagination?: SearchPagination
+  readonly pagination?: SearchPagination | RemoteSearchPagination
   readonly explain?: { readonly sources: readonly SourceSearchExplain[] }
 }
 
@@ -173,6 +180,14 @@ export class SearchPlanner {
   async search(input: SearchPlannerInput): Promise<SearchPlannerResult> {
     if (input.localOnly && input.remote)
       invalid('--local-only and --remote are mutually exclusive')
+    if (input.continuation !== undefined) {
+      if (!input.continuation.trim()) invalid('continuation must not be empty')
+      if (!input.remote) invalid('continuation requires remote execution')
+      if (input.sourceIds?.length !== 1)
+        invalid('continuation requires exactly one Source')
+      if (input.offset !== undefined)
+        invalid('continuation cannot be combined with offset')
+    }
     const limit = input.limit ?? 20
     if (!Number.isInteger(limit) || limit <= 0)
       invalid('limit must be a positive integer')
@@ -185,14 +200,26 @@ export class SearchPlanner {
       input.since !== undefined ||
       input.until !== undefined ||
       input.includeDeleted === true
-    if (input.text === undefined) {
-      if (!hasFilter) invalid('query text or at least one filter is required')
-      if (input.remote)
-        invalid(
-          'remote requires query text; filter-only remote enumeration is deferred',
-        )
+    if (input.text === undefined && !hasFilter)
+      invalid('query text or at least one filter is required')
+    if (
+      input.text === undefined &&
+      input.remote === true &&
+      (input.realms?.length ?? 0) === 0 &&
+      (input.sourceIds?.length ?? 0) === 0 &&
+      input.adapterId === undefined &&
+      input.kind === undefined &&
+      (input.fields?.length ?? 0) === 0 &&
+      input.since === undefined &&
+      input.until === undefined
+    ) {
+      invalid(
+        'query-less remote execution requires a narrowing Realm, Adapter, Source, kind, field, or time filter',
+      )
     }
-    const localExecution = input.text === undefined || input.localOnly === true
+    const localExecution =
+      (input.text === undefined && input.remote !== true) ||
+      input.localOnly === true
     const offset = input.offset ?? 0
     if (!Number.isInteger(offset) || offset < 0)
       invalid('offset must be a non-negative integer')
@@ -203,12 +230,17 @@ export class SearchPlanner {
     const resolved = resolveSearchQuery(this.deps.registry.profiles, {
       text: input.text ?? '',
       limit,
+      ...(input.continuation === undefined
+        ? {}
+        : { continuation: input.continuation }),
       ...(input.kind === undefined ? {} : { kind: input.kind }),
       ...(input.fields === undefined ? {} : { fields: input.fields }),
       ...(input.since === undefined ? {} : { since: input.since }),
       ...(input.until === undefined ? {} : { until: input.until }),
     })
     const selected = this.selectSources(input, resolved.kind)
+    if (input.continuation !== undefined && selected.length !== 1)
+      invalid('continuation requires exactly one selected Source')
     const warnings: SearchPlannerWarning[] = []
     const plans = selected.map((row) =>
       this.plan(
@@ -282,9 +314,11 @@ export class SearchPlanner {
               code: warning.code,
               message: warning.message,
             })),
+            continuation: remote.continuation,
             outcome: remote.warnings.length === 0 ? 'success' : 'degraded',
           } as const
         } catch (cause) {
+          if (cause instanceof CtxindexValidationError) throw cause
           return {
             sourceId: plan.row.id,
             origin: [],
@@ -302,6 +336,7 @@ export class SearchPlanner {
                 message: cause instanceof Error ? cause.message : String(cause),
               },
             ],
+            continuation: undefined,
             outcome: 'degraded',
           } as const
         } finally {
@@ -316,6 +351,16 @@ export class SearchPlanner {
     })
 
     const results = interleave([localUnified, ...providerOrigins], limit)
+    const remotePagination =
+      input.remote === true &&
+      input.sourceIds?.length === 1 &&
+      remoteRuns.length === 1
+        ? {
+            limit,
+            hasMore: remoteRuns[0]?.continuation !== undefined,
+            continuation: remoteRuns[0]?.continuation ?? null,
+          }
+        : undefined
     const explain = plans.map((plan) => ({
       sourceId: plan.row.id,
       routing: plan.routing,
@@ -330,7 +375,11 @@ export class SearchPlanner {
     }))
     return {
       results,
-      ...(localExecution ? { pagination: { offset, limit, hasMore } } : {}),
+      ...(localExecution
+        ? { pagination: { offset, limit, hasMore } }
+        : remotePagination === undefined
+          ? {}
+          : { pagination: remotePagination }),
       warnings: warnings.sort(
         (a, b) =>
           a.sourceId.localeCompare(b.sourceId) || a.code.localeCompare(b.code),

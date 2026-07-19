@@ -17,6 +17,7 @@ export interface ExecuteSearchInput {
   readonly until?: number
   readonly limit?: number
   readonly offset?: number
+  readonly continuation?: string
   readonly includeDeleted?: boolean
   readonly explain?: boolean
   readonly localOnly?: boolean
@@ -34,7 +35,7 @@ export type SearchArgs =
   | { readonly kind: 'unknown'; readonly message: string }
 
 export const searchUsage =
-  'search [query] [--realm <slug>] [--adapter <id>] [--source <id>] [--kind <kind>] [--field <name=value> ...] [--since <iso>] [--until <iso>] [--limit <n>] [--offset <n>] [--include-deleted] [--local-only|--remote] [--explain] [--refs] [--json] (query optional when a filter is present; --offset requires filter-only or --local-only)'
+  'search [query] [--realm <slug>] [--adapter <id>] [--source <id>] [--kind <kind>] [--field <name=value> ...] [--since <iso>] [--until <iso>] [--limit <n>] [--offset <n>|--continuation <token>] [--include-deleted] [--local-only|--remote] [--explain] [--refs] [--json] (query optional when a filter is present; continuation requires --remote and one --source)'
 
 function parseDateFlag(
   name: string,
@@ -84,7 +85,7 @@ export function parseSearchArgs(args: string[]): SearchArgs {
       'local-only',
       'remote',
     ],
-    valueFlags: ['limit', 'offset'],
+    valueFlags: ['limit', 'offset', 'continuation'],
   })
   const text = positional.join(' ').trim()
   if (flags['local-only'] === true && flags.remote === true) {
@@ -111,6 +112,13 @@ export function parseSearchArgs(args: string[]): SearchArgs {
   if (!limit.ok) return { kind: 'unknown', message: limit.message }
   const offset = parseCount('offset', flags.offset, 0)
   if (!offset.ok) return { kind: 'unknown', message: offset.message }
+  const continuation = stringFlag(flags, 'continuation')
+  if (flags.continuation !== undefined && continuation === undefined) {
+    return {
+      kind: 'unknown',
+      message: 'search: --continuation requires a token',
+    }
+  }
   const rawFields = listFlag(flags, 'field')
   const fields = rawFields.map(parseField)
   if (fields.some((field) => field === undefined)) {
@@ -135,6 +143,14 @@ export function parseSearchArgs(args: string[]): SearchArgs {
     since.value !== undefined ||
     until.value !== undefined ||
     flags['include-deleted'] === true
+  const hasRemoteFilter =
+    realms.length > 0 ||
+    adapterId !== undefined ||
+    sourceIds.length > 0 ||
+    kind !== undefined ||
+    fields.length > 0 ||
+    since.value !== undefined ||
+    until.value !== undefined
   if (!text && !hasFilter) {
     return {
       kind: 'unknown',
@@ -142,14 +158,33 @@ export function parseSearchArgs(args: string[]): SearchArgs {
         'search: provide <query> or at least one filter (--realm/--adapter/--source/--kind/--field/--since/--until/--include-deleted)',
     }
   }
-  if (!text && flags.remote === true) {
+  if (!text && flags.remote === true && !hasRemoteFilter) {
     return {
       kind: 'unknown',
       message:
-        'search: --remote requires <query>; filter-only remote enumeration is not supported',
+        'search: query-less --remote requires a narrowing Realm, Adapter, Source, kind, field, or time filter',
     }
   }
-  const localExecution = !text || flags['local-only'] === true
+  if (continuation !== undefined && flags.remote !== true) {
+    return {
+      kind: 'unknown',
+      message: 'search: --continuation requires --remote',
+    }
+  }
+  if (continuation !== undefined && sourceIds.length !== 1) {
+    return {
+      kind: 'unknown',
+      message: 'search: --continuation requires exactly one --source',
+    }
+  }
+  if (continuation !== undefined && offset.value !== undefined) {
+    return {
+      kind: 'unknown',
+      message: 'search: --continuation cannot be combined with --offset',
+    }
+  }
+  const localExecution =
+    (!text && flags.remote !== true) || flags['local-only'] === true
   if (offset.value !== undefined && !localExecution) {
     return {
       kind: 'unknown',
@@ -174,6 +209,7 @@ export function parseSearchArgs(args: string[]): SearchArgs {
       ...(until.value === undefined ? {} : { until: until.value }),
       ...(limit.value === undefined ? {} : { limit: limit.value }),
       ...(offset.value === undefined ? {} : { offset: offset.value }),
+      ...(continuation === undefined ? {} : { continuation }),
       ...(flags['include-deleted'] === true ? { includeDeleted: true } : {}),
       ...(flags.explain === true ? { explain: true } : {}),
       ...(flags['local-only'] === true ? { localOnly: true } : {}),
