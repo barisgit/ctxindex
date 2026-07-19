@@ -427,8 +427,18 @@ export async function microsoftDraftUpdate(
   const standalone = details
     ? undefined
     : (input as MicrosoftStandaloneDraftUpdateInput)
-  const stored = localMessage(context, input.ref, true)
-  const managedAttachmentRefs = stored.managedAttachmentRefs
+  const storedResource = context.resolveResource(input.ref)
+  const stored =
+    storedResource?.profile.id === 'communication.message' &&
+    storedResource.profile.version === 1 &&
+    storedResource.completeness === 'complete' &&
+    storedResource.deletedAt === null
+      ? communicationMessageSchema.safeParse(storedResource.payload)
+      : undefined
+  const managedAttachmentRefs =
+    stored?.success && stored.data.providerDraftId === draftId
+      ? stored.data.managedAttachmentRefs
+      : undefined
   const headers = graphHeaders(TEXT_BODY_PREFERENCE)
   headers.set('content-type', 'application/json')
   const response = await context.fetch(

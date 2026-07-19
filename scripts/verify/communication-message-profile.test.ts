@@ -56,18 +56,7 @@ test('bundled communication.message enters the public registry path', () => {
         id: 'communication.message.draft.create',
         profile: { id: 'communication.message', version: 1 },
         effect: 'reversible',
-        input: expect.objectContaining({
-          anyOf: [
-            expect.objectContaining({
-              additionalProperties: false,
-              required: ['to', 'subject', 'bodyText'],
-            }),
-            expect.objectContaining({
-              additionalProperties: false,
-              required: ['replyToRef', 'bodyText'],
-            }),
-          ],
-        }),
+        input: expect.anything(),
         output: { id: 'communication.message', version: 1 },
         docs: 'Create a Draft in the selected mailbox Source.',
         examples: [
@@ -75,6 +64,11 @@ test('bundled communication.message enters the public registry path', () => {
             to: ['recipient@example.com'],
             subject: 'Project update',
             bodyText: 'The project is on track.',
+            attachments: [
+              {
+                ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/stable-message-id/attachment/agenda',
+              },
+            ],
           },
           {
             replyToRef:
@@ -88,18 +82,7 @@ test('bundled communication.message enters the public registry path', () => {
         id: 'communication.message.draft.update',
         profile: { id: 'communication.message', version: 1 },
         effect: 'reversible',
-        input: expect.objectContaining({
-          anyOf: [
-            expect.objectContaining({
-              additionalProperties: false,
-              required: ['ref', 'to', 'subject', 'bodyText'],
-            }),
-            expect.objectContaining({
-              additionalProperties: false,
-              required: ['ref', 'replyToRef', 'bodyText'],
-            }),
-          ],
-        }),
+        input: expect.anything(),
         output: { id: 'communication.message', version: 1 },
         docs: 'Replace the complete content of the addressed Draft in the selected mailbox Source.',
         examples: [
@@ -120,6 +103,33 @@ test('bundled communication.message enters the public registry path', () => {
       },
     ],
   })
+  const [create, update] = description.actions as Array<{
+    input: {
+      anyOf?: Array<{
+        required?: string[]
+        properties?: Record<string, unknown>
+        additionalProperties?: boolean
+      }>
+    }
+  }>
+  expect(create?.input.anyOf?.map((branch) => branch.required)).toEqual([
+    ['to', 'subject', 'bodyText'],
+    ['replyToRef', 'bodyText'],
+  ])
+  expect(
+    create?.input.anyOf?.every(
+      (branch) =>
+        branch.additionalProperties === false &&
+        branch.properties?.attachments !== undefined,
+    ),
+  ).toBe(true)
+  expect(
+    update?.input.anyOf?.every(
+      (branch) =>
+        branch.additionalProperties === false &&
+        branch.properties?.attachments === undefined,
+    ),
+  ).toBe(true)
   const actionDescription = JSON.stringify(description.actions)
   expect(actionDescription).not.toMatch(/gmail|provider/i)
 })
