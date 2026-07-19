@@ -37,7 +37,16 @@ For non-trivial behavior changes, work from the active OpenSpec change and apply
 
 ## Start the development CLI
 
-Run from the repository root. The supported development invocation is `bun cli` (or `bun run cli` from the repository root or `apps/cli`); there is no `bun link` workflow.
+Run from the repository root. The checkout-oriented development invocation is
+`bun cli` (or `bun run cli` from the repository root or `apps/cli`). To exercise
+the installable package bin, build it and register the CLI workspace with Bun:
+
+```sh
+cd apps/cli
+bun run build:package
+bun link
+ctxindex --help
+```
 
 ```sh
 bun install

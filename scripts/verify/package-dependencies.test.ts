@@ -89,6 +89,59 @@ test('applications may depend on public packages but not on sibling applications
   ])
 })
 
+test('applications may declare bundled source imports as development dependencies', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'packages/core/package.json'),
+    JSON.stringify({ name: '@ctxindex/core', dependencies: {} }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'packages/core/src/index.ts'),
+    'export {}',
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/cli/package.json'),
+    JSON.stringify({
+      name: 'ctxindex',
+      dependencies: { keytar: '7.9.0' },
+      devDependencies: {
+        '@ctxindex/core': 'workspace:*',
+        citty: 'latest',
+      },
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/cli/src/index.ts'),
+    "import '@ctxindex/core'; import 'citty'; import 'keytar'",
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([])
+})
+
+test('development dependencies do not hide runtime imports outside the bundle package', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'packages/core/package.json'),
+    JSON.stringify({
+      name: '@ctxindex/core',
+      dependencies: {},
+      devDependencies: { hidden: 'latest' },
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'packages/core/src/index.ts'),
+    "import 'hidden'",
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([
+    {
+      type: 'undeclared-dependency',
+      packageName: '@ctxindex/core',
+      dependency: 'hidden',
+    },
+  ])
+})
+
 async function writeFixture(path: string, content: string): Promise<void> {
   await mkdir(join(path, '..'), { recursive: true })
   await writeFile(path, content)

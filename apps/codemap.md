@@ -7,7 +7,7 @@ Contains deployable application-facing workspace packages: the `ctxindex` comman
 ## Design / patterns
 
 - Separates the user-facing application boundary from reusable domain and provider packages under `packages/`.
-- `apps/cli/` is a private Bun ESM workspace package whose executable shim delegates to a layered TypeScript CLI composition root.
+- `apps/cli/` is the public unscoped Bun ESM `ctxindex` package; its executable shim delegates to a layered TypeScript CLI composition root and its Bun-target bundle incorporates private workspace code for npm distribution.
 - `apps/web/` is a private Next.js App Router workspace that compiles MDX with Fumadocs and exposes both human-readable pages and agent-readable Markdown/LLM representations.
 
 ## Data & control flow

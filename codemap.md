@@ -13,8 +13,8 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 
 ## Entry points
 
-- `package.json` — workspace manifest and root command surface; Turbo dispatches package-owned dev, start, build, lint, format, typecheck, test, clean, and fullclean tasks, while `cli` routes through `scripts/cli.sh` so helper-created worktrees isolate state.
-- `.github/workflows/ci.yml` — least-privilege pull-request CI that runs the repository gate with the pinned Bun version.
+- `package.json` — private workspace manifest and root command surface; Turbo dispatches package-owned dev, start, build, lint, format, typecheck, test, clean, and fullclean tasks, `cli` routes through `scripts/cli.sh`, and package scripts build, pack, and smoke the public CLI artifact.
+- `.github/workflows/ci.yml` and `.github/workflows/release.yml` — least-privilege pull-request gates and guarded exact-artifact npm trusted publishing with Bun 1.3.14.
 - `.agents/skills/repo-development/SKILL.md` — triggered contributor doctrine, CLI workflow, and verification guidance.
 - `DESIGN.md` — project-wide visual doctrine for the adaptive ctxindex mark, semantic color roles, typography, component treatment, motion, and accessibility; the web app supplies its executable specimen.
 - `apps/cli/bin/ctxindex.mjs` — executable shim forwarding argv to `runCli` and assigning its exit code.
@@ -38,7 +38,7 @@ CLI input is parsed and dispatched by `apps/cli/` into core services. The access
 
 | Directory | Responsibility | Detailed map |
 | --- | --- | --- |
-| `.github/` | GitHub pull-request automation for the repository CI gate. | Workflow-local configuration. |
+| `.github/` | GitHub pull-request gates and protected npm trusted-publishing automation. | Workflow-local configuration. |
 | `apps/` | Deployable application workspaces: the Bun-based `ctxindex` CLI and the Next.js/Fumadocs documentation site. | [`apps/codemap.md`](apps/codemap.md) |
 | `packages/` | Core runtime, extension contract, provider-neutral Profiles, and built-in Google/Microsoft/filesystem Adapters. | [`packages/codemap.md`](packages/codemap.md) |
 | `examples/` | External Extension examples using only the public authoring boundary. | [`examples/codemap.md`](examples/codemap.md) |
