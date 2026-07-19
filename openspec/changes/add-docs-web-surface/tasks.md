@@ -34,4 +34,4 @@
 - [x] 6.1 Promote applicable doctrine into `openspec/specs/docs-web-surface/implementation.md`
 - [x] 6.2 Run `bun run ci` and `bunx openspec validate --all --strict`
 - [x] 6.3 Run `openspec-verify-change` for `add-docs-web-surface` and resolve all critical, warning, and suggestion findings
-- [x] 6.4 Prepare the deployed visual-review checkpoint and report that human visual approval remains required without committing review captures
+- [x] 6.4 Prepare the visual-review checkpoint with committed captures so remote human approval does not require access to the development device
