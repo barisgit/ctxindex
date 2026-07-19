@@ -1,8 +1,24 @@
 import { CtxindexValidationError } from '@ctxindex/core/errors'
-import { describeRegistry } from '@ctxindex/core/registry'
-import { parseSourceArgs, sourceUsage } from '../args/source'
+import {
+  parseSourceArgs,
+  preflightSourceArgs,
+  type SourceArgumentDescription,
+  sourceUsage,
+} from '../args/source'
+import {
+  type DaemonSelection,
+  daemonSourceAdd,
+  daemonSourceDefinitions,
+  daemonSourceList,
+  daemonSourceRemove,
+  selectDaemon,
+} from '../daemon/client'
 import { loadCliDefinitions } from '../definitions'
 import { openDeps } from '../deps'
+import {
+  acquireDirectDatabaseOwnership,
+  type DirectDatabaseOwnership,
+} from '../direct-database'
 import { mapErrorToExit } from '../format/exit'
 import {
   formatSourceAdded,
@@ -11,20 +27,230 @@ import {
 } from '../format/source'
 import { resolveSourceGrant } from './resolve-source-grant'
 
-export async function handleSourceCommand(args: string[]): Promise<number> {
+export interface SourceCommandDeps {
+  readonly selectDaemon: typeof selectDaemon
+  readonly sourceDefinitions: typeof daemonSourceDefinitions
+  readonly sourceAdd: typeof daemonSourceAdd
+  readonly sourceList: typeof daemonSourceList
+  readonly sourceRemove: typeof daemonSourceRemove
+  readonly acquireOwnership?: typeof acquireDirectDatabaseOwnership
+  readonly loadDefinitions: typeof loadCliDefinitions
+  readonly open: typeof openDeps
+}
+
+const defaultDeps: SourceCommandDeps = {
+  selectDaemon,
+  sourceDefinitions: daemonSourceDefinitions,
+  sourceAdd: daemonSourceAdd,
+  sourceList: daemonSourceList,
+  sourceRemove: daemonSourceRemove,
+  acquireOwnership: acquireDirectDatabaseOwnership,
+  loadDefinitions: loadCliDefinitions,
+  open: openDeps,
+}
+
+type LoadedDefinitions = Awaited<ReturnType<typeof loadCliDefinitions>>
+
+export type SourceCommandRoute =
+  | {
+      readonly kind: 'daemon'
+      readonly selection: DaemonSelection
+      readonly definitions?: Awaited<ReturnType<typeof daemonSourceDefinitions>>
+    }
+  | {
+      readonly kind: 'direct'
+      readonly ownership: DirectDatabaseOwnership
+      readonly definitions?: LoadedDefinitions
+    }
+  | { readonly kind: 'local' }
+
+export const defaultSourceCommandDeps = defaultDeps
+
+const closedDirectRoutes = new WeakSet<object>()
+
+export function closeSourceCommandRoute(route: SourceCommandRoute): void {
+  if (route.kind !== 'direct' || closedDirectRoutes.has(route)) return
+  closedDirectRoutes.add(route)
+  route.ownership.close()
+}
+
+export interface RetainedSourceCommandRoute {
+  resolve(): Promise<SourceCommandRoute>
+  close(): Promise<void>
+  error(): unknown
+}
+
+export function retainSourceCommandRoute(
+  invocationArgs: string[],
+  services: SourceCommandDeps = defaultDeps,
+): RetainedSourceCommandRoute {
+  let retained: Promise<SourceCommandRoute> | undefined
+  let routeError: unknown
+  let closed = false
+  const resolve = (): Promise<SourceCommandRoute> => {
+    retained ??= resolveSourceCommandRoute(invocationArgs, services).catch(
+      (error: unknown) => {
+        routeError = error
+        throw error
+      },
+    )
+    return retained
+  }
+  return {
+    resolve,
+    async close() {
+      if (closed || !retained) return
+      closed = true
+      try {
+        closeSourceCommandRoute(await retained)
+      } catch {
+        // Route resolution owns rollback for partial acquisition.
+      }
+    },
+    error: () => routeError,
+  }
+}
+
+export function sourceRouteDescriptions(
+  route: SourceCommandRoute,
+): readonly SourceArgumentDescription[] {
+  if (route.kind === 'daemon') return route.definitions?.rows ?? []
+  if (route.kind === 'direct') {
+    return route.definitions?.description.sources ?? []
+  }
+  return []
+}
+
+export async function resolveSourceCommandRoute(
+  args: string[],
+  services: SourceCommandDeps = defaultDeps,
+): Promise<SourceCommandRoute> {
+  const preliminary = preflightSourceArgs(args)
+  const needsDefinitions =
+    preliminary.kind === 'needs-definitions' ||
+    (preliminary.kind === 'help' && args[0] === 'add')
+  if (
+    !needsDefinitions &&
+    (preliminary.kind === 'unknown' || preliminary.kind === 'help')
+  ) {
+    return { kind: 'local' }
+  }
+  const selection = services.selectDaemon()
+  if (selection) {
+    return needsDefinitions
+      ? {
+          kind: 'daemon',
+          selection,
+          definitions: await services.sourceDefinitions(selection),
+        }
+      : { kind: 'daemon', selection }
+  }
+  const ownership = (
+    services.acquireOwnership ?? acquireDirectDatabaseOwnership
+  )()
+  if (!needsDefinitions) return { kind: 'direct', ownership }
   try {
-    const definitions = await loadCliDefinitions()
-    const parsed = parseSourceArgs(args, definitions.description.sources)
+    const localOAuthAppIdentities =
+      await ownership.readLocalOAuthAppIdentities()
+    return {
+      kind: 'direct',
+      ownership,
+      definitions: await services.loadDefinitions({
+        localOAuthAppIdentities,
+      }),
+    }
+  } catch (error) {
+    ownership.close()
+    throw error
+  }
+}
+
+export async function handleSourceCommand(
+  args: string[],
+  services: SourceCommandDeps = defaultDeps,
+  retainedRoute?: SourceCommandRoute,
+): Promise<number> {
+  let deps: Awaited<ReturnType<typeof openDeps>> | undefined
+  let directOwnership: DirectDatabaseOwnership | undefined
+  let directRoute: Extract<SourceCommandRoute, { kind: 'direct' }> | undefined
+  const controller = new AbortController()
+  const cancel = () => controller.abort()
+  process.once('SIGINT', cancel)
+  try {
+    const preliminary = preflightSourceArgs(args)
+    if (preliminary.kind === 'unknown') {
+      console.error(`${preliminary.message}. Try: ${sourceUsage}`)
+      return 2
+    }
+    const needsDefinitions = preliminary.kind === 'needs-definitions'
+    const route =
+      retainedRoute ?? (await resolveSourceCommandRoute(args, services))
+    if (route.kind === 'direct') directRoute = route
+    const daemonDefinitions =
+      route.kind === 'daemon' ? route.definitions : undefined
+    const definitions = route.kind === 'direct' ? route.definitions : undefined
+    const parsed = needsDefinitions
+      ? parseSourceArgs(
+          args,
+          daemonDefinitions?.rows ?? definitions?.description.sources,
+        )
+      : preliminary
     if (parsed.kind === 'help') return 0
     if (parsed.kind === 'unknown') {
       console.error(`${parsed.message}. Try: ${sourceUsage}`)
       return 2
     }
-    const deps = await openDeps({ config: definitions.config })
-    const active = parseSourceArgs(
-      args,
-      describeRegistry(deps.registry).sources,
-    )
+    if (route.kind === 'daemon') {
+      if (parsed.kind === 'add') {
+        const result = await services.sourceAdd(
+          route.selection,
+          {
+            adapterId: parsed.adapterId,
+            ...(parsed.realmSlug ? { realmSlug: parsed.realmSlug } : {}),
+            ...(parsed.label ? { label: parsed.label } : {}),
+            ...(parsed.configJson ? { configJson: parsed.configJson } : {}),
+            ...(parsed.account ? { account: parsed.account } : {}),
+            ...(parsed.searchRouting
+              ? { searchRouting: parsed.searchRouting }
+              : {}),
+            ...(parsed.syncEnabled !== undefined
+              ? { syncEnabled: parsed.syncEnabled }
+              : {}),
+          },
+          controller.signal,
+        )
+        console.log(formatSourceAdded(result.sourceId))
+      } else if (parsed.kind === 'list') {
+        const result = await services.sourceList(
+          route.selection,
+          parsed.realmSlug ? { realmSlug: parsed.realmSlug } : {},
+          controller.signal,
+        )
+        const output = formatSources(result.rows, parsed)
+        if (output.length > 0) console.log(output)
+      } else {
+        const result = await services.sourceRemove(
+          route.selection,
+          parsed.sourceId,
+          controller.signal,
+        )
+        console.log(formatSourceRemoved(result.sourceId))
+      }
+      return 0
+    }
+    if (route.kind === 'local') return 0
+    directOwnership = route.ownership
+    const directDefinitions =
+      definitions ??
+      (await services.loadDefinitions({
+        localOAuthAppIdentities:
+          await directOwnership.readLocalOAuthAppIdentities(),
+      }))
+    deps = await services.open({
+      definitions: directDefinitions,
+      databaseOwnership: directOwnership,
+    })
+    const active = parseSourceArgs(args, directDefinitions.description.sources)
     if (active.kind === 'unknown') {
       console.error(`${active.message}. Try: ${sourceUsage}`)
       return 2
@@ -86,5 +312,9 @@ export async function handleSourceCommand(args: string[]): Promise<number> {
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))
     return mapErrorToExit(error)
+  } finally {
+    process.removeListener('SIGINT', cancel)
+    await deps?.close()
+    if (directRoute) closeSourceCommandRoute(directRoute)
   }
 }

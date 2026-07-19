@@ -1,6 +1,6 @@
 import { authorizeProvider, resolveOAuthSelection } from '@ctxindex/core/auth'
 import { CtxindexValidationError } from '@ctxindex/core/errors'
-import { readLocalOAuthAppIdentities } from '@ctxindex/core/oauth-app'
+import type { OAuthAppInventoryItem } from '@ctxindex/core/oauth-app'
 import { accountUsage, parseAccountArgs } from '../args/account'
 import { assertInitialized } from '../commands/db'
 import { loadAuthDefinitionDeps, openAccountDeps, openDeps } from '../deps'
@@ -12,20 +12,13 @@ import {
 import { mapErrorToExit } from '../format/exit'
 
 function availableOAuthAppLabels(
-  registry: Awaited<
-    ReturnType<typeof loadAuthDefinitionDeps>
-  >['completeRegistry'],
+  inventory: readonly OAuthAppInventoryItem[],
   providerId: string,
 ): string[] {
-  const labels = new Set(
-    [...registry.oauthApps.values()]
-      .filter((app) => app.provider.id === providerId)
-      .map((app) => app.label),
-  )
-  for (const app of readLocalOAuthAppIdentities()) {
-    if (app.providerId === providerId) labels.add(app.label)
-  }
-  return [...labels].sort()
+  return inventory
+    .filter((app) => app.providerId === providerId)
+    .map((app) => app.label)
+    .sort()
 }
 
 export async function handleAccountCommand(args: string[]): Promise<number> {
@@ -54,11 +47,18 @@ export async function handleAccountCommand(args: string[]): Promise<number> {
       await deps.authService.removeAccount(parsed.label)
       console.log(formatAccountRemoved(parsed.label))
     } else {
-      const definitions = await loadAuthDefinitionDeps()
-      resolveOAuthSelection(definitions.completeRegistry, parsed.provider)
-      await assertInitialized()
+      try {
+        await assertInitialized()
+      } catch (initializationError) {
+        const definitions = await loadAuthDefinitionDeps()
+        resolveOAuthSelection(definitions.completeRegistry, parsed.provider)
+        throw initializationError
+      }
+      const opened = await openDeps()
+      deps = opened
+      resolveOAuthSelection(opened.completeRegistry, parsed.provider)
       const availableApps = availableOAuthAppLabels(
-        definitions.completeRegistry,
+        opened.oauthAppService.listApps(),
         parsed.provider,
       )
       if (!availableApps.includes(parsed.app)) {
@@ -71,10 +71,6 @@ export async function handleAccountCommand(args: string[]): Promise<number> {
           `OAuth App "${parsed.app}" is not available for Provider "${parsed.provider}". ${guidance}`,
         )
       }
-      const opened = await openDeps({
-        config: definitions.config,
-      })
-      deps = opened
       const result = await authorizeProvider(
         {
           provider: parsed.provider,

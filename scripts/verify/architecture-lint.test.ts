@@ -26,6 +26,15 @@ test('thin sync command has no architecture violations', async () => {
   expect(violations).toEqual([])
 })
 
+test('init delegates retained database lifecycle outside commands', async () => {
+  const violations = await lintFiles([
+    'apps/cli/src/commands/init.ts',
+    'apps/cli/src/direct-database.ts',
+  ])
+
+  expect(violations).toEqual([])
+})
+
 test('test fixtures may import commands and name provider URLs', async () => {
   const violations = await lintFiles([
     'apps/cli/src/commands/registry-interface.test.ts',

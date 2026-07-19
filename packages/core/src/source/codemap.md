@@ -9,7 +9,7 @@ Owns Source lifecycle and Adapter execution boundaries for sync, remote search, 
 - `createSourceService()` resolves Adapters by stable id, validates config/routing and optional Provider access, derives verbatim labels, enforces global label uniqueness, and resolves Source label-or-ID references.
 - Defaults are `<account-label>-<adapter-tail>` for authenticated Sources or `<adapter-tail>` without an Account; no normalization or suffixing occurs.
 - Provider-backed contexts strip sensitive config, enforce Grant compatibility from the exact imported Provider plus Adapter access scopes, enforce Adapter host allowlists, and perform bounded token refresh/retry behavior. Providerless contexts bypass Account, Grant, token, and Provider egress resolution.
-- Remote search post-filters and Ref-deduplicates one provider origin, materializes it through one atomic Resource batch, yields after synchronous storage waits so scheduled cancellation wins, and degrades only exhausted optional-cache contention to a safe `storage_busy` warning.
+- Remote search post-filters and Ref-deduplicates one provider origin, materializes it through one atomic Resource batch, yields after synchronous storage waits so scheduled cancellation wins, and degrades only exhausted optional-cache contention to a safe `storage_busy` warning. Exact retrieval rechecks cancellation after Adapter completion and immediately before persistence.
 
 ## Data & control flow
 

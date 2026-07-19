@@ -6,14 +6,14 @@ Runs one-Source or all-eligible-Source sync, aggregates outcomes, formats result
 
 ## Design / patterns
 
-- A requested Source label or ID resolves through `SourceService` to the stable ID before sync eligibility checks; all-Source filtering resolves each Adapter by `adapter_id` only.
-- `SyncDeps` and `SyncServices` inject infrastructure/core execution; an `AbortController` converts SIGINT to cooperative cancellation.
+- A requested Source label or ID resolves through `SourceService` to the stable ID before sync eligibility checks.
+- `SyncDeps` and `SyncServices` inject direct infrastructure/core execution; exact-tuple discovery can instead select the typed daemon client. An `AbortController` converts SIGINT to request-scoped cancellation in either route.
 - Status-discriminated results support summary, compact, events, and JSON output.
 
 ## Data & control flow
 
-The runner parses argv, resolves or lists adapter-version-free Source rows, filters current Adapter capabilities by stable id, executes `syncSource` sequentially, converts thrown errors to typed failed results, emits warnings, and returns the maximum stable failure exit.
+The runner parses the complete argv before selection. A selected endpoint invokes `sync.run` and never falls back; no selector opens the retained-lease direct runtime and invokes `SyncApplicationService`. Both routes map into the established summary, compact, events, and JSON projections and maximum stable failure exit.
 
 ## Integration points
 
-Called by `commands/sync.ts`; depends on `openDeps`, `format/exit.ts`, registry capabilities, `SourceService`, and `@ctxindex/core/source#syncSource`.
+Called by `commands/sync.ts`; depends separately on `daemon/client.ts` for RPC and `openDeps` plus the core sync application service for the retained legacy path.

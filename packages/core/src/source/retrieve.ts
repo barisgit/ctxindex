@@ -71,6 +71,7 @@ export async function retrieveSourceResource(
     },
     emitArtifact() {},
   })
+  input.signal.throwIfAborted()
   const resource = emitted[0]
   if (
     emitted.length !== 1 ||
@@ -85,6 +86,7 @@ export async function retrieveSourceResource(
   }
 
   const store = new ResourceStore(input.db, input.registry.profiles)
+  input.signal.throwIfAborted()
   const materialized = store.upsert({
     ref: resource.ref,
     sourceId: parsed.sourceId,

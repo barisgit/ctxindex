@@ -5,7 +5,7 @@ export function formatRealmAdded(slug: string): string {
 }
 
 export function formatRealms(
-  realms: RealmRow[],
+  realms: readonly RealmRow[],
   opts: { readonly json: boolean },
 ): string {
   if (opts.json) {

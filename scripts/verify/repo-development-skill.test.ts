@@ -129,13 +129,16 @@ function extractCtxindexInvocations(markdown: string): CtxindexInvocation[] {
 
 function implementedCommands(mainSource: string): Set<string> {
   const match =
-    /export const rootCommand = defineCommand\(\{[\s\S]*?subCommands: \{([\s\S]*?)\n {2}\},\n\}\)/.exec(
+    /function createRootCommand\([\s\S]*?subCommands: \{([\s\S]*?)\n {4}\},\n {2}\}\)/.exec(
       mainSource,
     )
-  expect(match, 'main.ts should define root citty subCommands').not.toBeNull()
+  expect(
+    match,
+    'main.ts should define per-invocation root citty subCommands',
+  ).not.toBeNull()
   const subCommands = match?.[1] ?? ''
   return new Set(
-    [...subCommands.matchAll(/^ {4}'?([a-z][a-z0-9-]*)'?:/gm)].map(
+    [...subCommands.matchAll(/^ {6}'?([a-z][a-z0-9-]*)'?:/gm)].map(
       (commandMatch) => commandMatch[1] as string,
     ),
   )

@@ -1,4 +1,4 @@
-import type { SourceDescription } from '@ctxindex/core/registry'
+import { compareStrings, type SourceDescription } from '@ctxindex/core/registry'
 import {
   type FlagValue,
   hasHelpFlag,
@@ -28,8 +28,46 @@ export type SourceArgs =
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
 
+export type SourceArgsPreflight =
+  | SourceArgs
+  | { readonly kind: 'needs-definitions' }
+
+export type SourceArgumentDescription = Pick<SourceDescription, 'id'> & {
+  readonly configOptions: readonly {
+    readonly property: string
+    readonly flag: string
+    readonly type: string
+    readonly required: boolean
+    readonly docs?: string | undefined
+    readonly default?: unknown
+  }[]
+}
+
 export const sourceUsage =
   'source add <adapter-id> [--realm <slug>] [--label <label>] [--account <label|account-id>] [--config-json <json>|--config-* <value>] [--search-routing indexed|federated|hybrid] [--no-sync] | source list [--realm <slug>] [--format table|compact] [--json] | source remove <label|source-id>'
+
+export function generatedSourceConfigArgs(
+  sources: readonly SourceArgumentDescription[],
+): Record<string, { type: 'string'; description: string }> {
+  const byFlag = new Map<string, string[]>()
+  for (const source of [...sources].sort((left, right) =>
+    compareStrings(left.id, right.id),
+  )) {
+    for (const option of source.configOptions) {
+      const description = `${source.id}: ${option.property} (${option.type}${option.required ? ', required' : ''}${option.default !== undefined ? `, default ${JSON.stringify(option.default)}` : ''})`
+      const flag = option.flag.slice(2)
+      byFlag.set(flag, [...(byFlag.get(flag) ?? []), description])
+    }
+  }
+  return Object.fromEntries(
+    [...byFlag.entries()]
+      .sort(([left], [right]) => compareStrings(left, right))
+      .map(([flag, descriptions]) => [
+        flag,
+        { type: 'string' as const, description: descriptions.join('; ') },
+      ]),
+  )
+}
 
 function parsePrimitive(value: string, type: string): unknown {
   if (type === 'json') {
@@ -64,7 +102,7 @@ function parsePrimitive(value: string, type: string): unknown {
 
 function configJson(
   flags: Record<string, FlagValue>,
-  source: SourceDescription | undefined,
+  source: SourceArgumentDescription | undefined,
 ): { value?: string; message?: string } {
   const existing = stringFlag(flags, 'config-json')
   const configFlags = Object.keys(flags).filter(
@@ -118,7 +156,7 @@ function repeatedScalarOption(
 
 export function parseSourceArgs(
   args: string[],
-  sources: readonly SourceDescription[] = [],
+  sources: readonly SourceArgumentDescription[] = [],
 ): SourceArgs {
   if (hasHelpFlag(args)) return { kind: 'help' }
   const [subcommand, ...rest] = args
@@ -304,4 +342,37 @@ export function parseSourceArgs(
     kind: 'unknown',
     message: `source: unknown subcommand "${subcommand ?? ''}"`,
   }
+}
+
+export function preflightSourceArgs(args: string[]): SourceArgsPreflight {
+  if (args[0] !== 'add' || hasHelpFlag(args)) return parseSourceArgs(args)
+
+  const configFlags = args
+    .filter((arg) => arg.startsWith('--config-'))
+    .map((arg) => arg.slice(2).split('=', 1)[0])
+    .filter(
+      (flag): flag is string => flag !== undefined && flag !== 'config-json',
+    )
+  const { flags, positional } = parseFlags(args.slice(1), {
+    valueFlags: configFlags,
+    booleanFlags: ['no-sync'],
+  })
+  const adapterId = stringFlag(flags, 'adapter') ?? positional[0]
+  const parsed = parseSourceArgs(
+    args,
+    adapterId
+      ? [
+          {
+            id: adapterId,
+            configOptions: configFlags.map((flag) => ({
+              property: flag,
+              flag: `--${flag}`,
+              type: 'string[]',
+              required: false,
+            })),
+          },
+        ]
+      : [],
+  )
+  return parsed.kind === 'add' ? { kind: 'needs-definitions' } : parsed
 }

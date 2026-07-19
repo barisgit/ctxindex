@@ -10,6 +10,7 @@ import { resolveSearchQuery } from './preflight'
 import type { LocalSearchFieldFilter, LocalSearchResult } from './types'
 
 export interface SearchPlannerInput {
+  readonly signal?: AbortSignal
   readonly text?: string
   readonly limit?: number
   readonly offset?: number
@@ -170,6 +171,7 @@ export class SearchPlanner {
   }
 
   async search(input: SearchPlannerInput): Promise<SearchPlannerResult> {
+    input.signal?.throwIfAborted()
     if (input.localOnly && input.remote)
       invalid('--local-only and --remote are mutually exclusive')
     const limit = input.limit ?? 20
@@ -246,8 +248,14 @@ export class SearchPlanner {
     const remoteRuns = await Promise.all(
       remotePlans.map(async (plan) => {
         const controller = new AbortController()
+        const cancel = () => controller.abort(input.signal?.reason)
+        if (input.signal?.aborted) cancel()
+        else input.signal?.addEventListener('abort', cancel, { once: true })
         const timer = setTimeout(
-          () => controller.abort(),
+          () =>
+            controller.abort(
+              new DOMException('Remote search timed out', 'TimeoutError'),
+            ),
           input.timeoutMs ?? 10_000,
         )
         try {
@@ -284,6 +292,11 @@ export class SearchPlanner {
             outcome: remote.warnings.length === 0 ? 'success' : 'degraded',
           } as const
         } catch (cause) {
+          if (input.signal?.aborted) {
+            throw input.signal.reason instanceof Error
+              ? input.signal.reason
+              : new DOMException('The search was cancelled.', 'AbortError')
+          }
           return {
             sourceId: plan.row.id,
             origin: [],
@@ -305,6 +318,7 @@ export class SearchPlanner {
           } as const
         } finally {
           clearTimeout(timer)
+          input.signal?.removeEventListener('abort', cancel)
         }
       }),
     )
