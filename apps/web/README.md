@@ -26,6 +26,6 @@ bun run dev
 
 Documentation pages are prerendered, but `/api/search` is a Next.js runtime route. Deploy with `next build && next start` or a compatible serverless platform such as Vercel. Container deployments can enable Next.js `output: 'standalone'` before building. A static file host is not sufficient because it cannot serve search.
 
-Set `NEXT_PUBLIC_SITE_URL` to the deployment's absolute canonical origin before a production build. When it is absent, the app omits origin-dependent social image metadata instead of publishing a local or request-derived URL.
+Set `NEXT_PUBLIC_SITE_URL` to the deployment's absolute canonical origin before a production build. When it is absent, the app omits origin-dependent social image metadata instead of publishing a local or request-derived URL. A malformed non-empty value fails the build rather than emitting invalid public URLs.
 
 The web app stores no user, provider, Catalog, or search state. Catalog discovery and installation happen locally through the ctxindex CLI; this site is documentation, not a hosted marketplace.
