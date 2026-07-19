@@ -26,4 +26,4 @@ Contains reusable workspace libraries defining ctxindex's provider-neutral domai
 | `packages/adapters/` | Built-in Google, Microsoft, and local-directory provider integrations. | `packages/adapters/codemap.md` |
 | `packages/core/` | Provider-neutral services, registries, SQLite storage/schema, operation pipelines, and runtime infrastructure. | `packages/core/codemap.md` |
 
-- `apps/cli/` is the primary workspace consumer; external extensions consume the SDK boundary.
+- Each package manifest owns its build, quality, test, and clean/fullclean tasks; root Turbo commands dispatch them across the workspace. `apps/cli/` is the primary workspace consumer, while external extensions consume the SDK boundary.

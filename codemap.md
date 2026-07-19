@@ -13,11 +13,12 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 
 ## Entry points
 
-- `package.json` — workspace manifest and root commands; its `cli` script and the package-local CLI script share `scripts/cli.sh` so supported invocations automatically isolate state in helper-created worktrees, while build/typecheck/test/CI compose repository gates.
+- `package.json` — workspace manifest and root command surface; Turbo dispatches package-owned dev, start, build, lint, format, typecheck, test, clean, and fullclean tasks, while `cli` routes through `scripts/cli.sh` so helper-created worktrees isolate state.
 - `.github/workflows/ci.yml` — least-privilege pull-request CI that runs the repository gate with the pinned Bun version.
 - `.agents/skills/repo-development/SKILL.md` — triggered contributor doctrine, CLI workflow, and verification guidance.
+- `DESIGN.md` — project-wide visual doctrine for the adaptive ctxindex mark, semantic color roles, typography, component treatment, motion, and accessibility; the web app supplies its executable specimen.
 - `apps/cli/bin/ctxindex.mjs` — executable shim forwarding argv to `runCli` and assigning its exit code.
-- `apps/web/app/(home)/page.tsx` and `apps/web/app/docs/[[...slug]]/page.tsx` — Next.js landing page and Fumadocs-backed documentation routes.
+- `apps/web/app/(home)/page.tsx`, `apps/web/app/(home)/design/page.tsx`, and `apps/web/app/docs/[[...slug]]/page.tsx` — Next.js landing page, live visual-system specimen, and Fumadocs-backed documentation routes.
 - `packages/core/src/index.ts` — core domain services and runtime infrastructure export surface.
 - `packages/extension-sdk/src/index.ts` — public Profile, Adapter, Extension, OAuth, and operation contracts.
 - `packages/profiles/src/index.ts` and `packages/adapters/src/index.ts` — built-in semantic definitions and Google/Microsoft/filesystem integrations.

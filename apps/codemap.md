@@ -18,6 +18,6 @@ For the web workspace, Fumadocs compiles `content/docs/` into the generated `col
 
 ## Integration points
 
-- Registered by the root `package.json` workspace pattern `apps/*`; root and package-local `cli` scripts share the marker-aware `scripts/cli.sh` launcher before invoking `apps/cli/bin/ctxindex.mjs`.
+- Registered by the root `package.json` workspace pattern `apps/*`; app-owned scripts participate in root Turbo dev/build/quality/cleanup commands, while root and package-local `cli` scripts share the marker-aware `scripts/cli.sh` launcher before invoking `apps/cli/bin/ctxindex.mjs`.
 - `apps/cli/` consumes public seams from `packages/core`, `packages/adapters`, and `packages/extension-sdk` through their workspace package names.
 - Detailed maps: `apps/cli/codemap.md` and `apps/web/codemap.md`.

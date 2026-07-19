@@ -19,6 +19,6 @@ Publishes the stateless public authoring/runtime contract used to define ctxinde
 
 ## Integration points
 
-- Depends only on Zod, as declared in `packages/extension-sdk/package.json`.
+- Depends only on Zod; its package manifest also owns build, quality, test, and clean/fullclean tasks dispatched by root Turbo commands.
 - Authored against by `packages/profiles/src/`, `packages/adapters/src/`, and external extension modules.
 - Loaded by `packages/core/src/extension/loader.ts`, validated by `packages/core/src/registry/definition-registries.ts`, and consumed across core source/sync/search/action/resource/relation/artifact/export services.
