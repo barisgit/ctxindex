@@ -25,7 +25,27 @@ jobs:
         uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
         with:
           bun-version: 1.3.14
-      - name: Install dependencies
+      - name: Add local binaries to PATH
+        run: echo "${{ github.workspace }}/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: install
         run: bun install --frozen-lockfile
-      - name: Run repository CI
-        run: bun run ci
+      - name: lint
+        run: biome check .
+      - name: typecheck
+        run: tsgo --noEmit -p tsconfig.base.json
+      - name: build
+        run: bun run build
+      - name: package-dependencies
+        run: bun run scripts/verify/package-dependencies.ts
+      - name: architecture-lint
+        run: bun run scripts/verify/architecture-lint.ts
+      - name: cli-no-business-logic
+        run: bun run scripts/verify/cli-no-business-logic.ts
+      - name: cli-framework-citty
+        run: bun run scripts/verify/cli-framework-citty.ts
+      - name: cli-thin-lines
+        run: bun run scripts/verify/cli-thin-lines.ts
+      - name: exports-map
+        run: bun run scripts/verify/exports-map.ts
+      - name: full-test-suite
+        run: bash scripts/verify/full-test-suite.sh

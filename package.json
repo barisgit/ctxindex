@@ -11,18 +11,22 @@
   "scripts": {
     "build": "turbo run build",
     "lint": "biome check .",
+    "lint:staged": "lint-staged",
     "typecheck": "tsgo --noEmit -p tsconfig.base.json",
     "test": "bun test",
     "test:integration": "bun test --path-ignore-patterns '__none__' integration.test",
     "test:e2e": "bun run scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' --pass-with-no-tests e2e.test",
     "with-timeout": "bun scripts/with-timeout.ts",
     "ci": "bash scripts/verify/ci.sh",
-    "cli": "bash scripts/cli.sh"
+    "cli": "bash scripts/cli.sh",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.15",
     "@types/bun": "^1.3.14",
     "@typescript/native-preview": "^7.0.0-dev.20260519.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "turbo": "^2.9.14",
     "typescript": "^6.0.3"
   }
