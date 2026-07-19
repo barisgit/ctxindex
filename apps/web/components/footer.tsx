@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Logo } from '@/components/logo'
+import { BrandLockup } from '@/components/brand-lockup'
 import { gitConfig } from '@/lib/shared'
 
 const groups = [
@@ -27,20 +27,18 @@ const groups = [
         label: 'GitHub',
       },
       { href: '/docs/examples/marketplace', label: 'Marketplace' },
+      { href: '/brand', label: 'Brand assets' },
     ],
   },
 ]
 
 export function Footer() {
   return (
-    <footer className="border-t border-fd-border">
+    <footer className="border-t border-border-default">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 py-12 md:flex-row md:justify-between">
         <div className="flex flex-col gap-3">
-          <span className="flex items-center gap-2">
-            <Logo size={20} />
-            <span className="font-semibold tracking-tight">ctxindex</span>
-          </span>
-          <p className="max-w-xs text-sm text-fd-muted-foreground">
+          <BrandLockup variant="navigation" />
+          <p className="max-w-xs text-sm text-text-secondary">
             Local personal-context gateway for agents. Providers stay canonical;
             you stay in control.
           </p>
@@ -54,7 +52,7 @@ export function Footer() {
                   <li key={l.href}>
                     <Link
                       href={l.href}
-                      className="text-sm text-fd-muted-foreground transition-colors hover:text-fd-foreground"
+                      className="text-sm text-text-secondary transition-colors hover:text-text-primary"
                     >
                       {l.label}
                     </Link>

@@ -2,21 +2,152 @@
 @import "fumadocs-ui/css/neutral.css";
 @import "fumadocs-ui/css/preset.css";
 
-@theme {
+@theme inline {
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --color-background-primary: var(--color-fd-background);
+  --color-background-secondary: var(--color-fd-card);
+  --color-background-muted: var(--color-fd-muted);
+  --color-background-accent: var(--color-fd-accent);
+  --color-text-primary: var(--color-fd-foreground);
+  --color-text-secondary: var(--color-fd-muted-foreground);
+  --color-text-accent: var(--color-fd-primary);
+  --color-border-default: var(--color-fd-border);
+  --color-border-accent: var(--color-fd-primary);
+  --color-ctx-signal: var(--ctx-signal);
+  --color-ctx-frame: var(--ctx-frame);
+  --radius-ctx-control: 0.5rem;
+  --radius-ctx-surface: 0.75rem;
+  --radius-ctx-panel: 1rem;
+  --tracking-ctx-display: -0.03em;
+  --tracking-ctx-heading: -0.02em;
+  --text-ctx-display: clamp(2.5rem, 6vw, 4rem);
+  --text-ctx-display--line-height: 1.05;
+  --text-ctx-section: clamp(1.5rem, 3vw, 1.875rem);
+  --text-ctx-section--line-height: 1.15;
 }
 
-:root {
-  --color-fd-primary: hsl(32 95% 44%);
-  --ctx-amber: #f59e0b;
-  --ctx-amber-dim: #b45309;
+:root,
+.ctx-theme-light {
+  color-scheme: light;
+  --color-fd-background: oklch(100% 0 0);
+  --color-fd-foreground: oklch(24.22% 0.0186 241.9);
+  --color-fd-card: oklch(96.52% 0.0035 219.5);
+  --color-fd-card-foreground: oklch(24.22% 0.0186 241.9);
+  --color-fd-popover: oklch(100% 0 0);
+  --color-fd-popover-foreground: oklch(24.22% 0.0186 241.9);
+  --color-fd-primary: oklch(57.72% 0.1408 56.3);
+  --color-fd-primary-foreground: oklch(100% 0 0);
+  --color-fd-secondary: oklch(94.01% 0.0067 233.6);
+  --color-fd-secondary-foreground: oklch(30.61% 0.023 240.9);
+  --color-fd-muted: oklch(94.59% 0.006 223.5);
+  --color-fd-muted-foreground: oklch(45.62% 0.0219 238.2);
+  --color-fd-accent: oklch(94.01% 0.0067 233.6);
+  --color-fd-accent-foreground: oklch(24.22% 0.0186 241.9);
+  --color-fd-border: oklch(88.95% 0.0103 228.9);
+  --color-fd-ring: oklch(57.72% 0.1408 56.3);
+  --ctx-signal: oklch(67.02% 0.1536 62.5);
+  --ctx-frame: oklch(60.2% 0.0224 238.9);
+  --ctx-logo-leading: oklch(24.22% 0.0186 241.9);
+  --ctx-logo-trailing: oklch(60.2% 0.0224 238.9);
+  --ctx-logo-record: oklch(30.61% 0.023 240.9);
+  --ctx-logo-record-muted: oklch(55.09% 0.0229 239);
+  --ctx-logo-signal: oklch(67.02% 0.1536 62.5);
+  --ctx-terminal: oklch(14.5% 0.008 240);
+  --ctx-terminal-foreground: oklch(96.84% 0.0042 236.5);
+  --ctx-terminal-muted: oklch(30% 0.017 240);
+  --ctx-terminal-muted-foreground: oklch(68% 0.019 240);
 }
 
-.dark {
-  --color-fd-primary: hsl(38 92% 50%);
-  --color-fd-background: hsl(220 14% 6%);
-  --color-fd-card: hsl(220 13% 8%);
+.dark,
+.ctx-theme-dark {
+  color-scheme: dark;
+  --color-fd-background: oklch(16.55% 0.009 240.5);
+  --color-fd-foreground: oklch(90.53% 0.0146 244.7);
+  --color-fd-card: oklch(20.08% 0.0136 243.6);
+  --color-fd-card-foreground: oklch(90.53% 0.0146 244.7);
+  --color-fd-popover: oklch(22.22% 0.0157 244.4);
+  --color-fd-popover-foreground: oklch(90.53% 0.0146 244.7);
+  --color-fd-primary: oklch(77.75% 0.1641 72.8);
+  --color-fd-primary-foreground: oklch(18.88% 0.0386 86.5);
+  --color-fd-secondary: oklch(25.48% 0.0184 241.8);
+  --color-fd-secondary-foreground: oklch(90.53% 0.0146 244.7);
+  --color-fd-muted: oklch(24.22% 0.0186 241.9);
+  --color-fd-muted-foreground: oklch(71.85% 0.0189 240.1);
+  --color-fd-accent: oklch(29.04% 0.0211 240);
+  --color-fd-accent-foreground: oklch(96.84% 0.0042 236.5);
+  --color-fd-border: oklch(31.87% 0.0219 243.2);
+  --color-fd-ring: oklch(77.75% 0.1641 72.8);
+  --ctx-signal: oklch(77.75% 0.1641 72.8);
+  --ctx-frame: oklch(42.71% 0.0255 241.9);
+  --ctx-logo-leading: oklch(90.53% 0.0146 244.7);
+  --ctx-logo-trailing: oklch(42.71% 0.0255 241.9);
+  --ctx-logo-record: oklch(90.53% 0.0146 244.7);
+  --ctx-logo-record-muted: oklch(59.18% 0.0255 242.2);
+  --ctx-logo-signal: oklch(77.75% 0.1641 72.8);
+  --ctx-terminal: oklch(14.5% 0.008 240);
+  --ctx-terminal-foreground: oklch(96.84% 0.0042 236.5);
+  --ctx-terminal-muted: oklch(30% 0.017 240);
+  --ctx-terminal-muted-foreground: oklch(68% 0.019 240);
+}
+
+.dark #nd-sidebar,
+.ctx-theme-dark #nd-sidebar {
+  --color-fd-muted: oklch(24.22% 0.0186 241.9);
+  --color-fd-secondary: oklch(25.48% 0.0184 241.8);
+  --color-fd-muted-foreground: oklch(71.85% 0.0189 240.1);
+}
+
+.ctx-button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-ctx-control);
+  padding-inline: 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition:
+    background-color 160ms ease-out,
+    border-color 160ms ease-out,
+    color 160ms ease-out,
+    opacity 160ms ease-out;
+}
+
+.ctx-button:focus-visible,
+.ctx-inline-link:focus-visible {
+  outline: 2px solid var(--color-fd-ring);
+  outline-offset: 2px;
+}
+
+.ctx-button-primary {
+  background: var(--color-fd-primary);
+  color: var(--color-fd-primary-foreground);
+}
+
+.ctx-button-primary:hover {
+  opacity: 0.9;
+}
+
+.ctx-button-secondary {
+  border: 1px solid var(--color-fd-border);
+  background: var(--color-fd-card);
+  color: var(--color-fd-card-foreground);
+}
+
+.ctx-button-secondary:hover {
+  background: var(--color-fd-accent);
+  color: var(--color-fd-accent-foreground);
+}
+
+.ctx-inline-link {
+  color: var(--color-fd-primary);
+  font-weight: 600;
+  text-underline-offset: 0.25rem;
+}
+
+.ctx-inline-link:hover {
+  text-decoration-line: underline;
 }
 
 html {
@@ -26,6 +157,28 @@ html {
 html > body[data-scroll-locked] {
   margin-right: 0px;
   --removed-body-scroll-bar-size: 0px;
+}
+
+/* Fumadocs callouts use a colored side stripe and broad shadow by default.
+   Keep the semantic icon/color while expressing the state through the complete
+   boundary and surface instead. */
+.prose > div[style*="--callout-color"] {
+  padding-inline-start: 0.75rem;
+  box-shadow: none;
+  border-color: color-mix(
+    in oklab,
+    var(--callout-color) 32%,
+    var(--color-fd-border)
+  );
+  background: color-mix(
+    in oklab,
+    var(--callout-color) 5%,
+    var(--color-fd-card)
+  );
+}
+
+.prose > div[style*="--callout-color"] > div[role="none"] {
+  display: none;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -63,24 +216,9 @@ html > body[data-scroll-locked] {
 .ctx-hero-glow {
   background: radial-gradient(
     ellipse 60% 50% at 50% 0%,
-    color-mix(in srgb, var(--ctx-amber) 10%, transparent),
+    color-mix(in oklab, var(--ctx-signal) 9%, transparent),
     transparent 70%
   );
-}
-
-.ctx-grid-bg {
-  background-image:
-    linear-gradient(
-      to right,
-      color-mix(in srgb, currentcolor 6%, transparent) 1px,
-      transparent 1px
-    ),
-    linear-gradient(
-      to bottom,
-      color-mix(in srgb, currentcolor 6%, transparent) 1px,
-      transparent 1px
-    );
-  background-size: 40px 40px;
 }
 
 /* Keep docs navigation anchored to the viewport on wide displays. Fumadocs'

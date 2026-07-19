@@ -2,6 +2,7 @@ import { RootProvider } from 'fumadocs-ui/provider/next'
 import './global.css'
 import type { Metadata } from 'next'
 import { Inter, JetBrains_Mono } from 'next/font/google'
+import { BrandLockupDefs } from '@/components/brand-lockup-defs'
 import { pageMetadataUrls, resolveSiteOrigin } from '@/lib/shared'
 
 const inter = Inter({
@@ -36,6 +37,7 @@ export default function Layout({ children }: LayoutProps<'/'>) {
       suppressHydrationWarning
     >
       <body className="flex flex-col min-h-screen">
+        <BrandLockupDefs />
         <RootProvider theme={{ defaultTheme: 'dark' }}>{children}</RootProvider>
       </body>
     </html>
