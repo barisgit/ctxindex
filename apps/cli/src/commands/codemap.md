@@ -15,7 +15,7 @@ Defines the citty command tree and thin adapters connecting argv parsers, workfl
 
 ## Data & control flow
 
-`main.ts` registers descriptors. Citty selects one, the handler parses raw argv, opens full or focused dependencies, delegates core behavior, renders results, closes dependencies, and returns a stable code. `db.ts` alone retains lazy database module state.
+`main.ts` registers descriptors. Citty selects one, the handler parses raw argv, opens full or focused dependencies, delegates core behavior, renders results, closes dependencies, and returns a stable code. `db.ts` alone retains lazy database module state and rejects database-backed commands before SQLite opening when the explicit-init config marker is absent.
 
 ## Integration points
 

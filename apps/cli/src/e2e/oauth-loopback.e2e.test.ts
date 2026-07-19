@@ -5,6 +5,9 @@ import { createSandbox } from '@ctxindex/core/testing'
 test('CLI no-browser loopback emits a safe authorization URL and never accepts OOB input', async () => {
   const sandbox = await createSandbox()
   try {
+    const initialized = await sandbox.run(['init'])
+    expect(initialized.exitCode, initialized.stderr).toBe(0)
+
     const client = await sandbox.run(
       ['client', 'add', 'google', '--from-env'],
       {

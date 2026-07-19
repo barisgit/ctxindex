@@ -1,9 +1,46 @@
 import { expect, test } from 'bun:test'
+import { join } from 'node:path'
 import { createSandbox } from '@ctxindex/core/testing'
+
+test('client add requires explicit initialization before reading credentials or creating state', async () => {
+  const sandbox = await createSandbox()
+  try {
+    const added = await sandbox.run(
+      ['client', 'add', 'microsoft', '--from-env'],
+      {
+        env: {
+          CTXINDEX_MICROSOFT_CLIENT_ID: 'microsoft-client-id-canary',
+        },
+      },
+    )
+
+    expect(added.exitCode).toBe(2)
+    expect(added.stderr).toContain(
+      'ctxindex is not initialized; run bun cli init',
+    )
+    expect(`${added.stdout}${added.stderr}`).not.toContain(
+      'microsoft-client-id-canary',
+    )
+    for (const path of [
+      join(sandbox.env.CTXINDEX_CONFIG_HOME, 'config.toml'),
+      join(sandbox.env.CTXINDEX_DATA_HOME, 'ctxindex.sqlite'),
+      join(sandbox.env.CTXINDEX_DATA_HOME, 'secrets.box'),
+      join(sandbox.env.CTXINDEX_CONFIG_HOME, 'secret.key'),
+      sandbox.env.CTXINDEX_KEYTAR_MOCK_FILE ?? '',
+    ]) {
+      expect(await Bun.file(path).exists()).toBe(false)
+    }
+  } finally {
+    await sandbox.cleanup()
+  }
+})
 
 test('client add validates providers and manages safe labeled inventory', async () => {
   const sandbox = await createSandbox()
   try {
+    const initialized = await sandbox.run(['init'])
+    expect(initialized.exitCode, initialized.stderr).toBe(0)
+
     const empty = await sandbox.run(['client', 'list', '--json'])
     expect(empty.exitCode, empty.stderr).toBe(0)
     expect(empty.stdout).toBe('[]\n')
