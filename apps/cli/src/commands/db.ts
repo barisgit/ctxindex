@@ -10,9 +10,13 @@ import {
 let _db: CtxindexDatabase | null = null
 
 export async function assertInitialized(): Promise<void> {
-  if (await Bun.file(configPath()).exists()) return
+  const [hasConfig, hasDatabase] = await Promise.all([
+    Bun.file(configPath()).exists(),
+    Bun.file(databasePath()).exists(),
+  ])
+  if (hasConfig && hasDatabase) return
   throw new CtxindexError(
-    'ctxindex is not initialized; run bun cli init',
+    'ctxindex is not initialized; run ctxindex init',
     'invalid_args',
   )
 }

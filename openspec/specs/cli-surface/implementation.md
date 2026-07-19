@@ -432,7 +432,7 @@ export function parsePurgeArtifactsArgs(args: string[]): PurgeArtifactsArgs;
 
 `@ctxindex/cli` is the composition root. It opens core services, loads the current registry once per command flow, parses non-interactively, invokes deep-module services through focused handlers, and owns readable/JSON output plus exit mapping.
 
-Database-backed command dependency setup requires the persisted config written by explicit `init` before opening SQLite. The shared preflight fails with fixed exit-2 guidance and no durable side effects when config is absent. Client add preserves loaded-provider validation, then invokes the preflight before declared credential environments are read; list/remove check before dependencies. `init` retains backend selection before database bootstrap. Help, argument parsing, provider validation, and pure definition discovery remain available on fresh state.
+Database-backed command dependency setup requires both the persisted config and database created by explicit `init` before opening SQLite. The shared preflight fails with fixed installation-neutral exit-2 guidance and no durable side effects when either is absent. Client add preserves loaded-provider validation, then invokes the preflight before declared credential environments are read; list/remove check before dependencies. `init` retains backend selection before database bootstrap. Help, argument parsing, provider validation, and pure definition discovery remain available on fresh state.
 
 Parser unions are the command boundary. Registry-derived Source config, fields, kinds, exports, and Actions are resolved before service calls rather than duplicated as provider branches. Structured output writes data to stdout and human diagnostics to stderr; credential values and secret-store passphrases never enter argv.
 
@@ -440,4 +440,4 @@ The Extension command adapter delegates repository, manifest, persistence, refre
 
 ## Verification
 
-Argument tests cover every discriminated parser and invalid form. Command tests inject dependency/service interfaces. CLI e2e tests cover fresh-state initialization guards with no credential or durable-state side effects, readable/JSON stream separation, stable exits, registry-derived help/describe behavior, bundled skills, local Catalog trust, default command-time refresh, stored-snapshot age and `--no-refresh`, observable refresh failure, offline startup/loading, and relocated compiled execution.
+Argument tests cover every discriminated parser and invalid form. Command tests inject dependency/service interfaces. CLI e2e tests cover empty and config-only initialization guards with no credential or durable-state side effects, readable/JSON stream separation, stable exits, registry-derived help/describe behavior, bundled skills, local Catalog trust, default command-time refresh, stored-snapshot age and `--no-refresh`, observable refresh failure, offline startup/loading, and relocated compiled execution.

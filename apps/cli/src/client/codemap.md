@@ -12,7 +12,7 @@ Orchestrates CLI lifecycle for persisted provider-scoped OAuth client records wi
 
 ## Data & control flow
 
-`client add <provider> --from-env` first applies the shared initialization preflight, then reads declared client ID and optional/required secret once and delegates typed persistence to `OAuthClientService`. List reads deterministic metadata. Remove scopes label lookup by provider, deletes metadata, and cleans the client's refs.
+`client add <provider> --from-env` first validates the loaded provider, then applies the shared initialization preflight before reading the declared client ID and optional/required secret once and delegating typed persistence to `OAuthClientService`. List reads deterministic metadata. Remove scopes label lookup by provider, deletes metadata, and cleans the client's refs.
 
 ## Integration points
 

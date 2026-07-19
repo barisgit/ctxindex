@@ -8,7 +8,7 @@ Implements the CLI application layer: registers the citty command tree, parses a
 
 - `main.ts` is the composition root. It registers explicit `client`, `account`, and `source` lifecycle commands; the removed `auth` command is neither registered nor aliased.
 - `args/` is pure parsing, `commands/` is the thin citty adapter layer, workflow folders own multi-step orchestration, and `format/` owns presentation and exit mapping.
-- `commands/db.ts` owns the config-existence initialization preflight before lazy SQLite opening; `deps.ts` constructs one shared secret runtime and wires `OAuthClientService`, `AuthService`, `AccountService`, `SourceService`, registry, and provider-operation services.
+- `commands/db.ts` owns the config-and-database initialization preflight before lazy SQLite opening; `deps.ts` constructs one shared secret runtime and wires `OAuthClientService`, `AuthService`, `AccountService`, `SourceService`, registry, and provider-operation services.
 - `definitions.ts` loads configured Extensions; `describe` and generated Source options derive runtime truth from those registries, and human-readable Action descriptions retain strict `oneOf`/`anyOf` input branches.
 - `extensions/` exposes explicit trusted Git Catalog lifecycle commands while core owns acquisition, persistence, and install behavior; Catalog list/show/install refresh by default and accept `--no-refresh`, while `definitions.ts` includes installed provenance in offline registry loading.
 
