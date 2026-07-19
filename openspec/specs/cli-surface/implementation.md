@@ -35,6 +35,8 @@ export interface SecretCliDeps {
   close(): Promise<void>
 }
 
+export async function assertInitialized(): Promise<void>;
+
 export async function openDeps(
   opts: {
     readonly config?: CtxindexConfig
@@ -430,10 +432,12 @@ export function parsePurgeArtifactsArgs(args: string[]): PurgeArtifactsArgs;
 
 `@ctxindex/cli` is the composition root. It opens core services, loads the current registry once per command flow, parses non-interactively, invokes deep-module services through focused handlers, and owns readable/JSON output plus exit mapping.
 
+Database-backed command dependency setup requires both the persisted config and database created by explicit `init` before opening SQLite. The shared preflight fails with the fixed exit-2 guidance `ctxindex is not initialized; run bun cli init` and no durable side effects when either is absent. Client add preserves loaded-provider validation, then invokes the preflight before declared credential environments are read; list/remove check before dependencies. `init` retains backend selection before database bootstrap. Help, argument parsing, provider validation, and pure definition discovery remain available on fresh state.
+
 Parser unions are the command boundary. Registry-derived Source config, fields, kinds, exports, and Actions are resolved before service calls rather than duplicated as provider branches. Structured output writes data to stdout and human diagnostics to stderr; credential values and secret-store passphrases never enter argv.
 
 The Extension command adapter delegates repository, manifest, persistence, refresh policy, and install behavior to `CatalogService`. Its parser owns only the closed nested command grammar, exact selectors, required independent trust flags, and `--no-refresh`; pure formatters render Catalog records and loaded origin provenance with non-negative snapshot age. Catalog list/show and install request refresh by default, while `--no-refresh` selects stored state. Startup and loaded-Extension listing never cross the Git acquisition boundary.
 
 ## Verification
 
-Argument tests cover every discriminated parser and invalid form. Command tests inject dependency/service interfaces. CLI e2e tests cover readable/JSON stream separation, stable exits, registry-derived help/describe behavior, bundled skills, local Catalog trust, default command-time refresh, stored-snapshot age and `--no-refresh`, observable refresh failure, offline startup/loading, and relocated compiled execution.
+Argument tests cover every discriminated parser and invalid form. Command tests inject dependency/service interfaces. CLI e2e tests cover empty and config-only initialization guards with no credential or durable-state side effects, readable/JSON stream separation, stable exits, registry-derived help/describe behavior, bundled skills, local Catalog trust, default command-time refresh, stored-snapshot age and `--no-refresh`, observable refresh failure, offline startup/loading, and relocated compiled execution.

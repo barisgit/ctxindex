@@ -1,6 +1,7 @@
 import { readEnvironmentVariable } from '@ctxindex/core/config'
 import { CtxindexValidationError } from '@ctxindex/core/errors'
 import { clientUsage, parseClientArgs } from '../args/client'
+import { assertInitialized } from '../commands/db'
 import { loadCliDefinitions } from '../definitions'
 import { openDeps } from '../deps'
 import {
@@ -31,6 +32,7 @@ export async function handleClientCommand(args: string[]): Promise<number> {
           `Unknown OAuth provider: ${parsed.provider}`,
         )
       }
+      await assertInitialized()
       const clientId = readEnvironmentVariable(provider.environment.clientId)
       if (!clientId) {
         throw new CtxindexValidationError(
@@ -60,6 +62,7 @@ export async function handleClientCommand(args: string[]): Promise<number> {
       })
       console.log(formatClientAdded(added))
     } else {
+      await assertInitialized()
       deps = await openDeps()
       if (parsed.kind === 'list') {
         console.log(
