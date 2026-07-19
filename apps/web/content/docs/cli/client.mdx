@@ -1,0 +1,34 @@
+---
+title: ctxindex client
+description: Manage persisted OAuth application Clients.
+---
+
+A Client stores one provider's OAuth application configuration. Client labels are unique within that provider, not globally.
+
+## Usage
+
+```sh
+ctxindex client add <provider> [--label <label>] --from-env
+ctxindex client list [--json]
+ctxindex client remove <provider> <label>
+```
+
+## Commands and flags
+
+| Command or flag | Purpose |
+| --- | --- |
+| `add <provider>` | Add a provider Client. |
+| `--label <label>` | Set its provider-scoped label. The provider ID is the default. |
+| `--from-env` | Read the provider-declared environment values once and persist them through the active secret backend. |
+| `list` | List configured Clients without exposing credentials. |
+| `remove <provider> <label>` | Remove Client metadata and secrets. Existing Account Grants retain their refresh state. |
+
+Use `ctxindex describe adapter <adapter-id>` to discover the provider and declared environment variable names. Secret values are not accepted as command arguments.
+
+## JSON output
+
+Only `client list` accepts `--json`. The JSON inventory is deterministic and non-sensitive.
+
+<Callout title="Stable exit codes">
+Exit codes are API: `0` success; `2` invalid usage or a label collision; `10` `needs_auth`; `20` rate limited; `30` network/provider; `40` permission denied; `50` other sync failure; `130` cancelled by SIGINT.
+</Callout>

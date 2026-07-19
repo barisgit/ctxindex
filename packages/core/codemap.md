@@ -20,4 +20,4 @@ Defines the private `@ctxindex/core` workspace package, exposing provider-neutra
 
 - Implementation and aggregate map: `packages/core/src/index.ts` and `packages/core/src/codemap.md`; trusted Git distribution is mapped under `packages/core/src/catalog/codemap.md`.
 - Contracts and definitions: `packages/extension-sdk/`, `packages/profiles/`, and built-in Adapters including Microsoft identity/mailbox under `packages/adapters/src/microsoft/`.
-- Primary consumer/composition root: `apps/cli/src/deps.ts`; storage initialization consumes core migrations.
+- Primary consumer/composition root: `apps/cli/src/deps.ts`; storage initialization consumes core migrations. The package manifest owns build, quality, test-lane, and clean/fullclean tasks dispatched by root Turbo commands.

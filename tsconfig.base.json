@@ -19,5 +19,5 @@
     "isolatedModules": true
   },
   "include": ["apps/**/*.ts", "packages/**/*.ts", "examples/**/*.ts"],
-  "exclude": ["**/migrations/**", "**/node_modules/**"]
+  "exclude": ["**/migrations/**", "**/node_modules/**", "apps/web/**"]
 }

@@ -1,0 +1,93 @@
+---
+title: Architecture
+description: How the provider-neutral core combines live provider access with local SQLite projections.
+---
+
+ctxindex is a local personal-context gateway. The CLI is its agent integration surface; providers and the filesystem remain canonical.
+
+## System shape
+
+```text
+                              ┌──────────────────────────────┐
+                              │ Provider or local filesystem │
+                              │      canonical context       │
+                              └──────────────▲───────────────┘
+                                             │ provider I/O
+Agent ──> CLI ──> provider-neutral core ──> Source Adapter
+                    │              │              ▲
+                    │              └── Source ────┘
+                    │                    ▲
+                    │               Realm contains
+                    │
+                    └──> SQLite projections + managed Artifact cache
+
+Client ──> Account ──> Grant ──explicit binding──> Source
+```
+
+The main boundaries are deliberate:
+
+- the CLI parses, composes, formats, and maps final exits;
+- core owns provider-neutral orchestration, validation, SQLite, and cache state;
+- Profiles own portable domain vocabulary;
+- Source Adapters own provider authentication, transport, normalization, and declared operations;
+- Extensions bundle Profiles and Source Adapters without adding commands.
+
+## Sync and live search share one Resource model
+
+Search uses one normalized query and result envelope across local and provider origins. The route is selected per Source from the caller override, Source configuration, and Adapter routing declaration.
+
+| Path | Reads from | Local effect | Offline behavior |
+| --- | --- | --- | --- |
+| Local search | SQLite full-text and typed projections | Read only | Fully available for materialized coverage |
+| Live provider search | A Source Adapter's `search-remote` capability | May cache purgeable `adhoc` envelopes | Degrades with a warning |
+| Sync | A Source Adapter's `sync` capability | Transactionally updates `synced` Resources and the durable cursor | Requires the Source's provider or filesystem |
+| Retrieval | Local complete Resource first, then Adapter `retrieve` | May cache a complete `adhoc` Resource | Local complete state remains available |
+
+Indexed Sources search local projections. Federated Sources search the provider. Hybrid Sources can use local coverage and add a remote leg when needed. `--local-only` forces local projections; `--remote` forces remote-capable Sources. Mixed local and provider failures preserve usable local results and report warnings.
+
+<Callout>
+  Sync is a materialization strategy, not the product boundary. A stable Ref can exist before, during, or after local materialization.
+</Callout>
+
+## Sync commits data and cursor together
+
+```text
+Adapter iterator
+  └──> validated upserts / removals / checkpoints / warnings
+        └──> one SQLite transaction
+              ├── Resources and payloads
+              ├── fields, chunks, Relations, and tombstones
+              ├── Sync Run counts and status
+              └── final durable cursor
+```
+
+A failed Sync Run preserves the previous durable cursor. Checkpoints can support long runs but do not become current until completion. Adapters return typed operations; they never write core tables directly. Readers do not take the Sync lock.
+
+## SQLite stores projections, not canonical ownership
+
+Core stores generic projections that Profiles derive from Resources:
+
+| Projection | Purpose |
+| --- | --- |
+| Resource envelope and payload | Stable Ref, Source and Realm, Profile version, origin, completeness, times, text, and validated payload |
+| Field Index | Typed scalar and array values for generic filtering and aggregation |
+| Chunks and full-text index | Searchable Resource and chunk content |
+| Relations and resolutions | Typed edges to Refs or natural keys, including targets that resolve later |
+| Artifact descriptors | Metadata for lazily downloaded bytes in the managed cache |
+| Tombstones and Sync Runs | Provider deletion state and the audit trail of refresh attempts |
+
+Remote envelopes, retrieved payloads, and synced content use the same Resource tables. Sync upgrades an identical ad-hoc Ref to synced state rather than duplicating it.
+
+SQLite runs locally with WAL mode, foreign keys, normal synchronous mode, and a bounded busy timeout. This supports concurrent reads while Sync is coordinated through an advisory lock.
+
+## Providers stay canonical
+
+A Materialization is purgeable local state. It accelerates discovery and supports offline access over synced coverage, but it is not the system of record.
+
+- Provider updates arrive through later Sync, live search, or retrieval.
+- Synced provider deletions become local tombstones; ad-hoc cache entries are evicted instead.
+- Artifact bytes can be purged while their descriptors remain available for refetch.
+- Local directory Sources index files in place; ctxindex does not take ownership of them.
+- Provider mutations stop at reversible email Draft creation and update in V1.
+
+The result is one deterministic access model over context without replacing the services and files that own it.

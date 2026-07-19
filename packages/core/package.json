@@ -39,7 +39,10 @@
     "typecheck": "tsgo --noEmit -p tsconfig.json",
     "test": "bun test",
     "test:integration": "bun test --path-ignore-patterns '__none__' --pass-with-no-tests integration.test",
-    "test:e2e": "bun run ../../scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' --pass-with-no-tests e2e.test"
+    "test:e2e": "bun run ../../scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' --pass-with-no-tests e2e.test",
+    "format": "biome format --write .",
+    "clean": "rm -rf .turbo dist coverage",
+    "fullclean": "rm -rf .turbo dist coverage node_modules"
   },
   "dependencies": {
     "@ctxindex/extension-sdk": "workspace:*",
