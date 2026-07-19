@@ -16,7 +16,7 @@ Implements provider-neutral domain and application services: Extension registrat
 1. Config/paths and secrets initialize runtime state; storage applies the fresh schema.
 2. Extension loading builds registries from built-ins, paths, and offline installed Catalog provenance. `catalog/` acquires and race-safely publishes immutable Git snapshots, refreshes pins on request, and validates installs against the complete runtime registry; `client/` persists provider-scoped labeled clients; `account/` maintains globally labeled identities; `auth/` requests all loaded same-provider scopes and updates one stable Grant per Account.
 3. Realm/Source services persist required Source labels and explicit Grant bindings; Account removal marks bound Sources `needs_auth` and clears bindings.
-4. Sync/search/retrieval/Action/Artifact/export/thread services invoke constrained Adapter operations and persist validated generic results; remote-search origins use atomic SQLite-coordinated cache batches so optional contention cannot discard provider results.
+4. Sync/search/retrieval/Action/Artifact/export/thread services invoke constrained Adapter operations and persist validated generic results; Action contexts include same-Source local Resource resolution and verified cached Artifact byte resolution without provider I/O. Remote-search origins use atomic SQLite-coordinated cache batches so optional contention cannot discard provider results.
 
 ## Integration points
 

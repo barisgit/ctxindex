@@ -13,6 +13,7 @@ import {
   deriveCommunicationMessageReplySubject,
 } from '@ctxindex/profiles'
 import type { z } from 'zod'
+import { renderMimeMessage, resolveDraftAttachments } from '../../mail/mime'
 import { parseGraphMessage, retrievedResource } from './message'
 import { parseDraftRef } from './ref'
 import {
@@ -246,7 +247,24 @@ function replyReplacement(details: MicrosoftReplyDetails, bodyText: string) {
   }
 }
 
-function replyMime(details: MicrosoftReplyDetails, bodyText: string): string {
+function mimeHeaders(
+  input:
+    | MicrosoftStandaloneDraftCreateInput
+    | MicrosoftStandaloneDraftUpdateInput,
+): string[] {
+  return [
+    `To: ${input.to.join(', ')}`,
+    ...(input.cc?.length ? [`Cc: ${input.cc.join(', ')}`] : []),
+    ...(input.bcc?.length ? [`Bcc: ${input.bcc.join(', ')}`] : []),
+    `Subject: ${input.subject}`,
+  ]
+}
+
+function replyMime(
+  details: MicrosoftReplyDetails,
+  bodyText: string,
+  attachments: Parameters<typeof renderMimeMessage>[0]['attachments'],
+): string {
   const headers = [
     `To: ${details.recipient}`,
     `Subject: ${details.subject}`,
@@ -254,14 +272,10 @@ function replyMime(details: MicrosoftReplyDetails, bodyText: string): string {
     ...(details.references.length > 0
       ? [`References: ${details.references.join(' ')}`]
       : []),
-    'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=UTF-8',
-    'Content-Transfer-Encoding: 8bit',
   ]
-  const body = bodyText.replace(/\r\n|\r|\n/g, '\r\n')
-  return Buffer.from(`${headers.join('\r\n')}\r\n\r\n${body}`).toString(
-    'base64',
-  )
+  return Buffer.from(
+    renderMimeMessage({ headers, bodyText, attachments }),
+  ).toString('base64')
 }
 
 function normalizeBodyLineEndings(value: string): string {
@@ -276,6 +290,7 @@ function draftResource(
     readonly details: MicrosoftReplyDetails
     readonly bodyText: string
   },
+  managedAttachmentRefs?: readonly string[],
 ): RetrievedResource {
   const message = parseGraphMessage(value)
   if (
@@ -314,6 +329,9 @@ function draftResource(
   const payload = communicationMessageSchema.parse({
     ...basePayload,
     providerDraftId: message.id,
+    ...(managedAttachmentRefs !== undefined
+      ? { managedAttachmentRefs: [...managedAttachmentRefs] }
+      : {}),
     to: reply ? [reply.details.recipient] : (basePayload.to ?? []),
     cc: reply ? [] : (basePayload.cc ?? []),
     bcc: reply ? [] : (basePayload.bcc ?? []),
@@ -340,6 +358,8 @@ export async function microsoftDraftCreate(
   context: ActionContext<MicrosoftDraftCreateInput>,
 ): Promise<RetrievedResource> {
   const input = parseCreateInput(context.input)
+  const attachments = await resolveDraftAttachments(context, input.attachments)
+  const managedAttachmentRefs = attachments.map((artifact) => artifact.ref)
   if (isReplyInput(input)) {
     const details = replyDetails(context, input.replyToRef)
     const headers = graphHeaders(TEXT_BODY_PREFERENCE)
@@ -351,7 +371,7 @@ export async function microsoftDraftCreate(
       {
         method: 'POST',
         headers,
-        body: replyMime(details, input.bodyText),
+        body: replyMime(details, input.bodyText, attachments),
         signal: context.signal,
       },
     )
@@ -363,17 +383,36 @@ export async function microsoftDraftCreate(
         details,
         bodyText: input.bodyText,
       },
+      managedAttachmentRefs,
     )
   }
   const headers = graphHeaders(TEXT_BODY_PREFERENCE)
-  headers.set('content-type', 'application/json')
+  headers.set(
+    'content-type',
+    attachments.length > 0 ? 'text/plain' : 'application/json',
+  )
   const response = await context.fetch(graphUrl('/me/messages'), {
     method: 'POST',
     headers,
-    body: JSON.stringify(replacement(input)),
+    body:
+      attachments.length > 0
+        ? Buffer.from(
+            renderMimeMessage({
+              headers: mimeHeaders(input),
+              bodyText: input.bodyText,
+              attachments,
+            }),
+          ).toString('base64')
+        : JSON.stringify(replacement(input)),
     signal: context.signal,
   })
-  return draftResource(await graphJson(response), context.source.id)
+  return draftResource(
+    await graphJson(response),
+    context.source.id,
+    undefined,
+    undefined,
+    managedAttachmentRefs,
+  )
 }
 
 export async function microsoftDraftUpdate(
@@ -388,6 +427,8 @@ export async function microsoftDraftUpdate(
   const standalone = details
     ? undefined
     : (input as MicrosoftStandaloneDraftUpdateInput)
+  const stored = localMessage(context, input.ref, true)
+  const managedAttachmentRefs = stored.managedAttachmentRefs
   const headers = graphHeaders(TEXT_BODY_PREFERENCE)
   headers.set('content-type', 'application/json')
   const response = await context.fetch(
@@ -408,5 +449,6 @@ export async function microsoftDraftUpdate(
     context.source.id,
     draftId,
     details ? { details, bodyText: input.bodyText } : undefined,
+    managedAttachmentRefs,
   )
 }

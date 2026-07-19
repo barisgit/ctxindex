@@ -96,6 +96,9 @@ export class ArtifactStore {
     ): Promise<Artifact>;
   async createWriter(): Promise<ArtifactWriter>;
   async get(ref: string): Promise<Artifact | undefined>;
+  async read(ref: string): Promise<
+    { readonly artifact: Artifact; readonly bytes: Uint8Array } | undefined
+  >;
   async copyTo(ref: string, outputPath: string): Promise<void>;
   async purge(): Promise<ArtifactPurgeResult>;
   async diskAccounting(): Promise<ArtifactDiskAccounting>;
@@ -137,6 +140,10 @@ export interface ArtifactServiceInput {
 export class ArtifactService {
   constructor(private readonly input: ArtifactServiceInput);
   async list(ref: string): Promise<ArtifactListResult>;
+  async resolveCached(
+    ref: string,
+    sourceId: string,
+  ): Promise<ActionArtifact | null>;
   async download(
       ref: string,
       options: {
@@ -226,6 +233,8 @@ export async function exportSourceResource(
 Source retrieval parses the Ref, checks `ResourceStore`, invokes the bound Adapter only when complete local state is absent, requires exactly one matching Resource, validates it through the Profile, and stores complete ad-hoc state. Complete mailbox retrieval preserves portable Reply-To addresses, RFC References/message identity, and provider conversation identity so later reply Actions require no provider read before mutation. Thread traversal follows generic membership/parent Relations in both directions.
 
 Profiles derive Artifact descriptors. `ArtifactService` streams Adapter downloads into `ArtifactStore`; the store hashes while writing and commits immutable SHA-256 CAS objects plus SQLite metadata. V1 uses `cached` retention until explicit purge. Output copies do not transfer store ownership.
+
+Action attachment resolution revalidates exact current descriptor membership and selected-Source ownership, then reads a copied byte array only after the CAS hash, size, path, origin, media type, and declared size agree. It never downloads missing bytes. Purge leaves the descriptor discoverable but makes Action resolution return unavailable until an explicit Artifact download rematerializes the cache.
 
 ## Verification
 

@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 import type {
+  ActionArtifact,
   ActionContext,
   ActionResource,
   AdapterActionBinding,
@@ -46,6 +47,7 @@ import type {
 import * as runtimeSdk from './index'
 
 type PublicTypeSurface = {
+  actionArtifact: ActionArtifact
   actionContext: ActionContext
   actionResource: ActionResource
   adapterActionBinding: AdapterActionBinding
@@ -94,6 +96,7 @@ const publicTypeSurfaceCompiles: PublicTypeSurface | undefined = undefined
 void publicTypeSurfaceCompiles
 
 const publicSymbolNames = [
+  'ActionArtifact',
   'ActionContext',
   'ActionResource',
   'AdapterActionBinding',

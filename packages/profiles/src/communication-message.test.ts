@@ -49,11 +49,39 @@ type _PayloadIsInferred = Assert<
             byteSize?: number | undefined
           }[]
         | undefined
+      managedAttachmentRefs?: string[] | undefined
     }
   >
 >
 
 describe('communication.message Profile v1', () => {
+  test('accepts unique managed attachments only on create', () => {
+    const artifactRef =
+      'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/1/attachment/1'
+    expect(
+      communicationMessageDraftCreateInputSchema.parse({
+        to: ['recipient@example.test'],
+        subject: 'Subject',
+        bodyText: 'Body',
+        attachments: [{ ref: artifactRef }],
+      }).attachments,
+    ).toEqual([{ ref: artifactRef }])
+    expect(() =>
+      communicationMessageDraftCreateInputSchema.parse({
+        replyToRef: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/1',
+        bodyText: 'Body',
+        attachments: [{ ref: artifactRef }, { ref: artifactRef }],
+      }),
+    ).toThrow()
+    expect(() =>
+      communicationMessageDraftUpdateInputSchema.parse({
+        ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/1',
+        replyToRef: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/1',
+        bodyText: 'Body',
+        attachments: [{ ref: artifactRef }],
+      }),
+    ).toThrow()
+  })
   test('strictly validates the minimal Gmail search/get payload', () => {
     const payload: CommunicationMessagePayload = {
       providerMessageId: 'gmail-message-1',
@@ -101,6 +129,11 @@ describe('communication.message Profile v1', () => {
           to: ['recipient@example.com'],
           subject: 'Project update',
           bodyText: 'The project is on track.',
+          attachments: [
+            {
+              ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/stable-message-id/attachment/agenda',
+            },
+          ],
         },
         {
           replyToRef:

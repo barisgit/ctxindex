@@ -135,6 +135,56 @@ async function fixture(
 }
 
 describe('ArtifactService', () => {
+  test('resolves only current same-Source verified cached bytes for Actions', async () => {
+    const f = await fixture({ declaredSize: bytes.length })
+    expect(await f.service.resolveCached(artifactRef, sourceId)).toBeNull()
+    await f.service.download(artifactRef)
+    const first = await f.service.resolveCached(artifactRef, sourceId)
+    expect(first).toEqual({
+      ref: artifactRef,
+      originRef,
+      filename: 'file.bin',
+      mediaType: 'application/octet-stream',
+      byteSize: bytes.length,
+      bytes: new Uint8Array(bytes),
+    })
+    if (!first) throw new Error('expected cached Artifact')
+    first.bytes[0] = 255
+    expect(
+      (await f.service.resolveCached(artifactRef, sourceId))?.bytes,
+    ).toEqual(new Uint8Array(bytes))
+    expect(f.calls()).toBe(1)
+
+    await expect(
+      f.service.resolveCached(
+        artifactRef.replace(sourceId, '01KXHBNECDAH1T4MJ38X88EPFK'),
+        sourceId,
+      ),
+    ).rejects.toMatchObject({ code: 'ref_source_mismatch' })
+    f.db
+      .prepare('UPDATE resources SET payload_json = ? WHERE ref = ?')
+      .run(JSON.stringify({ attachments: [] }), originRef)
+    expect(await f.service.resolveCached(artifactRef, sourceId)).toBeNull()
+    expect(f.calls()).toBe(1)
+  })
+
+  test('rejects cached metadata drift and returns unavailable after purge', async () => {
+    const f = await fixture({ declaredSize: bytes.length })
+    await f.service.download(artifactRef)
+    f.db
+      .prepare('UPDATE artifacts SET media_type = ? WHERE ref = ?')
+      .run('text/plain', artifactRef)
+    await expect(
+      f.service.resolveCached(artifactRef, sourceId),
+    ).rejects.toMatchObject({ code: 'data_integrity' })
+    f.db
+      .prepare('UPDATE artifacts SET media_type = ? WHERE ref = ?')
+      .run('application/octet-stream', artifactRef)
+    await f.service.purge()
+    expect(await f.service.resolveCached(artifactRef, sourceId)).toBeNull()
+    expect(f.calls()).toBe(1)
+  })
+
   test('lists exact live Resource Profile descriptors without provider I/O', async () => {
     const f = await fixture()
     expect(await f.service.list(originRef)).toEqual({

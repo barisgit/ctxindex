@@ -18,6 +18,7 @@ export {
 } from './extension'
 
 export type {
+  ActionArtifact,
   ActionContext,
   ActionResource,
   AdapterLogger,

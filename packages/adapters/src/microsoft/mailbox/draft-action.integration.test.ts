@@ -111,6 +111,7 @@ describe('Microsoft Outlook Draft Actions', () => {
       logger,
       signal: new AbortController().signal,
       resolveResource: () => null,
+      resolveArtifact: async () => null,
     }).catch((caught: unknown) => caught)
 
     expect(error).toMatchObject({ code: 'invalid_action_input' })
@@ -133,6 +134,7 @@ describe('Microsoft Outlook Draft Actions', () => {
       logger,
       signal: new AbortController().signal,
       resolveResource: () => null,
+      resolveArtifact: async () => null,
     }).catch((caught: unknown) => caught)
 
     expect(error).toMatchObject({ code: 'invalid_action_input' })
@@ -296,6 +298,7 @@ describe('Microsoft Outlook Draft Actions', () => {
       logger,
       signal: new AbortController().signal,
       resolveResource: () => null,
+      resolveArtifact: async () => null,
     })
 
     expect(fetchCalls).toBe(1)
@@ -489,6 +492,7 @@ describe('Microsoft Outlook Draft Actions', () => {
       logger,
       signal: new AbortController().signal,
       resolveResource: () => null,
+      resolveArtifact: async () => null,
     }).catch((caught: unknown) => caught)
 
     expect(error).toMatchObject({ code })
@@ -514,6 +518,7 @@ describe('Microsoft Outlook Draft Actions', () => {
       logger,
       signal: new AbortController().signal,
       resolveResource: () => null,
+      resolveArtifact: async () => null,
     }).catch((caught: unknown) => caught)
 
     expect(error).toMatchObject({ code: 'invalid_action_input' })

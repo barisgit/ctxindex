@@ -268,12 +268,16 @@ defineAdapter({
         const resolved = context.resolveResource(
           'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/note/1',
         )
+        const artifact = context.resolveArtifact(
+          'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/note/1/attachment/1',
+        )
         void sourceId
         void inputTitle
         void signal
         void fetch
         void logger
         void resolved
+        void artifact
         return actionResult
       },
     },

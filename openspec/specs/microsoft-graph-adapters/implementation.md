@@ -121,6 +121,8 @@ export async function microsoftMailboxDownload(
 
 The Microsoft modules in `@ctxindex/adapters` own declarative OAuth metadata, provider DTOs, normalization, and operations. Calendar and mailbox operations depend on the provider-root Graph transport for request construction, continuation validation, response decoding, and normalized errors. Mailbox retrieval orchestrates message and attachment DTOs into generic Resources and Artifacts; Draft handlers map schema-inferred standalone or reply inputs and local Resource resolution into Graph requests, then normalize `RetrievedResource` results. Core sees only generic Resources, warnings, checkpoints, Artifacts, and Action results. Exact paging, sizing, retry, mutation, and diagnostic behavior lives in the capability spec and applicable delta specs.
 
+Attachment-bearing standalone and native-reply Draft creation renders one validated MIME message containing exact managed bytes and performs one immutable-id POST without follow-up attachment mutations. Attachment-free standalone create retains the JSON request. Update always uses one JSON PATCH that omits the attachment collection, preserving existing provider attachments and immutable reply context without a provider read, retry, add/delete route, or send route.
+
 ## Verification
 
 Transport/provider tests, calendar reconciliation/cursor tests, mailbox search/retrieve/download tests, Draft/no-send tests, auth integration, and compiled multi-provider workflows verify the interfaces. Transport tests prove diagnostic classification and redaction; the Outlook replay proves remote search to exact get, paged Artifact listing, exact-byte download, and cache reuse while rejecting annotation selection as an OData property.

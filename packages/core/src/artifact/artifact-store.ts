@@ -9,6 +9,7 @@ import {
   mkdtemp,
   open,
   readdir,
+  readFile,
   rename,
   rm,
   stat,
@@ -419,6 +420,28 @@ export class ArtifactStore {
     }
     await verifyObject(join(this.root, expectedPath), hex, row.byte_size)
     return fromRow(row)
+  }
+
+  async read(
+    ref: string,
+  ): Promise<
+    { readonly artifact: Artifact; readonly bytes: Uint8Array } | undefined
+  > {
+    const artifact = await this.get(ref)
+    if (!artifact) return undefined
+    const bytes = new Uint8Array(
+      await readFile(join(this.root, artifact.localPath)),
+    )
+    const contentHash = `${HASH_PREFIX}${createHash('sha256').update(bytes).digest('hex')}`
+    if (
+      bytes.byteLength !== artifact.byteSize ||
+      contentHash !== artifact.contentHash
+    )
+      throw integrityError(`Artifact cache object failed verification: ${ref}`)
+    return {
+      artifact,
+      bytes: bytes.slice(),
+    }
   }
 
   async copyTo(ref: string, outputPath: string): Promise<void> {

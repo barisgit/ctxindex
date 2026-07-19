@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ArtifactService } from '../artifact'
 import {
   CtxindexError,
   CtxindexNotFoundError,
@@ -145,6 +146,15 @@ export async function runAction(
         }
       : null
   }
+  const artifacts = new ArtifactService({
+    db: input.db,
+    registry: input.registry,
+    authService: input.authService,
+    logger: input.logger,
+    ...(input.fetch ? { fetch: input.fetch } : {}),
+  })
+  const resolveArtifact = (ref: string) =>
+    artifacts.resolveCached(ref, input.sourceId)
 
   const provider = await createSourceProviderContext({
     db: input.db,
@@ -162,6 +172,7 @@ export async function runAction(
     input: parsedInput.data,
     signal: input.signal,
     resolveResource,
+    resolveArtifact,
   })
 
   const parsedResult = resultSchema.safeParse(returned)

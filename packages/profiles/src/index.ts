@@ -6,6 +6,7 @@ export {
 } from './calendar-event'
 export type { CommunicationMessage } from './communication-message'
 export {
+  communicationMessageDraftAttachmentSchema,
   communicationMessageDraftCreateInputSchema,
   communicationMessageDraftUpdateInputSchema,
   communicationMessageProfile,
@@ -13,6 +14,8 @@ export {
   deriveCommunicationMessageReplyRecipient,
   deriveCommunicationMessageReplyReferences,
   deriveCommunicationMessageReplySubject,
+  MAX_DRAFT_ATTACHMENT_BYTES,
+  MAX_DRAFT_ATTACHMENT_COUNT,
 } from './communication-message'
 export type { FileChunk } from './file'
 export {
