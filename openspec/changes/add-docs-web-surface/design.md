@@ -18,7 +18,7 @@ The branch already contains a Next.js/Fumadocs landing and documentation app. Re
 - A fully static export or a replacement client-side search implementation.
 - A new agent integration surface or changes to CLI behavior.
 - Treating the site, its examples, or `SYSTEM.md` as normative product specifications.
-- Preserving malformed draft routes or review-only screenshots.
+- Preserving malformed draft routes. Final and iterative review screenshots are intentionally retained as PR-review evidence because remote reviewers may not have access to the development device.
 
 ## Decisions
 
@@ -38,7 +38,7 @@ The branch already contains a Next.js/Fumadocs landing and documentation app. Re
 
 ## Migration Plan
 
-No persistent user or provider state changes. Production deployments should set the documented canonical-origin environment variable before building. Previously published malformed representation URLs are intentionally unsupported. Review-only screenshots are removed from Git and remain recoverable from earlier branch commits.
+No persistent user or provider state changes. Production deployments should set the documented canonical-origin environment variable before building. Previously published malformed representation URLs are intentionally unsupported. Final and iterative review screenshots are committed under `apps/web/.screenshots/` so the pull request remains self-contained for remote review.
 
 ## Open Questions
 

@@ -21,7 +21,7 @@
 ## 4. Deployment and branch hygiene
 
 - [x] 4.1 Correct web deployment documentation to distinguish prerendered pages from server/serverless search runtime
-- [x] 4.2 Remove review-only `.screenshots` assets from the branch while preserving product images and document their Git recoverability
+- [x] 4.2 Retain final and iterative `.screenshots` assets in the branch so the pull request is self-contained for remote visual review
 - [x] 4.3 Run web formatting/lint, typecheck, and production build after content and deployment edits
 
 ## 5. Documentation structure

@@ -20,7 +20,7 @@ The workspace dependency verifier discovers authored source extensions recursive
 
 ## Storage and State
 
-The web surface stores no user, provider, catalog, or search state. MDX content and product images are repository assets. Framework build output and visual review captures are generated artifacts and are not versioned product state.
+The web surface stores no user, provider, catalog, or search state. MDX content and product images are repository assets. Framework build output is generated and ignored. Visual review captures are versioned PR evidence under `apps/web/.screenshots/` because reviewers may not have access to the development device; they are not runtime product state.
 
 ## Security and Compatibility
 
