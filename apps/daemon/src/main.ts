@@ -1,4 +1,5 @@
 import { cacheDir, configDir, dataDir, stateDir } from '@ctxindex/core/paths'
+import { FileLeaseUnsupportedError } from '@ctxindex/local-daemon'
 import {
   type DaemonStartupFailure,
   isDaemonStartupFailure,
@@ -36,6 +37,12 @@ export async function runForegroundMain(
     await main(start)
     return 0
   } catch (error) {
+    if (error instanceof FileLeaseUnsupportedError) {
+      console.error(
+        'The local daemon is unsupported on this platform or filesystem.',
+      )
+      return 50
+    }
     if (!isDaemonStartupFailure(error)) throw error
     console.error(formatStartupFailure(error))
     return 50

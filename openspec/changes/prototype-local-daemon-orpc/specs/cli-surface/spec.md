@@ -7,7 +7,7 @@ For daemon-routed commands, all input that can be validated without runtime stat
 
 For Realm add/list, Source add/list/remove and the Source-definition projection needed to parse Source configuration, sync/status, search, exact get, and local thread traversal, the CLI MUST select daemon routing when validated lifecycle/discovery metadata exists for the exact canonical runtime tuple or when a test endpoint override explicitly selects it. Once selected, the client process MUST NOT open SQLite, and an unreachable, stale, or lost endpoint MUST report daemon-unavailable with exit `50` without falling back to direct composition. Stateful command paths outside this implemented daemon-routed set are explicitly unconverted and MAY preserve their direct behavior only behind the database-lease fence.
 
-Before any unconverted stateful command composes a runtime or opens SQLite, the CLI MUST resolve the canonical SQLite path and attempt retained shared lease acquisition. Exclusive conflict MUST report `prototype_unsupported` through exit `50` before database open. Successful shared ownership MUST remain held until after SQLite close, while the command otherwise retains existing direct behavior.
+Before any unconverted stateful command composes a runtime or opens SQLite, the CLI MUST resolve the canonical SQLite path and attempt retained shared lease acquisition. Exclusive conflict MUST report `prototype_unsupported` through exit `50` before database open. Successful shared ownership MUST remain held until after SQLite close, while the command otherwise retains existing direct behavior. If the current platform has no retained-lease backend, daemon startup is impossible and the direct command MUST preserve its pre-prototype behavior without a lease; unsupported lock semantics on a platform that otherwise supplies the backend MUST still fail closed.
 
 #### Scenario: Malformed input fails before transport
 - **WHEN** an agent invokes a daemon-routed command with malformed arguments or an invalid locally checkable payload
@@ -37,6 +37,10 @@ Before any unconverted stateful command composes a runtime or opens SQLite, the 
 #### Scenario: Unconverted stateful command remains direct with shared ownership
 - **WHEN** the command acquires a shared lease for its canonical SQLite path
 - **THEN** it retains that lease until after close and otherwise preserves its existing direct behavior
+
+#### Scenario: Unsupported platform remains directly usable
+- **WHEN** no daemon route is selected and the operating system has no retained-lease backend
+- **THEN** an unconverted or directly implemented command preserves its prior SQLite behavior instead of failing with prototype-unsupported
 
 ### Requirement: Deterministic daemon lifecycle surface
 The system SHALL provide an explicit foreground daemon serve entrypoint. The CLI SHALL provide bounded commands to inspect daemon health and readiness and request graceful shutdown. These surfaces MUST be non-interactive, MUST support deterministic machine-readable output, and MUST report unavailable or incompatible daemon state with actionable diagnostics through the stable exit taxonomy. The prototype MUST NOT implicitly start or detach a daemon as a side effect of an ordinary command.

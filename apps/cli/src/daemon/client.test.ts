@@ -245,3 +245,66 @@ test('an already-aborted selected request is cancellation, not unavailability', 
     await setup.close()
   }
 })
+
+test('unix transport preserves the RPC fetch init', async () => {
+  const setup = await fixture()
+  const controller = new AbortController()
+  let observedInit: RequestInit | undefined
+  const fetch = spyOn(globalThis, 'fetch').mockImplementation((async (
+    _request: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    observedInit = init
+    throw new Error('stop after observing init')
+  }) as unknown as typeof globalThis.fetch)
+  try {
+    const selection = selectDaemonForRuntime(setup.runtime, {
+      testEndpoint: '/tmp/ctxd-init.sock',
+    }) as DaemonSelection
+    await expect(
+      daemonHealth(selection, controller.signal),
+    ).rejects.toMatchObject({
+      code: 'daemon_unavailable',
+    })
+    expect(observedInit).toMatchObject({
+      redirect: 'manual',
+      unix: selection.endpoint,
+    })
+  } finally {
+    fetch.mockRestore()
+    await setup.close()
+  }
+})
+
+test.each([
+  ['starting', 'The local daemon is starting and is not yet available.'],
+  ['stopping', 'The local daemon is stopping and is no longer available.'],
+] as const)('unavailable diagnostics reflect discovered %s lifecycle', async (lifecycle, message) => {
+  const setup = await fixture()
+  const fetch = spyOn(globalThis, 'fetch').mockRejectedValue(
+    new Error('offline'),
+  )
+  try {
+    const selection = {
+      endpoint: '/tmp/ctxd-lifecycle.sock',
+      roots: setup.runtime,
+      selectedBy: 'metadata',
+      metadata: {
+        schemaVersion: 1,
+        protocolId: 'ctxindex.local',
+        protocolVersion: 1,
+        ...setup.runtime.identity,
+        instanceId: 'instance-1',
+        ownerToken: 'a'.repeat(64),
+        pid: 123,
+        startedAt: '2026-07-18T00:00:00.000Z',
+        lifecycle,
+        endpointToken: `ctxd-${setup.runtime.identity.tupleDigest.slice(0, 24)}.sock`,
+      },
+    } satisfies DaemonSelection
+    await expect(daemonHealth(selection)).rejects.toMatchObject({ message })
+  } finally {
+    fetch.mockRestore()
+    await setup.close()
+  }
+})

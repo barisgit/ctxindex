@@ -11,8 +11,9 @@ Daemon ownership MUST NOT become the default until every stateful command is eit
 - **THEN** no command silently falls back to direct SQLite access after selecting a daemon
 
 ### Requirement: Supported platforms fail closed without retained ownership
-Each advertised operating system MUST provide process-retained shared and exclusive ownership with crash release, owner-private metadata, alias-safe canonical identity, and fail-closed acquisition. A platform without a verified implementation MUST reject daemon ownership before SQLite opens and MUST NOT be advertised as supported.
+Each advertised operating system MUST provide process-retained shared and exclusive ownership with crash release, owner-private metadata, alias-safe canonical identity, and fail-closed acquisition. A platform without a verified implementation MUST reject daemon ownership before SQLite opens and MUST NOT be advertised as daemon-supported; until promotion supplies that backend, the existing direct CLI MUST remain usable because no daemon can own its database.
 
 #### Scenario: Platform backend is unavailable
 - **WHEN** the current platform cannot provide the verified retained-ownership semantics
 - **THEN** daemon startup fails before SQLite open with a bounded actionable failure
+- **THEN** direct CLI behavior remains available without claiming daemon ownership

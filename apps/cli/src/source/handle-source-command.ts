@@ -314,7 +314,17 @@ export async function handleSourceCommand(
     return mapErrorToExit(error)
   } finally {
     process.removeListener('SIGINT', cancel)
-    await deps?.close()
-    if (directRoute) closeSourceCommandRoute(directRoute)
+    try {
+      await deps?.close()
+    } catch {
+      // Cleanup cannot replace the command result or failure.
+    }
+    if (directRoute) {
+      try {
+        closeSourceCommandRoute(directRoute)
+      } catch {
+        // Release is independent from dependency cleanup and command outcome.
+      }
+    }
   }
 }

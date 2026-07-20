@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { CtxindexDatabase } from '@ctxindex/core/storage'
 import {
-  acquireFileLease,
   type FileLease,
   FileLeaseConflictError,
+  FileLeaseUnsupportedError,
 } from '@ctxindex/local-daemon'
 import {
   initializeDirectStorage,
@@ -73,6 +73,50 @@ test('maps exclusive ownership to prototype unsupported before database open', a
   expect(opened).toBe(false)
 })
 
+test('unsupported platform keeps direct database behavior because no daemon can own it', async () => {
+  const events: string[] = []
+  const db = {
+    close: () => events.push('close'),
+  } as unknown as CtxindexDatabase
+
+  const runtime = await openLeasedDatabase({
+    target: '/tmp/ctxindex-cli-unsupported-platform.sqlite',
+    acquire: () => {
+      events.push('unsupported')
+      throw new FileLeaseUnsupportedError('platform')
+    },
+    assertTarget: () => events.push('assert'),
+    open: async () => {
+      events.push('open')
+      return db
+    },
+    migrate: async () => {
+      events.push('migrate')
+    },
+  })
+
+  expect(events).toEqual(['unsupported', 'open', 'migrate'])
+  runtime.close()
+  expect(events).toEqual(['unsupported', 'open', 'migrate', 'close'])
+})
+
+test('unsupported Darwin filesystem still fails closed before database open', async () => {
+  let opened = false
+  await expect(
+    openLeasedDatabase({
+      target: '/tmp/ctxindex-cli-unsupported-filesystem.sqlite',
+      acquire: () => {
+        throw new FileLeaseUnsupportedError('filesystem')
+      },
+      open: async () => {
+        opened = true
+        return {} as CtxindexDatabase
+      },
+    }),
+  ).rejects.toMatchObject({ reason: 'filesystem' })
+  expect(opened).toBe(false)
+})
+
 test('releases the shared lease when database construction fails', async () => {
   const events: string[] = []
   await expect(
@@ -97,17 +141,15 @@ test('local OAuth App identity reads fail closed behind exclusive ownership', as
   const root = await mkdtemp(join(tmpdir(), 'ctxindex-cli-identities-'))
   const target = join(await realpath(root), 'ctxindex.sqlite')
   await Bun.write(target, '')
-  const exclusive = acquireFileLease({
-    canonicalTarget: target,
-    purpose: 'database',
-    mode: 'exclusive',
-  })
   try {
     await expect(
-      readLeasedLocalOAuthAppIdentities(target),
+      readLeasedLocalOAuthAppIdentities(target, {
+        acquire: () => {
+          throw new FileLeaseConflictError('a'.repeat(64))
+        },
+      }),
     ).rejects.toBeInstanceOf(PrototypeUnsupportedError)
   } finally {
-    exclusive.release()
     await rm(root, { recursive: true, force: true })
   }
 })
@@ -115,18 +157,16 @@ test('local OAuth App identity reads fail closed behind exclusive ownership', as
 test('local OAuth App identity reads acquire before checking a missing database', async () => {
   const root = await mkdtemp(join(tmpdir(), 'ctxindex-cli-identities-race-'))
   const target = join(await realpath(root), 'ctxindex.sqlite')
-  const exclusive = acquireFileLease({
-    canonicalTarget: target,
-    purpose: 'database',
-    mode: 'exclusive',
-  })
   try {
     expect(await Bun.file(target).exists()).toBe(false)
     await expect(
-      readLeasedLocalOAuthAppIdentities(target),
+      readLeasedLocalOAuthAppIdentities(target, {
+        acquire: () => {
+          throw new FileLeaseConflictError('a'.repeat(64))
+        },
+      }),
     ).rejects.toBeInstanceOf(PrototypeUnsupportedError)
   } finally {
-    exclusive.release()
     await rm(root, { recursive: true, force: true })
   }
 })
@@ -139,7 +179,16 @@ test('local OAuth App identity reads do not migrate a partial database', async (
   partial.close()
 
   try {
-    expect(await readLeasedLocalOAuthAppIdentities(target)).toEqual([])
+    expect(
+      await readLeasedLocalOAuthAppIdentities(target, {
+        acquire: () => ({
+          mode: 'shared',
+          targetDigest: 'a'.repeat(64),
+          release: () => {},
+        }),
+        assertTarget: () => {},
+      }),
+    ).toEqual([])
     const verification = new Database(target, { readonly: true })
     expect(
       verification
@@ -185,4 +234,25 @@ test('init retains its lease around secret setup and guarded bootstrap', async (
     'assert',
     'release',
   ])
+})
+
+test('init preserves direct bootstrap on an unsupported platform', async () => {
+  const events: string[] = []
+
+  await initializeDirectStorage({
+    acquire: () => {
+      events.push('unsupported')
+      throw new FileLeaseUnsupportedError('platform')
+    },
+    initializeSecrets: async () => {
+      events.push('secrets')
+      return 'file'
+    },
+    assertTarget: () => events.push('assert'),
+    bootstrap: async () => {
+      events.push('bootstrap')
+    },
+  })
+
+  expect(events).toEqual(['unsupported', 'secrets', 'bootstrap'])
 })

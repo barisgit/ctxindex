@@ -65,6 +65,10 @@ export interface DiscoveryReadOptions {
   readonly readBytes?: typeof readSync
 }
 
+export interface DiscoveryCleanupOptions extends DiscoveryReadOptions {
+  readonly assertLease?: typeof assertRetainedFileLease
+}
+
 export interface ResolvedEndpoint {
   readonly runtimeRoot: string
   readonly token: string
@@ -361,10 +365,11 @@ export function cleanupDiscoveryMetadata(
   stateRoot: string,
   owner: Pick<DiscoveryMetadata, 'instanceId' | 'ownerToken'>,
   lifecycleLease: FileLease,
-  options: DiscoveryReadOptions = {},
+  options: DiscoveryCleanupOptions = {},
 ): DiscoveryCleanupResult {
   const canonicalStateRoot = canonicalizePath(stateRoot)
-  assertRetainedFileLease(lifecycleLease, {
+  const assertLease = options.assertLease ?? assertRetainedFileLease
+  assertLease(lifecycleLease, {
     canonicalTarget: canonicalStateRoot,
     purpose: 'lifecycle',
     mode: 'exclusive',

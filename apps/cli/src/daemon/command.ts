@@ -1,5 +1,5 @@
 import { accessSync, constants, statSync } from 'node:fs'
-import { basename, dirname, isAbsolute, join } from 'node:path'
+import { basename, isAbsolute, join } from 'node:path'
 import { defineCommand } from 'citty'
 import { daemonUsage, parseDaemonArgs } from '../args/daemon'
 import { mapErrorToExit, runWithExit } from '../format/exit'
@@ -9,6 +9,8 @@ import {
   daemonShutdown,
   requireDaemonSelection,
 } from './client'
+
+declare const __CTXINDEX_PACKAGED__: boolean | undefined
 
 function printHealth(
   health: Awaited<ReturnType<typeof daemonHealth>>,
@@ -41,7 +43,10 @@ export function resolveDaemonLaunch(
   options: DaemonLaunchResolutionOptions = {},
 ): string[] {
   const processExecutable = options.processExecutable ?? process.execPath
-  const sourceMode = options.sourceMode ?? basename(processExecutable) === 'bun'
+  const sourceMode =
+    options.sourceMode ??
+    (typeof __CTXINDEX_PACKAGED__ === 'undefined' &&
+      basename(processExecutable) === 'bun')
   if (sourceMode) {
     return [
       processExecutable,
@@ -51,7 +56,7 @@ export function resolveDaemonLaunch(
   const executable =
     options.compiledDaemonOverride ??
     process.env.CTXINDEX_DAEMON_EXECUTABLE ??
-    join(dirname(processExecutable), 'ctxindex-daemon')
+    join(import.meta.dir, 'ctxindex-daemon')
   try {
     if (!isAbsolute(executable) || !statSync(executable).isFile()) throw null
     accessSync(executable, constants.X_OK)

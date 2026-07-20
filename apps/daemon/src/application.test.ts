@@ -757,6 +757,17 @@ test('Source add checks cancellation after asynchronous Grant resolution', async
   const app = application({
     registry: {
       adapters: {
+        get: ({ id }: { id: string }) =>
+          id === 'test.adapter'
+            ? {
+                id: 'test.adapter',
+                provider: { id: 'test', auth: { kind: 'oauth2' } },
+                access: { scopes: ['read'] },
+                configSchema: {
+                  safeParse: () => ({ success: true, data: {} }),
+                },
+              }
+            : undefined,
         list: () => [
           {
             id: 'test.adapter',

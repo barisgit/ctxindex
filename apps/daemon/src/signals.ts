@@ -8,13 +8,19 @@ export function createSignalHandler(
   return (signal) => {
     if (stopping) exit(signal === 'SIGINT' ? 130 : 143)
     stopping = true
-    void daemon.close().then((result) => {
-      if (result.status === 'timeout') {
+    void daemon.close().then(
+      (result) => {
+        if (result.status !== 'timeout') return
         console.error(
           'Daemon shutdown timed out; ownership remains held until work settles or the process is force-terminated.',
         )
-      }
-    })
+      },
+      () => {
+        console.error(
+          'Daemon shutdown failed; ownership may remain held until the process is force-terminated.',
+        )
+      },
+    )
   }
 }
 

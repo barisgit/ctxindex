@@ -26,7 +26,7 @@ import {
   writeDiscoveryMetadata,
 } from './discovery'
 import { resolveRuntimeIdentity } from './identity'
-import { acquireFileLease } from './lease'
+import type { FileLease, FileLeaseRequest } from './lease'
 
 const cleanup: string[] = []
 
@@ -42,12 +42,29 @@ function temporaryDirectory(): string {
   return canonical
 }
 
-function lifecycleLease(stateRoot: string) {
-  return acquireFileLease({
-    canonicalTarget: stateRoot,
-    purpose: 'lifecycle',
+const activeTestLeases = new WeakSet<FileLease>()
+
+function lifecycleLease(_stateRoot: string): FileLease {
+  const lease: FileLease = {
     mode: 'exclusive',
-  })
+    targetDigest: 'a'.repeat(64),
+    release: () => activeTestLeases.delete(lease),
+  }
+  activeTestLeases.add(lease)
+  return lease
+}
+
+function assertLifecycleLease(
+  lease: FileLease,
+  expected: FileLeaseRequest,
+): void {
+  if (
+    !activeTestLeases.has(lease) ||
+    expected.purpose !== 'lifecycle' ||
+    expected.mode !== 'exclusive'
+  ) {
+    throw new Error('Cleanup requires the matching retained lifecycle lease')
+  }
 }
 
 function fixture(root: string): DiscoveryMetadata {
@@ -184,6 +201,7 @@ test('cleanup removes only matching owner metadata and rejects non-private files
         ownerToken: 'b'.repeat(64),
       },
       lease,
+      { assertLease: assertLifecycleLease },
     ),
   ).toBe('not_owner')
   expect(existsSync(discoveryMetadataPath(stateRoot))).toBe(true)
@@ -195,6 +213,7 @@ test('cleanup removes only matching owner metadata and rejects non-private files
         ownerToken: metadata.ownerToken,
       },
       lease,
+      { assertLease: assertLifecycleLease },
     ),
   ).toBe('removed')
   expect(existsSync(discoveryMetadataPath(stateRoot))).toBe(false)
@@ -222,6 +241,7 @@ test('cleanup requires a live matching retained lifecycle lease', () => {
         ownerToken: metadata.ownerToken,
       },
       lease,
+      { assertLease: assertLifecycleLease },
     ),
   ).toThrow(/retained lifecycle lease/i)
   expect(existsSync(discoveryMetadataPath(stateRoot))).toBe(true)
@@ -250,7 +270,7 @@ test('old cleanup cannot remove metadata replaced by a new owner', () => {
       stateRoot,
       { instanceId: metadata.instanceId, ownerToken: metadata.ownerToken },
       lease,
-      { openFile: replaceBeforeFinalOpen },
+      { openFile: replaceBeforeFinalOpen, assertLease: assertLifecycleLease },
     ),
   ).toBe('not_owner')
   expect(readDiscoveryMetadata(stateRoot)).toEqual(replacement)
@@ -279,7 +299,7 @@ test('old cleanup cannot unlink a renamed substitute with the same owner fields'
       stateRoot,
       { instanceId: metadata.instanceId, ownerToken: metadata.ownerToken },
       lease,
-      { openFile: replaceBeforeFinalOpen },
+      { openFile: replaceBeforeFinalOpen, assertLease: assertLifecycleLease },
     ),
   ).toBe('not_owner')
   expect(existsSync(path)).toBe(true)

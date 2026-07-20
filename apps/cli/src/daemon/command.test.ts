@@ -85,6 +85,7 @@ test('compiled launch rejects a missing sibling without ambient PATH lookup', ()
     resolveDaemonLaunch({
       sourceMode: false,
       processExecutable: '/missing/bin/ctxindex',
+      compiledDaemonOverride: '/missing/bin/ctxindex-daemon',
     }),
   ).toThrow('compiled daemon executable is unavailable')
 })

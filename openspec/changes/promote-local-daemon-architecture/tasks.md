@@ -30,7 +30,7 @@
 
 - [ ] 5.1 Preserve the proven Darwin retained-lease backend and extract platform selection behind the existing `FileLeaseBackend` without changing canonical identities, conflict wording, or lease lifetime.
 - [ ] 5.2 Run bounded Linux and Windows retained-lock spikes covering shared/exclusive contention, aliases, private owner metadata, symlink/reparse safety, SIGKILL/process-death release, and immediate reacquisition; document viable backends and pause at a Human supported-platform checkpoint before advertising or implementing additional platforms.
-- [ ] 5.3 Implement each approved platform backend and its compiled multi-process suite; make every unavailable/unsafe platform fail closed before SQLite open and keep public support documentation exact.
+- [ ] 5.3 Implement each approved platform backend and its compiled multi-process suite; make daemon startup fail closed before SQLite open where a backend is unavailable/unsafe, preserve the direct CLI until that platform is promoted, and keep public support documentation exact.
 
 ## 6. Normal ownership cutover
 

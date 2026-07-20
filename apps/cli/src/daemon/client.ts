@@ -59,12 +59,17 @@ export interface DaemonSelection {
   readonly selectedBy: 'metadata' | 'test_override'
 }
 
-function unavailable(): DaemonCliError {
+function unavailable(selection?: DaemonSelection): DaemonCliError {
+  const lifecycle = selection?.metadata?.lifecycle
   return new DaemonCliError({
     kind: 'daemon_unavailable',
     code: 'daemon_unavailable',
     message:
-      'The local daemon is unavailable. Start it with `ctxindex daemon serve`.',
+      lifecycle === 'starting'
+        ? 'The local daemon is starting and is not yet available.'
+        : lifecycle === 'stopping'
+          ? 'The local daemon is stopping and is no longer available.'
+          : 'The local daemon is unavailable. Start it with `ctxindex daemon serve`.',
   })
 }
 
@@ -183,8 +188,8 @@ function createClient(selection: DaemonSelection): DaemonClient {
       'x-ctxindex-protocol-version': String(CLI_DAEMON_PROTOCOL.version),
       'x-ctxindex-runtime': JSON.stringify(selection.roots.identity),
     },
-    fetch: async (request) =>
-      fetch(request, { unix: selection.endpoint } as RequestInit),
+    fetch: async (request, init) =>
+      fetch(request, { ...init, unix: selection.endpoint } as RequestInit),
   })
   return createORPCClient<DaemonClient>(link)
 }
@@ -211,7 +216,7 @@ async function invoke<T>(
     }
     const failure = daemonFailureFromDeclaredError(error)
     if (failure) throw new DaemonCliError(failure)
-    throw unavailable()
+    throw unavailable(selection)
   }
   if (signal?.aborted) {
     throw new DaemonCliError({

@@ -566,3 +566,40 @@ test('Source invocation cleanup releases ownership when Citty rejects a generate
     error.mockRestore()
   }
 })
+
+test('cleanup failures do not replace success and ownership release is independent', async () => {
+  const loaded = await loadCliDefinitions()
+  const events: string[] = []
+  const output = spyOn(console, 'log').mockImplementation(() => {})
+  try {
+    const exit = await handleSourceCommand(['list'], {
+      selectDaemon: () => null,
+      sourceDefinitions: async () => ({ rows: [] }),
+      sourceAdd: async () => ({ sourceId: 'unused', realmId: 'unused' }),
+      sourceList: async () => ({ rows: [] }),
+      sourceRemove: async () => ({ sourceId: 'unused' }),
+      acquireOwnership: () =>
+        ({
+          readLocalOAuthAppIdentities: async () => [],
+          close: () => {
+            events.push('close-owner')
+            throw new Error('owner cleanup failure')
+          },
+        }) as never,
+      loadDefinitions: async () => loaded,
+      open: async () =>
+        ({
+          registry: loaded.registry,
+          sourceService: { listSources: () => [] },
+          close: async () => {
+            events.push('close-deps')
+            throw new Error('deps cleanup failure')
+          },
+        }) as never,
+    })
+    expect(exit).toBe(0)
+    expect(events).toEqual(['close-deps', 'close-owner'])
+  } finally {
+    output.mockRestore()
+  }
+})

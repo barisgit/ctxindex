@@ -1,4 +1,5 @@
 import { afterEach, expect, spyOn, test } from 'bun:test'
+import { FileLeaseUnsupportedError } from '@ctxindex/local-daemon'
 import { runForegroundMain } from './main'
 import type { startDaemon } from './runtime'
 
@@ -28,4 +29,20 @@ test('foreground startup renders a safe database conflict and exits 50', async (
   expect(rendered).not.toContain(rawPath)
   expect(rendered).not.toContain('FileLeaseConflictError')
   expect(rendered).not.toContain('stack')
+})
+
+test('foreground startup renders unsupported lease hosts safely', async () => {
+  const output = spyOn(console, 'error').mockImplementation(() => {})
+  const start = (async () => {
+    throw new FileLeaseUnsupportedError(
+      'platform',
+      'unsafe host detail /Users/person/private',
+    )
+  }) as typeof startDaemon
+
+  expect(await runForegroundMain(start)).toBe(50)
+  expect(output).toHaveBeenCalledWith(
+    'The local daemon is unsupported on this platform or filesystem.',
+  )
+  expect(String(output.mock.calls[0]?.[0])).not.toContain('/Users/person')
 })

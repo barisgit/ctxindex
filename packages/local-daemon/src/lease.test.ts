@@ -506,9 +506,13 @@ describe.skipIf(process.platform !== 'darwin')(
 )
 
 test('unsupported platforms fail closed without exposing a boolean probe', () => {
-  expect(() => createFileLeaseBackend({ platform: 'linux' })).toThrow(
-    FileLeaseUnsupportedError,
-  )
+  try {
+    createFileLeaseBackend({ platform: 'linux' })
+    throw new Error('expected unsupported platform')
+  } catch (error) {
+    expect(error).toBeInstanceOf(FileLeaseUnsupportedError)
+    expect(error).toMatchObject({ reason: 'platform' })
+  }
 })
 
 test('unsupported filesystems fail closed with a safe typed error', () => {
@@ -522,11 +526,15 @@ test('unsupported filesystems fail closed with a safe typed error', () => {
     openFile: unsupportedOpen,
   })
 
-  expect(() =>
+  try {
     backend.acquire({
       canonicalTarget: join(temporaryDirectory(), 'ctxindex.sqlite'),
       purpose: 'database',
       mode: 'exclusive',
-    }),
-  ).toThrow(FileLeaseUnsupportedError)
+    })
+    throw new Error('expected unsupported filesystem')
+  } catch (error) {
+    expect(error).toBeInstanceOf(FileLeaseUnsupportedError)
+    expect(error).toMatchObject({ reason: 'filesystem' })
+  }
 })

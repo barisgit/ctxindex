@@ -2,6 +2,7 @@ export {
   cleanupDiscoveryMetadata,
   createOwnerToken,
   type DaemonLifecycleState,
+  type DiscoveryCleanupOptions,
   type DiscoveryCleanupResult,
   type DiscoveryMetadata,
   type DiscoveryReadOptions,

@@ -61,11 +61,15 @@ export class FileLeaseConflictError extends Error {
 }
 
 export class FileLeaseUnsupportedError extends Error {
+  readonly reason: 'platform' | 'filesystem'
+
   constructor(
+    reason: 'platform' | 'filesystem' = 'filesystem',
     message = 'Retained file leases are unsupported on this platform or filesystem',
   ) {
     super(message)
     this.name = 'FileLeaseUnsupportedError'
+    this.reason = reason
   }
 }
 
@@ -243,7 +247,8 @@ class DarwinFileLeaseBackend implements FileLeaseBackend {
       if (isConflict(error)) {
         throw new FileLeaseConflictError(targetDigest)
       }
-      if (isUnsupported(error)) throw new FileLeaseUnsupportedError()
+      if (isUnsupported(error))
+        throw new FileLeaseUnsupportedError('filesystem')
       throw error
     }
 
@@ -318,7 +323,7 @@ export function createFileLeaseBackend(
   options: FileLeaseBackendOptions = {},
 ): FileLeaseBackend {
   if ((options.platform ?? platform()) !== 'darwin')
-    throw new FileLeaseUnsupportedError()
+    throw new FileLeaseUnsupportedError('platform')
   return new DarwinFileLeaseBackend(
     options.openFile ?? openSync,
     options.currentUid ?? userInfo().uid,

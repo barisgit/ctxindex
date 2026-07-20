@@ -62,3 +62,8 @@
 - [x] 9.1 Add failing type/runtime/architecture tests proving one registry owns schema/code/message correlation and derives schema kinds from its keys, every exact contract path appears in the recursively inferred application tree, no handwritten procedure signature/error alias/switch remains, malformed accessors and hostile prototype/property traps normalize safely, and declared bounds, exactly-once delegation, and native signal identity remain intact.
 - [x] 9.2 Inline small failure schemas into the authoritative registry; derive `RpcFailure`, oRPC declarations, router construction, and CLI validation from it; derive the nested `DaemonRpcApplication` recursively from the contract input/output trees and update daemon composition to that shape.
 - [x] 9.3 Pass focused RPC, daemon, CLI, typecheck, lint, package-dependency, and module-architecture gates; update directly affected codemaps/evaluation, refresh cartography state after final review, and leave the Human promote/replace checkpoint open.
+
+## 10. Unsupported-platform direct CLI compatibility
+
+- [x] 10.1 Add Linux/unsupported-platform regression coverage that distinguishes platform absence from a Darwin filesystem failure, preserves fail-closed daemon startup and Darwin ownership, and keeps direct CLI/init/package execution usable without a lease where no daemon can own the database.
+- [x] 10.2 Inject retained-lease fakes into direct-database conflict tests so they prove ownership semantics independently of the host platform; pass focused lease, direct database, daemon runtime, typecheck, strict OpenSpec, and package gates.

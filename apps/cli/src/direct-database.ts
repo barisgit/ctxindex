@@ -16,6 +16,7 @@ import {
   assertRetainedDatabaseLeaseTarget,
   type FileLease,
   FileLeaseConflictError,
+  FileLeaseUnsupportedError,
   resolveRuntimeIdentity,
 } from '@ctxindex/local-daemon'
 
@@ -35,7 +36,7 @@ export class PrototypeUnsupportedError extends Error {
 export function acquireSharedDatabaseLease(
   target = directDatabasePath(),
   acquire: typeof acquireFileLease = acquireFileLease,
-): FileLease {
+): FileLease | null {
   try {
     return acquire({
       canonicalTarget: target,
@@ -45,6 +46,12 @@ export function acquireSharedDatabaseLease(
   } catch (error) {
     if (error instanceof FileLeaseConflictError) {
       throw new PrototypeUnsupportedError()
+    }
+    if (
+      error instanceof FileLeaseUnsupportedError &&
+      error.reason === 'platform'
+    ) {
+      return null
     }
     throw error
   }
@@ -86,16 +93,19 @@ export function acquireDirectDatabaseOwnership(
   const assertOpen = (): void => {
     if (released) throw new Error('Direct database ownership is closed')
   }
+  const assertLeaseTarget = (): void => {
+    if (lease) assertTarget(lease)
+  }
 
   return {
     target,
     async readLocalOAuthAppIdentities() {
       assertOpen()
       if (!(await Bun.file(target).exists())) return []
-      assertTarget(lease)
+      assertLeaseTarget()
       const readonlyDb = (options.openReadonly ?? openReadonlyDatabase)(target)
       try {
-        assertTarget(lease)
+        assertLeaseTarget()
         return listLocalOAuthAppIdentities(readonlyDb)
       } finally {
         readonlyDb.close()
@@ -104,10 +114,10 @@ export function acquireDirectDatabaseOwnership(
     async open() {
       assertOpen()
       if (db) return db
-      assertTarget(lease)
+      assertLeaseTarget()
       const opened = await (options.open ?? openDatabase)(target)
       try {
-        assertTarget(lease)
+        assertLeaseTarget()
         await (options.migrate ?? runMigrations)(opened)
         db = opened
         return opened
@@ -121,7 +131,7 @@ export function acquireDirectDatabaseOwnership(
       released = true
       db?.close()
       db = undefined
-      lease.release()
+      lease?.release()
     },
   }
 }
@@ -168,8 +178,9 @@ export async function closeDb(): Promise<void> {
 
 export async function readLeasedLocalOAuthAppIdentities(
   target = directDatabasePath(),
+  options: Omit<AcquireDirectDatabaseOwnershipOptions, 'target'> = {},
 ): Promise<readonly LocalOAuthAppIdentity[]> {
-  const ownership = acquireDirectDatabaseOwnership({ target })
+  const ownership = acquireDirectDatabaseOwnership({ ...options, target })
   try {
     return await ownership.readLocalOAuthAppIdentities()
   } finally {
@@ -192,12 +203,15 @@ export async function initializeDirectStorage(
     options.acquire,
   )
   const assertTarget = options.assertTarget ?? assertRetainedDatabaseLeaseTarget
+  const assertLeaseTarget = (): void => {
+    if (lease) assertTarget(lease)
+  }
   try {
     await (options.initializeSecrets ?? initializeSecretBackend)()
-    assertTarget(lease)
+    assertLeaseTarget()
     await (options.bootstrap ?? bootstrapDatabase)()
-    assertTarget(lease)
+    assertLeaseTarget()
   } finally {
-    lease.release()
+    lease?.release()
   }
 }

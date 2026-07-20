@@ -13,6 +13,7 @@
   },
   "files": [
     "dist/ctxindex.mjs",
+    "dist/ctxindex-daemon",
     "README.md"
   ],
   "engines": {
