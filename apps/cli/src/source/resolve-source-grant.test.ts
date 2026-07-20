@@ -1,11 +1,12 @@
 import { expect, test } from 'bun:test'
-import { gmailAdapterDefinition } from '@ctxindex/adapters'
+import {
+  gmailAdapterDefinition,
+  localDirectoryAdapterDefinition,
+} from '@ctxindex/adapters'
 import type { AuthService, GrantRow } from '@ctxindex/core/auth'
 import { resolveSourceGrant } from './resolve-source-grant'
 
-const gmailAuth = gmailAdapterDefinition.auth
-const requiredScopes =
-  gmailAuth.kind === 'oauth2' ? gmailAuth.scopes : ([] as const)
+const requiredScopes = gmailAdapterDefinition.access?.scopes ?? []
 
 function grant(
   id: string,
@@ -21,8 +22,7 @@ function grant(
     scopes,
     accessTokenRef: null,
     refreshTokenRef: null,
-    clientIdRef: null,
-    clientSecretRef: null,
+    appConfigRef: 'keychain:fixture-app-config',
     expiresAt: null,
     createdAt: 1,
     updatedAt: 1,
@@ -38,42 +38,68 @@ function service(rows: readonly GrantRow[]): AuthService {
 
 test('resolves one provider-compatible Grant without provider heuristics', async () => {
   await expect(
-    resolveSourceGrant(service([grant('grant-1', 'account-1')]), gmailAuth),
+    resolveSourceGrant(
+      service([grant('grant-1', 'account-1')]),
+      gmailAdapterDefinition,
+    ),
   ).resolves.toBe('grant-1')
 })
 
-test('requires an Account or Grant id when several compatible Grants exist', async () => {
+test('requires an Account label or id when several compatible authorizations exist', async () => {
   const auth = service([
     grant('grant-1', 'account-1'),
     grant('grant-2', 'account-2'),
   ])
-  await expect(resolveSourceGrant(auth, gmailAuth)).rejects.toMatchObject({
+  await expect(
+    resolveSourceGrant(auth, gmailAdapterDefinition),
+  ).rejects.toMatchObject({
     code: 'invalid_filter',
   })
-  await expect(resolveSourceGrant(auth, gmailAuth, 'account-2')).resolves.toBe(
-    'grant-2',
-  )
-  await expect(resolveSourceGrant(auth, gmailAuth, 'grant-1')).resolves.toBe(
-    'grant-1',
+  await expect(
+    resolveSourceGrant(auth, gmailAdapterDefinition, 'account-2'),
+  ).resolves.toBe('grant-2')
+  await expect(
+    resolveSourceGrant(auth, gmailAdapterDefinition, 'grant-1'),
+  ).rejects.toMatchObject({ code: 'invalid_filter' })
+})
+
+test('directs missing authorization through explicit OAuth App selection', async () => {
+  await expect(
+    resolveSourceGrant(service([]), gmailAdapterDefinition),
+  ).rejects.toThrow(
+    'no compatible Account authorization available; run bun cli account add google --app <label>',
   )
 })
 
 test('never selects by hidden external provider identity or insufficient scopes', async () => {
   const row = grant('grant-1', 'account-1', [requiredScopes[0] ?? 'missing'])
   await expect(
-    resolveSourceGrant(service([row]), gmailAuth, 'external-account-1'),
+    resolveSourceGrant(
+      service([row]),
+      gmailAdapterDefinition,
+      'external-account-1',
+    ),
   ).rejects.toMatchObject({ code: 'invalid_filter' })
   await expect(
-    resolveSourceGrant(service([row]), gmailAuth, row.accountId),
+    resolveSourceGrant(service([row]), gmailAdapterDefinition, row.accountId),
   ).rejects.toMatchObject({ code: 'invalid_filter' })
 })
 
-test('resolves Account labels before account and Grant ids', async () => {
+test('resolves Account labels before Account ids without accepting Grant ids', async () => {
   const auth = service([
     grant('grant-1', 'account-1', requiredScopes, 'work'),
     grant('work', 'account-2', requiredScopes, 'other'),
   ])
-  await expect(resolveSourceGrant(auth, gmailAuth, 'work')).resolves.toBe(
-    'grant-1',
-  )
+  await expect(
+    resolveSourceGrant(auth, gmailAdapterDefinition, 'work'),
+  ).resolves.toBe('grant-1')
+})
+
+test('providerless Adapters require no Grant and reject Account selection', async () => {
+  await expect(
+    resolveSourceGrant(service([]), localDirectoryAdapterDefinition),
+  ).resolves.toBeUndefined()
+  await expect(
+    resolveSourceGrant(service([]), localDirectoryAdapterDefinition, 'work'),
+  ).rejects.toMatchObject({ code: 'invalid_filter' })
 })

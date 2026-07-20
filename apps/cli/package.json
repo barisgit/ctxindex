@@ -1,13 +1,35 @@
 {
-  "name": "@ctxindex/cli",
+  "name": "ctxindex",
   "version": "0.0.0",
-  "private": true,
+  "description": "Local personal-context gateway CLI for agents",
+  "license": "MIT",
+  "homepage": "https://ctxindex.com",
+  "bugs": {
+    "url": "https://github.com/barisgit/ctxindex/issues"
+  },
   "type": "module",
-  "exports": {
-    ".": "./src/main.ts"
+  "bin": {
+    "ctxindex": "dist/ctxindex.mjs"
+  },
+  "files": [
+    "dist/ctxindex.mjs",
+    "README.md"
+  ],
+  "engines": {
+    "bun": "1.3.14"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/barisgit/ctxindex.git",
+    "directory": "apps/cli"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "build": "tsgo --noEmit -p tsconfig.json",
+    "build": "bun run build:package",
+    "build:package": "bun ../../scripts/release/build-cli-package.ts",
     "lint": "biome check .",
     "typecheck": "tsgo --noEmit -p tsconfig.json",
     "test": "bun test",
@@ -18,7 +40,7 @@
     "clean": "rm -rf .turbo dist coverage",
     "fullclean": "rm -rf .turbo dist coverage node_modules"
   },
-  "dependencies": {
+  "devDependencies": {
     "@ctxindex/adapters": "workspace:*",
     "@ctxindex/core": "workspace:*",
     "@ctxindex/extension-sdk": "workspace:*",

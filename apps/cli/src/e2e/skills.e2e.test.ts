@@ -33,10 +33,10 @@ test('skills get returns markdown', async () => {
     expect(result.stdout).toContain('ctxindex extensions list')
     expect(result.stdout).toContain('ctxindex skills list')
     expect(result.stdout).toContain('ctxindex skills get <name>')
-    expect(result.stdout).not.toMatch(/--from-env|client add|account add/)
+    expect(result.stdout).not.toMatch(/--from-env|oauth-app add|account add/)
     expect(result.stdout).not.toContain('```')
     expect(result.stdout).not.toMatch(
-      /^(?:\s*[-*+]\s+)?(?:init|realm|client|account|source)(?:\s|$|[/|])/m,
+      /^(?:\s*[-*+]\s+)?(?:init|realm|oauth-app|account|source)(?:\s|$|[/|])/m,
     )
   } finally {
     await sandbox.cleanup()

@@ -106,11 +106,11 @@ async function setupMessages(messages: readonly Message[]) {
     INSERT INTO realms VALUES ('archive', 'archive', NULL, 1);
   `)
   const insertSource = db.prepare(
-    'INSERT INTO sources (id, realm_id, adapter_id, adapter_version, label, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO sources (id, realm_id, adapter_id, label, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
   )
-  insertSource.run(sourceA, 'personal', 'fake', 1, sourceA, '{}', 1, 1)
-  insertSource.run(sourceB, 'work', 'fake', 1, sourceB, '{}', 1, 1)
-  insertSource.run(sourceC, 'archive', 'fake', 1, sourceC, '{}', 1, 1)
+  insertSource.run(sourceA, 'personal', 'fake', sourceA, '{}', 1, 1)
+  insertSource.run(sourceB, 'work', 'fake', sourceB, '{}', 1, 1)
+  insertSource.run(sourceC, 'archive', 'fake', sourceC, '{}', 1, 1)
   dbs.push(db)
   const profiles = createProfileRegistry([communicationMessageTestProfile])
   const resources = new ResourceStore(db, profiles)
@@ -152,8 +152,8 @@ async function setup(
   await runMigrations(db)
   db.exec("INSERT INTO realms VALUES ('realm', 'realm', NULL, 1)")
   db.prepare(
-    'INSERT INTO sources (id, realm_id, adapter_id, adapter_version, label, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-  ).run(sourceId, 'realm', 'fake', 1, sourceId, '{}', 1, 1)
+    'INSERT INTO sources (id, realm_id, adapter_id, label, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  ).run(sourceId, 'realm', 'fake', sourceId, '{}', 1, 1)
   dbs.push(db)
   const profiles = createProfileRegistry([profile])
   const resources = new ResourceStore(db, profiles)

@@ -348,8 +348,16 @@ export async function runMailboxRetrievalArtifactReplay(
     for (const command of [
       ['init'],
       ['realm', 'add', realm],
-      ['client', 'add', driver.provider, '--from-env'],
-      ['account', 'add', driver.provider, '--label', accountLabel],
+      ['oauth-app', 'add', driver.provider, driver.provider, '--from-env'],
+      [
+        'account',
+        'add',
+        driver.provider,
+        '--app',
+        driver.provider,
+        '--label',
+        accountLabel,
+      ],
     ] as const) {
       await runOk(harness, active.env, command)
     }

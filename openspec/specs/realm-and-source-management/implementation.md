@@ -49,7 +49,6 @@ export interface SourceRow {
   readonly realm_id: string
   readonly realm_slug?: string
   readonly adapter_id: string
-  readonly adapter_version: number
   readonly label: string
   readonly config_json: string | null
   readonly sync_enabled: boolean
@@ -59,7 +58,10 @@ export interface SourceRow {
   readonly availability: SourceAvailability
   readonly last_status?: string | null
   readonly last_run_at?: number | null
+  readonly warnings_count?: number | null
+  readonly last_warning?: SyncWarning | null
   readonly errors_count?: number | null
+  readonly last_error?: string | null
   readonly items_count?: number
   readonly chunks_count?: number
   readonly sample_uri?: string | null
@@ -69,7 +71,6 @@ export interface SourceRow {
 export interface AddSourceInput {
   readonly adapterId: string
   readonly realmSlug?: string
-  readonly adapterVersion?: number
   readonly label?: string
   readonly configJson?: string
   readonly grantId?: string
@@ -93,6 +94,8 @@ export interface StatusRow {
   readonly availability: SourceAvailability
   readonly lastStatus: string
   readonly lastRunAt: number | null
+  readonly warningsCount: number
+  readonly lastWarning: SyncWarning | null
   readonly errorsCount: number
   readonly lastError: string | null
   readonly cursor: unknown
@@ -159,10 +162,10 @@ export function createSourceService(deps: SourceServiceDeps): SourceService;
 
 ## Implementation doctrine
 
-`@ctxindex/core` owns Realm rows and exact slug lookup plus Source creation, listing, status, removal, Adapter/config validation, Grant compatibility, sync policy, and provider-context construction. Every Source stores one Adapter version, one Realm, one config payload, an explicit sync-enabled boolean, and an explicit Grant when required. Source creation writes the requested sync policy or true when omitted; public Source rows normalize the SQLite value to a boolean.
+`@ctxindex/core` owns Realm rows and exact slug lookup plus Source creation, listing, status, removal, Adapter/config validation, Grant compatibility, sync policy, and provider-context construction. Every Source stores one stable Adapter id, one Realm, one config payload, an explicit sync-enabled boolean, and an internal Grant binding when required. Adapter definitions are versionless; Source creation writes the requested sync policy or true when omitted, and public Source rows normalize the SQLite value to a boolean.
 
 Availability is derived by resolving the stored Adapter binding against the loaded registry, not from sync status. Provider contexts expose only Source metadata, scoped logger, and host-allowlisted authorized fetch. The CLI validates generic Source flags before opening state and maps stored snake-case fields to camel-case JSON, including `syncEnabled`. Core seeds no special Realm.
 
 ## Verification
 
-Realm/Source service tests cover exact lookup, labels, config validation, Grant compatibility, sync policy persistence/defaulting, availability, removal, and status. Provider-context tests cover host allowlists, token use, retry policy, and redaction; CLI tests cover registry-derived Source arguments, strict generic flag parsing, delegation, and JSON inventory.
+Realm/Source service tests cover exact lookup, labels, config validation, Grant compatibility, sync policy persistence/defaulting, availability, warning/error status, removal, and status. Provider-context tests cover host allowlists, token use, retry policy, and redaction; CLI tests cover registry-derived Source arguments, strict generic flag parsing, delegation, and JSON inventory.

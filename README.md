@@ -52,18 +52,41 @@ state itself must be rebuilt; run `bun install` afterward. `bun start` builds
 and starts the production web app. Package scripts remain independently
 runnable through Bun filters when a narrower command is needed.
 
-There is no `bun link` development path. `bun cli` dispatches through
-`scripts/cli.sh` to `apps/cli/bin/ctxindex.mjs` so helper-created worktrees use
-isolated state.
+To exercise the package executable through Bun's global bin directory:
 
-## Packaging
+```sh
+cd apps/cli
+bun run build:package
+bun link
+ctxindex --help
+```
 
-The release shape is one executable compiled with the repository-pinned Bun
-version. Bundled workflow skills and canonical migrations are embedded;
+`bun link` registers the CLI workspace in Bun's global link directory and
+exposes its `ctxindex` bin. The root `bun cli` path remains available and
+isolates state in helper-created worktrees.
+
+## Installation
+
+ctxindex requires Bun 1.3.14. After the first public release:
+
+```sh
+bun add --global ctxindex
+ctxindex --help
+```
+
+## Packaging and release
+
+The public package is a Bun-target bundle plus the native `keytar` runtime
+dependency. Bundled workflow skills and canonical migrations are embedded;
 trusted external Extensions remain explicit files loaded from configured paths.
-Relocation of the compiled executable, bundled skills, and external Extension
-loading are repository gate scenarios rather than alternate installation
-paths.
+`bun run pack:cli-package` creates one allowlisted tarball, and the isolated
+smoke installs and runs that exact artifact outside the checkout.
+
+Pushes to `main` are release candidates only when `apps/cli/package.json` has a
+valid version strictly greater than the previous commit and that exact version
+is absent from npm. Existing versions are successful no-ops. See
+[`docs/release/npm.md`](docs/release/npm.md) for the protected trusted-publishing
+setup and first-release checkpoint.
 
 ## Documentation map
 

@@ -8,7 +8,8 @@ import type {
   SearchRemoteResult,
   SyncContext,
 } from './operations'
-import type { ProfileReference } from './reference'
+import type { AnyProfileDefinition } from './profile'
+import type { AnyOAuth2Auth, AnyProviderDefinition, NoneAuth } from './provider'
 
 export type AdapterCapability =
   | 'sync'
@@ -18,83 +19,7 @@ export type AdapterCapability =
 
 export type SearchRouting = 'indexed' | 'federated' | 'hybrid'
 
-type JsonPath = readonly [string, ...string[]]
-
-interface OAuthProviderBase {
-  readonly id: string
-  readonly authorizationUrl: string
-  readonly tokenUrl: string
-  readonly identity: {
-    readonly url: string
-    readonly subjectPath: JsonPath
-    readonly labelPaths: readonly [JsonPath, ...JsonPath[]]
-    readonly identities: readonly [
-      {
-        readonly kind: string
-        readonly path: JsonPath
-        readonly verifiedPath?: JsonPath
-      },
-      ...{
-        readonly kind: string
-        readonly path: JsonPath
-        readonly verifiedPath?: JsonPath
-      }[],
-    ]
-  }
-  readonly pkce: { readonly method: 'S256'; readonly required: true }
-  readonly baseScopes: readonly string[]
-  readonly allowedHosts: readonly string[]
-  readonly fixedAuthorizationParams?: Readonly<Record<string, string>>
-}
-
-export type OAuthProviderSpec = OAuthProviderBase &
-  (
-    | {
-        readonly client: {
-          readonly type: 'public'
-          readonly secret: 'none'
-          readonly tokenAuthMethod: 'none'
-        }
-        readonly environment: {
-          readonly clientId: string
-          readonly clientSecret?: never
-          readonly refreshToken?: string
-        }
-      }
-    | {
-        readonly client: {
-          readonly type: 'public'
-          readonly secret: 'optional'
-          readonly tokenAuthMethod: 'client_secret_post'
-        }
-        readonly environment: {
-          readonly clientId: string
-          readonly clientSecret?: string
-          readonly refreshToken?: string
-        }
-      }
-    | {
-        readonly client: {
-          readonly type: 'confidential'
-          readonly secret: 'required'
-          readonly tokenAuthMethod: 'client_secret_post'
-        }
-        readonly environment: {
-          readonly clientId: string
-          readonly clientSecret: string
-          readonly refreshToken?: string
-        }
-      }
-  )
-
-export type AdapterAuthSpec =
-  | {
-      readonly kind: 'oauth2'
-      readonly provider: OAuthProviderSpec
-      readonly scopes: readonly string[]
-    }
-  | { readonly kind: 'api-key'; readonly label: string }
-  | { readonly kind: 'basic' | 'none' | 'custom' }
+export type ProfileTarget = AnyProfileDefinition
 
 export type AdapterOperations = {
   readonly sync?: (context: SyncContext) => void | Promise<void>
@@ -123,9 +48,9 @@ export type AdapterOperationsFor<
 export interface AdapterActionBinding<
   TInput extends z.ZodTypeAny = z.ZodTypeAny,
 > {
-  readonly profile: ProfileReference
+  readonly profile: ProfileTarget
   readonly input: TInput
-  readonly output: ProfileReference
+  readonly output: ProfileTarget
   readonly run: {
     bivarianceHack(
       context: ActionContext<z.infer<TInput>>,
@@ -133,68 +58,140 @@ export interface AdapterActionBinding<
   }['bivarianceHack']
 }
 
-export interface AdapterDefinition<
+type AdapterProviderBinding<
+  TProvider extends AnyProviderDefinition | undefined,
+  TScopes extends readonly string[],
+> = TProvider extends undefined
+  ? {
+      readonly provider?: never
+      readonly access?: never
+      readonly providerApiHosts?: never
+    }
+  : TProvider extends AnyProviderDefinition
+    ? {
+        readonly provider: TProvider
+        /** Provider API hosts this Adapter may contact. Missing/empty denies network egress. */
+        readonly providerApiHosts?: readonly string[]
+      } & (TProvider['auth'] extends NoneAuth
+        ? { readonly access?: never }
+        : TProvider['auth'] extends AnyOAuth2Auth
+          ? { readonly access: { readonly scopes: TScopes } }
+          : { readonly access?: { readonly scopes: TScopes } })
+    : never
+
+interface AdapterDefinitionBase<
+  TId extends string,
+  TConfigSchema extends z.ZodTypeAny,
+  TCapabilities extends readonly AdapterCapability[],
+  TActions extends Readonly<Record<string, AdapterActionBinding>>,
+  TProfiles extends readonly ProfileTarget[],
+> {
+  readonly kind: 'adapter'
+  readonly id: TId
+  readonly configSchema: TConfigSchema
+  readonly profiles: TProfiles
+  readonly routing: SearchRouting
+  readonly capabilities: TCapabilities
+  readonly operations: AdapterOperationsFor<TCapabilities>
+  readonly actions: TActions
+}
+
+export type AdapterDefinition<
   TId extends string = string,
-  TVersion extends number = number,
   TConfigSchema extends z.ZodTypeAny = z.ZodTypeAny,
   TCapabilities extends
     readonly AdapterCapability[] = readonly AdapterCapability[],
   TActions extends Readonly<Record<string, AdapterActionBinding>> = Readonly<
     Record<string, AdapterActionBinding>
   >,
-  TAuth extends AdapterAuthSpec = AdapterAuthSpec,
-> {
-  readonly id: TId
-  readonly version: TVersion
-  readonly configSchema: TConfigSchema
-  readonly auth: TAuth
-  /** Provider API hosts this Adapter may contact. Missing/empty denies network egress. */
-  readonly providerApiHosts?: readonly string[]
-  readonly profiles: readonly ProfileReference[]
-  readonly routing: SearchRouting
-  readonly capabilities: TCapabilities
-  readonly operations: AdapterOperationsFor<TCapabilities>
-  readonly actions: TActions
-  readonly docs?: { readonly summary: string }
-}
+  TProfiles extends readonly ProfileTarget[] = readonly ProfileTarget[],
+  TProvider extends AnyProviderDefinition | undefined =
+    | AnyProviderDefinition
+    | undefined,
+  TScopes extends readonly string[] = readonly string[],
+> = AdapterDefinitionBase<
+  TId,
+  TConfigSchema,
+  TCapabilities,
+  TActions,
+  TProfiles
+> &
+  AdapterProviderBinding<TProvider, TScopes>
 
 export type AnyAdapterDefinition = Omit<
-  AdapterDefinition<
+  AdapterDefinitionBase<
     string,
-    number,
     z.ZodTypeAny,
-    readonly [],
-    Readonly<Record<string, AdapterActionBinding>>
+    readonly AdapterCapability[],
+    Readonly<Record<string, AdapterActionBinding>>,
+    readonly ProfileTarget[]
   >,
-  'capabilities' | 'operations'
+  'operations'
 > & {
-  readonly capabilities: readonly AdapterCapability[]
   readonly operations: AdapterOperations
+  readonly provider?: AnyProviderDefinition
+  readonly providerApiHosts?: readonly string[]
+  readonly access?: { readonly scopes: readonly string[] }
 }
 
 export function defineAdapter<
   const TId extends string,
-  const TVersion extends number,
   TConfigSchema extends z.ZodTypeAny,
   const TCapabilities extends readonly AdapterCapability[],
   const TActions extends Readonly<Record<string, AdapterActionBinding>>,
-  const TAuth extends AdapterAuthSpec,
+  const TProfiles extends readonly ProfileTarget[],
 >(
-  definition: AdapterDefinition<
-    TId,
-    TVersion,
-    TConfigSchema,
-    TCapabilities,
-    TActions,
-    TAuth
-  >,
+  definition: Omit<
+    AdapterDefinitionBase<
+      TId,
+      TConfigSchema,
+      TCapabilities,
+      TActions,
+      TProfiles
+    >,
+    'kind'
+  > &
+    AdapterProviderBinding<undefined, readonly []>,
 ): AdapterDefinition<
   TId,
-  TVersion,
   TConfigSchema,
   TCapabilities,
   TActions,
-  TAuth
-> {
-  return definition
+  TProfiles,
+  undefined,
+  readonly []
+>
+export function defineAdapter<
+  const TId extends string,
+  TConfigSchema extends z.ZodTypeAny,
+  const TCapabilities extends readonly AdapterCapability[],
+  const TActions extends Readonly<Record<string, AdapterActionBinding>>,
+  const TProfiles extends readonly ProfileTarget[],
+  const TProvider extends AnyProviderDefinition,
+  const TScopes extends readonly string[] = readonly string[],
+>(
+  definition: Omit<
+    AdapterDefinitionBase<
+      TId,
+      TConfigSchema,
+      TCapabilities,
+      TActions,
+      TProfiles
+    >,
+    'kind'
+  > &
+    AdapterProviderBinding<TProvider, TScopes>,
+): AdapterDefinition<
+  TId,
+  TConfigSchema,
+  TCapabilities,
+  TActions,
+  TProfiles,
+  TProvider,
+  TScopes
+>
+export function defineAdapter(
+  definition: Omit<AnyAdapterDefinition, 'kind'>,
+): AnyAdapterDefinition {
+  return { ...definition, kind: 'adapter' }
 }

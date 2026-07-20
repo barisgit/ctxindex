@@ -1,17 +1,20 @@
-import type { ProfileReference } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
 import { compareReferences, compareStrings } from './compare'
 import type { ExtensionRegistry } from './definition-registries'
 
-export interface KindDescription {
+interface ProfileIdentity {
   readonly id: string
   readonly version: number
-  readonly summary?: string
-  readonly aliases: readonly string[]
+}
+
+interface AdapterIdentity {
+  readonly id: string
+}
+
+export interface KindDescription extends ProfileIdentity {
   readonly fields: readonly {
     readonly name: string
     readonly type: string
-    readonly docs?: string
   }[]
   readonly formats: readonly {
     readonly name: string
@@ -64,20 +67,18 @@ function describeConfigOptions(config: object): ConfigOptionDescription[] {
           : `--config--${encodedProperty(property)}`,
       type: configOptionType(option),
       required: required.has(property) && !('default' in option),
-      ...(typeof option.description === 'string'
-        ? { docs: option.description }
-        : {}),
       ...('default' in option ? { default: option.default } : {}),
     }))
 }
 
-export interface SourceDescription {
-  readonly id: string
-  readonly version: number
-  readonly summary?: string
-  readonly profiles: readonly ProfileReference[]
+export interface SourceDescription extends AdapterIdentity {
+  readonly profiles: readonly ProfileIdentity[]
   readonly routing: string
-  readonly auth: object
+  readonly provider?: {
+    readonly id: string
+    readonly auth: object
+  }
+  readonly access?: { readonly scopes: readonly string[] }
   readonly providerApiHosts: readonly string[]
   readonly capabilities: readonly string[]
   readonly config: object
@@ -89,19 +90,16 @@ export interface ConfigOptionDescription {
   readonly flag: string
   readonly type: string
   readonly required: boolean
-  readonly docs?: string
   readonly default?: unknown
 }
 
 export interface ActionDescription {
   readonly id: string
-  readonly profile: ProfileReference
+  readonly profile: ProfileIdentity
   readonly effect: string
   readonly input: object
-  readonly output: ProfileReference
-  readonly docs: string
-  readonly examples: readonly unknown[]
-  readonly adapters: readonly ProfileReference[]
+  readonly output: ProfileIdentity
+  readonly adapters: readonly AdapterIdentity[]
 }
 
 export interface RegistryDescription {
@@ -115,23 +113,17 @@ export function describeRegistry(registry: {
   readonly adapters: Pick<ExtensionRegistry['adapters'], 'list'>
 }): RegistryDescription {
   const profiles = [...registry.profiles.list()].sort(compareReferences)
-  const adapters = [...registry.adapters.list()].sort(compareReferences)
+  const adapters = [...registry.adapters.list()].sort((left, right) =>
+    compareStrings(left.id, right.id),
+  )
 
   return {
     kinds: profiles.map((profile) => ({
       id: profile.id,
       version: profile.version,
-      ...(profile.docs?.summary === undefined
-        ? {}
-        : { summary: profile.docs.summary }),
-      aliases: [...(profile.docs?.aliases ?? [])].sort(compareStrings),
       fields: Object.entries(profile.search?.fields ?? {})
         .sort(([left], [right]) => compareStrings(left, right))
-        .map(([name, field]) => ({
-          name,
-          type: field.type,
-          ...(field.docs === undefined ? {} : { docs: field.docs }),
-        })),
+        .map(([name, field]) => ({ name, type: field.type })),
       formats: Object.entries(profile.exports ?? {})
         .sort(([left], [right]) => compareStrings(left, right))
         .map(([name, format]) => ({
@@ -143,13 +135,21 @@ export function describeRegistry(registry: {
       const config = z.toJSONSchema(adapter.configSchema)
       return {
         id: adapter.id,
-        version: adapter.version,
-        ...(adapter.docs?.summary === undefined
-          ? {}
-          : { summary: adapter.docs.summary }),
-        profiles: [...adapter.profiles].sort(compareReferences),
+        profiles: adapter.profiles
+          .map(({ id, version }) => ({ id, version }))
+          .sort(compareReferences),
         routing: adapter.routing,
-        auth: adapter.auth,
+        ...(adapter.provider === undefined
+          ? {}
+          : {
+              provider: {
+                id: adapter.provider.id,
+                auth: adapter.provider.auth,
+              },
+            }),
+        ...(adapter.access === undefined
+          ? {}
+          : { access: { scopes: [...adapter.access.scopes] } }),
         providerApiHosts: [...(adapter.providerApiHosts ?? [])].sort(
           compareStrings,
         ),
@@ -167,8 +167,6 @@ export function describeRegistry(registry: {
           effect: action.effect,
           input: z.toJSONSchema(action.input),
           output: action.output,
-          docs: action.docs,
-          examples: action.examples ?? [],
           adapters: adapters
             .filter(
               (adapter) =>
@@ -176,7 +174,7 @@ export function describeRegistry(registry: {
                 adapter.actions[id]?.profile.id === profile.id &&
                 adapter.actions[id]?.profile.version === profile.version,
             )
-            .map((adapter) => ({ id: adapter.id, version: adapter.version })),
+            .map((adapter) => ({ id: adapter.id })),
         })),
     ),
   }

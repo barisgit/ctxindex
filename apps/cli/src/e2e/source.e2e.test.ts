@@ -1,7 +1,7 @@
 import { Database } from 'bun:sqlite'
 import { describe, expect, test } from 'bun:test'
 import { access, mkdir, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { createSandbox, type Sandbox } from '@ctxindex/core/testing'
 
 function dbPath(sandbox: Sandbox): string {
@@ -23,8 +23,8 @@ function insertGoogleGrant(
     ).run(accountId, input.email, input.email, now, now)
     db.prepare(
       `INSERT INTO grants
-         (id, account_id, provider, scopes_json, created_at, updated_at)
-       VALUES (?, ?, 'google', ?, ?, ?)`,
+         (id, account_id, provider, scopes_json, app_config_ref, created_at, updated_at)
+       VALUES (?, ?, 'google', ?, 'secret://test/app', ?, ?)`,
     ).run(input.id, accountId, input.scopes, now, now)
   } finally {
     db.close()
@@ -57,6 +57,74 @@ function parseSourceId(stdout: string): string {
 }
 
 describe('source e2e', () => {
+  test('OAuth App collision keeps the rejected Extension Adapter unavailable', async () => {
+    const sandbox = await createSandbox()
+    try {
+      expect((await sandbox.run(['init'])).exitCode).toBe(0)
+      expect((await sandbox.run(['realm', 'add', 'global'])).exitCode).toBe(0)
+      const app = await sandbox.run(
+        ['oauth-app', 'add', 'google', 'shadowed', '--from-env'],
+        { env: { CTXINDEX_GOOGLE_CLIENT_ID: 'local-client-id' } },
+      )
+      expect(app.exitCode, app.stderr).toBe(0)
+
+      const packageRoot = join(sandbox.dir, 'shadowing-extension')
+      await mkdir(packageRoot, { recursive: true })
+      await writeFile(
+        join(packageRoot, 'package.json'),
+        JSON.stringify({
+          name: '@ctxindex/shadowing-fixture',
+          ctxindex: { extensions: ['./entry.ts'] },
+        }),
+      )
+      const repoRoot = resolve(import.meta.dir, '../../../..')
+      await writeFile(
+        join(packageRoot, 'entry.ts'),
+        `import { defineAdapter, defineExtension, defineOAuthApp, z } from ${JSON.stringify(join(repoRoot, 'packages/extension-sdk/src/index.ts'))}
+import { googleOAuthProvider } from ${JSON.stringify(join(repoRoot, 'packages/adapters/src/google-oauth-provider.ts'))}
+
+const shadowedApp = defineOAuthApp(googleOAuthProvider, {
+  label: 'shadowed',
+  config: { clientId: 'extension-client-id' },
+})
+const rejectedAdapter = defineAdapter({
+  id: 'fixture.shadowed',
+  configSchema: z.object({}).strict(),
+  profiles: [],
+  routing: 'indexed',
+  capabilities: [],
+  operations: {},
+  actions: {},
+})
+export default defineExtension({
+  id: 'fixture.shadowing-extension',
+  oauthApps: [shadowedApp],
+  adapters: [rejectedAdapter],
+})
+`,
+      )
+      await writeFile(
+        join(sandbox.env.CTXINDEX_CONFIG_HOME, 'config.toml'),
+        `[extensions]\npaths = ${JSON.stringify([packageRoot])}\n\n[secrets]\nbackend = "keychain"\n\n[log]\nlevel = "info"\n\n[log.file]\nrotate = "daily"\nretain_days = 14\ncompress = true\n`,
+      )
+
+      const result = await sandbox.run([
+        'source',
+        'add',
+        'fixture.shadowed',
+        '--realm',
+        'global',
+      ])
+
+      expect(result.exitCode).toBe(2)
+      expect(result.stderr).toContain(
+        'source add: unknown adapter id "fixture.shadowed"',
+      )
+    } finally {
+      await sandbox.cleanup()
+    }
+  })
+
   test.each([
     ['--config-raw-records-enabled', 'true'],
     ['--config-labels-include', 'INBOX'],
@@ -128,7 +196,7 @@ describe('source e2e', () => {
     })
   })
 
-  test('source add Gmail rejects incompatible and ambiguous Grants', async () => {
+  test('source add Gmail rejects incompatible and ambiguous Account authorizations', async () => {
     await withInitializedSandbox(async (sandbox) => {
       insertGoogleGrant(sandbox, {
         id: 'grant-incompatible',
@@ -143,7 +211,7 @@ describe('source e2e', () => {
         'global',
       ])
       expect(incompatible.exitCode).toBe(2)
-      expect(incompatible.stderr).toContain('compatible Grant')
+      expect(incompatible.stderr).toContain('compatible Account authorization')
 
       const gmailScopes = JSON.stringify([
         'https://www.googleapis.com/auth/gmail.compose',
@@ -167,11 +235,12 @@ describe('source e2e', () => {
         'global',
       ])
       expect(ambiguous.exitCode).toBe(2)
-      expect(ambiguous.stderr).toContain('multiple compatible Grants')
+      expect(ambiguous.stderr).toContain('multiple compatible Accounts')
+      expect(ambiguous.stderr).not.toMatch(/grant/i)
     })
   })
 
-  test('source add Gmail explicit Account id binds the exact compatible Grant', async () => {
+  test('source add Gmail accepts Account id but rejects private Grant id', async () => {
     await withInitializedSandbox(async (sandbox) => {
       const gmailScopes = JSON.stringify([
         'https://www.googleapis.com/auth/gmail.compose',
@@ -187,6 +256,18 @@ describe('source e2e', () => {
         email: 'b@example.com',
         scopes: gmailScopes,
       })
+
+      const privateSelector = await sandbox.run([
+        'source',
+        'add',
+        'google.mailbox',
+        '--realm',
+        'global',
+        '--account',
+        'grant-b',
+      ])
+      expect(privateSelector.exitCode).toBe(2)
+      expect(privateSelector.stderr).not.toContain('Grant')
 
       const result = await sandbox.run([
         'source',
@@ -204,12 +285,8 @@ describe('source e2e', () => {
       const db = new Database(dbPath(sandbox), { readonly: true })
       try {
         expect(
-          db
-            .prepare(
-              'SELECT grant_id, adapter_version FROM sources WHERE id = ?',
-            )
-            .get(sourceId),
-        ).toEqual({ grant_id: 'grant-b', adapter_version: 1 })
+          db.prepare('SELECT grant_id FROM sources WHERE id = ?').get(sourceId),
+        ).toEqual({ grant_id: 'grant-b' })
       } finally {
         db.close()
       }

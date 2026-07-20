@@ -80,10 +80,10 @@ test('relocated compiled CLI serves embedded bundled skills', async () => {
     expect(get.stdout).toContain('ctxindex extensions list')
     expect(get.stdout).toContain('ctxindex skills list')
     expect(get.stdout).toContain('ctxindex skills get <name>')
-    expect(get.stdout).not.toMatch(/--from-env|client add|account add/)
+    expect(get.stdout).not.toMatch(/--from-env|oauth-app add|account add/)
     expect(get.stdout).not.toContain('```')
     expect(get.stdout).not.toMatch(
-      /^(?:\s*[-*+]\s+)?(?:init|realm|client|account|source)(?:\s|$|[/|])/m,
+      /^(?:\s*[-*+]\s+)?(?:init|realm|oauth-app|account|source)(?:\s|$|[/|])/m,
     )
 
     const getInline = await run([

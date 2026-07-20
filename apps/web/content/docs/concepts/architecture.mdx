@@ -21,7 +21,7 @@ Agent ──> CLI ──> provider-neutral core ──> Source Adapter
                     │
                     └──> SQLite projections + managed Artifact cache
 
-Client ──> Account ──> Grant ──explicit binding──> Source
+OAuth App ──> Account ──> Grant ──explicit binding──> Source
 ```
 
 The main boundaries are deliberate:
@@ -29,8 +29,9 @@ The main boundaries are deliberate:
 - the CLI parses, composes, formats, and maps final exits;
 - core owns provider-neutral orchestration, validation, SQLite, and cache state;
 - Profiles own portable domain vocabulary;
-- Source Adapters own provider authentication, transport, normalization, and declared operations;
-- Extensions bundle Profiles and Source Adapters without adding commands.
+- Providers own reusable authentication, registration, identity, and allowed-host declarations;
+- Source Adapters own Source configuration, requested access, transport, normalization, and declared operations, and may be provider-bound or providerless;
+- Extensions are plain exported roots bundling Source Adapters and OAuth Apps plus optional standalone Providers/Profiles, without adding commands or an authoring dependency graph.
 
 ## Sync and live search share one Resource model
 

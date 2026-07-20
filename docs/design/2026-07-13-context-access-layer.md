@@ -40,9 +40,10 @@ Division of labor with the surrounding ecosystem:
   ten auth/identity/search/artifact silos, while one future ctxindex MCP could
   expose the shared data plane.
 - **ACF** (`../agent-capability-format`): future distribution of agent-facing
-  skill docs. ctxindex extension packages therefore bundle adapters/profiles
-  ONLY, not skills. The existing `ctxindex skills` surface remains for bundled
-  docs but is expected to be superseded by ACF emission.
+  skill docs. ctxindex Extensions may bundle Providers, OAuth Apps, Profiles,
+  Adapters, and one passive documentation sidecar, but not agent workflow
+  skills. The existing `ctxindex skills` surface remains for bundled workflow
+  docs but may later be superseded by ACF emission.
 
 Explicitly out of scope: SaaS/remote canonical store, arbitrary provider
 automation, agent workflow policy, and a universal sync protocol. Typed
@@ -53,10 +54,10 @@ Profile Actions are in scope; arbitrary Extension subcommands are not.
 | # | Decision | Choice | Notes |
 |---|----------|--------|-------|
 | D1 | Extension power | Adapters with open `kind`/profiles, canonical operations. No arbitrary CLI subcommands | Revisit arbitrary commands only with demonstrated need |
-| D2 | Extension loading | In-process dynamic `import()` of TS/JS, full trust, factory-receives-API | Bun executes TS natively; out-of-process protocol deferred |
-| D3 | Binary distribution | Compiled Bun binary retained; extensions never import runtime code — type-only imports + host-provided API object | Verified with Bun 1.3.13/1.3.14; 1.3.12 fails, so the project is pinned to 1.3.14. Regression test at `apps/cli/src/e2e/compiled-extension.e2e.test.ts` |
+| D2 | Extension loading | In-process dynamic `import()` of TS/JS with full trust; Extensions use ordinary runtime imports from the private SDK workspace, while operation effects arrive through host-provided contexts | Bun executes TS natively; out-of-process protocol deferred |
+| D3 | Binary distribution | Compiled Bun binary retained; external packages bundle/import the Extension SDK contract but do not import core runtime internals | Verified with Bun 1.3.13/1.3.14; 1.3.12 fails, so the project is pinned to 1.3.14. Regression test at `apps/cli/src/e2e/compiled-extension.e2e.test.ts` |
 | D4 | Universal ref | `ctx://<source-id>/<adapter-opaque-suffix>` for every resource, indexed or not | Provider-native URIs kept as metadata |
-| D5 | Auth ownership | Declarative specs (oauth2/api-key/basic/none) run by core + minimal namespaced secret bucket as escape hatch | OAuth refresh, `needs_auth`, exit 10 stay uniform |
+| D5 | Auth ownership | Declarative `oauth2` or `none` Provider auth runs through core; API-key, basic, and custom secret-bucket forms remain deferred until a concrete Provider requires them | OAuth refresh, `needs_auth`, exit 10 stay uniform |
 | D6 | Source concept | Source = configured connection; sync is optional per-source | One noun; `source add --no-sync` |
 | D7 | Search default | Hybrid orchestration; adapter decides per source with sync-coverage knowledge; `--local-only` / `--remote` override | PROVISIONAL — validate by dogfooding partial Gmail sync |
 | D8 | Artifacts | Managed content-addressed store; V1 has one `cached` retention class, retained until explicit purge; `--output` copies out | No automatic age, quota, or pressure eviction in V1 |
@@ -68,9 +69,9 @@ Profile Actions are in scope; arbitrary Extension subcommands are not.
 | D14 | Relations | Bidirectional edges; targets are `ctx://` ref OR natural key (lazy resolution) | Order-independent threading, cross-source joins |
 | D15 | Exports | Vocabulary slot on profiles (`format -> render`); generic core verb; no conversion pipeline | |
 | D16 | Capabilities | Const array of enum flags: `["sync", "search-remote", "retrieve", "download"]`; search MODE moves to routing | |
-| D17 | Distribution | Explicit local paths in V1; auto-discovery, git, and npm later; possibly reuse ACF resolver | Smallest loader surface first |
+| D17 | Distribution | Explicit local package roots and exact installed Catalog snapshots use `package.json` `ctxindex.extensions`; persistent direct local/Git/npm installation remains a dependent change | Package tooling resolves dependencies; activation reuses one manifest/collector seam |
 | D18 | CLI dynamism | Generic verbs derive their whole argument space from registries (kinds, fields, formats, adapter flags from config schemas). NO parallel command/alias declarations. Typed subcommand registration through the registry machinery is the only future alternative (deferred) | Derive, never declare twice |
-| D19 | Docs | Definitions are self-documenting: `docs` fields, kind `aliases`, schema `.describe()` in the SDK contract from day one; `ctxindex describe` renders registry-derived docs; bundled skill docs mostly generated | Implementation deferred; contract fields not |
+| D19 | Docs | An Extension root may declare one passive documentation sidecar; core validates it and exposes a transport-neutral projection separately from generated registry reference data, while CLI, web, and agent presentation consumers remain deferred | Documentation never changes definition identity or activation |
 | D20 | Realms | Keep user-defined operating contexts; every Source has exactly one; no `global` Realm; explicit filters are exact | Personal/company/university are real reasoning boundaries, not security boundaries |
 | D21 | Provider Actions | Profiles declare typed Actions; Adapters implement them through a Source; no arbitrary command surface | V1 ships reversible email Draft create/update only; sending deferred |
 | D22 | Release baseline | This architecture is V1; prototype code/data are disposable | No schema migration, CLI compatibility, or stored-payload upgrade machinery |
@@ -80,8 +81,8 @@ Profile Actions are in scope; arbitrary Extension subcommands are not.
 - **Realm** — user-defined operating context such as personal, company, or
   university. Every Source belongs to exactly one Realm; no filter means all
   Realms, while an explicit filter is exact. There is no special global Realm.
-- **Client** — persisted OAuth application credentials/configuration for one
-  provider. Its verbatim label defaults to the provider id and is unique there.
+- **OAuth App** — exact provider-scoped application configuration identified by
+  `(provider id, label)`, either public Extension metadata or secret-backed local BYOA.
 - **Account** — one stable provider identity with a globally unique local label
   defaulting verbatim to the verified provider identity.
 - **Grant** — one internal stable permission/token record per Account, updated
@@ -89,17 +90,19 @@ Profile Actions are in scope; arbitrary Extension subcommands are not.
 - **Source** — one globally labeled configured connection instance (Grant,
   Realm, config, sync on/off) using exactly one Adapter. Its verbatim default
   label is `<account-label>-<adapter-tail>`, or `<adapter-tail>` without auth.
-- **Extension** — distributable module bundling Profiles and Adapters via
-  `defineExtension`; it has no operations or command surface of its own.
+- **Extension** — distributable module composing imported Adapters and OAuth
+  Apps plus optional standalone Providers/Profiles via `defineExtension`; it has
+  no operations, dependency graph, or command surface of its own.
 - **Profile** — versioned, schema-backed declaration of a domain shape plus
-  search fields, Relations, Artifacts, exports, docs, and typed Actions. It is
+  search fields, Relations, Artifacts, exports, and typed Actions. It is
   the only mechanism for domain semantics.
 - **Action** — typed provider mutation declared by a Profile and implemented
   by an Adapter through a specific Source.
 - **Draft** — reversible provider-persisted proposed state. Text composed only
   in an agent conversation is not a Draft until an Action saves it remotely.
-- **Adapter** — provider implementation declaring auth/config/capabilities and
-  implementing sync, remote search, retrieve, download, and supported Actions.
+- **Adapter** — provider-backed or providerless implementation declaring
+  config/capabilities, exact imported Profiles, optional exact Provider access,
+  and sync, remote search, retrieve, download, or supported Actions.
 - **Resource** — one unit of context (message, event, task, file, tender) as an
   envelope plus one primary Profile payload.
 - **Ref** — `ctx://<source-id>/<opaque-suffix>`; stable locator for a Resource,
@@ -116,7 +119,7 @@ Profile Actions are in scope; arbitrary Extension subcommands are not.
 Dependency DAG:
 
 ```text
-Client ─authorizes─> Account ─owns─> Grant
+OAuth App ─authorizes─> Account ─owns─> private Grant
                                       ▲
                                       │ binds
 Realm ─contains─> Source ─────────────┘
@@ -211,7 +214,7 @@ V1 starts from a fresh generic schema with no per-domain tables:
 | `chunks` (+FTS) | searchable text segments |
 | `relations` + `relation_resolutions` | Logical Ref/natural-key edges plus zero-to-many cached Resource matches |
 | `artifacts` | CAS metadata: stable Artifact Ref, owning Resource, hash, media type, size, origin Ref, fixed `cached` retention class, local path |
-| `oauth_clients` | Provider-scoped Client labels, typed credential refs, and timestamps |
+| `oauth_apps` | Provider-scoped local OAuth App labels, typed config refs, and timestamps |
 | `sources` + sync bookkeeping | sync_runs, sync_locks, source_sync_state, tombstones, globally labeled accounts/sources, one grant per account, user-defined realms |
 
 Prototype tables such as `items`, `mail_messages`, `mail_bodies`, and
@@ -307,31 +310,30 @@ through their capability-specific contexts.
 ### Auth (D5)
 
 ```ts
-auth: {
-  kind: "oauth2",
-  provider: {
-    id,
+const provider = defineProvider({
+  id,
+  auth: auth.oauth2({
     authorizationUrl,
     tokenUrl,
-    identity: { url, subjectPath, labelPaths, accountIdentityPaths },
-    pkce,
-    client,
+    identity,
+    pkce: { method: "S256", required: true },
+    registration: { type, configSchema, environment },
     baseScopes,
     allowedHosts,
-  },
-  scopes: [...],
-}
-auth: { kind: "api-key", label: "Fastmail API token" }
-auth: { kind: "basic" } | { kind: "none" } | { kind: "custom" }
+  }),
+})
+
+defineAdapter({ provider, access: { scopes: [...] }, ... })
+defineAdapter({ /* providerless: no provider/access/providerApiHosts */ ... })
 ```
 
 Core runs declarative flows, stores secrets, refreshes tokens, surfaces
 `needs_auth` (exit 10) uniformly, and hands adapters a pre-authorized `ctx.fetch`.
-`client add --from-env` reads declared Client environment names once and stores
-typed secret references plus provider-scoped labeled metadata; runtime never
-consults those environment values. `account add` resolves one persisted Client
-for its provider and requests provider base scopes plus the sorted union of all
-loaded same-provider Adapters. Core resolves stable provider identity, upserts
+`oauth-app add <provider> <label> --from-env` reads Provider-declared environment
+names once and stores typed secret references plus provider-scoped labeled
+metadata; runtime never consults those environment values. `account add
+<provider> --app <label>` resolves that exact App and requests Provider base
+scopes plus the sorted union of all loaded same-provider Adapters. Core resolves stable provider identity, upserts
 one globally labeled Account per `(provider, external subject)`, records
 verified Account Identities, and creates or updates that Account's one Grant in
 place. Reads route typed secret references to their backend while new writes use
@@ -345,10 +347,11 @@ existing Realm; initialization seeds no `global` Realm. An unfiltered query
 spans all Realms, while `--realm company` includes only company Sources.
 Realms organize reasoning and search, not authorization.
 
-Each Account owns exactly one stable Grant and may back multiple Sources.
+Each Account owns exactly one stable private Grant and may back multiple Sources.
 Reauthorization updates that Grant in place so existing Source bindings remain
 valid. Source creation resolves `--account` by exact globally unique Account
-label, then Account id, then Grant id, restricted to the Adapter's provider;
+label, then Account id, restricted to the Adapter's provider; Grant ids remain
+private implementation state and are not selectors;
 authorization never creates an "account Source" or selects a global/latest
 Grant.
 
@@ -388,13 +391,15 @@ timeout degrades stragglers to warnings.
 
 ## 9. Extension SDK and loading (D2/D3/D11)
 
-**D3 result — passed (2026-07-13, requires Bun >=1.3.13).** A relocated
-`bun build --compile` executable, launched from `/`, dynamically imported an
-external `.ts` extension through a `file:` URL. The extension used TypeScript
-syntax, a type-only authoring import, a relative `.ts` runtime import, its own
-`node_modules` dependency, and the host-provided factory API. The retained
-regression check is `apps/cli/src/e2e/compiled-extension.e2e.test.ts`. Bun 1.3.12
-was killed with exit 137 at dynamic import; 1.3.13 and 1.3.14 passed. The root
+**D3 result — passed (2026-07-13, requires Bun >=1.3.13).** The original spike
+proved that a relocated `bun build --compile` executable could dynamically
+import external TypeScript. The retained regression now installs the private
+`@ctxindex/extension-sdk` workspace into an external package, builds that
+package, relocates the compiled host, and loads the package's manifest entry.
+The Extension uses TypeScript syntax, runtime SDK factory imports, a relative
+runtime import, and its own dependency; there is no host-provided factory API.
+The check is `apps/cli/src/e2e/compiled-extension.e2e.test.ts`. Bun 1.3.12 was
+killed with exit 137 at dynamic import; 1.3.13 and 1.3.14 passed. The root
 toolchain pin is therefore Bun 1.3.14.
 
 Authoring — top-level pure factories, pi-style:
@@ -406,10 +411,11 @@ import { communication } from "@ctxindex/profiles";  // typed descriptors of bun
 
 - Factories return plain versioned definition objects; no module-level mutable
   state, no `instanceof` across package copies. Binding is by `(id, version)`.
-- `@ctxindex/extension-sdk` and `@ctxindex/profiles` are types+schemas
-  packages for authoring DX; runtime values (zod instance, logger, authorized
-  fetch, secrets, artifact sink) arrive via the host-provided context objects,
-  so the compiled binary stays sealed and never duplicates core.
+- `@ctxindex/extension-sdk` and `@ctxindex/profiles` are private workspace
+  packages for authoring and runtime contracts. Extensions import the SDK's
+  factories and supported `z` directly; logger, controlled fetch, secrets,
+  artifact sinks, and Resource lookup arrive through host-provided operation
+  contexts so the compiled host keeps orchestration and storage internals sealed.
 - Extensions may have their own `node_modules` for their own deps.
 - Internals mirror lume/sessionloom patterns: const-generic registries
   (`createProfileRegistry([...] as const)`, `createAdapterRegistry`) inferring
@@ -417,10 +423,12 @@ import { communication } from "@ctxindex/profiles";  // typed descriptors of bun
   validation of dynamically loaded definitions, type-erased `AnyAdapter` /
   `AnyProfile` surfaces inside core.
 
-Loading: V1 accepts explicit local paths in config. Auto-discovery from
-`~/.config/ctxindex/extensions/`, git, and npm are later distribution work.
-Full trust is documented. Built-in Extensions load first; id conflicts resolve
-to built-ins with a diagnostic.
+Loading: V1 accepts explicit local package-root paths in config and exact
+installed Catalog snapshots. Each materialized package declares ordered entry
+modules in `package.json` `ctxindex.extensions`; package tooling resolves normal
+imports. Full trust is documented. Built-in module namespaces load first, while
+later conflicting packages reject atomically with a diagnostic rather than
+winning by origin priority.
 
 Removal/absence semantics: when an extension is uninstalled or fails to load,
 its sources become `unavailable` (listed, not searchable remotely, no sync);
@@ -430,18 +438,19 @@ the profile came from the missing extension — in that case degrade to
 envelope-level behavior, D12 policy). `source remove` / `purge source` remain
 the explicit data-deletion paths; removing code never silently deletes data.
 
-Distribution (D17): explicit local paths now; auto-discovery and `git:` later; npm deferred;
-evaluate reusing the ACF resolver (`capabilities.yml`-style fetch + lockfile)
-before building bespoke fetch logic.
+Distribution (D17): explicit local package roots and trusted Catalog snapshots
+now; persistent generic local/Git/npm installation, update, and uninstall are a
+dependent change that must reuse ecosystem package resolution and the same
+manifest-entry/collector boundary.
 
 ## 10. CLI surface (target)
 
 ```text
 ctxindex init
-ctxindex client add <provider> [--label <label>] --from-env
-ctxindex client list
-ctxindex client remove <provider> <label>
-ctxindex account add <provider> [--label <label>] [--client <label>]
+ctxindex oauth-app add <provider> <label> --from-env
+ctxindex oauth-app list [--json]
+ctxindex oauth-app remove <provider> <label>
+ctxindex account add <provider> --app <label> [--label <label>]
 ctxindex account list [--json]
 ctxindex account remove <label>
 ctxindex realm add|list|remove
@@ -483,7 +492,7 @@ Example verb collapse: the Hermes CLI's bespoke `mail senders` becomes
 - `docs/milestones/V1.md` owns first-release scope and vertical slices.
 - Selective `openspec/specs/<capability>/implementation.md` sidecars own reference implementation doctrine; the module-architecture sidecar owns cross-cutting runtime, package, and testing choices.
 - This document owns cross-cutting rationale and decisions D1–D22.
-- `openspec/changes/v1-context-access-layer/` owns active capability specs and tasks.
+- `openspec/changes/archive/2026-07-17-v1-context-access-layer/` preserves the completed V1 change evidence; `openspec list` is authoritative for the current active-change inventory.
 
 The documents describe V1 directly. Prototype code, tables, CLI behavior, and
 local databases are not treated as a prior release and receive no migration or

@@ -43,13 +43,19 @@ export const ENV_SCHEMA_KEYS = Object.freeze(
 
 let memoizedEnv: Env | undefined
 
+export const SAFE_ENVIRONMENT_VARIABLE_NAME_PATTERN = /^[A-Z_][A-Z0-9_]*$/
+
+export function isSafeEnvironmentVariableName(name: string): boolean {
+  return SAFE_ENVIRONMENT_VARIABLE_NAME_PATTERN.test(name)
+}
+
 export function getEnv(): Env {
   memoizedEnv ??= Object.freeze(EnvSchema.parse(process.env))
   return memoizedEnv
 }
 
 export function readEnvironmentVariable(name: string): string | undefined {
-  if (!/^CTXINDEX_[A-Z0-9_]+$/.test(name)) return undefined
+  if (!isSafeEnvironmentVariableName(name)) return undefined
   return getEnv()[name]
 }
 

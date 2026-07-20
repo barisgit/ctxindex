@@ -28,6 +28,8 @@ const groups = [
       },
       { href: '/docs/examples/marketplace', label: 'Marketplace' },
       { href: '/brand', label: 'Brand assets' },
+      { href: '/privacy', label: 'Privacy' },
+      { href: '/terms', label: 'Terms' },
     ],
   },
 ]

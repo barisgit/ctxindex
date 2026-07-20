@@ -1,10 +1,169 @@
+import { Database } from 'bun:sqlite'
 import { expect, test } from 'bun:test'
+import { mkdir, readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { defaultConfig, writeConfig } from '@ctxindex/core/config'
 import { createSandbox } from '@ctxindex/core/testing'
 import { startMockGmail } from './_mock-gmail'
 import { startMockGoogleCalendar } from './_mock-google-calendar'
 import { installLoopbackBrowser } from './_oauth-account'
 
-test('account add authorizes with a persisted client, lists its label, and removes it', async () => {
+async function expectDatabaseAbsent(dataHome: string): Promise<void> {
+  for (const filename of [
+    'ctxindex.sqlite',
+    'ctxindex.sqlite-wal',
+    'ctxindex.sqlite-shm',
+  ]) {
+    expect(await Bun.file(join(dataHome, filename)).exists()).toBe(false)
+  }
+}
+
+async function expectSecretStateAbsent(
+  configHome: string,
+  dataHome: string,
+  keytarMockFile: string | undefined,
+): Promise<void> {
+  expect(keytarMockFile).toBeDefined()
+  if (keytarMockFile === undefined) {
+    throw new Error('sandbox Keychain mock path is required')
+  }
+  for (const path of [
+    join(dataHome, 'secrets.box'),
+    join(configHome, 'secret.key'),
+    keytarMockFile,
+  ]) {
+    expect(await Bun.file(path).exists()).toBe(false)
+  }
+}
+
+test('account add requires initialization before OAuth App inventory or durable effects', async () => {
+  const sandbox = await createSandbox()
+  try {
+    const result = await sandbox.run([
+      'account',
+      'add',
+      'microsoft',
+      '--app',
+      'missing',
+    ])
+    expect(result.exitCode).toBe(2)
+    expect(result.stderr).toContain(
+      'ctxindex is not initialized; run ctxindex init',
+    )
+    expect(result.stderr).not.toContain('OAuth App "missing"')
+    expect(
+      await Bun.file(
+        join(sandbox.env.CTXINDEX_CONFIG_HOME, 'config.toml'),
+      ).exists(),
+    ).toBe(false)
+    await expectDatabaseAbsent(sandbox.env.CTXINDEX_DATA_HOME)
+    await expectSecretStateAbsent(
+      sandbox.env.CTXINDEX_CONFIG_HOME,
+      sandbox.env.CTXINDEX_DATA_HOME,
+      sandbox.env.CTXINDEX_KEYTAR_MOCK_FILE,
+    )
+  } finally {
+    await sandbox.cleanup()
+  }
+})
+
+test('account add rejects config-only partial initialization without opening state', async () => {
+  const sandbox = await createSandbox()
+  try {
+    const configPath = join(sandbox.env.CTXINDEX_CONFIG_HOME, 'config.toml')
+    await writeConfig(defaultConfig(), configPath)
+    const before = await readFile(configPath)
+
+    const result = await sandbox.run([
+      'account',
+      'add',
+      'microsoft',
+      '--app',
+      'missing',
+    ])
+
+    expect(result.exitCode).toBe(2)
+    expect(result.stderr).toContain(
+      'ctxindex is not initialized; run ctxindex init',
+    )
+    expect(await readFile(configPath)).toEqual(before)
+    await expectDatabaseAbsent(sandbox.env.CTXINDEX_DATA_HOME)
+    await expectSecretStateAbsent(
+      sandbox.env.CTXINDEX_CONFIG_HOME,
+      sandbox.env.CTXINDEX_DATA_HOME,
+      sandbox.env.CTXINDEX_KEYTAR_MOCK_FILE,
+    )
+  } finally {
+    await sandbox.cleanup()
+  }
+})
+
+test('account add rejects database-only partial initialization without opening state', async () => {
+  const sandbox = await createSandbox()
+  try {
+    await mkdir(sandbox.env.CTXINDEX_DATA_HOME, { recursive: true })
+    const path = join(sandbox.env.CTXINDEX_DATA_HOME, 'ctxindex.sqlite')
+    const database = new Database(path, { create: true })
+    database.exec('CREATE TABLE sentinel (value TEXT)')
+    database.close()
+    const before = await readFile(path)
+
+    const result = await sandbox.run([
+      'account',
+      'add',
+      'microsoft',
+      '--app',
+      'missing',
+    ])
+
+    expect(result.exitCode).toBe(2)
+    expect(result.stderr).toContain(
+      'ctxindex is not initialized; run ctxindex init',
+    )
+    expect(await readFile(path)).toEqual(before)
+    expect(await Bun.file(`${path}-wal`).exists()).toBe(false)
+    expect(await Bun.file(`${path}-shm`).exists()).toBe(false)
+    expect(
+      await Bun.file(
+        join(sandbox.env.CTXINDEX_CONFIG_HOME, 'config.toml'),
+      ).exists(),
+    ).toBe(false)
+    await expectSecretStateAbsent(
+      sandbox.env.CTXINDEX_CONFIG_HOME,
+      sandbox.env.CTXINDEX_DATA_HOME,
+      sandbox.env.CTXINDEX_KEYTAR_MOCK_FILE,
+    )
+  } finally {
+    await sandbox.cleanup()
+  }
+})
+
+test('account add preserves Provider validation before initialization', async () => {
+  const sandbox = await createSandbox()
+  try {
+    const result = await sandbox.run([
+      'account',
+      'add',
+      'fastmail',
+      '--app',
+      'missing',
+    ])
+
+    expect(result.exitCode).toBe(2)
+    expect(result.stderr).toContain('Unknown OAuth provider "fastmail"')
+    expect(result.stderr).not.toContain('ctxindex is not initialized')
+    await expectDatabaseAbsent(sandbox.env.CTXINDEX_DATA_HOME)
+    await expectSecretStateAbsent(
+      sandbox.env.CTXINDEX_CONFIG_HOME,
+      sandbox.env.CTXINDEX_DATA_HOME,
+      sandbox.env.CTXINDEX_KEYTAR_MOCK_FILE,
+    )
+  } finally {
+    await sandbox.cleanup()
+  }
+})
+
+test('account add authorizes with a persisted OAuth App, lists its label, and removes it', async () => {
   const sandbox = await createSandbox()
   const mock = startMockGmail({ identityEmail: 'person@example.test' })
   const calendar = startMockGoogleCalendar()
@@ -19,44 +178,40 @@ test('account add authorizes with a persisted client, lists its label, and remov
     expect((await sandbox.run(['init'])).exitCode).toBe(0)
     expect((await sandbox.run(['realm', 'add', 'mail'])).exitCode).toBe(0)
 
-    const missingClient = await sandbox.run(['account', 'add', 'microsoft'], {
-      env,
-    })
-    expect(missingClient.exitCode).toBe(2)
-    expect(missingClient.stderr).toContain('bun cli client add microsoft')
-
-    const client = await sandbox.run(
-      ['client', 'add', 'google', '--from-env'],
+    const missingApp = await sandbox.run(
+      ['account', 'add', 'microsoft', '--app', 'microsoft'],
       { env },
     )
-    expect(client.exitCode, client.stderr).toBe(0)
+    expect(missingApp.exitCode).toBe(2)
+    expect(missingApp.stderr).toContain(
+      'bun cli oauth-app add microsoft microsoft --from-env',
+    )
 
-    const clientCollision = await sandbox.run(
-      ['client', 'add', 'google', '--from-env'],
+    const app = await sandbox.run(
+      ['oauth-app', 'add', 'google', 'google', '--from-env'],
       { env },
     )
-    expect(clientCollision.exitCode).toBe(2)
-    expect(clientCollision.stderr).toContain(
-      'Client label "google" is already taken',
+    expect(app.exitCode, app.stderr).toBe(0)
+
+    const appCollision = await sandbox.run(
+      ['oauth-app', 'add', 'google', 'google', '--from-env'],
+      { env },
+    )
+    expect(appCollision.exitCode).toBe(2)
+    expect(appCollision.stderr).toContain(
+      'OAuth App label "google" is already taken',
     )
 
     expect(
       (
         await sandbox.run(
-          [
-            'client',
-            'add',
-            'microsoft',
-            '--label',
-            'microsoft-only',
-            '--from-env',
-          ],
+          ['oauth-app', 'add', 'microsoft', 'microsoft-only', '--from-env'],
           { env },
         )
       ).exitCode,
     ).toBe(0)
     const mismatch = await sandbox.run(
-      ['account', 'add', 'google', '--client', 'microsoft-only'],
+      ['account', 'add', 'google', '--app', 'microsoft-only'],
       { env },
     )
     expect(mismatch.exitCode).toBe(2)
@@ -66,24 +221,28 @@ test('account add authorizes with a persisted client, lists its label, and remov
     expect(
       (
         await sandbox.run(
-          ['client', 'add', 'google', '--label', 'secondary', '--from-env'],
+          ['oauth-app', 'add', 'google', 'secondary', '--from-env'],
           { env },
         )
       ).exitCode,
     ).toBe(0)
-    const ambiguous = await sandbox.run(['account', 'add', 'google'], { env })
-    expect(ambiguous.exitCode).toBe(2)
-    expect(ambiguous.stderr).toContain('Available labels: google, secondary')
+    const missingSelector = await sandbox.run(['account', 'add', 'google'], {
+      env,
+    })
+    expect(missingSelector.exitCode).toBe(2)
+    expect(missingSelector.stderr).toContain('account add: --app is required')
 
     const added = await sandbox.run(
-      ['account', 'add', 'google', '--label', 'work', '--client', 'google'],
+      ['account', 'add', 'google', '--label', 'work', '--app', 'google'],
       { env },
     )
     expect(added.exitCode, added.stderr).toBe(0)
     expect(added.stdout).toContain('account added:')
+    expect(added.stdout).not.toMatch(/grant/i)
 
     const listed = await sandbox.run(['account', 'list', '--json'], { env })
     expect(listed.exitCode, listed.stderr).toBe(0)
+    expect(listed.stdout).not.toMatch(/grant|scope/i)
     expect(JSON.parse(listed.stdout)).toMatchObject([
       { provider: 'google', label: 'work' },
     ])

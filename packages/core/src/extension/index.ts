@@ -1,2 +1,6 @@
+export * from './collector'
+export { safeExtensionDiagnostic } from './diagnostics'
+export * from './documentation'
 export * from './import'
 export * from './loader'
+export * from './package-entry'

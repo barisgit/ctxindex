@@ -1,76 +1,75 @@
-# OAuth Client Management Implementation Doctrine
+# OAuth App Management Implementation Doctrine
 
 > This sidecar records intended-implementation doctrine. It is reference-level, not normative behavior; behavioral requirements live in [spec.md](spec.md).
 
 ## Interfaces
 
-These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
-
-### @ctxindex/core — OAuth Client records and service
+### @ctxindex/extension-sdk — Extension OAuth Apps
 
 ```ts
-export interface OAuthClientRecord {
-  readonly provider: string
+export interface OAuthAppDefinition<
+  TProvider extends ProviderDefinition<string, OAuth2Auth> = ProviderDefinition<string, OAuth2Auth>,
+  TLabel extends string = string,
+  TConfig = unknown,
+> {
+  readonly kind: 'oauth-app'
+  readonly provider: TProvider
+  readonly label: TLabel
+  readonly config: TConfig
+}
+
+export function defineOAuthApp<
+  const TProvider extends ProviderDefinition<string, OAuth2Auth>,
+  const TLabel extends string,
+>(
+  provider: TProvider,
+  definition: {
+    readonly label: TLabel
+    readonly config: z.input<TProvider['auth']['registration']['configSchema']>
+  },
+): OAuthAppDefinition<TProvider, TLabel>;
+```
+
+The factory accepts one exact imported OAuth2 Provider. Extension Apps require public registration policy and contain no typed secret references or host-private values.
+
+### @ctxindex/core — safe inventory and local BYOA
+
+```ts
+export interface OAuthAppInventoryEntry {
+  readonly providerId: string
   readonly label: string
+  readonly origin: 'builtin' | 'extension' | 'local'
+  readonly provenance?: SafeDefinitionProvenance
+}
+
+export interface LocalOAuthAppRecord {
+  readonly providerId: string
+  readonly label: string
+  readonly configRefs: Readonly<Record<string, SecretRef>>
   readonly createdAt: number
   readonly updatedAt: number
 }
 
-export interface AddOAuthClientInput {
-  readonly provider: string
-  readonly label?: string
-  readonly clientId: string
-  readonly clientSecret?: string
-}
-
-export interface OAuthClientServiceDeps {
-  readonly db: CtxindexDatabase
-  readonly store: SecretsStore
-  readonly now?: () => number
-}
-
-export interface OAuthClientService {
-  addClient(input: AddOAuthClientInput): Promise<OAuthClientRecord>
-  listClients(): OAuthClientRecord[]
-  removeClient(provider: string, label: string): Promise<void>
+export interface OAuthAppService {
+  addFromEnvironment(providerId: string, label: string): Promise<OAuthAppInventoryEntry>
+  list(): readonly OAuthAppInventoryEntry[]
+  remove(providerId: string, label: string): Promise<void>
+  resolve(providerId: string, label: string): Promise<ResolvedOAuthApp>
 }
 ```
 
-### @ctxindex/core — OAuth Client resolution
+Inventory combines active Extension Apps and local BYOA Apps but uses an explicit safe projection. Duplicate `(providerId,label)` identities reject across every origin; there is no shadowing or default label.
 
-```ts
-export interface ResolveOAuthClientInput {
-  readonly provider: string
-  readonly label?: string
-}
+### Provider registration environment import
 
-export interface ResolvedOAuthClient {
-  readonly provider: string
-  readonly label: string
-  readonly clientId: string
-  readonly clientSecret?: string
-}
-
-export async function resolveOAuthClient(
-  input: ResolveOAuthClientInput,
-  deps: Pick<OAuthClientServiceDeps, 'db' | 'store'>,
-): Promise<ResolvedOAuthClient>;
-```
-
-### @ctxindex/core — OAuth Client service boundary
-
-```ts
-export function createOAuthClientService(
-  deps: OAuthClientServiceDeps,
-): OAuthClientService;
-```
+OAuth2 Provider registration maps each top-level App config-schema key to one validated environment variable name. Local `oauth-app add --from-env` resolves the Provider first, reads through the central environment loader, validates the assembled complete config, writes typed secret references, then persists the record. Failure cleans new references. Authorization and refresh never use the environment map.
 
 ## Implementation doctrine
 
-`@ctxindex/core` owns OAuth Client add, list, remove, and resolve behavior. SQLite stores provider, label, timestamps, and typed client credential references; values live only in the routing Secret Vault.
+Core owns OAuth App inventory, local BYOA persistence, exact resolution, and collision handling. Complete-registry validation owns Extension App policy and cross-origin duplicate rejection. Fresh storage uses OAuth App terminology and has no Client table, view, service, command, alias, or compatibility path.
 
-`client add --from-env` reads Adapter-declared environment names once and persists the values. Authorization resolves one provider-matched stored Client and does not reread client credentials from the environment. Inventory omits values and references; the CLI's JSON inventory uses an explicit projection of provider, label, and timestamps from `OAuthClientRecord` so future service-record expansion cannot expose new metadata unintentionally. Failed adds clean temporary secrets.
+Account authorization resolves exact `(providerId,label)`, validates the App against the active semantic Provider, and creates a private Grant-owned snapshot. Removing an App affects future authorization only.
 
 ## Verification
 
-Client service tests cover provider/label uniqueness, deterministic resolution, cleanup, removal, and non-sensitive inventory. CLI/e2e tests cover one-time environment ingestion, authorization through persisted Client state, and JSON inventory shape, empty state, deterministic ordering, credential redaction, and text-output compatibility.
+Service, registry, secret, and CLI tests cover App policy, safe deterministic inventory, exact selection, environment import, zero-effect validation, duplicate rejection, snapshot independence, removal, cleanup, and absence of Client compatibility.

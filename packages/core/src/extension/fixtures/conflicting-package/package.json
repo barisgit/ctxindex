@@ -1,0 +1,8 @@
+{
+  "name": "@ctxindex/fixture-conflicting",
+  "ctxindex": {
+    "extensions": [
+      "./entry.ts"
+    ]
+  }
+}
