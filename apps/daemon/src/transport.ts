@@ -35,7 +35,6 @@ export function parseDaemonRequestContext(request: Request) {
   )
   return {
     requestId: randomUUID(),
-    signal: request.signal,
     clientProtocol: protocol,
     clientRuntime: runtime,
   }

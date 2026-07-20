@@ -13,7 +13,7 @@ import {
   type RpcRequestContext,
   type RpcRuntimeIdentity,
 } from '@ctxindex/rpc'
-import { createRouterClient } from '@orpc/server'
+import { createRouterClient, ORPCError } from '@orpc/server'
 import { DaemonApplication } from './application'
 
 const digest = 'a'.repeat(64)
@@ -130,7 +130,10 @@ test('tracks a business request and propagates request cancellation', async () =
   })
   app.markReady()
   const controller = new AbortController()
-  const pending = app.sync({ mode: 'sync' }, context('one', controller.signal))
+  const pending = app.sync.run(
+    { mode: 'sync' },
+    context('one', controller.signal),
+  )
   await Promise.resolve()
   expect(app.activeRequestCount).toBe(1)
   controller.abort()
@@ -153,14 +156,14 @@ test('shutdown stops admission, cancels active work, and is idempotent', async (
     },
   })
   app.markReady()
-  const pending = app.sync({ mode: 'sync' }, context('active'))
+  const pending = app.sync.run({ mode: 'sync' }, context('active'))
   await Promise.resolve()
-  const first = await app.shutdown({}, context('shutdown-1'))
-  const second = await app.shutdown({}, context('shutdown-2'))
+  const first = await app.system.shutdown({}, context('shutdown-1'))
+  const second = await app.system.shutdown({}, context('shutdown-2'))
   expect(first.ok && first.value.alreadyStopping).toBe(false)
   expect(second.ok && second.value.alreadyStopping).toBe(true)
   expect(operationSignal?.aborted).toBe(true)
-  expect((await app.status({}, context('rejected'))).ok).toBe(false)
+  expect((await app.status.get({}, context('rejected'))).ok).toBe(false)
   settle()
   await pending
   await app.whenDrained()
@@ -200,7 +203,7 @@ test('maps core failures and diagnostics without leaking unsafe text', async () 
     },
   })
   app.markReady()
-  const result = await app.sync({ mode: 'sync' }, context('safe'))
+  const result = await app.sync.run({ mode: 'sync' }, context('safe'))
   const serialized = JSON.stringify(result)
   expect(serialized).not.toContain('/Users')
   expect(serialized).not.toContain('/tmp')
@@ -242,17 +245,19 @@ test('sync preserves trusted unknown and disabled Source validation failures thr
       },
     }
     expect(
-      await app.sync(
+      await app.sync.run(
         { mode: 'sync', source: index === 0 ? 'missing' : 'disabled' },
         context(`sync-validation-${index}`),
       ),
     ).toEqual(expected)
     expect(
-      await clientFor(app).sync.run({
-        mode: 'sync',
-        source: index === 0 ? 'missing' : 'disabled',
-      }),
-    ).toEqual(expected)
+      await rpcFailure(
+        clientFor(app).sync.run({
+          mode: 'sync',
+          source: index === 0 ? 'missing' : 'disabled',
+        }),
+      ),
+    ).toEqual(expected.error)
   }
 })
 
@@ -277,11 +282,11 @@ test('status preserves trusted unknown Source failure through RPC', async () => 
     },
   }
   expect(
-    await app.status({ source: 'missing' }, context('status-not-found')),
+    await app.status.get({ source: 'missing' }, context('status-not-found')),
   ).toEqual(expected)
-  expect(await clientFor(app).status.get({ source: 'missing' })).toEqual(
-    expected,
-  )
+  expect(
+    await rpcFailure(clientFor(app).status.get({ source: 'missing' })),
+  ).toEqual(expected.error)
 })
 
 test('resource failures preserve every auth and sync taxonomy code through RPC', async () => {
@@ -294,17 +299,16 @@ test('resource failures preserve every auth and sync taxonomy code through RPC',
       },
     })
     app.markReady()
-    const result = await clientFor(app).resource.get({
-      ref: 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/one',
-    })
+    const result = await rpcFailure(
+      clientFor(app).resource.get({
+        ref: 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/one',
+      }),
+    )
     expect(result).toEqual({
-      ok: false,
-      error: {
-        kind: 'ctxindex',
-        taxonomy: 'auth',
-        code,
-        message: 'The daemon could not complete the request.',
-      },
+      kind: 'ctxindex',
+      taxonomy: 'auth',
+      code,
+      message: 'The daemon could not complete the request.',
     })
   }
 
@@ -320,18 +324,17 @@ test('resource failures preserve every auth and sync taxonomy code through RPC',
       },
     })
     app.markReady()
-    const result = await clientFor(app).resource.get({
-      ref: 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/one',
-    })
+    const result = await rpcFailure(
+      clientFor(app).resource.get({
+        ref: 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/one',
+      }),
+    )
     expect(result).toEqual({
-      ok: false,
-      error: {
-        kind: 'ctxindex',
-        taxonomy: 'sync',
-        code,
-        message: 'The daemon could not complete the request.',
-        ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
-      },
+      kind: 'ctxindex',
+      taxonomy: 'sync',
+      code,
+      message: 'The daemon could not complete the request.',
+      ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
     })
   }
 })
@@ -348,15 +351,14 @@ test('sync failures preserve every validation taxonomy code through RPC', async 
       },
     })
     app.markReady()
-    expect(await clientFor(app).sync.run({ mode: 'sync' })).toEqual({
-      ok: false,
-      error: {
+    expect(await rpcFailure(clientFor(app).sync.run({ mode: 'sync' }))).toEqual(
+      {
         kind: 'ctxindex',
         taxonomy: 'validation',
         code,
         message: code,
       },
-    })
+    )
   }
 })
 
@@ -372,17 +374,16 @@ test('sync projection omits an out-of-bounds retry delay', async () => {
   })
   app.markReady()
   expect(
-    await clientFor(app).resource.get({
-      ref: 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/one',
-    }),
+    await rpcFailure(
+      clientFor(app).resource.get({
+        ref: 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/one',
+      }),
+    ),
   ).toEqual({
-    ok: false,
-    error: {
-      kind: 'ctxindex',
-      taxonomy: 'sync',
-      code: 'rate_limited',
-      message: 'The daemon could not complete the request.',
-    },
+    kind: 'ctxindex',
+    taxonomy: 'sync',
+    code: 'rate_limited',
+    message: 'The daemon could not complete the request.',
   })
 })
 
@@ -396,15 +397,12 @@ test('raw errors cannot impersonate trusted public validation failures', async (
     },
   })
   app.markReady()
-  const result = await clientFor(app).sync.run({ mode: 'sync' })
+  const result = await rpcFailure(clientFor(app).sync.run({ mode: 'sync' }))
   expect(result).toEqual({
-    ok: false,
-    error: {
-      kind: 'ctxindex',
-      taxonomy: 'other',
-      code: 'internal_error',
-      message: 'The daemon could not complete the request.',
-    },
+    kind: 'ctxindex',
+    taxonomy: 'other',
+    code: 'internal_error',
+    message: 'The daemon could not complete the request.',
   })
   expect(JSON.stringify(result)).not.toContain(canary)
 })
@@ -434,20 +432,38 @@ test('status preserves established public warning and status fields through RPC'
     },
   })
   app.markReady()
-  const direct = await app.status({}, context('status-direct'))
+  const direct = await app.status.get({}, context('status-direct'))
   const rpc = await clientFor(app).status.get({})
   expect(direct).toEqual({ ok: true, value: { rows: [publicRow] } })
-  expect(rpc).toEqual(direct)
+  if (!direct.ok) throw new Error('Expected direct status success')
+  expect(rpc).toEqual(direct.value)
 })
 
 function clientFor(app: DaemonApplication) {
+  const requestContext = context('bounded-output')
   return createRouterClient(
     createDaemonRouter(app, {
       protocol: { id: 'ctxindex.local', version: 1 },
       runtime,
     }),
-    { context: context('bounded-output') },
+    {
+      context: {
+        requestId: requestContext.requestId,
+        clientProtocol: requestContext.clientProtocol,
+        clientRuntime: requestContext.clientRuntime,
+      },
+    },
   )
+}
+
+async function rpcFailure(promise: Promise<unknown>) {
+  try {
+    await promise
+    throw new Error('Expected declared RPC failure')
+  } catch (error) {
+    if (!(error instanceof ORPCError) || !error.defined) throw error
+    return error.data
+  }
 }
 
 const statusRow = {
@@ -506,10 +522,11 @@ test('completed sync warnings and refs preserve direct output through RPC', asyn
     syncService: { run: async () => expected.value },
   })
   app.markReady()
-  const direct = await app.sync({ mode: 'sync' }, context('sync-direct'))
+  const direct = await app.sync.run({ mode: 'sync' }, context('sync-direct'))
   const rpc = await clientFor(app).sync.run({ mode: 'sync' })
   expect(direct).toEqual(expected)
-  expect(rpc).toEqual(direct)
+  if (!direct.ok) throw new Error('Expected direct sync success')
+  expect(rpc).toEqual(direct.value)
 })
 
 test('failed sync uses the deterministic public CLI projection through RPC', async () => {
@@ -566,10 +583,11 @@ test('failed sync uses the deterministic public CLI projection through RPC', asy
       warnings: [],
     },
   }
-  const direct = await app.sync({ mode: 'sync' }, context('failed-direct'))
+  const direct = await app.sync.run({ mode: 'sync' }, context('failed-direct'))
   const rpc = await clientFor(app).sync.run({ mode: 'sync' })
   expect(direct).toEqual(expected)
-  expect(rpc).toEqual(direct)
+  if (!direct.ok) throw new Error('Expected projected sync success')
+  expect(rpc).toEqual(direct.value)
   expect(JSON.stringify(rpc)).not.toMatch(/raw provider body|raw diagnostic/)
 })
 
@@ -585,15 +603,12 @@ test('router rejects oversized status rows instead of returning partial success'
     },
   })
   app.markReady()
-  const result = await clientFor(app).status.get({})
+  const result = await rpcFailure(clientFor(app).status.get({}))
   expect(result).toEqual({
-    ok: false,
-    error: {
-      kind: 'ctxindex',
-      taxonomy: 'other',
-      code: 'internal_error',
-      message: 'The daemon could not complete the request.',
-    },
+    kind: 'ctxindex',
+    taxonomy: 'other',
+    code: 'internal_error',
+    message: 'The daemon could not complete the request.',
   })
 })
 
@@ -612,9 +627,8 @@ test('router rejects oversized sync results instead of returning partial success
     },
   })
   app.markReady()
-  const result = await clientFor(app).sync.run({ mode: 'sync' })
-  expect(result.ok).toBe(false)
-  expect(!result.ok && result.error.code).toBe('internal_error')
+  const result = await rpcFailure(clientFor(app).sync.run({ mode: 'sync' }))
+  expect(result).toMatchObject({ code: 'internal_error' })
 })
 
 test('router rejects oversized warning arrays instead of returning partial success', async () => {
@@ -652,9 +666,8 @@ test('router rejects oversized warning arrays instead of returning partial succe
       syncService: { run: async () => output },
     })
     app.markReady()
-    const result = await clientFor(app).sync.run({ mode: 'sync' })
-    expect(result.ok).toBe(false)
-    expect(!result.ok && result.error.code).toBe('internal_error')
+    const result = await rpcFailure(clientFor(app).sync.run({ mode: 'sync' }))
+    expect(result).toMatchObject({ code: 'internal_error' })
   }
 })
 
@@ -682,7 +695,10 @@ test('search receives request cancellation and redacts raw provider warning text
   })
   app.markReady()
   const controller = new AbortController()
-  const pending = app.search({}, context('search-cancel', controller.signal))
+  const pending = app.search.query(
+    {},
+    context('search-cancel', controller.signal),
+  )
   await Promise.resolve()
   controller.abort()
   const cancelled = await pending
@@ -707,7 +723,7 @@ test('search receives request cancellation and redacts raw provider warning text
     },
   })
   safe.markReady()
-  const result = await safe.search({}, context('search-warning'))
+  const result = await safe.search.query({}, context('search-warning'))
   expect(JSON.stringify(result)).not.toContain('TOKEN-CANARY')
   expect(JSON.stringify(result)).not.toContain('/private/provider/body')
   expect(result).toMatchObject({
@@ -763,7 +779,7 @@ test('Source add checks cancellation after asynchronous Grant resolution', async
   })
   app.markReady()
   const controller = new AbortController()
-  const pending = app.sourceAdd(
+  const pending = app.source.add(
     { adapterId: 'test.adapter', realmSlug: 'work' },
     context('source-add-cancel', controller.signal),
   )

@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
+import { z } from 'zod'
 import {
+  defineRpcFailureRegistry,
   rpcFailureSchema,
   rpcHealthResultSchema,
   rpcJsonCursorSchema,
@@ -24,7 +26,23 @@ import {
   rpcSyncResultSchema,
   rpcThreadGetInputSchema,
   rpcThreadGetResultSchema,
+  rpcTransportContextSchema,
 } from './schemas'
+
+test('failure registry derives kind from its key and rejects a repeated kind', () => {
+  const registry = defineRpcFailureRegistry({
+    mismatch: {
+      message: 'bounded',
+      data: {
+        // @ts-expect-error failure kind is derived from the registry key
+        kind: z.literal('different'),
+      },
+    },
+  })
+  expect(registry.mismatch.data.parse({ kind: 'mismatch' })).toEqual({
+    kind: 'mismatch',
+  })
+})
 
 const digest = 'a'.repeat(64)
 const protocol = { id: 'ctxindex.local', version: 1 } as const
@@ -86,6 +104,21 @@ describe('wire identity and common bounds', () => {
       rpcRuntimeIdentitySchema.parse({
         ...runtime,
         tupleDigest: 'A'.repeat(64),
+      }),
+    ).toThrow()
+  })
+
+  test('validated transport context excludes AbortSignal', () => {
+    const transport = {
+      requestId: 'request-id',
+      clientProtocol: protocol,
+      clientRuntime: runtime,
+    }
+    expect(rpcTransportContextSchema.parse(transport)).toEqual(transport)
+    expect(() =>
+      rpcTransportContextSchema.parse({
+        ...transport,
+        signal: new AbortController().signal,
       }),
     ).toThrow()
   })
@@ -172,8 +205,8 @@ describe('wire identity and common bounds', () => {
   })
 })
 
-describe('sync/status/result envelopes', () => {
-  test('accepts strict success and declared failure envelopes', () => {
+describe('sync/status and internal application results', () => {
+  test('accepts strict internal success and failure values', () => {
     expect(
       rpcResultSchema(rpcSyncResultSchema).parse({
         ok: true,

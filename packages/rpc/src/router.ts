@@ -1,122 +1,55 @@
-import { os, type RouterClient } from '@orpc/server'
+import type {
+  AnyContractProcedure,
+  InferContractRouterInputs,
+  InferContractRouterOutputs,
+} from '@orpc/contract'
+import { type createORPCErrorConstructorMap, implement } from '@orpc/server'
 import type { z } from 'zod'
+import { daemonContract } from './contract'
 import {
-  type RpcHealthInput,
-  type RpcHealthResult,
-  type RpcRealmAddInput,
-  type RpcRealmAddResult,
-  type RpcRealmListInput,
-  type RpcRealmListResult,
+  type RpcFailure,
   type RpcRequestContext,
-  type RpcResourceGetInput,
-  type RpcResourceGetResult,
   type RpcResult,
-  type RpcSearchInput,
-  type RpcSearchResult,
-  type RpcShutdownAccepted,
-  type RpcShutdownInput,
-  type RpcSourceAddInput,
-  type RpcSourceAddResult,
-  type RpcSourceDefinitionsInput,
-  type RpcSourceDefinitionsResult,
-  type RpcSourceListInput,
-  type RpcSourceListResult,
-  type RpcSourceRemoveInput,
-  type RpcSourceRemoveResult,
-  type RpcStatusInput,
-  type RpcStatusResult,
-  type RpcSyncInput,
-  type RpcSyncResult,
-  type RpcThreadGetInput,
-  type RpcThreadGetResult,
-  rpcHealthInputSchema,
+  type RpcTransportContext,
+  type rpcFailureRegistry,
   rpcHealthResultSchema,
   rpcProtocolIdentitySchema,
-  rpcRealmAddInputSchema,
   rpcRealmAddResultSchema,
-  rpcRealmListInputSchema,
   rpcRealmListResultSchema,
-  rpcRequestContextSchema,
-  rpcResourceGetInputSchema,
   rpcResourceGetResultSchema,
   rpcResultSchema,
   rpcRuntimeIdentitySchema,
-  rpcSearchInputSchema,
   rpcSearchResultSchema,
   rpcShutdownAcceptedSchema,
-  rpcShutdownInputSchema,
-  rpcSourceAddInputSchema,
   rpcSourceAddResultSchema,
-  rpcSourceDefinitionsInputSchema,
   rpcSourceDefinitionsResultSchema,
-  rpcSourceListInputSchema,
   rpcSourceListResultSchema,
-  rpcSourceRemoveInputSchema,
   rpcSourceRemoveResultSchema,
-  rpcStatusInputSchema,
   rpcStatusResultSchema,
-  rpcSyncInputSchema,
   rpcSyncResultSchema,
-  rpcThreadGetInputSchema,
   rpcThreadGetResultSchema,
+  rpcTransportContextSchema,
 } from './schemas'
 
-export type { RpcRequestContext } from './schemas'
+export type { DaemonClient } from './contract'
+export type { RpcRequestContext, RpcTransportContext } from './schemas'
 
-export interface DaemonRpcApplication {
-  health(
-    input: RpcHealthInput,
-    context: RpcRequestContext,
-  ): Promise<RpcResult<RpcHealthResult>>
-  realmAdd(
-    input: RpcRealmAddInput,
-    context: RpcRequestContext,
-  ): Promise<RpcResult<RpcRealmAddResult>>
-  realmList(
-    input: RpcRealmListInput,
-    context: RpcRequestContext,
-  ): Promise<RpcResult<RpcRealmListResult>>
-  sourceAdd(
-    input: RpcSourceAddInput,
-    context: RpcRequestContext,
-  ): Promise<RpcResult<RpcSourceAddResult>>
-  sourceDefinitions(
-    input: RpcSourceDefinitionsInput,
-    context: RpcRequestContext,
-  ): Promise<RpcResult<RpcSourceDefinitionsResult>>
-  sourceList(
-    input: RpcSourceListInput,
-    context: RpcRequestContext,
-  ): Promise<RpcResult<RpcSourceListResult>>
-  sourceRemove(
-    input: RpcSourceRemoveInput,
-    context: RpcRequestContext,
-  ): Promise<RpcResult<RpcSourceRemoveResult>>
-  sync(
-    input: RpcSyncInput,
-    context: RpcRequestContext,
-  ): Promise<RpcResult<RpcSyncResult>>
-  status(
-    input: RpcStatusInput,
-    context: RpcRequestContext,
-  ): Promise<RpcResult<RpcStatusResult>>
-  search(
-    input: RpcSearchInput,
-    context: RpcRequestContext,
-  ): Promise<RpcResult<RpcSearchResult>>
-  resourceGet(
-    input: RpcResourceGetInput,
-    context: RpcRequestContext,
-  ): Promise<RpcResult<RpcResourceGetResult>>
-  threadGet(
-    input: RpcThreadGetInput,
-    context: RpcRequestContext,
-  ): Promise<RpcResult<RpcThreadGetResult>>
-  shutdown(
-    input: RpcShutdownInput,
-    context: RpcRequestContext,
-  ): Promise<RpcResult<RpcShutdownAccepted>>
-}
+type ContractApplication<Contract, Input, Output> =
+  Contract extends AnyContractProcedure
+    ? (input: Input, context: RpcRequestContext) => Promise<RpcResult<Output>>
+    : {
+        [Key in keyof Contract]: Key extends keyof Input
+          ? Key extends keyof Output
+            ? ContractApplication<Contract[Key], Input[Key], Output[Key]>
+            : never
+          : never
+      }
+
+export type DaemonRpcApplication = ContractApplication<
+  typeof daemonContract,
+  InferContractRouterInputs<typeof daemonContract>,
+  InferContractRouterOutputs<typeof daemonContract>
+>
 
 export interface DaemonRouterExpectations {
   readonly protocol: z.infer<typeof rpcProtocolIdentitySchema>
@@ -124,29 +57,51 @@ export interface DaemonRouterExpectations {
 }
 
 const INTERNAL_FAILURE = {
-  ok: false,
-  error: {
-    kind: 'ctxindex',
-    taxonomy: 'other',
-    code: 'internal_error',
-    message: 'The daemon could not complete the request.',
-  },
+  kind: 'ctxindex',
+  taxonomy: 'other',
+  code: 'internal_error',
+  message: 'The daemon could not complete the request.',
 } as const
 
-async function validateApplicationResult<TSchema extends z.ZodType>(
+type FailureErrorFactories = ReturnType<
+  typeof createORPCErrorConstructorMap<typeof rpcFailureRegistry>
+>
+
+function declaredError<Kind extends RpcFailure['kind']>(
+  errors: FailureErrorFactories,
+  failure: Extract<RpcFailure, { kind: Kind }>,
+): Error {
+  // Indexed access cannot retain the discriminant/factory correlation. The
+  // registry-backed runtime tests verify this isolated bridge for every kind.
+  const create = errors[failure.kind] as (options: {
+    data: RpcFailure
+  }) => Error
+  return create({ data: failure })
+}
+
+async function invokeApplication<TSchema extends z.ZodType>(
   invoke: () => Promise<unknown>,
-  schema: TSchema,
+  outputSchema: TSchema,
+  errors: FailureErrorFactories,
 ): Promise<z.output<TSchema>> {
-  // The injected application is the trusted core-to-wire content projector.
-  // This package enforces only the closed wire shape and bounds; it does not
-  // inspect or rewrite otherwise valid public message strings.
+  let data: RpcResult<z.output<TSchema>>
   try {
-    const result = schema.safeParse(await invoke())
-    if (result.success) return result.data
+    const value = await invoke()
+    const result = rpcResultSchema(outputSchema).safeParse(value)
+    if (!result.success) throw new TypeError('Invalid application result')
+    data = result.data as RpcResult<z.output<TSchema>>
   } catch {
-    // Application failures are replaced with one bounded, transport-safe result.
+    throw declaredError(errors, INTERNAL_FAILURE)
   }
-  return schema.parse(INTERNAL_FAILURE)
+  if (data.ok) return data.value
+  throw declaredError(errors, data.error)
+}
+
+function applicationContext(
+  context: RpcTransportContext,
+  signal: AbortSignal | undefined,
+): RpcRequestContext {
+  return { ...context, signal: signal ?? new AbortController().signal }
 }
 
 export function createDaemonRouter(
@@ -155,20 +110,20 @@ export function createDaemonRouter(
 ) {
   const daemonProtocol = rpcProtocolIdentitySchema.parse(expectations.protocol)
   const daemonRuntime = rpcRuntimeIdentitySchema.parse(expectations.runtime)
-  const base = os.$context<RpcRequestContext>()
-  const compatibility = base.middleware(
-    async ({ context, next }, _input, output) => {
-      const parsedContext = rpcRequestContextSchema.safeParse(context)
-      if (!parsedContext.success) return output(INTERNAL_FAILURE)
-
+  const os = implement(daemonContract).$context<RpcTransportContext>()
+  const compatibility = os.middleware(
+    async ({ context, next, errors }, _input, _output) => {
+      const parsedContext = rpcTransportContextSchema.safeParse(context)
+      if (!parsedContext.success) {
+        throw errors.ctxindex({ data: INTERNAL_FAILURE })
+      }
       const requestContext = parsedContext.data
       if (
         requestContext.clientProtocol.id !== daemonProtocol.id ||
         requestContext.clientProtocol.version !== daemonProtocol.version
       ) {
-        return output({
-          ok: false,
-          error: {
+        throw errors.protocol_incompatible({
+          data: {
             kind: 'protocol_incompatible',
             code: 'protocol_incompatible',
             message: 'The client protocol is incompatible with this daemon.',
@@ -177,7 +132,6 @@ export function createDaemonRouter(
           },
         })
       }
-
       if (
         requestContext.clientRuntime.tupleDigest !==
           daemonRuntime.tupleDigest ||
@@ -191,9 +145,8 @@ export function createDaemonRouter(
         requestContext.clientRuntime.databaseDigest !==
           daemonRuntime.databaseDigest
       ) {
-        return output({
-          ok: false,
-          error: {
+        throw errors.runtime_identity_mismatch({
+          data: {
             kind: 'runtime_identity_mismatch',
             code: 'runtime_identity_mismatch',
             message: 'The client runtime identity does not match this daemon.',
@@ -202,176 +155,191 @@ export function createDaemonRouter(
           },
         })
       }
-
       return next({ context: requestContext })
     },
   )
 
-  const healthResultSchema = rpcResultSchema(rpcHealthResultSchema)
-  const realmAddResultSchema = rpcResultSchema(rpcRealmAddResultSchema)
-  const realmListResultSchema = rpcResultSchema(rpcRealmListResultSchema)
-  const sourceAddResultSchema = rpcResultSchema(rpcSourceAddResultSchema)
-  const sourceDefinitionsResultSchema = rpcResultSchema(
-    rpcSourceDefinitionsResultSchema,
-  )
-  const sourceListResultSchema = rpcResultSchema(rpcSourceListResultSchema)
-  const sourceRemoveResultSchema = rpcResultSchema(rpcSourceRemoveResultSchema)
-  const syncResultSchema = rpcResultSchema(rpcSyncResultSchema)
-  const statusResultSchema = rpcResultSchema(rpcStatusResultSchema)
-  const searchResultSchema = rpcResultSchema(rpcSearchResultSchema)
-  const resourceGetResultSchema = rpcResultSchema(rpcResourceGetResultSchema)
-  const threadGetResultSchema = rpcResultSchema(rpcThreadGetResultSchema)
-  const shutdownResultSchema = rpcResultSchema(rpcShutdownAcceptedSchema)
-
-  return {
+  return os.router({
     system: {
-      health: base
-        .input(rpcHealthInputSchema)
-        .output(healthResultSchema)
+      health: os.system.health
         .use(compatibility)
-        .handler(({ input, context }) =>
-          validateApplicationResult(
-            () => application.health(input, context),
-            healthResultSchema,
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.system.health(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcHealthResultSchema,
+            errors,
           ),
         ),
-      shutdown: base
-        .input(rpcShutdownInputSchema)
-        .output(shutdownResultSchema)
+      shutdown: os.system.shutdown
         .use(compatibility)
-        .handler(({ input, context }) =>
-          validateApplicationResult(
-            () => application.shutdown(input, context),
-            shutdownResultSchema,
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.system.shutdown(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcShutdownAcceptedSchema,
+            errors,
           ),
         ),
     },
     realm: {
-      add: base
-        .input(rpcRealmAddInputSchema)
-        .output(realmAddResultSchema)
+      add: os.realm.add
         .use(compatibility)
-        .handler(({ input, context }) =>
-          validateApplicationResult(
-            () => application.realmAdd(input, context),
-            realmAddResultSchema,
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.realm.add(input, applicationContext(context, signal)),
+            rpcRealmAddResultSchema,
+            errors,
           ),
         ),
-      list: base
-        .input(rpcRealmListInputSchema)
-        .output(realmListResultSchema)
+      list: os.realm.list
         .use(compatibility)
-        .handler(({ input, context }) =>
-          validateApplicationResult(
-            () => application.realmList(input, context),
-            realmListResultSchema,
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.realm.list(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcRealmListResultSchema,
+            errors,
           ),
         ),
     },
     source: {
-      definitions: base
-        .input(rpcSourceDefinitionsInputSchema)
-        .output(sourceDefinitionsResultSchema)
+      definitions: os.source.definitions
         .use(compatibility)
-        .handler(({ input, context }) =>
-          validateApplicationResult(
-            () => application.sourceDefinitions(input, context),
-            sourceDefinitionsResultSchema,
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.source.definitions(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcSourceDefinitionsResultSchema,
+            errors,
           ),
         ),
-      add: base
-        .input(rpcSourceAddInputSchema)
-        .output(sourceAddResultSchema)
+      add: os.source.add
         .use(compatibility)
-        .handler(({ input, context }) =>
-          validateApplicationResult(
-            () => application.sourceAdd(input, context),
-            sourceAddResultSchema,
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.source.add(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcSourceAddResultSchema,
+            errors,
           ),
         ),
-      list: base
-        .input(rpcSourceListInputSchema)
-        .output(sourceListResultSchema)
+      list: os.source.list
         .use(compatibility)
-        .handler(({ input, context }) =>
-          validateApplicationResult(
-            () => application.sourceList(input, context),
-            sourceListResultSchema,
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.source.list(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcSourceListResultSchema,
+            errors,
           ),
         ),
-      remove: base
-        .input(rpcSourceRemoveInputSchema)
-        .output(sourceRemoveResultSchema)
+      remove: os.source.remove
         .use(compatibility)
-        .handler(({ input, context }) =>
-          validateApplicationResult(
-            () => application.sourceRemove(input, context),
-            sourceRemoveResultSchema,
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.source.remove(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcSourceRemoveResultSchema,
+            errors,
           ),
         ),
     },
     sync: {
-      run: base
-        .input(rpcSyncInputSchema)
-        .output(syncResultSchema)
+      run: os.sync.run
         .use(compatibility)
-        .handler(({ input, context }) =>
-          validateApplicationResult(
-            () => application.sync(input, context),
-            syncResultSchema,
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.sync.run(input, applicationContext(context, signal)),
+            rpcSyncResultSchema,
+            errors,
           ),
         ),
     },
     status: {
-      get: base
-        .input(rpcStatusInputSchema)
-        .output(statusResultSchema)
+      get: os.status.get
         .use(compatibility)
-        .handler(({ input, context }) =>
-          validateApplicationResult(
-            () => application.status(input, context),
-            statusResultSchema,
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.status.get(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcStatusResultSchema,
+            errors,
           ),
         ),
     },
     search: {
-      query: base
-        .input(rpcSearchInputSchema)
-        .output(searchResultSchema)
+      query: os.search.query
         .use(compatibility)
-        .handler(({ input, context }) =>
-          validateApplicationResult(
-            () => application.search(input, context),
-            searchResultSchema,
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.search.query(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcSearchResultSchema,
+            errors,
           ),
         ),
     },
     resource: {
-      get: base
-        .input(rpcResourceGetInputSchema)
-        .output(resourceGetResultSchema)
+      get: os.resource.get
         .use(compatibility)
-        .handler(({ input, context }) =>
-          validateApplicationResult(
-            () => application.resourceGet(input, context),
-            resourceGetResultSchema,
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.resource.get(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcResourceGetResultSchema,
+            errors,
           ),
         ),
     },
     thread: {
-      get: base
-        .input(rpcThreadGetInputSchema)
-        .output(threadGetResultSchema)
+      get: os.thread.get
         .use(compatibility)
-        .handler(({ input, context }) =>
-          validateApplicationResult(
-            () => application.threadGet(input, context),
-            threadGetResultSchema,
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.thread.get(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcThreadGetResultSchema,
+            errors,
           ),
         ),
     },
-  }
+  })
 }
 
 export type DaemonRouter = ReturnType<typeof createDaemonRouter>
-export type DaemonClient = RouterClient<DaemonRouter>

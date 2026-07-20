@@ -2,21 +2,25 @@
 
 Date: 2026-07-19
 
-## Checkpoint reopened
+## Checkpoint accepted
 
-The 2026-07-18 recommendation below was based on the deliberately partial sync/status slice. It is retained as prior evidence, but it is no longer the final promote/replace basis. The Human checkpoint is reopened until the normal setup-and-access migration slices in tasks 7.1-7.7 are implemented and measured.
+The 2026-07-18 recommendation below was based on the deliberately partial sync/status slice. It is retained as prior evidence, but the final decision also incorporates the completed normal setup-and-access slices in tasks 7.1-7.7, the contract-derivation refinement in tasks 8.x-9.x, and the isolated private live acceptance report.
+
+On 2026-07-20 the Human checkpoint selected `promote`. The private live journey confirmed daemon readiness; Realm and local-directory Source setup; separate-process sync, search, exact get, local thread traversal, and status; fail-closed behavior for an unconverted command; request cancellation with exit `130` and zero partial results; graceful shutdown/restart with retained indexed state; stale-endpoint no-fallback after forced termination; and successful direct execution after shutdown. Cleanup left no daemon process or socket. The separate follow-up change `promote-local-daemon-architecture` now owns canonical sidecars, full stateful-command migration, relative Extension path identity, platform policy, and explicit operational follow-ups.
 
 The expanded implementation now covers Realm and Source management plus search, exact get, and thread traversal. Focused dependency-seam tests and the compiled exclusive-lease journey prove that a selected-daemon CLI does not open SQLite for those commands. Account/OAuth App/secrets, Artifact byte transfer, export, typed Actions, purge, and pre-daemon initialization remain explicit follow-on candidates.
 
+The 2026-07-20 contract refinement replaced the internal-result-shaped wire protocol with a pure `@orpc/contract` contract. Successful procedures now return their bounded value directly; every safe failure variant is declared as typed oRPC error data with a constant outer message. Compatibility still precedes delegation, unsafe application output still collapses to one bounded internal failure, and native oRPC handler cancellation reaches the existing application context without placing `AbortSignal` in validated transport context. Focused RPC, daemon, and CLI tests prove every declared variant, plain success inference, signal identity, and declared-versus-unknown client error mapping. Request batching for a possible authenticated remote daemon and OpenAPI/external SDK generation for a future public protocol remain explicit separate follow-ups.
+
 On 2026-07-20 the final rebased compiled daemon and relocated-Extension gate passed with `6 pass`, `0 fail`, and `130 expect()` calls in `17.98s`. Its representative journey created a Realm and Source using the daemon's active registry projection, synchronized and searched a local directory, retrieved the resulting Resource, traversed it through `thread get`, read status, removed a Source, fenced every remaining SQLite-backed family plus Account authorization and Extension-install identity preflights, and exercised lifecycle/lease behavior through separate compiled CLI processes while one daemon held the exclusive SQLite lease. The focused review-regression matrix passed `132` tests with no failures across retained Source routing and cleanup, direct database ownership, exhaustive direct/RPC exit-taxonomy parity, OAuth App identity ownership, daemon safe failure projection, and strict RPC schemas/router composition. Final integrated repository CI passed every gate, including `1588 pass` and `0 fail` in the full serial suite, in `168s`.
 
-## Prior verdict
+## Final verdict
 
 Recommendation: `promote`.
 
 The prototype demonstrated the intended architectural boundary for its deliberately partial slice: one foreground Bun process owns one canonical SQLite database and one immutable Extension registry; separate CLI processes route `sync` and `status` through a bounded typed RPC surface; direct SQLite owners and the daemon exclude one another; cancellation reaches a real sync; and shutdown retains ownership until work settles or the operator force-terminates the process.
 
-This is not a recommendation to treat the prototype as a complete daemon migration or released service. The Human `promote` or `replace` choice remains pending. A `promote` choice requires a separate OpenSpec change for canonical sidecars, full stateful-command migration, and any independently accepted operational hardening. A `replace` choice requires a separate OpenSpec change for removal or replacement and may retain only independently justified core extraction. This prototype does not promote canonical sidecars in either direction.
+This is not a decision to treat the prototype as a complete daemon migration or released service. The accepted `promote` direction is recorded through the separate `promote-local-daemon-architecture` change. This prototype still does not promote canonical sidecars itself.
 
 ## Measured evidence
 
@@ -45,7 +49,7 @@ No product assertion failed in these measured runs. The evidence does expose del
 
 - Ownership is tied to canonical runtime and database identities, not a raw spelling of a path. Separate lifecycle and database leases close the same-state/different-data and different-state/same-data gaps.
 - The CLI remains the only agent-facing contract. Transport envelopes, private RPC procedures, and numeric exit mapping do not leak into the public command surface.
-- `@ctxindex/rpc` is narrow and bounded: compatibility precedes business delegation, handlers delegate once, request signals retain identity, and strict schemas reject unknown or oversized results rather than returning partial success.
+- `@ctxindex/rpc` is narrow, contract-first, and bounded: the pure contract owns paths, inputs, and plain outputs; one keyed registry owns strict failure data and declared error codes; the nested application type derives recursively from the contract; compatibility precedes business delegation; handlers delegate once; native request signals retain identity; and strict schemas reject unknown or oversized results rather than returning partial success.
 - The long-lived daemon owns runtime composition, SQLite, and one immutable registry, while provider-neutral sync orchestration remains reusable in core.
 - Readiness and shutdown are observable without fixed sleeps. A stale or lost selected endpoint produces deterministic daemon-unavailable behavior without opening SQLite in the client.
 - Kernel-retained leases survive ordinary lock-file persistence and are released by process death without unlink or heartbeat recovery.
@@ -91,8 +95,8 @@ This is safe but operationally incomplete: there is no supervisor, escalation po
 - Configured relative Extension paths remain a current-process ambiguity. Promotion must define canonical persisted resolution before treating daemon registry ownership as durable doctrine.
 - Backup is a documented boundary, not an automated command: clients must stop sync, request shutdown, and verify database handle plus both matching leases are released before copying SQLite and the file secret store. Endpoint disappearance or shutdown timeout is insufficient.
 
-## Recommendation and conditional next step
+## Recommendation and accepted next step
 
 The measured proof supports `promote` because the hard risks that motivated the prototype—canonical single ownership, typed error fidelity, immutable registry lifetime, real cancellation, shutdown lease retention, and compiled multi-process behavior—worked together without product assertion failures. The remaining weaknesses are expected consequences of the intentionally bounded prototype rather than evidence that the selected process/RPC boundary must be replaced.
 
-Promotion is conditional, not automatic. If the Human chooses `promote`, create a separate OpenSpec change that decides and specifies canonical sidecars, migrates or deliberately exempts every remaining stateful path, canonicalizes relative Extension resolution, and separately evaluates service installation/autostart, client authentication, backup orchestration, and supported-platform policy. If the Human chooses `replace`, create a separate OpenSpec change to remove or replace the daemon/RPC/lifecycle surface and retain the extracted core sync service only if independently justified.
+The Human selected `promote`. The separate `promote-local-daemon-architecture` OpenSpec change specifies canonical sidecars, migration or deliberate exemption of every remaining stateful path, launch-directory-independent Extension resolution, supported-platform gates, and separately scoped operational work for service installation/autostart, enhanced local-client authentication, and backup automation.

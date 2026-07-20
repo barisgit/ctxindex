@@ -2,22 +2,22 @@
 
 ## Responsibility
 
-Defines the private composition-only `@ctxindex/rpc` package: bounded local-daemon request/result schemas, protocol/runtime compatibility enforcement, the injected application contract, router composition, and its generated client type.
+Defines the private composition-only `@ctxindex/rpc` package: bounded local-daemon DTO schemas, a pure oRPC contract with declared typed errors, injected router implementation, and generated client type.
 
 ## Design / patterns
 
-- `package.json` exposes a single ESM facade and depends only on Zod plus the transport-neutral `@orpc/server` contract builder.
-- `src/schemas.ts` is the closed wire-shape boundary. Strict schemas cap strings, collections, cursors, Source-definition JSON defaults, Resources, recursive threads, safe JSON payloads, counters, timeouts, diagnostics, and typed failures including `result_too_large`; transported ctxindex failures carry a closed taxonomy discriminator so colliding public codes retain their meaning.
-- `src/router.ts` uses dependency injection: `DaemonRpcApplication` supplies behavior, compatibility middleware validates presented protocol and exact runtime identity, and every application result is revalidated before emission.
+- `package.json` exposes a single ESM facade and depends only on Zod plus transport-neutral `@orpc/contract` and `@orpc/server`.
+- `src/schemas.ts` is the closed bounded DTO boundary. Its keyed failure registry is the single source for strict failure schemas, `RpcFailure`, oRPC codes, and declared error data. `RpcResult<T>` is internal to the injected application boundary and is never serialized; `RpcRequestContext` augments validated transport metadata with the native request signal.
+- `src/contract.ts` owns the handler-free `@orpc/contract` procedure tree: exact inputs, plain success outputs, and registry-declared typed errors. `src/router.ts` recursively derives the nested `DaemonRpcApplication` from the contract input/output trees, then implements that contract with injected behavior, compatibility middleware, exactly-once delegation, and error adaptation.
 - The package contains no Bun listener/client transport, daemon lifecycle, filesystem discovery or leases, database composition, provider calls, or CLI presentation.
 
 ## Data & control flow
 
-1. A daemon composition root injects a `DaemonRpcApplication` and its expected protocol/runtime identities into `createDaemonRouter()`.
-2. Request context is parsed before handlers run; incompatible protocol or runtime identity returns a bounded typed failure.
-3. Health/shutdown, active Source definitions, Realm/Source management, sync/status, search, Resource get, and thread get inputs pass through strict semantic endpoint schemas to the injected application.
-4. Returned application values are checked against endpoint-specific `RpcResult` schemas; throws or invalid shapes collapse to one bounded internal failure.
-5. `DaemonRouter` derives from the composed router, and `DaemonClient` derives from that router for the CLI without importing the daemon application.
+1. A daemon composition root injects a `DaemonRpcApplication` and expected protocol/runtime identities into `createDaemonRouter()`.
+2. The pure contract independently exposes every procedure path, exact input, plain success output, and declared bounded error; transport context is validated before handlers run.
+3. Compatibility middleware rejects incompatible protocol or runtime identity with its declared typed error before application delegation.
+4. Each handler forwards oRPC's native `AbortSignal` to exactly one injected application call. Its internal `RpcResult` is validated, then becomes either a plain success value or the matching declared typed error; throws and malformed results become the bounded internal error.
+5. `DaemonRouter` implements the contract, and `DaemonClient` derives from the contract for consumers without importing daemon application code.
 
 ## Integration points
 

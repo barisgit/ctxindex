@@ -24,7 +24,7 @@ test('transport preserves a presented incompatible protocol for router middlewar
     id: 'incompatible.client',
     version: 2,
   })
-  expect(context.signal).toBe(request.signal)
+  expect(context).not.toHaveProperty('signal')
 })
 
 test('transport rejects absent runtime metadata before dispatch', () => {

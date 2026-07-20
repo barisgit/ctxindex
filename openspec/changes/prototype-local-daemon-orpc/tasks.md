@@ -39,7 +39,7 @@
 - [x] 6.2 Refresh prototype-affected codemaps and the readable system projection through cartography/system-reference only where the implemented prototype changed the current tree; do not project unchosen promotion doctrine.
 - [x] 6.3 Record an evaluation report with measured strengths, failures, every unsupported stateful path, shutdown/cancellation evidence, security limitations, and an explicit promote-or-replace recommendation without claiming complete CLI migration.
 - [x] 6.4 Document the conditional next step: a separate follow-up OpenSpec change for canonical sidecar/full migration work only after `promote`, or replacement/removal work only after `replace`. Do not promote sidecars in this prototype.
-- [ ] 6.5 Human checkpoint: present the isolated report/evidence and pause for the user to choose exactly `promote` or `replace`.
+- [x] 6.5 Human checkpoint: the isolated automated and private live evidence was accepted on 2026-07-20; the user chose `promote`, and `promote-local-daemon-architecture` owns the required canonical sidecar and full-migration follow-up.
 
 ## 7. Expanded normal CLI coverage before the Human checkpoint
 
@@ -50,3 +50,15 @@
 - [x] 7.5 Implement search, exact get, and local thread traversal through daemon-owned orchestration; pass focused package/typecheck and architecture gates.
 - [x] 7.6 Extend compiled multi-process coverage across Realm/Source setup, sync, search, get, thread, and status through one daemon-owned SQLite handle and immutable registry; rerun the direct-path inventory and record remaining unsupported families.
 - [x] 7.7 Run final gates, refresh affected codemaps/system projection, rewrite the evaluation from the expanded evidence, and only then present the Human promote/replace checkpoint.
+
+## 8. Contract-first typed errors and native cancellation
+
+- [x] 8.1 Reopen the prototype artifacts and add failing contract/router/client/transport tests proving pure contract paths, inferred plain success types, every declared bounded error variant, no `RpcResult` wire envelope, compatibility-before-delegation, generic bounded internal replacement, native signal identity, declared-error client mapping, unknown transport mapping, and existing CLI/security behavior; explicitly defer remote batching and OpenAPI/external SDK generation.
+- [x] 8.2 Add direct `@orpc/contract` 1.14.8 ownership in `@ctxindex/rpc`, define and export the pure contract, implement it with compatibility middleware and exactly-once application delegation, translate internal application results to plain outputs or declared typed errors, remove `AbortSignal` from validated transport context, and preserve stable CLI exits/no-fallback/cancellation behavior.
+- [x] 8.3 Pass focused RPC, daemon, CLI, typecheck, lint, package-dependency, and module-architecture gates; refresh directly affected codemaps/evaluation evidence and mark only this 8.x slice complete while leaving the Human promote/replace checkpoint open.
+
+## 9. Single-source error and application derivation
+
+- [x] 9.1 Add failing type/runtime/architecture tests proving one registry owns schema/code/message correlation and derives schema kinds from its keys, every exact contract path appears in the recursively inferred application tree, no handwritten procedure signature/error alias/switch remains, malformed accessors and hostile prototype/property traps normalize safely, and declared bounds, exactly-once delegation, and native signal identity remain intact.
+- [x] 9.2 Inline small failure schemas into the authoritative registry; derive `RpcFailure`, oRPC declarations, router construction, and CLI validation from it; derive the nested `DaemonRpcApplication` recursively from the contract input/output trees and update daemon composition to that shape.
+- [x] 9.3 Pass focused RPC, daemon, CLI, typecheck, lint, package-dependency, and module-architecture gates; update directly affected codemaps/evaluation, refresh cartography state after final review, and leave the Human promote/replace checkpoint open.

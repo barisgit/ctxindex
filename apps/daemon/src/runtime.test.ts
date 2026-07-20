@@ -175,9 +175,9 @@ test('startup owns leases before one load/open and publishes ready last', async 
     'bind',
     'metadata:ready',
   ])
-  expect((await daemon.application.health({}, daemon.testContext())).ok).toBe(
-    true,
-  )
+  expect(
+    (await daemon.application.system.health({}, daemon.testContext())).ok,
+  ).toBe(true)
   expect(await daemon.close(100)).toEqual({ status: 'complete' })
   expect(events.slice(-7)).toEqual([
     'metadata:stopping',
@@ -335,7 +335,7 @@ test('a lifecycle-lease loser cannot remove the live daemon endpoint or discover
   )
   expect(endpointPresent).toBe(true)
   expect(String(discoveryLifecycle)).toBe('ready')
-  const health = await live.application.health({}, live.testContext())
+  const health = await live.application.system.health({}, live.testContext())
   expect(health.ok && health.value.ready).toBe(true)
   await live.close(100)
 })
@@ -390,7 +390,7 @@ test('non-cooperative request times out while ownership remains, then cleans up 
       removeEndpoint: () => {},
     },
   })
-  const pending = daemon.application.sync(
+  const pending = daemon.application.sync.run(
     { mode: 'sync' },
     daemon.testContext(),
   )

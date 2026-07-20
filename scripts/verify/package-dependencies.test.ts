@@ -227,23 +227,29 @@ void query
   )
 })
 
-test('rpc package accepts schema and procedure composition dependencies', async () => {
+test('rpc package accepts direct contract, schema, and procedure composition dependencies', async () => {
   fixtureRoot = await createFixtureRoot()
   await writeFixture(
     join(fixtureRoot, 'packages/rpc/package.json'),
     JSON.stringify({
       name: '@ctxindex/rpc',
       private: true,
-      dependencies: { '@orpc/server': 'latest', zod: 'latest' },
+      dependencies: {
+        '@orpc/contract': 'latest',
+        '@orpc/server': 'latest',
+        zod: 'latest',
+      },
     }),
   )
   await writeFixture(
     join(fixtureRoot, 'packages/rpc/src/router.ts'),
     `
-import { os } from '@orpc/server'
+import { oc } from '@orpc/contract'
+import { implement } from '@orpc/server'
 import { z } from 'zod'
 
-export const router = os.input(z.object({ value: z.string() }))
+export const contract = oc.input(z.object({ value: z.string() }))
+export const router = implement(contract).handler(({ input }) => input)
 `,
   )
   await writeFixture(

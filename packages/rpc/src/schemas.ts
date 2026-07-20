@@ -60,92 +60,139 @@ export const rpcRuntimeIdentitySchema = z
   .readonly()
 export type RpcRuntimeIdentity = z.infer<typeof rpcRuntimeIdentitySchema>
 
-const ctxindexFailureSchema = z
-  .strictObject({
-    kind: z.literal('ctxindex'),
-    taxonomy: z.enum(['auth', 'sync', 'validation', 'lookup', 'other']),
-    code: publicCodeSchema,
-    message: publicMessageSchema,
-    retryAfterMs: timeoutMsSchema.optional(),
-  })
-  .readonly()
-const daemonUnavailableFailureSchema = z
-  .strictObject({
-    kind: z.literal('daemon_unavailable'),
-    code: z.literal('daemon_unavailable'),
-    message: publicMessageSchema,
-  })
-  .readonly()
-const protocolIncompatibleFailureSchema = z
-  .strictObject({
-    kind: z.literal('protocol_incompatible'),
-    code: z.literal('protocol_incompatible'),
-    message: publicMessageSchema,
-    clientProtocol: rpcPresentedProtocolIdentitySchema,
-    daemonProtocol: rpcProtocolIdentitySchema,
-  })
-  .readonly()
-const runtimeIdentityMismatchFailureSchema = z
-  .strictObject({
-    kind: z.literal('runtime_identity_mismatch'),
-    code: z.literal('runtime_identity_mismatch'),
-    message: publicMessageSchema,
-    clientRuntime: rpcRuntimeIdentitySchema,
-    daemonRuntime: rpcRuntimeIdentitySchema,
-  })
-  .readonly()
-const databaseLeaseConflictFailureSchema = z
-  .strictObject({
-    kind: z.literal('database_lease_conflict'),
-    code: z.literal('database_lease_conflict'),
-    message: publicMessageSchema,
-    databaseDigest: digestSchema,
-  })
-  .readonly()
-const prototypeUnsupportedFailureSchema = z
-  .strictObject({
-    kind: z.literal('prototype_unsupported'),
-    code: z.literal('prototype_unsupported'),
-    message: publicMessageSchema,
-    command: identifierSchema,
-  })
-  .readonly()
-const shutdownTimeoutFailureSchema = z
-  .strictObject({
-    kind: z.literal('shutdown_timeout'),
-    code: z.literal('shutdown_timeout'),
-    message: publicMessageSchema,
-    instanceId: identifierSchema,
-    timeoutMs: timeoutMsSchema,
-  })
-  .readonly()
-const cancelledFailureSchema = z
-  .strictObject({
-    kind: z.literal('cancelled'),
-    code: z.literal('cancelled'),
-    message: publicMessageSchema,
-  })
-  .readonly()
-const resultTooLargeFailureSchema = z
-  .strictObject({
-    kind: z.literal('result_too_large'),
-    code: z.literal('result_too_large'),
-    message: publicMessageSchema,
-  })
-  .readonly()
+const RPC_ERROR_MESSAGE = 'The daemon request failed.'
 
-export const rpcFailureSchema = z.discriminatedUnion('kind', [
-  ctxindexFailureSchema,
-  daemonUnavailableFailureSchema,
-  protocolIncompatibleFailureSchema,
-  runtimeIdentityMismatchFailureSchema,
-  databaseLeaseConflictFailureSchema,
-  prototypeUnsupportedFailureSchema,
-  shutdownTimeoutFailureSchema,
-  cancelledFailureSchema,
-  resultTooLargeFailureSchema,
-])
-export type RpcFailure = z.infer<typeof rpcFailureSchema>
+type FailureRegistryInput = Record<
+  string,
+  { readonly message: string; readonly data: z.ZodRawShape }
+>
+
+function failureDataSchema<
+  const Kind extends string,
+  const Shape extends z.ZodRawShape,
+>(kind: Kind, shape: Shape) {
+  return z.strictObject({ ...shape, kind: z.literal(kind) }).readonly()
+}
+
+type DefinedFailureRegistry<Input extends FailureRegistryInput> = {
+  readonly [Kind in keyof Input & string]: {
+    readonly message: Input[Kind]['message']
+    readonly data: ReturnType<
+      typeof failureDataSchema<Kind, Omit<Input[Kind]['data'], 'kind'>>
+    >
+  }
+}
+
+export function defineRpcFailureRegistry<
+  const Input extends FailureRegistryInput,
+>(
+  input: Input & {
+    readonly [Kind in keyof Input]: {
+      readonly data: Input[Kind]['data'] & { readonly kind?: never }
+    }
+  },
+): DefinedFailureRegistry<Input> {
+  // Object.entries cannot preserve its key/value correlation. This is the only
+  // assertion bridge; registry correlation is covered by type and runtime tests.
+  return Object.fromEntries(
+    Object.entries(input).map(([kind, entry]) => [
+      kind,
+      { message: entry.message, data: failureDataSchema(kind, entry.data) },
+    ]),
+  ) as unknown as DefinedFailureRegistry<Input>
+}
+
+export const rpcFailureRegistry = defineRpcFailureRegistry({
+  ctxindex: {
+    message: RPC_ERROR_MESSAGE,
+    data: {
+      taxonomy: z.enum(['auth', 'sync', 'validation', 'lookup', 'other']),
+      code: publicCodeSchema,
+      message: publicMessageSchema,
+      retryAfterMs: timeoutMsSchema.optional(),
+    },
+  },
+  daemon_unavailable: {
+    message: RPC_ERROR_MESSAGE,
+    data: {
+      code: z.literal('daemon_unavailable'),
+      message: publicMessageSchema,
+    },
+  },
+  protocol_incompatible: {
+    message: RPC_ERROR_MESSAGE,
+    data: {
+      code: z.literal('protocol_incompatible'),
+      message: publicMessageSchema,
+      clientProtocol: rpcPresentedProtocolIdentitySchema,
+      daemonProtocol: rpcProtocolIdentitySchema,
+    },
+  },
+  runtime_identity_mismatch: {
+    message: RPC_ERROR_MESSAGE,
+    data: {
+      code: z.literal('runtime_identity_mismatch'),
+      message: publicMessageSchema,
+      clientRuntime: rpcRuntimeIdentitySchema,
+      daemonRuntime: rpcRuntimeIdentitySchema,
+    },
+  },
+  database_lease_conflict: {
+    message: RPC_ERROR_MESSAGE,
+    data: {
+      code: z.literal('database_lease_conflict'),
+      message: publicMessageSchema,
+      databaseDigest: digestSchema,
+    },
+  },
+  prototype_unsupported: {
+    message: RPC_ERROR_MESSAGE,
+    data: {
+      code: z.literal('prototype_unsupported'),
+      message: publicMessageSchema,
+      command: identifierSchema,
+    },
+  },
+  shutdown_timeout: {
+    message: RPC_ERROR_MESSAGE,
+    data: {
+      code: z.literal('shutdown_timeout'),
+      message: publicMessageSchema,
+      instanceId: identifierSchema,
+      timeoutMs: timeoutMsSchema,
+    },
+  },
+  cancelled: {
+    message: RPC_ERROR_MESSAGE,
+    data: { code: z.literal('cancelled'), message: publicMessageSchema },
+  },
+  result_too_large: {
+    message: RPC_ERROR_MESSAGE,
+    data: {
+      code: z.literal('result_too_large'),
+      message: publicMessageSchema,
+    },
+  },
+})
+
+type RpcFailureSchema =
+  (typeof rpcFailureRegistry)[keyof typeof rpcFailureRegistry]['data']
+export type RpcFailure = z.output<RpcFailureSchema>
+
+function failureSchemaFromRegistry(
+  registry: typeof rpcFailureRegistry,
+): z.ZodType<RpcFailure> {
+  // Object.values loses the non-empty tuple that Zod requires; the registry is
+  // the tested source of truth for both this schema and the oRPC declarations.
+  const schemas = Object.values(registry).map((entry) => entry.data) as [
+    RpcFailureSchema,
+    RpcFailureSchema,
+    ...RpcFailureSchema[],
+  ]
+  return z.union(schemas) as z.ZodType<RpcFailure>
+}
+
+export const rpcFailureSchema = failureSchemaFromRegistry(rpcFailureRegistry)
 
 export function rpcResultSchema<T extends z.ZodType>(valueSchema: T) {
   return z.union([
@@ -933,15 +980,15 @@ export const rpcShutdownAcceptedSchema = z
   .readonly()
 export type RpcShutdownAccepted = z.infer<typeof rpcShutdownAcceptedSchema>
 
-export const rpcRequestContextSchema = z
+export const rpcTransportContextSchema = z
   .strictObject({
     requestId: identifierSchema,
-    signal: z.custom<AbortSignal>(
-      (value) =>
-        typeof AbortSignal !== 'undefined' && value instanceof AbortSignal,
-    ),
     clientProtocol: rpcPresentedProtocolIdentitySchema,
     clientRuntime: rpcRuntimeIdentitySchema,
   })
   .readonly()
-export type RpcRequestContext = z.infer<typeof rpcRequestContextSchema>
+export type RpcTransportContext = z.infer<typeof rpcTransportContextSchema>
+
+export interface RpcRequestContext extends RpcTransportContext {
+  readonly signal: AbortSignal
+}

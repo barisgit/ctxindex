@@ -7,7 +7,7 @@ Implements the CLI-owned Bun Unix-socket RPC adapter, exact runtime discovery se
 ## Design / patterns
 
 - `client.ts` derives the canonical config/data/state/cache identity through `@ctxindex/local-daemon`, selects only exact matching metadata or `CTXINDEX_DAEMON_TEST_ENDPOINT`, and constructs a typed `@orpc/client` link with explicit protocol/runtime headers.
-- Selected transport failures become bounded `DaemonCliError` values; aborted caller signals remain cancellation, and no selected request falls back to direct composition.
+- `client.ts` returns plain typed procedure values without an RPC envelope. It converts only declared oRPC failures whose defined status, constant outer message, registry-derived strict `RpcFailure` data, and matching kind/code validate; unknown selected transport/protocol failures become `daemon_unavailable`. Aborted caller signals remain cancellation, and no selected request falls back to direct composition.
 - `command.ts` exposes `serve`, `health`, and `shutdown`. Serve uses the current pinned Bun executable plus the source entrypoint during development, or an explicit/sibling `ctxindex-daemon` executable when compiled, and forwards termination signals; it never consults ambient PATH, detaches, or autostarts from ordinary commands.
 
 ## Data & control flow

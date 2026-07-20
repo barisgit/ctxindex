@@ -33,7 +33,7 @@ The prototype adds these workspace boundaries and dependency directions:
 @ctxindex/core -/-> @ctxindex/rpc, @ctxindex/daemon, or @ctxindex/cli
 ```
 
-`@ctxindex/rpc` is a separate private composition-only package with zero business logic. It owns only exact wire schemas and schema-derived types, protocol identity, declared safe RPC errors, the narrow injected `DaemonRpcApplication` interface, compatibility/cross-cutting middleware, the oRPC router factory, and exported inferred router/client types. A handler validates one input, delegates exactly once to the corresponding injected method with the request signal, validates/serializes the result, and returns it. It owns no Source selection/iteration, retry policy, use-case orchestration, database access, Extension loading, provider calls, lifecycle files, Unix-socket code, CLI output, exit mapping, or inspection of core error classes.
+`@ctxindex/rpc` is a separate private contract-first composition package with zero business logic. It owns only a pure `@orpc/contract` contract with exact input and plain success output schemas; one authoritative failure registry containing exact strict bounded data schemas and constant messages; schema-derived types; protocol identity; a recursively contract-derived `DaemonRpcApplication` type; compatibility/cross-cutting middleware; the `implement(contract)` router factory; and exported contract/router/client types. A handler delegates exactly once to the corresponding nested injected method with oRPC's native request signal, validates the internal application result, returns its plain success value, or constructs the matching declared error directly from the registry-correlated failure kind. It owns no Source selection/iteration, retry policy, use-case orchestration, database access, Extension loading, provider calls, lifecycle files, Unix-socket code, CLI output, exit mapping, or inspection of core error classes.
 
 `@ctxindex/local-daemon` is a separate private infrastructure package shared by daemon and CLI. It owns canonical config/data/state/cache and SQLite-path resolution, safe SHA-256 identity digests, short endpoint derivation, validated discovery metadata, and injected/acquired retained `FileLeaseBackend`/`FileLease` primitives. Lease state is established only by retained acquisition. It owns no RPC schema/router, oRPC/Bun HTTP adapter, database open/migrate/close, business logic, core service, provider access, Extension loading, application orchestration, CLI formatting, or numeric exit mapping.
 
@@ -75,11 +75,19 @@ export interface RpcRuntimeIdentity {
   readonly databaseDigest: string
 }
 
-export interface RpcRequestContext { // server-only, not serialized
+export interface RpcTransportContext { // server-only transport context, validated without a signal
   readonly requestId: string
-  readonly signal: AbortSignal
   readonly clientProtocol: RpcPresentedProtocolIdentity
   readonly clientRuntime: RpcRuntimeIdentity
+}
+
+export interface RpcRequestContext extends RpcTransportContext { // application-only
+  readonly signal: AbortSignal
+}
+
+export const rpcFailureRegistry = {
+  // keys are the exact oRPC codes and failure `kind` values; each entry owns
+  // its constant outer message and inline strict bounded data schema
 }
 
 export type RpcFailure =
@@ -93,7 +101,7 @@ export type RpcFailure =
   | { readonly kind: 'cancelled'; readonly code: 'cancelled'; readonly message: string }
   | { readonly kind: 'result_too_large'; readonly code: 'result_too_large'; readonly message: string }
 
-export type RpcResult<T> =
+export type RpcResult<T> = // internal application boundary only; never serialized
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly error: RpcFailure }
 
@@ -329,29 +337,21 @@ export interface RpcShutdownAccepted {
   readonly observationTimeoutMs: number // integer 1..60000
 }
 
-export interface DaemonRpcApplication {
-  health(input: RpcHealthInput, context: RpcRequestContext): Promise<RpcResult<RpcHealthResult>>
-  realmAdd(input: RpcRealmAddInput, context: RpcRequestContext): Promise<RpcResult<RpcRealmAddResult>>
-  realmList(input: RpcRealmListInput, context: RpcRequestContext): Promise<RpcResult<RpcRealmListResult>>
-  sourceAdd(input: RpcSourceAddInput, context: RpcRequestContext): Promise<RpcResult<RpcSourceAddResult>>
-  sourceDefinitions(input: RpcSourceDefinitionsInput, context: RpcRequestContext): Promise<RpcResult<RpcSourceDefinitionsResult>>
-  sourceList(input: RpcSourceListInput, context: RpcRequestContext): Promise<RpcResult<RpcSourceListResult>>
-  sourceRemove(input: RpcSourceRemoveInput, context: RpcRequestContext): Promise<RpcResult<RpcSourceRemoveResult>>
-  sync(input: RpcSyncInput, context: RpcRequestContext): Promise<RpcResult<RpcSyncResult>>
-  status(input: RpcStatusInput, context: RpcRequestContext): Promise<RpcResult<RpcStatusResult>>
-  search(input: RpcSearchInput, context: RpcRequestContext): Promise<RpcResult<RpcSearchResult>>
-  resourceGet(input: RpcResourceGetInput, context: RpcRequestContext): Promise<RpcResult<RpcResourceGetResult>>
-  threadGet(input: RpcThreadGetInput, context: RpcRequestContext): Promise<RpcResult<RpcThreadGetResult>>
-  shutdown(input: RpcShutdownInput, context: RpcRequestContext): Promise<RpcResult<RpcShutdownAccepted>>
-}
+export type DaemonRpcApplication = ContractApplication<
+  DaemonContract,
+  InferContractRouterInputs<DaemonContract>,
+  InferContractRouterOutputs<DaemonContract>
+>
 
 export interface DaemonRouterExpectations {
   readonly protocol: RpcProtocolIdentity
   readonly runtime: RpcRuntimeIdentity
 }
 export function createDaemonRouter(application: DaemonRpcApplication, expectations: DaemonRouterExpectations): DaemonRouter
+export const daemonContract: { /* exact procedure tree from this section */ }
+export type DaemonContract = typeof daemonContract
 export type DaemonRouter = ReturnType<typeof createDaemonRouter>
-export type DaemonClient = RouterClient<DaemonRouter>
+export type DaemonClient = ContractRouterClient<DaemonContract>
 ```
 
 The router exposes exactly `system.health`, `system.shutdown`, `realm.add`, `realm.list`, `source.definitions`, `source.add`, `source.list`, `source.remove`, `sync.run`, `status.get`, `search.query`, `resource.get`, and `thread.get`. There is no generic command-execution procedure.
@@ -362,9 +362,11 @@ The router exposes exactly `system.health`, `system.shutdown`, `realm.add`, `rea
 
 `lastRunAt` and other count fields are non-negative safe integers or their declared nullable form. Search occurrence/provider timestamps are signed safe integers. Adapter/Profile versions are integers 1..65,535. `retryAfterMs` and `shutdown_timeout.timeoutMs` are integers from 0 through 60,000.
 
-`RpcFailure` is the only failure payload. Per-Source sync failures use `RpcSourceFailure`; neither failure type can contain `Error`, `cause`, `stack`, a raw diagnostics object, socket/config/data/state/cache/SQLite paths, OS errors, raw SQLite/provider bodies, secrets, tokens, or Extension paths. Unknown application errors become one generic safe `ctxindex` failure. An otherwise valid application result that cannot be projected within a search, Resource, or thread bound is returned as the typed `result_too_large` failure rather than being truncated. Each handler validates input, delegates exactly once with the original `RpcRequestContext`, validates the returned `RpcResult`, and serializes it. Compatibility middleware uses only `DaemonRouterExpectations`; it never calls an application method and therefore cannot create hidden delegation.
+`RpcFailure` is the only declared error data payload. One readonly registry entry per failure kind owns the oRPC code (the kind itself), constant safe outer message, and exact strict bounded data schema. The oRPC declaration map, discriminated `RpcFailure` schema/union, router error constructor lookup, and CLI code/data validation derive from those entries; there is no uppercase alias map or handwritten failure-kind switch. Small one-use failure schemas remain inline in the registry. Per-Source sync failures use the separately reused `RpcSourceFailure`; neither failure type can contain `Error`, `cause`, `stack`, a raw diagnostics object, socket/config/data/state/cache/SQLite paths, OS errors, raw SQLite/provider bodies, secrets, tokens, or Extension paths. Unknown application throws, malformed/unsafe internal results, and throwing accessors become one generic safe declared `ctxindex` internal failure. An otherwise valid application result that cannot be projected within a search, Resource, or thread bound becomes the declared `result_too_large` error rather than being truncated. Each handler delegates exactly once with a `RpcRequestContext` composed from the validated transport context and native oRPC signal, validates the internal `RpcResult`, returns only its plain success value, or throws the registry-selected declared typed error. Compatibility middleware uses only `DaemonRouterExpectations`; it never calls an application method and therefore cannot create hidden delegation.
 
-The daemon transport adapter parses and validates client protocol/runtime metadata and combines it with the HTTP request id and `AbortSignal` into server-only `RpcRequestContext`. Compatibility middleware compares the typed client identities with immutable router expectations before every business procedure; an incompatible request cannot reach its application method. The CLI adapter builds the oRPC client over Bun's Unix-socket `fetch` support and attaches metadata plus caller signal. Neither transport adapter is exported by `@ctxindex/rpc`.
+The application tree is recursively derived from `daemonContract` plus `InferContractRouterInputs` and `InferContractRouterOutputs`. Contract groups remain nested, while every procedure leaf becomes `(input, context: RpcRequestContext) => Promise<RpcResult<output>>`. This is the only application signature source: adding or changing a contract procedure causes a type error until the daemon provides the corresponding exact implementation.
+
+The daemon transport adapter parses and validates client protocol/runtime metadata and combines it with the HTTP request id into server-only `RpcTransportContext`; it neither carries nor validates an `AbortSignal`. Compatibility middleware compares the typed client identities with immutable router expectations before every business procedure; an incompatible request cannot reach its application method. The implementation handler obtains oRPC's native `signal` and forwards that exact object to the application, using a safe non-aborted signal only for signal-less in-process invocations. The CLI adapter builds the oRPC client over Bun's Unix-socket `fetch` support and attaches metadata plus caller signal. Neither transport adapter is exported by `@ctxindex/rpc`.
 
 ### Core sync application service
 
@@ -407,11 +409,11 @@ Realm add/list and Source add/list/remove remain core service operations. `sourc
 
 ### CLI client and cancellation boundary
 
-The CLI parses Realm add/list, Source add/list/remove, sync, status, search, exact get, local thread traversal, health, and shutdown argv before constructing a daemon client; Source add obtains only the immutable daemon `source.definitions` projection needed for generated option parsing. The client facade unwraps `RpcResult`; existing formatters consume mapped command results and never print the transport envelope. Only the final CLI boundary adds numeric exits: invalid local input `2`; daemon unavailable, protocol/runtime mismatch, database lease conflict, prototype-unsupported, result-too-large, or shutdown timeout `50`; cancellation `130`; and existing ctxindex code mappings unchanged.
+The CLI parses Realm add/list, Source add/list/remove, sync, status, search, exact get, local thread traversal, health, and shutdown argv before constructing a daemon client; Source add obtains only the immutable daemon `source.definitions` projection needed for generated option parsing. The client facade consumes plain contract outputs. It catches only declared oRPC errors whose code/data pair validates against the exact contract failure variant and constructs `DaemonCliError` from that bounded data; unknown link/protocol exceptions become daemon-unavailable. Existing formatters never receive a transport envelope. Only the final CLI boundary adds numeric exits: invalid local input `2`; daemon unavailable, protocol/runtime mismatch, database lease conflict, prototype-unsupported, result-too-large, or shutdown timeout `50`; cancellation `130`; and existing ctxindex code mappings unchanged.
 
 For every migrated command, validated lifecycle/discovery metadata for the exact canonical tuple or a test endpoint override selects daemon routing. Once selected, stale metadata, an unreachable endpoint, or a lost connection returns `daemon_unavailable`; none falls back or opens SQLite in the client. Without selection, commands that retain a direct implementation use it behind the shared-lease fence. Before any direct stateful path constructs dependencies, the CLI uses `@ctxindex/local-daemon` to acquire a shared lease for its canonical SQLite path. Exclusive conflict returns `prototype_unsupported` before open even when state roots differ. The CLI retains the shared lease across runtime composition and SQLite use and releases it only after database close.
 
-For an in-flight command, SIGINT aborts the CLI request controller. The socket fetch signal becomes the server request signal, and the router forwards that exact `AbortSignal` in `RpcRequestContext` to each corresponding application method. The daemon passes it to Realm, Source, sync, search, retrieval, or thread orchestration as applicable; sync continues through `SyncApplicationService`, `syncSource`, `SyncCoordinator`, provider context, and the Adapter. A late success after the request is aborted is discarded at the client boundary. Cancellation of one request never uses the daemon-wide shutdown controller.
+For an in-flight command, SIGINT aborts the CLI request controller. The socket fetch signal becomes oRPC's native server handler signal, and the router forwards that exact `AbortSignal` in the application-only `RpcRequestContext` to each corresponding application method. The daemon passes it to Realm, Source, sync, search, retrieval, or thread orchestration as applicable; sync continues through `SyncApplicationService`, `syncSource`, `SyncCoordinator`, provider context, and the Adapter. A late success after the request is aborted is discarded at the client boundary. Cancellation of one request never uses the daemon-wide shutdown controller.
 
 The daemon tracks active business requests as request-id/controller entries only to support shutdown and observability. Normal request cancellation removes its own entry after core cleanup. Shutdown switches admission to `stopping`, aborts the remaining request controllers, and awaits settlement for the observation deadline. If Bun/oRPC disconnect propagation fails the compiled cancellation gate, the same facade gains an explicit operation id plus typed cancel procedure; cancellation must not be claimed until that gate proves core observed it.
 
@@ -481,7 +483,9 @@ Compiled multi-process tests use isolated config/data/state/cache roots, readine
 - shutdown rejects new work and cancels active work; a non-cooperative request returns timeout while the daemon retains SQLite and both leases, and only eventual settlement or explicit force-termination permits restart/backup;
 - wire/public output contains no transport envelope, raw socket error, internal path, stack, provider body, or secret canary.
 
-Architecture and package tests enforce the dependency graph, forbid Bun transport APIs in `@ctxindex/rpc` and core, forbid storage/provider/formatting imports in the router, forbid database opening in daemon-routed CLI modules, and keep the CLI as the sole agent-facing surface. Final verification includes focused package typechecks/tests, the compiled Extension gate under Bun 1.3.14, `bun run ci`, and `bunx openspec validate --all --strict`.
+Architecture and package tests enforce the dependency graph, direct `@orpc/contract` ownership, pure-contract separation from handlers, `implement(contract)` composition, no `RpcResult` wire outputs, no handwritten application signature list/error alias map/failure-kind switch, forbid Bun transport APIs in `@ctxindex/rpc` and core, forbid storage/provider/formatting imports in the router, forbid database opening in daemon-routed CLI modules, and keep the CLI as the sole agent-facing surface. Focused tests cover registry schema/code correlation, exact recursive application-path inference, declared error inference/round-trip for every failure variant, throwing-accessor and generic bounded internal replacement, native signal identity, and client declared-error versus unknown-transport mapping. Final verification includes focused package typechecks/tests, the compiled Extension gate under Bun 1.3.14, `bun run ci`, and `bunx openspec validate --all --strict`.
+
+Request batching for a possible authenticated remote daemon and OpenAPI/external SDK generation for a future public protocol are separate follow-up changes. The pure contract makes them technically possible, but this prototype enables neither and establishes no remote authentication, batching/idempotency, public compatibility, exposure, or SDK release contract.
 
 ## Evaluation and Human Checkpoint
 

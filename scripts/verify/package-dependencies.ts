@@ -53,7 +53,7 @@ const rpcForbiddenStoragePackages = new Set([
   'drizzle-orm',
   'sqlite3',
 ])
-const rpcAllowedOrpcEntryPoints = new Set(['@orpc/server'])
+const rpcAllowedOrpcEntryPoints = new Set(['@orpc/contract', '@orpc/server'])
 const localDaemonAllowedBuiltinRoots = new Set(['crypto', 'fs', 'os', 'path'])
 const providerHosts = [
   'accounts.google.com',

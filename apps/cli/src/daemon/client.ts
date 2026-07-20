@@ -8,30 +8,31 @@ import {
   resolveEndpoint,
   resolveRuntimeIdentity,
 } from '@ctxindex/local-daemon'
-import type {
-  DaemonClient,
-  RpcFailure,
-  RpcHealthResult,
-  RpcRealmAddInput,
-  RpcRealmAddResult,
-  RpcRealmListResult,
-  RpcResourceGetResult,
-  RpcResult,
-  RpcSearchInput,
-  RpcSearchResult,
-  RpcShutdownAccepted,
-  RpcSourceAddInput,
-  RpcSourceAddResult,
-  RpcSourceDefinitionsResult,
-  RpcSourceListInput,
-  RpcSourceListResult,
-  RpcSourceRemoveResult,
-  RpcStatusResult,
-  RpcSyncInput,
-  RpcSyncResult,
-  RpcThreadGetResult,
+import {
+  type DaemonClient,
+  type RpcFailure,
+  type RpcHealthResult,
+  type RpcRealmAddInput,
+  type RpcRealmAddResult,
+  type RpcRealmListResult,
+  type RpcResourceGetResult,
+  type RpcSearchInput,
+  type RpcSearchResult,
+  type RpcShutdownAccepted,
+  type RpcSourceAddInput,
+  type RpcSourceAddResult,
+  type RpcSourceDefinitionsResult,
+  type RpcSourceListInput,
+  type RpcSourceListResult,
+  type RpcSourceRemoveResult,
+  type RpcStatusResult,
+  type RpcSyncInput,
+  type RpcSyncResult,
+  type RpcThreadGetResult,
+  rpcFailureRegistry,
+  rpcFailureSchema,
 } from '@ctxindex/rpc'
-import { createORPCClient } from '@orpc/client'
+import { createORPCClient, ORPCError } from '@orpc/client'
 import { RPCLink } from '@orpc/client/fetch'
 
 export const CLI_DAEMON_PROTOCOL = {
@@ -194,22 +195,13 @@ function requestOptions(signal: AbortSignal | undefined) {
 
 async function invoke<T>(
   signal: AbortSignal | undefined,
-  call: (client: DaemonClient) => Promise<RpcResult<T>>,
+  call: (client: DaemonClient) => Promise<T>,
   selection: DaemonSelection,
 ): Promise<T> {
+  let result: T
   try {
-    const result = await call(createClient(selection))
-    if (signal?.aborted) {
-      throw new DaemonCliError({
-        kind: 'cancelled',
-        code: 'cancelled',
-        message: 'The daemon request was cancelled.',
-      })
-    }
-    if (!result.ok) throw new DaemonCliError(result.error)
-    return result.value
+    result = await call(createClient(selection))
   } catch (error) {
-    if (error instanceof DaemonCliError) throw error
     if (signal?.aborted) {
       throw new DaemonCliError({
         kind: 'cancelled',
@@ -217,7 +209,34 @@ async function invoke<T>(
         message: 'The daemon request was cancelled.',
       })
     }
+    const failure = daemonFailureFromDeclaredError(error)
+    if (failure) throw new DaemonCliError(failure)
     throw unavailable()
+  }
+  if (signal?.aborted) {
+    throw new DaemonCliError({
+      kind: 'cancelled',
+      code: 'cancelled',
+      message: 'The daemon request was cancelled.',
+    })
+  }
+  return result
+}
+
+export function daemonFailureFromDeclaredError(
+  error: unknown,
+): RpcFailure | null {
+  try {
+    if (!(error instanceof ORPCError) || !error.defined) return null
+    const failure = rpcFailureSchema.safeParse(error.data)
+    if (!failure.success) return null
+    const definition = rpcFailureRegistry[failure.data.kind]
+    return error.message === definition.message &&
+      error.code === failure.data.kind
+      ? failure.data
+      : null
+  } catch {
+    return null
   }
 }
 

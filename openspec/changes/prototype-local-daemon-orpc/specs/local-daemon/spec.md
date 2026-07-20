@@ -63,7 +63,7 @@ The daemon SHALL provide a side-effect-free health operation that reports readin
 - **THEN** the request fails as daemon unavailable without composing a client-owned runtime
 
 ### Requirement: Protocol and runtime compatibility precede business execution
-Every client request MUST establish exact protocol and canonical runtime-identity compatibility before invoking a business procedure. Compatibility middleware MUST use immutable router expectations and MUST NOT call an application method as part of the check. An incompatible client MUST receive a structured safe failure and the daemon MUST NOT execute any application method. The prototype creates no compatibility obligation between different protocol versions.
+Every client request MUST establish exact protocol and canonical runtime-identity compatibility before invoking a business procedure. Compatibility middleware MUST use immutable router expectations and MUST NOT call an application method as part of the check. An incompatible client MUST receive a declared typed safe error and the daemon MUST NOT execute any application method. The prototype creates no compatibility obligation between different protocol versions.
 
 #### Scenario: Compatible protocol admits a request
 - **WHEN** a client and ready daemon present compatible protocol identities and versions
@@ -79,6 +79,8 @@ Every client request MUST establish exact protocol and canonical runtime-identit
 
 ### Requirement: Request-scoped cancellation
 Cancellation of an in-flight daemon request MUST propagate to that request's operation through the existing cancellation contract. Cancelling one request MUST NOT terminate the daemon or cancel unrelated requests. Cancellation MUST preserve existing transactional storage and sync bookkeeping guarantees, and a late result from a cancelled request MUST NOT be reported as successful to the cancelling client.
+
+The router MUST obtain cancellation from the oRPC procedure handler's native signal rather than from serialized or validated transport context. It MUST forward that exact signal through `RpcRequestContext`; a signal-less in-process invocation MUST receive a safe non-aborted signal.
 
 #### Scenario: Client cancels one in-flight request
 - **WHEN** a client cancels an in-flight daemon request before it completes

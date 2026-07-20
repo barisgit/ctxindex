@@ -396,6 +396,36 @@ export class DaemonApplication implements DaemonRpcApplication {
   #requestSequence = 0
   #stoppingNotified = false
 
+  readonly system: DaemonRpcApplication['system'] = {
+    health: (input, context) => this.health(input, context),
+    shutdown: (input, context) => this.shutdown(input, context),
+  }
+  readonly realm: DaemonRpcApplication['realm'] = {
+    add: (input, context) => this.realmAdd(input, context),
+    list: (input, context) => this.realmList(input, context),
+  }
+  readonly source: DaemonRpcApplication['source'] = {
+    definitions: (input, context) => this.sourceDefinitions(input, context),
+    add: (input, context) => this.sourceAdd(input, context),
+    list: (input, context) => this.sourceList(input, context),
+    remove: (input, context) => this.sourceRemove(input, context),
+  }
+  readonly sync: DaemonRpcApplication['sync'] = {
+    run: (input, context) => this.runSync(input, context),
+  }
+  readonly status: DaemonRpcApplication['status'] = {
+    get: (input, context) => this.getStatus(input, context),
+  }
+  readonly search: DaemonRpcApplication['search'] = {
+    query: (input, context) => this.querySearch(input, context),
+  }
+  readonly resource: DaemonRpcApplication['resource'] = {
+    get: (input, context) => this.getResource(input, context),
+  }
+  readonly thread: DaemonRpcApplication['thread'] = {
+    get: (input, context) => this.getThread(input, context),
+  }
+
   constructor(options: DaemonApplicationOptions) {
     this.#options = options
   }
@@ -455,7 +485,7 @@ export class DaemonApplication implements DaemonRpcApplication {
     }
   }
 
-  sync(
+  runSync(
     input: RpcSyncInput,
     context: RpcRequestContext,
   ): Promise<RpcResult<RpcSyncResult>> {
@@ -604,7 +634,7 @@ export class DaemonApplication implements DaemonRpcApplication {
     })
   }
 
-  search(
+  querySearch(
     input: RpcSearchInput,
     context: RpcRequestContext,
   ): Promise<RpcResult<RpcSearchResult>> {
@@ -651,7 +681,7 @@ export class DaemonApplication implements DaemonRpcApplication {
     })
   }
 
-  resourceGet(
+  getResource(
     input: RpcResourceGetInput,
     context: RpcRequestContext,
   ): Promise<RpcResult<RpcResourceGetResult>> {
@@ -674,7 +704,7 @@ export class DaemonApplication implements DaemonRpcApplication {
     })
   }
 
-  threadGet(
+  getThread(
     input: RpcThreadGetInput,
     context: RpcRequestContext,
   ): Promise<RpcResult<RpcThreadGetResult>> {
@@ -693,7 +723,7 @@ export class DaemonApplication implements DaemonRpcApplication {
     })
   }
 
-  status(
+  getStatus(
     input: RpcStatusInput,
     context: RpcRequestContext,
   ): Promise<RpcResult<RpcStatusResult>> {

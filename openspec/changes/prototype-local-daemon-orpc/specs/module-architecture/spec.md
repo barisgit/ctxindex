@@ -7,7 +7,9 @@ The CLI is the sole agent-facing integration surface. CLI command entrypoints MU
 
 The local daemon MUST be the application composition root for daemon-routed behavior. It MUST compose the provider-neutral runtime, storage, loaded Extension registry, and all daemon use-case orchestration, while provider-neutral business rules remain owned by core services and Source Adapters.
 
-The separate private `@ctxindex/rpc` package MUST contain only exact bounded wire schemas/schema-derived types, oRPC procedure composition, the narrow injected `DaemonRpcApplication` interface, and compatibility/cross-cutting middleware. Each handler MUST validate input, delegate exactly once, validate/serialize the returned result, and MUST NOT implement use-case/business logic, inspect core error classes, select/iterate Sources, retry, access storage/providers/filesystem lifecycle, load Extensions, parse/format CLI data, or map exits. Compatibility expectations MUST be injected into router construction and middleware MUST NOT call an application method as hidden delegation. Bun HTTP/Unix-socket adapters MUST remain outside the package.
+The separate private `@ctxindex/rpc` package MUST define a pure oRPC contract with `@orpc/contract` that owns exact bounded input, plain success output, and declared error schemas plus schema-derived types. Its router factory MUST use `implement(contract)` and contain only the narrow injected `DaemonRpcApplication` interface, exactly-once delegation, result-to-declared-error adaptation, and compatibility/cross-cutting middleware. Each handler MUST validate input, delegate exactly once, validate/serialize the plain success or declared error data, and MUST NOT implement use-case/business logic, inspect core error classes, select/iterate Sources, retry, access storage/providers/filesystem lifecycle, load Extensions, parse/format CLI data, or map exits. Compatibility expectations MUST be injected into router construction and middleware MUST NOT call an application method as hidden delegation. Bun HTTP/Unix-socket adapters MUST remain outside the package.
+
+The injected application boundary MUST be recursively derived from the contract's inferred input/output tree and MUST NOT repeat a handwritten signature for every procedure. Failure declarations and validation MUST derive from one authoritative registry and MUST NOT maintain a second error alias map or handwritten failure-kind switch.
 
 The separate private `@ctxindex/local-daemon` infrastructure package MAY be imported by daemon and CLI and MUST own only canonical config/data/state/cache and SQLite-path resolution, safe identity digests, endpoint discovery metadata, and retained exclusive/shared file-lease primitives. It MUST NOT contain RPC procedures/DTOs, oRPC/Bun HTTP adapters, database composition, application orchestration, core/provider/Extension behavior, CLI formatting, or exit mapping. The CLI MUST NOT import the daemon application.
 
@@ -26,7 +28,15 @@ The OAuth host flow MAY bind a loopback-only socket and explicitly open a browse
 
 #### Scenario: RPC procedure delegates without business logic
 - **WHEN** an RPC procedure receives a valid typed request
-- **THEN** it delegates exactly once to `DaemonRpcApplication`, validates/serializes the result, and returns it without applying use-case/domain policy, formatting CLI output, or selecting an exit code
+- **THEN** its `implement(contract)` handler delegates exactly once to `DaemonRpcApplication`, validates/serializes a plain success or throws a declared typed error, and returns without applying use-case/domain policy, formatting CLI output, or selecting an exit code
+
+#### Scenario: Pure contract owns the wire shape
+- **WHEN** a client or future generator consumes the daemon contract
+- **THEN** it can infer every procedure path, input, plain success output, and declared error without importing handlers or daemon application code
+
+#### Scenario: Application shape follows the contract
+- **WHEN** a procedure is added, removed, or changes input/output in the pure contract
+- **THEN** the recursive injected application type changes with it without updating another procedure signature declaration
 
 #### Scenario: Compatibility middleware does not hide a second delegation
 - **WHEN** compatibility middleware checks a request

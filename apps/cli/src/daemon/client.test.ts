@@ -1,13 +1,127 @@
-import { expect, test } from 'bun:test'
+import { expect, spyOn, test } from 'bun:test'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { resolveRuntimeIdentity } from '@ctxindex/local-daemon'
+import { rpcFailureRegistry } from '@ctxindex/rpc'
+import { ORPCError } from '@orpc/client'
 import {
   type DaemonSelection,
+  daemonFailureFromDeclaredError,
   daemonHealth,
   selectDaemonForRuntime,
 } from './client'
+
+const rpcErrorMessage = rpcFailureRegistry.ctxindex.message
+
+test('maps only validated declared oRPC errors to bounded daemon failures', () => {
+  const failure = {
+    kind: 'cancelled' as const,
+    code: 'cancelled' as const,
+    message: 'The daemon request was cancelled.',
+  }
+  expect(
+    daemonFailureFromDeclaredError(
+      new ORPCError('cancelled', {
+        defined: true,
+        message: rpcErrorMessage,
+        data: failure,
+      }),
+    ),
+  ).toEqual(failure)
+  expect(
+    daemonFailureFromDeclaredError(
+      new ORPCError('wrong_code', {
+        defined: true,
+        message: rpcErrorMessage,
+        data: failure,
+      }),
+    ),
+  ).toBeNull()
+  expect(
+    daemonFailureFromDeclaredError(new Error('raw socket path')),
+  ).toBeNull()
+  expect(
+    daemonFailureFromDeclaredError(
+      new ORPCError('cancelled', {
+        defined: true,
+        message: rpcErrorMessage,
+        data: { ...failure, stack: 'secret-canary' },
+      }),
+    ),
+  ).toBeNull()
+
+  const canary = new Error('secret-canary /private/db.sqlite')
+  const throwingPrototype = new Proxy(
+    new ORPCError('cancelled', {
+      defined: true,
+      message: rpcErrorMessage,
+      data: failure,
+    }),
+    {
+      getPrototypeOf: () => {
+        throw canary
+      },
+    },
+  )
+  const throwingProperty = new Proxy(
+    new ORPCError('cancelled', {
+      defined: true,
+      message: rpcErrorMessage,
+      data: failure,
+    }),
+    {
+      get(target, property, receiver) {
+        if (property === 'defined') throw canary
+        return Reflect.get(target, property, receiver)
+      },
+    },
+  )
+  expect(() => daemonFailureFromDeclaredError(throwingPrototype)).not.toThrow()
+  expect(daemonFailureFromDeclaredError(throwingPrototype)).toBeNull()
+  expect(() => daemonFailureFromDeclaredError(throwingProperty)).not.toThrow()
+  expect(daemonFailureFromDeclaredError(throwingProperty)).toBeNull()
+})
+
+test('hazardous transport errors become daemon_unavailable without leaking raw data', async () => {
+  const setup = await fixture()
+  const canary = new Error('secret-canary /private/db.sqlite')
+  const hazardous = new Proxy(
+    new ORPCError('cancelled', {
+      defined: true,
+      message: rpcErrorMessage,
+      data: {
+        kind: 'cancelled',
+        code: 'cancelled',
+        message: 'The request was cancelled.',
+      },
+    }),
+    {
+      get(target, property, receiver) {
+        if (property === 'defined') throw canary
+        return Reflect.get(target, property, receiver)
+      },
+    },
+  )
+  const fetch = spyOn(globalThis, 'fetch').mockRejectedValue(hazardous)
+  try {
+    const selection = selectDaemonForRuntime(setup.runtime, {
+      testEndpoint: '/tmp/ctxd-hostile-error.sock',
+    }) as DaemonSelection
+    const error = await daemonHealth(selection).catch((value) => value)
+    expect(error).toMatchObject({ code: 'daemon_unavailable' })
+    expect(String(error)).not.toMatch(/secret-canary|private|db\.sqlite/)
+
+    const controller = new AbortController()
+    controller.abort()
+    await expect(
+      daemonHealth(selection, controller.signal),
+    ).rejects.toMatchObject({ code: 'cancelled' })
+  } finally {
+    fetch.mockRestore()
+    await setup.close()
+  }
+})
 
 async function fixture() {
   const sandbox = await mkdtemp(join(tmpdir(), 'ctxindex-cli-daemon-'))
