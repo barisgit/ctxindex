@@ -253,12 +253,12 @@ describe('Gmail Draft Action integration', () => {
     expect({ tokenCalls, fetchCalls }).toEqual({ tokenCalls: 2, fetchCalls: 2 })
   })
 
-  test('materializes an addressed provider Draft that was absent locally', async () => {
+  test('rejects an addressed provider Draft with unknown attachment provenance before I/O', async () => {
     const db = await freshDb()
     let fetchCalls = 0
     const ref = `ctx://${sourceId}/draft/provider-only`
 
-    const result = await runAction({
+    const error = await runAction({
       db,
       registry,
       authService: authService(() => {}),
@@ -279,11 +279,12 @@ describe('Gmail Draft Action integration', () => {
           message: { id: 'message-id-2' },
         })
       }) as unknown as typeof fetch,
-    })
+    }).catch((caught: unknown) => caught)
 
-    expect(result.resource.ref).toBe(ref)
-    expect(fetchCalls).toBe(1)
-    expect(resourceCount(db)).toBe(1)
+    expect(error).toMatchObject({ code: 'invalid_action_input' })
+    expect(String(error)).toContain('is not available locally')
+    expect(fetchCalls).toBe(0)
+    expect(resourceCount(db)).toBe(0)
   })
 
   test('foreign-source Draft Ref performs no provider fetch or Resource write', async () => {

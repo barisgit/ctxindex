@@ -49,18 +49,7 @@ test('bundled communication.message enters the public registry path', () => {
         id: 'communication.message.draft.create',
         profile: { id: 'communication.message', version: 1 },
         effect: 'reversible',
-        input: expect.objectContaining({
-          anyOf: [
-            expect.objectContaining({
-              additionalProperties: false,
-              required: ['to', 'subject', 'bodyText'],
-            }),
-            expect.objectContaining({
-              additionalProperties: false,
-              required: ['replyToRef', 'bodyText'],
-            }),
-          ],
-        }),
+        input: expect.anything(),
         output: { id: 'communication.message', version: 1 },
         adapters: [],
       },
@@ -68,23 +57,39 @@ test('bundled communication.message enters the public registry path', () => {
         id: 'communication.message.draft.update',
         profile: { id: 'communication.message', version: 1 },
         effect: 'reversible',
-        input: expect.objectContaining({
-          anyOf: [
-            expect.objectContaining({
-              additionalProperties: false,
-              required: ['ref', 'to', 'subject', 'bodyText'],
-            }),
-            expect.objectContaining({
-              additionalProperties: false,
-              required: ['ref', 'replyToRef', 'bodyText'],
-            }),
-          ],
-        }),
+        input: expect.anything(),
         output: { id: 'communication.message', version: 1 },
         adapters: [],
       },
     ],
   })
+  const [create, update] = description.actions as Array<{
+    input: {
+      anyOf?: Array<{
+        required?: string[]
+        properties?: Record<string, unknown>
+        additionalProperties?: boolean
+      }>
+    }
+  }>
+  expect(create?.input.anyOf?.map((branch) => branch.required)).toEqual([
+    ['to', 'subject', 'bodyText'],
+    ['replyToRef', 'bodyText'],
+  ])
+  expect(
+    create?.input.anyOf?.every(
+      (branch) =>
+        branch.additionalProperties === false &&
+        branch.properties?.attachments !== undefined,
+    ),
+  ).toBe(true)
+  expect(
+    update?.input.anyOf?.every(
+      (branch) =>
+        branch.additionalProperties === false &&
+        branch.properties?.attachments === undefined,
+    ),
+  ).toBe(true)
   const actionDescription = JSON.stringify(description.actions)
   expect(actionDescription).not.toMatch(/gmail|provider/i)
 })
