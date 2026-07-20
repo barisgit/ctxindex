@@ -57,6 +57,8 @@ export async function loadCliDefinitions(): Promise<CliDefinitions>;
 
 ```
 
+`LoadExtensionsResult` includes core's passive Extension documentation projection, but current CLI command registration and bundled skills do not render, list, or inline it. Bundled skills remain release-versioned workflow guidance; registry descriptions remain authoritative for interface facts. A CLI or agent presentation surface for Extension documentation requires a separately accepted consumer contract.
+
 ### @ctxindex/cli — composition boundary
 
 ```ts

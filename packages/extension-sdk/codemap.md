@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-Publishes the stateless authoring/runtime contract for ctxindex Extension graphs and passive documentation sidecars: Providers, OAuth Apps, Profiles, Adapters, provider operations, and their host callbacks.
+Defines the private workspace authoring/runtime contract for ctxindex Extension graphs and passive documentation sidecars: Providers, OAuth Apps, Profiles, Adapters, provider operations, and their host callbacks.
 
 ## Design / patterns
 

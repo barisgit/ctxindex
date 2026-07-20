@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-Publishes ctxindex's bundled provider-neutral Profile vocabularies: `calendar.event@1`, `communication.message@1`, and `file@1`, with their schemas, draft input unions, Ref/text/reply helpers, and public types.
+Defines ctxindex's bundled provider-neutral Profile vocabularies in the private `@ctxindex/profiles` workspace package: `calendar.event@1`, `communication.message@1`, and `file@1`, with their schemas, draft input unions, Ref/text/reply helpers, and public types.
 
 ## Design / patterns
 

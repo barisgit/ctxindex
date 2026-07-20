@@ -41,7 +41,7 @@ Providers own direct `oauth2` or `none` authentication, identity discovery, OAut
 
 OAuth Apps bind one exact imported OAuth2 Provider. Accounts select an App explicitly. Grants are private and own the selected App configuration snapshot and token references. Public inventory and configuration do not expose Grant selectors or state.
 
-`@ctxindex/profiles` remains an ordinary library. Definition values contain no embedded documentation contract; future human and agent documentation belongs in separately owned sidecars.
+`@ctxindex/profiles` remains an ordinary private workspace library. Provider, Profile, Adapter, and OAuth App values contain no embedded documentation contract. An Extension root may carry one pure directory or virtual-tree declaration; core resolves and validates it, strips it from runtime definition identity, and exposes authored and generated entries through a separate passive list/get projection.
 
 ## Verification
 
