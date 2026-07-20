@@ -65,6 +65,10 @@ describe('direct Extension target parsing', () => {
     ['git', 'ssh://user@example.com/repo.git'],
     ['git', 'git+ssh://git:secret@example.com/repo.git'],
     ['git', 'user@example.com:repo.git'],
+    ['git', 'git+ssh://g%69t@example.com/repo.git'],
+    ['git', 'git+ssh://git:%73ecret@example.com/repo.git'],
+    ['git', 'g%69t@example.com:repo.git'],
+    ['git', 'git%3Asecret@example.com:repo.git'],
   ] as const)('rejects embedded credentials for %s targets', (kind, target) => {
     expect(() =>
       parseDirectExtensionTarget(kind, target, {

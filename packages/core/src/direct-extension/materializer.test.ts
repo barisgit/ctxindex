@@ -173,8 +173,10 @@ test('Git materialization records the selected package tuple commit', async () =
   const commit = 'b'.repeat(40)
   const result = await materializeGit(`{
     "lockfileVersion": 1,
+    // Bun lockfiles permit line comments.
     "packages": {
       "unrelated": ["unrelated@git+https://example.com/unrelated.git", {}, "${unrelatedCommit}"],
+      /* The selected package may follow a block comment. */
       "fixture-git-extension": ["fixture-git-extension@git+https://example.com/repository.git", {}, "${commit}"],
     },
   }`)
@@ -200,6 +202,30 @@ test('Git materialization ignores unrelated commits when the selected tuple has 
       },
     }`),
   ).rejects.toMatchObject({ code: 'extension_acquisition_failed' })
+})
+
+test.each([
+  null,
+  undefined,
+])('wraps a nullish package-runner rejection as an acquisition failure', async (rejection) => {
+  const root = await mkdtemp(join(tmpdir(), 'ctxindex-runner-rejection-'))
+  roots.push(root)
+  const materializer = new BunPackageMaterializer({
+    stagingParent: root,
+    run: async () => {
+      throw rejection
+    },
+  })
+
+  await expect(
+    materializer.materialize({
+      kind: 'npm',
+      requestedTarget: '@example/mail@^2',
+    }),
+  ).rejects.toMatchObject({
+    code: 'extension_acquisition_failed',
+    message: 'Extension package acquisition failed',
+  })
 })
 
 test('package process bounds output, timeout, cancellation, and temporary state', async () => {

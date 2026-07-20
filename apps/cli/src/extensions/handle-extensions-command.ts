@@ -288,20 +288,21 @@ export async function handleExtensionsCommand(
     )
     return 0
   } catch (error) {
-    const code = (error as { code?: unknown }).code
-    if (error instanceof PrototypeUnsupportedError) {
-      console.error(error.message)
-      return mapErrorToExit(error)
+    const caught = error ?? {}
+    const code = (caught as { code?: unknown }).code
+    if (caught instanceof PrototypeUnsupportedError) {
+      console.error(caught.message)
+      return mapErrorToExit(caught)
     }
     if (
-      error instanceof Error &&
+      caught instanceof Error &&
       typeof code === 'string' &&
       code.startsWith('extension_')
     ) {
-      console.error(`${code}: ${error.message}`)
+      console.error(`${code}: ${caught.message}`)
     } else {
       const diagnostic = safeExtensionDiagnostic(
-        error,
+        caught,
         'Extension command failed',
       )
       console.error(
@@ -310,6 +311,6 @@ export async function handleExtensionsCommand(
           : diagnostic,
       )
     }
-    return mapErrorToExit(error)
+    return mapErrorToExit(caught)
   }
 }

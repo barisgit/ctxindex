@@ -91,6 +91,53 @@ test('collapses arbitrary injected Catalog service failures', async () => {
   }
 })
 
+test('preserves typed Extension diagnostics and stable exit mapping', async () => {
+  const error = spyOn(console, 'error').mockImplementation(() => {})
+  const catalogs = {
+    list: async () => {
+      throw Object.assign(new Error('candidate conflicts with active state'), {
+        code: 'extension_conflict',
+      })
+    },
+  } as unknown as CatalogService
+  try {
+    const exitCode = await handleExtensionsCommand(
+      ['catalog', 'list', '--no-refresh'],
+      catalogs,
+    )
+
+    expect(exitCode).toBe(50)
+    expect(error).toHaveBeenCalledWith(
+      'extension_conflict: candidate conflicts with active state',
+    )
+  } finally {
+    error.mockRestore()
+  }
+})
+
+test.each([
+  null,
+  undefined,
+])('collapses a nullish rejected Catalog value: %p', async (rejected) => {
+  const error = spyOn(console, 'error').mockImplementation(() => {})
+  const catalogs = {
+    list: async () => {
+      throw rejected
+    },
+  } as unknown as CatalogService
+  try {
+    const exitCode = await handleExtensionsCommand(
+      ['catalog', 'list', '--no-refresh'],
+      catalogs,
+    )
+
+    expect(exitCode).toBe(50)
+    expect(error).toHaveBeenCalledWith('Extension command failed')
+  } finally {
+    error.mockRestore()
+  }
+})
+
 test('direct install wires SIGINT cancellation into the Core lifecycle call', async () => {
   let received: AbortSignal | undefined
   let cancel: (() => void) | undefined

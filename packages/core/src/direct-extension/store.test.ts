@@ -124,6 +124,10 @@ describe('direct Extension records', () => {
     'git+ssh://git:secret@example.com/repository.git',
     'git+ssh://user@example.com/repository.git',
     'user@example.com:repository.git',
+    'git+ssh://g%69t@example.com/repository.git',
+    'git+ssh://git:%73ecret@example.com/repository.git',
+    'g%69t@example.com:repository.git',
+    'git%3Asecret@example.com:repository.git',
   ])('rejects credentialed Git SSH target %s', (requestedTarget) => {
     expect(() =>
       directExtensionDocumentSchema.parse({

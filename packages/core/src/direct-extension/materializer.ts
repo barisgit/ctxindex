@@ -191,31 +191,7 @@ function packageLockEntry(
 ): readonly unknown[] | undefined {
   let lock: unknown
   try {
-    let normalized = ''
-    let inString = false
-    let escaped = false
-    for (let index = 0; index < lockText.length; index++) {
-      const character = lockText[index] ?? ''
-      if (inString) {
-        normalized += character
-        if (escaped) escaped = false
-        else if (character === '\\') escaped = true
-        else if (character === '"') inString = false
-        continue
-      }
-      if (character === '"') {
-        inString = true
-        normalized += character
-        continue
-      }
-      if (character === ',') {
-        let next = index + 1
-        while (/\s/.test(lockText[next] ?? '')) next++
-        if (lockText[next] === '}' || lockText[next] === ']') continue
-      }
-      normalized += character
-    }
-    lock = JSON.parse(normalized)
+    lock = Bun.JSONC.parse(lockText)
   } catch {
     return undefined
   }
@@ -369,7 +345,14 @@ export class BunPackageMaterializer implements PackageMaterializer {
       }
     } catch (cause) {
       await rm(stagingRoot, { recursive: true, force: true })
-      if ((cause as { code?: string }).code !== undefined) throw cause
+      if (
+        cause !== null &&
+        typeof cause === 'object' &&
+        'code' in cause &&
+        cause.code !== undefined
+      ) {
+        throw cause
+      }
       throw acquisitionFailure('Extension package acquisition failed', cause)
     }
   }
