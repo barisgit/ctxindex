@@ -89,16 +89,16 @@ describe('no-prompts contract', () => {
     }
   })
 
-  test('account add: missing OAuth App exits non-zero without prompting', async () => {
+  test('account add: unavailable explicit OAuth App exits with safe guidance without prompting', async () => {
     const { env, cleanup } = await mkSandbox()
     try {
       const { exitCode, stderr } = await spawnCli(
-        ['account', 'add', 'google'],
+        ['account', 'add', 'google', '--app', 'missing'],
         env,
         'null',
       )
-      expect(exitCode).not.toBe(0)
-      expect(stderr).toContain('--app is required')
+      expect(exitCode).toBe(2)
+      expect(stderr).toContain('Available labels: ctxindex')
     } finally {
       await cleanup()
     }

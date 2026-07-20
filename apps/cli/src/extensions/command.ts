@@ -84,10 +84,15 @@ export const extensionsCommand = defineCommand({
       },
     }),
     install: defineCommand({
-      meta: { name: 'install', description: 'Install a Catalog Extension.' },
+      meta: {
+        name: 'install',
+        description:
+          'Install a Catalog Extension, or trust and install one explicit npm, Git, or local package.',
+      },
       args: {
-        catalog: { type: 'positional', required: true },
-        extension: { type: 'positional', required: true },
+        source: { type: 'positional', required: true },
+        target: { type: 'positional', required: true },
+        extension: { type: 'string', required: false },
         trust: trustArg,
         noRefresh: noRefreshArg,
         json: jsonArg,
@@ -95,10 +100,28 @@ export const extensionsCommand = defineCommand({
       run: ({ rawArgs }) =>
         runWithExit(() => handleExtensionsCommand(['install', ...rawArgs])),
     }),
+    update: defineCommand({
+      meta: {
+        name: 'update',
+        description:
+          'Explicitly reacquire and execute a directly installed Extension target.',
+      },
+      args: {
+        extension: { type: 'positional', required: true },
+        json: jsonArg,
+      },
+      run: ({ rawArgs }) =>
+        runWithExit(() => handleExtensionsCommand(['update', ...rawArgs])),
+    }),
     uninstall: defineCommand({
       meta: { name: 'uninstall', description: 'Uninstall an Extension.' },
       args: {
         extension: { type: 'positional', required: true },
+        force: {
+          type: 'boolean',
+          description:
+            'Remove direct activation while preserving dependent Sources and data',
+        },
         json: jsonArg,
       },
       run: ({ rawArgs }) =>

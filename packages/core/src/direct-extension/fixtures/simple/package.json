@@ -1,0 +1,10 @@
+{
+  "name": "@ctxindex/direct-extension-fixture",
+  "version": "1.0.0",
+  "type": "module",
+  "ctxindex": {
+    "extensions": [
+      "./entry.ts"
+    ]
+  }
+}

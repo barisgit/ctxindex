@@ -20,9 +20,20 @@ test('parses account add, list, and label removal', () => {
   })
 })
 
+test('parses account add with managed OAuth App selection omitted', () => {
+  expect(parseAccountArgs(['add', 'google'])).toEqual({
+    kind: 'add',
+    provider: 'google',
+  })
+  expect(parseAccountArgs(['add', 'google', '--label', 'work'])).toEqual({
+    kind: 'add',
+    provider: 'google',
+    label: 'work',
+  })
+})
+
 test('rejects removed authorization vocabulary and malformed account commands', () => {
   for (const args of [
-    ['add', 'google'],
     ['add', 'google', '--adapter', 'google.mailbox'],
     ['add', 'google', '--from-env'],
     ['add', 'google', '--client', 'desktop'],

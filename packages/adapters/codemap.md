@@ -6,7 +6,7 @@ Packages ctxindex's built-in integration definitions: source-scoped Extensions, 
 
 ## Design/patterns
 
-- Thin package facade: `package.json` maps the sole export `.` to `src/index.ts`, which re-exports the three built-in Extensions, individual Adapter definitions/config schemas, and reusable Google and Microsoft Provider declarations.
+- Thin package facade: `package.json` maps the sole export `.` to `src/index.ts`, which re-exports the three built-in Extensions, individual Adapter definitions/config schemas, reusable Google and Microsoft Provider declarations, their ordinary public OAuth App leaves, and immutable bundled managed-App policy.
 - Built-in authoring directories under `src/builtin-documentation/` are validated and staged by `scripts/generate-documentation.ts` into `src/generated/documentation.ts`; roots carry those portable virtual trees so compiled relocation needs no source files.
 - Provider I/O is isolated behind SDK operation contracts rather than embedded in core services or Profiles.
 - Detailed implementation maps: `packages/adapters/src/codemap.md` and provider maps under `packages/adapters/src/google-calendar/`, `google-mailbox/`, `local-directory/`, and `microsoft/`.
@@ -14,7 +14,7 @@ Packages ctxindex's built-in integration definitions: source-scoped Extensions, 
 ## Data & control flow
 
 1. The CLI passes the actual `@ctxindex/adapters` module namespace to core's shared Extension-export collector; consumers may also import individual definitions or the convenience `CTXINDEX_BUILTIN_EXTENSIONS` tuple.
-2. The collector selects the exported `ctxindex.google`, `ctxindex.microsoft`, and `ctxindex.local` Extension roots while ignoring unrelated namespace exports, then core validates their embedded documentation and registers their five Adapters. Each Adapter directly references its Provider (when authenticated) and Profile definition before capability-specific dispatch.
+2. The collector selects the exported `ctxindex.google`, `ctxindex.microsoft`, and `ctxindex.local` Extension roots while ignoring unrelated namespace exports, then core validates their embedded documentation and registers five Adapters plus the Google/Microsoft public OAuth App leaves. Host policy names those exact bundled App/Extension identities for managed-default eligibility without changing registry identity or activation.
 3. Adapter code translates Google, Microsoft Graph, or filesystem data into Profile-shaped resources, streamed emissions, Artifacts, warnings, checkpoints, or Action results for core to validate and persist. Microsoft calendar and mailbox operations share the provider-root Graph transport; Draft implementations consume the shared communication Action schemas, derive replies from complete local parent Resources, resolve managed attachments before provider access, preserve attachment sets on update, issue exactly one provider mutation, and return a canonical Draft Resource; no send Action is registered.
 
 ## Integration points
