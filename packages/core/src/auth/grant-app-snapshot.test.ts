@@ -9,7 +9,11 @@ import { createAuthService } from './service'
 
 class MemoryStore implements SecretsStore {
   readonly values = new Map<string, string>()
+  readonly failDeleteRefs = new Set<string>()
+  failAllDeletes = false
   failWriteAt = 0
+  writeBarrier: Promise<void> | null = null
+  onWrite: (() => void) | null = null
   writes = 0
   async getSecret(ref: string) {
     const value = this.values.get(ref)
@@ -19,11 +23,16 @@ class MemoryStore implements SecretsStore {
   async setSecret(scope: string, key: string, value: string) {
     this.writes += 1
     if (this.failWriteAt === this.writes) throw new Error('write failed')
+    this.onWrite?.()
+    if (this.writeBarrier) await this.writeBarrier
     const ref = keychainRef(scope, key)
     this.values.set(ref, value)
     return ref
   }
   async deleteSecret(ref: string) {
+    if (this.failAllDeletes || this.failDeleteRefs.has(ref)) {
+      throw new Error('DELETE-FAILURE-SECRET-CANARY')
+    }
     this.values.delete(ref)
   }
   async listKeys() {
@@ -141,6 +150,69 @@ test('refresh uses the Grant-owned exact App snapshot without current App invent
   await expect(service.refreshAccessToken(grantId)).resolves.toBe('fresh')
 })
 
+test('refresh warns safely when superseded token cleanup remains pending', async () => {
+  const db = await database()
+  const store = new MemoryStore()
+  const warnings: unknown[][] = []
+  const warningLogger = {
+    debug() {},
+    warn(...args: unknown[]) {
+      warnings.push(args)
+    },
+  } as unknown as Logger
+  const service = createAuthService({
+    db,
+    store,
+    logger: warningLogger,
+    registry: registry(),
+    now: () => 1_000,
+  })
+  const { grantId } = await service.addGrant({
+    provider: 'example',
+    account: {
+      externalUserId: 'subject',
+      label: 'Person',
+      verifiedIdentities: [],
+    },
+    scopes: ['openid'],
+    appConfig: { clientId: 'snapshot-client-canary' },
+    refreshToken: 'old-refresh-canary',
+    accessToken: 'old-access-canary',
+    expiresAt: 0,
+  })
+  const prior = await service.getGrantById(grantId)
+  expect(prior).not.toBeNull()
+  for (const ref of [prior?.accessTokenRef, prior?.refreshTokenRef]) {
+    if (ref) store.failDeleteRefs.add(ref)
+  }
+  globalThis.fetch = (async () =>
+    Response.json({
+      access_token: 'replacement-access-canary',
+      refresh_token: 'replacement-refresh-canary',
+      expires_in: 60,
+      scope: 'openid',
+    })) as unknown as typeof fetch
+
+  await expect(service.refreshAccessToken(grantId)).resolves.toBe(
+    'replacement-access-canary',
+  )
+
+  const current = await service.getGrantById(grantId)
+  expect(current?.accessTokenRef).not.toBe(prior?.accessTokenRef)
+  expect(current?.refreshTokenRef).not.toBe(prior?.refreshTokenRef)
+  expect(warnings).toHaveLength(1)
+  expect(warnings[0]?.[0]).toMatchObject({
+    lifecycle: 'refresh',
+    provider: 'example',
+    grantId,
+    cleanupFailures: 2,
+  })
+  const rendered = JSON.stringify(warnings)
+  expect(rendered).not.toMatch(
+    /old-access-canary|old-refresh-canary|DELETE-FAILURE-SECRET-CANARY|keychain:/,
+  )
+})
+
 test('reauthorization keeps stable identity and replaces the App snapshot', async () => {
   const db = await database()
   const store = new MemoryStore()
@@ -183,6 +255,254 @@ test('reauthorization keeps stable identity and replaces the App snapshot', asyn
   expect(store.values.has(prior?.refreshTokenRef ?? '')).toBe(false)
 })
 
+test('concurrent reauthorization leaves only the winning Grant refs', async () => {
+  const db = await database()
+  const store = new MemoryStore()
+  const service = createAuthService({
+    db,
+    store,
+    logger,
+    registry: registry(),
+    now: () => 1_000,
+  })
+  const account = {
+    externalUserId: 'subject',
+    label: 'Person',
+    verifiedIdentities: [],
+  }
+  const first = await service.addGrant({
+    provider: 'example',
+    account,
+    scopes: ['openid'],
+    appConfig: { clientId: 'initial' },
+    refreshToken: 'initial-refresh',
+  })
+  let signalWrite = () => {}
+  const writeStarted = new Promise<void>((resolve) => {
+    signalWrite = resolve
+  })
+  let releaseWrite = () => {}
+  store.writeBarrier = new Promise<void>((resolve) => {
+    releaseWrite = resolve
+  })
+  store.onWrite = signalWrite
+  const concurrentA = service.addGrant({
+    provider: 'example',
+    account,
+    scopes: ['openid'],
+    appConfig: { clientId: 'concurrent-a' },
+    refreshToken: 'refresh-a',
+  })
+  await writeStarted
+  const concurrentB = service.addGrant({
+    provider: 'example',
+    account,
+    scopes: ['openid'],
+    appConfig: { clientId: 'concurrent-b' },
+    refreshToken: 'refresh-b',
+  })
+  releaseWrite()
+
+  const results = await Promise.all([concurrentA, concurrentB])
+
+  expect(results).toEqual([first, first])
+  const current = await service.getGrantById(first.grantId)
+  expect(current).not.toBeNull()
+  if (!current?.refreshTokenRef) throw new Error('missing current Grant refs')
+  expect(new Set(store.values.keys())).toEqual(
+    new Set([current.appConfigRef, current.refreshTokenRef]),
+  )
+  const pair = [
+    JSON.parse(await store.getSecret(current.appConfigRef)).clientId,
+    await store.getSecret(current.refreshTokenRef),
+  ]
+  expect(pair).toEqual(['concurrent-b', 'refresh-b'])
+})
+
+test('old-label removal cannot delete an Account renamed while queued', async () => {
+  const db = await database()
+  const store = new MemoryStore()
+  const service = createAuthService({
+    db,
+    store,
+    logger,
+    registry: registry(),
+    now: () => 1_000,
+  })
+  const account = {
+    externalUserId: 'subject',
+    label: 'Old label',
+    verifiedIdentities: [],
+  }
+  const first = await service.addGrant({
+    provider: 'example',
+    account,
+    scopes: ['openid'],
+    appConfig: { clientId: 'initial' },
+    refreshToken: 'initial-refresh',
+  })
+  let releaseWrite = () => {}
+  store.writeBarrier = new Promise<void>((resolve) => {
+    releaseWrite = resolve
+  })
+  let signalWrite = () => {}
+  const writeStarted = new Promise<void>((resolve) => {
+    signalWrite = resolve
+  })
+  store.onWrite = signalWrite
+
+  const rename = service.addGrant({
+    provider: 'example',
+    account: { ...account, label: 'New label' },
+    scopes: ['openid'],
+    appConfig: { clientId: 'replacement' },
+    refreshToken: 'replacement-refresh',
+  })
+  await writeStarted
+  const removal = service.removeAccount('Old label')
+  const removalOutcome = removal.then(
+    () => null,
+    (error: unknown) => error,
+  )
+  releaseWrite()
+  await expect(rename).resolves.toEqual(first)
+  expect(await removalOutcome).toMatchObject({
+    code: 'not_found',
+    message: 'account not found: "Old label"',
+  })
+
+  expect(
+    db.prepare('SELECT label FROM accounts WHERE id = ?').get(first.accountId),
+  ).toEqual({ label: 'New label' })
+  expect(db.prepare('SELECT COUNT(*) AS count FROM grants').get()).toEqual({
+    count: 1,
+  })
+})
+
+test('concurrent refresh leaves only current token refs', async () => {
+  const db = await database()
+  const store = new MemoryStore()
+  const service = createAuthService({
+    db,
+    store,
+    logger,
+    registry: registry(),
+    now: () => 1_000,
+  })
+  const { grantId } = await service.addGrant({
+    provider: 'example',
+    account: {
+      externalUserId: 'subject',
+      label: 'Person',
+      verifiedIdentities: [],
+    },
+    scopes: ['openid'],
+    appConfig: { clientId: 'snapshot' },
+    refreshToken: 'initial-refresh',
+    accessToken: 'initial-access',
+    expiresAt: 0,
+  })
+  let signalWrite = () => {}
+  const writeStarted = new Promise<void>((resolve) => {
+    signalWrite = resolve
+  })
+  let releaseWrite = () => {}
+  store.writeBarrier = new Promise<void>((resolve) => {
+    releaseWrite = resolve
+  })
+  store.onWrite = signalWrite
+  let request = 0
+  globalThis.fetch = (async () => {
+    request += 1
+    return Response.json({
+      access_token: `access-${request}`,
+      refresh_token: `refresh-${request}`,
+      expires_in: 60,
+      scope: 'openid',
+    })
+  }) as unknown as typeof fetch
+
+  const firstRefresh = service.refreshAccessToken(grantId)
+  await writeStarted
+  const secondRefresh = service.refreshAccessToken(grantId)
+  releaseWrite()
+  await expect(Promise.all([firstRefresh, secondRefresh])).resolves.toEqual([
+    'access-1',
+    'access-2',
+  ])
+
+  const current = await service.getGrantById(grantId)
+  expect(current).not.toBeNull()
+  if (!current?.accessTokenRef || !current.refreshTokenRef)
+    throw new Error('missing current Grant refs')
+  expect(new Set(store.values.keys())).toEqual(
+    new Set([
+      current.appConfigRef,
+      current.accessTokenRef,
+      current.refreshTokenRef,
+    ]),
+  )
+  expect(await store.getSecret(current.accessTokenRef)).toBe('access-2')
+  expect(await store.getSecret(current.refreshTokenRef)).toBe('refresh-2')
+})
+
+test('reauthorization warns safely when superseded secret cleanup remains pending', async () => {
+  const db = await database()
+  const store = new MemoryStore()
+  const warnings: unknown[][] = []
+  const warningLogger = {
+    debug() {},
+    warn(...args: unknown[]) {
+      warnings.push(args)
+    },
+  } as unknown as Logger
+  const service = createAuthService({
+    db,
+    store,
+    logger: warningLogger,
+    registry: registry(),
+    now: () => 1_000,
+  })
+  const account = {
+    externalUserId: 'subject',
+    label: 'Person',
+    verifiedIdentities: [],
+  }
+  const first = await service.addGrant({
+    provider: 'example',
+    account,
+    scopes: ['openid'],
+    appConfig: { clientId: 'first-config-canary' },
+    refreshToken: 'first-refresh-canary',
+  })
+  const prior = await service.getGrantById(first.grantId)
+  expect(prior).not.toBeNull()
+  for (const ref of [prior?.appConfigRef, prior?.refreshTokenRef]) {
+    if (ref) store.failDeleteRefs.add(ref)
+  }
+
+  await expect(
+    service.addGrant({
+      provider: 'example',
+      account,
+      scopes: ['openid'],
+      appConfig: { clientId: 'replacement-config-canary' },
+      refreshToken: 'replacement-refresh-canary',
+    }),
+  ).resolves.toEqual(first)
+
+  const current = await service.getGrantById(first.grantId)
+  expect(current?.appConfigRef).not.toBe(prior?.appConfigRef)
+  expect(current?.refreshTokenRef).not.toBe(prior?.refreshTokenRef)
+  expect(warnings).toHaveLength(1)
+  const rendered = JSON.stringify(warnings)
+  expect(rendered).toContain('reauthorization')
+  expect(rendered).toContain('cleanupFailures')
+  expect(rendered).not.toMatch(
+    /first-config-canary|first-refresh-canary|DELETE-FAILURE-SECRET-CANARY|keychain:/,
+  )
+})
+
 test('failed Grant persistence cleans the App snapshot and token refs atomically', async () => {
   const db = await database()
   db.exec(
@@ -217,6 +537,53 @@ test('failed Grant persistence cleans the App snapshot and token refs atomically
   expect(db.prepare('SELECT COUNT(*) AS count FROM grants').get()).toEqual({
     count: 0,
   })
+})
+
+test('failed Grant persistence preserves its original error when rollback cleanup also fails', async () => {
+  const db = await database()
+  db.exec(
+    "CREATE TRIGGER reject_grant_cleanup BEFORE INSERT ON grants BEGIN SELECT RAISE(FAIL, 'ORIGINAL-PERSISTENCE-FAILURE'); END",
+  )
+  const store = new MemoryStore()
+  store.failAllDeletes = true
+  const warnings: unknown[][] = []
+  const warningLogger = {
+    debug() {},
+    warn(...args: unknown[]) {
+      warnings.push(args)
+    },
+  } as unknown as Logger
+  const service = createAuthService({
+    db,
+    store,
+    logger: warningLogger,
+    registry: registry(),
+  })
+
+  await expect(
+    service.addGrant({
+      provider: 'example',
+      account: {
+        externalUserId: 'subject',
+        label: 'Person',
+        verifiedIdentities: [],
+      },
+      scopes: ['openid'],
+      appConfig: { clientId: 'rollback-config-canary' },
+      refreshToken: 'rollback-refresh-canary',
+      accessToken: 'rollback-access-canary',
+    }),
+  ).rejects.toThrow('ORIGINAL-PERSISTENCE-FAILURE')
+
+  expect(warnings).toHaveLength(1)
+  expect(warnings[0]?.[0]).toMatchObject({
+    lifecycle: 'authorization-rollback',
+    provider: 'example',
+    cleanupFailures: 3,
+  })
+  expect(JSON.stringify(warnings)).not.toMatch(
+    /rollback-config-canary|rollback-refresh-canary|rollback-access-canary|DELETE-FAILURE-SECRET-CANARY|keychain:/,
+  )
 })
 
 test('Account removal cleans private App and token refs and preserves bound Source as needs_auth', async () => {
@@ -260,4 +627,71 @@ test('Account removal cleans private App and token refs and preserves bound Sour
   expect(db.prepare('SELECT last_status FROM source_sync_state').get()).toEqual(
     { last_status: 'needs_auth' },
   )
+})
+
+test('Account removal cleanup warning contains only the enumerated safe fields', async () => {
+  const db = await database()
+  const store = new MemoryStore()
+  const warnings: unknown[][] = []
+  const warningLogger = {
+    debug() {},
+    warn(...args: unknown[]) {
+      warnings.push(args)
+    },
+  } as unknown as Logger
+  const service = createAuthService({
+    db,
+    store,
+    logger: warningLogger,
+    registry: registry(),
+    now: () => 1_000,
+  })
+  const { grantId } = await service.addGrant({
+    provider: 'example',
+    account: {
+      externalUserId: 'subject',
+      label: 'Person',
+      verifiedIdentities: [],
+    },
+    scopes: ['openid'],
+    appConfig: { clientId: 'removal-config-canary' },
+    refreshToken: 'removal-refresh-canary',
+    accessToken: 'removal-access-canary',
+  })
+  const grant = await service.getGrantById(grantId)
+  if (!grant?.accessTokenRef || !grant.refreshTokenRef)
+    throw new Error('missing Account removal refs')
+  const refs = [grant.appConfigRef, grant.accessTokenRef, grant.refreshTokenRef]
+  store.failAllDeletes = true
+
+  await expect(service.removeAccount('Person')).resolves.toBeUndefined()
+
+  expect(warnings).toEqual([
+    [
+      {
+        lifecycle: 'account-removal',
+        provider: 'example',
+        grantId,
+        cleanupFailures: 3,
+      },
+      'OAuth secret cleanup remains pending',
+    ],
+  ])
+  expect(JSON.stringify(warnings)).not.toMatch(
+    /removal-config-canary|removal-refresh-canary|removal-access-canary|DELETE-FAILURE-SECRET-CANARY|keychain:|accountId/,
+  )
+  expect(db.prepare('SELECT COUNT(*) AS count FROM accounts').get()).toEqual({
+    count: 0,
+  })
+  expect(db.prepare('SELECT COUNT(*) AS count FROM grants').get()).toEqual({
+    count: 0,
+  })
+  expect(store.values.size).toBe(3)
+
+  store.failAllDeletes = false
+  for (const ref of refs) {
+    await expect(store.deleteSecret(ref)).resolves.toBeUndefined()
+    await expect(store.deleteSecret(ref)).resolves.toBeUndefined()
+  }
+  expect(store.values.size).toBe(0)
 })
