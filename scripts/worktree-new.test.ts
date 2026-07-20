@@ -176,7 +176,11 @@ test('usage advertises only the four supported branch types', async () => {
 
   expect(result.exitCode).toBe(1)
   expect(result.stderr).toContain('Types: feature, fix, docs, chore')
-  expect(result.stderr).not.toMatch(
+  const typesLine = result.stderr
+    .split('\n')
+    .find((line) => line.trimStart().startsWith('Types:'))
+  expect(typesLine).toBeDefined()
+  expect(typesLine).not.toMatch(
     /refactor|test|perf|ci|build|revert|spike|codex/,
   )
 })

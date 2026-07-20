@@ -196,6 +196,17 @@ test('unified inventory safely projects Extension provenance and rejects BYOA sh
     /public-id|desktop-metadata|dist|officialApp/,
   )
   await expect(
+    service.resolveApp('example', 'official'),
+  ).resolves.toMatchObject({
+    provider,
+    label: 'official',
+    config: {
+      clientId: 'public-id',
+      clientSecret: 'desktop-metadata',
+    },
+    definition: extensionApp,
+  })
+  await expect(
     service.addLocalApp({
       providerId: 'example',
       label: 'official',

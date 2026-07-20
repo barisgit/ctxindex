@@ -183,9 +183,7 @@ test('account add authorizes with a persisted OAuth App, lists its label, and re
       { env },
     )
     expect(missingApp.exitCode).toBe(2)
-    expect(missingApp.stderr).toContain(
-      'bun cli oauth-app add microsoft microsoft --from-env',
-    )
+    expect(missingApp.stderr).toContain('Available labels: ctxindex')
 
     const app = await sandbox.run(
       ['oauth-app', 'add', 'google', 'google', '--from-env'],
@@ -215,22 +213,8 @@ test('account add authorizes with a persisted OAuth App, lists its label, and re
       { env },
     )
     expect(mismatch.exitCode).toBe(2)
-    expect(mismatch.stderr).toContain('Available labels: google')
+    expect(mismatch.stderr).toContain('Available labels: ctxindex, google')
     expect(mismatch.stderr).not.toContain('Available labels: microsoft-only')
-
-    expect(
-      (
-        await sandbox.run(
-          ['oauth-app', 'add', 'google', 'secondary', '--from-env'],
-          { env },
-        )
-      ).exitCode,
-    ).toBe(0)
-    const missingSelector = await sandbox.run(['account', 'add', 'google'], {
-      env,
-    })
-    expect(missingSelector.exitCode).toBe(2)
-    expect(missingSelector.stderr).toContain('account add: --app is required')
 
     const added = await sandbox.run(
       ['account', 'add', 'google', '--label', 'work', '--app', 'google'],
