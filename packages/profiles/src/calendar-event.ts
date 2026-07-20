@@ -6,6 +6,83 @@ const providerIdPattern = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/
 const instantSchema = z.iso.datetime({ offset: true })
 const dateSchema = z.iso.date()
 
+const canonicalTimeZoneAliases = new Map<string, string>([
+  // Selected IANA tzdb 2026b backward spellings that replace obsolete names
+  // exposed by Bun 1.3.14's Intl inventory, plus legacy UTC/US identifiers.
+  ['Africa/Asmera', 'Africa/Asmara'],
+  ['America/Buenos_Aires', 'America/Argentina/Buenos_Aires'],
+  ['America/Catamarca', 'America/Argentina/Catamarca'],
+  ['America/Cordoba', 'America/Argentina/Cordoba'],
+  ['America/Godthab', 'America/Nuuk'],
+  ['America/Indianapolis', 'America/Indiana/Indianapolis'],
+  ['America/Jujuy', 'America/Argentina/Jujuy'],
+  ['America/Knox_IN', 'America/Indiana/Knox'],
+  ['America/Louisville', 'America/Kentucky/Louisville'],
+  ['America/Mendoza', 'America/Argentina/Mendoza'],
+  ['Etc/UTC', 'UTC'],
+  ['Etc/UCT', 'UTC'],
+  ['Etc/Universal', 'UTC'],
+  ['Etc/Zulu', 'UTC'],
+  ['GMT', 'UTC'],
+  ['UCT', 'UTC'],
+  ['Universal', 'UTC'],
+  ['Zulu', 'UTC'],
+  ['US/Alaska', 'America/Anchorage'],
+  ['US/Arizona', 'America/Phoenix'],
+  ['US/Central', 'America/Chicago'],
+  ['US/Eastern', 'America/New_York'],
+  ['US/Hawaii', 'Pacific/Honolulu'],
+  ['US/Mountain', 'America/Denver'],
+  ['US/Pacific', 'America/Los_Angeles'],
+  ['Asia/Ashkhabad', 'Asia/Ashgabat'],
+  ['Asia/Calcutta', 'Asia/Kolkata'],
+  ['Asia/Chungking', 'Asia/Chongqing'],
+  ['Asia/Dacca', 'Asia/Dhaka'],
+  ['Asia/Istanbul', 'Europe/Istanbul'],
+  ['Asia/Katmandu', 'Asia/Kathmandu'],
+  ['Asia/Macao', 'Asia/Macau'],
+  ['Asia/Rangoon', 'Asia/Yangon'],
+  ['Asia/Saigon', 'Asia/Ho_Chi_Minh'],
+  ['Asia/Thimbu', 'Asia/Thimphu'],
+  ['Asia/Ujung_Pandang', 'Asia/Makassar'],
+  ['Asia/Ulan_Bator', 'Asia/Ulaanbaatar'],
+  ['Atlantic/Faeroe', 'Atlantic/Faroe'],
+  ['Europe/Kiev', 'Europe/Kyiv'],
+  ['Europe/Nicosia', 'Asia/Nicosia'],
+  ['Pacific/Enderbury', 'Pacific/Kanton'],
+  ['Pacific/Ponape', 'Pacific/Pohnpei'],
+  ['Pacific/Samoa', 'Pacific/Pago_Pago'],
+  ['Pacific/Truk', 'Pacific/Chuuk'],
+])
+const canonicalTimeZones = new Set(Intl.supportedValuesOf('timeZone'))
+const modernCanonicalTimeZones = new Set(canonicalTimeZoneAliases.values())
+
+export function canonicalizeIanaTimeZone(value: string): string | undefined {
+  const alias = canonicalTimeZoneAliases.get(value)
+  if (alias) return alias
+  if (
+    value === 'UTC' ||
+    modernCanonicalTimeZones.has(value) ||
+    canonicalTimeZones.has(value)
+  )
+    return value
+  if (!/^Etc\/GMT(?:[+-](?:[1-9]|1[0-4]))?$/.test(value)) return undefined
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value })
+    return value
+  } catch {
+    return undefined
+  }
+}
+
+const canonicalTimeZoneSchema = z
+  .string()
+  .min(1)
+  .refine(
+    (value) => canonicalizeIanaTimeZone(value) === value,
+    'Calendar time zone must be a canonical IANA name',
+  )
+
 const participantShape = {
   displayName: z.string().min(1).optional(),
   email: z.string().min(1).optional(),
@@ -47,8 +124,8 @@ const timedTimingSchema = z
     kind: z.literal('timed'),
     start: instantSchema,
     end: instantSchema,
-    startTimeZone: z.string().min(1).optional(),
-    endTimeZone: z.string().min(1).optional(),
+    startTimeZone: canonicalTimeZoneSchema.optional(),
+    endTimeZone: canonicalTimeZoneSchema.optional(),
   })
   .strict()
   .refine(
@@ -73,7 +150,7 @@ const occurrenceStartSchema = z.discriminatedUnion('kind', [
     .object({
       kind: z.literal('timed'),
       at: instantSchema,
-      timeZone: z.string().min(1).optional(),
+      timeZone: canonicalTimeZoneSchema.optional(),
     })
     .strict(),
   z.object({ kind: z.literal('all-day'), date: dateSchema }).strict(),
@@ -239,6 +316,20 @@ export const calendarEventProfile = defineProfile({
             ? new Date(event.timing.end)
             : undefined,
         docs: 'Timed end instant; absent for all-day Calendar Events.',
+      },
+      startTimeZone: {
+        type: 'string',
+        extract: (event) =>
+          event.timing.kind === 'timed'
+            ? event.timing.startTimeZone
+            : undefined,
+        docs: 'Canonical IANA start time zone; absent for all-day Calendar Events.',
+      },
+      endTimeZone: {
+        type: 'string',
+        extract: (event) =>
+          event.timing.kind === 'timed' ? event.timing.endTimeZone : undefined,
+        docs: 'Canonical IANA end time zone; absent for all-day Calendar Events.',
       },
       startDate: {
         type: 'string',

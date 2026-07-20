@@ -176,6 +176,63 @@ describe('Google Calendar event normalization', () => {
     expect(result.resource?.payload).not.toHaveProperty('birthdayProperties')
   })
 
+  test('canonicalizes provider IANA aliases and omits unknown labels', () => {
+    const alias = normalizeGoogleCalendarEvent(
+      {
+        id: 'alias-zone',
+        status: 'confirmed',
+        start: {
+          dateTime: '2026-07-16T09:00:00-07:00',
+          timeZone: 'US/Pacific',
+        },
+        end: {
+          dateTime: '2026-07-16T10:00:00-07:00',
+          timeZone: 'US/Pacific',
+        },
+        recurringEventId: 'alias-series',
+        originalStartTime: {
+          dateTime: '2026-07-16T09:00:00-07:00',
+          timeZone: 'US/Pacific',
+        },
+        updated: '2026-07-16T00:00:00Z',
+      },
+      sourceId,
+      'primary',
+    )
+    expect(alias.warnings).toEqual([])
+    expect(alias.resource?.payload).toMatchObject({
+      timing: {
+        startTimeZone: 'America/Los_Angeles',
+        endTimeZone: 'America/Los_Angeles',
+      },
+      series: {
+        originalStart: { timeZone: 'America/Los_Angeles' },
+      },
+    })
+
+    const unknown = normalizeGoogleCalendarEvent(
+      {
+        id: 'unknown-zone',
+        status: 'confirmed',
+        start: {
+          dateTime: '2026-07-16T09:00:00Z',
+          timeZone: 'Synthetic/Unknown',
+        },
+        end: {
+          dateTime: '2026-07-16T10:00:00Z',
+          timeZone: 'Synthetic/Unknown',
+        },
+        updated: '2026-07-16T00:00:00Z',
+      },
+      sourceId,
+      'primary',
+    )
+    expect(unknown.warnings).toEqual([])
+    expect(unknown.resource).toBeDefined()
+    expect(unknown.resource?.payload).not.toHaveProperty('timing.startTimeZone')
+    expect(unknown.resource?.payload).not.toHaveProperty('timing.endTimeZone')
+  })
+
   test('returns deterministic warnings instead of malformed resources for unsupported variants', () => {
     for (const eventType of ['workingLocation', 'fromGmail']) {
       const unsupported = normalizeGoogleCalendarEvent(

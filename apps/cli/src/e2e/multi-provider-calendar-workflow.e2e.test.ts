@@ -20,6 +20,8 @@ function syncRun(stdout: string): {
   readonly added: number
   readonly updated: number
   readonly deleted: number
+  readonly warningsCount: number
+  readonly warnings: readonly { readonly code: string }[]
 } {
   const parsed = JSON.parse(stdout) as {
     results?: { run?: unknown }[]
@@ -97,8 +99,47 @@ function graphEvent(
   }
 }
 
-const graphShared = graphEvent(sharedEventId, 'Cross-provider planning')
-const graphRemoved = graphEvent('graph-removed', 'Work event to remove')
+const graphShared = {
+  ...graphEvent(sharedEventId, 'Cross-provider planning'),
+  type: 'occurrence',
+  seriesMasterId: 'synthetic-windows-series',
+  originalStartTimeZone: undefined,
+  originalEndTimeZone: undefined,
+  start: {
+    dateTime: '2026-07-20T09:00:00.0000000',
+    timeZone: 'GMT Standard Time',
+  },
+  end: {
+    dateTime: '2026-07-20T10:00:00.0000000',
+    timeZone: 'GMT Standard Time',
+  },
+}
+const graphRemoved = {
+  ...graphEvent('graph-removed', 'Work event to remove'),
+  type: 'occurrence',
+  seriesMasterId: 'synthetic-iana-series',
+  originalStart: '2026-07-22T09:00:00.0000000',
+  originalStartTimeZone: 'Europe/Belgrade',
+  originalEndTimeZone: 'Europe/Belgrade',
+}
+const graphUnknownZone = {
+  ...graphEvent('graph-unknown-zone', 'Synthetic unknown-zone occurrence'),
+  type: 'occurrence',
+  seriesMasterId: 'synthetic-unknown-zone-series',
+  originalStart: '2026-07-23T09:00:00.0000000',
+  originalStartTimeZone: 'Synthetic/Unknown',
+}
+const graphDstGap = {
+  ...graphEvent(
+    'graph-dst-gap',
+    'Synthetic DST-gap occurrence',
+    '2026-03-29T09:00:00.000',
+  ),
+  type: 'occurrence',
+  seriesMasterId: 'synthetic-dst-gap-series',
+  originalStart: '2026-03-29T02:30:00.0000000',
+  originalStartTimeZone: 'Europe/Belgrade',
+}
 
 test('compiled CLI isolates Google and Microsoft calendars across exact Realms', async () => {
   const sandbox = await createSandbox()
@@ -108,7 +149,12 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
   })
   const graph = startMockGraph({
     calendarEvents: {
-      'work/calendar': [graphShared, graphRemoved],
+      'work/calendar': [
+        graphShared,
+        graphRemoved,
+        graphUnknownZone,
+        graphDstGap,
+      ],
     },
     tokenScopes: 'Calendars.Read Mail.ReadWrite User.Read',
   })
@@ -271,7 +317,7 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
     graph.resetRequests()
     for (const [source, expectedAdded] of [
       [googleSourceLabel, 2],
-      [graphSourceLabel, 2],
+      [graphSourceLabel, 4],
     ] as const) {
       const result = await sandbox.run(['sync', '--source', source, '--json'], {
         env: baseEnv,
@@ -284,6 +330,19 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
         added: expectedAdded,
         updated: 0,
         deleted: 0,
+        ...(source === graphSourceLabel
+          ? {
+              warningsCount: 2,
+              warnings: [
+                expect.objectContaining({
+                  code: 'microsoft_calendar_unresolved_series_start',
+                }),
+                expect.objectContaining({
+                  code: 'microsoft_calendar_unresolved_series_start',
+                }),
+              ],
+            }
+          : {}),
       })
     }
 
@@ -333,6 +392,51 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
         sourceId,
         payload: { provider, providerEventId: sharedEventId },
       })
+      if (provider === 'microsoft') {
+        expect(JSON.parse(got.stdout).resource.payload).toMatchObject({
+          timing: {
+            startTimeZone: 'Europe/London',
+            endTimeZone: 'Europe/London',
+          },
+          series: {
+            providerEventId: 'synthetic-windows-series',
+            ref: `ctx://${graphSource}/event/synthetic-windows-series`,
+            originalStart: {
+              kind: 'timed',
+              at: '2026-07-20T08:00:00.000Z',
+              timeZone: 'Europe/London',
+            },
+          },
+        })
+      }
+    }
+
+    const zoneSearch = await sandbox.run(
+      [
+        'search',
+        'Cross-provider planning',
+        '--kind',
+        'events',
+        '--field',
+        'startTimeZone=Europe/London',
+        '--json',
+      ],
+      { env: baseEnv },
+    )
+    expect(zoneSearch.exitCode, zoneSearch.stderr).toBe(0)
+    expect(JSON.parse(zoneSearch.stdout).results).toEqual([
+      expect.objectContaining({ ref: graphRef, sourceId: graphSource }),
+    ])
+
+    for (const id of ['graph-unknown-zone', 'graph-dst-gap']) {
+      const got = await sandbox.run(
+        ['get', '--json', `ctx://${graphSource}/event/${id}`],
+        { env: baseEnv },
+      )
+      expect(got.exitCode, got.stderr).toBe(0)
+      expect(JSON.parse(got.stdout).resource.payload).not.toHaveProperty(
+        'series',
+      )
     }
 
     googleCalendar.upsertEvent('personal@example.test', {
@@ -346,7 +450,15 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
     })
     googleCalendar.cancelEvent('personal@example.test', googleRemoved.id)
     graph.setCalendarEvents('work/calendar', [
-      graphEvent(sharedEventId, 'Cross-provider planning updated'),
+      {
+        ...graphShared,
+        subject: 'Cross-provider planning updated',
+        bodyPreview: 'Cross-provider planning updated preview',
+        body: {
+          contentType: 'text',
+          content: 'Cross-provider planning updated body',
+        },
+      },
       graphEvent('graph-added', 'Work added event'),
       graphEvent(
         'far-future',
@@ -362,7 +474,7 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
       expect(syncRun(result.stdout)).toMatchObject({
         added: 1,
         updated: 1,
-        deleted: 1,
+        deleted: source === graphSourceLabel ? 3 : 1,
       })
     }
 

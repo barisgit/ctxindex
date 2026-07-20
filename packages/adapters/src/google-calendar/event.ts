@@ -1,5 +1,9 @@
 import type { SyncedResource } from '@ctxindex/extension-sdk'
-import { calendarEventRef, calendarEventSchema } from '@ctxindex/profiles'
+import {
+  calendarEventRef,
+  calendarEventSchema,
+  canonicalizeIanaTimeZone,
+} from '@ctxindex/profiles'
 import { parseHTML } from 'linkedom'
 import { z } from 'zod'
 
@@ -92,14 +96,20 @@ function timing(
   end: z.infer<typeof eventDateTimeSchema>,
 ) {
   if (start.dateTime !== undefined && end.dateTime !== undefined) {
+    const startTimeZone =
+      start.timeZone === undefined
+        ? undefined
+        : canonicalizeIanaTimeZone(start.timeZone)
+    const endTimeZone =
+      end.timeZone === undefined
+        ? undefined
+        : canonicalizeIanaTimeZone(end.timeZone)
     return {
       kind: 'timed' as const,
       start: start.dateTime,
       end: end.dateTime,
-      ...(start.timeZone === undefined
-        ? {}
-        : { startTimeZone: start.timeZone }),
-      ...(end.timeZone === undefined ? {} : { endTimeZone: end.timeZone }),
+      ...(startTimeZone === undefined ? {} : { startTimeZone }),
+      ...(endTimeZone === undefined ? {} : { endTimeZone }),
     }
   }
   if (start.date !== undefined && end.date !== undefined) {
@@ -114,10 +124,14 @@ function timing(
 
 function originalStart(value: z.infer<typeof eventDateTimeSchema>) {
   if (value.dateTime !== undefined) {
+    const timeZone =
+      value.timeZone === undefined
+        ? undefined
+        : canonicalizeIanaTimeZone(value.timeZone)
     return {
       kind: 'timed' as const,
       at: value.dateTime,
-      ...(value.timeZone === undefined ? {} : { timeZone: value.timeZone }),
+      ...(timeZone === undefined ? {} : { timeZone }),
     }
   }
   if (value.date !== undefined)

@@ -3,6 +3,7 @@ export {
   calendarEventProfile,
   calendarEventRef,
   calendarEventSchema,
+  canonicalizeIanaTimeZone,
 } from './calendar-event'
 export type { CommunicationMessage } from './communication-message'
 export {
