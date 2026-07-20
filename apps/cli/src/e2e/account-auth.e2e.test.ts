@@ -2,12 +2,41 @@ import { Database } from 'bun:sqlite'
 import { expect, test } from 'bun:test'
 import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { defaultConfig, writeConfig } from '@ctxindex/core/config'
 import { createSandbox } from '@ctxindex/core/testing'
 import { startMockGmail } from './_mock-gmail'
 import { startMockGoogleCalendar } from './_mock-google-calendar'
 import { installLoopbackBrowser } from './_oauth-account'
 
-test('account rejects an unavailable OAuth App without creating SQLite files', async () => {
+async function expectDatabaseAbsent(dataHome: string): Promise<void> {
+  for (const filename of [
+    'ctxindex.sqlite',
+    'ctxindex.sqlite-wal',
+    'ctxindex.sqlite-shm',
+  ]) {
+    expect(await Bun.file(join(dataHome, filename)).exists()).toBe(false)
+  }
+}
+
+async function expectSecretStateAbsent(
+  configHome: string,
+  dataHome: string,
+  keytarMockFile: string | undefined,
+): Promise<void> {
+  expect(keytarMockFile).toBeDefined()
+  if (keytarMockFile === undefined) {
+    throw new Error('sandbox Keychain mock path is required')
+  }
+  for (const path of [
+    join(dataHome, 'secrets.box'),
+    join(configHome, 'secret.key'),
+    keytarMockFile,
+  ]) {
+    expect(await Bun.file(path).exists()).toBe(false)
+  }
+}
+
+test('account add requires initialization before OAuth App inventory or durable effects', async () => {
   const sandbox = await createSandbox()
   try {
     const result = await sandbox.run([
@@ -19,23 +48,57 @@ test('account rejects an unavailable OAuth App without creating SQLite files', a
     ])
     expect(result.exitCode).toBe(2)
     expect(result.stderr).toContain(
-      'OAuth App "missing" is not available for Provider "microsoft"',
+      'ctxindex is not initialized; run bun cli init',
     )
-    for (const filename of [
-      'ctxindex.sqlite',
-      'ctxindex.sqlite-wal',
-      'ctxindex.sqlite-shm',
-    ]) {
-      expect(
-        await Bun.file(join(sandbox.env.CTXINDEX_DATA_HOME, filename)).exists(),
-      ).toBe(false)
-    }
+    expect(result.stderr).not.toContain('OAuth App "missing"')
+    expect(
+      await Bun.file(
+        join(sandbox.env.CTXINDEX_CONFIG_HOME, 'config.toml'),
+      ).exists(),
+    ).toBe(false)
+    await expectDatabaseAbsent(sandbox.env.CTXINDEX_DATA_HOME)
+    await expectSecretStateAbsent(
+      sandbox.env.CTXINDEX_CONFIG_HOME,
+      sandbox.env.CTXINDEX_DATA_HOME,
+      sandbox.env.CTXINDEX_KEYTAR_MOCK_FILE,
+    )
   } finally {
     await sandbox.cleanup()
   }
 })
 
-test('account rejects an unavailable OAuth App without migrating an existing database', async () => {
+test('account add rejects config-only partial initialization without opening state', async () => {
+  const sandbox = await createSandbox()
+  try {
+    const configPath = join(sandbox.env.CTXINDEX_CONFIG_HOME, 'config.toml')
+    await writeConfig(defaultConfig(), configPath)
+    const before = await readFile(configPath)
+
+    const result = await sandbox.run([
+      'account',
+      'add',
+      'microsoft',
+      '--app',
+      'missing',
+    ])
+
+    expect(result.exitCode).toBe(2)
+    expect(result.stderr).toContain(
+      'ctxindex is not initialized; run bun cli init',
+    )
+    expect(await readFile(configPath)).toEqual(before)
+    await expectDatabaseAbsent(sandbox.env.CTXINDEX_DATA_HOME)
+    await expectSecretStateAbsent(
+      sandbox.env.CTXINDEX_CONFIG_HOME,
+      sandbox.env.CTXINDEX_DATA_HOME,
+      sandbox.env.CTXINDEX_KEYTAR_MOCK_FILE,
+    )
+  } finally {
+    await sandbox.cleanup()
+  }
+})
+
+test('account add rejects database-only partial initialization without opening state', async () => {
   const sandbox = await createSandbox()
   try {
     await mkdir(sandbox.env.CTXINDEX_DATA_HOME, { recursive: true })
@@ -54,9 +117,47 @@ test('account rejects an unavailable OAuth App without migrating an existing dat
     ])
 
     expect(result.exitCode).toBe(2)
+    expect(result.stderr).toContain(
+      'ctxindex is not initialized; run bun cli init',
+    )
     expect(await readFile(path)).toEqual(before)
     expect(await Bun.file(`${path}-wal`).exists()).toBe(false)
     expect(await Bun.file(`${path}-shm`).exists()).toBe(false)
+    expect(
+      await Bun.file(
+        join(sandbox.env.CTXINDEX_CONFIG_HOME, 'config.toml'),
+      ).exists(),
+    ).toBe(false)
+    await expectSecretStateAbsent(
+      sandbox.env.CTXINDEX_CONFIG_HOME,
+      sandbox.env.CTXINDEX_DATA_HOME,
+      sandbox.env.CTXINDEX_KEYTAR_MOCK_FILE,
+    )
+  } finally {
+    await sandbox.cleanup()
+  }
+})
+
+test('account add preserves Provider validation before initialization', async () => {
+  const sandbox = await createSandbox()
+  try {
+    const result = await sandbox.run([
+      'account',
+      'add',
+      'fastmail',
+      '--app',
+      'missing',
+    ])
+
+    expect(result.exitCode).toBe(2)
+    expect(result.stderr).toContain('Unknown OAuth provider "fastmail"')
+    expect(result.stderr).not.toContain('ctxindex is not initialized')
+    await expectDatabaseAbsent(sandbox.env.CTXINDEX_DATA_HOME)
+    await expectSecretStateAbsent(
+      sandbox.env.CTXINDEX_CONFIG_HOME,
+      sandbox.env.CTXINDEX_DATA_HOME,
+      sandbox.env.CTXINDEX_KEYTAR_MOCK_FILE,
+    )
   } finally {
     await sandbox.cleanup()
   }

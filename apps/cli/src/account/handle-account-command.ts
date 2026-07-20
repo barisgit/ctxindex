@@ -2,6 +2,7 @@ import { authorizeProvider, resolveOAuthSelection } from '@ctxindex/core/auth'
 import { CtxindexValidationError } from '@ctxindex/core/errors'
 import { readLocalOAuthAppIdentities } from '@ctxindex/core/oauth-app'
 import { accountUsage, parseAccountArgs } from '../args/account'
+import { assertInitialized } from '../commands/db'
 import { loadAuthDefinitionDeps, openAccountDeps, openDeps } from '../deps'
 import {
   formatAccountAdded,
@@ -55,6 +56,7 @@ export async function handleAccountCommand(args: string[]): Promise<number> {
     } else {
       const definitions = await loadAuthDefinitionDeps()
       resolveOAuthSelection(definitions.completeRegistry, parsed.provider)
+      await assertInitialized()
       const availableApps = availableOAuthAppLabels(
         definitions.completeRegistry,
         parsed.provider,
