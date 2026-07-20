@@ -59,8 +59,8 @@ async function fixture(
     "INSERT INTO realms (id, slug, label, created_at) VALUES ('realm', 'work', 'Work', 1)",
   )
   db.prepare(`INSERT INTO sources
-    (id, realm_id, label, adapter_id, adapter_version, config_json, sync_enabled, created_at, updated_at)
-    VALUES (?, 'realm', 'Artifact Service Source', 'fake.artifacts', 1, '{}', 1, 1, 1)`).run(
+    (id, realm_id, label, adapter_id, config_json, sync_enabled, created_at, updated_at)
+    VALUES (?, 'realm', 'Artifact Service Source', 'fake.artifacts', '{}', 1, 1, 1)`).run(
     sourceId,
   )
 
@@ -81,10 +81,8 @@ async function fixture(
   })
   const common = {
     id: 'fake.artifacts',
-    version: 1,
     configSchema: z.object({}).strict(),
-    auth: { kind: 'none' as const },
-    profiles: [{ id: 'fake.message', version: 1 }],
+    profiles: [profile],
     routing: 'indexed' as const,
     actions: {},
   }
@@ -107,7 +105,6 @@ async function fixture(
   const registry = createExtensionRegistry([
     defineExtension({
       id: 'fake.artifacts-extension',
-      version: 1,
       profiles: [profile],
       adapters: [adapter],
     }),
@@ -135,6 +132,59 @@ async function fixture(
 }
 
 describe('ArtifactService', () => {
+  test('resolves only current same-Source verified cached bytes for Actions', async () => {
+    const f = await fixture({ declaredSize: bytes.length })
+    expect(await f.service.resolveCached(artifactRef, sourceId)).toBeNull()
+    await f.service.download(artifactRef)
+    const first = await f.service.resolveCached(artifactRef, sourceId)
+    expect(first).toEqual({
+      ref: artifactRef,
+      originRef,
+      filename: 'file.bin',
+      mediaType: 'application/octet-stream',
+      byteSize: bytes.length,
+      bytes: new Uint8Array(bytes),
+    })
+    if (!first) throw new Error('expected cached Artifact')
+    first.bytes[0] = 255
+    expect(
+      (await f.service.resolveCached(artifactRef, sourceId))?.bytes,
+    ).toEqual(new Uint8Array(bytes))
+    expect(f.calls()).toBe(1)
+    await expect(
+      f.service.resolveCached(artifactRef, sourceId, bytes.length - 1),
+    ).rejects.toMatchObject({ code: 'invalid_action_input' })
+
+    await expect(
+      f.service.resolveCached(
+        artifactRef.replace(sourceId, '01KXHBNECDAH1T4MJ38X88EPFK'),
+        sourceId,
+      ),
+    ).rejects.toMatchObject({ code: 'ref_source_mismatch' })
+    f.db
+      .prepare('UPDATE resources SET payload_json = ? WHERE ref = ?')
+      .run(JSON.stringify({ attachments: [] }), originRef)
+    expect(await f.service.resolveCached(artifactRef, sourceId)).toBeNull()
+    expect(f.calls()).toBe(1)
+  })
+
+  test('rejects cached metadata drift and returns unavailable after purge', async () => {
+    const f = await fixture({ declaredSize: bytes.length })
+    await f.service.download(artifactRef)
+    f.db
+      .prepare('UPDATE artifacts SET media_type = ? WHERE ref = ?')
+      .run('text/plain', artifactRef)
+    await expect(
+      f.service.resolveCached(artifactRef, sourceId),
+    ).rejects.toMatchObject({ code: 'data_integrity' })
+    f.db
+      .prepare('UPDATE artifacts SET media_type = ? WHERE ref = ?')
+      .run('application/octet-stream', artifactRef)
+    await f.service.purge()
+    expect(await f.service.resolveCached(artifactRef, sourceId)).toBeNull()
+    expect(f.calls()).toBe(1)
+  })
+
   test('lists exact live Resource Profile descriptors without provider I/O', async () => {
     const f = await fixture()
     expect(await f.service.list(originRef)).toEqual({
@@ -315,7 +365,6 @@ describe('ArtifactService', () => {
     const registry = createExtensionRegistry([
       defineExtension({
         id: 'bad-ext',
-        version: 1,
         profiles: [badProfile],
         adapters: [],
       }),

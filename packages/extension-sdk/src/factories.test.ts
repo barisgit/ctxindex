@@ -1,20 +1,21 @@
 import { describe, expect, test } from 'bun:test'
 import { readFile } from 'node:fs/promises'
-import { z } from 'zod'
 import {
   type ActionContext,
-  type AdapterAuthSpec,
   type ArtifactDescriptor,
+  auth,
   type DownloadContext,
   defineAdapter,
   defineExtension,
   defineProfile,
+  defineProvider,
   type InferProfilePayload,
   type ResolvedArtifactDescriptor,
   type RetrievedResource,
   type SearchRemoteResource,
   type SearchRemoteResult,
   type SyncEmission,
+  z,
 } from './index'
 
 type Equal<A, B> =
@@ -23,41 +24,43 @@ type Equal<A, B> =
     : false
 type Assert<T extends true> = T
 
+const oauthProvider = defineProvider({
+  id: 'fake',
+  auth: auth.oauth2({
+    authorizationUrl: 'https://auth.example.com/authorize',
+    tokenUrl: 'https://auth.example.com/token',
+    identity: {
+      url: 'https://api.example.com/userinfo',
+      subjectPath: ['sub'],
+      labelPaths: [['email'], ['name']],
+      identities: [
+        { kind: 'email', path: ['email'], verifiedPath: ['email_verified'] },
+      ],
+    },
+    pkce: { method: 'S256', required: true },
+    registration: {
+      type: 'public',
+      configSchema: z.object({
+        clientId: z.string(),
+        clientSecret: z.string().optional(),
+      }),
+      environment: {
+        clientId: 'CTXINDEX_FAKE_CLIENT_ID',
+        clientSecret: 'CTXINDEX_FAKE_CLIENT_SECRET',
+      },
+    },
+    baseScopes: ['openid', 'email'],
+    allowedHosts: ['api.example.com', 'auth.example.com'],
+    fixedAuthorizationParams: { prompt: 'consent' },
+  }),
+})
+const localProvider = defineProvider({ id: 'local', auth: auth.none() })
+
 const oauthAdapter = defineAdapter({
   id: 'fake.oauth',
-  version: 1,
   configSchema: z.object({}),
-  auth: {
-    kind: 'oauth2',
-    provider: {
-      id: 'fake',
-      authorizationUrl: 'https://auth.example.com/authorize',
-      tokenUrl: 'https://auth.example.com/token',
-      identity: {
-        url: 'https://api.example.com/userinfo',
-        subjectPath: ['sub'],
-        labelPaths: [['email'], ['name']],
-        identities: [
-          { kind: 'email', path: ['email'], verifiedPath: ['email_verified'] },
-        ],
-      },
-      pkce: { method: 'S256', required: true },
-      client: {
-        type: 'public',
-        secret: 'optional',
-        tokenAuthMethod: 'client_secret_post',
-      },
-      baseScopes: ['openid', 'email'],
-      environment: {
-        clientId: 'FAKE_CLIENT_ID',
-        clientSecret: 'FAKE_CLIENT_SECRET',
-        refreshToken: 'FAKE_REFRESH_TOKEN',
-      },
-      allowedHosts: ['api.example.com', 'auth.example.com'],
-      fixedAuthorizationParams: { prompt: 'consent' },
-    },
-    scopes: ['fake.read'],
-  },
+  provider: oauthProvider,
+  access: { scopes: ['fake.read'] },
   providerApiHosts: ['api.example.com'],
   profiles: [],
   routing: 'federated',
@@ -68,32 +71,23 @@ const oauthAdapter = defineAdapter({
 
 type OAuthAuthInference = Assert<
   Equal<
-    typeof oauthAdapter.auth.provider.client,
+    typeof oauthAdapter.provider.auth.registration,
     {
       readonly type: 'public'
-      readonly secret: 'optional'
-      readonly tokenAuthMethod: 'client_secret_post'
+      readonly configSchema: z.ZodObject<{
+        clientId: z.ZodString
+        clientSecret: z.ZodOptional<z.ZodString>
+      }>
+      readonly environment: {
+        readonly clientId: 'CTXINDEX_FAKE_CLIENT_ID'
+        readonly clientSecret: 'CTXINDEX_FAKE_CLIENT_SECRET'
+      }
     }
   >
 >
 const oauthAuthInferenceCompiles: OAuthAuthInference = true
 void oauthAuthInferenceCompiles
 void oauthAdapter
-
-type OAuthAuthShape = Assert<
-  Equal<
-    AdapterAuthSpec,
-    | {
-        readonly kind: 'oauth2'
-        readonly provider: import('./index').OAuthProviderSpec
-        readonly scopes: readonly string[]
-      }
-    | { readonly kind: 'api-key'; readonly label: string }
-    | { readonly kind: 'basic' | 'none' | 'custom' }
-  >
->
-const oauthAuthShapeCompiles: OAuthAuthShape = true
-void oauthAuthShapeCompiles
 
 const noteProfile = defineProfile({
   id: 'fake.note',
@@ -106,15 +100,13 @@ const noteProfile = defineProfile({
       pinned: { type: 'boolean', extract: (payload) => payload.pinned },
     },
   },
-  docs: { summary: 'A fake note', aliases: ['note'] },
 })
 
 const noteAdapter = defineAdapter({
   id: 'fake.notes',
-  version: 1,
   configSchema: z.object({ root: z.string().describe('Notes root') }),
-  auth: { kind: 'none' },
-  profiles: [{ id: 'fake.note', version: 1 }],
+  provider: localProvider,
+  profiles: [noteProfile],
   routing: 'indexed',
   capabilities: ['retrieve'],
   operations: { retrieve: async () => {} },
@@ -123,16 +115,16 @@ const noteAdapter = defineAdapter({
 
 defineAdapter({
   id: 'fake.remote-notes',
-  version: 1,
   configSchema: z.object({}),
-  auth: { kind: 'none' },
-  profiles: [{ id: 'fake.note', version: 1 }],
+  provider: localProvider,
+  profiles: [noteProfile],
   routing: 'federated',
   capabilities: ['search-remote'],
   operations: {
     searchRemote: async (context): Promise<SearchRemoteResult> => {
       const text: string = context.query.text
       const limit: number = context.query.limit
+      const continuation: string | undefined = context.query.continuation
       const since: number | undefined = context.query.since
       const until: number | undefined = context.query.until
       const fields = context.query.fields
@@ -141,6 +133,7 @@ defineAdapter({
       void until
       void fields
       void aborted
+      void continuation
       return {
         resources: [
           {
@@ -151,6 +144,7 @@ defineAdapter({
           },
         ].slice(0, limit),
         warnings: [],
+        continuation: 'next-page',
       }
     },
   },
@@ -159,10 +153,9 @@ defineAdapter({
 
 defineAdapter({
   id: 'fake.downloads',
-  version: 1,
   configSchema: z.object({}),
-  auth: { kind: 'none' },
-  profiles: [{ id: 'fake.note', version: 1 }],
+  provider: localProvider,
+  profiles: [noteProfile],
   routing: 'indexed',
   capabilities: ['download'],
   operations: {
@@ -197,10 +190,9 @@ void _DownloadIsAsyncCompatible
 
 defineAdapter({
   id: 'fake.sync',
-  version: 1,
   configSchema: z.object({}),
-  auth: { kind: 'none' },
-  profiles: [{ id: 'fake.note', version: 1 }],
+  provider: localProvider,
+  profiles: [noteProfile],
   routing: 'indexed',
   capabilities: ['sync'],
   operations: {
@@ -226,9 +218,8 @@ defineAdapter({
 
 defineAdapter({
   id: 'fake.sync-return',
-  version: 1,
   configSchema: z.object({}),
-  auth: { kind: 'none' },
+  provider: localProvider,
   profiles: [],
   routing: 'indexed',
   capabilities: ['sync'],
@@ -247,18 +238,17 @@ const actionResult: RetrievedResource = {
 
 defineAdapter({
   id: 'fake.actions',
-  version: 1,
   configSchema: z.object({}),
-  auth: { kind: 'none' },
-  profiles: [{ id: 'fake.note', version: 1 }],
+  provider: localProvider,
+  profiles: [noteProfile],
   routing: 'indexed',
   capabilities: [],
   operations: {},
   actions: {
     'fake.note.create': {
-      profile: { id: 'fake.note', version: 1 },
+      profile: noteProfile,
       input: z.object({ title: z.string() }),
-      output: { id: 'fake.note', version: 1 },
+      output: noteProfile,
       run(context: ActionContext<{ title: string }>) {
         const sourceId: string = context.source.id
         const inputTitle: string = context.input.title
@@ -268,12 +258,16 @@ defineAdapter({
         const resolved = context.resolveResource(
           'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/note/1',
         )
+        const artifact = context.resolveArtifact(
+          'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/note/1/attachment/1',
+        )
         void sourceId
         void inputTitle
         void signal
         void fetch
         void logger
         void resolved
+        void artifact
         return actionResult
       },
     },
@@ -290,9 +284,8 @@ void assertActionContextIsCapabilitySpecific
 
 defineAdapter({
   id: 'fake.missing-operation',
-  version: 1,
   configSchema: z.object({}),
-  auth: { kind: 'none' },
+  provider: localProvider,
   profiles: [],
   routing: 'indexed',
   capabilities: ['retrieve'],
@@ -303,9 +296,8 @@ defineAdapter({
 
 defineAdapter({
   id: 'fake.forbidden-operation',
-  version: 1,
   configSchema: z.object({}),
-  auth: { kind: 'none' },
+  provider: localProvider,
   profiles: [],
   routing: 'indexed',
   capabilities: [],
@@ -318,9 +310,8 @@ defineAdapter({
 
 defineAdapter({
   id: 'fake.capability-contexts',
-  version: 1,
   configSchema: z.object({}),
-  auth: { kind: 'none' },
+  provider: localProvider,
   profiles: [],
   routing: 'indexed',
   capabilities: ['retrieve'],
@@ -337,7 +328,6 @@ defineAdapter({
 
 const noteExtension = defineExtension({
   id: 'fake.notes',
-  version: 1,
   profiles: [noteProfile],
   adapters: [noteAdapter],
 })
@@ -355,8 +345,9 @@ type _ExtensionIdInference = Assert<
 >
 
 describe('extension SDK definition factories', () => {
-  test('return plain definitions without wrapping or mutation', () => {
+  test('return fresh plain definitions without mutating imported values', () => {
     expect(noteProfile.id).toBe('fake.note')
+    expect(noteProfile.kind).toBe('profile')
     expect(noteAdapter.capabilities).toEqual(['retrieve'])
     expect(noteExtension.profiles[0]).toBe(noteProfile)
     expect(Object.getPrototypeOf(noteExtension)).toBe(Object.prototype)
@@ -372,6 +363,7 @@ describe('extension SDK definition factories', () => {
     const result = {
       resources: [],
       warnings: [],
+      continuation: 'next-page',
       // @ts-expect-error provider results do not expose scores
       score: 1,
     } satisfies SearchRemoteResult
@@ -382,6 +374,7 @@ describe('extension SDK definition factories', () => {
       score: 1,
     } satisfies SearchRemoteResource
     expect(result.resources).toEqual([])
+    expect(result.continuation).toBe('next-page')
     expect(resource.ref).toContain('/note/1')
   })
 })

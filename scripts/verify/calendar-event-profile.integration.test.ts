@@ -47,10 +47,8 @@ function fakeCalendarAdapter(
 ) {
   return defineAdapter({
     id,
-    version: 1,
     configSchema: z.object({}).strict(),
-    auth: { kind: 'none' },
-    profiles: [{ id: 'calendar.event', version: 1 }],
+    profiles: [calendarEventProfile],
     routing: 'indexed',
     capabilities: ['retrieve'],
     operations: {
@@ -85,14 +83,13 @@ async function setup(retrieveCalls = { google: 0, microsoft: 0 }) {
   db.exec("INSERT INTO realms VALUES ('realm-personal', 'personal', NULL, 1)")
   db.exec("INSERT INTO realms VALUES ('realm-work', 'work', NULL, 1)")
   const insertSource = db.prepare(
-    'INSERT INTO sources (id, realm_id, label, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO sources (id, realm_id, label, adapter_id, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
   )
   insertSource.run(
     googleSourceId,
     'realm-personal',
     'Google Calendar Fixture',
     'fake.google-calendar',
-    1,
     '{}',
     1,
     1,
@@ -102,7 +99,6 @@ async function setup(retrieveCalls = { google: 0, microsoft: 0 }) {
     'realm-work',
     'Microsoft Calendar Fixture',
     'fake.microsoft-calendar',
-    1,
     '{}',
     1,
     1,
@@ -111,7 +107,6 @@ async function setup(retrieveCalls = { google: 0, microsoft: 0 }) {
   const registry = createExtensionRegistry([
     defineExtension({
       id: 'ctxindex.calendar-profile.integration',
-      version: 1,
       profiles: [calendarEventProfile],
       adapters: [
         fakeCalendarAdapter('fake.google-calendar', 'google', () => {
@@ -188,7 +183,7 @@ test('calendar.event uses generic registry, storage, search, exact Realm, and ge
     search
       .search({
         text: 'shared',
-        kind: 'events',
+        kind: 'calendar.event',
         fields: [{ name: 'provider', value: 'microsoft' }],
       })
       .map(({ ref }) => ref),
@@ -235,7 +230,6 @@ test('calendar.event uses generic registry, storage, search, exact Realm, and ge
     expect.objectContaining({
       id: 'calendar.event',
       version: 1,
-      aliases: ['events'],
     }),
   ])
 })

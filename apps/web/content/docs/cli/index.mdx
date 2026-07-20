@@ -21,11 +21,11 @@ Profiles, kinds, fields, export formats, Actions, and Adapter configuration come
 | --- | --- | --- |
 | `ctxindex init` | Initialize config, data, state, cache, logs, and SQLite. | No |
 | `ctxindex account add` | Authorize a provider Account. | No |
-| `ctxindex account list` | List Accounts, Grants, and bound Sources. | Yes |
+| `ctxindex account list` | List Accounts with authorization health and bound Sources. | Yes |
 | `ctxindex account remove` | Remove an Account and its Grant. | No |
-| `ctxindex client add` | Persist an OAuth Client from declared environment variables. | No |
-| `ctxindex client list` | List configured OAuth Clients. | Yes |
-| `ctxindex client remove` | Remove an OAuth Client. | No |
+| `ctxindex oauth-app add` | Persist a local OAuth App from Provider-declared environment variables. | No |
+| `ctxindex oauth-app list` | List available Extension and local OAuth Apps safely. | Yes |
+| `ctxindex oauth-app remove` | Remove a local OAuth App. | No |
 | `ctxindex describe` | Inspect loaded Profiles, Adapters, and Actions. | Yes |
 | `ctxindex extensions list` | List loaded Extensions. | Yes |
 | `ctxindex extensions catalog add` | Trust and add a pinned Git Catalog. | Yes |

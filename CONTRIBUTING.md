@@ -45,6 +45,33 @@ Trivial fixes do not need OpenSpec. If a supposedly trivial change alters a
 stable contract, exit behavior, provider semantics, or multiple subsystems,
 stop and create an OpenSpec change.
 
+## CLI package verification
+
+Build and expose the package executable locally from the CLI workspace:
+
+```sh
+cd apps/cli
+bun run build:package
+bun link
+ctxindex --help
+```
+
+`bun link` registers the CLI workspace in Bun's global link directory and
+exposes its package bin. Release verification instead packs one staging
+manifest and installs that exact tarball with temporary
+`BUN_INSTALL_GLOBAL_DIR`, `BUN_INSTALL_BIN`, `BUN_INSTALL_CACHE_DIR`, and
+`CTXINDEX_*_HOME` paths. Run the focused package checks from the repository root:
+
+```sh
+bun test scripts/verify/cli-package.test.ts scripts/release/cli-package.test.ts
+bun run pack:cli-package
+bun run smoke:cli-package -- dist/npm/artifacts/ctxindex-<version>.tgz
+```
+
+The smoke may download `keytar`; it never uses the user's global Bun or ctxindex
+state. Release ownership and trusted-publisher setup are documented in
+[`docs/release/npm.md`](docs/release/npm.md).
+
 ## Live-provider evidence
 
 Use isolated ctxindex state for automated tests and loopback provider mocks.

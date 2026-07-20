@@ -103,7 +103,7 @@ describe('exit codes e2e', () => {
   test('exit 40 config_error: malformed TOML config is rejected', async () => {
     const sandbox = await createSandbox()
     try {
-      await mkdir(sandbox.env.CTXINDEX_CONFIG_HOME, { recursive: true })
+      await initSandbox(sandbox)
       await writeFile(
         join(sandbox.env.CTXINDEX_CONFIG_HOME, 'config.toml'),
         '[secrets\nbackend = "file"\n',
@@ -123,18 +123,21 @@ describe('exit codes e2e', () => {
     try {
       await initSandbox(sandbox)
 
-      const client = await sandbox.run(
-        ['client', 'add', 'google', '--from-env'],
+      const app = await sandbox.run(
+        ['oauth-app', 'add', 'google', 'google', '--from-env'],
         { env: { CTXINDEX_GOOGLE_CLIENT_ID: 'client-id' } },
       )
-      expect(client.exitCode, client.stderr).toBe(0)
+      expect(app.exitCode, app.stderr).toBe(0)
 
-      const result = await sandbox.run(['account', 'add', 'google'], {
-        env: {
-          CTXINDEX_NO_BROWSER: '1',
-          CTXINDEX_LOOPBACK_TIMEOUT_SECS: '0.5',
+      const result = await sandbox.run(
+        ['account', 'add', 'google', '--app', 'google'],
+        {
+          env: {
+            CTXINDEX_NO_BROWSER: '1',
+            CTXINDEX_LOOPBACK_TIMEOUT_SECS: '0.5',
+          },
         },
-      })
+      )
 
       expect(result.exitCode).toBe(50)
       expect(result.stderr).toContain('loopback_timeout')

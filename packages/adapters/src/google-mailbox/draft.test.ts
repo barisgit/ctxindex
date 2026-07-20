@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import { resetEnvForTests } from '@ctxindex/core/config'
-import type { ActionContext } from '@ctxindex/extension-sdk'
+import type { ActionArtifact, ActionContext } from '@ctxindex/extension-sdk'
 import {
   communicationMessageDraftCreateInputSchema,
   communicationMessageDraftUpdateInputSchema,
+  communicationMessageProfile,
 } from '@ctxindex/profiles'
 import { gmailAdapterDefinition } from './definition'
 import { buildGmailDraftRaw, gmailDraftCreate, gmailDraftUpdate } from './draft'
@@ -17,19 +18,52 @@ const logger = {
   warn() {},
   error() {},
 }
+const managedArtifact: ActionArtifact = {
+  ref: `ctx://${sourceId}/message/source/attachment/file`,
+  originRef: `ctx://${sourceId}/message/source`,
+  filename: 'report.bin',
+  mediaType: 'application/octet-stream',
+  byteSize: 4,
+  bytes: Uint8Array.from([0, 1, 254, 255]),
+}
 
 function context(
   input: unknown,
   mockedFetch: typeof fetch,
-  resolveResource: ActionContext['resolveResource'] = () => null,
+  resolveResource?: ActionContext['resolveResource'],
+  resolveArtifact: ActionContext['resolveArtifact'] = async () => null,
 ): ActionContext<never> {
+  const defaultResolveResource: ActionContext['resolveResource'] = (ref) => {
+    if (
+      typeof input !== 'object' ||
+      input === null ||
+      !('ref' in input) ||
+      input.ref !== ref
+    )
+      return null
+    const encodedId = ref.split('/').at(-1)
+    if (!encodedId) return null
+    return {
+      ref,
+      sourceId,
+      profile: { id: 'communication.message', version: 1 },
+      completeness: 'complete',
+      deletedAt: null,
+      payload: {
+        providerMessageId: 'stored-message',
+        providerDraftId: decodeURIComponent(encodedId),
+        managedAttachmentRefs: [],
+      },
+    }
+  }
   return {
     source: { id: sourceId, config: {} },
     input: input as never,
     signal,
     fetch: mockedFetch,
     logger,
-    resolveResource,
+    resolveResource: resolveResource ?? defaultResolveResource,
+    resolveArtifact,
   }
 }
 
@@ -106,12 +140,55 @@ describe('buildGmailDraftRaw', () => {
 })
 
 describe('gmailDraftCreate', () => {
+  test('creates one standalone Draft with exact managed attachment bytes and provenance', async () => {
+    const calls: { init?: Parameters<typeof fetch>[1] }[] = []
+    const input = {
+      to: ['recipient@example.test'],
+      subject: 'Attached',
+      bodyText: 'See file.',
+      attachments: [{ ref: managedArtifact.ref }],
+    }
+    const resource = await gmailDraftCreate(
+      context(
+        input,
+        (async (
+          _input: Parameters<typeof fetch>[0],
+          init?: Parameters<typeof fetch>[1],
+        ) => {
+          calls.push({ init })
+          return Response.json({
+            id: 'attachment-draft',
+            message: { id: 'attachment-message', labelIds: ['DRAFT'] },
+          })
+        }) as unknown as typeof fetch,
+        undefined,
+        async (ref) => (ref === managedArtifact.ref ? managedArtifact : null),
+      ),
+    )
+    expect(calls).toHaveLength(1)
+    const request = JSON.parse(String(calls[0]?.init?.body))
+    const mime = decodeRaw(request.message.raw)
+    expect(mime).toContain('Content-Type: multipart/mixed;')
+    expect(mime).toContain(
+      'Content-Disposition: attachment; filename="report.bin"',
+    )
+    expect(mime).toContain('AAH+/w==')
+    expect(resource).toMatchObject({
+      ref: `ctx://${sourceId}/draft/attachment-draft`,
+      payload: { managedAttachmentRefs: [managedArtifact.ref] },
+    })
+  })
+
   test('creates one native threaded reply Draft with exact Gmail thread headers', async () => {
     const calls: { init?: Parameters<typeof fetch>[1] }[] = []
     const parentRef = `ctx://${sourceId}/message/parent-1`
     const resource = await gmailDraftCreate(
       context(
-        { replyToRef: parentRef, bodyText: 'Reply body' },
+        {
+          replyToRef: parentRef,
+          bodyText: 'Reply body',
+          attachments: [{ ref: managedArtifact.ref }],
+        },
         (async (
           _input: Parameters<typeof fetch>[0],
           init?: Parameters<typeof fetch>[1],
@@ -145,24 +222,19 @@ describe('gmailDraftCreate', () => {
                 },
               }
             : null,
+        async (ref) => (ref === managedArtifact.ref ? managedArtifact : null),
       ),
     )
 
     const body = JSON.parse(String(calls[0]?.init?.body))
     expect(body.message.threadId).toBe('thread-1')
-    expect(decodeRaw(body.message.raw)).toBe(
-      [
-        'To: Reply Person <reply@example.com>',
-        'Subject: Re: Project',
-        'In-Reply-To: <parent@example.com>',
-        'References: <root@example.com> <parent@example.com>',
-        'MIME-Version: 1.0',
-        'Content-Type: text/plain; charset=UTF-8',
-        'Content-Transfer-Encoding: 8bit',
-        '',
-        'Reply body',
-      ].join('\r\n'),
+    const mime = decodeRaw(body.message.raw)
+    expect(mime).toContain('To: Reply Person <reply@example.com>')
+    expect(mime).toContain('In-Reply-To: <parent@example.com>')
+    expect(mime).toContain(
+      'References: <root@example.com> <parent@example.com>',
     )
+    expect(mime).toContain('AAH+/w==')
     expect(resource).toMatchObject({
       ref: `ctx://${sourceId}/draft/reply-draft-1`,
       title: 'Re: Project',
@@ -173,6 +245,7 @@ describe('gmailDraftCreate', () => {
         references: ['<root@example.com>', '<parent@example.com>'],
         replyToRef: parentRef,
         threadId: 'thread-1',
+        managedAttachmentRefs: [managedArtifact.ref],
       },
     })
     expect(calls).toHaveLength(1)
@@ -315,11 +388,8 @@ describe('gmailDraftCreate', () => {
 
     const binding =
       gmailAdapterDefinition.actions['communication.message.draft.create']
-    expect(binding?.profile).toEqual({
-      id: 'communication.message',
-      version: 1,
-    })
-    expect(binding?.output).toEqual({ id: 'communication.message', version: 1 })
+    expect(binding?.profile).toBe(communicationMessageProfile)
+    expect(binding?.output).toBe(communicationMessageProfile)
     expect(binding?.input).toBe(communicationMessageDraftCreateInputSchema)
     const resource = await binding?.run(context(input, mockedFetch))
 
@@ -346,6 +416,7 @@ describe('gmailDraftCreate', () => {
         bcc: ['bcc@example.com'],
         subject: 'Subject',
         bodyText: 'Body',
+        managedAttachmentRefs: [],
         threadId: 'thread-1',
         conversationKey: `${sourceId}:thread-1`,
         labels: ['DRAFT', 'UNREAD'],
@@ -448,6 +519,90 @@ describe('gmailDraftCreate', () => {
 })
 
 describe('gmailDraftUpdate', () => {
+  test('replays the exact proven managed attachment set in one replacement', async () => {
+    const draftRef = `ctx://${sourceId}/draft/attachment-draft`
+    const calls: { init?: Parameters<typeof fetch>[1] }[] = []
+    const resource = await gmailDraftUpdate(
+      context(
+        {
+          ref: draftRef,
+          to: ['recipient@example.test'],
+          subject: 'Updated',
+          bodyText: 'Updated body',
+        },
+        (async (
+          _input: Parameters<typeof fetch>[0],
+          init?: Parameters<typeof fetch>[1],
+        ) => {
+          calls.push({ init })
+          return Response.json({
+            id: 'attachment-draft',
+            message: { id: 'updated-message', labelIds: ['DRAFT'] },
+          })
+        }) as unknown as typeof fetch,
+        (ref) =>
+          ref === draftRef
+            ? {
+                ref,
+                sourceId,
+                profile: { id: 'communication.message', version: 1 },
+                completeness: 'complete',
+                deletedAt: null,
+                payload: {
+                  providerMessageId: 'attachment-message',
+                  providerDraftId: 'attachment-draft',
+                  managedAttachmentRefs: [managedArtifact.ref],
+                },
+              }
+            : null,
+        async (ref) => (ref === managedArtifact.ref ? managedArtifact : null),
+      ),
+    )
+    expect(calls).toHaveLength(1)
+    const request = JSON.parse(String(calls[0]?.init?.body))
+    expect(decodeRaw(request.message.raw)).toContain('AAH+/w==')
+    expect(resource.payload).toMatchObject({
+      managedAttachmentRefs: [managedArtifact.ref],
+    })
+  })
+
+  test('rejects unknown or unavailable managed provenance before provider I/O', async () => {
+    const draftRef = `ctx://${sourceId}/draft/legacy-draft`
+    for (const managedAttachmentRefs of [undefined, [managedArtifact.ref]]) {
+      let fetchCalls = 0
+      const error = await gmailDraftUpdate(
+        context(
+          {
+            ref: draftRef,
+            to: ['recipient@example.test'],
+            subject: 'Updated',
+            bodyText: 'Updated body',
+          },
+          (async () => {
+            fetchCalls += 1
+            throw new Error('must not fetch')
+          }) as unknown as typeof fetch,
+          () => ({
+            ref: draftRef,
+            sourceId,
+            profile: { id: 'communication.message', version: 1 },
+            completeness: 'complete',
+            deletedAt: null,
+            payload: {
+              providerMessageId: 'legacy-message',
+              providerDraftId: 'legacy-draft',
+              ...(managedAttachmentRefs === undefined
+                ? {}
+                : { managedAttachmentRefs }),
+            },
+          }),
+        ),
+      ).catch((caught) => caught)
+      expect(error).toMatchObject({ code: 'invalid_action_input' })
+      expect(fetchCalls).toBe(0)
+    }
+  })
+
   test('rejects standalone update of a locally stored reply Draft before fetch', async () => {
     const parentRef = `ctx://${sourceId}/message/parent-1`
     const draftRef = `ctx://${sourceId}/draft/reply-draft-1`
@@ -475,6 +630,7 @@ describe('gmailDraftUpdate', () => {
                 payload: {
                   providerMessageId: 'reply-message-1',
                   providerDraftId: 'reply-draft-1',
+                  managedAttachmentRefs: [],
                   replyToRef: parentRef,
                 },
               }
@@ -518,6 +674,7 @@ describe('gmailDraftUpdate', () => {
           payload: {
             providerMessageId: 'reply-message-1',
             providerDraftId: 'reply-draft-1',
+            managedAttachmentRefs: [],
             replyToRef: parentRef,
             to: ['sender@example.com'],
             subject: 'Re: Project',
@@ -591,6 +748,7 @@ describe('gmailDraftUpdate', () => {
           payload: {
             providerMessageId: 'reply-message-1',
             providerDraftId: 'reply-draft-1',
+            managedAttachmentRefs: [],
             replyToRef: parentRef,
             to: ['original@example.com'],
             subject: 'Re: Original subject',
@@ -666,6 +824,7 @@ describe('gmailDraftUpdate', () => {
                 payload: {
                   providerMessageId: 'reply-message-1',
                   providerDraftId: 'reply-draft-1',
+                  managedAttachmentRefs: [],
                   replyToRef: parentRef,
                   to: ['sender@example.test'],
                   subject: 'Safe\r\nBcc: injected@example.test',
@@ -719,11 +878,8 @@ describe('gmailDraftUpdate', () => {
 
     const binding =
       gmailAdapterDefinition.actions['communication.message.draft.update']
-    expect(binding?.profile).toEqual({
-      id: 'communication.message',
-      version: 1,
-    })
-    expect(binding?.output).toEqual({ id: 'communication.message', version: 1 })
+    expect(binding?.profile).toBe(communicationMessageProfile)
+    expect(binding?.output).toBe(communicationMessageProfile)
     expect(binding?.input).toBe(communicationMessageDraftUpdateInputSchema)
     const resource = await binding?.run(context(input, mockedFetch))
 
@@ -771,6 +927,7 @@ describe('gmailDraftUpdate', () => {
         bcc: [],
         subject: 'Replacement',
         bodyText: 'Replacement body',
+        managedAttachmentRefs: [],
         threadId: 'thread-2',
         conversationKey: `${sourceId}:thread-2`,
         labels: ['DRAFT', 'UNREAD'],

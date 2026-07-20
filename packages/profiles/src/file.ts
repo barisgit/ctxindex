@@ -109,8 +109,4 @@ export const fileProfile = defineProfile({
       },
     },
   },
-  docs: {
-    summary: 'An extracted local file.',
-    aliases: ['files'],
-  },
 })

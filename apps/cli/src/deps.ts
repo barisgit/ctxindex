@@ -1,15 +1,9 @@
-import { CTXINDEX_BUILTIN_EXTENSIONS } from '@ctxindex/adapters'
 import {
   type AccountService,
   createAccountService,
 } from '@ctxindex/core/account'
 import { ArtifactService } from '@ctxindex/core/artifact'
 import { type AuthService, createAuthService } from '@ctxindex/core/auth'
-import { CatalogStore } from '@ctxindex/core/catalog'
-import {
-  createOAuthClientService,
-  type OAuthClientService,
-} from '@ctxindex/core/client'
 import {
   type CtxindexConfig,
   getEnv,
@@ -17,10 +11,17 @@ import {
   readConfig,
   writeConfig,
 } from '@ctxindex/core/config'
-import { loadExtensions } from '@ctxindex/core/extension'
 import { logger as createLogger, type Logger } from '@ctxindex/core/logger'
+import {
+  createOAuthAppService,
+  listLocalOAuthAppIdentities,
+  type OAuthAppService,
+} from '@ctxindex/core/oauth-app'
 import { createRealmService, type RealmService } from '@ctxindex/core/realm'
-import type { ExtensionRegistry } from '@ctxindex/core/registry'
+import type {
+  CompleteRegistry,
+  ExtensionRegistry,
+} from '@ctxindex/core/registry'
 import {
   createSecretBackendManager,
   createSecretVault,
@@ -33,6 +34,7 @@ import { createSourceService, type SourceService } from '@ctxindex/core/source'
 import type { CtxindexDatabase } from '@ctxindex/core/storage'
 import { createThreadService, type ThreadService } from '@ctxindex/core/thread'
 import { getDb } from './commands/db'
+import { loadCliDefinitions } from './definitions'
 
 export interface CliDeps {
   readonly db: CtxindexDatabase
@@ -43,8 +45,9 @@ export interface CliDeps {
   readonly secretBackendManager: SecretBackendManager
   readonly secretVault: SecretVault
   readonly authService: AuthService
-  readonly oauthClientService: OAuthClientService
+  readonly oauthAppService: OAuthAppService
   readonly registry: ExtensionRegistry
+  readonly completeRegistry: CompleteRegistry
   readonly threadService: ThreadService
   readonly artifactService: ArtifactService
   close(): Promise<void>
@@ -117,39 +120,31 @@ export async function openSecretDeps(): Promise<SecretCliDeps> {
 export async function loadAuthDefinitionDeps(): Promise<{
   readonly config: CtxindexConfig
   readonly registry: ExtensionRegistry
+  readonly completeRegistry: CompleteRegistry
 }> {
   const config = await readConfig()
-  const installed = await new CatalogStore().readInstalled()
-  const registry = (
-    await loadExtensions({
-      config,
-      builtins: CTXINDEX_BUILTIN_EXTENSIONS,
-      installed,
-    })
-  ).registry
-  return { config, registry }
+  const loaded = await loadCliDefinitions({ config })
+  return {
+    config,
+    registry: loaded.registry,
+    completeRegistry: loaded.completeRegistry,
+  }
 }
 
 export async function openDeps(
-  opts: {
-    readonly config?: CtxindexConfig
-    readonly registry?: ExtensionRegistry
-  } = {},
+  opts: { readonly config?: CtxindexConfig } = {},
 ): Promise<CliDeps> {
   const db = await getDb()
   const log = await createLogger(cliLogLevel ? { level: cliLogLevel } : {})
   const config = opts.config ?? (await readConfig())
-  const installed = await new CatalogStore().readInstalled()
+  const localOAuthAppIdentities = listLocalOAuthAppIdentities(db)
+  const loaded = await loadCliDefinitions({
+    config,
+    localOAuthAppIdentities,
+  })
   const realmService = createRealmService({ db, logger: log })
-  const registry =
-    opts.registry ??
-    (
-      await loadExtensions({
-        config,
-        builtins: CTXINDEX_BUILTIN_EXTENSIONS,
-        installed,
-      })
-    ).registry
+  const registry = loaded.registry
+  const completeRegistry = loaded.completeRegistry
   const threadService = createThreadService({ db, profiles: registry.profiles })
   const sourceService = createSourceService({
     db,
@@ -163,15 +158,16 @@ export async function openDeps(
     config,
   )
   const env = getEnv()
-  const oauthClientService = createOAuthClientService({
+  const oauthAppService = createOAuthAppService({
     db,
     store: secretVault,
+    registry: completeRegistry,
   })
   const authService = createAuthService({
     db,
     store: secretVault,
     logger: log,
-    registry: registry.adapters,
+    registry: completeRegistry,
   })
   const artifactService = new ArtifactService({
     db,
@@ -188,8 +184,9 @@ export async function openDeps(
     secretBackendManager,
     secretVault,
     authService,
-    oauthClientService,
+    oauthAppService,
     registry,
+    completeRegistry,
     threadService,
     artifactService,
     async close() {},

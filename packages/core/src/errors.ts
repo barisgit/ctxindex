@@ -35,7 +35,7 @@ export class CtxindexError extends Error {
 
 export type CtxindexAuthErrorCode =
   | 'needs_auth'
-  | 'missing_oauth_client_creds'
+  | 'missing_oauth_app_config'
   | 'invalid_grant'
   | 'invalid_client'
   | 'oauth_failed'
@@ -103,6 +103,15 @@ export class CtxindexValidationError extends CtxindexError {
     super(message, code, options)
     this.name = 'CtxindexValidationError'
     this.code = code
+  }
+}
+
+export class CtxindexContinuationError extends CtxindexValidationError {
+  override readonly code = 'invalid_filter'
+
+  constructor(message: string, options?: CtxindexErrorOptions) {
+    super('invalid_filter', message, options)
+    this.name = 'CtxindexContinuationError'
   }
 }
 

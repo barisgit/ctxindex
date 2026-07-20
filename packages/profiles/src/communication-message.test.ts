@@ -49,11 +49,39 @@ type _PayloadIsInferred = Assert<
             byteSize?: number | undefined
           }[]
         | undefined
+      managedAttachmentRefs?: string[] | undefined
     }
   >
 >
 
 describe('communication.message Profile v1', () => {
+  test('accepts unique managed attachments only on create', () => {
+    const artifactRef =
+      'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/1/attachment/1'
+    expect(
+      communicationMessageDraftCreateInputSchema.parse({
+        to: ['recipient@example.test'],
+        subject: 'Subject',
+        bodyText: 'Body',
+        attachments: [{ ref: artifactRef }],
+      }).attachments,
+    ).toEqual([{ ref: artifactRef }])
+    expect(() =>
+      communicationMessageDraftCreateInputSchema.parse({
+        replyToRef: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/1',
+        bodyText: 'Body',
+        attachments: [{ ref: artifactRef }, { ref: artifactRef }],
+      }),
+    ).toThrow()
+    expect(() =>
+      communicationMessageDraftUpdateInputSchema.parse({
+        ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/1',
+        replyToRef: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/1',
+        bodyText: 'Body',
+        attachments: [{ ref: artifactRef }],
+      }),
+    ).toThrow()
+  })
   test('strictly validates the minimal Gmail search/get payload', () => {
     const payload: CommunicationMessagePayload = {
       providerMessageId: 'gmail-message-1',
@@ -95,19 +123,6 @@ describe('communication.message Profile v1', () => {
       effect: 'reversible',
       input: communicationMessageDraftCreateInputSchema,
       output: { id: 'communication.message', version: 1 },
-      docs: 'Create a Draft in the selected mailbox Source.',
-      examples: [
-        {
-          to: ['recipient@example.com'],
-          subject: 'Project update',
-          bodyText: 'The project is on track.',
-        },
-        {
-          replyToRef:
-            'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/stable-message-id',
-          bodyText: 'Thanks for the update.',
-        },
-      ],
     })
     expect(
       communicationMessageDraftCreateInputSchema.parse({
@@ -156,7 +171,7 @@ describe('communication.message Profile v1', () => {
     ])
   })
 
-  test('declares strict complete-replacement Draft update with a stable Ref example', () => {
+  test('declares strict complete-replacement Draft update', () => {
     const action =
       communicationMessageProfile.actions?.[
         'communication.message.draft.update'
@@ -166,21 +181,6 @@ describe('communication.message Profile v1', () => {
       effect: 'reversible',
       input: communicationMessageDraftUpdateInputSchema,
       output: { id: 'communication.message', version: 1 },
-      docs: 'Replace the complete content of the addressed Draft in the selected mailbox Source.',
-      examples: [
-        {
-          ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/stable-draft-id',
-          to: ['recipient@example.com'],
-          subject: 'Updated project status',
-          bodyText: 'The project is ready for review.',
-        },
-        {
-          ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/stable-draft-id',
-          replyToRef:
-            'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/stable-message-id',
-          bodyText: 'Updated reply text.',
-        },
-      ],
     })
     expect(
       communicationMessageDraftUpdateInputSchema.parse({

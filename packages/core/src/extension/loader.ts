@@ -1,5 +1,4 @@
 import { join, resolve } from 'node:path'
-import type { AnyExtensionDefinition } from '@ctxindex/extension-sdk'
 import {
   catalogSnapshotPath,
   type InstalledExtensionRecord,
@@ -8,7 +7,24 @@ import {
 import type { CtxindexConfig } from '../config'
 import { dataDir } from '../paths'
 import { createExtensionRegistry, type ExtensionRegistry } from '../registry'
-import { importExtensionDefinition } from './import'
+import {
+  buildCompleteCandidateRegistry,
+  type CollectedExtension,
+  type CompleteRegistry,
+  type OAuthAppIdentity,
+} from '../registry/complete-registry'
+import { collectExtensionExports, type DefinitionModule } from './collector'
+import { safeExtensionDiagnostic } from './diagnostics'
+import {
+  assertCompatibleExtensionDocumentation,
+  createDocumentationProjection,
+  type DocumentationProjection,
+  resolveCollectedExtensionDocumentation,
+} from './documentation'
+import {
+  importExtensionPackageRoot,
+  importExtensionPackageRoots,
+} from './import'
 
 export interface ExtensionLoadDiagnostic {
   readonly path: string
@@ -17,26 +33,24 @@ export interface ExtensionLoadDiagnostic {
 
 export interface LoadExtensionsInput {
   readonly config: CtxindexConfig
-  readonly builtins: readonly AnyExtensionDefinition[]
+  readonly builtins: DefinitionModule
   readonly installed?: readonly InstalledExtensionRecord[]
+  readonly localOAuthAppIdentities?: readonly OAuthAppIdentity[]
   readonly dataRoot?: string
 }
 
 export type ExtensionLoadProvenance =
   | {
       readonly id: string
-      readonly version: number
       readonly kind: 'builtin'
     }
   | {
       readonly id: string
-      readonly version: number
       readonly kind: 'path'
       readonly path: string
     }
   | {
       readonly id: string
-      readonly version: number
       readonly kind: 'catalog'
       readonly catalog: string
       readonly catalogId: string
@@ -48,39 +62,76 @@ export type ExtensionLoadProvenance =
 
 export interface LoadExtensionsResult {
   readonly registry: ExtensionRegistry
+  readonly completeRegistry: CompleteRegistry
   readonly diagnostics: readonly ExtensionLoadDiagnostic[]
   readonly provenance: readonly ExtensionLoadProvenance[]
+  readonly documentation: DocumentationProjection
 }
 
 export async function loadExtensions(
   input: LoadExtensionsInput,
 ): Promise<LoadExtensionsResult> {
-  if (!Array.isArray(input.builtins)) {
+  if (
+    input.builtins === null ||
+    typeof input.builtins !== 'object' ||
+    Array.isArray(input.builtins)
+  ) {
     throw new TypeError(
-      'loadExtensions requires an explicit complete builtins list',
+      'loadExtensions requires an explicit built-in module namespace',
     )
   }
-  const registry = createExtensionRegistry(input.builtins)
+  let activeRoots: readonly CollectedExtension[] = await Promise.all(
+    collectExtensionExports(input.builtins, 'builtin:@ctxindex/adapters', {
+      origin: 'builtin',
+      packageName: '@ctxindex/adapters',
+    }).map((root) => resolveCollectedExtensionDocumentation(root)),
+  )
+  assertCompatibleExtensionDocumentation(activeRoots)
+  const localOAuthAppIdentities = input.localOAuthAppIdentities ?? []
+  let completeRegistry = buildCompleteCandidateRegistry({
+    roots: activeRoots,
+    localOAuthAppIdentities,
+  })
+  let registry = createExtensionRegistry(
+    activeRoots.map(({ definition }) => definition),
+  )
   const diagnostics: ExtensionLoadDiagnostic[] = []
-  const provenance: ExtensionLoadProvenance[] = input.builtins.map(
-    ({ id, version }) => ({ id, version, kind: 'builtin' }),
+  const provenance: ExtensionLoadProvenance[] = activeRoots.map(
+    ({ definition }) => ({
+      id: definition.id,
+      kind: 'builtin',
+    }),
   )
 
   for (const configuredPath of input.config.extensions.paths) {
     const extensionPath = resolve(configuredPath)
     try {
-      const definition = await importExtensionDefinition(extensionPath)
-      registry.register(definition)
-      provenance.push({
-        id: definition.id,
-        version: definition.version,
-        kind: 'path',
-        path: extensionPath,
+      const roots = await importExtensionPackageRoots(extensionPath)
+      const nextRoots = [...activeRoots, ...roots]
+      assertCompatibleExtensionDocumentation(nextRoots)
+      const candidate = buildCompleteCandidateRegistry({
+        roots: nextRoots,
+        localOAuthAppIdentities,
       })
+      registry = createExtensionRegistry(
+        nextRoots.map(({ definition }) => definition),
+      )
+      activeRoots = nextRoots
+      completeRegistry = candidate
+      provenance.push(
+        ...roots.map(({ definition }) => ({
+          id: definition.id,
+          kind: 'path' as const,
+          path: extensionPath,
+        })),
+      )
     } catch (cause) {
       diagnostics.push({
         path: extensionPath,
-        message: cause instanceof Error ? cause.message : String(cause),
+        message: safeExtensionDiagnostic(
+          cause,
+          'Extension package could not be loaded',
+        ),
       })
     }
   }
@@ -102,7 +153,6 @@ export async function loadExtensions(
       const entry = manifest.extensions.find(
         (candidate) =>
           candidate.id === installed.id &&
-          candidate.version === installed.version &&
           candidate.source.path === installed.source_path,
       )
       if (entry === undefined) {
@@ -110,19 +160,27 @@ export async function loadExtensions(
           'Installed Extension provenance does not match snapshot manifest',
         )
       }
-      const definition = await importExtensionDefinition(extensionPath)
-      if (
-        definition.id !== installed.id ||
-        definition.version !== installed.version
-      ) {
-        throw new TypeError(
-          `Installed Extension identity mismatch: expected ${installed.id}@${installed.version}, loaded ${definition.id}@${definition.version}`,
-        )
-      }
-      registry.register(definition)
+      const selected = await importExtensionPackageRoot(
+        extensionPath,
+        installed.id,
+        {
+          origin: 'catalog',
+          commit: installed.commit,
+        },
+      )
+      const nextRoots = [...activeRoots, selected]
+      assertCompatibleExtensionDocumentation(nextRoots)
+      const candidate = buildCompleteCandidateRegistry({
+        roots: nextRoots,
+        localOAuthAppIdentities,
+      })
+      registry = createExtensionRegistry(
+        nextRoots.map(({ definition }) => definition),
+      )
+      activeRoots = nextRoots
+      completeRegistry = candidate
       provenance.push({
-        id: definition.id,
-        version: definition.version,
+        id: selected.definition.id,
         kind: 'catalog',
         catalog: installed.catalog_name,
         catalogId: installed.catalog_id,
@@ -134,10 +192,19 @@ export async function loadExtensions(
     } catch (cause) {
       diagnostics.push({
         path: extensionPath,
-        message: cause instanceof Error ? cause.message : String(cause),
+        message: safeExtensionDiagnostic(
+          cause,
+          'Catalog Extension package could not be loaded',
+        ),
       })
     }
   }
 
-  return { registry, diagnostics, provenance }
+  return {
+    registry,
+    completeRegistry,
+    diagnostics,
+    provenance,
+    documentation: createDocumentationProjection(activeRoots),
+  }
 }

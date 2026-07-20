@@ -4,9 +4,11 @@ import {
   defineAdapter,
   defineExtension,
   defineProfile,
+  type SearchContext,
 } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
 import type { AuthService } from '../auth'
+import { CtxindexContinuationError, CtxindexValidationError } from '../errors'
 import type { Logger } from '../logger'
 import { createExtensionRegistry } from '../registry'
 import { ResourceStore } from '../resource'
@@ -25,6 +27,10 @@ const ids = {
   unavailable: '01KXJZHHHHHHHHHHHHHHHHHHHH',
 }
 const calls: string[] = []
+const remoteQueries: Array<{
+  readonly text: string
+  readonly continuation?: string
+}> = []
 const signals: AbortSignal[] = []
 let timeoutSource: string | undefined
 let failureSource: string | undefined
@@ -33,6 +39,9 @@ const startedAt = new Map<string, number>()
 let barrierSource: string | undefined
 let barrierPeer: string | undefined
 let releaseBarrier: (() => void) | undefined
+let continuationSource: string | undefined
+let validationFailureSource: string | undefined
+let continuationValidationFailureSource: string | undefined
 
 const profile = defineProfile({
   id: 'fake.item',
@@ -48,17 +57,11 @@ const profile = defineProfile({
       sender: { type: 'string[]', extract: (payload) => payload.sender ?? [] },
     },
   },
-  docs: { summary: 'Fake item', aliases: ['item'] },
 })
 
-async function remote({
-  source,
-  query,
-  signal,
-}: Parameters<
-  NonNullable<ReturnType<typeof defineAdapter>['operations']['searchRemote']>
->[0]) {
+async function remote({ source, query, signal }: SearchContext) {
   calls.push(source.id)
+  remoteQueries.push(query)
   signals.push(signal)
   startedAt.set(source.id, Date.now())
   if (source.id === barrierSource) {
@@ -75,6 +78,17 @@ async function remote({
     throw Object.assign(new Error('authorization expired'), {
       code: 'auth_expired',
     })
+  }
+  if (source.id === validationFailureSource) {
+    throw new CtxindexValidationError(
+      'invalid_filter',
+      'provider filter is unsupported',
+    )
+  }
+  if (source.id === continuationValidationFailureSource) {
+    throw new CtxindexContinuationError(
+      'continuation does not match this search',
+    )
   }
   if (source.id === timeoutSource || timeoutSources.has(source.id)) {
     await new Promise<void>((_resolve, reject) =>
@@ -105,16 +119,17 @@ async function remote({
       },
     ],
     warnings: [],
+    ...(source.id === continuationSource && query.continuation === undefined
+      ? { continuation: 'adapter-next-page' }
+      : {}),
   }
 }
 
 const adapters = [
   defineAdapter({
     id: 'fake.indexed',
-    version: 1,
     configSchema: z.object({}).passthrough(),
-    auth: { kind: 'none' },
-    profiles: [{ id: 'fake.item', version: 1 }],
+    profiles: [profile],
     routing: 'indexed',
     capabilities: ['search-remote'],
     operations: { searchRemote: remote },
@@ -122,10 +137,8 @@ const adapters = [
   }),
   defineAdapter({
     id: 'fake.federated',
-    version: 1,
     configSchema: z.object({}).passthrough(),
-    auth: { kind: 'none' },
-    profiles: [{ id: 'fake.item', version: 1 }],
+    profiles: [profile],
     routing: 'federated',
     capabilities: ['search-remote'],
     operations: { searchRemote: remote },
@@ -133,10 +146,8 @@ const adapters = [
   }),
   defineAdapter({
     id: 'fake.local',
-    version: 1,
     configSchema: z.object({}).passthrough(),
-    auth: { kind: 'none' },
-    profiles: [{ id: 'fake.item', version: 1 }],
+    profiles: [profile],
     routing: 'indexed',
     capabilities: [],
     operations: {},
@@ -144,12 +155,10 @@ const adapters = [
   }),
   defineAdapter({
     id: 'fake.hybrid',
-    version: 1,
     configSchema: z
       .object({ sync_window_days: z.number().optional() })
       .passthrough(),
-    auth: { kind: 'none' },
-    profiles: [{ id: 'fake.item', version: 1 }],
+    profiles: [profile],
     routing: 'hybrid',
     capabilities: ['sync', 'search-remote'],
     operations: { sync: async () => {}, searchRemote: remote },
@@ -159,7 +168,6 @@ const adapters = [
 const registry = createExtensionRegistry([
   defineExtension({
     id: 'fake.search',
-    version: 1,
     profiles: [profile],
     adapters,
   }),
@@ -196,7 +204,7 @@ function addSource(
   } = {},
 ) {
   db.prepare(
-    `INSERT INTO sources (id, realm_id, label, adapter_id, adapter_version, config_json, sync_enabled, search_routing, created_at, updated_at) VALUES (?, 'realm-1', ?, ?, 1, ?, ?, ?, 1, 1)`,
+    `INSERT INTO sources (id, realm_id, label, adapter_id, config_json, sync_enabled, search_routing, created_at, updated_at) VALUES (?, 'realm-1', ?, ?, ?, ?, ?, 1, 1)`,
   ).run(
     id,
     `Test Source ${id}`,
@@ -227,6 +235,7 @@ function planner(db: Database) {
 
 afterEach(() => {
   calls.length = 0
+  remoteQueries.length = 0
   signals.length = 0
   timeoutSource = undefined
   failureSource = undefined
@@ -235,6 +244,9 @@ afterEach(() => {
   barrierSource = undefined
   barrierPeer = undefined
   releaseBarrier = undefined
+  continuationSource = undefined
+  validationFailureSource = undefined
+  continuationValidationFailureSource = undefined
   for (const db of dbs.splice(0)) db.close()
 })
 
@@ -358,7 +370,7 @@ describe('SearchPlanner', () => {
       realms: ['work'],
       sourceIds: [ids.unavailable],
       adapterId: 'missing.adapter',
-      kind: 'item',
+      kind: 'fake.item',
       explain: true,
     } as const
 
@@ -453,7 +465,7 @@ describe('SearchPlanner', () => {
 
     const result = await planner(db).search({
       text: 'x',
-      kind: 'item',
+      kind: 'fake.item',
       since: now - 1_000,
       now,
       explain: true,
@@ -567,6 +579,153 @@ describe('SearchPlanner', () => {
     }
   })
 
+  test('runs constrained query-less remote search and resumes one exact Source', async () => {
+    const db = await database()
+    addSource(db, ids.federated, 'fake.federated')
+    continuationSource = ids.federated
+    const service = planner(db)
+
+    const first = await service.search({
+      remote: true,
+      sourceIds: [ids.federated],
+      kind: 'fake.item',
+      limit: 2,
+    })
+    expect(remoteQueries[0]).toMatchObject({ text: '' })
+    expect(first.pagination).toEqual({
+      limit: 2,
+      hasMore: true,
+      continuation: 'adapter-next-page',
+    })
+
+    const second = await service.search({
+      remote: true,
+      sourceIds: [ids.federated],
+      kind: 'fake.item',
+      limit: 2,
+      continuation: 'adapter-next-page',
+    })
+    expect(remoteQueries[1]).toMatchObject({
+      text: '',
+      continuation: 'adapter-next-page',
+    })
+    expect(second.pagination).toEqual({
+      limit: 2,
+      hasMore: false,
+      continuation: null,
+    })
+
+    await expect(
+      service.search({ remote: true, includeDeleted: true }),
+    ).rejects.toMatchObject({ code: 'invalid_filter' })
+    expect(calls).toHaveLength(2)
+  })
+
+  test('rejects invalid continuation modes before provider execution', async () => {
+    const db = await database()
+    addSource(db, ids.federated, 'fake.federated')
+    addSource(db, ids.federated2, 'fake.federated')
+    const service = planner(db)
+
+    for (const input of [
+      { text: 'x', continuation: 'next' },
+      { text: 'x', remote: true, continuation: 'next' },
+      {
+        text: 'x',
+        remote: true,
+        sourceIds: [ids.federated, ids.federated2],
+        continuation: 'next',
+      },
+      {
+        text: 'x',
+        remote: true,
+        sourceIds: [ids.federated],
+        offset: 1,
+        continuation: 'next',
+      },
+      {
+        text: 'x',
+        localOnly: true,
+        sourceIds: [ids.federated],
+        continuation: 'next',
+      },
+    ]) {
+      await expect(service.search(input)).rejects.toMatchObject({
+        code: 'invalid_filter',
+      })
+    }
+    expect(calls).toEqual([])
+  })
+
+  test('propagates Adapter continuation validation as invalid usage', async () => {
+    const db = await database()
+    addSource(db, ids.federated, 'fake.federated')
+    continuationValidationFailureSource = ids.federated
+
+    await expect(
+      planner(db).search({
+        text: 'changed',
+        remote: true,
+        sourceIds: [ids.federated],
+        continuation: 'adapter-next-page',
+      }),
+    ).rejects.toMatchObject({
+      code: 'invalid_filter',
+      message: 'continuation does not match this search',
+    })
+  })
+
+  test('degrades one ordinary Adapter validation failure without aborting peer Sources', async () => {
+    const db = await database()
+    addSource(db, ids.federated, 'fake.federated')
+    addSource(db, ids.federated2, 'fake.federated')
+    validationFailureSource = ids.federated
+
+    const result = await planner(db).search({
+      text: 'ordinary',
+      remote: true,
+      sourceIds: [ids.federated, ids.federated2],
+    })
+
+    expect(calls).toEqual([ids.federated, ids.federated2])
+    expect(result.results).toHaveLength(2)
+    expect(
+      result.results.every(({ sourceId }) => sourceId === ids.federated2),
+    ).toBe(true)
+    expect(result.warnings).toContainEqual({
+      sourceId: ids.federated,
+      code: 'invalid_filter',
+      message: 'provider filter is unsupported',
+    })
+  })
+
+  test('degrades an ordinary validation failure during exact continuation resume', async () => {
+    const db = await database()
+    addSource(db, ids.federated, 'fake.federated')
+    validationFailureSource = ids.federated
+
+    const result = await planner(db).search({
+      text: 'ordinary',
+      remote: true,
+      sourceIds: [ids.federated],
+      continuation: 'adapter-next-page',
+    })
+
+    expect(result.results).toEqual([])
+    expect(result.pagination).toEqual({
+      limit: 20,
+      hasMore: false,
+      continuation: null,
+    })
+    expect(result.warnings).toEqual([
+      {
+        sourceId: ids.federated,
+        code: 'invalid_filter',
+        message: 'provider filter is unsupported',
+      },
+    ])
+  })
+
   test('includes local tombstones only when requested and exposes their deletion time', async () => {
     const db = await database()
     addSource(db, ids.indexed, 'fake.indexed')
@@ -595,7 +754,7 @@ describe('SearchPlanner', () => {
     const filters = {
       realms: ['work'],
       sourceIds: [ids.indexed],
-      kind: 'item',
+      kind: 'fake.item',
     } as const
 
     const ordinary = await service.search(filters)
@@ -687,7 +846,7 @@ describe('SearchPlanner', () => {
     expect(localOnly.results).toHaveLength(2)
   })
 
-  test('rejects bare search, query-less remote, and non-local offset', async () => {
+  test('rejects bare search and non-local offset', async () => {
     const db = await database()
     addSource(db, ids.indexed, 'fake.indexed')
     addSource(db, ids.federated, 'fake.federated')
@@ -696,9 +855,12 @@ describe('SearchPlanner', () => {
     await expect(service.search({})).rejects.toThrow(
       'query text or at least one filter is required',
     )
-    await expect(
-      service.search({ realms: ['work'], remote: true }),
-    ).rejects.toThrow('remote requires query text')
+    const remote = await service.search({
+      remote: true,
+      sourceIds: [ids.federated],
+    })
+    expect(remote.results.length).toBeGreaterThan(0)
+    calls.length = 0
     await expect(service.search({ text: 'x', offset: 5 })).rejects.toThrow(
       'offset requires local execution',
     )

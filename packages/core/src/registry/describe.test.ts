@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  type AnyProfileDefinition,
   defineAdapter,
   defineExtension,
   defineProfile,
@@ -16,11 +17,7 @@ const fakeProfile = defineProfile({
   search: {
     title: (payload) => payload.title,
     fields: {
-      pinned: {
-        type: 'boolean',
-        extract: (payload) => payload.pinned,
-        docs: 'Whether the note is pinned',
-      },
+      pinned: { type: 'boolean', extract: (payload) => payload.pinned },
     },
   },
   exports: {
@@ -34,31 +31,23 @@ const fakeProfile = defineProfile({
       effect: 'reversible',
       input: publishInput,
       output: { id: 'fake.note', version: 1 },
-      docs: 'Publish the note',
-      examples: [{ title: 'Release notes' }],
     },
-  },
-  docs: {
-    summary: 'A fake note',
-    aliases: ['note'],
   },
 })
 const fakeAdapter = defineAdapter({
   id: 'fake.notes',
-  version: 1,
   configSchema: z.object({
     root: z.string().describe('Directory containing notes'),
   }),
-  auth: { kind: 'none' },
-  profiles: [{ id: 'fake.note', version: 1 }],
+  profiles: [fakeProfile],
   routing: 'indexed',
   capabilities: ['retrieve'],
   operations: { retrieve: async () => {} },
   actions: {
     'fake.note.publish': {
-      profile: { id: 'fake.note', version: 1 },
+      profile: fakeProfile,
       input: publishInput,
-      output: { id: 'fake.note', version: 1 },
+      output: fakeProfile,
       run: async () => ({
         ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/one',
         profile: { id: 'fake.ticket', version: 1 },
@@ -66,7 +55,6 @@ const fakeAdapter = defineAdapter({
       }),
     },
   },
-  docs: { summary: 'Fake notes source' },
 })
 
 describe('registry-derived describe data', () => {
@@ -80,7 +68,6 @@ describe('registry-derived describe data', () => {
     const registry = createExtensionRegistry([
       defineExtension({
         id: 'fake',
-        version: 1,
         profiles: [fakeProfile],
         adapters: [fakeAdapter],
       }),
@@ -91,24 +78,15 @@ describe('registry-derived describe data', () => {
       {
         id: 'fake.note',
         version: 1,
-        summary: 'A fake note',
-        aliases: ['note'],
-        fields: [
-          {
-            name: 'pinned',
-            type: 'boolean',
-            docs: 'Whether the note is pinned',
-          },
-        ],
+        fields: [{ name: 'pinned', type: 'boolean' }],
         formats: [{ name: 'markdown', mediaType: 'text/markdown' }],
       },
     ])
     expect(result.sources[0]).toMatchObject({
       id: 'fake.notes',
-      version: 1,
-      summary: 'Fake notes source',
       profiles: [{ id: 'fake.note', version: 1 }],
       capabilities: ['retrieve'],
+      providerApiHosts: [],
       config: {
         type: 'object',
         properties: {
@@ -128,9 +106,7 @@ describe('registry-derived describe data', () => {
         effect: 'reversible',
         input: expect.objectContaining({ type: 'object' }),
         output: { id: 'fake.note', version: 1 },
-        docs: 'Publish the note',
-        examples: [{ title: 'Release notes' }],
-        adapters: [{ id: 'fake.notes', version: 1 }],
+        adapters: [{ id: 'fake.notes' }],
       },
     ])
   })
@@ -157,37 +133,33 @@ describe('registry-derived describe data', () => {
             effect: 'reversible',
             input: actionInput,
             output: { id, version: 1 },
-            docs: `${id} shared`,
           },
         },
-        docs: { summary: `${id} summary`, aliases: ['z-alias', 'a-alias'] },
       })
     const makeAdapter = (
       id: 'z.adapter' | 'a.adapter',
-      profileId: 'z.kind' | 'a.kind',
+      profile: AnyProfileDefinition,
     ) =>
       defineAdapter({
         id,
-        version: 1,
         configSchema: z.object({
           foo_bar: z.string().describe('Foo path'),
           count: z.number().int().default(2),
           labels: z.array(z.string()).optional(),
           enabled: z.boolean().optional(),
         }),
-        auth: { kind: 'none' },
-        profiles: [{ id: profileId, version: 1 }],
+        profiles: [profile],
         routing: 'indexed',
         capabilities: ['retrieve', 'sync'],
         operations: { retrieve: async () => {}, sync: async () => {} },
         actions: {
           shared: {
-            profile: { id: profileId, version: 1 },
+            profile,
             input: actionInput,
-            output: { id: profileId, version: 1 },
+            output: profile,
             run: async () => ({
               ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/one',
-              profile: { id: profileId, version: 1 },
+              profile: { id: profile.id, version: profile.version },
               payload: { value: 'one' },
             }),
           },
@@ -195,17 +167,15 @@ describe('registry-derived describe data', () => {
       })
     const zProfile = makeProfile('z.kind')
     const aProfile = makeProfile('a.kind')
-    const zAdapter = makeAdapter('z.adapter', 'z.kind')
-    const aAdapter = makeAdapter('a.adapter', 'a.kind')
+    const zAdapter = makeAdapter('z.adapter', zProfile)
+    const aAdapter = makeAdapter('a.adapter', aProfile)
 
-    const shuffledRegistry = {
+    const result = describeRegistry({
       profiles: { list: () => [zProfile, aProfile] },
       adapters: { list: () => [zAdapter, aAdapter] },
-    }
-    const result = describeRegistry(shuffledRegistry)
+    })
 
     expect(result.kinds.map(({ id }) => id)).toEqual(['a.kind', 'z.kind'])
-    expect(result.kinds[0]?.aliases).toEqual(['a-alias', 'z-alias'])
     expect(result.kinds[0]?.fields.map(({ name }) => name)).toEqual([
       'alpha',
       'zebra',
@@ -220,7 +190,6 @@ describe('registry-derived describe data', () => {
     ])
     expect(result.sources[0]).toMatchObject({
       routing: 'indexed',
-      auth: { kind: 'none' },
       capabilities: ['retrieve', 'sync'],
       configOptions: [
         {
@@ -241,7 +210,6 @@ describe('registry-derived describe data', () => {
           flag: '--config-foo-bar',
           type: 'string',
           required: true,
-          docs: 'Foo path',
         },
         {
           property: 'labels',
@@ -255,19 +223,18 @@ describe('registry-derived describe data', () => {
     expect(result.actions[0]).toMatchObject({
       id: 'shared',
       profile: { id: 'a.kind', version: 1 },
-      adapters: [{ id: 'a.adapter', version: 1 }],
+      adapters: [{ id: 'a.adapter' }],
     })
     expect(result.actions[1]).toMatchObject({
       id: 'shared',
       profile: { id: 'z.kind', version: 1 },
-      adapters: [{ id: 'z.adapter', version: 1 }],
+      adapters: [{ id: 'z.adapter' }],
     })
   })
 
   test('uses strict ordering and collision-safe JSON-capable config flags', () => {
     const adapter = defineAdapter({
       id: 'config.adapter',
-      version: 1,
       configSchema: z.object({
         foo_bar: z.string(),
         'foo-bar': z.string(),
@@ -275,7 +242,6 @@ describe('registry-derived describe data', () => {
         json: z.string(),
         nested: z.object({ token: z.string() }).describe('Nested credentials'),
       }),
-      auth: { kind: 'none' },
       profiles: [],
       routing: 'indexed',
       capabilities: [],
@@ -317,7 +283,6 @@ describe('registry-derived describe data', () => {
         flag: '--config-nested',
         type: 'json',
         required: true,
-        docs: 'Nested credentials',
       },
     ])
   })
@@ -330,14 +295,7 @@ describe('registry-derived describe data', () => {
       '!kind',
       '𐀀.kind',
       '\uE000.kind',
-    ].map((id) =>
-      defineProfile({
-        id,
-        version: 1,
-        schema: z.object({}),
-        docs: { summary: 'Ordering fixture', aliases: ['a', '_', 'A', '!'] },
-      }),
-    )
+    ].map((id) => defineProfile({ id, version: 1, schema: z.object({}) }))
     const result = describeRegistry({
       profiles: { list: () => profiles },
       adapters: { list: () => [] },
@@ -350,6 +308,5 @@ describe('registry-derived describe data', () => {
       '\uE000.kind',
       '𐀀.kind',
     ])
-    expect(result.kinds[0]?.aliases).toEqual(['!', 'A', '_', 'a'])
   })
 })

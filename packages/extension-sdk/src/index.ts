@@ -1,23 +1,37 @@
+export { z } from 'zod'
+
 export {
   type AdapterActionBinding,
-  type AdapterAuthSpec,
   type AdapterCapability,
   type AdapterDefinition,
   type AdapterOperations,
   type AdapterOperationsFor,
   type AnyAdapterDefinition,
   defineAdapter,
-  type OAuthProviderSpec,
+  type ProfileTarget,
   type SearchRouting,
 } from './adapter'
 export {
+  type DocumentationAssetMediaType,
+  type DocumentationDeclaration,
+  type DocumentationDirectoryDeclaration,
+  type DocumentationFile,
+  type DocumentationVirtualTreeDeclaration,
+  docs,
+} from './documentation'
+export {
   type AnyExtensionDefinition,
   defineExtension,
-  type ExtensionAuthoringHost,
   type ExtensionDefinition,
 } from './extension'
-
+export {
+  type AnyOAuthAppDefinition,
+  defineOAuthApp,
+  type OAuthAppDefinition,
+  type OAuthProviderDefinition,
+} from './oauth-app'
 export type {
+  ActionArtifact,
   ActionContext,
   ActionResource,
   AdapterLogger,
@@ -39,6 +53,7 @@ export type {
 export {
   type AnyProfileDefinition,
   type ArtifactDescriptor,
+  type DefinitionVersion,
   defineProfile,
   type FieldType,
   type InferProfilePayload,
@@ -50,4 +65,13 @@ export {
   type ProfileRelationTargets,
   type ResolvedArtifactDescriptor,
 } from './profile'
-export type { DefinitionVersion, ProfileReference } from './reference'
+export {
+  type AnyProviderDefinition,
+  auth,
+  defineProvider,
+  type NoneAuth,
+  type OAuth2Auth,
+  type OAuth2RegistrationPolicy,
+  type ProviderAuth,
+  type ProviderDefinition,
+} from './provider'

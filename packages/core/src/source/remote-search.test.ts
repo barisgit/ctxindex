@@ -27,21 +27,18 @@ const profile = defineProfile({
     fields: { text: { type: 'string', extract: (payload) => payload.text } },
   },
 })
+const provider = testOAuthProvider({
+  authorizationUrl: 'https://provider.test/auth',
+  tokenUrl: 'https://provider.test/token',
+})
 
 const adapter = defineAdapter({
   id: 'fake.remote-adapter',
-  version: 1,
   configSchema: z.object({}).strict(),
-  auth: {
-    kind: 'oauth2',
-    provider: testOAuthProvider({
-      authorizationUrl: 'https://provider.test/auth',
-      tokenUrl: 'https://provider.test/token',
-    }),
-    scopes: ['remote:read'],
-  },
+  provider,
+  access: { scopes: ['remote:read'] },
   providerApiHosts: ['provider.test'],
-  profiles: [{ id: 'fake.remote', version: 1 }],
+  profiles: [profile],
   routing: 'federated',
   capabilities: ['search-remote'],
   operations: {
@@ -68,6 +65,7 @@ const adapter = defineAdapter({
             message: 'provider result was partial',
           },
         ],
+        continuation: 'adapter-next-page',
       }
     },
   },
@@ -76,8 +74,6 @@ const adapter = defineAdapter({
 const registry = createExtensionRegistry([
   defineExtension({
     id: 'fake.remote-extension',
-    version: 1,
-    profiles: [profile],
     adapters: [adapter],
   }),
 ])
@@ -109,13 +105,13 @@ async function freshDb(path = ':memory:'): Promise<Database> {
   ).run()
   db.prepare(
     `INSERT INTO grants
-       (id, account_id, provider, scopes_json, created_at, updated_at)
-     VALUES ('grant-1', 'account-1', 'test', '["remote:read"]', 1, 1)`,
+       (id, account_id, provider, scopes_json, app_config_ref, created_at, updated_at)
+     VALUES ('grant-1', 'account-1', 'test', '["remote:read"]', 'secret://test/app', 1, 1)`,
   ).run()
   db.prepare(
     `INSERT INTO sources
-       (id, realm_id, adapter_id, adapter_version, label, config_json, grant_id, sync_enabled, created_at, updated_at)
-     VALUES (?, 'realm-1', 'fake.remote-adapter', 1, ?, '{}', 'grant-1', 1, 1, 1)`,
+       (id, realm_id, adapter_id, label, config_json, grant_id, sync_enabled, created_at, updated_at)
+     VALUES (?, 'realm-1', 'fake.remote-adapter', ?, '{}', 'grant-1', 1, 1, 1)`,
   ).run(sourceId, sourceId)
   return db
 }
@@ -350,7 +346,9 @@ describe('searchSourceRemote', () => {
     expect(first.warnings).toEqual([
       { code: 'provider_warning', message: 'provider result was partial' },
     ])
+    expect(first.continuation).toBe('adapter-next-page')
     expect(second.warnings).toEqual(first.warnings)
+    expect(second.continuation).toBe(first.continuation)
     expect(authorizations).toEqual([
       'Bearer linked-token',
       'Bearer linked-token',

@@ -23,16 +23,46 @@ const communicationMessageDraftStandaloneContentShape = {
   bodyText: z.string(),
 }
 
+export const communicationMessageDraftAttachmentSchema = z
+  .object({ ref: z.string().min(1) })
+  .strict()
+
+export const MAX_DRAFT_ATTACHMENT_COUNT = 10
+export const MAX_DRAFT_ATTACHMENT_BYTES = 2 * 1024 * 1024
+
+const draftAttachmentsSchema = z
+  .array(communicationMessageDraftAttachmentSchema)
+  .min(1)
+  .max(MAX_DRAFT_ATTACHMENT_COUNT)
+  .superRefine((attachments, context) => {
+    const seen = new Set<string>()
+    for (const [index, attachment] of attachments.entries()) {
+      if (seen.has(attachment.ref))
+        context.addIssue({
+          code: 'custom',
+          message: 'Draft attachment Refs must be unique',
+          path: [index, 'ref'],
+        })
+      seen.add(attachment.ref)
+    }
+  })
+
 const communicationMessageDraftReplyContentShape = {
   replyToRef: z.string().min(1),
   bodyText: z.string(),
 }
 
 const communicationMessageDraftStandaloneCreateInputSchema = z
-  .object(communicationMessageDraftStandaloneContentShape)
+  .object({
+    ...communicationMessageDraftStandaloneContentShape,
+    attachments: draftAttachmentsSchema.optional(),
+  })
   .strict()
 const communicationMessageDraftReplyCreateInputSchema = z
-  .object(communicationMessageDraftReplyContentShape)
+  .object({
+    ...communicationMessageDraftReplyContentShape,
+    attachments: draftAttachmentsSchema.optional(),
+  })
   .strict()
 
 export const communicationMessageDraftCreateInputSchema = z.union([
@@ -113,6 +143,7 @@ export const communicationMessageSchema = z
     labels: z.array(z.string()).optional(),
     unread: z.boolean().optional(),
     attachments: z.array(artifactDescriptorSchema).optional(),
+    managedAttachmentRefs: z.array(z.string().min(1)).optional(),
   })
   .strict()
 
@@ -147,39 +178,11 @@ export const communicationMessageProfile = defineProfile({
       effect: 'reversible',
       input: communicationMessageDraftCreateInputSchema,
       output: { id: 'communication.message', version: 1 },
-      docs: 'Create a Draft in the selected mailbox Source.',
-      examples: [
-        {
-          to: ['recipient@example.com'],
-          subject: 'Project update',
-          bodyText: 'The project is on track.',
-        },
-        {
-          replyToRef:
-            'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/stable-message-id',
-          bodyText: 'Thanks for the update.',
-        },
-      ],
     },
     'communication.message.draft.update': {
       effect: 'reversible',
       input: communicationMessageDraftUpdateInputSchema,
       output: { id: 'communication.message', version: 1 },
-      docs: 'Replace the complete content of the addressed Draft in the selected mailbox Source.',
-      examples: [
-        {
-          ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/stable-draft-id',
-          to: ['recipient@example.com'],
-          subject: 'Updated project status',
-          bodyText: 'The project is ready for review.',
-        },
-        {
-          ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/stable-draft-id',
-          replyToRef:
-            'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/stable-message-id',
-          bodyText: 'Updated reply text.',
-        },
-      ],
     },
   },
   search: {
@@ -197,22 +200,18 @@ export const communicationMessageProfile = defineProfile({
       sender: {
         type: 'string[]',
         extract: (payload) => payload.from ?? [],
-        docs: 'Sender addresses associated with the message.',
       },
       unread: {
         type: 'boolean',
         extract: (payload) => payload.unread,
-        docs: 'Whether the message is unread.',
       },
       rfcMessageId: {
         type: 'string',
         extract: (payload) => payload.rfcMessageId,
-        docs: 'Normalized RFC Message-ID header value.',
       },
       conversationKey: {
         type: 'string',
         extract: (payload) => payload.conversationKey,
-        docs: 'Source-scoped provider conversation identity.',
       },
     },
   },
@@ -233,9 +232,5 @@ export const communicationMessageProfile = defineProfile({
       // V1 EML omits Artifact bytes, which remain separately downloadable.
       render: renderEml,
     },
-  },
-  docs: {
-    summary: 'An email or provider message.',
-    aliases: ['message', 'email', 'mail'],
   },
 })

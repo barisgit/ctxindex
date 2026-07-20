@@ -36,9 +36,9 @@ async function fixture(options: { purgeId?: () => string } = {}) {
   db.exec(`
     INSERT INTO realms (id, slug, created_at) VALUES ('realm', 'test', 1);
     INSERT INTO sources (
-      id, realm_id, label, adapter_id, adapter_version, config_json, created_at, updated_at
+      id, realm_id, label, adapter_id, config_json, created_at, updated_at
     ) VALUES (
-      '${sourceId}', 'realm', 'Artifact Store Source', 'fake', 1, '{}', 1, 1
+      '${sourceId}', 'realm', 'Artifact Store Source', 'fake', '{}', 1, 1
     );
     INSERT INTO resources (
       id, ref, source_id, realm_id, profile_id, profile_version, origin,
@@ -109,6 +109,20 @@ test('streams bytes into the managed CAS before recording metadata', async () =>
     byte_size: 11,
     local_path: relativePath,
   })
+})
+
+test('read rejects an oversized cache entry before filesystem access', async () => {
+  const { root, store } = await fixture()
+  const artifact = await writeArtifact(store, artifactRef, 'hello world')
+
+  expect(await store.read(artifactRef, artifact.byteSize)).toMatchObject({
+    artifact: { ref: artifactRef, byteSize: artifact.byteSize },
+    bytes: new TextEncoder().encode('hello world'),
+  })
+  await rm(join(root, artifact.localPath))
+  await expect(
+    store.read(artifactRef, artifact.byteSize - 1),
+  ).rejects.toMatchObject({ code: 'invalid_action_input' })
 })
 
 test('a filesystem failure after metadata deletion leaves safe orphan bytes for the next purge', async () => {

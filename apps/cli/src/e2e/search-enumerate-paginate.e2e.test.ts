@@ -154,8 +154,8 @@ test('binary CLI enumerates filter-only searches locally and paginates determini
     const remote = await sandbox.run(['search', '--kind', 'file', '--remote'], {
       env,
     })
-    expect(remote.exitCode).toBe(2)
-    expect(remote.stderr).toContain('--remote requires <query>')
+    expect(remote.exitCode).toBe(0)
+    expect(remote.stderr).toContain('does not support remote search')
 
     const badOffset = await sandbox.run(
       ['search', 'content', '--kind', 'file', '--offset', '2'],

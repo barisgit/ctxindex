@@ -13,7 +13,7 @@ export const accountCommand = defineCommand({
       args: {
         provider: { type: 'positional', required: false },
         label: { type: 'string', description: 'Global Account label' },
-        client: { type: 'string', description: 'Provider-scoped client label' },
+        app: { type: 'string', description: 'Provider-scoped OAuth App label' },
       },
       run: ({ rawArgs }) =>
         runWithExit(() => handleAccountCommand(['add', ...rawArgs])),
@@ -21,7 +21,7 @@ export const accountCommand = defineCommand({
     list: defineCommand({
       meta: {
         name: 'list',
-        description: 'List Accounts with Grants and bound Sources.',
+        description: 'List Accounts with bound Sources.',
       },
       args: { json: { type: 'boolean', description: 'Print JSON' } },
       run: ({ rawArgs }) =>

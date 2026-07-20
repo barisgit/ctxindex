@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test'
-import type { ActionContext, ActionResource } from '@ctxindex/extension-sdk'
+import type {
+  ActionArtifact,
+  ActionContext,
+  ActionResource,
+} from '@ctxindex/extension-sdk'
 import { microsoftDraftCreate, microsoftDraftUpdate } from './draft'
 
 const sourceId = '01KXHBNECDAH1T4MJ38X88EPFJ'
@@ -12,6 +16,14 @@ const logger = {
   info() {},
   warn() {},
   error() {},
+}
+const managedArtifact: ActionArtifact = {
+  ref: `ctx://${sourceId}/message/source/attachment/file`,
+  originRef: `ctx://${sourceId}/message/source`,
+  filename: 'report.bin',
+  mediaType: 'application/octet-stream',
+  byteSize: 4,
+  bytes: Uint8Array.from([0, 1, 254, 255]),
 }
 
 function parent(): ActionResource {
@@ -86,6 +98,7 @@ function context(
   input: unknown,
   mockedFetch: typeof fetch,
   resources: readonly ActionResource[] = [parent(), draft()],
+  resolveArtifact: ActionContext['resolveArtifact'] = async () => null,
 ): ActionContext<never> {
   return {
     source: { id: sourceId, config: {} },
@@ -95,10 +108,131 @@ function context(
     logger,
     resolveResource: (ref) =>
       resources.find((value) => value.ref === ref) ?? null,
+    resolveArtifact,
   }
 }
 
 describe('Microsoft threaded reply Drafts', () => {
+  test('creates one standalone MIME Draft with exact managed attachment bytes', async () => {
+    const calls: { init?: Parameters<typeof fetch>[1] }[] = []
+    const resource = await microsoftDraftCreate(
+      context(
+        {
+          to: ['Doe, Jane <jane@example.test>', 'recipient@example.test'],
+          cc: ['Copy Person <copy@example.test>'],
+          bcc: ['blind@example.test'],
+          subject: 'Attached',
+          bodyText: 'See file.',
+          attachments: [{ ref: managedArtifact.ref }],
+        },
+        (async (
+          _input: Parameters<typeof fetch>[0],
+          init?: Parameters<typeof fetch>[1],
+        ) => {
+          calls.push({ init })
+          return Response.json(
+            graphDraft('See file.', {
+              subject: 'Attached',
+              conversationId: 'attachment-conversation',
+              toRecipients: [
+                { emailAddress: { address: 'recipient@example.test' } },
+              ],
+            }),
+            { status: 201 },
+          )
+        }) as unknown as typeof fetch,
+        [],
+        async (ref) => (ref === managedArtifact.ref ? managedArtifact : null),
+      ),
+    )
+    expect(calls).toHaveLength(1)
+    expect(new Headers(calls[0]?.init?.headers).get('content-type')).toBe(
+      'text/plain',
+    )
+    const mime = Buffer.from(String(calls[0]?.init?.body), 'base64').toString()
+    expect(mime).toContain('Content-Type: multipart/mixed;')
+    expect(mime).toContain(
+      'To: "Doe, Jane" <jane@example.test>, recipient@example.test',
+    )
+    expect(mime).toContain('Cc: Copy Person <copy@example.test>')
+    expect(mime).toContain('Bcc: blind@example.test')
+    expect(mime).toContain(
+      'Content-Disposition: attachment; filename="report.bin"',
+    )
+    expect(mime).toContain('AAH+/w==')
+    expect(resource.payload).toMatchObject({
+      managedAttachmentRefs: [managedArtifact.ref],
+    })
+  })
+
+  test.each([
+    {
+      path: 'to',
+      recipient: 'bad:local@example.test',
+      transport: 'attachment MIME create',
+    },
+    {
+      path: 'cc',
+      recipient: 'bad(comment)@example.test',
+      transport: 'attachment MIME create',
+    },
+    {
+      path: 'bcc',
+      recipient: 'Bad\u0000 Name <valid@example.test>',
+      transport: 'attachment MIME create',
+    },
+    {
+      path: 'to',
+      recipient: 'bad"quote@example.test',
+      transport: 'JSON create',
+    },
+    {
+      path: 'cc',
+      recipient: 'missing-at.example.test',
+      transport: 'JSON update',
+    },
+    {
+      path: 'bcc',
+      recipient: 'bad\u007f@example.test',
+      transport: 'JSON update',
+    },
+  ] as const)('rejects malformed $path recipients before $transport Graph I/O', async ({
+    path,
+    recipient,
+    transport,
+  }) => {
+    let fetchCalls = 0
+    const input = {
+      ...(transport === 'JSON update'
+        ? { ref: `ctx://${sourceId}/draft/standalone-1` }
+        : {}),
+      to: path === 'to' ? [recipient] : ['valid@example.test'],
+      ...(path === 'cc' ? { cc: [recipient] } : {}),
+      ...(path === 'bcc' ? { bcc: [recipient] } : {}),
+      subject: 'Malformed recipient',
+      bodyText: 'Must fail locally.',
+      ...(transport === 'attachment MIME create'
+        ? { attachments: [{ ref: managedArtifact.ref }] }
+        : {}),
+    }
+    const action =
+      transport === 'JSON update' ? microsoftDraftUpdate : microsoftDraftCreate
+    const error = await action(
+      context(
+        input,
+        (async () => {
+          fetchCalls += 1
+          throw new Error('must not fetch')
+        }) as unknown as typeof fetch,
+        [],
+        async (ref) => (ref === managedArtifact.ref ? managedArtifact : null),
+      ),
+    ).catch((caught) => caught)
+
+    expect(error).toMatchObject({ code: 'invalid_action_input' })
+    expect(fetchCalls).toBe(0)
+  })
+
   test('rejects standalone update of a locally stored reply Draft before fetch', async () => {
     let fetchCalls = 0
     const error = await microsoftDraftUpdate(
@@ -123,13 +257,22 @@ describe('Microsoft threaded reply Drafts', () => {
   test('creates one native reply Draft with MIME content and no provider read', async () => {
     const calls: { url: string; init?: Parameters<typeof fetch>[1] }[] = []
     const resource = await microsoftDraftCreate(
-      context({ replyToRef: parentRef, bodyText: 'Reply body' }, (async (
-        input: Parameters<typeof fetch>[0],
-        init?: Parameters<typeof fetch>[1],
-      ) => {
-        calls.push({ url: input.toString(), init })
-        return Response.json(graphDraft(), { status: 201 })
-      }) as unknown as typeof fetch),
+      context(
+        {
+          replyToRef: parentRef,
+          bodyText: 'Reply body',
+          attachments: [{ ref: managedArtifact.ref }],
+        },
+        (async (
+          input: Parameters<typeof fetch>[0],
+          init?: Parameters<typeof fetch>[1],
+        ) => {
+          calls.push({ url: input.toString(), init })
+          return Response.json(graphDraft(), { status: 201 })
+        }) as unknown as typeof fetch,
+        undefined,
+        async (ref) => (ref === managedArtifact.ref ? managedArtifact : null),
+      ),
     )
 
     expect(calls).toHaveLength(1)
@@ -140,19 +283,13 @@ describe('Microsoft threaded reply Drafts', () => {
     expect(new Headers(calls[0]?.init?.headers).get('content-type')).toBe(
       'text/plain',
     )
-    expect(Buffer.from(String(calls[0]?.init?.body), 'base64').toString()).toBe(
-      [
-        'To: Reply Person <reply@example.test>',
-        'Subject: Re: Project',
-        'In-Reply-To: <parent@example.test>',
-        'References: <root@example.test> <parent@example.test>',
-        'MIME-Version: 1.0',
-        'Content-Type: text/plain; charset=UTF-8',
-        'Content-Transfer-Encoding: 8bit',
-        '',
-        'Reply body',
-      ].join('\r\n'),
+    const mime = Buffer.from(String(calls[0]?.init?.body), 'base64').toString()
+    expect(mime).toContain('To: Reply Person <reply@example.test>')
+    expect(mime).toContain('In-Reply-To: <parent@example.test>')
+    expect(mime).toContain(
+      'References: <root@example.test> <parent@example.test>',
     )
+    expect(mime).toContain('AAH+/w==')
     expect(resource).toMatchObject({
       ref: draftRef,
       title: 'Re: Project',
@@ -164,6 +301,7 @@ describe('Microsoft threaded reply Drafts', () => {
         inReplyTo: '<parent@example.test>',
         references: ['<root@example.test>', '<parent@example.test>'],
         replyToRef: parentRef,
+        managedAttachmentRefs: [managedArtifact.ref],
       },
     })
   })

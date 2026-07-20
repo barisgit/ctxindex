@@ -1,26 +1,20 @@
 import { expect, test } from 'bun:test'
 import type { AccountInventoryItem } from '@ctxindex/core/account'
-import { formatAccountInventory } from './account'
+import { formatAccountAdded, formatAccountInventory } from './account'
 
 const inventory: AccountInventoryItem[] = [
   {
     id: 'account-1',
     provider: 'google',
     label: 'Person\nOne',
-    grants: [
+    expiresAt: 2000,
+    expiryState: 'active',
+    sources: [
       {
-        id: 'grant-1',
-        scopes: ['mail.read', 'openid'],
-        expiresAt: 2000,
-        expiryState: 'active',
-        sources: [
-          {
-            id: 'source-1',
-            label: 'primary-inbox',
-            adapter: { id: 'google.mailbox', version: 1 },
-            realm: { id: 'realm-1', slug: 'work', label: 'Work' },
-          },
-        ],
+        id: 'source-1',
+        label: 'primary-inbox',
+        adapter: { id: 'google.mailbox' },
+        realm: { id: 'realm-1', slug: 'work', label: 'Work' },
       },
     ],
   },
@@ -28,28 +22,20 @@ const inventory: AccountInventoryItem[] = [
     id: 'account-2',
     provider: 'microsoft',
     label: null,
-    grants: [
-      {
-        id: 'grant-2',
-        scopes: [],
-        expiresAt: null,
-        expiryState: 'unknown',
-        sources: [],
-      },
-    ],
+    expiresAt: null,
+    expiryState: 'unknown',
+    sources: [],
   },
 ]
 
-test('formats compact nested Account, Grant, and Source inventory', () => {
+test('formats compact Account and Source inventory without private Grant state', () => {
   expect(formatAccountInventory(inventory, false)).toBe(
     [
       'ACCOUNT account-1  provider=google  label="Person\\nOne"',
-      '  GRANT grant-1  active  expiresAt=2000',
-      '    scopes: mail.read, openid',
-      '    SOURCE source-1  label="primary-inbox"  adapter=google.mailbox@1  realm=work',
+      '  AUTH active  expiresAt=2000',
+      '  SOURCE source-1  label="primary-inbox"  adapter=google.mailbox  realm=work',
       'ACCOUNT account-2  provider=microsoft  label=(unlabeled)',
-      '  GRANT grant-2  unknown  expiresAt=-',
-      '    scopes: none',
+      '  AUTH unknown  expiresAt=-',
     ].join('\n'),
   )
   expect(formatAccountInventory([], false)).toBe('No Accounts configured.')
@@ -59,6 +45,12 @@ test('JSON preserves safe nested cardinality without inventing identity or secre
   const output = formatAccountInventory(inventory, true)
   expect(JSON.parse(output)).toEqual(inventory)
   expect(output).not.toContain('externalUserId')
-  expect(output).not.toMatch(/token|secret|Ref/)
+  expect(output).not.toMatch(/grant|scope|token|secret|Ref/i)
   expect(formatAccountInventory([], true)).toBe('[]')
+})
+
+test('account added output exposes only the public Account id', () => {
+  expect(formatAccountAdded({ accountId: 'account-1' })).toBe(
+    'account added: account-1',
+  )
 })

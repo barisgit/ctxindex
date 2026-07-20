@@ -28,17 +28,27 @@ test('relocated compiled CLI installs and loads a local Git Catalog Extension', 
   const buildPath = join(sandbox, 'build', 'ctxindex')
   const relocatedPath = join(sandbox, 'relocated', 'ctxindex')
   const repository = join(sandbox, 'repository')
+  const extensionPackage = join(repository, 'extension-package')
   try {
     await mkdir(join(sandbox, 'build'), { recursive: true })
     await mkdir(join(sandbox, 'relocated'), { recursive: true })
     await mkdir(repository)
+    await mkdir(extensionPackage)
     expect(
       (await runProcess(['git', 'init', '-b', 'main'], { cwd: repository }))
         .exitCode,
     ).toBe(0)
     await writeFile(
-      join(repository, 'extension.ts'),
-      `export default ({ defineExtension }) => defineExtension({ id: 'fixture.compiled-catalog', version: 1, profiles: [], adapters: [] })\n`,
+      join(extensionPackage, 'package.json'),
+      JSON.stringify({
+        name: '@fixture/compiled-catalog',
+        type: 'module',
+        ctxindex: { extensions: ['./extension.js'] },
+      }),
+    )
+    await writeFile(
+      join(extensionPackage, 'extension.js'),
+      `export const buildMarker = 'initial'\nexport default { kind: 'extension', id: 'fixture.compiled-catalog', adapters: [], oauthApps: [], providers: [], profiles: [] }\n`,
     )
     await writeFile(
       join(repository, 'ctxindex-catalog.json'),
@@ -49,7 +59,7 @@ test('relocated compiled CLI installs and loads a local Git Catalog Extension', 
           {
             id: 'fixture.compiled-catalog',
             version: 1,
-            source: { kind: 'inline', path: 'extension.ts' },
+            source: { kind: 'inline', path: 'extension-package' },
           },
         ],
       }),
@@ -114,12 +124,15 @@ test('relocated compiled CLI installs and loads a local Git Catalog Extension', 
     expect(added.exitCode, added.stderr).toBe(0)
     const addedCommit = JSON.parse(added.stdout).commit
     await writeFile(
-      join(repository, 'extension.ts'),
-      `export default ({ defineExtension }) => defineExtension({ id: 'fixture.compiled-catalog', version: 1, profiles: [], adapters: [], docs: { summary: 'Refreshed compiled fixture' } })\n`,
+      join(extensionPackage, 'extension.js'),
+      `export const buildMarker = 'refreshed'\nexport default { kind: 'extension', id: 'fixture.compiled-catalog', adapters: [], oauthApps: [], providers: [], profiles: [] }\n`,
     )
     expect(
-      (await runProcess(['git', 'add', 'extension.ts'], { cwd: repository }))
-        .exitCode,
+      (
+        await runProcess(['git', 'add', 'extension-package/extension.js'], {
+          cwd: repository,
+        })
+      ).exitCode,
     ).toBe(0)
     expect(
       (
@@ -156,7 +169,6 @@ test('relocated compiled CLI installs and loads a local Git Catalog Extension', 
       expect.arrayContaining([
         expect.objectContaining({
           id: 'fixture.compiled-catalog',
-          summary: 'Refreshed compiled fixture',
           provenance: expect.objectContaining({
             kind: 'catalog',
             catalog: 'fixture',

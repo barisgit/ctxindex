@@ -1,5 +1,22 @@
 import type { z } from 'zod'
-import type { ProfileReference } from './reference'
+
+export type DefinitionVersion = number
+
+interface ProfileIdentity {
+  readonly id: string
+  readonly version: DefinitionVersion
+}
+
+type PayloadFunction<TPayload, TResult> = {
+  bivarianceHack(payload: TPayload): TResult
+}['bivarianceHack']
+
+type PayloadRender<TPayload> = {
+  bivarianceHack(
+    payload: TPayload,
+    dependencies?: unknown,
+  ): ProfileExportRenderResult
+}['bivarianceHack']
 
 export type ProfileExportRenderResult = string | Uint8Array
 
@@ -34,16 +51,13 @@ export type FieldType =
 
 export interface ProfileField<TPayload = unknown> {
   readonly type: FieldType
-  readonly extract: (payload: TPayload) => unknown
-  readonly docs?: string
+  readonly extract: PayloadFunction<TPayload, unknown>
 }
 
 export interface ProfileAction<TInput extends z.ZodTypeAny = z.ZodTypeAny> {
   readonly effect: 'reversible' | 'irreversible'
   readonly input: TInput
-  readonly output: ProfileReference
-  readonly docs: string
-  readonly examples?: readonly unknown[]
+  readonly output: ProfileIdentity
 }
 
 export interface ProfileDefinition<
@@ -51,40 +65,34 @@ export interface ProfileDefinition<
   TVersion extends number = number,
   TSchema extends z.ZodTypeAny = z.ZodTypeAny,
 > {
+  readonly kind: 'profile'
   readonly id: TId
   readonly version: TVersion
   readonly schema: TSchema
   readonly search?: {
-    readonly title?: (payload: z.infer<TSchema>) => string | null
-    readonly summary?: (payload: z.infer<TSchema>) => string | null
-    readonly occurredAt?: (payload: z.infer<TSchema>) => Date | null
-    readonly chunks?: (payload: z.infer<TSchema>) => readonly string[]
+    readonly title?: PayloadFunction<z.infer<TSchema>, string | null>
+    readonly summary?: PayloadFunction<z.infer<TSchema>, string | null>
+    readonly occurredAt?: PayloadFunction<z.infer<TSchema>, Date | null>
+    readonly chunks?: PayloadFunction<z.infer<TSchema>, readonly string[]>
     readonly fields?: Readonly<Record<string, ProfileField<z.infer<TSchema>>>>
   }
   readonly relations?: Readonly<
-    Record<string, (payload: z.infer<TSchema>) => ProfileRelationTargets>
+    Record<string, PayloadFunction<z.infer<TSchema>, ProfileRelationTargets>>
   >
-  readonly artifacts?: (
-    payload: z.infer<TSchema>,
-  ) => readonly ArtifactDescriptor[]
+  readonly artifacts?: PayloadFunction<
+    z.infer<TSchema>,
+    readonly ArtifactDescriptor[]
+  >
   readonly exports?: Readonly<
     Record<
       string,
       {
         readonly mediaType: string
-        readonly render: (
-          payload: z.infer<TSchema>,
-          dependencies?: unknown,
-        ) => ProfileExportRenderResult
+        readonly render: PayloadRender<z.infer<TSchema>>
       }
     >
   >
   readonly actions?: Readonly<Record<string, ProfileAction>>
-  readonly docs?: {
-    readonly summary: string
-    readonly aliases?: readonly string[]
-    readonly examples?: readonly unknown[]
-  }
 }
 
 export type AnyProfileDefinition = ProfileDefinition<
@@ -101,7 +109,7 @@ export function defineProfile<
   const TVersion extends number,
   TSchema extends z.ZodTypeAny,
 >(
-  definition: ProfileDefinition<TId, TVersion, TSchema>,
+  definition: Omit<ProfileDefinition<TId, TVersion, TSchema>, 'kind'>,
 ): ProfileDefinition<TId, TVersion, TSchema> {
-  return definition
+  return { ...definition, kind: 'profile' }
 }

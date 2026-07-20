@@ -11,7 +11,6 @@ export const sources = sqliteTable(
       .notNull()
       .references(() => realms.id),
     adapterId: text('adapter_id').notNull(),
-    adapterVersion: integer('adapter_version', { mode: 'number' }).notNull(),
     grantId: text('grant_id').references(() => grants.id),
     label: text('label').notNull().unique(),
     configJson: text('config_json').notNull(),

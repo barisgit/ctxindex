@@ -1,13 +1,14 @@
-import type { ResolvedOAuthClient, ResolveOAuthClientInput } from '../client'
 import { readEnvironmentVariable } from '../config'
 import { CtxindexAuthError } from '../errors'
-import type { AdapterRegistry } from '../registry'
+import type { ResolvedOAuthApp } from '../oauth-app'
+import type { CompleteRegistry } from '../registry'
 import { openOAuthLoopback } from './loopback'
 import {
   assertOAuthProviderHost,
   fetchOAuthIdentity,
   postOAuthToken,
   resolveInitialGrantedScopes,
+  resolveOAuthAppCredentials,
   resolveOAuthEndpoint,
 } from './oauth'
 import { resolveOAuthSelection } from './selection'
@@ -15,16 +16,17 @@ import type { AddGrantResult, AuthService } from './types'
 
 export interface AuthorizeProviderInput {
   readonly provider: string
+  readonly app: string
   readonly mode: 'loopback' | 'from-env'
-  readonly client?: string
   readonly label?: string
 }
 export interface AuthorizeProviderDependencies {
-  readonly registry: AdapterRegistry
+  readonly registry: CompleteRegistry
   readonly authService: AuthService
-  readonly resolveClient: (
-    input: ResolveOAuthClientInput,
-  ) => Promise<ResolvedOAuthClient>
+  readonly resolveApp: (
+    providerId: string,
+    label: string,
+  ) => Promise<ResolvedOAuthApp>
   readonly readEnvironment?: (name: string) => string | undefined
   readonly launchBrowser?: (url: string) => Promise<void> | void
   readonly emitAuthorizationUrl?: (url: string) => void
@@ -39,26 +41,15 @@ export async function authorizeProvider(
   input: AuthorizeProviderInput,
   deps: AuthorizeProviderDependencies,
 ): Promise<AuthorizeProviderResult> {
+  const app = await deps.resolveApp(input.provider, input.app)
   const selection = resolveOAuthSelection(deps.registry, input.provider)
   const provider = selection.provider
   const readEnvironment = deps.readEnvironment ?? readEnvironmentVariable
-  const client = await deps.resolveClient({
-    provider: provider.id,
-    ...(input.client === undefined ? {} : { label: input.client }),
-  })
-  const clientId = client.clientId
-  const clientSecret = client.clientSecret
-  if (provider.client.secret === 'required' && !clientSecret)
-    throw new CtxindexAuthError(
-      'missing_oauth_client_creds',
-      'OAuth client secret is unavailable',
-    )
+  const { clientId, clientSecret } = resolveOAuthAppCredentials(app.config)
   let token: import('./oauth').OAuthTokenResponse
   let durableRefreshToken: string
   if (input.mode === 'from-env') {
-    const refreshToken = provider.environment.refreshToken
-      ? readEnvironment(provider.environment.refreshToken)
-      : undefined
+    const refreshToken = readEnvironment('CTXINDEX_OAUTH_REFRESH_TOKEN')
     if (!refreshToken)
       throw new CtxindexAuthError(
         'invalid_grant',
@@ -129,8 +120,7 @@ export async function authorizeProvider(
       ...(input.label !== undefined ? { label: input.label } : {}),
     },
     scopes,
-    clientId,
-    ...(clientSecret ? { clientSecret } : {}),
+    appConfig: app.config,
     accessToken: token.accessToken,
     refreshToken: durableRefreshToken,
     expiresAt,

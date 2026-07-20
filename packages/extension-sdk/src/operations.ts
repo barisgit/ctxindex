@@ -3,7 +3,11 @@ import type {
   FieldType,
   ResolvedArtifactDescriptor,
 } from './profile'
-import type { ProfileReference } from './reference'
+
+interface ResourceProfileIdentity {
+  readonly id: string
+  readonly version: number
+}
 
 export interface AdapterSourceContext {
   readonly id: string
@@ -28,7 +32,7 @@ export type SyncMode = 'sync' | 'resync' | 'diff'
 
 export interface RetrievedResource<TPayload = unknown> {
   readonly ref: string
-  readonly profile: ProfileReference
+  readonly profile: ResourceProfileIdentity
   readonly title?: string | null
   readonly summary?: string | null
   readonly occurredAt?: number | null
@@ -62,6 +66,7 @@ export interface SyncContext extends ProviderContext {
 export interface SearchRemoteQuery {
   readonly text: string
   readonly limit: number
+  readonly continuation?: string
   readonly since?: number
   readonly until?: number
   readonly fields?: readonly SearchFieldFilter[]
@@ -75,7 +80,7 @@ export interface SearchFieldFilter {
 
 export interface SearchRemoteResource<TPayload = unknown> {
   readonly ref: string
-  readonly profile: ProfileReference
+  readonly profile: ResourceProfileIdentity
   readonly title?: string | null
   readonly summary?: string | null
   readonly occurredAt?: number | null
@@ -92,6 +97,7 @@ export interface SearchRemoteWarning {
 export interface SearchRemoteResult {
   readonly resources: readonly SearchRemoteResource[]
   readonly warnings: readonly SearchRemoteWarning[]
+  readonly continuation?: string
 }
 
 export interface SearchContext extends ProviderContext {
@@ -115,14 +121,27 @@ export interface DownloadContext extends ProviderContext {
 export interface ActionResource {
   readonly ref: string
   readonly sourceId: string
-  readonly profile: ProfileReference
+  readonly profile: ResourceProfileIdentity
   readonly completeness: 'partial' | 'complete'
   readonly deletedAt: number | null
   readonly payload: unknown | null
+}
+
+export interface ActionArtifact {
+  readonly ref: string
+  readonly originRef: string
+  readonly filename: string
+  readonly mediaType: string
+  readonly byteSize: number
+  readonly bytes: Uint8Array
 }
 
 export interface ActionContext<TInput = unknown> extends ProviderContext {
   readonly input: TInput
   readonly signal: AbortSignal
   readonly resolveResource: (ref: string) => ActionResource | null
+  readonly resolveArtifact: (
+    ref: string,
+    maxByteSize?: number,
+  ) => Promise<ActionArtifact | null>
 }

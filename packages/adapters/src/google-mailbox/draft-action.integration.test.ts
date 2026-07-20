@@ -40,13 +40,13 @@ async function freshDb(): Promise<Database> {
     "INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES ('account-1', 'google', 'Test', 'subject-1', 1, 1)",
   ).run()
   db.prepare(
-    `INSERT INTO grants (id, account_id, provider, scopes_json, created_at, updated_at)
-     VALUES ('grant-1', 'account-1', 'google', ?, 1, 1)`,
+    `INSERT INTO grants (id, account_id, provider, scopes_json, app_config_ref, created_at, updated_at)
+     VALUES ('grant-1', 'account-1', 'google', ?, 'keychain:test/app-config', 1, 1)`,
   ).run(JSON.stringify(scopes))
   db.prepare(
     `INSERT INTO sources
-       (id, realm_id, label, adapter_id, adapter_version, grant_id, config_json, sync_enabled, created_at, updated_at)
-     VALUES (?, 'realm-1', 'Google Mailbox Fixture', 'google.mailbox', 1, 'grant-1', '{}', 1, 1, 1)`,
+       (id, realm_id, label, adapter_id, grant_id, config_json, sync_enabled, created_at, updated_at)
+     VALUES (?, 'realm-1', 'Google Mailbox Fixture', 'google.mailbox', 'grant-1', '{}', 1, 1, 1)`,
   ).run(sourceId)
   return db
 }
@@ -253,12 +253,12 @@ describe('Gmail Draft Action integration', () => {
     expect({ tokenCalls, fetchCalls }).toEqual({ tokenCalls: 2, fetchCalls: 2 })
   })
 
-  test('materializes an addressed provider Draft that was absent locally', async () => {
+  test('rejects an addressed provider Draft with unknown attachment provenance before I/O', async () => {
     const db = await freshDb()
     let fetchCalls = 0
     const ref = `ctx://${sourceId}/draft/provider-only`
 
-    const result = await runAction({
+    const error = await runAction({
       db,
       registry,
       authService: authService(() => {}),
@@ -279,11 +279,12 @@ describe('Gmail Draft Action integration', () => {
           message: { id: 'message-id-2' },
         })
       }) as unknown as typeof fetch,
-    })
+    }).catch((caught: unknown) => caught)
 
-    expect(result.resource.ref).toBe(ref)
-    expect(fetchCalls).toBe(1)
-    expect(resourceCount(db)).toBe(1)
+    expect(error).toMatchObject({ code: 'invalid_action_input' })
+    expect(String(error)).toContain('is not available locally')
+    expect(fetchCalls).toBe(0)
+    expect(resourceCount(db)).toBe(0)
   })
 
   test('foreign-source Draft Ref performs no provider fetch or Resource write', async () => {

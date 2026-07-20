@@ -150,6 +150,24 @@
   text-decoration-line: underline;
 }
 
+.legal-document code {
+  border-radius: 0.25rem;
+  background: var(--color-fd-muted);
+  padding: 0.125rem 0.375rem;
+  color: var(--color-fd-foreground);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 0.875em;
+}
+
+.legal-document ul {
+  list-style: disc;
+  padding-inline-start: 1.5rem;
+}
+
+.legal-document li + li {
+  margin-top: 0.5rem;
+}
+
 html {
   scrollbar-gutter: stable;
 }

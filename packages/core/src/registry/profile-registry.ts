@@ -1,8 +1,6 @@
-import type {
-  AnyProfileDefinition,
-  ProfileReference,
-} from '@ctxindex/extension-sdk'
+import type { AnyProfileDefinition } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
+import { isDefinitionId } from './definition-id'
 
 export type DefinitionRegistryErrorCode =
   | 'invalid_definition'
@@ -33,69 +31,76 @@ const schemaSchema = z.custom<z.ZodTypeAny>(
     'safeParse' in value &&
     typeof value.safeParse === 'function',
 )
-const referenceSchema = z.object({
-  id: z.string().min(1),
-  version: z.number().int().positive(),
-})
-const profileDefinitionSchema = z.object({
-  id: z.string().min(1),
-  version: z.number().int().positive(),
-  schema: schemaSchema,
-  search: z
-    .object({
-      title: functionSchema.optional(),
-      summary: functionSchema.optional(),
-      occurredAt: functionSchema.optional(),
-      chunks: functionSchema.optional(),
-      fields: z
-        .record(
-          z.string(),
-          z.object({
-            type: z.enum([
-              'string',
-              'string[]',
-              'number',
-              'number[]',
-              'boolean',
-              'datetime',
-            ]),
-            extract: functionSchema,
-            docs: z.string().optional(),
-          }),
-        )
-        .optional(),
-    })
-    .optional(),
-  relations: z.record(z.string(), functionSchema).optional(),
-  artifacts: functionSchema.optional(),
-  exports: z
-    .record(
-      z.string(),
-      z.object({ mediaType: z.string().min(1), render: functionSchema }),
-    )
-    .optional(),
-  actions: z
-    .record(
-      z.string().min(1),
-      z.object({
-        effect: z.enum(['reversible', 'irreversible']),
-        input: schemaSchema,
-        output: referenceSchema,
-        docs: z.string().min(1),
-        examples: z.array(z.unknown()).readonly().optional(),
-      }),
-    )
-    .optional(),
-  docs: z
-    .object({
-      summary: z.string().min(1),
-      aliases: z.array(z.string().min(1)).readonly().optional(),
-      examples: z.array(z.unknown()).readonly().optional(),
-    })
-    .optional(),
-})
+const referenceSchema = z
+  .object({
+    id: z.string().refine(isDefinitionId, 'Invalid definition id'),
+    version: z.number().int().positive(),
+  })
+  .strict()
+const profileDefinitionSchema = z
+  .object({
+    kind: z.literal('profile'),
+    id: z.string().refine(isDefinitionId, 'Invalid definition id'),
+    version: z.number().int().positive(),
+    schema: schemaSchema,
+    search: z
+      .object({
+        title: functionSchema.optional(),
+        summary: functionSchema.optional(),
+        occurredAt: functionSchema.optional(),
+        chunks: functionSchema.optional(),
+        fields: z
+          .record(
+            z.string(),
+            z
+              .object({
+                type: z.enum([
+                  'string',
+                  'string[]',
+                  'number',
+                  'number[]',
+                  'boolean',
+                  'datetime',
+                ]),
+                extract: functionSchema,
+              })
+              .strict(),
+          )
+          .optional(),
+      })
+      .strict()
+      .optional(),
+    relations: z.record(z.string(), functionSchema).optional(),
+    artifacts: functionSchema.optional(),
+    exports: z
+      .record(
+        z.string(),
+        z
+          .object({ mediaType: z.string().min(1), render: functionSchema })
+          .strict(),
+      )
+      .optional(),
+    actions: z
+      .record(
+        z.string().min(1),
+        z
+          .object({
+            effect: z.enum(['reversible', 'irreversible']),
+            input: schemaSchema,
+            output: referenceSchema,
+          })
+          .strict(),
+      )
+      .optional(),
+  })
+  .strict()
 
-function definitionKey(reference: ProfileReference): string {
+export interface ProfileIdentity {
+  readonly id: string
+  readonly version: number
+}
+
+function definitionKey(reference: ProfileIdentity): string {
   return `${reference.id}@${reference.version}`
 }
 
@@ -162,7 +167,7 @@ export class ProfileRegistry {
     return [...this.#profiles.values()]
   }
 
-  get(reference: ProfileReference): AnyProfileDefinition | undefined {
+  get(reference: ProfileIdentity): AnyProfileDefinition | undefined {
     return this.#profiles.get(definitionKey(reference))
   }
 
@@ -174,18 +179,7 @@ export class ProfileRegistry {
         .map((profile) => profile.id)
         .filter((id) => id.toLocaleLowerCase() === kind),
     )
-    const ids =
-      canonicalIds.size > 0
-        ? canonicalIds
-        : new Set(
-            profiles
-              .filter((profile) =>
-                (profile.docs?.aliases ?? []).some(
-                  (alias) => alias.toLocaleLowerCase() === kind,
-                ),
-              )
-              .map((profile) => profile.id),
-          )
+    const ids = canonicalIds
     if (ids.size === 0) return { status: 'unknown', kind }
     const candidates = [...ids].sort()
     if (candidates.length > 1) {
@@ -201,7 +195,7 @@ export class ProfileRegistry {
     }
   }
 
-  resolve(reference: ProfileReference): ProfileResolution {
+  resolve(reference: ProfileIdentity): ProfileResolution {
     const profile = this.get(reference)
     if (profile) {
       return { status: 'known', profile }

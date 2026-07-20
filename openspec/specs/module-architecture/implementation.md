@@ -21,80 +21,20 @@ These listings prioritize interfaces, type aliases, discriminated unions, and fu
   bundled provider implementations
 ```
 
-### @ctxindex/extension-sdk — capability-gated Adapter contract
+### @ctxindex/extension-sdk — imported-value authoring boundary
 
-```ts
-export type AdapterCapability =
-  | 'sync'
-  | 'search-remote'
-  | 'retrieve'
-  | 'download'
-
-export type AdapterOperations = {
-  readonly sync?: (context: SyncContext) => void | Promise<void>
-  readonly searchRemote?: (
-    context: SearchContext,
-  ) => Promise<SearchRemoteResult>
-  readonly retrieve?: (context: RetrieveContext) => void | Promise<void>
-  readonly download?: (context: DownloadContext) => void | Promise<void>
-}
-
-export type AdapterOperationsFor<
-  TCapabilities extends readonly AdapterCapability[],
-> = CapabilityOperation<TCapabilities, 'sync', 'sync'> &
-  CapabilityOperation<TCapabilities, 'search-remote', 'searchRemote'> &
-  CapabilityOperation<TCapabilities, 'retrieve', 'retrieve'> &
-  CapabilityOperation<TCapabilities, 'download', 'download'>
-
-export interface AdapterDefinition<
-  TId extends string = string,
-  TVersion extends number = number,
-  TConfigSchema extends z.ZodTypeAny = z.ZodTypeAny,
-  TCapabilities extends
-    readonly AdapterCapability[] = readonly AdapterCapability[],
-  TActions extends Readonly<Record<string, AdapterActionBinding>> = Readonly<
-    Record<string, AdapterActionBinding>
-  >,
-  TAuth extends AdapterAuthSpec = AdapterAuthSpec,
-> {
-  readonly id: TId
-  readonly version: TVersion
-  readonly configSchema: TConfigSchema
-  readonly auth: TAuth
-  readonly providerApiHosts?: readonly string[]
-  readonly profiles: readonly ProfileReference[]
-  readonly routing: SearchRouting
-  readonly capabilities: TCapabilities
-  readonly operations: AdapterOperationsFor<TCapabilities>
-  readonly actions: TActions
-  readonly docs?: { readonly summary: string }
-}
-
-export function defineAdapter<
-  const TId extends string,
-  const TVersion extends number,
-  TConfigSchema extends z.ZodTypeAny,
-  const TCapabilities extends readonly AdapterCapability[],
-  const TActions extends Readonly<Record<string, AdapterActionBinding>>,
-  const TAuth extends AdapterAuthSpec,
->(
-  definition: AdapterDefinition<
-    TId,
-    TVersion,
-    TConfigSchema,
-    TCapabilities,
-    TActions,
-    TAuth
-  >,
-): AdapterDefinition<
-  TId,
-  TVersion,
-  TConfigSchema,
-  TCapabilities,
-  TActions,
-  TAuth
->;
+```text
+@ctxindex/extension-sdk
+  z and core-independent plain-value factories/types
+  Profile, Provider, OAuth App, Adapter, and Extension definitions
+  direct auth.oauth2 and auth.none constructors
+  pure Extension-root documentation descriptors and eager virtual trees
+  no leaf docs, reference factories, dependency graph, host callback, or registration
 ```
+
+Provider and Profile use sites accept exact imported values. Adapter types discriminate OAuth2 Provider-backed, `none` Provider-backed, and providerless shapes so Provider authorization, access, and egress fields are impossible on providerless Adapters.
+
+Package manifests and ordinary imports own workspace, local, Git, and npm dependencies. `@ctxindex/profiles` is an ordinary library rather than a privileged or always-selected Extension.
 
 ### @ctxindex/cli and @ctxindex/core — composition entrypoints
 
@@ -112,10 +52,10 @@ export async function loadExtensions(
 
 ctxindex is a Bun and TypeScript monorepo; Node is not a build target. Bun remains pinned through `packageManager` at 1.3.14. The distribution target is the CLI entrypoint compiled with `bun build --compile`; migration SQL is imported as text and bundled skills are embedded so relocated binaries retain both.
 
-The CLI composes services, parses arguments, formats output, and maps errors. It owns no provider HTTP, SQL, identity generation, or domain behavior. Core owns orchestration and every SQLite table/migration; Profiles own provider-neutral validation and projections; Adapters own provider transport and normalization; the SDK owns public authoring contracts. Workspace dependencies point only toward those public lower seams.
+The CLI composes services, parses arguments, formats output, and maps errors. It owns no provider HTTP, SQL, identity generation, or domain behavior. Core owns orchestration, persistence, the source-neutral `ctxindex.extensions` entry resolver, namespace/root and reachable-leaf collectors, conservative duplicate handling, complete-registry validation, and atomic activation. Providers own auth and OAuth App registration contracts; Profiles own provider-neutral validation and projections; Adapters own Provider access, transport, normalization, operations, and Actions; the SDK owns core-independent plain-value authoring contracts. Extension roots only compose imported values and may declare one documentation sidecar, while package tooling owns dependencies. Core resolves sidecars before registry activation and excludes them from definition equivalence. Built-in, explicit-path, and Catalog origins enter the same collector and activation boundary.
 
 The repository is pre-alpha. Implementation starts from the fresh schema and adds no prototype compatibility or data migration path.
 
 ## Verification
 
-Use Bun's colocated unit/integration/e2e tests. Storage tests create fresh sandboxes; provider tests use loopback-only authorized HTTP. `scripts/verify/architecture-lint.ts`, package-dependency checks, and relocated compiled-host and CLI tests enforce this shape.
+Use Bun's colocated unit/integration/e2e tests. Storage tests create fresh sandboxes; provider tests use loopback-only authorized HTTP. `scripts/verify/architecture-lint.ts`, package-dependency checks, SDK inference fixtures, common-origin activation tests, documentation resolver/projection tests, and relocated compiled-host and CLI tests enforce this shape. Verification rejects leaf documentation, reference/dependency/host-callback surfaces, providerless authorization fields, origin-specific registration, and pre-validation registry mutation.

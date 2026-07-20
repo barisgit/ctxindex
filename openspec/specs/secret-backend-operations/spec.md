@@ -6,15 +6,15 @@ Define safe secret backend inspection, crash-safe backend switching, explicit ru
 ## Requirements
 
 ### Requirement: Secret backend status is safe and explicit
-The system SHALL expose the configured secret backend, its availability, and aggregate referenced-secret counts through readable and deterministic JSON output. Status output, diagnostics, and logs MUST NOT include secret values, secret keys, credentials, authorization headers, or refresh/access tokens.
+The system SHALL expose the configured secret backend, availability, and aggregate referenced-secret counts through deterministic JSON output. Aggregate counts MUST include local OAuth App config references, private Grant App-snapshot references, and token references without distinguishing or exposing secret values. Status, diagnostics, logs, and OAuth App inventory MUST NOT include secret values, config values, config keys, environment values, credentials, authorization headers, tokens, client ids, desktop-secret metadata, or typed secret references.
 
-#### Scenario: Agent inspects secret storage
-- **WHEN** an agent runs `secrets status --json`
-- **THEN** the command returns the configured backend, availability, and aggregate counts without opening or rendering any secret value
+#### Scenario: Agent inspects storage containing Apps and Grants
+- **WHEN** an agent runs `secrets status --json` while local Apps and authorized Accounts exist
+- **THEN** output reports only backend status and aggregate counts without opening or rendering App config or Grant snapshot values
 
-#### Scenario: Unavailable backend is reported without fallback
+#### Scenario: Unavailable backend has no fallback
 - **WHEN** the configured backend cannot be opened
-- **THEN** status identifies it as unavailable and no alternative backend becomes active implicitly
+- **THEN** status identifies it as unavailable and no alternate backend becomes active implicitly
 
 ### Requirement: Backend selection moves secrets crash-safely
 `secrets backend set <keychain|file>` SHALL validate target key material and availability, copy secret entries before changing references, preserve source copies until all durable references and configuration select the target, and be idempotently resumable after interruption. The configured backend MUST change only after target copies are usable. Mixed typed references left by an interrupted operation MUST remain resolvable by their own URI backend until the operation is completed.
@@ -39,37 +39,97 @@ Secret reads SHALL route by typed secret reference, while new writes SHALL use e
 - **THEN** an attempted credential write fails and creates no encrypted-file secret or contradictory configuration
 
 ### Requirement: Long-lived secret input avoids process arguments
-The CLI MUST NOT accept a secret-store passphrase, refresh token, access token, or OAuth client secret as a literal command argument. OAuth client credentials SHALL be read from the provider's declared environment names only during `client add --from-env`, then persisted through typed secret references; authorization and refresh MUST NOT read them from the environment. Other secret inputs SHALL resolve through the central environment/typed-secret mechanism or an explicitly prepared private key file, and help text MUST identify the safe input path without echoing values.
+The CLI MUST NOT accept a secret-store passphrase, refresh token, access token, OAuth App config value, client id, client secret, authorization code, or generic App-config JSON as a literal argument.
+
+Only `oauth-app add <provider> <label> --from-env` MAY import local BYOA App config from the process environment. It SHALL resolve the active Provider before environment access, use the Provider OAuth registration's typed top-level config-key-to-environment-name mapping, read through the central environment loader, assemble the config by key, and validate the complete config schema before persistence. Unknown Provider selection SHALL fail before environment/secret reads. Missing or invalid values SHALL fail before secret-store writes, database mutation, browser launch, or Provider egress. Successful import SHALL persist values through typed secret references and SHALL clean every new reference if metadata persistence fails.
+
+Account authorization SHALL read the selected active Extension App or persisted local App, then copy the exact config into Grant-owned secret references. Authorization and refresh MUST NOT consult Provider environment mappings or reread App config from environment variables. Other secret input SHALL use the central environment/typed-secret mechanism or an explicitly prepared private key file, and help MUST identify safe input paths without echoing values.
+
+#### Scenario: Local BYOA reads environment once
+- **WHEN** `oauth-app add google work --from-env` succeeds
+- **THEN** later authorization and refresh use persisted App/Grant references even if the mapped environment variables change or disappear
+
+#### Scenario: Literal App config is rejected
+- **WHEN** a caller supplies a client-id, client-secret, config JSON, or secret flag to `oauth-app add`
+- **THEN** parsing exits `2` before dependencies open and the supplied value is not logged
 
 #### Scenario: Legacy passphrase option is rejected
 - **WHEN** a caller supplies `secrets backend set file --passphrase <value>`
 - **THEN** parsing fails before dependencies open and the value is not logged
 
 #### Scenario: File backend uses prepared key material
-- **WHEN** the caller explicitly selects file storage with supported environment or private key-file material
-- **THEN** the encrypted file backend becomes usable without a passphrase appearing in argv
+- **WHEN** file storage is selected with supported environment or private key-file material
+- **THEN** it becomes usable without a passphrase appearing in argv
 
 ### Requirement: Secret storage and typed references
-The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.
+ctxindex MUST store OAuth App configuration, OAuth tokens, and other secrets outside SQLite by default, using the configured OS keychain where available. SQLite and declarative config MUST store typed secret references, not raw values. An encrypted local store MAY exist where no keychain is usable.
 
-ctxindex MUST store OAuth tokens, API keys, and other secrets outside SQLite by default, using the OS keychain where available.
+Local BYOA App records MUST contain typed references for App config values. Each private Grant MUST own typed references for its exact App-config snapshot and token state. Removing a local or Extension App MUST NOT remove Grant-owned snapshots. Reauthorization MUST write and verify replacement snapshot references before durably swapping them and cleaning superseded references.
 
-SQLite and declarative config MUST store secret references, not raw secrets.
+The configured backend MUST be the only destination for new writes. Reads/deletes MUST route by each typed reference. Backend status, copy/verify switching, cleanup, and orphan traversal MUST include local App config references, Grant snapshot references, and token references. A move MUST copy and validate all target entries before changing durable references or configured backend, retain sources until durable commit, and resume safely after interruption.
 
-An encrypted local secret-store fallback MAY exist for environments without a usable OS keychain.
+Secret values, config values, keys, tokens, client secrets, and encryption passphrases MUST NOT appear in output, logs, inventory, or literal process arguments.
 
-The configured backend MUST be the only destination for new secret writes. Runtime MUST NOT silently fall back to another backend when it is unavailable. Reads and deletes MUST resolve an existing secret according to its typed reference so an interrupted explicit backend move cannot strand mixed references.
-
-An explicit backend move MUST copy and validate target entries before changing durable references or configured backend, retain source entries until the target is selected durably, and be safely retryable after interruption. Secret values, keys, access/refresh tokens, client secrets, and encryption passphrases MUST NOT appear in command output, logs, or literal process arguments.
-
-Secret references in declarative config (TOML or otherwise) MUST be one of the following typed URI forms:
+Secret references in declarative config MUST use one of these typed URI forms:
 
 - `keychain:<service>/<account>/<key>` — OS keychain entry.
-- `file:<absolute-or-config-relative-path>#<key>` — entry inside an encrypted secrets file.
-- `env:<VAR_NAME>` or `env://<VAR_NAME>` — environment variable, resolved through the central env loader (no direct `process.env` reads outside the loader). The variable name MUST match `^[A-Z_][A-Z0-9_]*$`.
+- `file:<absolute-or-config-relative-path>#<key>` — encrypted secrets-file entry.
+- `env:<VAR_NAME>` or `env://<VAR_NAME>` — environment variable resolved only through the central loader, where the name matches `^[A-Z_][A-Z0-9_]*$`.
 
-A bare secret string in config (no URI scheme) MUST be rejected at config-load time with an actionable error.
+A bare secret string in declarative config MUST reject at config-load time with an actionable error.
 
-#### Scenario: Secrets stay outside SQLite and resolve through typed references
-- **WHEN** a conforming implementation exercises this contract
-- **THEN** it satisfies every applicable MUST and MUST NOT clause and treats SHOULD, SHOULD NOT, and MAY clauses according to their normative meanings
+#### Scenario: Backend switch includes App and Grant state
+- **WHEN** an operator switches backends with local Apps and authorized Accounts
+- **THEN** every App config, Grant snapshot, and token reference copies and verifies before old references are cleaned
+
+#### Scenario: Removed App does not strand refresh
+- **WHEN** an OAuth App is removed after authorization
+- **THEN** its Account refreshes from Grant-owned references without App inventory or environment access
+
+### Requirement: Keychain inventory mutations are process-consistent
+Within one ctxindex process, Keychain-backed secret writes, deletes, and inventory reads MUST observe one serialized inventory mutation order across all backend instances. Every successful write MUST appear exactly once in inventory, every successful delete MUST be absent, and concurrent successful mutations MUST NOT overwrite one another.
+
+A write whose inventory publication fails MUST fail before reporting or returning a usable new reference. If the credential write reports failure after inventory publication, the operation MUST attempt to restore the prior inventory and MUST fail with the existing bounded backend error. Successful compensation restores the prior inventory. If compensation also reports failure, the original credential-write failure remains authoritative, no reference or success is returned, and the inventory MAY retain the intended entry or reflect another backend-completed state; ctxindex MUST NOT claim whether the native credential write took effect. A delete whose credential or inventory mutation fails MUST fail without being reported as complete. Failed compensation MUST NOT expose secret values or references in diagnostics.
+
+The Keychain availability probe MUST use one stable reserved credential identity in a service namespace structurally distinct from every valid `ctxindex/<scope>` secret service, MUST attempt deletion after every successful probe write even when the read fails, and MUST report read or cleanup failure as the existing bounded backend-unavailable error. A later probe MUST retry through the same identity rather than create another uniquely named probe credential. Probing MUST NOT overwrite or delete a scoped secret for any valid scope and key.
+
+#### Scenario: Concurrent writes preserve both entries
+- **WHEN** two Keychain secrets are written concurrently through separate backend instances in one process
+- **THEN** both successful references appear exactly once in deterministic inventory
+
+#### Scenario: Inventory publication fails before credential write
+- **WHEN** the reserved Keychain inventory cannot record a new entry
+- **THEN** the write fails through the existing secret-backend error mapping and no untracked credential is reported as successful
+
+#### Scenario: Credential write fails after inventory publication
+- **WHEN** the credential value cannot be persisted after its intended inventory entry is published
+- **THEN** ctxindex attempts to restore the previous inventory, reports the existing bounded backend failure, and reveals no secret material
+
+#### Scenario: Credential write and compensation both fail
+- **WHEN** a credential write reports failure and restoring the prior inventory also reports failure
+- **THEN** the credential-write failure remains authoritative, no reference or success is returned, and ctxindex makes no stronger claim about native backend state than the last completed inventory operation
+
+#### Scenario: Probe read or cleanup fails
+- **WHEN** the Keychain probe writes its reserved credential but reading or deleting it fails
+- **THEN** ctxindex attempts cleanup, reports the bounded backend-unavailable error, and the next probe retries the same credential identity without accumulating probe rows
+
+#### Scenario: Scoped secret resembles probe identity
+- **WHEN** a valid scoped secret uses `probe` and `__ctxindex_probe__` as its scope and key
+- **THEN** an availability probe uses a distinct service and leaves that secret unchanged
+
+### Requirement: Authentication cleanup failures are explicit and redacted
+Authentication lifecycle cleanup MUST count failures instead of silently discarding them. Cleanup failure before an operation's durable commit MUST preserve the operation's original failure. Cleanup failure after a durable Grant replacement, token refresh, or Account removal MUST NOT roll back usable committed state or change the existing public result and exit mapping; it MUST emit one bounded structured warning whose bindings contain only Provider id, Grant id, lifecycle phase, and failed-entry count.
+
+Cleanup warnings and errors MUST NOT contain Account id, secret values, OAuth App config keys or values, tokens, typed secret references, Keychain credential keys, caught backend errors, or any other sensitive field.
+
+#### Scenario: Reauthorization cleanup remains pending
+- **WHEN** replacement Grant references commit and one or more superseded Keychain entries cannot be deleted
+- **THEN** reauthorization succeeds with the replacement Grant and emits one redacted cleanup-pending warning with the failure count
+
+#### Scenario: Refresh cleanup remains pending
+- **WHEN** refreshed token references commit and deletion of a superseded token fails
+- **THEN** refresh returns the new usable token and emits one redacted cleanup-pending warning without changing its exit behavior
+
+#### Scenario: Rollback cleanup also fails
+- **WHEN** a pre-commit authorization or refresh failure is followed by failure to clean newly written temporary entries
+- **THEN** the original failure remains authoritative and a separate bounded warning reports only the cleanup failure count

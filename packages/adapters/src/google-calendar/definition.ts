@@ -1,4 +1,5 @@
 import { defineAdapter } from '@ctxindex/extension-sdk'
+import { calendarEventProfile } from '@ctxindex/profiles'
 import { googleOAuthProvider } from '../google-oauth-provider'
 import { googleCalendarSourceConfigSchema } from './config'
 import { googleCalendarRetrieve } from './retrieve'
@@ -8,15 +9,13 @@ export { googleCalendarSourceConfigSchema } from './config'
 
 export const googleCalendarAdapterDefinition = defineAdapter({
   id: 'google.calendar',
-  version: 1,
   configSchema: googleCalendarSourceConfigSchema,
-  auth: {
-    kind: 'oauth2',
-    provider: googleOAuthProvider,
+  provider: googleOAuthProvider,
+  access: {
     scopes: ['https://www.googleapis.com/auth/calendar.events.readonly'],
   },
   providerApiHosts: ['www.googleapis.com'],
-  profiles: [{ id: 'calendar.event', version: 1 }],
+  profiles: [calendarEventProfile],
   routing: 'indexed',
   capabilities: ['sync', 'retrieve'],
   operations: {
@@ -24,5 +23,4 @@ export const googleCalendarAdapterDefinition = defineAdapter({
     retrieve: googleCalendarRetrieve,
   },
   actions: {},
-  docs: { summary: 'Google Calendar events from one selected calendar.' },
 })

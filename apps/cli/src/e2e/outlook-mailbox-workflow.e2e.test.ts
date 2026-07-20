@@ -129,13 +129,21 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
       expect(result.exitCode, result.stderr).toBe(0)
     }
 
-    const client = await sandbox.run(
-      ['client', 'add', 'microsoft', '--from-env'],
+    const app = await sandbox.run(
+      ['oauth-app', 'add', 'microsoft', 'microsoft', '--from-env'],
       { env },
     )
-    expect(client.exitCode, client.stderr).toBe(0)
+    expect(app.exitCode, app.stderr).toBe(0)
     const authenticated = await sandbox.run(
-      ['account', 'add', 'microsoft', '--label', 'outlook'],
+      [
+        'account',
+        'add',
+        'microsoft',
+        '--app',
+        'microsoft',
+        '--label',
+        'outlook',
+      ],
       { env },
     )
     expect(authenticated.exitCode, authenticated.stderr).toBe(0)
@@ -173,19 +181,18 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
     })
     expect(inventoryResult.exitCode, inventoryResult.stderr).toBe(0)
     expect(inventoryResult.stdout).not.toContain('microsoft-work-subject')
+    expect(inventoryResult.stdout).not.toMatch(/grant|scope/i)
     const inventory = JSON.parse(inventoryResult.stdout) as {
       provider: string
       label: string
-      grants: { scopes: string[] }[]
+      sources: { label: string }[]
     }[]
     expect(inventory).toHaveLength(1)
     expect(inventory[0]?.provider).toBe('microsoft')
     expect(inventory[0]?.label).toBe('outlook')
-    expect(inventory[0]?.grants).toHaveLength(1)
-    expect(inventory[0]?.grants[0]?.scopes).toEqual([
-      'Calendars.Read',
-      'Mail.ReadWrite',
-      'User.Read',
+    expect(inventory[0]?.sources.map(({ label }) => label).sort()).toEqual([
+      'personal-outlook',
+      workSourceLabel,
     ])
     const sources = JSON.parse(
       (await sandbox.run(['source', 'list', '--json'], { env })).stdout,
@@ -194,6 +201,177 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
       'personal-outlook',
       workSourceLabel,
     ])
+
+    const enumerationBase = messages[0]
+    const hiddenDraft = messages[2]
+    if (!enumerationBase || !hiddenDraft) throw new Error('invalid fixture')
+    const enumeratedMessages = Array.from({ length: 55 }, (_, index) => ({
+      ...enumerationBase,
+      id: `enumerated-${String(index).padStart(2, '0')}`,
+      conversationId: `enumerated-conversation-${index}`,
+      internetMessageId: `<enumerated-${index}@example.test>`,
+      subject: `Enumerated message ${index}`,
+      bodyPreview: `Enumerated preview ${index}`,
+      body: `Enumerated body ${index}`,
+      isRead: index % 2 === 1,
+    }))
+    graph.setMessages([...enumeratedMessages, hiddenDraft])
+    graph.resetRequests()
+    const firstEnumeration = await sandbox.run(
+      [
+        'search',
+        '--remote',
+        '--source',
+        workSourceLabel,
+        '--kind',
+        'communication.message',
+        '--limit',
+        '100',
+        '--json',
+      ],
+      { env },
+    )
+    expect(firstEnumeration.exitCode, firstEnumeration.stderr).toBe(0)
+    const firstEnumerationJson = JSON.parse(firstEnumeration.stdout) as {
+      results: { ref: string }[]
+      pagination: {
+        limit: number
+        hasMore: boolean
+        continuation: string | null
+      }
+    }
+    expect(firstEnumerationJson.results).toHaveLength(50)
+    const firstEnumerationRequest = graph
+      .readRequests()
+      .find(({ pathname }) => pathname === '/v1.0/me/messages')
+    expect(
+      new URLSearchParams(firstEnumerationRequest?.search).get('$search'),
+    ).toBeNull()
+    expect(
+      new URLSearchParams(firstEnumerationRequest?.search).get('$filter'),
+    ).toBeNull()
+    const enumerationContinuation =
+      firstEnumerationJson.pagination.continuation ?? ''
+    expect(firstEnumerationJson.pagination).toEqual({
+      limit: 100,
+      hasMore: true,
+      continuation: enumerationContinuation,
+    })
+    expect(typeof enumerationContinuation).toBe('string')
+    expect(enumerationContinuation.length).toBeGreaterThan(0)
+
+    const secondEnumeration = await sandbox.run(
+      [
+        'search',
+        '--remote',
+        '--source',
+        workSourceLabel,
+        '--kind',
+        'communication.message',
+        '--limit',
+        '100',
+        '--continuation',
+        enumerationContinuation,
+        '--json',
+      ],
+      { env },
+    )
+    expect(secondEnumeration.exitCode, secondEnumeration.stderr).toBe(0)
+    const secondEnumerationJson = JSON.parse(secondEnumeration.stdout) as {
+      results: { ref: string }[]
+      pagination: {
+        limit: number
+        hasMore: boolean
+        continuation: string | null
+      }
+    }
+    expect(
+      secondEnumerationJson.results,
+      secondEnumeration.stdout,
+    ).toHaveLength(5)
+    expect(secondEnumerationJson.pagination).toEqual({
+      limit: 100,
+      hasMore: false,
+      continuation: null,
+    })
+    const enumerationRefs = [
+      ...firstEnumerationJson.results,
+      ...secondEnumerationJson.results,
+    ].map(({ ref }) => ref)
+    expect(new Set(enumerationRefs).size).toBe(55)
+    expect(enumerationRefs).not.toContain(
+      `ctx://${workSourceId.toUpperCase()}/message/outlook-draft`,
+    )
+
+    graph.resetRequests()
+    const unreadEnumeration = await sandbox.run(
+      [
+        'search',
+        '--remote',
+        '--source',
+        workSourceLabel,
+        '--kind',
+        'communication.message',
+        '--field',
+        'unread=true',
+        '--limit',
+        '50',
+        '--json',
+      ],
+      { env },
+    )
+    expect(unreadEnumeration.exitCode, unreadEnumeration.stderr).toBe(0)
+    expect(
+      (JSON.parse(unreadEnumeration.stdout) as { results: unknown[] }).results,
+    ).toHaveLength(28)
+    const unreadRequest = graph
+      .readRequests()
+      .find(({ pathname }) => pathname === '/v1.0/me/messages')
+    expect(new URLSearchParams(unreadRequest?.search).get('$search')).toBeNull()
+    expect(new URLSearchParams(unreadRequest?.search).get('$filter')).toBe(
+      'isRead eq false',
+    )
+
+    graph.resetRequests()
+    const invalidContinuation = await sandbox.run(
+      [
+        'search',
+        '--remote',
+        '--source',
+        workSourceLabel,
+        '--kind',
+        'communication.message',
+        '--limit',
+        '100',
+        '--offset',
+        '1',
+        '--continuation',
+        firstEnumerationJson.pagination.continuation ?? '',
+        '--json',
+      ],
+      { env },
+    )
+    expect(invalidContinuation.exitCode).toBe(2)
+    expect(graph.readRequests()).toEqual([])
+    const malformedContinuation = await sandbox.run(
+      [
+        'search',
+        '--remote',
+        '--source',
+        workSourceLabel,
+        '--kind',
+        'communication.message',
+        '--limit',
+        '100',
+        '--continuation',
+        'malformed',
+        '--json',
+      ],
+      { env },
+    )
+    expect(malformedContinuation.exitCode).toBe(2)
+    expect(graph.readRequests()).toEqual([])
+    graph.setMessages(messages)
 
     graph.resetRequests()
     const searched = await sandbox.run(
