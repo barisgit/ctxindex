@@ -22,6 +22,14 @@ describe('ProfileRegistry', () => {
     expect(createProfileRegistry([profile]).list()).toEqual([profile])
   })
 
+  test('enforces the shared route-safe Profile id grammar', () => {
+    for (const id of ['../escape', 'a'.repeat(129), '\uD800']) {
+      expect(() => createProfileRegistry([{ ...profile, id }])).toThrow(
+        DefinitionRegistryError,
+      )
+    }
+  })
+
   test('rejects a non-function Profile summary projection', () => {
     expect(() =>
       createProfileRegistry([

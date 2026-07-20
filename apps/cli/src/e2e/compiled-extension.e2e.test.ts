@@ -107,6 +107,10 @@ test('relocated compiled host loads an external TypeScript Extension', async () 
     expect(JSON.parse(stdout)).toEqual({
       id: 'fixture.extension',
       adapters: ['fixture.adapter.typescript-runtime-dependency-ok'],
+      builtinDocumentation:
+        '# Local directory\n\nUse the local-directory Adapter to index supported files from an acquired directory tree.\n\nSee the [local.directory Adapter](adapters/local.directory.md).\n',
+      builtinAdapterDocumentation:
+        '# local.directory\n\nIndexes supported files from a configured local directory.\n',
     })
   } finally {
     await rm(sandbox, { recursive: true, force: true })

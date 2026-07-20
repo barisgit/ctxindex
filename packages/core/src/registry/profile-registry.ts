@@ -1,5 +1,6 @@
 import type { AnyProfileDefinition } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
+import { isDefinitionId } from './definition-id'
 
 export type DefinitionRegistryErrorCode =
   | 'invalid_definition'
@@ -32,14 +33,14 @@ const schemaSchema = z.custom<z.ZodTypeAny>(
 )
 const referenceSchema = z
   .object({
-    id: z.string().min(1),
+    id: z.string().refine(isDefinitionId, 'Invalid definition id'),
     version: z.number().int().positive(),
   })
   .strict()
 const profileDefinitionSchema = z
   .object({
     kind: z.literal('profile'),
-    id: z.string().min(1),
+    id: z.string().refine(isDefinitionId, 'Invalid definition id'),
     version: z.number().int().positive(),
     schema: schemaSchema,
     search: z

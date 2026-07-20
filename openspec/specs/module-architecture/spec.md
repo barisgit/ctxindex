@@ -93,12 +93,16 @@ Provider-neutral core MUST own one `ctxindex.extensions` package-entry resolver 
 - **WHEN** architecture verification discovers bundled and external entry modules
 - **THEN** every namespace delegates root collection, graph collection, and activation to the same core boundary
 
-### Requirement: Documentation is a deferred sidecar concern
-Definition values MUST NOT embed a normative `docs` property in this change. Human and agent documentation SHALL be introduced only through separately owned sidecars in a future accepted contract and MUST NOT affect current definition identity or activation.
+### Requirement: Extension documentation is an owned sidecar concern
+`@ctxindex/extension-sdk` SHALL expose one core-independent, side-effect-free `docs()` helper and plain directory-or-virtual declaration types. Only an Extension root MAY carry the declaration; Provider, OAuth App, Profile, and Adapter values MUST remain free of embedded documentation. Provider-neutral core SHALL bind acquired entry-module provenance, validate and normalize the sidecar before atomic activation, and expose transport-neutral documentation data. Extension documentation MUST NOT affect definition identity, equivalence, dependency resolution, acquisition, or operation behavior.
 
-#### Scenario: Documentation does not alter activation
-- **WHEN** the current SDK and registry schemas are inspected
-- **THEN** definition equivalence contains no embedded documentation field
+#### Scenario: Documentation remains outside definition behavior
+- **WHEN** an Extension declares a documentation sidecar
+- **THEN** its imported Provider, OAuth App, Profile, and Adapter values retain their existing shapes and activation semantics
+
+#### Scenario: No consumer-specific runtime enters the SDK
+- **WHEN** the public SDK and package dependencies are inspected
+- **THEN** documentation authoring adds no filesystem, Catalog, CLI, browser, Markdown-rendering, or network dependency to `@ctxindex/extension-sdk`
 
 ### Requirement: Acquisition and activation remain separate
 Current Catalog and explicit-path acquisition SHALL hand materialized package roots and safe provenance to source-neutral manifest-entry, collection, exact-selection, and activation seams. Package entries MUST come from `package.json` `ctxindex.extensions` and identify module files, not export symbols.

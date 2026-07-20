@@ -10,6 +10,7 @@ import {
   createExtensionHostDiagnostic,
   isExtensionHostDiagnostic,
 } from './diagnostics'
+import { resolveCollectedExtensionDocumentation } from './documentation'
 
 export interface ResolvedPackageEntries {
   readonly entries: readonly string[]
@@ -108,9 +109,15 @@ export async function importPackageEntries(
       )
     }
     try {
-      collected.push(
-        ...collectExtensionExports(module, entry, resolved.provenance),
-      )
+      const roots = collectExtensionExports(module, entry, resolved.provenance)
+      for (const root of roots) {
+        collected.push(
+          await resolveCollectedExtensionDocumentation(
+            root,
+            pathToFileURL(entry),
+          ),
+        )
+      }
     } catch (cause) {
       if (isExtensionHostDiagnostic(cause)) throw cause
       throw createExtensionHostDiagnostic(

@@ -277,6 +277,7 @@ test('public Extension SDK is a stable barrel over core-independent modules', as
 
   expect(productionFiles).toEqual([
     'adapter.ts',
+    'documentation.ts',
     'extension.ts',
     'index.ts',
     'oauth-app.ts',

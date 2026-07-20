@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite'
 import { expect, test } from 'bun:test'
-import { copyFile, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { copyFile, cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
@@ -88,6 +88,13 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
       extensionBuildExitCode,
       `${extensionBuildStdout}\n${extensionBuildStderr}`,
     ).toBe(0)
+    await cp(
+      join(extensionSourceRoot, 'docs'),
+      join(extensionPath, 'dist/docs'),
+      {
+        recursive: true,
+      },
+    )
     await writeFile(
       join(extensionPath, 'package.json'),
       JSON.stringify({

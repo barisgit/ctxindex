@@ -130,6 +130,60 @@ function build(roots: readonly CollectedExtension[]) {
 }
 
 describe('buildCompleteCandidateRegistry', () => {
+  test('requires bounded route-safe ids for every definition kind', () => {
+    const boundary = 'a'.repeat(128)
+    expect(() =>
+      build([
+        collected(
+          extension(boundary, {
+            providers: [provider(boundary)],
+            profiles: [profile(boundary)],
+            adapters: [adapter({ id: boundary })],
+          }),
+        ),
+      ]),
+    ).not.toThrow()
+
+    for (const invalidId of [
+      'a'.repeat(129),
+      '../escape',
+      '\uD800',
+      'Uppercase',
+      'repeated..separator',
+    ]) {
+      expect(() => build([collected(extension(invalidId))])).toThrow(
+        'Invalid Extension definition',
+      )
+      expect(() =>
+        build([
+          collected(
+            extension('fixture.invalid-provider-id', {
+              providers: [provider(invalidId)],
+            }),
+          ),
+        ]),
+      ).toThrow('Invalid Provider definition')
+      expect(() =>
+        build([
+          collected(
+            extension('fixture.invalid-profile-id', {
+              profiles: [profile(invalidId)],
+            }),
+          ),
+        ]),
+      ).toThrow('Invalid Profile definition')
+      expect(() =>
+        build([
+          collected(
+            extension('fixture.invalid-adapter-id', {
+              adapters: [adapter({ id: invalidId })],
+            }),
+          ),
+        ]),
+      ).toThrow('Invalid Adapter definition')
+    }
+  })
+
   test('exposes deterministic reachable graph collection with provenance', () => {
     const note = profile()
     const local = provider()
@@ -924,7 +978,7 @@ describe('buildCompleteCandidateRegistry', () => {
     const documentedExtension = {
       ...extension('fixture.documented-extension'),
       docs: { summary: 'Removed' },
-    } as AnyExtensionDefinition
+    } as unknown as AnyExtensionDefinition
     const documentedProvider = {
       ...provider(),
       docs: { summary: 'Removed' },

@@ -1,4 +1,5 @@
 import type { AnyAdapterDefinition } from './adapter'
+import type { DocumentationDeclaration } from './documentation'
 import type { AnyOAuthAppDefinition } from './oauth-app'
 import type { AnyProfileDefinition } from './profile'
 import type { AnyProviderDefinition } from './provider'
@@ -13,6 +14,9 @@ export interface ExtensionDefinition<
     readonly AnyProfileDefinition[] = readonly AnyProfileDefinition[],
   TAdapters extends
     readonly AnyAdapterDefinition[] = readonly AnyAdapterDefinition[],
+  TDocs extends DocumentationDeclaration | undefined =
+    | DocumentationDeclaration
+    | undefined,
 > {
   readonly kind: 'extension'
   readonly id: TId
@@ -20,6 +24,7 @@ export interface ExtensionDefinition<
   readonly oauthApps: TOAuthApps
   readonly profiles: TProfiles
   readonly adapters: TAdapters
+  readonly docs?: TDocs
 }
 
 export type AnyExtensionDefinition = ExtensionDefinition
@@ -30,13 +35,22 @@ export function defineExtension<
   const TOAuthApps extends readonly AnyOAuthAppDefinition[] = readonly [],
   const TProfiles extends readonly AnyProfileDefinition[] = readonly [],
   const TAdapters extends readonly AnyAdapterDefinition[] = readonly [],
+  const TDocs extends DocumentationDeclaration | undefined = undefined,
 >(definition: {
   readonly id: TId
   readonly providers?: TProviders
   readonly oauthApps?: TOAuthApps
   readonly profiles?: TProfiles
   readonly adapters?: TAdapters
-}): ExtensionDefinition<TId, TProviders, TOAuthApps, TProfiles, TAdapters> {
+  readonly docs?: TDocs
+}): ExtensionDefinition<
+  TId,
+  TProviders,
+  TOAuthApps,
+  TProfiles,
+  TAdapters,
+  TDocs
+> {
   return {
     ...definition,
     kind: 'extension',

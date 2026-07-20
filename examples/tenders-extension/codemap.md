@@ -2,21 +2,22 @@
 
 ## Responsibility
 
-Provides a deterministic package-managed external Extension proof for public-procurement tenders. The private ESM workspace package `@ctxindex/example-tenders-extension` advertises `extension.ts` through `ctxindex.extensions`; the module defines the Extension, Profile, and fixture-backed sync Adapter.
+Provides a deterministic package-managed external Extension proof for public-procurement tenders. The private ESM workspace package `@ctxindex/example-tenders-extension` advertises `extension.ts` through `ctxindex.extensions`; the module defines the Extension, Profile, fixture-backed sync Adapter, and package-sidecar documentation tree.
 
 ## Design
 
 - `extension.ts` imports `defineProfile`, `defineAdapter`, `defineExtension`, and `z` from the public SDK and exports ordinary plain values.
-- `tenderSchema` is strict; `tenderProfile` maps payload fields into searchable title, occurrence time, chunks, and typed indexes without embedded docs.
+- `tenderSchema` is strict; `tenderProfile` maps payload fields into searchable title, occurrence time, chunks, and typed indexes without leaf documentation.
 - `tenderAdapter` is providerless, indexed, and sync-only. `TENDER_FIXTURES` is immutable deterministic input.
+- `docs/` contains the required index plus canonical Adapter and versioned Profile pages; `extension.ts` declares it with the pure `docs('./docs')` descriptor.
 
 ## Flow
 
-1. Package entry resolution reads `./extension.ts`, imports it once, and collects the default `enarocanje.proof` root.
+1. Package entry resolution reads `./extension.ts`, imports it once, collects the default `enarocanje.proof` root, and binds its `./docs` descriptor to that module.
 2. The root reaches exact `enarocanje.tender` and `enarocanje.fixture` values without an Extension dependency graph.
 3. `operations.sync(context)` iterates `TENDER_FIXTURES`, emitting one `upsertResource` per tender with a source-scoped `ctx://` ref and parsed timestamps.
 4. Sync emits a final versioned `checkpoint` containing all fixture references.
-5. Complete-registry validation activates the collected graph; providerless execution bypasses authorization resolution.
+5. Documentation and complete-registry validation activate the collected graph; providerless execution bypasses authorization resolution.
 
 ## Integration
 

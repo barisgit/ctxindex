@@ -12,6 +12,14 @@ export {
   type SearchRouting,
 } from './adapter'
 export {
+  type DocumentationAssetMediaType,
+  type DocumentationDeclaration,
+  type DocumentationDirectoryDeclaration,
+  type DocumentationFile,
+  type DocumentationVirtualTreeDeclaration,
+  docs,
+} from './documentation'
+export {
   type AnyExtensionDefinition,
   defineExtension,
   type ExtensionDefinition,

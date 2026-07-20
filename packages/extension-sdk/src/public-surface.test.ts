@@ -16,6 +16,11 @@ import type {
   AnyProviderDefinition,
   ArtifactDescriptor,
   DefinitionVersion,
+  DocumentationAssetMediaType,
+  DocumentationDeclaration,
+  DocumentationDirectoryDeclaration,
+  DocumentationFile,
+  DocumentationVirtualTreeDeclaration,
   DownloadContext,
   ExtensionDefinition,
   FieldType,
@@ -68,6 +73,11 @@ type PublicTypeSurface = {
   anyProviderDefinition: AnyProviderDefinition
   artifactDescriptor: ArtifactDescriptor
   definitionVersion: DefinitionVersion
+  documentationAssetMediaType: DocumentationAssetMediaType
+  documentationDeclaration: DocumentationDeclaration
+  documentationDirectoryDeclaration: DocumentationDirectoryDeclaration
+  documentationFile: DocumentationFile
+  documentationVirtualTreeDeclaration: DocumentationVirtualTreeDeclaration
   downloadContext: DownloadContext
   extensionDefinition: ExtensionDefinition
   fieldType: FieldType
@@ -122,6 +132,11 @@ const publicSymbolNames = [
   'AnyProviderDefinition',
   'ArtifactDescriptor',
   'DefinitionVersion',
+  'DocumentationAssetMediaType',
+  'DocumentationDeclaration',
+  'DocumentationDirectoryDeclaration',
+  'DocumentationFile',
+  'DocumentationVirtualTreeDeclaration',
   'DownloadContext',
   'ExtensionDefinition',
   'FieldType',
@@ -160,6 +175,7 @@ const publicSymbolNames = [
   'defineOAuthApp',
   'defineProfile',
   'defineProvider',
+  'docs',
   'z',
 ]
 
@@ -184,6 +200,7 @@ test('public index exports the exact symbol surface', async () => {
     'defineOAuthApp',
     'defineProfile',
     'defineProvider',
+    'docs',
     'z',
   ])
 })
