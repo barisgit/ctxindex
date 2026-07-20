@@ -20,6 +20,7 @@ export interface CliDeps {
   readonly authService: AuthService
   readonly oauthAppService: OAuthAppService
   readonly registry: ExtensionRegistry
+  readonly completeRegistry: CompleteRegistry
   readonly threadService: ThreadService
   readonly artifactService: ArtifactService
   close(): Promise<void>
@@ -40,7 +41,8 @@ export async function assertInitialized(): Promise<void>;
 export async function openDeps(
   opts: {
     readonly config?: CtxindexConfig
-    readonly registry?: ExtensionRegistry
+    readonly definitions?: CliDefinitions
+    readonly databaseOwnership?: DirectDatabaseOwnership
   } = {},
 ): Promise<CliDeps>;
 ```
@@ -53,7 +55,14 @@ export interface CliDefinitions extends LoadExtensionsResult {
   readonly description: RegistryDescription
 }
 
-export async function loadCliDefinitions(): Promise<CliDefinitions>;
+export interface LoadCliDefinitionsOptions {
+  readonly config?: CtxindexConfig
+  readonly localOAuthAppIdentities?: readonly OAuthAppIdentity[]
+}
+
+export async function loadCliDefinitions(
+  options: LoadCliDefinitionsOptions = {},
+): Promise<CliDefinitions>;
 
 ```
 
@@ -229,11 +238,16 @@ export type ExtensionsArgs =
       readonly trust: true
       readonly json: boolean
     }
-  | { readonly kind: 'catalog-list'; readonly json: boolean }
+  | {
+      readonly kind: 'catalog-list'
+      readonly noRefresh: boolean
+      readonly json: boolean
+    }
   | {
       readonly kind: 'catalog-show'
       readonly name: string
       readonly extension?: ExtensionSelector
+      readonly noRefresh: boolean
       readonly json: boolean
     }
   | {
@@ -247,15 +261,34 @@ export type ExtensionsArgs =
       readonly json: boolean
     }
   | {
-      readonly kind: 'install'
+      readonly kind: 'catalog-install'
       readonly catalog: string
       readonly extension: ExtensionSelector
       readonly trust: true
+      readonly noRefresh: boolean
       readonly json: boolean
     }
   | {
-      readonly kind: 'uninstall'
+      readonly kind: 'catalog-uninstall'
       readonly extension: ExtensionSelector
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'direct-install'
+      readonly sourceKind: 'npm' | 'git' | 'local'
+      readonly target: string
+      readonly extensionId: string
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'direct-update'
+      readonly extensionId: string
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'direct-uninstall'
+      readonly extensionId: string
+      readonly force: boolean
       readonly json: boolean
     }
   | { readonly kind: 'help' }
@@ -443,8 +476,8 @@ Database-backed command dependency setup requires both the persisted config and 
 
 Parser unions are the command boundary. Registry-derived Source config, fields, kinds, exports, and Actions are resolved before service calls rather than duplicated as provider branches. The OAuth surface contains only `oauth-app` and `account` commands: App add requires exact Provider and label plus `--from-env`; Account add accepts an optional `--app`. An explicit label bypasses managed selection, while omission delegates to core's host-policy resolver and feeds the returned exact label through the same OAuth App service resolver. The CLI owns only this branch and static BYOA formatting; it does not infer Apps or reproduce policy, provenance, scope, or Provider logic. No `client` route or alias is parsed. Structured output writes safe projections to stdout and human diagnostics to stderr; App config, credential values, tokens, authorization codes, and secret-store passphrases never enter argv or output.
 
-The Extension command adapter delegates repository, manifest, persistence, refresh policy, and install behavior to `CatalogService`. Its parser owns only the closed nested command grammar, exact selectors, required independent trust flags, and `--no-refresh`; pure formatters render Catalog records and loaded origin provenance with non-negative snapshot age. Catalog list/show and install request refresh by default, while `--no-refresh` selects stored state. Startup and loaded-Extension listing never cross the Git acquisition boundary.
+The Extension command adapter delegates repository, manifest, persistence, refresh policy, and Catalog install behavior to `CatalogService`. Direct lifecycle forms delegate target parsing, package materialization, validation, persistence, and removal guards to `DirectExtensionService`. The parser distinguishes exact `npm|git|local` source kinds from existing Catalog selectors, and install/update emit their in-process trust notice on stderr before acquisition so JSON stdout remains one document. Catalog list/show and install request refresh by default, while `--no-refresh` selects stored state. Startup, loaded-Extension listing, uninstall, and ordinary operations never cross either acquisition boundary.
 
 ## Verification
 
-Argument tests cover every discriminated parser and invalid form, including optional managed selection, explicit exact App labels, zero-effect invalid selection, static BYOA guidance, and rejection of every Client compatibility route. Command tests inject dependency/service interfaces. CLI e2e tests cover empty and config-only initialization guards with no OAuth App configuration or durable-state side effects, readable/JSON stream separation, stable exits, registry-derived help/describe behavior, bundled skills, local Catalog trust, default command-time refresh, stored-snapshot age and `--no-refresh`, observable refresh failure, offline startup/loading, and relocated compiled execution.
+Argument tests cover every discriminated parser and invalid form, including optional managed App selection, explicit exact App labels, exact direct source-kind and Extension selection, Catalog/direct separation, zero-effect invalid selection, static BYOA guidance, and rejection of every Client compatibility route. Command tests inject dependency/service interfaces. CLI e2e tests cover empty and config-only initialization guards with no OAuth App configuration or durable-state side effects, readable/JSON stream separation, stable exits, registry-derived help/describe behavior, bundled skills, local Catalog trust, direct package trust, default command-time refresh, stored-snapshot age and `--no-refresh`, observable refresh failure, offline pinned startup/loading, guarded removal, and relocated compiled execution.

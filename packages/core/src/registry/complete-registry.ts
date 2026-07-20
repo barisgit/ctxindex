@@ -19,7 +19,7 @@ import {
 } from './profile-registry'
 
 export interface DefinitionProvenance {
-  readonly origin: 'builtin' | 'explicit-path' | 'catalog'
+  readonly origin: 'builtin' | 'explicit-path' | 'catalog' | 'direct'
   readonly packageName?: string
   readonly packageVersion?: string
   readonly integrity?: string

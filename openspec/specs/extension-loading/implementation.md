@@ -51,7 +51,7 @@ export function buildCompleteCandidateRegistry(
 
 Traversal follows exact Provider/Profile values imported by Adapters and OAuth Apps and includes explicit standalone Provider/Profile leaves. Complete candidate validation is order-independent and atomic. Its shared definition-id validator accepts at most 128 lowercase ASCII characters composed of alphanumeric segments separated by one `.`, `_`, or `-`, allowing authored and generated routes to use stable ids directly. OAuth App duplicates always conflict. Exact reused non-App objects may coalesce; distinct executable/schema-bearing same-identity values conflict; distinct pure declarative values coalesce only through canonical structural equality.
 
-Built-in namespaces, explicit-path packages, and Catalog snapshots use these same seams. Acquisition and dependency materialization happen before this boundary and remain source-specific; core resolves no Extension dependency graph.
+Built-in namespaces, explicit-path packages, Catalog snapshots, and immutable direct materializations use these same seams. Acquisition and dependency materialization happen before this boundary and remain source-specific; core resolves no Extension dependency graph.
 
 ### Degraded loading
 
@@ -63,7 +63,7 @@ Trusted entry modules use ordinary package imports and export shallow plain Exte
 
 Root provenance is retained as safe immutable acquisition evidence. A separate host release-policy matcher may consume it after duplicate-free activation solely to determine managed-App eligibility. Provenance, load order, origin priority, package version, integrity, path, object identity, and function text never establish leaf identity or equivalence and never select duplicate winners. Extension exports and package or Catalog manifests carry no authored managed authority. Complete candidate validation succeeds before active registry mutation.
 
-Persistent direct local/Git/npm installation remains deferred. Existing explicit-path and Catalog acquisition delegate materialized roots and safe provenance to the common entry, collection, selection, and activation seams.
+Direct local/Git/npm installation delegates acquired roots and safe generic provenance to the common entry, collection, exact-selection, and activation seams. Strict direct records derive content-addressed package roots under the current data root. Startup verifies those pins and degrades only the invalid Extension without invoking Bun, Git, npm, or the original local path.
 
 ## Verification
 

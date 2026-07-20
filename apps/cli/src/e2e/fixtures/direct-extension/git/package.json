@@ -1,0 +1,10 @@
+{
+  "name": "fixture-direct-git",
+  "version": "1.0.0",
+  "type": "module",
+  "ctxindex": {
+    "extensions": [
+      "./extension.js"
+    ]
+  }
+}

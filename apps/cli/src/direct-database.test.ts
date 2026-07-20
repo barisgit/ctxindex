@@ -13,6 +13,7 @@ import {
   initializeDirectStorage,
   openLeasedDatabase,
   PrototypeUnsupportedError,
+  readLeasedDirectExtensionSourceBindings,
   readLeasedLocalOAuthAppIdentities,
 } from './direct-database'
 
@@ -198,6 +199,77 @@ test('local OAuth App identity reads do not migrate a partial database', async (
         .all(),
     ).toEqual([{ name: 'preserved' }])
     verification.close()
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('Source binding reads retain ownership from before readonly open through close', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'ctxindex-cli-sources-lease-'))
+  const target = join(await realpath(root), 'ctxindex.sqlite')
+  await Bun.write(target, '')
+  const events: string[] = []
+  const db = {
+    prepare: (sql: string) => ({
+      get: () => {
+        events.push(`get:${sql}`)
+        return { present: 1 }
+      },
+      all: () => {
+        events.push(`all:${sql}`)
+        return [{ id: 'source-1', label: 'mail', adapter_id: 'mail.adapter' }]
+      },
+    }),
+    close: () => events.push('close'),
+  } as unknown as CtxindexDatabase
+
+  try {
+    await expect(
+      readLeasedDirectExtensionSourceBindings(target, {
+        acquire: () => {
+          events.push('acquire')
+          return {
+            mode: 'shared',
+            targetDigest: 'a'.repeat(64),
+            release: () => events.push('release'),
+          }
+        },
+        assertTarget: () => events.push('assert'),
+        openReadonly: () => {
+          events.push('open')
+          return db
+        },
+      }),
+    ).resolves.toEqual([
+      { id: 'source-1', label: 'mail', adapterId: 'mail.adapter' },
+    ])
+    expect(events[0]).toBe('acquire')
+    expect(events.indexOf('open')).toBeGreaterThan(events.indexOf('acquire'))
+    expect(events.indexOf('close')).toBeGreaterThan(events.indexOf('open'))
+    expect(events.at(-1)).toBe('release')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('Source binding reads fail closed before SQLite open under daemon ownership', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'ctxindex-cli-sources-conflict-'))
+  const target = join(await realpath(root), 'ctxindex.sqlite')
+  await Bun.write(target, '')
+  let opened = false
+  try {
+    await expect(
+      readLeasedDirectExtensionSourceBindings(target, {
+        acquire: () => {
+          throw new FileLeaseConflictError('a'.repeat(64))
+        },
+        openReadonly: () => {
+          opened = true
+          return {} as CtxindexDatabase
+        },
+      }),
+    ).rejects.toBeInstanceOf(PrototypeUnsupportedError)
+    expect(opened).toBe(false)
   } finally {
     await rm(root, { recursive: true, force: true })
   }

@@ -129,6 +129,13 @@ export class CtxindexSyncError extends CtxindexError {
 }
 ```
 
+Direct Extension lifecycle errors use the public `extension_target_invalid`,
+`extension_trust_required`, `extension_removal_blocked`,
+`extension_acquisition_failed`, `extension_validation_failed`, and
+`extension_conflict` codes. Parser failures precede effects, acquisition errors
+are sanitized at the package boundary, and install/update publication remains
+atomic so an earlier valid pin survives every failure stage.
+
 ### @ctxindex/core — secret backend errors
 
 ```ts
