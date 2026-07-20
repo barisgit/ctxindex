@@ -215,7 +215,10 @@ test('implicit command does not attach selection fallback after exact App resolu
           config: definition.config,
           definition,
         })),
-      authorizeProvider: async () => {
+      authorizeProvider: async (_input, deps) => {
+        await expect(
+          deps.resolveApp('google', 'ctxindex'),
+        ).resolves.toMatchObject({ label: 'ctxindex' })
         throw new CtxindexAuthError(
           'insufficient_scope',
           'Provider denied the requested scopes',
@@ -228,6 +231,31 @@ test('implicit command does not attach selection fallback after exact App resolu
   const output = String(error.mock.calls[0]?.[0])
   expect(output).toBe('Provider denied the requested scopes')
   expect(output).not.toMatch(/oauth-app add|account add .*--app/)
+})
+
+test('implicit command rejects a changed cached App authorization request', async () => {
+  const error = spyOn(console, 'error').mockImplementation(() => {})
+  const definition = completeRegistry.oauthApps.get('["google","ctxindex"]')
+  if (definition === undefined) throw new Error('Google fixture App missing')
+  const exit = await handleAccountCommand(
+    ['add', 'google'],
+    commandRuntime({
+      openDeps: async () =>
+        openedDeps(async () => ({
+          provider: definition.provider,
+          label: definition.label,
+          config: definition.config,
+          definition,
+        })),
+      authorizeProvider: async (_input, deps) =>
+        deps.resolveApp('microsoft', 'ctxindex') as never,
+    }),
+  )
+
+  expect(exit).toBe(2)
+  expect(String(error.mock.calls[0]?.[0])).toBe(
+    'OAuth App selection changed during authorization',
+  )
 })
 
 test('explicit App resolution failure does not add managed fallback guidance', () => {

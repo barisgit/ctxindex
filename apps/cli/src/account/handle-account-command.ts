@@ -171,7 +171,15 @@ export async function handleAccountCommand(
         {
           registry: opened.completeRegistry,
           authService: opened.authService,
-          resolveApp: async () => app,
+          resolveApp: async (providerId, label) => {
+            if (providerId !== parsed.provider || label !== appLabel) {
+              throw new CtxindexValidationError(
+                'invalid_oauth_selection',
+                'OAuth App selection changed during authorization',
+              )
+            }
+            return app
+          },
           emitAuthorizationUrl: (url) => console.log(`Open this URL: ${url}`),
         },
       )
