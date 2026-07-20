@@ -26,7 +26,7 @@ test('oauth-app add requires explicit initialization before reading config or cr
     )
     expect(added.exitCode).toBe(2)
     expect(added.stderr).toContain(
-      'ctxindex is not initialized; run bun cli init',
+      'ctxindex is not initialized; run ctxindex init',
     )
     expect(`${added.stdout}${added.stderr}`).not.toContain(
       'microsoft-client-id-canary',
@@ -72,7 +72,7 @@ test('oauth-app add rejects config-only partial initialization without opening s
 
     expect(added.exitCode).toBe(2)
     expect(added.stderr).toContain(
-      'ctxindex is not initialized; run bun cli init',
+      'ctxindex is not initialized; run ctxindex init',
     )
     expect(`${added.stdout}${added.stderr}`).not.toContain(
       'partial-client-id-canary',

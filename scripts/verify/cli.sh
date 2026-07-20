@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 bin_path="$repo_root/apps/cli/bin/ctxindex.mjs"
+package_bin_path="$repo_root/apps/cli/dist/ctxindex.mjs"
 
 log() {
   printf 'cli: %s\n' "$*" >&2
@@ -34,7 +35,7 @@ if [[ ! -f "$bin_path" ]]; then
   die "required CLI binary is missing: $bin_path"
 fi
 
-if [[ ! -d "$repo_root/node_modules" || ! -e "$repo_root/node_modules/@ctxindex/cli" || ! -e "$repo_root/node_modules/@ctxindex/core" ]]; then
+if [[ ! -d "$repo_root/node_modules" || ! -e "$repo_root/node_modules/ctxindex" || ! -e "$repo_root/node_modules/@ctxindex/core" ]]; then
   log 'dependencies are missing; running bun install'
   if ! (cd "$repo_root" && bun install --frozen-lockfile); then
     log 'bun install --frozen-lockfile failed; retrying bun install'
@@ -60,6 +61,22 @@ if ! workspace_version=$(cd "$repo_root/apps/cli" && bun run cli --version 2>"$v
   die 'bun run cli --version failed from apps/cli'
 fi
 assert_semver 'bun run cli --version (apps/cli)' "$workspace_version"
+
+# Probe the public package bundle and its merged OAuth App command surface.
+(cd "$repo_root" && bun run build:cli-package)
+if [[ ! -x "$package_bin_path" ]]; then
+  die "required CLI package binary is missing or not executable: $package_bin_path"
+fi
+if ! package_version=$(cd "$repo_root" && bun "$package_bin_path" --version 2>"$version_stderr"); then
+  cat "$version_stderr" >&2
+  die 'packaged ctxindex --version failed'
+fi
+assert_semver 'packaged ctxindex --version' "$package_version"
+if ! package_oauth_app_help=$(cd "$repo_root" && NO_COLOR=1 bun "$package_bin_path" oauth-app --help 2>"$version_stderr"); then
+  cat "$version_stderr" >&2
+  die 'packaged ctxindex oauth-app --help failed'
+fi
+grep -Fq 'USAGE ctxindex oauth-app add|list|remove' <<<"$package_oauth_app_help" || die 'packaged ctxindex oauth-app help is incomplete'
 
 # Help output sanity: every v1 top-level command must appear.
 if ! help_output=$(cd "$repo_root" && NO_COLOR=1 bun cli --help 2>"$version_stderr"); then

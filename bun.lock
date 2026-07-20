@@ -15,9 +15,12 @@
       },
     },
     "apps/cli": {
-      "name": "@ctxindex/cli",
+      "name": "ctxindex",
       "version": "0.0.0",
-      "dependencies": {
+      "bin": {
+        "ctxindex": "dist/ctxindex.mjs",
+      },
+      "devDependencies": {
         "@ctxindex/adapters": "workspace:*",
         "@ctxindex/core": "workspace:*",
         "@ctxindex/extension-sdk": "workspace:*",
@@ -56,6 +59,10 @@
       "version": "0.0.0",
       "dependencies": {
         "@ctxindex/extension-sdk": "workspace:*",
+      },
+      "devDependencies": {
+        "@ctxindex/adapters": "workspace:*",
+        "@ctxindex/core": "workspace:*",
       },
     },
     "packages/adapters": {
@@ -136,8 +143,6 @@
     "@colors/colors": ["@colors/colors@1.5.0", "", {}, "sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ=="],
 
     "@ctxindex/adapters": ["@ctxindex/adapters@workspace:packages/adapters"],
-
-    "@ctxindex/cli": ["@ctxindex/cli@workspace:apps/cli"],
 
     "@ctxindex/core": ["@ctxindex/core@workspace:packages/core"],
 
@@ -512,6 +517,8 @@
     "cssom": ["cssom@0.5.0", "", {}, "sha512-iKuQcq+NdHqlAcwUY0o/HL69XQrUaQdMjmStJ8JFmUaiiQErlhrmuigkg/CU4E2J0IyUKUrMAgl36TvN67MqTw=="],
 
     "csstype": ["csstype@3.2.3", "", {}, "sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ=="],
+
+    "ctxindex": ["ctxindex@workspace:apps/cli"],
 
     "date-fns": ["date-fns@4.3.0", "", {}, "sha512-OYcL+3N/jyWbYdFGqoMAhytDgxP9pbYPUUiRCOgn4Fewaadk9l/Wam4Avciiyp2BgkpfQyBV9B+ehnVJych+eQ=="],
 

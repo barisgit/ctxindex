@@ -2,11 +2,12 @@
 
 ## Responsibility
 
-Provides repository-level executable tooling: policy verification gates under `scripts/verify/`, bounded process supervision in `scripts/with-timeout.ts`, and helper-created worktree isolation through `scripts/worktree-new.sh` and `scripts/cli.sh`.
+Provides repository-level executable tooling: policy verification gates under `scripts/verify/`, npm artifact and release gating under `scripts/release/`, bounded process supervision in `scripts/with-timeout.ts`, and helper-created worktree isolation through `scripts/worktree-new.sh` and `scripts/cli.sh`.
 
 ## Design/patterns
 
 - Verification scripts are deterministic command-line gates: they scan production source/config, optionally spawn or import runtime targets, print findings, and signal success or failure by exit status. The full-suite wrapper installs a temporary Keychain mock; completed milestone architecture assertions live in normal discovered tests rather than exhausted red contracts. See `scripts/verify/codemap.md`.
+- Release scripts build, stage, and inspect a minimal CLI package, smoke the exact archive in isolated global/state directories, and fail closed on invalid, unbumped, reversed, already raced, or indeterminate npm versions. See `scripts/release/codemap.md`.
 
 - `with-timeout.ts` is a process-supervisor wrapper. It runs a command in a detached process group where supported, forwards terminal streams/signals, and applies TERM-then-KILL timeout escalation.
 
@@ -24,4 +25,5 @@ Provides repository-level executable tooling: policy verification gates under `s
 - Root and `apps/cli/package.json` expose `cli` through `scripts/cli.sh`; the root manifest also exposes `with-timeout` and `ci`.
 - Verification targets include every root-declared `apps/*`, `packages/*`, and `examples/*` workspace, their manifests, CLI/core/Adapter architecture surfaces, and selected script sources.
 - Detailed map: `scripts/verify/codemap.md`.
+- Package and release tooling map: `scripts/release/codemap.md`.
 - Runtime dependencies are Bun process/file APIs plus Node filesystem, path, URL, and child-process utilities.
