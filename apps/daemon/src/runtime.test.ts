@@ -106,7 +106,7 @@ test('startup owns leases before one load/open and publishes ready last', async 
       },
       readInstalled: async () => {
         events.push('installed')
-        return [] as never
+        return { records: [], diagnostics: [] }
       },
       loadExtensions: async ({ localOAuthAppIdentities }) => {
         events.push(`identities:${localOAuthAppIdentities.length}`)
@@ -214,7 +214,7 @@ test('startup rejects an Extension OAuth App that collides with persisted local 
           readMatchingMetadata: () => null,
           assertDatabaseTarget: () => {},
           readConfig: async () => defaultConfig(),
-          readInstalled: async () => [],
+          readInstalled: async () => ({ records: [], diagnostics: [] }),
           openDatabase,
           runMigrations: async (database) => {
             await runMigrations(database)
@@ -279,7 +279,7 @@ test('a lifecycle-lease loser cannot remove the live daemon endpoint or discover
     readMatchingMetadata: () => null,
     assertDatabaseTarget: () => {},
     readConfig: async () => ({}) as never,
-    readInstalled: async () => [] as never,
+    readInstalled: async () => ({ records: [], diagnostics: [] }),
     loadExtensions: async () => ({
       registry: {} as never,
       completeRegistry: {} as never,
@@ -357,7 +357,7 @@ test('non-cooperative request times out while ownership remains, then cleans up 
       readMatchingMetadata: () => null,
       assertDatabaseTarget: () => {},
       readConfig: async () => ({}) as never,
-      readInstalled: async () => [] as never,
+      readInstalled: async () => ({ records: [], diagnostics: [] }),
       loadExtensions: async () => ({
         registry: {} as never,
         completeRegistry: {} as never,
@@ -425,7 +425,6 @@ test('startup rollback closes opened resources and releases both leases', async 
         readMatchingMetadata: () => null,
         assertDatabaseTarget: () => {},
         readConfig: async () => ({}) as never,
-        readInstalled: async () => [] as never,
         loadExtensions: async () => ({
           registry: {} as never,
           completeRegistry: {} as never,
@@ -483,7 +482,7 @@ test('post-open database target assertion closes SQLite before rollback', async 
           if (assertions === 2) throw new Error('database target changed')
         },
         readConfig: async () => ({}) as never,
-        readInstalled: async () => [] as never,
+        readInstalled: async () => ({ records: [], diagnostics: [] }),
         loadExtensions: async () => ({
           registry: {} as never,
           completeRegistry: {} as never,
@@ -541,7 +540,7 @@ test('daemon startup loads local Extensions without network acquisition', async 
         readMatchingMetadata: () => null,
         assertDatabaseTarget: () => {},
         readConfig: async () => defaultConfig(),
-        readInstalled: async () => [],
+        readInstalled: async () => ({ records: [], diagnostics: [] }),
         openDatabase: async () => ({ close: () => {} }) as never,
         runMigrations: async () => {},
         listLocalOAuthAppIdentities: () => [],
@@ -569,7 +568,7 @@ test('daemon startup loads local Extensions without network acquisition', async 
   }
 })
 
-test('daemon startup loads direct pins and counts direct record diagnostics', async () => {
+test('daemon startup fails managed loading closed for an invalid record document', async () => {
   const sandbox = await mkdtemp(join(tmpdir(), 'ctxindex-daemon-direct-'))
   const roots = {
     configRoot: join(sandbox, 'config'),
@@ -591,7 +590,12 @@ test('daemon startup loads direct pins and counts direct record diagnostics', as
           source: {
             kind: 'npm',
             requested_target: '@example/direct@^1',
+            package: '@example/direct',
             exact_version: '1.2.3',
+          },
+          dependency_resolution: {
+            format: 'bun.lock@1.3.14',
+            digest: 'b'.repeat(64),
           },
           materialization_digest: 'a'.repeat(64),
           package_root: 'node_modules/@example/direct',
@@ -611,7 +615,6 @@ test('daemon startup loads direct pins and counts direct record diagnostics', as
         readMatchingMetadata: () => null,
         assertDatabaseTarget: () => {},
         readConfig: async () => defaultConfig(),
-        readInstalled: async () => [],
         openDatabase: async () => ({ close: () => {} }) as never,
         runMigrations: async () => {},
         listLocalOAuthAppIdentities: () => [],
@@ -637,7 +640,7 @@ test('daemon startup loads direct pins and counts direct record diagnostics', as
     expect(health).toEqual(
       expect.objectContaining({
         ok: true,
-        value: expect.objectContaining({ extensionDiagnosticsCount: 2 }),
+        value: expect.objectContaining({ extensionDiagnosticsCount: 1 }),
       }),
     )
     await daemon.close(100)

@@ -13,11 +13,11 @@ Contains application-facing workspace packages: the public `ctxindex` CLI, the N
 
 ## Data & control flow
 
-User argv enters `apps/cli/bin/ctxindex.mjs`, flows to `apps/cli/src/main.ts#runCli`, then through citty command descriptors, typed parsers, dependency composition, core service calls, and output/exit adapters. Trusted Git Catalog acquisition and manifest-owned explicit packages feed the common Extension entry/collection boundary while startup stays offline. Initialization selects a secret backend for a fresh config. OAuth onboarding resolves either one exact host-managed bundled App when `--app` is omitted or the explicitly named Extension/local App, then binds the Account through a private Grant to a Source; removed `client` and `auth` commands have no aliases. The application returns a numeric status to the executable shim.
+User argv enters `apps/cli/bin/ctxindex.mjs`, flows to `apps/cli/src/main.ts#runCli`, then through citty command descriptors, typed parsers, dependency composition, core service calls, and output/exit adapters. Trusted package-backed Catalog build and Git snapshot acquisition produce exact managed package replay into the common Extension entry/collection boundary while startup stays offline. Initialization selects a secret backend for a fresh config. OAuth onboarding resolves either one exact host-managed bundled App when `--app` is omitted or the explicitly named Extension/local App, then binds the Account through a private Grant to a Source; removed `client` and `auth` commands have no aliases. The application returns a numeric status to the executable shim.
 
 For the web workspace, Fumadocs compiles `content/docs/` into the generated `collections/server` source. Next.js routes load that source to render the documentation tree, provide search, produce per-page Markdown and aggregate LLM text, and generate Open Graph images; content negotiation rewrites Markdown-preferring `/docs` requests to the page representation route.
 
-The daemon foreground entry `apps/daemon/src/main.ts#main` derives ctxindex roots, calls `startDaemon()`, acquires retained lifecycle/database leases, loads persisted Extensions offline, composes core services, binds the Unix-socket RPC transport, publishes readiness, and drains/cleans up on shutdown.
+The daemon foreground entry `apps/daemon/src/main.ts#main` derives ctxindex roots, calls `startDaemon()`, acquires retained lifecycle/database leases, loads unified direct and Catalog-curated installation records offline, composes core services, binds the Unix-socket RPC transport, publishes readiness, and drains/cleans up on shutdown.
 
 ## Integration points
 

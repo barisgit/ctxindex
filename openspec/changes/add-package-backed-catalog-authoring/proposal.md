@@ -1,55 +1,50 @@
 ## Why
 
-Git Catalogs currently curate hand-written inline Extension files. The ergonomic
-Extension SDK and direct installer establish a better package boundary:
-`package.json#ctxindex.extensions` exports versionless Extension roots, while one
-generic installer resolves npm, Git, and local package targets into immutable
-managed materializations. Catalog authoring should compose those same roots and
-targets without creating another package resolver, downloader, store, or
-installation lifecycle.
+Catalogs currently curate only static metadata. Authors need to curate runnable
+Extensions from npm, Git, contained local packages, and literal Extension roots
+without making Catalog browsing executable or creating a second installation
+system.
 
-Issue #59 adds typed Catalog authoring and an aggregate Marketplace over inert,
-commit-pinned Catalog snapshots. Discovery remains data-only; explicit install
-is the only path from curation metadata to trusted executable code.
+The safe boundary is a hybrid: Catalog build is an explicitly trusted authoring
+operation that resolves and validates candidates, while Catalog install replays
+the exact recorded result through the canonical generic installer. Catalog
+refresh, inspection, and Marketplace search remain data-only, and startup uses
+only locally managed bytes.
 
 ## What Changes
 
-- Add imported `defineCatalog` and `packageExtension` authoring helpers. A
-  Catalog directly contains literal Extension values and/or declarative npm,
-  Git, or local package targets for one stable Extension id. Catalogs never
-  contain or inherit other Catalogs.
-- Discover Catalog and Extension roots only from module paths declared in
-  `package.json#ctxindex.extensions`; selection uses stable definition ids and
-  nested Catalog entry positions, never JavaScript export names.
-- Generate a strict canonical data-only snapshot before publication. Generation
-  delegates target resolution and candidate inspection to the generic direct
-  installer primitive, then records source-specific exact fields: npm version
-  and integrity, Git commit, or contained local path and content digest, plus a
-  contained exact dependency-resolution artifact and materialization digest.
-  The explicit build command is the author's trust grant and warns before
-  evaluating package code.
-- Keep Catalog add, refresh, list, show, Marketplace search, and startup inert:
-  they validate and project the committed snapshot without importing author
-  modules, resolving targets, invoking Bun, or materializing packages.
-- On trusted Catalog install, refresh only the selected Catalog by default,
-  verify the exact snapshot entry, and ask the generic installer to reproduce
-  and validate that exact resolution. Catalog code does not implement registry,
-  Git, archive, package-manager, storage, lock, or garbage-collection behavior.
-- Persist Catalog curation provenance separately from generic executable
-  installation provenance. Refresh may advance only Catalog state; running code
-  remains pinned to its immutable materialization until another explicit trusted
-  install succeeds. Execution and curation activate as one durable generation
-  through a single atomic pointer replacement plus directory fsync, so
-  interruption cannot expose a split pair.
-- Add deterministic Marketplace search across configured Catalog snapshots.
-  Marketplace names the aggregate discovery/install experience; Catalog remains
-  one distributable curated collection.
-- Retain default command-time Catalog refresh, `--no-refresh` stored-snapshot
-  operation with age visibility, repository trust and separate execution trust,
-  commit-pinned execution, and offline startup.
-- Replace pre-alpha versioned Extension selectors and schema-v1 records with
-  stable Extension ids and a generated schema-v2 snapshot. Profiles remain the
-  only versioned definition type.
+- Add typed, effect-free Catalog authoring helpers for literal and package-backed
+  entries. Catalog entries accept only literal Extension objects or package
+  descriptors; Catalogs cannot nest.
+- Add `ctxindex extensions catalog build`, which imports the author package only
+  after an author trust warning, resolves every package target through the
+  canonical installer, and writes one deterministic schema-v2 snapshot.
+- Record exact npm versions and integrity, Git commits, or contained local
+  origins together with a sanitized Bun 1.3.14 lock artifact and expected
+  materialization digest. Mutable package requests are never install-time
+  authority.
+- Record literal entries as an exact locator into the immutable Catalog author
+  package: module path, Catalog id, entry index, and Extension id, plus that
+  package's lock artifact and materialization digest.
+- Extend the canonical installer with two explicit operations:
+  `resolveForAuthoring`, which resolves and validates an exact candidate and
+  emits replay data, and `installExact`, which reproduces recorded bytes under
+  a frozen lock, verifies identity and digest, validates the complete registry,
+  and publishes managed bytes.
+- Store every installed package-backed Extension in one atomically rewritten
+  generic execution record. Catalog-installed records add optional nested
+  curation metadata; there are no activation generations, pointer files, or
+  retained history.
+- Allow automatic replacement only when the installed record is curated by the
+  same configured Catalog name and stable Catalog id. Direct installs, another
+  Catalog, builtins, and explicit-path Extensions require an explicit uninstall
+  before the stable id can be reused.
+- Preserve data-only Catalog add/refresh/list/show/search, deterministic
+  Marketplace results, separate repository and execution trust, default refresh
+  with explicit offline `--no-refresh`, and offline startup.
+- Preserve the existing direct-install CLI and route direct and Catalog installs
+  through the same materialization, selection, validation, publication, and
+  record-writing implementation.
 
 ## Capabilities
 
@@ -59,29 +54,28 @@ None.
 
 ### Modified Capabilities
 
-- `extension-catalogs`: Typed Catalog authoring, inert exact snapshots,
-  npm/Git/local curation, separate curation provenance, and deterministic
-  Marketplace search.
-- `extension-installation`: Catalog installation delegates exact package
-  reproduction and immutable execution state to the generic installer.
-- `extension-loading`: Catalog and package roots use `ctxindex.extensions`,
-  versionless exact selection, the common activation path, and offline managed
-  materializations.
-- `cli-surface`: Add Catalog build and Marketplace search while changing Catalog
-  selectors and provenance output to stable Extension ids.
+- `extension-catalogs`: typed authoring, schema-v2 exact replay metadata,
+  deterministic Marketplace projection, same-Catalog replacement, and safe
+  removal rules.
+- `extension-installation`: canonical authoring resolution and exact install
+  seams, sanitized Bun lock replay, one atomic generic record, and collision
+  policy.
+- `extension-loading`: package entry discovery during trusted authoring and
+  offline loading exclusively from managed installed bytes.
+- `cli-surface`: Catalog build/search/install workflow while retaining explicit
+  direct package lifecycle forms and trust boundaries.
 
 ## Impact
 
-- Depends on archive/sync of both `add-git-extension-catalogs` and
-  `add-direct-extension-installation`; runtime work is blocked until the Catalog
-  base and generic target, exact dependency-resolution artifact,
-  materialization, record, lock, selection, and validation seams are canonical.
-- Affects pure Catalog factories in `@ctxindex/extension-sdk`, provider-neutral
-  Catalog snapshot/projection services in `@ctxindex/core`, shared generic
-  installation composition, and thin CLI authoring/search/install formatting.
-- Catalog schema-v1 fixtures and versioned installed records are replaced before
-  release. No compatibility alias, migration, second package store, or bespoke
-  npm/Git/local acquisition path is introduced.
-- Private package sources may be usable only to the extent supported by the
-  generic installer and its credential-redaction contract. Catalog snapshots
-  never persist credentials or package-manager authentication state.
+- SDK: new plain authoring value types and factories.
+- Catalog snapshot: pre-alpha schema-v2 entries with exact source provenance,
+  bounded replay artifacts, and literal author-package locators.
+- Installer: a source-neutral `resolveForAuthoring` / `installExact` split added
+  to the existing canonical direct installer.
+- State: the generic installed-extension document gains optional Catalog
+  curation; no separate Catalog activation state is introduced.
+- CLI: a trusted build command and Marketplace search/install behavior; Catalog
+  lifecycle and direct lifecycle grammar remain explicit.
+- Security: package-manager execution and module import occur only at trusted
+  build or install boundaries; refresh, search, and startup never fetch or
+  execute Catalog-controlled upstream content.

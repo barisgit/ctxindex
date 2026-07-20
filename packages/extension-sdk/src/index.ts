@@ -20,9 +20,16 @@ export {
   docs,
 } from './documentation'
 export {
+  type AnyCatalogDefinition,
   type AnyExtensionDefinition,
+  type CatalogDefinition,
+  type CatalogEntry,
+  defineCatalog,
   defineExtension,
   type ExtensionDefinition,
+  type ExtensionPackageTarget,
+  type PackageExtensionDescriptor,
+  packageExtension,
 } from './extension'
 export {
   type AnyOAuthAppDefinition,

@@ -1,182 +1,217 @@
 ## MODIFIED Requirements
 
 ### Requirement: Explicit trusted direct package acquisition
-The system SHALL accept direct Extension package targets classified explicitly
-as `npm`, `git`, or `local`. npm targets MUST satisfy the pinned package manager's
-npm package-spec grammar, Git targets MUST satisfy its Git package-spec grammar,
-and local targets MUST identify package directories. A relative local target
-MUST be resolved against the install command's working directory and its
-normalized absolute origin MUST be retained for working-directory-independent
-updates. Embedded target credentials MUST be rejected and package-manager
-authentication material MUST NOT be persisted.
 
-Acquisition MUST occur only during an explicit direct install/update, explicit
-Catalog build authoring operation, or trusted Catalog install. Direct
-install/update and Catalog build invocations SHALL be their respective
-non-interactive operator/author trust grants for package evaluation and import;
-each MUST emit the trust notice before package-manager, materialization, or
-module-import effects without requiring a redundant flag. Catalog install MUST
-instead require its separate `--trust` acknowledgement before refresh or any
-executable effect. No startup, list, show, search, refresh, configuration file,
-or other read path may create a trust grant.
+The canonical generic installer SHALL remain the only implementation for direct
+and Catalog-backed package acquisition, selection, validation, managed
+publication, lifecycle locking, record persistence, and cleanup.
 
-Direct install/update MUST NOT require or create a Catalog. Every executable
-caller MUST describe definition validation as a correctness boundary rather than
-a sandbox.
+It SHALL expose separate `resolveForAuthoring` and `installExact` operations.
+`resolveForAuthoring` SHALL require an explicit target and selection union:
+`{ kind: "extension", extensionId }` for a package descriptor or
+`{ kind: "catalog", module, catalogId? }` for an author package, where an omitted
+id requires exactly one Catalog root in the declared module. It SHALL resolve
+one exact requested root in isolated staging, perform intrinsic package
+validation, and return that root plus replay metadata without publishing
+installed state. `installExact`
+SHALL accept only exact replay metadata and SHALL reproduce, verify, completely
+validate, publish, and record that candidate.
 
-All three callers MUST use the same typed target validation, credential
-sanitization, package-manager materialization, immutable publication, exact
-Extension selection, complete-registry validation, and rollback behavior.
-Catalog build MUST receive only safe exact resolved provenance and a sanitized
-replayable dependency-resolution artifact and MUST NOT publish end-user
-installation state. ctxindex MUST NOT resolve an Extension dependency graph,
-honor an Extension dependency declaration, automatically install sibling roots,
-or weaken the package manager's lifecycle-script/trusted-dependency policy.
+Direct install/update SHALL reuse the same internal phases and trust boundary.
+No list, show, search, refresh, or startup path SHALL implicitly acquire a
+package.
 
 #### Scenario: npm package is explicitly trusted
-- **WHEN** an operator directly installs an npm target and selects one exact
-  Extension id
-- **THEN** the package manager resolves ordinary dependencies, the command is the
-  in-process trust grant, and no Catalog record is required
 
-#### Scenario: Acquisition is attempted without an explicit lifecycle request
-- **WHEN** startup or a read-only command encounters an unmaterialized target
-- **THEN** the system performs no acquisition or import and reports the Extension
-  unavailable
-
-#### Scenario: Package exports sibling Extensions
-- **WHEN** the selected package exports multiple Extension roots
-- **THEN** only the exact requested Extension root is installed and no Extension
-  dependency edge is inferred
-
-#### Scenario: Relative local origin survives working-directory changes
-- **WHEN** a direct local package installed by relative target is updated from a
-  different working directory
-- **THEN** update rereads the normalized stored origin rather than reinterpreting
-  the relative argument
+- **WHEN** a user explicitly requests and trusts direct npm installation with an
+  exact Extension selection
+- **THEN** the canonical installer materializes, selects, validates, publishes,
+  and records it through the shared lifecycle
 
 #### Scenario: Catalog build evaluates package entries
-- **WHEN** an author runs Catalog build over npm, Git, or local package entries
-- **THEN** the CLI emits the authoring trust notice before generic materialization
-  or import and persists no end-user execution record
 
-#### Scenario: Catalog install omits execution trust
-- **WHEN** Catalog install omits its required acknowledgement
-- **THEN** the request exits as invalid usage before refresh, package-manager,
-  filesystem acquisition, import, materialization, or persisted mutation
+- **WHEN** a trusted Catalog build resolves a package target
+- **THEN** it calls `resolveForAuthoring` and receives exact replay metadata
+  without installing the Extension
+
+#### Scenario: Acquisition is attempted without an explicit lifecycle request
+
+- **WHEN** a read-only Catalog, Marketplace, or startup path encounters package
+  replay metadata
+- **THEN** no package manager, import, materialization, or publication occurs
+
+### Requirement: Exact package selection and complete validation
+
+Every authoring resolution and installation SHALL discover only declared entry
+modules and SHALL select exactly one Extension matching the requested stable id.
+Sibling roots SHALL NOT cause implicit selection.
+
+Authoring resolution SHALL validate the selected root and reachable roots as an
+intrinsic package registry independent of the author's active machine state.
+Exact installation SHALL repeat intrinsic validation and SHALL validate the
+candidate in the complete active registry, including builtin, explicit-path,
+generic installed, provider, and OAuth-app contracts, before commit.
+The canonical installer SHALL read that active state itself; a Catalog caller
+SHALL NOT construct or supply an alternate registry context.
+
+#### Scenario: Package exports sibling Extensions
+
+- **WHEN** a package exports several roots and one stable Extension id is
+  requested
+- **THEN** only the exact requested Extension is selected and siblings do not
+  become installed implicitly
+
+#### Scenario: Complete registry rejects the candidate
+
+- **WHEN** exact replay succeeds but the candidate conflicts with active registry
+  contracts
+- **THEN** installation fails before record replacement and the prior installed
+  state remains authoritative
 
 ## ADDED Requirements
 
 ### Requirement: Catalog snapshots reproduce immutable package resolution
-The generic installer MUST accept only a Catalog snapshot's source-specific exact
-provenance, verified contained dependency-resolution artifact, stable Extension
-id, immutable snapshot handle when required for a contained local path, and
-optional separately typed exact Catalog curation provenance. That curation input
-MUST NOT contain a caller-selected execution pin; the installer MUST derive and
-link its validated execution result. npm provenance MUST carry exact `version`
-and `integrity`; Git provenance MUST carry exact `commit`; local provenance MUST
-carry normalized contained `path` and `contentDigest`. All variants MUST carry
-the materialization digest and exact dependency-resolution artifact.
 
-The installer MUST internally acquire into staging, replay the artifact's
-ordinary transitive package dependency graph without range drift, resolve
-`package.json#ctxindex.extensions`, collect roots, select the exact Extension id,
-read the active registry and local OAuth App identities, build and validate the
-complete candidate registry, and publish. A Catalog caller MUST NOT supply a
-`CompleteRegistryInput`, preselected root, or precomputed active candidate for a
-package install. The installer MUST NOT re-resolve a mutable range/ref to a
-different result or permit Catalog composition to bypass complete validation.
+`resolveForAuthoring` SHALL record exact source provenance, normalized package
+root, expected canonical materialization digest, and a bounded
+content-addressed sanitized lock artifact with format `bun.lock@1.3.14`.
 
-The generic execution record MUST remain origin-neutral. Catalog local name/id,
-repository, commit, snapshot age, and entry locator MUST live in a separate
-curation link and MUST NOT alter materialization identity or activation behavior.
+For npm, exact provenance SHALL contain package name, exact version, and
+integrity. For Git, it SHALL contain credential-free repository identity and
+exact commit. For local sources, it SHALL contain a normalized path within the
+immutable snapshot and content digest.
+Every source SHALL retain a sanitized `requestedTarget` for explanation only;
+the lock and exact fields SHALL remain replay authority. Literal author-package
+local provenance SHALL identify the immutable Catalog snapshot root without
+persisting an author-machine absolute path.
+
+`installExact` SHALL create a sanitized staging manifest from that provenance,
+write the exact lock bytes, and run pinned Bun 1.3.14 with frozen-lockfile,
+production, and ignore-scripts semantics. It SHALL NOT re-resolve the original
+range, tag, branch, or other mutable request. Source, lock, package-root, selected
+identity, and materialization-digest mismatch SHALL fail before commit.
 
 #### Scenario: Upstream mutable target has advanced
-- **WHEN** Catalog install reproduces an older exact snapshot resolution after
-  the authored npm range or Git ref would now choose different code
-- **THEN** the generic installer uses the snapshot's exact pin or fails without
-  silently selecting the newer target
 
-#### Scenario: Exact reproduction differs
-- **WHEN** integrity, content, materialization digest, collected root, or stable
-  Extension id differs from the snapshot constraint
-- **THEN** installation fails atomically and preserves prior generic execution
-  and Catalog curation records
+- **WHEN** the original npm range, tag, or Git branch now resolves differently
+  from the snapshot
+- **THEN** Catalog install reproduces the recorded exact source and frozen lock
+  or fails without using the newer result
 
 #### Scenario: Transitive dependency range has advanced
-- **WHEN** current package metadata would resolve a dependency differently from
-  the committed generic resolution artifact
-- **THEN** install replays the artifact's exact dependency pin or fails without
-  constructing a different materialization
 
-#### Scenario: Catalog delegates an exact package constraint
-- **WHEN** Catalog install passes exact snapshot provenance, its verified
-  resolution artifact, stable Extension id, and any required immutable snapshot
-  handle to the generic installer
-- **THEN** the installer itself collects and selects roots, reads active state,
-  complete-validates the candidate, and publishes without accepting a caller-
-  constructed registry candidate
+- **WHEN** a transitive range could resolve to newer bytes after build
+- **THEN** frozen lock replay uses the recorded graph and verifies the expected
+  materialization digest
 
-### Requirement: Catalog entries use common exact selection and complete validation
-Literal and package-backed Catalog entries MUST use the same versionless exact
-Extension selector and complete candidate-registry validator as direct, built-in,
-and explicit-path roots. A literal entry MUST be recollected from the exact
-Catalog commit, Catalog id, module, and nested entry index after trust; a package
-entry MUST be recollected from its reproduced immutable materialization. Neither
-origin may pre-register leaves, shadow by source priority, or win by load order.
+#### Scenario: Exact reproduction differs
+
+- **WHEN** replayed source integrity, commit, local content, package root,
+  selected identity, or materialization digest differs
+- **THEN** installation fails and publishes no authoritative record
+
+### Requirement: Sanitized replay artifacts contain no ambient authority
+
+The canonical installer SHALL sanitize and validate replay lock artifacts before
+snapshot publication and again before replay. It SHALL reject credentials,
+tokens, userinfo, authentication headers, secret query data, absolute host paths,
+home paths, traversal, symlink escapes, mutable Git refs, unsupported protocols,
+external file dependencies, lifecycle scripts, and lock formats not replayable
+by Bun 1.3.14.
+
+Package subprocesses SHALL be non-interactive and SHALL NOT use ambient
+credential helpers or authentication configuration.
+
+#### Scenario: Lock contains a credential-bearing URL
+
+- **WHEN** resolution produces a lock entry containing embedded credentials or
+  secret query data
+- **THEN** authoring fails before snapshot publication
+
+#### Scenario: Replay artifact uses an absolute local path
+
+- **WHEN** a lock contains an absolute or escaping file dependency
+- **THEN** authoring or installation rejects it without invoking that dependency
+
+### Requirement: Literal Catalog entries replay immutable author packages
+
+A literal Catalog entry SHALL be installed from the exact author-package replay
+payload and locator stored in the immutable Catalog snapshot. `installExact`
+SHALL receive a `{ kind: "catalog-entry", module, catalogId, entryIndex,
+extensionId }` selection and
+SHALL replay the author package under its sanitized lock, verify the expected
+materialization digest and package root, import the exact declared module,
+select the exact Catalog id and zero-based entry index, and verify the stable
+Extension id.
+
+After complete validation, the installer SHALL publish the replayed author
+package as managed runnable bytes. It SHALL NOT persist only an in-memory
+Extension root and SHALL NOT require the Catalog snapshot or author checkout at
+startup.
 
 #### Scenario: Literal nested identity changed
-- **WHEN** the pinned module's selected Catalog entry index no longer contains
-  the snapshot's stable Extension id
-- **THEN** installation fails before activation or curation publication
 
-### Requirement: Atomic Catalog-curated replacement
-Catalog install MUST serialize through the generic lifecycle lock. The generic
-installer MUST write the validated execution record and separate Catalog
-curation link as distinct members of one inactive activation generation and
-fsync the complete generation and its parent directory. It MUST then write and
-fsync a pointer candidate, atomically replace the stable Extension id's active-
-generation pointer, and fsync the pointer directory. Only the pointer-directory
-fsync SHALL make activation durably committed and permit prior-generation
-cleanup. Startup MUST read only pointer-reachable generations.
+- **WHEN** replayed module, Catalog id, entry index, or Extension id differs from
+  the recorded locator
+- **THEN** installation fails before managed publication or record commit
 
-Recovery under the same lock MUST retain the prior pointer when a candidate is
-malformed, validate the pointer target before use, and discard or reuse only
-inactive unreferenced generations. Cleanup after pointer replacement MUST be
-retryable. Any acquisition, import, selection, conflict, digest, record, or
-curation failure before the durable pointer commit MUST preserve a complete
-recoverable prior generation. Interruption after it MAY leave inert bytes but
-MUST expose the complete new pair rather than split active state. Interruption
-between pointer rename and pointer-directory fsync MUST leave both complete
-generations available; recovery SHALL use whichever complete generation the
-durable pointer names.
+#### Scenario: Literal Extension starts offline
 
-#### Scenario: Refreshed Catalog candidate is invalid
-- **WHEN** reinstall from a newer Catalog commit fails exact reproduction or
-  complete-registry validation
-- **THEN** the prior installed Extension and prior Catalog curation link remain
-  active unchanged
+- **WHEN** a literal Catalog Extension was installed successfully and upstream,
+  the Catalog checkout, Bun, and the network are unavailable
+- **THEN** startup imports it from the managed author-package materialization
 
-#### Scenario: Interruption occurs before activation commit
-- **WHEN** the process stops after staging or fsync but before replacing the
-  active-generation pointer
-- **THEN** startup and recovery retain the complete prior execution-and-curation
-  pair and treat the candidate generation as inactive
+### Requirement: One atomic generic installation record
 
-#### Scenario: Interruption occurs after activation commit
-- **WHEN** the process stops after replacing the active-generation pointer but
-  after fsyncing its directory and before superseded-generation cleanup
-- **THEN** startup exposes the complete new execution-and-curation pair and
-  recovery retries only cleanup of unreferenced state
+Each managed stable id SHALL have exactly one generic installed-extension record
+containing exact source, materialization digest, package root, numeric
+timestamps, and
+optional Catalog curation. Catalog curation SHALL include configured Catalog
+name, Catalog id, repository, selected commit, snapshot acquisition time, and
+exact source locator in that same record.
 
-#### Scenario: Interruption occurs before pointer durability
-- **WHEN** the process stops after pointer rename but before pointer-directory
-  fsync
-- **THEN** both complete generations remain available and recovery exposes the
-  complete generation named by the durable pointer without split state
+After staging and validation, the installer SHALL take the lifecycle lock,
+recheck collisions, publish immutable managed bytes, and atomically rewrite the
+entire strict generic record document by synced temporary file, rename, and
+parent-directory sync. Failure before durable rename SHALL leave the prior
+record authoritative. Published but unreferenced bytes SHALL remain inert and
+SHALL be cleaned idempotently.
 
-#### Scenario: Active generation is invalid
-- **WHEN** startup or recovery encounters a missing, malformed, or mismatched
-  pointer-reachable generation
-- **THEN** it fails that Extension closed without acquisition, implicit repair,
-  or activation of an unreferenced generation
+The implementation SHALL NOT create activation generations, pointer files,
+rollback history, or a separate Catalog curation/execution store.
+
+#### Scenario: Interruption occurs before record rename
+
+- **WHEN** install or replacement is interrupted after staging or publication but
+  before the atomic record rename is durable
+- **THEN** the previous generic record remains authoritative and any new bytes
+  are inert
+
+#### Scenario: Record rename is durable
+
+- **WHEN** the complete replacement document is durably renamed
+- **THEN** startup observes the new execution and optional curation together
+  without consulting a pointer or history
+
+### Requirement: Catalog replacement is limited to the same Catalog
+
+A Catalog install SHALL create an absent stable id or replace a record only when
+the existing record's configured Catalog name and Catalog id both match the
+selected Catalog. Exact replay of the same record SHALL be idempotent.
+
+A direct record, record curated by another Catalog, builtin Extension, or
+explicit-path Extension using the stable id SHALL cause a conflict with
+uninstall-first guidance. Direct install/update SHALL NOT replace a curated
+record implicitly. Collision failure SHALL preserve all prior bytes and records.
+
+#### Scenario: Same Catalog advances its curated entry
+
+- **WHEN** the same configured Catalog name and Catalog id select a newer exact
+  commit and replay and validation succeed
+- **THEN** its generic record is atomically replaced
+
+#### Scenario: Different origin owns the stable id
+
+- **WHEN** the stable id belongs to direct install, another Catalog, a builtin,
+  or an explicit path
+- **THEN** Catalog install fails with uninstall-first guidance

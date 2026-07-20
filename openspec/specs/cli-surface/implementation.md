@@ -223,13 +223,22 @@ export function parseExportArgs(args: string[]): ExportArgs;
 ### @ctxindex/cli — Extension arguments
 
 ```ts
-export interface ExtensionSelector {
-  readonly id: string
-  readonly version: number
-}
-
 export type ExtensionsArgs =
   | { readonly kind: 'list'; readonly json: boolean }
+  | {
+      readonly kind: 'search'
+      readonly query?: string
+      readonly noRefresh: boolean
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'catalog-build'
+      readonly packageRoot: string
+      readonly catalogId?: string
+      readonly output?: string
+      readonly trust: true
+      readonly json: boolean
+    }
   | {
       readonly kind: 'catalog-add'
       readonly name: string
@@ -246,7 +255,7 @@ export type ExtensionsArgs =
   | {
       readonly kind: 'catalog-show'
       readonly name: string
-      readonly extension?: ExtensionSelector
+      readonly extensionId?: string
       readonly noRefresh: boolean
       readonly json: boolean
     }
@@ -263,14 +272,9 @@ export type ExtensionsArgs =
   | {
       readonly kind: 'catalog-install'
       readonly catalog: string
-      readonly extension: ExtensionSelector
+      readonly extensionId: string
       readonly trust: true
       readonly noRefresh: boolean
-      readonly json: boolean
-    }
-  | {
-      readonly kind: 'catalog-uninstall'
-      readonly extension: ExtensionSelector
       readonly json: boolean
     }
   | {
@@ -286,7 +290,7 @@ export type ExtensionsArgs =
       readonly json: boolean
     }
   | {
-      readonly kind: 'direct-uninstall'
+      readonly kind: 'uninstall'
       readonly extensionId: string
       readonly force: boolean
       readonly json: boolean
@@ -476,7 +480,20 @@ Database-backed command dependency setup requires both the persisted config and 
 
 Parser unions are the command boundary. Registry-derived Source config, fields, kinds, exports, and Actions are resolved before service calls rather than duplicated as provider branches. The OAuth surface contains only `oauth-app` and `account` commands: App add requires exact Provider and label plus `--from-env`; Account add accepts an optional `--app`. An explicit label bypasses managed selection, while omission delegates to core's host-policy resolver and feeds the returned exact label through the same OAuth App service resolver. The CLI owns only this branch and static BYOA formatting; it does not infer Apps or reproduce policy, provenance, scope, or Provider logic. No `client` route or alias is parsed. Structured output writes safe projections to stdout and human diagnostics to stderr; App config, credential values, tokens, authorization codes, and secret-store passphrases never enter argv or output.
 
-The Extension command adapter delegates repository, manifest, persistence, refresh policy, and Catalog install behavior to `CatalogService`. Direct lifecycle forms delegate target parsing, package materialization, validation, persistence, and removal guards to `DirectExtensionService`. The parser distinguishes exact `npm|git|local` source kinds from existing Catalog selectors, and install/update emit their in-process trust notice on stderr before acquisition so JSON stdout remains one document. Catalog list/show and install request refresh by default, while `--no-refresh` selects stored state. Startup, loaded-Extension listing, uninstall, and ordinary operations never cross either acquisition boundary.
+The Extension command adapter keeps the Catalog lifecycle, Marketplace projection,
+and trusted installation seams distinct: inert repository/manifest reads delegate
+to `CatalogService`, while Catalog-selected execution delegates to
+`CatalogInstallationService`. Both Catalog-selected and direct lifecycle forms
+ultimately use the same generic package installer, managed materializations, and
+atomic installed-extension record; `DirectExtensionService` remains only the
+thin direct install/update/list/uninstall facade. The parser distinguishes exact
+`npm|git|local` source kinds from configured Catalog selectors, uses stable
+versionless Extension ids, and exposes one origin-neutral uninstall. Catalog
+list/show and install request refresh by default, while `--no-refresh` selects
+stored state. Install/update emit their in-process trust notice on stderr before
+acquisition so JSON stdout remains one document. Startup, loaded-Extension
+listing, uninstall, and ordinary operations never cross either acquisition
+boundary.
 
 ## Verification
 

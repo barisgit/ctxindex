@@ -3,15 +3,8 @@ import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import * as CTXINDEX_BUILTIN_MODULE from '@ctxindex/adapters'
 import { type AuthService, createAuthService } from '@ctxindex/core/auth'
-import {
-  CatalogStore,
-  type InstalledExtensionRecord,
-} from '@ctxindex/core/catalog'
 import { type CtxindexConfig, readConfig } from '@ctxindex/core/config'
-import {
-  type DirectExtensionInstallationRecord,
-  DirectExtensionStore,
-} from '@ctxindex/core/direct-extension'
+import { DirectExtensionStore } from '@ctxindex/core/direct-extension'
 import {
   type LoadExtensionsResult,
   loadExtensions,
@@ -107,15 +100,15 @@ export interface DaemonServices {
 
 export interface DaemonRuntimeHooks {
   readonly readConfig: (path: string) => Promise<CtxindexConfig>
-  readonly readInstalled: () => Promise<readonly InstalledExtensionRecord[]>
-  readonly readDirectInstalled: () => ReturnType<
+  readonly readInstalled: () => ReturnType<
     DirectExtensionStore['readRecordsForLoading']
   >
   readonly loadExtensions: (input: {
     readonly config: CtxindexConfig
     readonly builtins: typeof CTXINDEX_BUILTIN_MODULE
-    readonly installed: readonly InstalledExtensionRecord[]
-    readonly directInstalled: readonly DirectExtensionInstallationRecord[]
+    readonly installed: Awaited<
+      ReturnType<DirectExtensionStore['readRecordsForLoading']>
+    >['records']
     readonly dataRoot: string
     readonly localOAuthAppIdentities: ReturnType<
       typeof listLocalOAuthAppIdentities
@@ -258,8 +251,6 @@ function defaultHooks(
   return {
     readConfig,
     readInstalled: () =>
-      new CatalogStore({ configRoot: roots.configRoot }).readInstalled(),
-    readDirectInstalled: () =>
       new DirectExtensionStore({
         configRoot: roots.configRoot,
         dataRoot: roots.dataRoot,
@@ -405,7 +396,6 @@ export async function startDaemon(
     writeLifecycle('starting')
     const config = await hooks.readConfig(join(roots.configRoot, 'config.toml'))
     const installed = await hooks.readInstalled()
-    const direct = await hooks.readDirectInstalled()
     hooks.assertDatabaseTarget(databaseLease)
     database = await hooks.openDatabase(roots.databasePath)
     hooks.assertDatabaseTarget(databaseLease)
@@ -414,16 +404,15 @@ export async function startDaemon(
     const extensionResult = await hooks.loadExtensions({
       config,
       builtins: CTXINDEX_BUILTIN_MODULE,
-      installed,
-      directInstalled: direct.records,
+      installed: installed.records,
       dataRoot: roots.dataRoot,
       localOAuthAppIdentities,
     })
     const loaded = {
       ...extensionResult,
       diagnostics: [
-        ...direct.diagnostics.map((message) => ({
-          path: 'direct-records',
+        ...installed.diagnostics.map((message) => ({
+          path: 'installed-records',
           message,
         })),
         ...extensionResult.diagnostics,

@@ -1,12 +1,21 @@
 import { hasHelpFlag, parseFlags } from './flags'
 
-export interface ExtensionSelector {
-  readonly id: string
-  readonly version: number
-}
-
 export type ExtensionsArgs =
   | { readonly kind: 'list'; readonly json: boolean }
+  | {
+      readonly kind: 'search'
+      readonly query?: string
+      readonly noRefresh: boolean
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'catalog-build'
+      readonly packageRoot: string
+      readonly catalogId?: string
+      readonly output?: string
+      readonly trust: true
+      readonly json: boolean
+    }
   | {
       readonly kind: 'catalog-add'
       readonly name: string
@@ -23,7 +32,7 @@ export type ExtensionsArgs =
   | {
       readonly kind: 'catalog-show'
       readonly name: string
-      readonly extension?: ExtensionSelector
+      readonly extensionId?: string
       readonly noRefresh: boolean
       readonly json: boolean
     }
@@ -40,14 +49,9 @@ export type ExtensionsArgs =
   | {
       readonly kind: 'catalog-install'
       readonly catalog: string
-      readonly extension: ExtensionSelector
+      readonly extensionId: string
       readonly trust: true
       readonly noRefresh: boolean
-      readonly json: boolean
-    }
-  | {
-      readonly kind: 'catalog-uninstall'
-      readonly extension: ExtensionSelector
       readonly json: boolean
     }
   | {
@@ -63,7 +67,7 @@ export type ExtensionsArgs =
       readonly json: boolean
     }
   | {
-      readonly kind: 'direct-uninstall'
+      readonly kind: 'uninstall'
       readonly extensionId: string
       readonly force: boolean
       readonly json: boolean
@@ -75,14 +79,8 @@ function unknown(message: string): ExtensionsArgs {
   return { kind: 'unknown', message }
 }
 
-function parseSelector(value: string): ExtensionSelector | undefined {
-  const match = /^(.+)@([1-9]\d*)$/.exec(value)
-  if (match === null || match[1] === undefined || match[2] === undefined) {
-    return undefined
-  }
-  const version = Number(match[2])
-  if (!Number.isSafeInteger(version)) return undefined
-  return { id: match[1], version }
+function isStableExtensionId(value: string): boolean {
+  return value.length <= 128 && /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/.test(value)
 }
 
 function parseSimple(
@@ -134,6 +132,45 @@ function parseCatalogRead(
 
 function parseCatalogArgs(args: string[]): ExtensionsArgs {
   const [subcommand, ...rest] = args
+  if (subcommand === 'build') {
+    const parsed = parseFlags(rest, {
+      booleanFlags: ['trust', 'json'],
+      valueFlags: ['catalog', 'output'],
+      strict: true,
+    })
+    if (parsed.error !== undefined) {
+      return unknown(
+        `extensions catalog build: ${parsed.error.kind} option ${parsed.error.flag}`,
+      )
+    }
+    if (parsed.positional.length !== 1) {
+      return unknown(
+        'extensions catalog build: expected <package-root> [--catalog <id>] [--output <manifest-path>]',
+      )
+    }
+    if (parsed.flags.trust !== true) {
+      return unknown('extensions catalog build: --trust is required')
+    }
+    if (
+      parsed.flags.catalog !== undefined &&
+      (typeof parsed.flags.catalog !== 'string' ||
+        !isStableExtensionId(parsed.flags.catalog))
+    ) {
+      return unknown('extensions catalog build: invalid Catalog id')
+    }
+    return {
+      kind: 'catalog-build',
+      packageRoot: parsed.positional[0] ?? '',
+      ...(typeof parsed.flags.catalog === 'string'
+        ? { catalogId: parsed.flags.catalog }
+        : {}),
+      ...(typeof parsed.flags.output === 'string'
+        ? { output: parsed.flags.output }
+        : {}),
+      trust: true,
+      json: parsed.flags.json === true,
+    }
+  }
   if (subcommand === 'add') {
     const parsed = parseFlags(rest, {
       booleanFlags: ['trust', 'json'],
@@ -183,20 +220,17 @@ function parseCatalogArgs(args: string[]): ExtensionsArgs {
     if ('kind' in parsed) return parsed
     if (parsed.positional.length < 1 || parsed.positional.length > 2) {
       return unknown(
-        'extensions catalog show: expected <name> [<id>@<version>]',
+        'extensions catalog show: expected <name> [<extension-id>]',
       )
     }
-    const selector =
-      parsed.positional[1] === undefined
-        ? undefined
-        : parseSelector(parsed.positional[1])
-    if (parsed.positional[1] !== undefined && selector === undefined) {
+    const extensionId = parsed.positional[1]
+    if (extensionId !== undefined && !isStableExtensionId(extensionId)) {
       return unknown('extensions catalog show: invalid Extension selector')
     }
     return {
       kind: 'catalog-show',
       name: parsed.positional[0] ?? '',
-      ...(selector === undefined ? {} : { extension: selector }),
+      ...(extensionId === undefined ? {} : { extensionId }),
       noRefresh: parsed.noRefresh,
       json: parsed.json,
     }
@@ -222,6 +256,28 @@ export function parseExtensionsArgs(args: string[]): ExtensionsArgs {
     const parsed = parseSimple('extensions list', rest, 0)
     if ('kind' in parsed) return parsed
     return { kind: 'list', json: parsed.json }
+  }
+  if (subcommand === 'search') {
+    const parsed = parseFlags(rest, {
+      booleanFlags: ['no-refresh', 'json'],
+      strict: true,
+    })
+    if (parsed.error !== undefined) {
+      return unknown(
+        `extensions search: ${parsed.error.kind} option ${parsed.error.flag}`,
+      )
+    }
+    if (parsed.positional.length > 1) {
+      return unknown('extensions search: expected [query]')
+    }
+    return {
+      kind: 'search',
+      ...(parsed.positional[0] === undefined
+        ? {}
+        : { query: parsed.positional[0] }),
+      noRefresh: parsed.flags['no-refresh'] === true,
+      json: parsed.flags.json === true,
+    }
   }
   if (subcommand === 'catalog') return parseCatalogArgs(rest)
   if (subcommand === 'install') {
@@ -271,13 +327,14 @@ export function parseExtensionsArgs(args: string[]): ExtensionsArgs {
         `extensions install: ${parsed.error.kind} option ${parsed.error.flag}`,
       )
     }
-    const selector =
-      parsed.positional[1] === undefined
-        ? undefined
-        : parseSelector(parsed.positional[1])
-    if (parsed.positional.length !== 2 || selector === undefined) {
+    const extensionId = parsed.positional[1]
+    if (
+      parsed.positional.length !== 2 ||
+      extensionId === undefined ||
+      !isStableExtensionId(extensionId)
+    ) {
       return unknown(
-        'extensions install: expected <catalog> <id>@<version> --trust',
+        'extensions install: expected <catalog> <extension-id> --trust',
       )
     }
     if (parsed.flags.trust !== true) {
@@ -286,7 +343,7 @@ export function parseExtensionsArgs(args: string[]): ExtensionsArgs {
     return {
       kind: 'catalog-install',
       catalog: parsed.positional[0] ?? '',
-      extension: selector,
+      extensionId,
       trust: true,
       noRefresh: parsed.flags['no-refresh'] === true,
       json: parsed.flags.json === true,
@@ -315,24 +372,11 @@ export function parseExtensionsArgs(args: string[]): ExtensionsArgs {
       return unknown('extensions uninstall: invalid arguments')
     }
     const value = parsed.positional[0] ?? ''
-    const selector = parseSelector(value)
-    if (selector !== undefined) {
-      if (parsed.flags.force === true) {
-        return unknown(
-          'extensions uninstall: --force applies only to direct Extensions',
-        )
-      }
-      return {
-        kind: 'catalog-uninstall',
-        extension: selector,
-        json: parsed.flags.json === true,
-      }
-    }
-    if (value.length === 0 || value.includes('@')) {
+    if (!isStableExtensionId(value)) {
       return unknown('extensions uninstall: invalid Extension selector')
     }
     return {
-      kind: 'direct-uninstall',
+      kind: 'uninstall',
       extensionId: value,
       force: parsed.flags.force === true,
       json: parsed.flags.json === true,

@@ -1,250 +1,282 @@
 ## ADDED Requirements
 
 ### Requirement: Typed direct Catalog authoring
-The system SHALL provide imported `defineCatalog` and `packageExtension`
-factories. A Catalog definition MUST contain a stable id, label, optional
-summary, and at most 256 direct entries. Each entry MUST be either one valid
-versionless Extension definition or one inert package descriptor containing an
-explicit `npm`, `git`, or `local` source kind, sanitized target, and exact stable
-Extension id. A Catalog MUST NOT contain another Catalog, a textual Extension
-dependency, or an implicit sibling-root reference.
 
-The factories MUST return readonly plain values and perform no filesystem,
-package-manager, network, import, or materialization effect. The same Extension
-id MUST NOT occur twice within one Catalog. Independent Catalogs MAY curate that
-same id and MUST retain independent provenance.
+The SDK SHALL expose effect-free plain factories with the established shape
+`defineCatalog({ id, label, summary?, entrySummaries?, extensions })` and
+`packageExtension(source, extensionId)`. A package descriptor SHALL have exactly
+`{ kind: "package-extension", source, extensionId }`, where `source` is the
+exported `{ kind, target }` npm, Git, or local `ExtensionPackageTarget` union.
+`extensions` SHALL accept literal Extension roots and those descriptors.
+`entrySummaries`, when present, SHALL be a plain partial map whose keys are
+limited by inference and runtime validation to the stable ids in `extensions`.
+It SHALL provide the optional per-entry Marketplace summary for literal and
+package-backed entries without changing either underlying entry value.
+Factories SHALL preserve inference, exact public shapes, excess-property
+checking, structural copy compatibility, and SDK dependency boundaries.
+
+Catalog entries SHALL be versionless and SHALL accept only literal Extension
+objects or package descriptors. A Catalog or any other value SHALL NOT be valid
+as an entry.
 
 #### Scenario: Mixed Catalog is authored
-- **WHEN** an author passes literal Extension values and npm, Git, and contained
-  local package descriptors to `defineCatalog`
-- **THEN** TypeScript preserves their exact entry types and factory evaluation
-  performs no acquisition or code import
 
-#### Scenario: Catalog or dependency ref is nested
-- **WHEN** an entry is another Catalog or a textual dependency reference
-- **THEN** Catalog validation rejects it instead of traversing or resolving it
+- **WHEN** an author defines one Catalog containing literal, npm, Git, and local
+  package entries
+- **THEN** the SDK returns a plain typed value without filesystem, package
+  manager, import, trust, or persistence effects, and build emits any authored
+  per-entry summaries into the corresponding schema-v2 entries
 
-### Requirement: Explicit generated Catalog snapshot
-An explicit authoring operation SHALL inspect only modules listed in the local
-package's strict `package.json#ctxindex.extensions`, select exactly one Catalog
-root by stable Catalog id, validate every direct entry, and atomically write one
-canonical data-only `ctxindex-catalog.json`. When more than one Catalog root is
-available, generation MUST require an exact Catalog id. JavaScript export names
-MUST NOT be a selection or persistence contract.
+#### Scenario: Unsupported Catalog entry is supplied
 
-Literal entries MUST compile to their declared module, selected Catalog id,
-stable nested entry index, Extension id, and optional summary. Package entries
-MUST delegate resolution, dependency materialization, module collection, and
-exact Extension selection to the generic installer primitive and copy only its
-sanitized requested target and exact resolved provenance into the snapshot.
-Generation MUST preserve a prior valid output on any failure and report a
-byte-identical output as unchanged. Generic exact dependency-resolution
-artifacts MUST be emitted at bounded content-addressed paths contained beside
-the output, verified before manifest publication, and referenced only by path,
-format, and digest. Catalog code MUST treat their content as inert bytes.
+- **WHEN** an author places a Catalog or any other unsupported value in
+  `extensions`
+- **THEN** type checking and runtime snapshot validation reject it
 
-#### Scenario: Package target resolves during generation
-- **WHEN** a Catalog package descriptor selects one mutable npm range, Git ref,
-  or contained local package and one Extension id
-- **THEN** the generic installer resolves and validates it once and the generated
-  snapshot records its exact immutable resolution, contained generic
-  dependency-resolution artifact, and digests
+### Requirement: Trusted deterministic Catalog build
 
-#### Scenario: Entry module exports multiple roots
-- **WHEN** a declared module exports multiple Extensions or Catalogs
-- **THEN** generation selects only the requested Catalog and package descriptor
-  Extension ids without persisting export names or following nested Catalogs
+Catalog build SHALL require explicit author trust before package acquisition,
+Bun execution, or module import. It SHALL resolve the author package and every
+package entry through the canonical installer's `resolveForAuthoring` operation.
 
-#### Scenario: Generation candidate fails
-- **WHEN** module collection, target resolution, exact selection, validation, or
-  canonical snapshot validation fails
-- **THEN** generation preserves the prior output and publishes no partial file
+The build SHALL emit one deterministic schema-v2 snapshot only after every entry
+is resolved, selected, and intrinsically validated. It SHALL sort canonical
+content, normalize paths, deduplicate identical lock artifacts by digest, and
+atomically replace output. Any candidate failure SHALL leave prior output
+unchanged.
+
+#### Scenario: Package target resolves during build
+
+- **WHEN** a trusted build includes a mutable npm range or Git ref
+- **THEN** the snapshot records its exact version and integrity or exact commit,
+  expected materialization digest, package root, and sanitized Bun 1.3.14 lock
+  artifact
+
+#### Scenario: Candidate generation fails
+
+- **WHEN** any declared module, selected Extension, exact resolution, lock
+  sanitization, or intrinsic validation fails
+- **THEN** build fails without publishing a partial snapshot
+
+### Requirement: Literal entries carry exact author-package replay locators
+
+A literal entry SHALL record the exact immutable author-package replay payload
+and a locator containing normalized module path, Catalog id, zero-based entry
+index, and Extension id. The author-package replay payload SHALL include exact
+source provenance, package root, expected materialization digest, and sanitized
+Bun 1.3.14 lock artifact.
+
+The locator SHALL be verified against the exact author-package materialization
+during build and install. The snapshot SHALL NOT serialize an in-memory
+Extension root as a substitute for runnable package bytes.
+
+#### Scenario: Module exports multiple Catalog roots
+
+- **WHEN** a declared module exports multiple Catalogs or a Catalog contains
+  multiple literal entries
+- **THEN** each literal snapshot entry records the exact Catalog id and entry
+  index that identifies its Extension id
+
+#### Scenario: Literal identity no longer matches
+
+- **WHEN** exact replay yields a different Catalog id, entry index, or Extension
+  id than the locator
+- **THEN** installation fails before managed bytes or records are committed
 
 ### Requirement: Deterministic aggregate Marketplace search
-Marketplace SHALL project the stored snapshots of all configured Catalogs as one
-aggregate without creating a persisted Marketplace record. Matching MUST use
-case-insensitive substring comparison over Extension id and summary. Results MUST
-retain one row per Catalog entry and sort by Extension id ascending, Catalog
-local name ascending, then exact source locator ascending. Marketplace MUST NOT
-collapse duplicate curation, select a preferred source, import code, invoke the
-package manager, or materialize a package.
 
-Default search SHALL refresh all configured Catalogs in deterministic local-name
-order before projection. `--no-refresh` search MUST remain offline and expose
-stored snapshot age. A refresh failure MUST fail the aggregate operation without
-emitting a stale success result.
+Marketplace search SHALL project only stored validated snapshot data. Matching
+SHALL be case-insensitive over Extension id and summary. Results SHALL retain all
+matching curation rows, including duplicate stable ids across Catalogs, and sort
+deterministically by normalized Extension id, configured Catalog name, Catalog
+id, and source locator.
+
+Default search SHALL refresh configured Catalogs before projection. Stored search
+or `--no-refresh` SHALL perform no network access and SHALL report snapshot age.
+Search SHALL NOT invoke Bun, import modules, or materialize packages.
 
 #### Scenario: Duplicate curation is searched
-- **WHEN** two Catalogs contain a matching Extension id
-- **THEN** Marketplace returns one deterministically ordered row for each Catalog
-  provenance rather than choosing a winner
+
+- **WHEN** two configured Catalogs contain the same stable Extension id and both
+  match the query
+- **THEN** both deterministic curation rows are returned
 
 #### Scenario: Stored Marketplace search is requested
-- **WHEN** aggregate search uses stored-snapshot policy
-- **THEN** it performs no Git, package-manager, registry, original-local-path,
-  module import, or state-mutation effect and reports snapshot age per result
+
+- **WHEN** search is requested without refresh
+- **THEN** only stored snapshot data is used and each result reports its stored
+  snapshot age
 
 ## MODIFIED Requirements
 
 ### Requirement: Strict bounded Catalog manifest
-Each acquired Catalog snapshot MUST contain a UTF-8 generated
-`ctxindex-catalog.json` at repository root of at most 256 KiB. The manifest MUST
-be strict schema version `2`, reject unknown fields at every level, and contain
-only Catalog identity/summary, credential-free generation metadata, and at most
-256 versionless Extension entries. Every entry MUST contain stable Extension id,
-optional summary, and exactly one variant from this closed set:
 
-- a literal source with one normalized declared module path, Catalog id, and
-  non-negative nested entry index; or
-- an npm package source with sanitized requested target, exact `version`,
-  required `integrity`, one contained content-addressed exact dependency-
-  resolution artifact produced by the generic installer, and materialization
-  digest;
-- a Git package source with sanitized requested target, exact `commit`, one
-  contained content-addressed exact dependency-resolution artifact produced by
-  the generic installer, and materialization digest; or
-- a local package source with normalized contained `path`, required
-  `contentDigest`, one contained content-addressed exact dependency-resolution
-  artifact produced by the generic installer, and materialization digest.
+A stored Catalog manifest SHALL use the closed schema-v2 shape and SHALL contain
+only versionless metadata, exact replay provenance, literal locators, and bounded
+references to contained content-addressed lock artifacts. Unknown fields,
+duplicate stable ids within one Catalog, malformed exact pins, unsupported lock
+formats, unsafe paths, invalid digests, or exceeded per-artifact/aggregate bounds
+SHALL fail validation before state mutation.
 
-Author-machine absolute paths, credentials, package-manager authentication,
-JavaScript export names, Extension definition versions, registry overrides,
-installer commands, nested Catalogs, auth/scopes/hosts, and executable hooks MUST
-be rejected. Catalog ids MUST be unique among configured Catalogs and Extension
-ids MUST be unique within one manifest.
+Each exact source SHALL retain a sanitized explanatory `requestedTarget`; lock
+bytes plus the exact npm version/integrity, Git commit, or contained local
+path/content digest SHALL remain replay authority. Literal author-package local
+provenance SHALL denote the immutable snapshot root, never an author-machine
+absolute checkout path.
+
+The manifest SHALL NOT grant provider authority, acquisition authority, ambient
+credential use, lifecycle scripts, nested Catalogs, mutable install-time source
+selection, or executable behavior during parsing.
 
 #### Scenario: Versioned Extension entry is supplied
-- **WHEN** a snapshot entry includes an Extension definition version or a
-  versioned Extension selector
-- **THEN** the entire Catalog candidate is rejected without acquisition
 
-#### Scenario: Provider or acquisition authority is supplied
-- **WHEN** a manifest includes auth, scopes, hosts, credentials, registry
-  overrides, shell commands, or another unknown field
-- **THEN** the entire candidate is rejected before persistence
+- **WHEN** a manifest supplies a version field or versioned Extension selector
+- **THEN** validation rejects the manifest
+
+#### Scenario: Replay artifact is unsafe
+
+- **WHEN** a lock artifact path traverses, escapes containment, exceeds bounds,
+  mismatches its digest, or declares a format other than `bun.lock@1.3.14`
+- **THEN** validation rejects the snapshot without executing the artifact
 
 #### Scenario: Duplicate stable Extension id is supplied
-- **WHEN** two snapshot entries contain the same stable Extension id
-- **THEN** the complete Catalog candidate is rejected before persistence
+
+- **WHEN** one Catalog contains the same stable Extension id more than once
+- **THEN** validation rejects the manifest deterministically
 
 ### Requirement: Contained inline paths and deterministic bounds
-Literal module paths, local package targets, and dependency-resolution artifact paths MUST be normalized
-repository-relative POSIX paths no longer than 1024 UTF-8 bytes. Empty paths,
-NUL bytes, absolute paths, backslashes, dot or parent segments, non-normalized
-forms, and paths or links escaping the exact Catalog snapshot MUST be rejected.
-They MUST identify committed regular files or contained package directories as
-applicable. Resolution artifact size/content bounds and format validation MUST
-delegate to the generic installer; Catalog refresh SHALL only verify the
-contained regular file and recorded digest without interpreting it. npm and Git target syntax and credential rejection MUST delegate to
-the generic installer target contract rather than a Catalog-specific parser.
+
+All snapshot paths SHALL be normalized and contained. Module paths, local
+package paths, lock artifact paths, and package roots SHALL be relative to the immutable Catalog
+snapshot or replayed package root as applicable. Validation SHALL reject
+absolute paths, traversal, symlink escape, host-specific build paths, and values
+outside declared depth/count/byte limits.
 
 #### Scenario: Local package escapes the Catalog snapshot
-- **WHEN** a local package descriptor is absolute, traversing, or resolves
-  through a link outside the pinned Catalog snapshot
-- **THEN** generation or install fails before import, publication, or activation
 
-#### Scenario: Literal module traverses outside the snapshot
-- **WHEN** a literal module or resolution artifact path traverses or resolves
-  through a link outside the pinned Catalog snapshot
-- **THEN** the candidate is rejected before persistence or activation
+- **WHEN** a local package or file dependency resolves outside the immutable
+  snapshot
+- **THEN** build or validation rejects it before publication
+
+#### Scenario: Literal module traverses outside the author package
+
+- **WHEN** a literal locator module is absolute, traversing, or escapes through a
+  symlink
+- **THEN** build or installation rejects it before import
 
 ### Requirement: Hardened Git execution and repository policy
-System Git acquisition for the Catalog repository MUST disable terminal
-prompting, credential helpers, hooks, submodule recursion, LFS or smudge filters,
-and external protocol helpers. Remote Catalog repositories MUST use HTTPS
-without URL userinfo, query, or fragment and reject localhost plus literal
-loopback, private, link-local, unspecified, or multicast destinations. Local
-Catalog repositories MUST be absolute paths.
 
-Catalog repository acquisition MUST remain distinct from Extension package
-materialization. Refresh, list, show, search, and startup MUST NOT invoke the
-generic package materializer. Catalog code MUST NOT implement registry access,
-package-manager execution, dependency resolution, downloads, archive extraction,
-immutable package storage, lifecycle locking, or garbage collection.
+Adding a remote Git Catalog SHALL require explicit repository trust and hardened
+non-interactive credential-free Git policy. Add and refresh SHALL acquire and
+validate only inert snapshot data and contained artifacts at an exact commit;
+they SHALL NOT invoke Bun, import modules, or materialize Extension packages.
+Snapshot acquisition SHALL occur outside the canonical installation lifecycle
+lock. After acquisition, add and refresh SHALL acquire that lock, re-read all
+configured Catalogs, revalidate their operation preconditions, and write from
+that current state. Refresh SHALL require its selected configured record to be
+unchanged and SHALL NOT change its stable Catalog id.
+
+Package-manager execution and module import SHALL occur only during explicitly
+trusted build or install operations.
 
 #### Scenario: Refresh encounters package entries
-- **WHEN** a refreshed data-only snapshot contains npm, Git, or local package
-  entries
-- **THEN** refresh validates and stores their inert exact metadata without
-  acquiring, importing, or materializing them
 
-#### Scenario: Unsafe remote Catalog repository is supplied
-- **WHEN** a repository URL uses credentials, query/fragment, a non-HTTPS scheme,
-  localhost, or a forbidden literal address
-- **THEN** validation fails before Git or the generic package materializer runs
+- **WHEN** refresh validates a schema-v2 snapshot containing package and literal
+  replay metadata
+- **THEN** it stores bounded data without invoking the canonical installer, Bun,
+  or module import
 
 #### Scenario: Catalog Git would use ambient credentials
-- **WHEN** Git would otherwise prompt or invoke a configured credential helper
-- **THEN** Catalog acquisition fails without prompting or invoking the helper
+
+- **WHEN** repository acquisition would prompt, use a credential helper, or send
+  ambient credentials
+- **THEN** it fails closed before persisted Catalog state changes
+
+#### Scenario: Refresh races configured Catalog removal
+
+- **WHEN** refresh acquisition starts and the configured Catalog is removed
+  before refresh enters the lifecycle lock
+- **THEN** refresh fails without recreating the removed configured record
+
+#### Scenario: Concurrent Catalog additions finish acquisition together
+
+- **WHEN** two distinct valid Catalog additions acquire snapshots concurrently
+- **THEN** their serialized current-state commits retain both Catalog records
 
 ### Requirement: Independent pin refresh and installed provenance
-Refresh MUST validate a complete data-only candidate before atomically advancing
-only the configured Catalog commit and acquisition time. It MUST NOT change
-generic executable installation state or installed Catalog curation links.
 
-A successful Catalog install MUST persist curation separately from execution.
-Catalog curation provenance MUST retain Catalog local name/id, repository, exact
-commit, snapshot acquisition time, exact entry source locator, Extension id, and
-the linked generic execution pin. It MUST NOT duplicate managed paths,
-package-manager authentication, or mutable execution state. Reinstall MUST
-stage the validated execution record and curation link as distinct members of
-one inactive activation generation, durably persist that complete generation,
-atomically replace the stable Extension id's single active-generation pointer,
-and durably commit the replacement by fsyncing the pointer directory before any
-prior-generation cleanup. An identical complete generation is idempotent;
-failure before the durable pointer commit preserves both complete recovery
-choices, and failure after it can leave only inactive retryable cleanup state.
+Refreshing a configured Catalog SHALL advance only its selected snapshot commit.
+It SHALL NOT mutate installed Extensions. A successful Catalog install SHALL
+write optional curation into the same generic execution record, including
+configured Catalog name, stable Catalog id, repository, selected commit,
+snapshot acquisition time, and exact source locator.
 
-Catalog install MUST require separate exact-install execution trust, reproduce
-the snapshot's exact generic dependency-resolution artifact and source pin,
-select the stable Extension id through the common validator, and replace no
-active-generation pointer until generic installation and complete validation
-succeed.
+A subsequent install SHALL replace an installed record automatically only when
+both configured Catalog name and Catalog id match. Direct records, another
+Catalog, builtins, and explicit-path Extensions SHALL require uninstall first.
 
 #### Scenario: Catalog refresh advances after install
-- **WHEN** refresh pins a newer commit or a snapshot with a different package
-  resolution
-- **THEN** configured discovery advances while installed curation and executable
-  materialization remain fixed until another explicit trusted install succeeds
 
-#### Scenario: Replacement candidate is invalid
-- **WHEN** exact dependency replay, digest verification, root selection, or
-  complete-registry validation fails
-- **THEN** prior execution and curation provenance remain active unchanged
+- **WHEN** a configured Catalog refreshes to a newer commit after one of its
+  Extensions was installed
+- **THEN** the installed generic record and managed bytes remain unchanged until
+  a trusted install is requested
 
-#### Scenario: Activation is interrupted
-- **WHEN** replacement is interrupted before or after the active-generation
-  pointer is atomically replaced
-- **THEN** recovery exposes either the complete prior pair or the complete new
-  pair, never an execution record and curation link from different generations
+#### Scenario: Same Catalog installs a newer exact entry
+
+- **WHEN** the selected Catalog name and Catalog id match the installed record
+  and exact replay and validation succeed
+- **THEN** the generic record and managed materialization are atomically replaced
+
+#### Scenario: Another origin uses the stable id
+
+- **WHEN** a Catalog install collides with a direct record, another Catalog,
+  builtin, or explicit-path Extension
+- **THEN** it fails with uninstall-first guidance and changes no state
 
 ### Requirement: Safe removal, uninstall, and retained state
-Catalog removal MUST fail while any curation link references that configured
-Catalog. Uninstalling a Catalog-curated Extension MUST remove its curation link
-and the corresponding generic activation record through the common guarded
-uninstall lifecycle. Removal and uninstall MUST preserve Sources, Resources,
-Artifacts, Accounts, Grants, OAuth Apps, sync history, Catalog snapshots, and any
-materialization still referenced by an installation record.
+
+Removing a configured Catalog SHALL be blocked while any generic installed
+record's curation references that configured Catalog. Origin-neutral uninstall
+SHALL remove the generic record and its referenced managed bytes under the
+canonical lifecycle lock without requiring the Catalog snapshot or network.
+The removal blocker check and configured-Catalog deletion SHALL share that
+lifecycle lock. Catalog install SHALL stage exact replay outside the lock, then
+revalidate from stored state under the lock that the selected Catalog name and
+Catalog id are still configured before committing its curated generic record.
+
+No activation generations, pointer files, rollback history, or Catalog-specific
+execution records SHALL be retained.
 
 #### Scenario: Referenced Catalog removal is attempted
-- **WHEN** installed curation still names the requested Catalog
-- **THEN** removal fails atomically and preserves Catalog, execution, curation,
-  Source, and Resource state
+
+- **WHEN** any installed record cites the configured Catalog being removed
+- **THEN** removal fails and identifies the installed stable ids
+
+#### Scenario: Catalog removal races trusted installation
+
+- **WHEN** removal and a trusted install from the same configured Catalog race
+- **THEN** the lifecycle lock orders them so an install committed first blocks
+  removal, while removal committed first causes install revalidation to fail
+  without creating a curated generic record
 
 #### Scenario: Catalog-curated Extension is uninstalled
-- **WHEN** origin-neutral stable-id uninstall removes a Catalog-curated Extension
-- **THEN** it removes execution activation and its curation link while preserving
-  Sources, Resources, snapshots, and other referenced materializations
+
+- **WHEN** uninstall targets a Catalog-curated stable id
+- **THEN** the generic record and managed bytes are removed atomically enough that
+  startup cannot load a record without its committed execution ownership
 
 ### Requirement: Strict portable persistence
-Configured Catalog records and Catalog curation links MUST use strict versioned
-portable persistence that rejects unknown or invalid fields. Snapshot paths and generic materialization paths MUST be
-derived under the configured data root rather than persisted as absolute paths.
-Records MUST preserve snapshot acquisition time so list, show, search, install,
-and loaded provenance can surface age without repository or package access.
+
+All persisted Catalog and install paths SHALL be portable. Configured Catalog
+state, stored snapshots, replay artifact references, generic installed records,
+and managed package roots SHALL use normalized state-relative
+paths. They SHALL NOT persist author-machine temporary roots, absolute checkout
+paths, credentials, generation pointers, or inferred recovery state.
 
 #### Scenario: State is relocated
-- **WHEN** the ctxindex data root changes while records, snapshots, and managed
-  materializations move together
-- **THEN** both Catalog and generic execution paths derive from the new root
-  without rewriting absolute paths or contacting an upstream source
+
+- **WHEN** the complete ctxindex state tree is moved and the compiled CLI starts
+  with no network or package manager access
+- **THEN** Catalog inspection and installed Extension loading resolve from the
+  relocated stored snapshot metadata and managed bytes

@@ -1,225 +1,195 @@
 ## ADDED Requirements
 
-### Requirement: Deterministic Catalog authoring command
-The CLI SHALL provide
-`extensions catalog build <package-root> [--catalog <id>] [--output <path>]`
-as an explicit local authoring operation. It MUST inspect only modules declared
-by `package.json#ctxindex.extensions`, require `--catalog` when more than one
-Catalog id exists, delegate npm/Git/local target resolution and materialization
-to the generic installer primitive, validate the complete candidate, and
-atomically write canonical snapshot bytes. Output SHALL default to
-`<package-root>/ctxindex-catalog.json`.
+### Requirement: Deterministic trusted Catalog authoring command
 
-Catalog build SHALL be an explicit non-interactive author trust grant for
-package evaluation and import. It MUST emit the trust notice to stderr before
-generic package-manager, materialization, or module-import effects so JSON
-stdout remains one valid result document; it MUST NOT require a redundant
-`--trust` flag or publish an end-user execution record.
+The CLI SHALL provide a non-interactive Catalog build command that accepts an
+author package, optional Catalog id, and output location. It SHALL derive the
+single declared ctxindex entry module from the package manifest and fail
+deterministically when the package declares multiple entry modules. It SHALL show
+or return a trust warning covering package acquisition, Bun execution, and
+author-controlled module import, and SHALL require explicit trust before any of
+those actions.
 
-Text and JSON results MUST report the selected Catalog, stable Extension ids,
-source kinds, sanitized targets, and exact resolved pins deterministically. They
-MUST NOT expose credentials, authentication state, author-machine absolute
-paths, managed paths, or JavaScript export names.
+The command SHALL generate deterministic schema-v2 output through the Catalog
+authoring service and canonical installer's `resolveForAuthoring` operation. It
+SHALL write no partial output when any candidate fails.
 
 #### Scenario: Generated snapshot is current
-- **WHEN** generation produces bytes identical to the existing output
-- **THEN** the command succeeds without changing the file
+
+- **WHEN** a trusted build succeeds for the same exact inputs twice
+- **THEN** canonical snapshot and content-addressed lock artifact bytes are
+  identical
 
 #### Scenario: Candidate generation fails
-- **WHEN** Catalog selection, package resolution, exact Extension selection,
-  definition validation, or canonical snapshot validation fails
-- **THEN** the command returns the mapped failure and preserves the prior output
+
+- **WHEN** resolution, lock sanitization, import, exact selection, or validation
+  fails
+- **THEN** the command returns the stable failure and preserves prior output
 
 ### Requirement: Deterministic aggregate Extension search
-The CLI SHALL provide `extensions search [query] [--no-refresh]` as Marketplace
-search over every configured Catalog. It MUST delegate refresh, matching,
-ordering, and provenance to provider-neutral core. Text and JSON output MUST
-retain duplicate curation rows and include Catalog local name/id, stable
-Extension id, source kind, source-specific exact npm version/integrity, Git
-commit, or contained local path/content digest when applicable, exact Catalog
-commit, and stored snapshot age. It MUST NOT expose an implicit preferred Catalog
-or install source.
+
+The CLI SHALL provide Marketplace search over configured Catalog snapshots with
+human and `--json` output. It SHALL match id and summary case-insensitively,
+retain duplicate curation rows across Catalogs, and use deterministic ordering.
+
+Default search SHALL refresh configured Catalogs. `--no-refresh` SHALL use only
+stored state, perform no network or execution, and report snapshot age.
 
 #### Scenario: Marketplace search is requested as JSON
-- **WHEN** an agent invokes `extensions search calendar --json`
-- **THEN** the CLI emits one deterministic machine-readable array ordered by
-  core without importing Catalog/Extension code or materializing a package
+
+- **WHEN** matching entries exist in multiple Catalogs
+- **THEN** JSON output contains every matching curation row in deterministic
+  order with source kind and exact pin or locator metadata
 
 #### Scenario: Stored Marketplace search is requested
-- **WHEN** an agent invokes `extensions search --no-refresh --json`
-- **THEN** the command searches stored snapshots offline and reports snapshot
-  age for every result
+
+- **WHEN** `--no-refresh` is supplied
+- **THEN** output uses stored snapshots, includes acquisition age, and invokes no
+  package manager or import
 
 ### Requirement: Marketplace-facing refresh scope
-Catalog list, Catalog show, Marketplace search, and Catalog Extension install SHALL
-refresh by default. List and search MUST refresh every configured Catalog
-in deterministic local-name order; show and install MUST refresh only their
-selected Catalog. Each MUST accept `--no-refresh` to use stored snapshot state,
-perform no Catalog Git refresh, and expose snapshot age.
 
-A refresh-enabled install MUST execute only the exact entry from the newly
-pinned selected Catalog. It MUST NOT refresh unrelated Catalogs or resolve a
-snapshot's requested npm range, Git ref, or local target to different code.
+Default Catalog install SHALL refresh only the explicitly selected configured
+Catalog after execution trust is accepted. `--no-refresh` SHALL use only its
+stored snapshot and fail deterministically if required snapshot or replay
+artifact bytes are absent. Refresh failure SHALL occur before install mutation.
 
 #### Scenario: Install refreshes one Catalog
-- **WHEN** an operator installs a Catalog Extension without `--no-refresh`
-- **THEN** ctxindex refreshes only that Catalog and reproduces the exact resulting
-  snapshot pin after execution trust
+
+- **WHEN** a user trusts installation from one configured Catalog without
+  `--no-refresh`
+- **THEN** only that Catalog refreshes before exact entry selection
 
 #### Scenario: Default Marketplace refresh fails
-- **WHEN** any involved Catalog fails to refresh before search
-- **THEN** CLI returns the mapped acquisition failure and emits no stale success
-  payload
+
+- **WHEN** the selected Catalog cannot refresh or validate
+- **THEN** install fails without invoking Bun or changing installed state
 
 ### Requirement: Loaded Extension provenance output
-Loaded-Extension inventory MUST distinguish generic executable provenance from
-optional Catalog curation provenance. Catalog-curated output MUST include stable
-Extension id, source kind, source-specific exact npm version/integrity, Git
-commit, or contained local path/content digest, materialization digest, Catalog
-local name/id/repository/commit, and snapshot age. Literal entries MUST identify
-their pinned module and nested entry index. Output MUST NOT include an Extension
-definition version, JavaScript export name, credential, package-manager auth, or
-absolute managed path.
+
+Loaded/listing output SHALL expose exact generic source provenance and, when
+present, configured Catalog name, Catalog id, commit, and source locator from the
+same generic installed record. Output SHALL NOT imply that the currently
+refreshed Catalog commit is the installed commit.
 
 #### Scenario: Offline loaded listing is requested
-- **WHEN** an agent lists loaded Extensions after a Catalog install
-- **THEN** CLI renders both provenance layers from persisted state without
-  refresh, package-manager, registry, Git, original-local-path, or import effects
+
+- **WHEN** a Catalog-curated Extension is listed while offline
+- **THEN** output reports persisted installed provenance without refreshing or
+  opening the Catalog snapshot
 
 ## MODIFIED Requirements
 
 ### Requirement: Deterministic Git Catalog command surface
-Catalog commands SHALL use stable versionless Extension ids. Existing versioned
-`<id>@<definition-version>` Catalog selectors MUST be removed with no pre-alpha
-compatibility alias. Catalog install MUST retain its explicit `--trust` execution
-acknowledgement and remain distinguishable from direct npm/Git/local install.
-Catalog list/show and Catalog Extension install MUST refresh the involved
-Catalogs by default and accept `--no-refresh` to use stored snapshots. Every text
-and JSON result MUST remain deterministic, expose applicable stored snapshot age,
-and delegate business behavior to provider-neutral core.
+
+The CLI SHALL keep explicit commands for Catalog add, refresh, list, show,
+remove, build, Marketplace search, and Catalog-selected install. Catalog entries
+and selectors SHALL use stable versionless Extension ids.
+
+Catalog install SHALL require an explicit configured Catalog name and trust:
 
 ```text
-extensions catalog build <package-root> [--catalog <id>] [--output <path>] [--json]
-extensions catalog add <name> <repository> --ref <full-ref-or-oid> --trust [--json]
-extensions catalog list [--no-refresh] [--json]
-extensions catalog show <catalog> [<extension-id>] [--no-refresh] [--json]
-extensions catalog refresh <catalog> [--json]
-extensions catalog remove <catalog> [--json]
-extensions search [query] [--no-refresh] [--json]
-extensions install <catalog> <extension-id> --trust [--no-refresh] [--json]
-extensions uninstall <extension-id> [--force] [--json]
+ctxindex extensions install <catalog> <extension-id> --trust [--no-refresh]
 ```
 
-Missing Catalog execution trust MUST exit `2` before refresh, package-manager,
-filesystem acquisition, module import, materialization, or persisted mutation.
-The thin CLI MUST delegate exact-pin reproduction, common validation, generic
-execution persistence, Catalog curation linking, and rollback to core services.
+Catalog lifecycle and Marketplace read commands SHALL operate on inert stored
+data only. Catalog install SHALL delegate exact replay to the canonical generic
+installer and SHALL return source-neutral results and stable errors.
 
 #### Scenario: Versioned selector is supplied
-- **WHEN** an agent passes `mail.extension@1` to a Catalog show or install form
-- **THEN** parsing rejects it as invalid usage before refresh or installation
+
+- **WHEN** a Catalog command receives a versioned Extension selector
+- **THEN** parsing or validation rejects it
 
 #### Scenario: Catalog lifecycle is requested as JSON
-- **WHEN** an agent invokes a supported Catalog inspection or mutation with
-  `--json`
-- **THEN** CLI emits one deterministic result containing exact safe provenance
-  and no prompts
 
-#### Scenario: Default Catalog refresh fails
-- **WHEN** Catalog list/show or Extension install cannot refresh an involved
-  Catalog
-- **THEN** CLI returns the mapped acquisition failure without stale success
+- **WHEN** add, refresh, list, show, remove, search, or install is requested with
+  `--json`
+- **THEN** the CLI returns deterministic structured output without prompts
 
 #### Scenario: Catalog package install succeeds
-- **WHEN** an agent installs a trusted npm, Git, or local Catalog entry by stable
-  id
-- **THEN** deterministic output presents generic execution provenance and
-  separate Catalog curation provenance without credentials or managed paths
+
+- **WHEN** a trusted exact Catalog entry passes replay, selection, collision, and
+  complete validation
+- **THEN** output identifies its stable id, Catalog name/id, commit, source kind,
+  exact pin or literal locator, and install/update time
 
 ### Requirement: Separate trust acknowledgements
-Catalog add MUST require repository trust acknowledgement and Catalog Extension
-install MUST independently require execution trust acknowledgement. Missing
-either required `--trust` MUST exit `2` before Catalog refresh or repository,
-package-manager, filesystem acquisition, module import, materialization, or
-persisted mutation. Direct install/update trust remains its explicit command
-invocation and MUST NOT be inferred from prior Catalog trust.
+
+Repository, authoring, and install trust SHALL be separate acknowledgements.
+Install trust SHALL be checked before
+default refresh, replay-artifact acquisition, Bun execution, module import, or
+managed publication. A prior repository or build trust SHALL NOT satisfy install
+trust.
 
 #### Scenario: Install trust is omitted after Catalog trust
-- **WHEN** a Catalog is registered but its Extension install omits `--trust`
-- **THEN** install fails before refresh or executable effects and preserves
-  configured Catalog, generic execution, and curation state
+
+- **WHEN** a Catalog was previously added or built with trust but install omits
+  `--trust`
+- **THEN** the command fails before refresh, acquisition, Bun, or import
 
 ### Requirement: Relocated compiled Catalog workflow
-The compiled Bun CLI SHALL build and acquire a mixed Catalog from an absolute
-local Git fixture, search its inert snapshot, install literal plus npm/Git/local
-entries through the generic installer, then load and list them after executable
-and ctxindex state relocation with upstream access disabled.
+
+The compiled Catalog workflow SHALL cover building a mixed literal/Git/local
+Catalog, adding and refreshing it, deterministic search, trusted exact install,
+same-Catalog replacement, different-origin collision rejection, origin-neutral
+uninstall, relocation of complete state, and offline startup from managed bytes.
+Exact npm replay through the shared canonical installer SHALL remain covered by
+focused installer tests and the relocated compiled direct npm workflow rather
+than a second Catalog-specific registry and tarball fixture.
 
 #### Scenario: Relocated compiled CLI loads mixed Catalog provenance
-- **WHEN** the compiled Catalog end-to-end test relocates an installed mixed
-  Catalog and its generic materializations outside the repository tree
-- **THEN** offline loading/listing succeeds from exact pins with separate
-  curation provenance and no project-local, package-manager, or network access
+
+- **WHEN** generated state is moved and network, Bun, upstream repositories, and
+  author checkouts are unavailable
+- **THEN** the compiled CLI loads installed package and literal entries from
+  managed bytes and reports persisted exact and Catalog provenance
 
 ### Requirement: Deterministic direct Extension lifecycle commands
-The CLI SHALL retain these direct-install forms alongside loaded-Extension and
-Catalog commands:
+
+The CLI SHALL retain explicit direct npm, Git, and local install/update forms
+with exact Extension selection and trust. Direct and Catalog-backed commands
+SHALL share the canonical installer and generic installed-extension record.
+
+Direct install SHALL reject an existing managed stable id. Direct update SHALL
+require a direct record and SHALL NOT take over Catalog-curated state. Catalog
+install SHALL replace only the same configured Catalog name and Catalog id. All
+other managed, builtin, and explicit-path collisions SHALL instruct the user to
+uninstall first.
+
+Uninstall SHALL remain origin-neutral:
 
 ```text
-extensions install <npm|git|local> <target> --extension <id> [--json]
-extensions update <id> [--json]
-extensions list [--json]
-extensions uninstall <id> [--force] [--json]
+ctxindex extensions uninstall <extension-id>
 ```
 
-The direct source-kind positional MUST be exact and prevent target-kind guessing.
-`--extension <id>` MUST be required for direct install even when one root exists.
-Direct update MUST resolve one exact direct-installed id and reuse its persisted
-source kind/target. Changing a direct target or source kind MUST require
-uninstall followed by install. Catalog install selectors remain distinct and
-MUST NOT be reinterpreted as direct targets.
-
-Uninstall MUST resolve one exact generic executable installation id regardless
-of direct or Catalog curation origin. For Catalog-curated execution it MUST
-remove the matching curation link through the same serialized guarded lifecycle
-and MUST NOT leave a link that blocks Catalog removal.
-
-Direct install/update MUST remain explicit non-interactive trust grants, require
-no redundant trust flag, explain the in-process boundary, and emit a trust notice
-to stderr before acquisition/import so JSON stdout remains valid. List, startup,
-and uninstall MUST NOT grant trust or acquire packages. Commands MUST delegate
-package behavior, persistence, complete validation, dependency guards, curation
-cleanup, and removal guards to provider-neutral core.
-
-Text/JSON output MUST be deterministic and credential-free. Direct inventory and
-mutation output MUST retain stable id, source kind, sanitized requested target,
-exact resolved identity, materialization digest, and installation/update time;
-Catalog-curated output adds only its separate safe curation provenance. No output
-may expose package-manager authentication or absolute managed paths.
-Failure output MUST identify the failed lifecycle stage using sanitized
-provenance without leaking embedded or ambient credentials.
-
 #### Scenario: Direct npm install is selected exactly
-- **WHEN** an agent runs `extensions install npm @example/mail@^2 --extension example.mail --json`
-- **THEN** CLI grants execution trust, delegates one npm candidate for exact
-  `example.mail`, and emits deterministic resolved provenance
+
+- **WHEN** direct npm installation includes explicit source kind, target,
+  Extension id, and trust
+- **THEN** the shared installer selects exactly that Extension and writes a
+  generic record without Catalog curation
 
 #### Scenario: Source kind is omitted or guessed
-- **WHEN** direct install supplies a target without exact `npm`, `git`, or `local`
-- **THEN** parsing exits `2` before package-manager, filesystem, import, or
-  persistence effects
 
-#### Scenario: Exact Extension selection is omitted
-- **WHEN** direct install omits `--extension <id>`
-- **THEN** parsing exits `2` before acquisition or execution even for a
-  single-root package
+- **WHEN** a direct package command does not explicitly identify npm, Git, or
+  local source kind
+- **THEN** the CLI rejects it instead of guessing
 
-#### Scenario: Update is explicit and startup remains offline
-- **WHEN** a mutable direct upstream target changes
-- **THEN** only `extensions update <id>` may resolve it, while list and startup
-  continue using the prior pin without acquisition
+#### Scenario: Same Catalog update is explicit
+
+- **WHEN** Catalog install selects the same configured Catalog name and Catalog
+  id at a newer commit
+- **THEN** trusted exact replay may atomically replace its prior generic record
+
+#### Scenario: Different origin collides
+
+- **WHEN** direct or Catalog install targets an id owned by a different allowed
+  origin, builtin, or explicit path
+- **THEN** the command fails with uninstall-first guidance and preserves state
 
 #### Scenario: Catalog-curated stable id is uninstalled
-- **WHEN** an agent uninstalls the stable id of a Catalog-curated Extension
-- **THEN** CLI removes generic execution plus Catalog curation state without a
-  removed definition-version selector and preserves Source-owned data
+
+- **WHEN** origin-neutral uninstall targets a Catalog-curated record
+- **THEN** the CLI removes its generic record and managed bytes without requiring
+  refresh, Bun, or Catalog availability

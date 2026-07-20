@@ -146,6 +146,29 @@ Direct installation from local, Git, and npm package targets MUST use package-ma
 - **WHEN** the direct installer materializes a local, Git, or npm package and its dependencies
 - **THEN** it passes the resulting package root and exact Extension id to the source-neutral seams without adding an Extension dependency resolver
 
+### Requirement: Catalog package installation delegates to canonical exact replay
+
+Catalog installation SHALL delegate source replay, declared-module discovery,
+exact selection, validation, managed publication, collision enforcement, and
+record persistence to the canonical generic installer's `installExact`
+operation.
+
+Literal entries SHALL select by exact module, Catalog id, entry index, and
+Extension id after author-package replay. Package entries SHALL select the exact
+Extension id after package replay. Neither form SHALL make sibling roots active.
+
+#### Scenario: Catalog package entry is installed
+
+- **WHEN** a trusted Catalog install selects a package-backed entry
+- **THEN** the canonical installer reproduces and publishes it using its recorded
+  exact source, sanitized lock, package root, and materialization digest
+
+#### Scenario: Literal author package is installed
+
+- **WHEN** a trusted Catalog install selects a literal entry
+- **THEN** the canonical installer replays the author package, verifies the exact
+  locator, and publishes complete managed runnable bytes
+
 ### Requirement: Direct installation loading is pinned and offline
 The loader SHALL derive each directly installed package root from its strict persisted direct provenance and immutable managed materialization. Startup and loaded-Extension listing MUST NOT invoke package management, contact npm or Git, read an original local target, or mutate installation state. Loaded Extension inventory and diagnostics MUST expose deterministic generic direct provenance sufficient to identify source kind, sanitized requested target, exact resolved identity, and materialization digest.
 
@@ -165,6 +188,30 @@ If a direct record or materialization is missing, corrupt, or invalid, the loade
 #### Scenario: Entry module exports two roots
 - **WHEN** one path in `ctxindex.extensions` exports two Extensions
 - **THEN** the module is imported once and both roots are collected
+
+### Requirement: Catalog root discovery uses declared package entry modules
+
+Trusted Catalog build and install SHALL discover Extension and Catalog roots
+only from package-declared entry modules after the canonical installer has
+materialized the exact package. A module MAY expose both Extension and Catalog
+roots. Undeclared files, sibling exports, and nested Catalog values SHALL NOT be
+discovered implicitly.
+
+Catalog add, refresh, list, show, search, and startup SHALL NOT perform this
+discovery or import any Catalog-controlled module.
+
+#### Scenario: One module exposes Extension and Catalog roots
+
+- **WHEN** a declared module exports both root kinds during trusted build or
+  exact install
+- **THEN** discovery returns both for explicit exact selection without installing
+  siblings implicitly
+
+#### Scenario: Undeclared file exports a Catalog
+
+- **WHEN** a package contains a Catalog export in a file absent from its declared
+  entry modules
+- **THEN** build and install ignore that file
 
 ### Requirement: Compiled binary resolves ordinary package dependencies
 The relocated Bun compiled-binary gate SHALL load a trusted external package whose `ctxindex.extensions` entry uses ordinary SDK imports, SDK-exported `z`, a relative TypeScript module, and a package-managed runtime dependency. The gate MUST run outside the repository under Bun 1.3.14 and prove common exported-value discovery without host injection or ctxindex dependency resolution.
@@ -192,15 +239,41 @@ The compiled built-in packaging path SHALL resolve directory descriptors while t
 - **THEN** its built-in Extension documentation matches the source projection using embedded strings/bytes only
 
 ### Requirement: Installed Catalog Extension loading and provenance
-The system SHALL load installed Catalog Extensions from their exact persisted Catalog ID, commit, and inline source path through the same runtime validation and atomic registry activation used by explicit-path Extensions. Extension listings MUST include installed Catalog provenance sufficient to identify the Catalog, repository, commit, manifest entry, and stored snapshot age while retaining deterministic ordering. Startup and loaded-Extension listing MUST NOT refresh Catalogs.
+Startup SHALL load Catalog-curated Extensions only from the package root and
+materialization identified by the authoritative generic installed-extension
+record. It SHALL report the record's optional Catalog curation provenance
+together with exact generic source provenance.
 
-#### Scenario: Installed Catalog Extension loads offline
-- **WHEN** valid installed provenance and its immutable snapshot exist at startup
-- **THEN** the Extension loads through the normal validation seam without repository access and its listing includes provenance
+Startup SHALL NOT read a Catalog snapshot to reconstruct an Extension, invoke
+Bun, fetch a source, resolve dependencies, import an author checkout, scan for
+alternate generations, or repair records implicitly. There SHALL be no active
+generation pointer or Catalog-specific execution state.
+
+#### Scenario: Catalog-curated Extension starts offline
+
+- **WHEN** a Catalog-curated package or literal Extension has a valid generic
+  record and managed materialization while network, Bun, and Catalog sources are
+  unavailable
+- **THEN** it loads from managed bytes and reports its stored Catalog and exact
+  source provenance
+
+#### Scenario: Generic record document is corrupt
+
+- **WHEN** the strict generic record document cannot be validated
+- **THEN** managed Extension loading fails closed without scanning managed bytes
+  for a replacement record
 
 ### Requirement: Missing or invalid installed snapshots degrade without fetch
-If installed Catalog provenance refers to a missing or invalid snapshot, source path, or Extension definition, the loader MUST report an existing-style Extension diagnostic, MUST NOT fetch or mutate Catalog state, and MUST preserve Sources, Resources, snapshots, and other installed Extensions.
+Startup SHALL degrade invalid managed materializations without fetch. When a
+valid generic record references a missing, altered, or unloadable managed
+materialization, startup SHALL degrade that Extension with a deterministic
+record/path error and SHALL continue according to the existing per-Extension
+degradation contract. It SHALL NOT fetch, invoke Bun, consult Catalog snapshots,
+or mutate installed state.
 
-#### Scenario: Installed snapshot is missing at startup
-- **WHEN** an installed provenance record refers to a snapshot absent from local data
-- **THEN** the loader reports an unavailable Extension diagnostic, performs no repository access, and preserves materialized data
+#### Scenario: Generic execution materialization is missing
+
+- **WHEN** a valid Catalog-curated generic record references managed bytes that
+  are absent
+- **THEN** startup reports that Extension as degraded and performs no recovery or
+  acquisition

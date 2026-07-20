@@ -2,12 +2,12 @@
 
 ## Responsibility
 
-Defines the private workspace authoring/runtime contract for ctxindex Extension graphs and passive documentation sidecars: Providers, OAuth Apps, Profiles, Adapters, provider operations, and their host callbacks.
+Defines the private workspace authoring/runtime contract for ctxindex Extension graphs, package-backed Catalog curation, and passive documentation sidecars: Providers, OAuth Apps, Profiles, Adapters, provider operations, and their host callbacks.
 
 ## Design / patterns
 
 - `package.json` exposes only `src/index.ts` as `@ctxindex/extension-sdk`; the barrel is a stable facade over private cohesive modules.
-- Generic identity factories (`defineProvider`, `defineOAuthApp`, `defineProfile`, `defineAdapter`, and `defineExtension`) add a discriminating `kind` while retaining literal definition data through inference.
+- Generic identity factories (`defineProvider`, `defineOAuthApp`, `defineProfile`, `defineAdapter`, and `defineExtension`) add a discriminating `kind` while retaining literal definition data through inference. `defineCatalog` adds a validated Catalog root, and `packageExtension` identifies one exact Extension within an npm, Git, or local package target.
 - `docs('./docs')` returns a pure relative descriptor; generated builds may instead supply one eager virtual tree of Markdown strings and image bytes. Only Extension roots carry either declaration.
 - Provider policy is separate from Adapter behavior: a Provider owns authentication and network policy, OAuth Apps supply schema-typed registrations, and Adapters declare source-specific scopes, API hosts, capabilities, and Actions.
 - Capability-gated operation contracts and callback contexts let providers run independently of core orchestration and persistence. `ActionContext.resolveResource` and `resolveArtifact` are narrow, read-only selected-Source seams; the latter accepts an optional maximum byte size and exposes copied verified bytes without a storage path or provider access.
@@ -16,8 +16,9 @@ Defines the private workspace authoring/runtime contract for ctxindex Extension 
 ## Data & control flow
 
 1. Authors compose Provider policy, optional OAuth App configuration, Profile schemas/hooks, Adapters, and optionally one documentation sidecar into an Extension graph.
-2. Core completes and validates the graph, then supplies operation contexts to Adapter sync, remote-search, retrieval, download, or Action handlers.
-3. Operations return Resources/results or emit Resources, removals, checkpoints, warnings, artifacts, and bytes through SDK contracts; core validates and materializes the outputs.
+2. Catalog authors curate literal Extension roots and package descriptors into a bounded Catalog definition; core resolves that trusted authoring graph into immutable replay metadata.
+3. Core completes and validates runtime Extension graphs, then supplies operation contexts to Adapter sync, remote-search, retrieval, download, or Action handlers.
+4. Operations return Resources/results or emit Resources, removals, checkpoints, warnings, artifacts, and bytes through SDK contracts; core validates and materializes the outputs.
 
 ## Integration points
 

@@ -24,6 +24,29 @@ export const extensionsCommand = defineCommand({
     catalog: defineCommand({
       meta: { name: 'catalog', description: 'Manage trusted Git Catalogs.' },
       subCommands: {
+        build: defineCommand({
+          meta: {
+            name: 'build',
+            description:
+              'Build an inert Catalog snapshot from a local package.',
+          },
+          args: {
+            packageRoot: { type: 'positional', required: true },
+            catalog: { type: 'string', required: false },
+            output: {
+              type: 'string',
+              required: false,
+              description:
+                'Write the generated ctxindex-catalog.json manifest to this file path',
+            },
+            trust: trustArg,
+            json: jsonArg,
+          },
+          run: ({ rawArgs }) =>
+            runWithExit(() =>
+              handleExtensionsCommand(['catalog', 'build', ...rawArgs]),
+            ),
+        }),
         add: defineCommand({
           meta: { name: 'add', description: 'Add a trusted Git Catalog.' },
           args: {
@@ -82,6 +105,19 @@ export const extensionsCommand = defineCommand({
             ),
         }),
       },
+    }),
+    search: defineCommand({
+      meta: {
+        name: 'search',
+        description: 'Search Extensions across configured Catalogs.',
+      },
+      args: {
+        query: { type: 'positional', required: false },
+        noRefresh: noRefreshArg,
+        json: jsonArg,
+      },
+      run: ({ rawArgs }) =>
+        runWithExit(() => handleExtensionsCommand(['search', ...rawArgs])),
     }),
     install: defineCommand({
       meta: {

@@ -1,6 +1,7 @@
 # Extension Catalogs Implementation Doctrine
 
-> This sidecar records intended-implementation doctrine. It is reference-level, not normative behavior; behavioral requirements are introduced by the active `add-git-extension-catalogs` delta and will live in this capability's `spec.md` after archive.
+> This sidecar records intended-implementation doctrine. It is reference-level,
+> not normative behavior; behavioral requirements live in [spec.md](spec.md).
 
 ## Interfaces
 
@@ -10,9 +11,8 @@
 export type CatalogManifestEntry = z.infer<typeof catalogManifestEntrySchema>
 export type CatalogManifest = z.infer<typeof catalogManifestSchema>
 export type CatalogRecord = z.infer<typeof catalogRecordSchema>
-export type InstalledExtensionRecord = z.infer<
-  typeof installedExtensionRecordSchema
->
+export type GenericExtensionInstallationRecord =
+  DirectExtensionInstallationRecord
 ```
 
 ### @ctxindex/core — Catalog service
@@ -22,6 +22,7 @@ export interface CatalogServiceOptions {
   readonly configRoot?: string
   readonly dataRoot?: string
   readonly now?: () => number
+  readonly installationRecords?: CatalogInstallationRecordReader
 }
 
 export interface CatalogReadOptions {
@@ -38,12 +39,15 @@ export class CatalogService {
   showExtension(
     name: string,
     id: string,
-    version: number,
     options?: CatalogReadOptions,
   ): Promise<{
     readonly catalog: CatalogRecord
     readonly extension: CatalogRecord['extensions'][number]
   }>;
+  search(
+    query?: string,
+    options?: CatalogReadOptions,
+  ): Promise<readonly MarketplaceExtension[]>;
   add(input: {
     readonly name: string
     readonly repository: string
@@ -52,23 +56,16 @@ export class CatalogService {
   }): Promise<CatalogRecord>;
   refresh(input: { readonly name: string }): Promise<CatalogRecord>;
   remove(name: string): Promise<CatalogRecord>;
+}
+
+export class CatalogInstallationService {
   install(input: {
     readonly catalog: string
-    readonly id: string
-    readonly version: number
+    readonly extensionId: string
     readonly trust: boolean
-    readonly registry: ExtensionRegistry
-    readonly localOAuthAppIdentities: readonly OAuthAppIdentity[]
-    readonly refresh?: boolean
-    readonly replaceableCatalog?: {
-      readonly catalog: string
-      readonly commit: string
-    }
-  }): Promise<InstalledExtensionRecord>;
-  uninstall(input: {
-    readonly id: string
-    readonly version: number
-  }): Promise<InstalledExtensionRecord>;
+    readonly noRefresh?: boolean
+    readonly signal?: AbortSignal
+  }): Promise<GenericExtensionInstallationRecord>;
 }
 ```
 
@@ -81,14 +78,9 @@ export interface CatalogStoreOptions {
 
 export class CatalogStore {
   readonly catalogsPath: string
-  readonly installedPath: string
   constructor(options?: CatalogStoreOptions);
   readCatalogs(): Promise<readonly CatalogRecord[]>;
   writeCatalogs(records: readonly CatalogRecord[]): Promise<void>;
-  readInstalled(): Promise<readonly InstalledExtensionRecord[]>;
-  writeInstalled(
-    records: readonly InstalledExtensionRecord[],
-  ): Promise<void>;
 }
 
 export interface AcquiredCatalogSnapshot {
@@ -107,11 +99,28 @@ export function acquireCatalogSnapshot(input: {
 
 ## Implementation doctrine
 
-`@ctxindex/core/catalog` is the sole owner of Catalog repository policy, system-Git acquisition, strict manifest and TOML schemas, portable snapshot derivation, and Catalog/install state transitions. CLI modules depend on this service; Catalog core never depends on CLI or provider Adapters.
+`@ctxindex/core/catalog` owns Catalog repository policy, system-Git acquisition,
+strict manifest and TOML schemas, portable snapshot derivation, inert lifecycle,
+and Marketplace projection. `CatalogInstallationService` selects one exact
+versionless entry from validated stored state, then delegates replay, selection,
+runtime-complete validation, publication, collision policy, and record writing
+to the canonical generic installer. CLI modules depend on these services;
+Catalog core never depends on CLI or provider Adapters.
 
 Acquisition uses isolated temporary bare Git storage, resolves one full ref or exact OID to a commit, archives committed objects, validates the complete candidate snapshot, and publishes it by atomic rename. A concurrent publisher of the same valid target is accepted after target validation; unrelated filesystem errors remain failures. Git executes without terminal prompts, credential helpers, hooks, filters, submodules, or external protocol helpers. Public HTTPS repositories exclude userinfo, query, fragment, localhost, and literal loopback, IPv4-mapped, private, unique-local, link-local, site-local, unspecified, or multicast destinations; persisted acquisition inputs are revalidated at the Git boundary. Snapshot and record writes fail without changing the previously visible pin or installed provenance.
 
-Catalog and installed records persist separately. Their stored fields include the exact snapshot acquisition time as portable provenance; absolute snapshot paths are always derived from the active data root. Explicit refresh and refresh-enabled read/install calls change the Catalog pin only, while `refresh: false` uses stored state. Install validates an atomic candidate replacement against the runtime-complete registry through the shared Extension import and registry seam before switching one `(id, version)` installed record. Only an exact previously loaded Catalog provenance is replaceable; built-in and explicit-path identity conflicts fail before persistence. Metadata removal retains snapshots and all Source/Resource storage.
+Configured Catalog records and generic installed-extension records persist in
+their respective stores. Catalog records include the exact snapshot acquisition
+time as portable provenance; absolute snapshot paths are always derived from the
+active data root. Explicit refresh and refresh-enabled reads change only the
+Catalog pin, while `refresh: false` uses stored inert state. The canonical
+installer publishes managed bytes and atomically rewrites one stable-id generic
+record containing exact source provenance and optional Catalog curation. Only a
+record curated by the same configured Catalog name and Catalog id is replaceable;
+direct, other-Catalog, built-in, and explicit-path identity conflicts fail before
+persistence. Origin-neutral uninstall is owned by the generic direct lifecycle,
+and Catalog removal checks those same records under the lifecycle lock while
+retaining snapshots and all Source/Resource storage.
 
 ## Verification
 

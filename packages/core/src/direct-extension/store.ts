@@ -17,7 +17,6 @@ import { configDir, dataDir } from '../paths'
 import {
   type DirectExtensionInstallationRecord,
   directExtensionDocumentSchema,
-  directExtensionInstallationRecordSchema,
 } from './schema'
 
 const DIGEST_PATTERN = /^[0-9a-f]{64}$/
@@ -154,40 +153,14 @@ export class DirectExtensionStore {
         diagnostics: ['Direct Extension records are not valid JSON'],
       }
     }
-    if (
-      parsed === null ||
-      typeof parsed !== 'object' ||
-      (parsed as { schema_version?: unknown }).schema_version !== 1 ||
-      !Array.isArray((parsed as { extensions?: unknown }).extensions)
-    ) {
+    const result = directExtensionDocumentSchema.safeParse(parsed)
+    if (!result.success) {
       return {
         records: [],
         diagnostics: ['Direct Extension record document is invalid'],
       }
     }
-    const records: DirectExtensionInstallationRecord[] = []
-    const diagnostics: string[] = []
-    const seen = new Set<string>()
-    const duplicate = new Set<string>()
-    for (const [index, candidate] of (
-      parsed as { extensions: readonly unknown[] }
-    ).extensions.entries()) {
-      const result =
-        directExtensionInstallationRecordSchema.safeParse(candidate)
-      if (!result.success) {
-        diagnostics.push(`Direct Extension record ${index} is invalid`)
-        continue
-      }
-      if (seen.has(result.data.id)) duplicate.add(result.data.id)
-      seen.add(result.data.id)
-      records.push(result.data)
-    }
-    for (const id of duplicate)
-      diagnostics.push(`Direct Extension ${id} has duplicate records`)
-    return {
-      records: records.filter((record) => !duplicate.has(record.id)),
-      diagnostics,
-    }
+    return { records: result.data.extensions, diagnostics: [] }
   }
 
   async writeRecords(

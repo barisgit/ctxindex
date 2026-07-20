@@ -1,410 +1,425 @@
 ## Capability Implementation Targets
 
-- `extension-catalogs` -> `openspec/specs/extension-catalogs/implementation.md`
-- `extension-installation` -> `openspec/specs/extension-installation/implementation.md`
-- `extension-loading` -> `openspec/specs/extension-loading/implementation.md`
-- `cli-surface` -> `openspec/specs/cli-surface/implementation.md`
+Implement typed Catalog authoring, deterministic schema-v2 generation,
+data-only Marketplace projection, and exact trusted Catalog installation by
+extending the canonical generic installer. Keep command handlers thin and keep
+all persisted execution state in the generic installed-extension document.
 
 ## Module Ownership
 
-`@ctxindex/extension-sdk` owns only pure Catalog authoring definitions and
-factories. It imports/re-exports the same inert npm/Git/local target value shape
-consumed by direct installation and performs no resolution or I/O.
+- SDK owns effect-free Catalog and entry values/factories. It owns no filesystem,
+  package manager, import, trust, or persistence behavior.
+- Generic extension installation owns source parsing, Bun invocation, exact
+  resolution, lock sanitization/replay, root discovery/selection, validation,
+  managed publication, collision checks, cleanup, and generic record storage.
+- Catalog authoring orchestrates declared author modules and calls
+  `resolveForAuthoring`; it does not materialize packages itself.
+- Catalog schema/storage owns strict bounded snapshot data and contained replay
+  artifacts. Catalog lifecycle never imports or invokes Bun.
+- Catalog service projects Marketplace rows and calls `installExact` after trust
+  and optional refresh.
+- Extension loading consumes only generic installed records and managed bytes.
+- CLI parses explicit commands, gathers trust, and formats results.
 
-Provider-neutral Catalog core owns generated snapshot schemas, strict configured
-Catalog and curation-link records, Catalog Git snapshot acquisition, authoring
-orchestration, data-only Marketplace projection, and Catalog-specific state
-transitions. It does not own package-manager invocation, target resolution,
-dependency materialization, immutable package storage, locking, garbage
-collection, module collection, exact Extension selection, or complete-registry
-validation.
-
-The canonical generic Extension installation service owns those execution
-concerns for direct and Catalog callers. Catalog core injects that service and
-passes either an authoring target to resolve or a snapshot resolution to
-reproduce. The common Extension loader/collector owns `ctxindex.extensions`
-module resolution and versionless root selection.
-
-The CLI owns only closed grammar, usage validation, service composition,
-deterministic formatting, typed-error mapping, and exit codes. Built-in Adapter
-packages remain independent of Catalog and installation core.
+Architecture tests MUST reject Bun, dynamic-import, materializer, installed
+store, and managed-publication dependencies from SDK, Catalog schema/storage,
+Marketplace projection, and CLI formatter modules.
 
 ## Interfaces and Data Flow
 
 ### Pure Catalog authoring values
 
-```ts
-// Imported from the generic installation contract; shown here only as a use.
-export type ExtensionPackageTarget =
-  | { readonly kind: 'npm'; readonly target: string }
-  | { readonly kind: 'git'; readonly target: string }
-  | { readonly kind: 'local'; readonly target: string }
+The SDK public surface uses plain copy-compatible values:
 
-export interface PackageExtensionDescriptor<
+```ts
+type ExtensionPackageTarget =
+  | { readonly kind: "npm"; readonly target: string }
+  | { readonly kind: "git"; readonly target: string }
+  | { readonly kind: "local"; readonly target: string };
+
+interface PackageExtensionDescriptor<
   TTarget extends ExtensionPackageTarget = ExtensionPackageTarget,
   TExtensionId extends string = string,
 > {
-  readonly kind: 'package-extension'
-  readonly source: TTarget
-  readonly extensionId: TExtensionId
+  readonly kind: "package-extension";
+  readonly source: TTarget;
+  readonly extensionId: TExtensionId;
 }
 
-export type CatalogEntry =
-  | AnyExtensionDefinition
-  | PackageExtensionDescriptor
+type CatalogEntry = AnyExtensionDefinition | PackageExtensionDescriptor;
 
-export interface CatalogDefinition<
-  TId extends string = string,
-  TEntries extends readonly CatalogEntry[] = readonly CatalogEntry[],
-> {
-  readonly kind: 'catalog'
-  readonly id: TId
-  readonly label: string
-  readonly summary?: string
-  readonly extensions: TEntries
+type CatalogEntryId<TEntry extends CatalogEntry> =
+  TEntry extends ExtensionDefinition<infer TId>
+    ? TId
+    : TEntry extends PackageExtensionDescriptor<ExtensionPackageTarget, infer TId>
+      ? TId
+      : never;
+
+interface CatalogDefinition<TEntries extends readonly CatalogEntry[]> {
+  readonly kind: "catalog";
+  readonly id: string;
+  readonly label: string;
+  readonly summary?: string;
+  readonly entrySummaries?: Readonly<
+    Partial<Record<CatalogEntryId<TEntries[number]>, string>>
+  >;
+  readonly extensions: TEntries;
 }
 
-export function packageExtension<
-  const TTarget extends ExtensionPackageTarget,
-  const TExtensionId extends string,
->(
-  source: TTarget,
-  extensionId: TExtensionId,
-): PackageExtensionDescriptor<TTarget, TExtensionId>;
-
-export function defineCatalog<
-  const TId extends string,
-  const TEntries extends readonly CatalogEntry[],
->(
-  definition: CatalogDefinition<TId, TEntries>,
-): CatalogDefinition<TId, TEntries>;
+declare function defineCatalog(value: CatalogDefinition): CatalogDefinition;
+declare function packageExtension(
+  source: ExtensionPackageTarget,
+  extensionId: string,
+): PackageExtensionDescriptor;
 ```
 
-The implementation consumes the final generic target type from
-`extension-installation`; it must not retain the duplicate illustrative alias
-above. Factories validate local object shape only. Runtime schemas revalidate
-their output; branding or physical SDK identity is not an authorization seam.
+Factories are effect-free identity helpers with inference and excess-property
+checking. `extensions` accepts only literal Extension definitions or package
+descriptors; Catalogs and other values are rejected. `entrySummaries` is keyed
+by the ids inferred from those entries, remains separate from the Catalog's own
+summary, and supplies inert Marketplace metadata without wrapping or changing
+the selected Extension values.
 
-### Package entry discovery
+### Canonical installer seam
 
-```ts
-export type CtxindexPackageRoot =
-  | AnyExtensionDefinition
-  | AnyCatalogDefinition
-
-export interface CollectedCtxindexModule {
-  readonly modulePath: string
-  readonly roots: readonly CtxindexPackageRoot[]
-}
-```
-
-The existing strict `package.json#ctxindex.extensions` resolver supplies module
-paths. Generic namespace inspection collects recognized roots by discriminator,
-rejects malformed recognized roots and duplicate ids, ignores unknown future
-roots, and exposes no export-name selector. Normal runtime activation selects
-only Extensions. Catalog authoring may select one Catalog id; a trusted literal
-install then verifies its nested entry index and stable Extension id.
-
-### Generated snapshot
+The illustrative boundary is:
 
 ```ts
-export interface CatalogLiteralSource {
-  readonly kind: 'literal'
-  readonly module: string
-  readonly catalogId: string
-  readonly entryIndex: number
+interface ExactResolutionArtifact {
+  format: "bun.lock@1.3.14";
+  relativePath: string;
+  sha256: string;
+  byteLength: number;
 }
 
-export interface CatalogDependencyResolutionArtifact {
-  readonly format: string
-  readonly path: string
-  readonly digest: string
+type ExactExtensionSource =
+  | {
+      kind: "npm";
+      requestedTarget: string;
+      package: string;
+      version: string;
+      integrity: string;
+    }
+  | {
+      kind: "git";
+      requestedTarget: string;
+      repository: string;
+      commit: string;
+    }
+  | {
+      kind: "local";
+      requestedTarget: string;
+      relativePath: string;
+      contentDigest: string;
+    };
+
+type AuthoringSelection =
+  | { kind: "extension"; extensionId: string }
+  | { kind: "catalog"; module: string; catalogId?: string };
+
+interface ReplayPayload {
+  source: ExactExtensionSource;
+  packageRoot: string;
+  materializationDigest: string;
+  lock: ExactResolutionArtifact;
 }
 
-export interface CatalogNpmPackageResolution {
-  readonly kind: 'npm'
-  readonly requestedTarget: string
-  readonly version: string
-  readonly integrity: string
-  readonly dependencyResolution: CatalogDependencyResolutionArtifact
-  readonly materializationDigest: string
+interface AuthoringResolution {
+  selection: AuthoringSelection;
+  replay: ReplayPayload;
+  selectedRoot: AnyExtensionDefinition | CatalogDefinition;
+  dispose(): Promise<void>;
 }
 
-export interface CatalogGitPackageResolution {
-  readonly kind: 'git'
-  readonly requestedTarget: string
-  readonly commit: string
-  readonly dependencyResolution: CatalogDependencyResolutionArtifact
-  readonly materializationDigest: string
+interface LiteralReplayLocator {
+  module: string;
+  catalogId: string;
+  entryIndex: number;
+  extensionId: string;
 }
 
-export interface CatalogLocalPackageResolution {
-  readonly kind: 'local'
-  readonly path: string
-  readonly contentDigest: string
-  readonly dependencyResolution: CatalogDependencyResolutionArtifact
-  readonly materializationDigest: string
+type ExactInstallSelection =
+  | { kind: "extension"; extensionId: string }
+  | ({ kind: "catalog-entry" } & LiteralReplayLocator);
+
+interface CatalogCuration {
+  catalogName: string;
+  catalogId: string;
+  repository: string;
+  commit: string;
+  snapshotAcquiredAt: number;
+  sourceLocator:
+    | { kind: "package"; entryIndex: number }
+    | ({ kind: "literal" } & LiteralReplayLocator);
 }
 
-export interface CatalogPackageSource {
-  readonly kind: 'package'
-  readonly resolution:
-    | CatalogNpmPackageResolution
-    | CatalogGitPackageResolution
-    | CatalogLocalPackageResolution
-}
-
-export interface CatalogSnapshotEntry {
-  readonly id: string
-  readonly summary?: string
-  readonly source: CatalogLiteralSource | CatalogPackageSource
-}
-
-export interface CatalogManifest {
-  readonly schemaVersion: 2
-  readonly catalog: {
-    readonly id: string
-    readonly label: string
-    readonly summary?: string
-  }
-  readonly generated: {
-    readonly packageName: string
-    readonly packageVersion: string
-    readonly module: string
-  }
-  readonly extensions: readonly CatalogSnapshotEntry[]
-}
-```
-
-The final package source is composed from the canonical generic resolved
-provenance schema rather than manually duplicating its validation. The generic
-installer also emits a sanitized content-addressed exact dependency-resolution
-artifact that authoring copies into a contained Catalog path; its format, digest,
-and replay semantics remain installer-owned. Catalog adds only its closed
-snapshot wrapper and contained-path constraints. Exact
-required fields differ by source kind: npm retains exact version and required
-integrity, Git retains exact commit, and local retains contained path plus content
-digest; every kind retains the generic materialization digest.
-
-### Generic installation dependency
-
-Catalog authoring and install depend on, but do not own, these semantic
-operations from the canonical generic installer:
-
-```ts
-export interface CatalogCurationProvenanceInput {
-  readonly extensionId: string
-  readonly catalogName: string
-  readonly catalogId: string
-  readonly repository: string
-  readonly commit: string
-  readonly snapshotAcquiredAt: number
-  readonly sourceLocator: string
-}
-
-export interface GenericExtensionPackageInstaller {
+interface GenericExtensionInstaller {
   resolveForAuthoring(input: {
-    readonly source: ExtensionPackageTarget
-    readonly extensionId: string
-    readonly baseRoot: string
-  }): Promise<ResolvedExtensionCandidate>;
+    target: ExtensionPackageTarget;
+    selection: AuthoringSelection;
+    immutableBaseRoot?: string;
+  }): Promise<AuthoringResolution>;
 
   installExact(input: {
-    readonly expected: ResolvedExtensionProvenance
-    readonly dependencyResolutionArtifact: Uint8Array
-    readonly extensionId: string
-    readonly immutableSnapshot?: ImmutableSnapshotHandle
-    readonly curation?: CatalogCurationProvenanceInput
-  }): Promise<GenericExtensionInstallationRecord>;
-
-  installCollectedRoot(input: {
-    readonly root: AnyExtensionDefinition
-    readonly extensionId: string
-    readonly immutableOrigin: GenericResolvedOrigin
-    readonly curation?: CatalogCurationProvenanceInput
-  }): Promise<GenericExtensionInstallationRecord>;
+    replay: ReplayPayload;
+    lockBytes: Uint8Array;
+    immutableSnapshotRoot: string;
+    selection: ExactInstallSelection;
+    curation?: CatalogCuration;
+  }): Promise<GenericInstalledExtensionRecord>;
 }
 ```
 
-Names are reconciled to the implemented direct-install interface before runtime
-work. The invariant is normative: these operations use the one target parser,
-Bun materializer, staging root, lifecycle lock, immutable publisher, manifest
-resolver, collectors, selector, validator, execution record, rollback, and
-referenced-only cleanup. Catalog core neither wraps shell commands nor performs
-source-kind-specific acquisition.
+Concrete names may follow the landed direct installer, but these two operations
+and their ownership must remain explicit. Direct install/update reuse the same
+private resolution/replay phases; they do not create a parallel adapter.
 
-`installExact` accepts only the snapshot's exact source-specific provenance,
-verified replay artifact, stable Extension id, and an immutable snapshot handle
-when a contained local path requires it, plus optional separately typed exact
-Catalog curation provenance. It does not accept an execution pin because the
-installer derives that from its validated result. The installer itself acquires
-into staging, resolves `ctxindex.extensions`, collects package roots, selects
-the exact id, reads the active registry and local OAuth App identities, builds
-the complete candidate, validates conflicts, constructs the curation link, and
-transactionally publishes both members. Catalog callers cannot supply or
-precompute a `CompleteRegistryInput` or execution record and cannot bypass any
-validation stage. `installCollectedRoot` follows the same internally owned
-active-state, complete-validation, and transaction path for literals.
+`resolveForAuthoring`:
 
-Build emits the authoring trust notice before any generic package or import
-effect, then selects the authored Catalog, maps literal entries to stable nested
-locators, calls `resolveForAuthoring` for each package entry, copies only safe
-resolved provenance and the generic replay artifact, validates the artifact
-digest plus complete schema, canonicalizes entry order, and atomically writes
-the output. A local target's `baseRoot` is the author
-Catalog package root and must resolve to a contained directory.
+1. normalizes the requested npm, Git, or contained local target;
+2. materializes it under an isolated staging root with Bun 1.3.14 and scripts
+   disabled;
+3. discovers declared entry modules and selects exactly one requested Extension
+   or Catalog root;
+4. validates the selected intrinsic package registry;
+5. returns the selected root for build-time enumeration and derives exact source
+   provenance, normalized package root, and canonical
+   materialization digest;
+6. sanitizes and validates the Bun lock, emits a content-addressed artifact, and
+   returns replay metadata without publishing an installed record;
+7. cleans staging on success or failure.
 
-Trusted install first validates persisted configured-Catalog state against the
-exact snapshot. Literal install imports the exact pinned module, recollects the
-Catalog id, checks the entry index/id, and calls `installCollectedRoot`. Package
-install verifies the contained replay artifact and passes it with the snapshot's
-exact generic provenance to `installExact`; mutable requested targets and
-transitive dependency ranges are never independently re-resolved.
+`installExact`:
 
-### Separate configured, curation, and execution state
+1. validates artifact path, size, digest, format, and sanitization;
+2. constructs a sanitized staging manifest from recorded exact provenance;
+3. runs Bun 1.3.14 with frozen-lockfile, production, and ignore-scripts
+   semantics;
+4. verifies npm integrity, Git commit, or contained local digest and then the
+   complete materialization digest and package root;
+5. discovers roots, selects the recorded Extension, and verifies its identity;
+6. reads active state itself and performs intrinsic validation and complete
+   active-registry validation;
+7. acquires the lifecycle lock, rechecks collisions, publishes managed bytes,
+   and atomically rewrites the generic record document;
+8. cleans staging and later removes any unreferenced inert materialization.
+
+Neither operation may follow symlinks outside its immutable base, invoke
+dependency lifecycle scripts, use ambient credentials, or accept an unpinned
+source as replay authority.
+
+### Sanitized Bun lock contract
+
+The lock artifact is produced and consumed only by the generic installer. It is
+stored inside the Catalog snapshot under a normalized content-addressed relative
+path and is covered by `sha256` and `byteLength` bounds.
+
+Sanitization and validation reject:
+
+- credentials, userinfo, tokens, authentication headers, or secret query data;
+- absolute host paths, home-directory paths, traversal, or symlink escapes;
+- mutable Git refs or an npm resolution lacking exact version and integrity;
+- file dependencies outside the immutable snapshot;
+- unsupported workspace, link, patch, or protocol forms;
+- a lockfile not generated for and replayable by pinned Bun 1.3.14.
+
+Replay writes the exact bytes as `bun.lock`, derives a minimal staging
+`package.json` from the recorded exact source, and executes a frozen install.
+Tests inspect the subprocess arguments and environment to prove no ambient auth
+or mutable resolution is used. `requestedTarget` is sanitized explanatory
+provenance only; exact fields and the lock are replay authority.
+
+### Package and literal snapshot entries
+
+The generated schema-v2 snapshot uses a shared replay payload:
 
 ```ts
-export interface CatalogCurationLink {
-  readonly extension_id: string
-  readonly catalog_name: string
-  readonly catalog_id: string
-  readonly repository: string
-  readonly commit: string
-  readonly snapshot_acquired_at: number
-  readonly source_locator: string
-  readonly execution_materialization_digest: string
+type GeneratedCatalogEntry =
+  | {
+      kind: "package";
+      id: string;
+      summary: string;
+      replay: ReplayPayload;
+    }
+  | {
+      kind: "literal";
+      id: string;
+      summary: string;
+      authorPackage: ReplayPayload;
+      locator: LiteralReplayLocator;
+    };
+```
+
+For a package entry, build calls `resolveForAuthoring` with
+`{ kind: "extension", extensionId }` and stores the returned replay payload.
+
+For literal entries, build derives the package's single declared ctxindex entry
+module and calls `resolveForAuthoring` with
+`{ kind: "catalog", module, catalogId? }` against the author package as an exact
+contained package. The installer materializes it, imports only that declared
+module, and returns the selected (or sole) Catalog root; build can then enumerate literal
+extensions and record module, Catalog id, zero-based entry index, and Extension
+id. Its local source is the immutable snapshot root, normally `.`, and never the
+author's absolute checkout path. All literal entries from the same author
+package may reference the same content-addressed lock artifact and replay
+payload.
+
+At install, `installExact` receives the `catalog-entry` selection, replays the author package, imports the recorded
+module, chooses the recorded Catalog id and entry index, verifies the Extension
+id, and uses that root for validation. It publishes the entire replayed author
+package as the managed execution materialization so relative imports and
+dependencies remain available offline.
+
+Literal locator mismatch, reordered entry with a different id, undeclared module,
+or digest mismatch fails before publication.
+
+### Deterministic generation and inert lifecycle
+
+Build requires explicit author trust before resolving the author package,
+running Bun, or importing a module. It accumulates all entries, rejects duplicate
+ids within a Catalog, sorts canonical output, deduplicates identical artifacts
+by digest, and atomically replaces the output only after all candidates pass.
+
+Snapshot validation is closed and bounded. It validates exact source fields,
+artifact paths/digests/sizes, locator bounds, containment, uniqueness, and total
+manifest/artifact limits without opening packages or importing modules.
+
+Add, refresh, list, show, Marketplace search, and default Catalog parsing call
+only inert schema/storage code. Tests inject a throwing installer/import/package
+runner to prove those paths cannot acquire or execute anything.
+
+### Generic execution record with optional curation
+
+The installed document remains one strict atomically rewritten generic store:
+
+```ts
+interface GenericInstalledExtensionRecord {
+  id: string;
+  source: ExactExtensionSource;
+  materializationDigest: string;
+  packageRoot: string;
+  installedAt: number;
+  updatedAt: number;
+  curation?: CatalogCuration;
 }
 ```
 
-Configured Catalog records retain local name, repository/ref, exact current
-commit, acquisition time, Catalog metadata, and inert entries. The generic
-execution record remains owned by `extension-installation` and contains no
-Catalog-shaped fields. The curation link joins them for inventory and lifecycle
-guards without becoming a loading source of truth.
+There is exactly one record per managed stable id. Catalog install supplies
+`curation`; direct install omits it. No second Catalog installation store,
+generation directory, active pointer, or history is created.
 
-Execution and curation remain distinct typed records but activate as one durable
-generation. Under the generic lifecycle lock, install writes an inactive
-generation containing the validated generic execution record plus its optional
-Catalog curation link and fsyncs the generation and parent directory. It then
-writes and fsyncs a pointer candidate, atomically replaces the stable Extension
-id's active-generation pointer, and fsyncs the pointer directory. Only that
-directory fsync makes the activation commit durable and permits cleanup of the
-prior generation. Startup reads only pointer-reachable generations, so an
-interruption before the durable pointer commit retains whichever complete pair
-the recovered pointer names and an interruption after it observes the complete
-new pair. No intermediate state exposes a new execution record without its
-curation link or vice versa.
+The commit sequence under the lifecycle lock is:
 
-Recovery under the same lock validates pointer targets, discards or reuses only
-inactive unreferenced generations, and retains a prior pointer on any malformed
-candidate. If interruption occurs between pointer rename and pointer-directory
-fsync, both complete generations remain; recovery accepts whichever complete
-generation the durable pointer names and treats the other as inactive. Cleanup
-of superseded generations and unreferenced materializations happens only after
-the directory fsync and is retryable; interruption can leak inert bytes but
-cannot lose or split active state. Refresh changes only the configured Catalog
-record. Missing or corrupt pointer-reachable state degrades without acquisition
-or implicit relinking.
+1. re-read the generic document and active builtin/explicit-path registry;
+2. enforce the collision policy;
+3. publish the already validated immutable materialization;
+4. write the entire next strict document to a sibling temporary file;
+5. sync the file, rename over the prior document, and sync its parent directory;
+6. release the lock and perform retryable orphan cleanup.
+
+Until step 5 succeeds, the prior record remains authoritative. Bytes published
+before a failed rename are inert because startup has no record pointing to them.
+The store never guesses, repairs, or scans for an alternate record on startup.
+
+Strict document-level corruption fails managed loading closed. A valid document
+whose individual materialization is missing or invalid degrades that Extension
+without fetch and reports the record/path error.
+
+### Collision, replacement, uninstall, and Catalog removal
+
+For selected stable id `id`, Catalog install is permitted only if:
+
+- no active builtin, explicit-path Extension, or generic installed record uses
+  `id`; or
+- the generic record has curation whose configured Catalog name and Catalog id
+  exactly equal the selected Catalog.
+
+The second case atomically replaces the same Catalog's prior commit/source. If
+all replay and curation fields already match, it is idempotent. A direct record,
+another Catalog's record, builtin, or explicit-path Extension returns a stable
+conflict with uninstall-first guidance. Direct install/update likewise cannot
+replace a curated record.
+
+Uninstall removes the origin-neutral generic record and referenced managed bytes
+under the same lock. Catalog removal checks generic records and is blocked while
+any `curation.catalogName` references the configured Catalog.
 
 ### Catalog service and CLI composition
 
-Catalog list/search refresh all configured Catalogs in deterministic local-name
-order only when requested; show/install refresh only the selected Catalog. CLI
-defaults pass refresh enabled, while `--no-refresh` passes stored policy and
-formatters derive snapshot age from an injected clock.
+Marketplace search projects stored snapshot rows only. Matching is
+case-insensitive over id and summary; duplicate ids across Catalogs are retained;
+ordering is stable by normalized id, configured Catalog name, Catalog id, and
+source locator. Stored/offline output includes acquisition age.
 
-Catalog show/install use only stable Extension ids. Marketplace search matches
-id/summary and returns every provenance row sorted by id, Catalog local name,
-then exact source locator. CLI build/search adapters receive narrow service
-interfaces and never parse snapshots or package-manager results.
+Catalog install requires a positional configured Catalog name and stable Extension id. The service
+checks `--trust` before default refresh or any file/execution acquisition,
+refreshes only the selected Catalog unless `--no-refresh`, resolves exactly one
+entry, loads contained replay bytes, and calls `installExact`.
+
+CLI behavior stays explicit and thin:
+
+- `ctxindex extensions catalog build ...`
+- `ctxindex extensions catalog add|refresh|list|show|remove ...`
+- `ctxindex extensions search ... [--no-refresh]`
+- `ctxindex extensions install <catalog> <id> --trust [--no-refresh]`
+- existing explicit direct npm, Git, and local install/update forms
+- origin-neutral `ctxindex extensions uninstall <id>`
+
+Versioned Catalog selectors remain invalid. Human and JSON output report Catalog
+name/id, commit, source kind, exact pin/locator, install/update time, and offline
+snapshot age where applicable.
 
 ## Storage and State
 
-`catalogs.toml` advances to strict schema version 2 for configured inert Catalog
-records. The generic installation store owns inactive activation-generation
-documents and one atomically replaced active-generation pointer map. Each
-generation stores separate execution and optional Catalog curation members; the
-pointer, not either member alone, grants activation. The generic immutable
-materialization tree remains where `extension-installation` owns it. Catalog code
-adds no package root, staging directory, lock file, or garbage collector.
-
-Catalog snapshots remain below `data/catalogs/<catalog-name>/<commit>` and carry
-generic dependency-resolution artifacts in normalized content-addressed paths.
-Catalog core transports and hashes those inert files but does not interpret their
-installer-owned format. Absolute
-snapshot and materialization paths are derived, never persisted. Local package
-targets in generated snapshots are repository-relative and contained. Uninstall
-and Catalog removal preserve snapshots and Source-owned data; materialization
-cleanup delegates to the generic referenced-only lifecycle.
-
-Generated resolution artifacts use bounded content-addressed paths such as
-`ctxindex-resolutions/<digest>.json` beside the manifest. Authoring validates and
-publishes reusable artifacts before using a sibling candidate file and existing
-atomic-writer discipline to switch the manifest last. Canonical serialization
-sorts object keys and entries deterministically. A byte-identical output is
-unchanged; failed generation preserves the prior manifest, while an unreferenced
-content-addressed artifact is inert and may be reused by a later generation.
+- Configured Catalog records keep repository policy and the independently
+  refreshed selected commit.
+- Stored snapshots contain schema-v2 JSON plus bounded content-addressed lock
+  artifacts; all paths are relative to state or snapshot roots.
+- Generic installed records contain exact execution provenance and optional
+  Catalog curation in one atomic document.
+- Managed materializations are addressed by canonical digest and contain the
+  complete runnable package root needed for offline startup.
+- No absolute temporary/build paths, credentials, generation pointers, or
+  Catalog-specific execution records are persisted.
 
 ## Security and Compatibility
 
-Catalog Git acquisition retains hardened issue #23 policy and repository trust.
-Catalog build and direct install/update invocations are their explicit author or
-operator trust grants and emit warnings before package evaluation/import.
-Catalog install checks its separate execution `--trust` before refresh,
-materialization, import, or mutation. Generic package operations inherit the
-direct installer's target credential rejection, safe provenance, explicit argv,
-bounded process output/timeouts, pinned Bun policy, dependency handling,
-immutable publication, digest verification, and redacted diagnostics.
-
-Refresh/search/list/show/startup never invoke package management or import
-Catalog/Extension modules. Snapshot requested targets are inert; exact resolved
-provenance constrains trusted install. A Catalog cannot supply commands,
-credentials, registry configuration, Provider auth, scopes, or hosts.
-
-Both `add-git-extension-catalogs` and `add-direct-extension-installation` must be
-archived and synced before this delta is implemented or later synced. The schema
-and selector change is intentionally breaking before release.
-Extension definition versions, `ctxindex.entries`, bespoke Catalog package
-records, and any custom npm acquisition types receive no compatibility aliases.
-Profiles remain versioned; Extensions are selected only by stable id.
+- Build trust covers author-package acquisition, Bun execution, and module
+  import. Repository-add trust and install execution trust remain separate.
+- Install trust is checked before refresh, snapshot/artifact acquisition, Bun,
+  import, or publication.
+- Git uses hardened non-interactive credential-free policy; npm and Git exact
+  provenance is verified; local and literal paths are contained.
+- Bun scripts are disabled. Unknown lock formats and unsafe dependency forms fail
+  closed.
+- Catalog read paths and startup have no package-manager or network capability.
+- This pre-alpha change replaces draft schema/state directly and adds no
+  migration or compatibility alias.
 
 ## Verification
 
-SDK tests cover inference, readonly mixed entries, exact public exports, all
-three source kinds, stable ids, and effect-free factories. Package-entry tests
-cover `ctxindex.extensions`, generic root inspection, malformed recognized roots,
-unknown future roots, multi-Catalog selection, nested literal indices, and no
-export-name persistence.
-
-Authoring tests inject the generic installer. They cover npm/Git/contained-local
-resolved provenance, exact replay-artifact transport, transitive range drift,
-exact root selection, duplicate ids, no nested Catalogs,
-canonical ordering, unchanged bytes, failed-output preservation, and proof that
-Catalog code contains no registry/downloader/extractor/materialization store.
-
-Catalog lifecycle tests cover strict schema v2, data-only refresh/search/list,
-default/stored refresh order and age, duplicate Marketplace curation, exact pin
-reproduction, literal nested selection, separate curation/execution records,
-stable installed pins across refresh, atomic replacement, relocation, and
-offline degraded startup. Shared installer tests remain the sole source of npm,
-Git, local, dependency, locking, rollback, and garbage-collection behavior.
-
-CLI tests cover build/search grammar, versionless selectors, default and
-`--no-refresh` behavior, both trust gates, separate provenance rendering,
-trust-before-effects, deterministic JSON, and thin delegation. Final gates are
-focused tests, architecture/package-dependency/egress checks, compiled
-Extension/Catalog relocation, `bun run ci`, strict all-OpenSpec validation,
-cartography, system-reference refresh, and `openspec-verify-change`.
+- SDK inference, exact-surface, copy-compatibility, and dependency-boundary tests.
+- Failing-first resolver tests for npm, Git, contained local, literal author
+  packages, exact selection, intrinsic validation, cleanup, and no publication.
+- Lock sanitizer/replay tests for deterministic bytes, pinned Bun arguments,
+  frozen replay, digest/integrity/commit checks, containment, credential
+  rejection, no scripts, and upstream mutable-source advancement.
+- Snapshot schema tests for canonical output, artifact bounds/deduplication,
+  closed fields, versionless identity, literal locator bounds, and relocation.
+- Inertness tests proving add/refresh/list/show/search/startup never call Bun,
+  import, installer, or network acquisition.
+- Install tests for complete-registry validation, literal locator replay, offline
+  managed publication, same-Catalog replacement, idempotency, all uninstall-first
+  collisions, interruption before record rename, orphan cleanup, and strict
+  record degradation.
+- CLI parser/command/formatter and compiled relocation workflow tests.
+- Focused gates per slice, then `bun run ci`,
+  `bunx openspec validate --all --strict`, `openspec-verify-change`, and affected
+  codemap/SYSTEM refreshes.
 
 ## Promotion Notes
 
-- Promote pure Catalog factories, inert schema-v2 snapshots, configured/curation
-  records, Marketplace projection, and no-acquisition discovery doctrine into
-  `extension-catalogs/implementation.md`.
-- Promote shared Catalog caller semantics without duplicated package behavior
-  into `extension-installation/implementation.md`.
-- Promote `ctxindex.extensions` Catalog root inspection, nested literal
-  selection, generic offline execution, and separate provenance joins into
-  `extension-loading/implementation.md`.
-- Promote versionless build/search/show/install discriminants, refresh policy,
-  trust ordering, and provenance formatting into `cli-surface/implementation.md`.
+After implementation is verified, promote only durable ownership and interface
+doctrine: canonical installer ownership, inert Catalog read paths, exact lock
+replay, one generic record with optional curation, and same-Catalog-only
+replacement. Keep task sequencing and implementation detail in this change.

@@ -326,10 +326,36 @@ describe('extensions list interface', () => {
               repository: '/tmp/fixture.git',
               commit: 'a'.repeat(40),
               snapshotAcquiredAt: 1_000,
-              sourcePath: 'extension.ts',
+              sourceLocator: { kind: 'package', entryIndex: 0 },
+              sourceKind: 'npm',
+              requestedTarget: '@example/external@1.2.3',
+              resolvedIdentity: '1.2.3 (sha512-exact)',
+              materializationDigest: 'b'.repeat(64),
+              installedAt: 500,
+              updatedAt: 750,
             },
           ],
-          [],
+          [
+            {
+              id: 'external',
+              sourceKind: 'npm',
+              requestedTarget: '@example/external@1.2.3',
+              resolvedIdentity: '1.2.3 (sha512-exact)',
+              materializationDigest: 'b'.repeat(64),
+              installedAt: 500,
+              updatedAt: 750,
+              curation: {
+                extension_id: 'external',
+                catalog_name: 'fixture',
+                catalog_id: 'fixture.catalog',
+                repository: '/tmp/fixture.git',
+                commit: 'a'.repeat(40),
+                snapshot_acquired_at: 1_000,
+                source_locator: { kind: 'package', entryIndex: 0 },
+                execution_materialization_digest: 'b'.repeat(64),
+              },
+            },
+          ],
           4_000,
         ),
       )[0].provenance,
@@ -393,6 +419,66 @@ describe('extensions list interface', () => {
         id: 'example.direct',
         available: false,
         provenance: expect.objectContaining({ kind: 'direct' }),
+      }),
+    ])
+  })
+
+  test('retains exact Catalog curation for an unavailable generic record', () => {
+    const result = JSON.parse(
+      formatExtensions(
+        { list: () => [] },
+        true,
+        [],
+        [
+          {
+            id: 'example.curated',
+            sourceKind: 'git',
+            requestedTarget: 'git+https://example.test/curated.git',
+            resolvedIdentity: 'a'.repeat(40),
+            materializationDigest: 'b'.repeat(64),
+            installedAt: 100,
+            updatedAt: 200,
+            curation: {
+              extension_id: 'example.curated',
+              catalog_name: 'team',
+              catalog_id: 'team.catalog',
+              repository: 'https://example.test/catalog.git',
+              commit: 'c'.repeat(40),
+              snapshot_acquired_at: 1_000,
+              source_locator: {
+                kind: 'literal',
+                module: './catalog.ts',
+                catalogId: 'team.catalog',
+                entryIndex: 3,
+                extensionId: 'example.curated',
+              },
+              execution_materialization_digest: 'b'.repeat(64),
+            },
+          },
+        ],
+        4_000,
+      ),
+    )
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: 'example.curated',
+        available: false,
+        provenance: expect.objectContaining({
+          kind: 'catalog',
+          catalog: 'team',
+          catalogId: 'team.catalog',
+          snapshotAgeMs: 3_000,
+          sourceLocator: {
+            kind: 'literal',
+            module: './catalog.ts',
+            catalogId: 'team.catalog',
+            entryIndex: 3,
+            extensionId: 'example.curated',
+          },
+          sourceKind: 'git',
+          resolvedIdentity: 'a'.repeat(40),
+        }),
       }),
     ])
   })

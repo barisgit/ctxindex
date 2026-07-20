@@ -1,48 +1,93 @@
 ---
-title: Local Git Catalog
-description: Discover and install trusted Extension versions from Git Catalogs.
+title: Local Extension Marketplace
+description: Build, discover, and install trusted Extensions through Git Catalogs.
 ---
 
 <Callout>
-ctxindex does not operate a hosted marketplace. Catalog discovery, snapshots, installation records, and Extension loading all happen on the local machine.
+ctxindex does not operate a hosted marketplace. Catalog discovery, immutable snapshots, generic installation records, and managed Extension bytes remain under local control.
 </Callout>
 
-Catalogs are explicitly added credential-free public HTTPS or absolute local Git repositories. Each Catalog is pinned to an immutable commit snapshot and contributes its entries to one merged local discovery surface.
+## Build a schema-v2 Catalog
 
-## Add and inspect a Catalog
+Export one `defineCatalog({ id, label, summary?, extensions })` value from the single module declared in the author package's `package.json`. Entries are versionless literal Extensions or `packageExtension({ kind, target }, extensionId)` descriptors for npm, Git, and local targets.
 
-Adding a repository requires an explicit trust acknowledgement:
+```json
+{
+  "ctxindex": {
+    "extensions": ["./catalog.ts"]
+  }
+}
+```
+
+```ts
+import { defineCatalog, packageExtension } from '@ctxindex/extension-sdk'
+
+export default defineCatalog({
+  id: 'community.catalog',
+  label: 'Community',
+  extensions: [
+    packageExtension(
+      { kind: 'git', target: 'git+https://example.com/mail.git#main' },
+      'community.mail',
+    ),
+    packageExtension(
+      { kind: 'local', target: './extensions/calendar' },
+      'community.calendar',
+    ),
+  ],
+})
+```
+
+Build trust is required before ctxindex acquires packages, invokes Bun, or imports the author module. The package does not need to be published to npm.
 
 ```sh
-ctxindex extensions catalog add community https://example.com/ctxindex-catalog.git \
+ctxindex extensions catalog build ./community-author \
+  --catalog community.catalog \
+  --output ./dist/ctxindex-catalog.json \
+  --trust \
+  --json
+```
+
+## Add and search a Git Catalog
+
+Adding a repository has its own trust acknowledgement:
+
+```sh
+ctxindex extensions catalog add community https://example.com/catalog.git \
   --ref refs/heads/main \
   --trust \
   --json
 
-ctxindex extensions catalog list --json
-ctxindex extensions catalog show community --json
-ctxindex extensions catalog show community example.extension@1.0.0 --json
+ctxindex extensions search mail --json
+ctxindex extensions catalog show community community.mail --json
 ```
 
-`catalog list` and `catalog show` refresh configured repositories before reading them. If a refresh fails, the command reports the failure rather than silently using stale data. Pass `--no-refresh` when you intentionally want the persisted snapshot offline; output includes snapshot age when stored data is used.
+Marketplace search retains matching curation rows from every configured Catalog, including duplicate stable ids across Catalogs. Search, list, and show refresh by default. Use stored state deliberately with `--no-refresh`; offline output reports the stored snapshot age.
 
 ```sh
+ctxindex extensions search mail --no-refresh --json
 ctxindex extensions catalog list --no-refresh --json
 ctxindex extensions catalog show community --no-refresh --json
-ctxindex extensions catalog refresh community --json
 ```
 
-## Install and uninstall an Extension
+## Install and remove
 
-Installing code has a separate trust gate from adding its Catalog. The exact `<id>@<version>` selector is required:
+Installing executable code requires trust independently of authoring and repository acquisition. Select the configured Catalog and stable, versionless Extension id:
 
 ```sh
-ctxindex extensions install community example.extension@1.0.0 --trust --json
+ctxindex extensions install community community.mail --trust --json
 ctxindex extensions list --json
-ctxindex describe --full --json
-ctxindex extensions uninstall example.extension@1.0.0 --json
 ```
 
-Install refreshes its Catalog by default. Add `--no-refresh` to install from the stored snapshot. Startup, ordinary registry loading, `extensions list`, and uninstall do not fetch from Git.
+Install refreshes only the selected Catalog by default. Add `--no-refresh` to install from its stored snapshot. On success, exact replayed bytes are published to generic content-addressed storage. Startup and listing then use only that installed record and managed materialization, without the network, Bun package execution, Catalog checkout, or author checkout.
 
-External Extension modules execute in-process with full trust. Catalog validation checks metadata and registry consistency; it does not sandbox the installed code or make a hosted service responsible for it. Remove an unused Catalog with `ctxindex extensions catalog remove community --json`.
+A later trusted install may replace the record only when its configured Catalog name and Catalog id match. Collisions with a direct install, another Catalog, a built-in, or an explicit path require uninstalling the existing Extension first.
+
+Uninstall works the same for direct and Catalog-curated records and does not require Catalog availability:
+
+```sh
+ctxindex extensions uninstall community.mail --json
+ctxindex extensions catalog remove community --json
+```
+
+Uninstall is blocked while configured Sources require the Extension's Adapter unless `--force` is supplied; forced removal preserves those Sources and their data as unavailable. Catalog removal is blocked until no installed record cites that configured Catalog.

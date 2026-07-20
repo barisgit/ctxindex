@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { createHash } from 'node:crypto'
 import { mkdir, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createSandbox } from '../testing'
@@ -6,98 +7,253 @@ import {
   CATALOG_MANIFEST_MAX_BYTES,
   CATALOG_MAX_ENTRIES,
   CATALOG_PATH_MAX_BYTES,
-  CATALOG_SETUP_MAX_BYTES,
   catalogSnapshotPath,
   parseCatalogManifest,
   validateCatalogSnapshot,
 } from '.'
 
+const digest = 'a'.repeat(64)
+const lockBytes = new TextEncoder().encode('{"lockfileVersion":1}\n')
+const lockDigest = createHash('sha256').update(lockBytes).digest('hex')
+const lock = {
+  format: 'bun.lock@1.3.14',
+  path: `ctxindex-resolutions/${lockDigest}.json`,
+  digest: lockDigest,
+  byteLength: lockBytes.byteLength,
+} as const
+
+function replay(source: Record<string, unknown>) {
+  return {
+    source,
+    packageRoot: 'package',
+    materializationDigest: digest,
+    lock,
+  }
+}
+
 function manifest(overrides: Record<string, unknown> = {}): unknown {
   return {
-    schemaVersion: 1,
-    catalog: { id: 'fixture.catalog', name: 'Fixture Catalog' },
+    schemaVersion: 2,
+    catalog: { id: 'fixture.catalog', label: 'Fixture Catalog' },
+    generated: { packageName: '@fixture/catalog', packageVersion: '1.0.0' },
     extensions: [
       {
-        id: 'fixture.extension',
-        version: 1,
-        source: { kind: 'inline', path: 'extension-package' },
-        setup: { path: 'SETUP.md' },
+        id: 'fixture.literal',
+        summary: 'A literal Extension.',
+        source: {
+          kind: 'literal',
+          authorPackage: replay({
+            kind: 'local',
+            requestedTarget: '.',
+            path: '.',
+            contentDigest: digest,
+          }),
+          locator: {
+            module: 'index.ts',
+            catalogId: 'fixture.catalog',
+            entryIndex: 0,
+            extensionId: 'fixture.literal',
+          },
+        },
+      },
+      {
+        id: 'fixture.npm',
+        source: {
+          kind: 'package',
+          replay: replay({
+            kind: 'npm',
+            requestedTarget: '@fixture/npm@^2',
+            package: '@fixture/npm',
+            version: '2.1.0',
+            integrity: 'sha512-fixture',
+          }),
+        },
+      },
+      {
+        id: 'fixture.git',
+        source: {
+          kind: 'package',
+          replay: replay({
+            kind: 'git',
+            requestedTarget: 'git+https://example.test/fixture.git#main',
+            repository: 'git+https://example.test/fixture.git',
+            commit: 'b'.repeat(40),
+          }),
+        },
+      },
+      {
+        id: 'fixture.local',
+        source: {
+          kind: 'package',
+          replay: replay({
+            kind: 'local',
+            requestedTarget: './packages/local',
+            path: 'packages/local',
+            contentDigest: digest,
+          }),
+        },
       },
     ],
     ...overrides,
   }
 }
 
-describe('Catalog manifest schema', () => {
-  test('parses the closed schema-version-1 shape', () => {
+async function writeValidSnapshot(root: string): Promise<void> {
+  await mkdir(join(root, 'ctxindex-resolutions'), { recursive: true })
+  await mkdir(join(root, 'packages', 'local'), { recursive: true })
+  await writeFile(join(root, 'index.ts'), 'export {}\n')
+  await writeFile(join(root, lock.path), lockBytes)
+  await writeFile(
+    join(root, 'ctxindex-catalog.json'),
+    `${JSON.stringify(manifest())}\n`,
+  )
+}
+
+describe('Catalog schema-v2 manifest', () => {
+  test('parses the closed literal/npm/Git/local replay shape', () => {
     expect(parseCatalogManifest(JSON.stringify(manifest()))).toEqual(
       manifest() as never,
     )
   })
 
   test.each([
-    ['root', { forbidden: true }],
+    ['schema v1', { schemaVersion: 1 }],
+    ['unknown root field', { forbidden: true }],
     [
-      'catalog auth',
-      { catalog: { id: 'fixture.catalog', name: 'Fixture', auth: {} } },
-    ],
-    [
-      'extension scopes',
+      'versioned Extension',
       {
         extensions: [
           {
-            id: 'fixture.extension',
-            version: 1,
-            scopes: ['mail.read'],
-            source: { kind: 'inline', path: 'extension-package' },
-          },
-        ],
-      },
-    ],
-    [
-      'source config',
-      {
-        extensions: [
-          {
-            id: 'fixture.extension',
+            id: 'fixture.versioned',
             version: 1,
             source: {
-              kind: 'inline',
-              path: 'extension-package',
-              config: {},
+              kind: 'package',
+              replay: replay({
+                kind: 'npm',
+                requestedTarget: 'fixture@1',
+                version: '1.0.0',
+                integrity: 'sha512-fixture',
+              }),
             },
           },
         ],
       },
     ],
-  ])('rejects unknown fields: %s', (_label, override) => {
+    [
+      'npm without integrity',
+      {
+        extensions: [
+          {
+            id: 'fixture.npm',
+            source: {
+              kind: 'package',
+              replay: replay({
+                kind: 'npm',
+                requestedTarget: 'fixture@1',
+                version: '1.0.0',
+              }),
+            },
+          },
+        ],
+      },
+    ],
+    [
+      'npm without package identity',
+      {
+        extensions: [
+          {
+            id: 'fixture.npm',
+            source: {
+              kind: 'package',
+              replay: replay({
+                kind: 'npm',
+                requestedTarget: 'fixture@1',
+                version: '1.0.0',
+                integrity: 'sha512-fixture',
+              }),
+            },
+          },
+        ],
+      },
+    ],
+    [
+      'Git without repository identity',
+      {
+        extensions: [
+          {
+            id: 'fixture.git',
+            source: {
+              kind: 'package',
+              replay: replay({
+                kind: 'git',
+                requestedTarget: 'git+https://example.test/fixture.git#main',
+                commit: 'b'.repeat(40),
+              }),
+            },
+          },
+        ],
+      },
+    ],
+    [
+      'Git repository identity with credentials',
+      {
+        extensions: [
+          {
+            id: 'fixture.git',
+            source: {
+              kind: 'package',
+              replay: replay({
+                kind: 'git',
+                requestedTarget: 'git@example.test:fixture.git#main',
+                repository: 'user@example.test:fixture.git',
+                commit: 'b'.repeat(40),
+              }),
+            },
+          },
+        ],
+      },
+    ],
+    [
+      'literal identity mismatch',
+      {
+        extensions: [
+          {
+            id: 'fixture.literal',
+            source: {
+              kind: 'literal',
+              authorPackage: replay({
+                kind: 'local',
+                requestedTarget: '.',
+                path: '.',
+                contentDigest: digest,
+              }),
+              locator: {
+                module: 'index.ts',
+                catalogId: 'fixture.catalog',
+                entryIndex: 0,
+                extensionId: 'fixture.other',
+              },
+            },
+          },
+        ],
+      },
+    ],
+  ])('rejects %s', (_label, override) => {
     expect(() =>
       parseCatalogManifest(JSON.stringify(manifest(override))),
     ).toThrow()
   })
 
-  test('rejects duplicate Extension id and version tuples', () => {
-    const entry = {
-      id: 'fixture.extension',
-      version: 1,
-      source: { kind: 'inline', path: 'extension-package' },
-    }
+  test('rejects duplicate stable Extension ids and manifest bounds', () => {
+    const entry = (manifest() as { extensions: unknown[] }).extensions[0]
     expect(() =>
       parseCatalogManifest(
         JSON.stringify(manifest({ extensions: [entry, entry] })),
       ),
-    ).toThrow('Duplicate Catalog Extension fixture.extension@1')
-  })
-
-  test('enforces manifest and entry bounds', () => {
+    ).toThrow('Duplicate Catalog Extension fixture.literal')
     expect(() =>
       parseCatalogManifest(' '.repeat(CATALOG_MANIFEST_MAX_BYTES + 1)),
     ).toThrow('256 KiB')
-    const entry = {
-      id: 'fixture.extension',
-      version: 1,
-      source: { kind: 'inline', path: 'extension-package' },
-    }
     expect(() =>
       parseCatalogManifest(
         JSON.stringify(
@@ -106,26 +262,34 @@ describe('Catalog manifest schema', () => {
       ),
     ).toThrow()
   })
+
+  test('rejects conflicting metadata for a reused resolution path', () => {
+    const candidate = structuredClone(manifest()) as {
+      extensions: Array<{
+        source:
+          | { kind: 'literal'; authorPackage: { lock: typeof lock } }
+          | { kind: 'package'; replay: { lock: typeof lock } }
+      }>
+    }
+    const second = candidate.extensions[1]
+    if (second?.source.kind !== 'package')
+      throw new Error('missing package fixture')
+    second.source.replay.lock = {
+      ...lock,
+      digest: 'b'.repeat(64),
+    }
+    expect(() => parseCatalogManifest(JSON.stringify(candidate))).toThrow(
+      'Conflicting Catalog resolution artifact',
+    )
+  })
 })
 
-describe('Catalog snapshot validation', () => {
-  test('accepts a normalized contained package root and setup file', async () => {
+describe('Catalog schema-v2 snapshot validation', () => {
+  test('validates contained modules, local packages, and exact lock bytes', async () => {
     const sandbox = await createSandbox()
     try {
       const root = join(sandbox.dir, 'snapshot')
-      await mkdir(root, { recursive: true })
-      await mkdir(join(root, 'extension-package'))
-      await writeFile(
-        join(root, 'extension-package', 'package.json'),
-        '{"ctxindex":{"extensions":["./entry.ts"]}}',
-      )
-      await writeFile(join(root, 'extension-package', 'entry.ts'), 'export {}')
-      await writeFile(join(root, 'SETUP.md'), 'Follow these steps.')
-      await writeFile(
-        join(root, 'ctxindex-catalog.json'),
-        JSON.stringify(manifest()),
-      )
-
+      await writeValidSnapshot(root)
       expect(await validateCatalogSnapshot(root)).toEqual(manifest() as never)
     } finally {
       await sandbox.cleanup()
@@ -133,35 +297,45 @@ describe('Catalog snapshot validation', () => {
   })
 
   test.each([
-    '',
     '/absolute.ts',
     '../escape.ts',
     'nested/../escape.ts',
-    './extension-package',
-    'nested//extension-package',
-    'nested\\extension-package',
-    'extension-package\0ignored',
+    './index.ts',
+    'nested//index.ts',
+    'nested\\index.ts',
+    'index.ts\0ignored',
     `${'a'.repeat(CATALOG_PATH_MAX_BYTES)}x`,
-  ])('rejects unsafe source path %j', async (path) => {
+  ])('rejects unsafe literal module path %j', async (module) => {
     const sandbox = await createSandbox()
     try {
       const root = join(sandbox.dir, 'snapshot')
       await mkdir(root, { recursive: true })
+      const candidate = structuredClone(manifest()) as {
+        extensions: Array<{ source: { locator?: { module: string } } }>
+      }
+      const literal = candidate.extensions[0]
+      if (literal?.source.locator === undefined)
+        throw new Error('missing literal fixture')
+      literal.source.locator.module = module
       await writeFile(
         join(root, 'ctxindex-catalog.json'),
-        JSON.stringify(
-          manifest({
-            extensions: [
-              {
-                id: 'fixture.extension',
-                version: 1,
-                source: { kind: 'inline', path },
-              },
-            ],
-          }),
-        ),
+        JSON.stringify(candidate),
       )
       await expect(validateCatalogSnapshot(root)).rejects.toThrow()
+    } finally {
+      await sandbox.cleanup()
+    }
+  })
+
+  test('rejects lock digest and byte-length mismatch', async () => {
+    const sandbox = await createSandbox()
+    try {
+      const root = join(sandbox.dir, 'snapshot')
+      await writeValidSnapshot(root)
+      await writeFile(join(root, lock.path), 'changed\n')
+      await expect(validateCatalogSnapshot(root)).rejects.toThrow(
+        'resolution artifact',
+      )
     } finally {
       await sandbox.cleanup()
     }
@@ -173,23 +347,18 @@ describe('Catalog snapshot validation', () => {
       const root = join(sandbox.dir, 'snapshot')
       await mkdir(root, { recursive: true })
       await writeFile(join(sandbox.dir, 'outside.ts'), 'outside')
-      await mkdir(join(sandbox.dir, 'outside-package'))
-      await symlink(
-        join(sandbox.dir, 'outside-package'),
-        join(root, 'extension-package'),
-      )
+      await symlink(join(sandbox.dir, 'outside.ts'), join(root, 'index.ts'))
       await writeFile(
         join(root, 'ctxindex-catalog.json'),
         JSON.stringify(manifest()),
       )
-      await writeFile(join(root, 'SETUP.md'), 'setup')
       await expect(validateCatalogSnapshot(root)).rejects.toThrow('escapes')
     } finally {
       await sandbox.cleanup()
     }
   })
 
-  test('rejects an invalid UTF-8 manifest before JSON parsing', async () => {
+  test('rejects invalid UTF-8 before JSON parsing', async () => {
     const sandbox = await createSandbox()
     try {
       const root = join(sandbox.dir, 'snapshot')
@@ -199,26 +368,6 @@ describe('Catalog snapshot validation', () => {
         new Uint8Array([0xc3, 0x28]),
       )
       await expect(validateCatalogSnapshot(root)).rejects.toThrow('UTF-8')
-    } finally {
-      await sandbox.cleanup()
-    }
-  })
-
-  test('rejects setup files larger than 1 MiB', async () => {
-    const sandbox = await createSandbox()
-    try {
-      const root = join(sandbox.dir, 'snapshot')
-      await mkdir(root, { recursive: true })
-      await mkdir(join(root, 'extension-package'))
-      await writeFile(
-        join(root, 'SETUP.md'),
-        'x'.repeat(CATALOG_SETUP_MAX_BYTES + 1),
-      )
-      await writeFile(
-        join(root, 'ctxindex-catalog.json'),
-        JSON.stringify(manifest()),
-      )
-      await expect(validateCatalogSnapshot(root)).rejects.toThrow('1 MiB')
     } finally {
       await sandbox.cleanup()
     }

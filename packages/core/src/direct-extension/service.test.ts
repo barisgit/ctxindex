@@ -1,5 +1,12 @@
 import { afterEach, expect, test } from 'bun:test'
-import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  realpath,
+  rm,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -11,10 +18,15 @@ import {
 } from '@ctxindex/extension-sdk'
 import { type CollectedExtension, createExtensionRegistry } from '../registry'
 import type {
+  ExactDependencyResolutionArtifact,
   MaterializedDirectExtension,
   PackageMaterializer,
 } from './materializer'
-import { DirectExtensionService } from './service'
+import {
+  DirectExtensionService,
+  GenericExtensionPackageInstaller,
+  type ResolvedExtensionCandidate,
+} from './service'
 import { DirectExtensionStore, hashDirectory } from './store'
 import type { DirectExtensionTarget } from './target'
 
@@ -27,14 +39,27 @@ afterEach(async () => {
 
 class FixtureMaterializer implements PackageMaterializer {
   calls = 0
+  exactCalls = 0
+  cleanupCalls = 0
+  exactLocalPackageRoot: string | undefined
+  pauseExactReturn?: () => Promise<void>
+  pauseMaterializeReturn?: () => Promise<void>
+  lastCatalogMetadataExclusion = false
+  lastExactCatalogMetadataExclusion = false
   fail = false
   cleanupFails = false
   entry = `export default { kind: 'extension', id: 'example.direct', providers: [], oauthApps: [], profiles: [], adapters: [] }\n`
 
   async materialize(
     target: DirectExtensionTarget,
+    options: {
+      readonly signal?: AbortSignal
+      readonly excludeCatalogSnapshotMetadata?: boolean
+    } = {},
   ): Promise<MaterializedDirectExtension> {
     this.calls += 1
+    this.lastCatalogMetadataExclusion =
+      options.excludeCatalogSnapshotMetadata === true
     if (this.fail)
       throw Object.assign(new Error('failed'), {
         code: 'extension_acquisition_failed',
@@ -51,7 +76,7 @@ class FixtureMaterializer implements PackageMaterializer {
     )
     await writeFile(join(stagingRoot, 'package', 'entry.ts'), this.entry)
     const materializationDigest = await hashDirectory(stagingRoot)
-    return {
+    const result: MaterializedDirectExtension = {
       stagingRoot,
       packageRoot: 'package',
       source:
@@ -66,19 +91,84 @@ class FixtureMaterializer implements PackageMaterializer {
             ? {
                 kind: 'npm',
                 requested_target: target.requestedTarget,
+                package: 'fixture-package',
                 exact_version: '1.0.0',
+                integrity: 'sha512-fixture',
               }
             : {
                 kind: 'git',
                 requested_target: target.requestedTarget,
+                repository: target.requestedTarget.replace(/#.*$/, ''),
                 commit: 'a'.repeat(40),
               },
       materializationDigest,
-      cleanup: () =>
-        this.cleanupFails
+      dependencyResolutionArtifact: {
+        format: 'bun.lock@1.3.14',
+        digest: 'b'.repeat(64),
+        bytes: new TextEncoder().encode('{"fixture":true}\n'),
+      },
+      cleanup: () => {
+        this.cleanupCalls += 1
+        return this.cleanupFails
           ? Promise.reject(new Error('staging cleanup failed'))
-          : Promise.resolve(),
+          : Promise.resolve()
+      },
     }
+    await this.pauseMaterializeReturn?.()
+    return result
+  }
+
+  async materializeExact(input: {
+    readonly source: MaterializedDirectExtension['source']
+    readonly packageRoot: string
+    readonly materializationDigest: string
+    readonly dependencyResolutionArtifact: ExactDependencyResolutionArtifact
+    readonly localPackageRoot?: string
+    readonly excludeCatalogSnapshotMetadata?: boolean
+  }): Promise<MaterializedDirectExtension> {
+    this.exactCalls += 1
+    this.lastExactCatalogMetadataExclusion =
+      input.excludeCatalogSnapshotMetadata === true
+    this.exactLocalPackageRoot = input.localPackageRoot
+    const target: DirectExtensionTarget =
+      input.source.kind === 'local'
+        ? {
+            kind: 'local',
+            requestedTarget: input.source.requested_target,
+            originPath:
+              input.localPackageRoot ?? (input.source.origin_path as string),
+          }
+        : {
+            kind: input.source.kind,
+            requestedTarget: input.source.requested_target,
+          }
+    const materialized = await this.materialize(target)
+    await this.pauseExactReturn?.()
+    return {
+      ...materialized,
+      source: input.source,
+      packageRoot: input.packageRoot,
+      materializationDigest: input.materializationDigest,
+      dependencyResolutionArtifact: input.dependencyResolutionArtifact,
+    }
+  }
+}
+
+function exactInstallInput(resolved: ResolvedExtensionCandidate) {
+  const artifact = resolved.dependencyResolutionArtifact
+  return {
+    replay: {
+      ...resolved.replay,
+      lock: {
+        format: artifact.format,
+        path: `ctxindex-resolutions/${artifact.digest}.json`,
+        digest: artifact.digest,
+        byteLength: artifact.bytes.byteLength,
+      },
+    },
+    lockBytes: artifact.bytes,
+    immutableSnapshotRoot: process.cwd(),
+    selection: resolved.selection,
   }
 }
 
@@ -158,6 +248,543 @@ test('install selects one exact root, publishes, and rejects a repeated direct i
     }),
   ).rejects.toMatchObject({ code: 'extension_target_invalid' })
   expect(materializer.calls).toBe(1)
+})
+
+test('generic authoring resolution emits exact replay input without publishing installation state', async () => {
+  const { materializer, store } = await fixtureService()
+  const installer = new GenericExtensionPackageInstaller({
+    store,
+    materializer,
+    loadActiveState: loadValidationContext(),
+    now: () => 100,
+  })
+
+  const resolved = await installer.resolveForAuthoring({
+    target: { kind: 'npm', target: 'example-package@^1' },
+    selection: { kind: 'extension', extensionId: 'example.direct' },
+    immutableBaseRoot: process.cwd(),
+  })
+  if (resolved.kind !== 'extension') throw new TypeError('Expected Extension')
+
+  expect(resolved).toMatchObject({
+    extensionId: 'example.direct',
+    replay: {
+      source: {
+        kind: 'npm',
+        requestedTarget: 'example-package@^1',
+        package: 'fixture-package',
+        version: '1.0.0',
+      },
+      packageRoot: 'package',
+    },
+    dependencyResolutionArtifact: {
+      format: 'bun.lock@1.3.14',
+    },
+  })
+  expect(await store.readRecords()).toEqual([])
+  expect(materializer.cleanupCalls).toBe(0)
+  await resolved.dispose()
+  await resolved.dispose()
+  expect(materializer.cleanupCalls).toBe(1)
+})
+
+test('generic authoring stores contained local provenance without an author path', async () => {
+  const { materializer, store } = await fixtureService()
+  const baseRoot = await mkdtemp(join(tmpdir(), 'ctxindex-authoring-root-'))
+  roots.push(baseRoot)
+  await mkdir(join(baseRoot, 'package'))
+  const installer = new GenericExtensionPackageInstaller({
+    store,
+    materializer,
+    loadActiveState: loadValidationContext(),
+  })
+
+  const resolved = await installer.resolveForAuthoring({
+    target: { kind: 'local', target: './package' },
+    selection: { kind: 'extension', extensionId: 'example.direct' },
+    immutableBaseRoot: baseRoot,
+  })
+  if (resolved.kind !== 'extension') throw new TypeError('Expected Extension')
+
+  expect(resolved.replay.source).toEqual({
+    kind: 'local',
+    requestedTarget: 'package',
+    path: 'package',
+    contentDigest: expect.stringMatching(/^[0-9a-f]{64}$/),
+  })
+  const exact = exactInstallInput(resolved)
+  await resolved.dispose()
+  if (exact.replay.source.kind !== 'local')
+    throw new TypeError('Expected local replay')
+  await expect(
+    installer.installExact({
+      ...exact,
+      replay: {
+        ...exact.replay,
+        source: { ...exact.replay.source, path: '..' },
+      },
+      immutableSnapshotRoot: baseRoot,
+    }),
+  ).rejects.toMatchObject({ code: 'extension_validation_failed' })
+  await installer.installExact({ ...exact, immutableSnapshotRoot: baseRoot })
+  expect(materializer.exactLocalPackageRoot).toBe(
+    await realpath(join(baseRoot, 'package')),
+  )
+})
+
+test('generic exact install selects a Catalog literal locator from replayed package bytes', async () => {
+  const { materializer, store } = await fixtureService()
+  materializer.entry = `
+    export default {
+      kind: 'catalog', id: 'example.catalog', label: 'Example',
+      extensions: [{ kind: 'extension', id: 'example.direct', providers: [], oauthApps: [], profiles: [], adapters: [] }]
+    }
+  `
+  const acquired = await materializer.materialize({
+    kind: 'npm',
+    requestedTarget: 'literal-package@1',
+  })
+  const candidate = {
+    selection: {
+      kind: 'catalog-entry' as const,
+      module: 'entry.ts',
+      catalogId: 'example.catalog',
+      entryIndex: 0,
+      extensionId: 'example.direct',
+    },
+    replay: {
+      source: {
+        kind: 'npm' as const,
+        requestedTarget: acquired.source.requested_target,
+        package:
+          acquired.source.kind === 'npm'
+            ? acquired.source.package
+            : 'literal-package',
+        version: '1.0.0',
+        integrity: 'sha512-fixture',
+      },
+      packageRoot: acquired.packageRoot,
+      materializationDigest: acquired.materializationDigest,
+      lock: {
+        format: acquired.dependencyResolutionArtifact.format,
+        path: 'ctxindex-resolutions/fixture.json',
+        digest: acquired.dependencyResolutionArtifact.digest,
+        byteLength: acquired.dependencyResolutionArtifact.bytes.byteLength,
+      },
+    },
+    lockBytes: acquired.dependencyResolutionArtifact.bytes,
+    immutableSnapshotRoot: process.cwd(),
+  }
+  await acquired.cleanup()
+  const installer = new GenericExtensionPackageInstaller({
+    store,
+    materializer,
+    loadActiveState: loadValidationContext(),
+  })
+
+  const installed = await installer.installExact(candidate)
+  expect(installed).toMatchObject({ id: 'example.direct' })
+})
+
+test('generic authoring exact-selects a Catalog from a package with no top-level Extension', async () => {
+  const { materializer, store } = await fixtureService()
+  materializer.entry = `
+    export default {
+      kind: 'catalog', id: 'example.catalog', label: 'Example',
+      extensions: [{ kind: 'extension', id: 'example.direct', providers: [], oauthApps: [], profiles: [], adapters: [] }]
+    }
+  `
+  const installer = new GenericExtensionPackageInstaller({
+    store,
+    materializer,
+    loadActiveState: loadValidationContext(),
+  })
+
+  const resolved = await installer.resolveForAuthoring({
+    target: { kind: 'npm', target: 'author-package@1' },
+    selection: {
+      kind: 'catalog',
+      module: './entry.ts',
+    },
+    immutableBaseRoot: process.cwd(),
+  })
+
+  expect(resolved).toMatchObject({
+    kind: 'catalog',
+    selection: {
+      module: './entry.ts',
+      catalogId: 'example.catalog',
+    },
+    selectedRoot: { kind: 'catalog', id: 'example.catalog' },
+  })
+  expect(await store.readRecords()).toEqual([])
+  await resolved.dispose()
+
+  materializer.entry = `
+    export const first = { kind: 'catalog', id: 'example.first', label: 'First', extensions: [] }
+    export const second = { kind: 'catalog', id: 'example.second', label: 'Second', extensions: [] }
+  `
+  await expect(
+    installer.resolveForAuthoring({
+      target: { kind: 'npm', target: 'author-package@1' },
+      selection: { kind: 'catalog', module: './entry.ts' },
+      immutableBaseRoot: process.cwd(),
+    }),
+  ).rejects.toMatchObject({
+    code: 'extension_validation_failed',
+    message: expect.stringContaining('select one exact Catalog id'),
+  })
+})
+
+test('Catalog-local authoring and literal replay request snapshot-metadata exclusion', async () => {
+  const { materializer, store } = await fixtureService()
+  const baseRoot = await mkdtemp(join(tmpdir(), 'ctxindex-catalog-root-'))
+  roots.push(baseRoot)
+  materializer.entry = `
+    export default {
+      kind: 'catalog', id: 'example.catalog', label: 'Example',
+      extensions: [{ kind: 'extension', id: 'example.direct', providers: [], oauthApps: [], profiles: [], adapters: [] }]
+    }
+  `
+  const installer = new GenericExtensionPackageInstaller({
+    store,
+    materializer,
+    loadActiveState: loadValidationContext(),
+  })
+  const resolution = await installer.resolveForAuthoring({
+    target: { kind: 'local', target: '.' },
+    selection: { kind: 'catalog', module: 'entry.ts' },
+    immutableBaseRoot: baseRoot,
+  })
+  expect(materializer.lastCatalogMetadataExclusion).toBe(true)
+  await resolution.dispose()
+
+  const acquired = await materializer.materialize({
+    kind: 'local',
+    requestedTarget: '.',
+    originPath: baseRoot,
+  })
+  if (acquired.source.kind !== 'local') throw new TypeError('Expected local')
+  const replay = {
+    source: {
+      kind: 'local' as const,
+      requestedTarget: '.',
+      path: '.',
+      contentDigest: acquired.source.content_digest,
+    },
+    packageRoot: acquired.packageRoot,
+    materializationDigest: acquired.materializationDigest,
+    lock: {
+      format: acquired.dependencyResolutionArtifact.format,
+      path: 'ctxindex-resolutions/fixture.json',
+      digest: acquired.dependencyResolutionArtifact.digest,
+      byteLength: acquired.dependencyResolutionArtifact.bytes.byteLength,
+    },
+  }
+  await acquired.cleanup()
+  await installer.installExact({
+    replay,
+    lockBytes: acquired.dependencyResolutionArtifact.bytes,
+    immutableSnapshotRoot: baseRoot,
+    selection: {
+      kind: 'catalog-entry',
+      module: 'entry.ts',
+      catalogId: 'example.catalog',
+      entryIndex: 0,
+      extensionId: 'example.direct',
+    },
+  })
+  expect(materializer.lastExactCatalogMetadataExclusion).toBe(true)
+})
+
+test('Catalog authoring rejects an invalid intrinsic literal Extension registry', async () => {
+  const { materializer, store } = await fixtureService()
+  materializer.entry = `
+    import { z } from '@ctxindex/extension-sdk'
+    const invalidAdapter = {
+      kind: 'adapter', id: 'example.invalid-adapter',
+      configSchema: z.object({}), profiles: [], routing: 'indexed',
+      capabilities: ['retrieve'], operations: { retrieve: async () => {} },
+      actions: {}, access: { scopes: ['example.read'] }
+    }
+    export default {
+      kind: 'catalog', id: 'example.catalog', label: 'Example',
+      extensions: [
+        { kind: 'extension', id: 'example.invalid', providers: [], oauthApps: [], profiles: [], adapters: [invalidAdapter] }
+      ]
+    }
+  `
+  const installer = new GenericExtensionPackageInstaller({
+    store,
+    materializer,
+    loadActiveState: loadValidationContext(),
+  })
+
+  await expect(
+    installer.resolveForAuthoring({
+      target: { kind: 'npm', target: 'author-package@1' },
+      selection: {
+        kind: 'catalog',
+        module: 'entry.ts',
+        catalogId: 'example.catalog',
+      },
+      immutableBaseRoot: process.cwd(),
+    }),
+  ).rejects.toMatchObject({ code: 'extension_validation_failed' })
+})
+
+test('generic exact install owns active-state validation and atomically persists execution with same-Catalog curation replacement only', async () => {
+  const { materializer, store } = await fixtureService()
+  let activeStateReads = 0
+  const installer = new GenericExtensionPackageInstaller({
+    store,
+    materializer,
+    loadActiveState: async () => {
+      activeStateReads += 1
+      return loadValidationContext()()
+    },
+    now: () => 100,
+  })
+  const resolved = await installer.resolveForAuthoring({
+    target: { kind: 'npm', target: 'example-package@^1' },
+    selection: { kind: 'extension', extensionId: 'example.direct' },
+    immutableBaseRoot: process.cwd(),
+  })
+  if (resolved.kind !== 'extension') throw new TypeError('Expected Extension')
+  const exact = exactInstallInput(resolved)
+  await resolved.dispose()
+  const curation = {
+    extensionId: 'example.direct',
+    catalogName: 'example-catalog',
+    catalogId: 'example.catalog',
+    repository: 'https://example.test/catalog.git',
+    commit: 'c'.repeat(40),
+    snapshotAcquiredAt: 10,
+    sourceLocator: { kind: 'package' as const, entryIndex: 0 },
+  }
+  let competingLockEntered = false
+  let competingLock: Promise<void> | undefined
+
+  const installed = await installer.installExact({
+    ...exact,
+    curation,
+    validatePreCommit: async () => {
+      expect(activeStateReads).toBe(0)
+      competingLock = store.withLifecycleLock(async () => {
+        competingLockEntered = true
+      })
+      await Bun.sleep(40)
+      expect(competingLockEntered).toBe(false)
+    },
+  })
+  await competingLock
+  expect(competingLockEntered).toBe(true)
+  expect(activeStateReads).toBe(1)
+  expect(materializer.exactCalls).toBe(1)
+  expect(installed.curation).toMatchObject({
+    catalog_name: 'example-catalog',
+    catalog_id: 'example.catalog',
+    execution_materialization_digest: installed.materialization_digest,
+    source_locator: { kind: 'package', entryIndex: 0 },
+  })
+  expect(installed.source).toMatchObject({
+    kind: 'npm',
+    package: 'fixture-package',
+  })
+
+  await expect(
+    installer.installExact({
+      ...exact,
+      curation: {
+        ...curation,
+        sourceLocator: {
+          kind: 'literal',
+          module: 'entry.ts',
+          catalogId: 'example.catalog',
+          entryIndex: 0,
+          extensionId: 'other.extension',
+        },
+      },
+    }),
+  ).rejects.toMatchObject({ code: 'extension_target_invalid' })
+
+  await expect(
+    installer.installExact({
+      ...exact,
+      curation: { ...curation, commit: 'd'.repeat(40) },
+    }),
+  ).resolves.toMatchObject({
+    curation: { catalog_name: 'example-catalog', commit: 'd'.repeat(40) },
+  })
+
+  await expect(
+    installer.installExact({
+      ...exact,
+      curation: {
+        ...curation,
+        catalogName: 'other-catalog',
+        catalogId: 'other.catalog',
+      },
+    }),
+  ).rejects.toMatchObject({ code: 'extension_conflict' })
+  expect(materializer.exactCalls).toBe(3)
+
+  const direct = new DirectExtensionService({ store, materializer })
+  expect(await direct.list()).toMatchObject([
+    {
+      id: 'example.direct',
+      curation: {
+        catalog_name: 'example-catalog',
+        catalog_id: 'example.catalog',
+        source_locator: { kind: 'package', entryIndex: 0 },
+      },
+    },
+  ])
+  await expect(
+    direct.update({
+      extensionId: 'example.direct',
+      loadValidationContext: loadValidationContext(),
+    }),
+  ).rejects.toMatchObject({
+    code: 'extension_target_invalid',
+    message: expect.stringContaining('Catalog-curated'),
+  })
+
+  const adapter = defineAdapter({
+    id: 'catalog.adapter',
+    configSchema: z.object({}),
+    profiles: [],
+    routing: 'indexed',
+    capabilities: [],
+    operations: {},
+    actions: {},
+  })
+  await expect(
+    direct.uninstall({
+      extensionId: 'example.direct',
+      loadValidationContext: loadUninstallContext(
+        createExtensionRegistry([
+          defineExtension({ id: 'example.direct', adapters: [adapter] }),
+        ]),
+        [{ id: 'source-1', label: 'catalog source', adapterId: adapter.id }],
+      ),
+      force: false,
+    }),
+  ).rejects.toMatchObject({
+    code: 'extension_removal_blocked',
+    message: expect.stringMatching(/^Extension example\.direct /),
+  })
+})
+
+test('exact replay stages concurrently and rechecks the stable-id collision under the lifecycle lock', async () => {
+  const { materializer, store } = await fixtureService()
+  let activeStateReads = 0
+  const installer = new GenericExtensionPackageInstaller({
+    store,
+    materializer,
+    loadActiveState: async () => {
+      activeStateReads += 1
+      return loadValidationContext()()
+    },
+  })
+  const resolved = await installer.resolveForAuthoring({
+    target: { kind: 'npm', target: 'example-package@^1' },
+    selection: { kind: 'extension', extensionId: 'example.direct' },
+    immutableBaseRoot: process.cwd(),
+  })
+  if (resolved.kind !== 'extension') throw new TypeError('Expected Extension')
+  const exact = exactInstallInput(resolved)
+  await resolved.dispose()
+
+  let stagedCount = 0
+  let markBothStaged: (() => void) | undefined
+  const bothStaged = new Promise<void>((resolve) => {
+    markBothStaged = resolve
+  })
+  let releaseReplay: (() => void) | undefined
+  const replayReleased = new Promise<void>((resolve) => {
+    releaseReplay = resolve
+  })
+  materializer.pauseExactReturn = async () => {
+    stagedCount += 1
+    if (stagedCount === 2) markBothStaged?.()
+    await replayReleased
+  }
+
+  const attempts = [
+    installer.installExact(exact),
+    installer.installExact(exact),
+  ]
+  const replayWasConcurrent = await Promise.race([
+    bothStaged.then(() => true),
+    new Promise<false>((resolve) => setTimeout(() => resolve(false), 250)),
+  ])
+  const recordsBeforeRelease = await store.readRecords()
+  releaseReplay?.()
+  const settled = await Promise.allSettled(attempts)
+
+  expect(recordsBeforeRelease).toEqual([])
+  expect(replayWasConcurrent).toBe(true)
+  expect(settled.filter(({ status }) => status === 'fulfilled')).toHaveLength(1)
+  expect(settled.filter(({ status }) => status === 'rejected')).toHaveLength(1)
+  expect(settled.find(({ status }) => status === 'rejected')).toMatchObject({
+    reason: { code: 'extension_conflict' },
+  })
+  expect(materializer.exactCalls).toBe(2)
+  expect(materializer.cleanupCalls).toBe(3)
+  expect(activeStateReads).toBe(1)
+})
+
+test('direct acquisition stages concurrently and rechecks the stable-id collision under the lifecycle lock', async () => {
+  const { materializer, service, store } = await fixtureService()
+  let activeStateReads = 0
+  const loadActiveState = async () => {
+    activeStateReads += 1
+    return loadValidationContext()()
+  }
+  let stagedCount = 0
+  let markBothStaged: (() => void) | undefined
+  const bothStaged = new Promise<void>((resolve) => {
+    markBothStaged = resolve
+  })
+  let releaseAcquisition: (() => void) | undefined
+  const acquisitionReleased = new Promise<void>((resolve) => {
+    releaseAcquisition = resolve
+  })
+  materializer.pauseMaterializeReturn = async () => {
+    stagedCount += 1
+    if (stagedCount === 2) markBothStaged?.()
+    await acquisitionReleased
+  }
+
+  const input = {
+    target: {
+      kind: 'local' as const,
+      requestedTarget: '/fixture',
+      originPath: '/fixture',
+    },
+    extensionId: 'example.direct',
+    loadValidationContext: loadActiveState,
+  }
+  const attempts = [service.install(input), service.install(input)]
+  const acquisitionWasConcurrent = await Promise.race([
+    bothStaged.then(() => true),
+    new Promise<false>((resolve) => setTimeout(() => resolve(false), 250)),
+  ])
+  const recordsBeforeRelease = await store.readRecords()
+  releaseAcquisition?.()
+  const settled = await Promise.allSettled(attempts)
+
+  expect(recordsBeforeRelease).toEqual([])
+  expect(acquisitionWasConcurrent).toBe(true)
+  expect(settled.filter(({ status }) => status === 'fulfilled')).toHaveLength(1)
+  expect(settled.filter(({ status }) => status === 'rejected')).toHaveLength(1)
+  expect(settled.find(({ status }) => status === 'rejected')).toMatchObject({
+    reason: { code: 'extension_target_invalid' },
+  })
+  expect(materializer.calls).toBe(2)
+  expect(materializer.cleanupCalls).toBe(2)
+  expect(activeStateReads).toBe(1)
 })
 
 test('install requires the exact exported root and validates the complete registry before publication', async () => {
@@ -273,7 +900,7 @@ test('update validates documentation compatibility before replacing the prior pi
   expect(await store.readRecords()).toEqual([installed])
 })
 
-test('list tolerates invalid records and returns unrelated valid inventory', async () => {
+test('list fails closed for an invalid record document', async () => {
   const { service, store } = await fixtureService()
   const installed = await service.install({
     target: { kind: 'npm', requestedTarget: 'example-package@1' },
@@ -288,9 +915,7 @@ test('list tolerates invalid records and returns unrelated valid inventory', asy
     }),
   )
 
-  expect(await service.list()).toEqual([
-    expect.objectContaining({ id: 'example.direct' }),
-  ])
+  expect(await service.list()).toEqual([])
 })
 
 test('concurrent mutations refresh complete validation inside the lifecycle lock', async () => {
