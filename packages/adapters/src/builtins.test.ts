@@ -164,6 +164,10 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
     expect(adapters[2]?.profiles[0]).toBe(calendarEventProfile)
     expect(adapters[3]?.profiles[0]).toBe(communicationMessageProfile)
     expect(adapters[4]?.profiles[0]).toBe(fileProfile)
+    expect(calendarEventProfile.search?.fields).toMatchObject({
+      startTimeZone: { type: 'string' },
+      endTimeZone: { type: 'string' },
+    })
     expect(
       [...CTXINDEX_BUILTIN_EXTENSIONS, ...adapters].every(
         (definition) => !Object.hasOwn(definition, 'docs'),

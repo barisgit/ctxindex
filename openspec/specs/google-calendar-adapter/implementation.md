@@ -58,7 +58,7 @@ export async function googleCalendarRetrieve(
 
 ## Implementation doctrine
 
-The Google Calendar module in `@ctxindex/adapters` keeps configuration, transport validation, event normalization, sync, retrieval, and its definition together. It emits `calendar.event@1`; Profile semantics and OAuth orchestration stay outside the module.
+The Google Calendar module in `@ctxindex/adapters` keeps configuration, transport validation, event normalization, sync, retrieval, and its definition together. It emits `calendar.event@1` and passes provider timed-event and series-start zone labels through the Profile-owned IANA canonicalizer before validation, retaining independently valid offset-bearing instants when an unknown label is omitted. Profile semantics and OAuth orchestration stay outside the module.
 
 One Source selects one calendar and anchored past/future window. The cursor stores the final opaque sync token and sorted Source-local manifest. Full scans require a final token and compare complete results before removals/checkpoint; incremental sync retains the window and applies explicit provider deletions. Exact retrieval uses the same normalizer as sync.
 

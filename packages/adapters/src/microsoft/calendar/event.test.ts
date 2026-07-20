@@ -1,10 +1,43 @@
 import { describe, expect, test } from 'bun:test'
 import { calendarEventSchema } from '@ctxindex/profiles'
-import { normalizeMicrosoftCalendarEvent } from './event'
+import {
+  microsoftCalendarEventSchema,
+  normalizeMicrosoftCalendarEvent,
+} from './event'
 
 const sourceId = '01J00000000000000000000000'
 
 describe('Microsoft Calendar event normalization', () => {
+  test('treats an unknown future Graph event type as absent', () => {
+    expect(
+      microsoftCalendarEventSchema.parse({
+        id: 'future-type',
+        type: 'futureSeriesVariant',
+      }).type,
+    ).toBeUndefined()
+
+    const result = normalizeMicrosoftCalendarEvent(
+      {
+        id: 'future-type',
+        type: 'futureSeriesVariant',
+        start: { dateTime: '2026-07-16T09:00:00Z', timeZone: 'UTC' },
+        end: { dateTime: '2026-07-16T10:00:00Z', timeZone: 'UTC' },
+      },
+      sourceId,
+      'default',
+    )
+
+    expect(result.warnings).toEqual([])
+    expect(result.resource?.payload).toMatchObject({
+      providerEventId: 'future-type',
+      timing: {
+        kind: 'timed',
+        start: '2026-07-16T09:00:00.000Z',
+        end: '2026-07-16T10:00:00.000Z',
+      },
+    })
+  })
+
   test('normalizes timed participants, status, recurrence, and series identity', () => {
     const result = normalizeMicrosoftCalendarEvent(
       {
@@ -132,6 +165,130 @@ describe('Microsoft Calendar event normalization', () => {
       status: 'confirmed',
     })
     expect(result.resource?.payload).not.toHaveProperty('series')
+  })
+
+  test('uses a replayed unmodified occurrence start when Graph omits originalStart', () => {
+    const result = normalizeMicrosoftCalendarEvent(
+      {
+        type: 'occurrence',
+        id: 'REDACTED_OCCURRENCE_ID',
+        start: {
+          dateTime: '2026-07-13T10:00:00.0000000',
+          timeZone: 'UTC',
+        },
+        end: {
+          dateTime: '2026-07-13T11:00:00.0000000',
+          timeZone: 'UTC',
+        },
+        seriesMasterId: 'REDACTED_SERIES_ID',
+      },
+      sourceId,
+      'default',
+    )
+
+    expect(result.resource).toBeDefined()
+    expect(result.warnings).toEqual([])
+    expect(result.resource?.payload).toMatchObject({
+      timing: {
+        kind: 'timed',
+        start: '2026-07-13T10:00:00.000Z',
+        end: '2026-07-13T11:00:00.000Z',
+        startTimeZone: 'UTC',
+        endTimeZone: 'UTC',
+      },
+      series: {
+        providerEventId: 'REDACTED_SERIES_ID',
+        ref: `${sourceId}/event/REDACTED_SERIES_ID`.replace(
+          sourceId,
+          `ctx://${sourceId}`,
+        ),
+        originalStart: {
+          kind: 'timed',
+          at: '2026-07-13T10:00:00.000Z',
+          timeZone: 'UTC',
+        },
+      },
+    })
+  })
+
+  test('uses the current start zone for occurrence fallback even when the original zone is unknown', () => {
+    const result = normalizeMicrosoftCalendarEvent(
+      {
+        type: 'occurrence',
+        id: 'synthetic-occurrence-unknown-original-zone',
+        start: { dateTime: '2026-07-13T10:00:00Z', timeZone: 'UTC' },
+        end: { dateTime: '2026-07-13T11:00:00Z', timeZone: 'UTC' },
+        originalStartTimeZone: 'Synthetic/Unknown',
+        seriesMasterId: 'synthetic-series',
+      },
+      sourceId,
+      'default',
+    )
+
+    expect(result.warnings).toEqual([])
+    expect(result.resource?.payload).toMatchObject({
+      timing: {
+        start: '2026-07-13T10:00:00.000Z',
+        end: '2026-07-13T11:00:00.000Z',
+      },
+      series: {
+        providerEventId: 'synthetic-series',
+        originalStart: {
+          kind: 'timed',
+          at: '2026-07-13T10:00:00.000Z',
+          timeZone: 'UTC',
+        },
+      },
+    })
+    expect(result.resource?.payload).not.toHaveProperty('timing.startTimeZone')
+  })
+
+  test('does not substitute the moved start of an exception missing originalStart', () => {
+    const result = normalizeMicrosoftCalendarEvent(
+      {
+        type: 'exception',
+        id: 'synthetic-exception',
+        start: { dateTime: '2026-07-13T12:00:00Z', timeZone: 'UTC' },
+        end: { dateTime: '2026-07-13T13:00:00Z', timeZone: 'UTC' },
+        seriesMasterId: 'synthetic-series',
+      },
+      sourceId,
+      'default',
+    )
+
+    expect(result.resource?.payload).not.toHaveProperty('series')
+    expect(result.warnings.map(({ code }) => code)).toEqual([
+      'microsoft_calendar_unresolved_series_start',
+    ])
+  })
+
+  test('uses an unmodified all-day occurrence date when Graph omits originalStart', () => {
+    const result = normalizeMicrosoftCalendarEvent(
+      {
+        type: 'occurrence',
+        id: 'synthetic-all-day-occurrence',
+        isAllDay: true,
+        start: {
+          dateTime: '2026-07-13T00:00:00.0000000',
+          timeZone: 'Pacific Standard Time',
+        },
+        end: {
+          dateTime: '2026-07-14T00:00:00.0000000',
+          timeZone: 'Pacific Standard Time',
+        },
+        seriesMasterId: 'synthetic-all-day-series',
+      },
+      sourceId,
+      'default',
+    )
+
+    expect(result.warnings).toEqual([])
+    expect(result.resource?.payload).toMatchObject({
+      series: {
+        providerEventId: 'synthetic-all-day-series',
+        originalStart: { kind: 'all-day', date: '2026-07-13' },
+      },
+    })
   })
 
   test('resolves an all-day series date through a Windows provider zone', () => {
