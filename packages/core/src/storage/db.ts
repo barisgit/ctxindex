@@ -25,6 +25,18 @@ export async function openDatabase(
   }
 }
 
+export function openReadonlyDatabase(path: string): CtxindexDatabase {
+  let database: Database | undefined
+  try {
+    database = new Database(path, { readonly: true, strict: true })
+    database.exec('PRAGMA busy_timeout = 5000;')
+    return database
+  } catch (error) {
+    database?.close()
+    normalizeStorageError(error)
+  }
+}
+
 export function applyPragmas(database: CtxindexDatabase): void {
   try {
     database.exec('PRAGMA busy_timeout = 5000;')

@@ -81,6 +81,29 @@ describe('thread output', () => {
     log.mockRestore()
   })
 
+  test('selected daemon thread preserves output without opening direct dependencies', async () => {
+    const log = spyOn(console, 'log').mockImplementation(() => {})
+    let opened = false
+    try {
+      const exit = await handleThreadGetCommand(
+        ['--json', ref],
+        async () => {
+          opened = true
+          throw new Error('direct dependencies opened')
+        },
+        {
+          select: () => ({}) as never,
+          get: async () => result as never,
+        },
+      )
+      expect(exit).toBe(0)
+      expect(opened).toBe(false)
+      expect(log).toHaveBeenCalledWith(formatThreadJson(result))
+    } finally {
+      log.mockRestore()
+    }
+  })
+
   test('malformed and unknown seeds use typed exit 2', async () => {
     const error = spyOn(console, 'error').mockImplementation(() => {})
     let opens = 0

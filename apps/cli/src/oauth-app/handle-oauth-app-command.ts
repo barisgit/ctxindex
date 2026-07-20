@@ -4,6 +4,10 @@ import { oauthAppUsage, parseOAuthAppArgs } from '../args/oauth-app'
 import { assertInitialized } from '../commands/db'
 import { loadCliDefinitions } from '../definitions'
 import { openDeps } from '../deps'
+import {
+  acquireDirectDatabaseOwnership,
+  type DirectDatabaseOwnership,
+} from '../direct-database'
 import { mapErrorToExit } from '../format/exit'
 import {
   formatOAuthAppAdded,
@@ -11,7 +15,26 @@ import {
   formatOAuthAppRemoved,
 } from '../format/oauth-app'
 
-export async function handleOAuthAppCommand(args: string[]): Promise<number> {
+export interface OAuthAppCommandDeps {
+  readonly acquireOwnership: typeof acquireDirectDatabaseOwnership
+  readonly loadDefinitions: typeof loadCliDefinitions
+  readonly open: typeof openDeps
+  readonly assertInitialized: typeof assertInitialized
+  readonly readEnvironmentVariable: typeof readEnvironmentVariable
+}
+
+const defaultDeps: OAuthAppCommandDeps = {
+  acquireOwnership: acquireDirectDatabaseOwnership,
+  loadDefinitions: loadCliDefinitions,
+  open: openDeps,
+  assertInitialized,
+  readEnvironmentVariable,
+}
+
+export async function handleOAuthAppCommand(
+  args: string[],
+  services: OAuthAppCommandDeps = defaultDeps,
+): Promise<number> {
   const parsed = parseOAuthAppArgs(args)
   if (parsed.kind === 'help') return 0
   if (parsed.kind === 'unknown') {
@@ -20,9 +43,13 @@ export async function handleOAuthAppCommand(args: string[]): Promise<number> {
   }
 
   let deps: Awaited<ReturnType<typeof openDeps>> | undefined
+  let ownership: DirectDatabaseOwnership | undefined
   try {
     if (parsed.kind === 'add') {
-      const definitions = await loadCliDefinitions()
+      ownership = services.acquireOwnership()
+      const definitions = await services.loadDefinitions({
+        localOAuthAppIdentities: await ownership.readLocalOAuthAppIdentities(),
+      })
       const provider = definitions.completeRegistry.providers.get(
         parsed.provider,
       )
@@ -32,13 +59,13 @@ export async function handleOAuthAppCommand(args: string[]): Promise<number> {
           `Unknown OAuth provider: ${parsed.provider}`,
         )
       }
-      await assertInitialized()
+      await services.assertInitialized()
       const config: Record<string, string> = {}
       for (const [field, name] of Object.entries(
         provider.auth.registration.environment,
       )) {
         if (typeof name !== 'string') continue
-        const value = readEnvironmentVariable(name)
+        const value = services.readEnvironmentVariable(name)
         if (value !== undefined) config[field] = value
       }
       const validated =
@@ -54,7 +81,10 @@ export async function handleOAuthAppCommand(args: string[]): Promise<number> {
           'OAuth App configuration is invalid for the selected Provider',
         )
       }
-      deps = await openDeps({ config: definitions.config })
+      deps = await services.open({
+        definitions,
+        databaseOwnership: ownership,
+      })
       if (
         deps.oauthAppService
           .listApps()
@@ -75,8 +105,8 @@ export async function handleOAuthAppCommand(args: string[]): Promise<number> {
       })
       console.log(formatOAuthAppAdded(parsed.provider, parsed.label))
     } else {
-      await assertInitialized()
-      deps = await openDeps()
+      await services.assertInitialized()
+      deps = await services.open()
       if (parsed.kind === 'list') {
         console.log(
           formatOAuthAppInventory(deps.oauthAppService.listApps(), parsed.json),
@@ -92,5 +122,6 @@ export async function handleOAuthAppCommand(args: string[]): Promise<number> {
     return mapErrorToExit(error)
   } finally {
     await deps?.close()
+    ownership?.close()
   }
 }

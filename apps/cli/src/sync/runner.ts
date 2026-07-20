@@ -1,11 +1,15 @@
-import { compareStrings } from '@ctxindex/core/registry'
+import { CtxindexValidationError } from '@ctxindex/core/errors'
 import { syncSource } from '@ctxindex/core/source'
 import {
-  getSyncRunFailureDiagnostics,
+  type FailedSourceSyncResult,
+  mapSyncErrorCode,
+  type RunSyncResult,
+  SyncApplicationService,
   type SyncRunResult,
   type SyncWarning,
 } from '@ctxindex/core/sync'
 import { parseSyncArgs, syncUsage } from '../args/sync'
+import { daemonSync, selectDaemon } from '../daemon/client'
 import { type CliDeps, openDeps } from '../deps'
 import { mapErrorToExit } from '../format/exit'
 
@@ -19,11 +23,28 @@ export interface SyncServices {
   readonly syncSource: typeof syncSource
 }
 
+export interface SyncRouteServices {
+  readonly selectDaemon: typeof selectDaemon
+  readonly daemonSync: typeof daemonSync
+}
+
 interface SyncWarningOutput {
   readonly sourceId: string
   readonly code: string
   readonly message: string
   readonly ref?: string
+}
+
+function rpcWarning(value: {
+  readonly code: string
+  readonly message: string
+  readonly ref?: string | undefined
+}): SyncWarning {
+  return {
+    code: value.code,
+    message: value.message,
+    ...(value.ref !== undefined ? { ref: value.ref } : {}),
+  }
 }
 
 interface CompletedSourceSync {
@@ -52,22 +73,23 @@ export interface SyncOutput {
 }
 
 const defaultServices: SyncServices = { syncSource }
+const defaultRouteServices: SyncRouteServices = { selectDaemon, daemonSync }
 
 function errorCode(error: unknown): string {
   const code = (error as { code?: unknown }).code
   return typeof code === 'string' ? code : 'unknown'
 }
 
-function failedSource(sourceId: string, error: unknown): FailedSourceSync {
+function failedSource(result: FailedSourceSyncResult): FailedSourceSync {
+  const { sourceId, error, diagnostics } = result
   const code = errorCode(error)
   const publicMessage = `Sync failed for Source "${sourceId}" (${code})`
-  const diagnostics = getSyncRunFailureDiagnostics(error)
   return {
     sourceId,
     status: 'failed',
-    warningsCount: diagnostics?.warningsCount ?? 0,
-    lastWarning: diagnostics?.lastWarning ?? null,
-    errorsCount: diagnostics?.errorsCount ?? 1,
+    warningsCount: diagnostics.warningsCount,
+    lastWarning: diagnostics.lastWarning,
+    errorsCount: diagnostics.errorsCount,
     lastError: publicMessage,
     error: {
       code,
@@ -77,19 +99,9 @@ function failedSource(sourceId: string, error: unknown): FailedSourceSync {
   }
 }
 
-function warningsFor(result: SourceSyncOutput): SyncWarningOutput[] {
-  const warnings =
-    result.status === 'completed'
-      ? result.run.warnings
-      : result.lastWarning
-        ? [result.lastWarning]
-        : []
-  return warnings.map((warning) => ({
-    sourceId: result.sourceId,
-    code: warning.code,
-    message: warning.message,
-    ...(warning.ref ? { ref: warning.ref } : {}),
-  }))
+export function mapRpcSyncFailureToExit(code: string): number {
+  return mapSyncErrorCode(code as Parameters<typeof mapSyncErrorCode>[0])
+    .exitCode
 }
 
 export function formatSyncOutput(
@@ -147,6 +159,7 @@ export async function handleSyncCommand(
   args: string[],
   open: OpenSyncDeps = openDeps,
   services: SyncServices = defaultServices,
+  routes: SyncRouteServices = defaultRouteServices,
 ): Promise<number> {
   const parsed = parseSyncArgs(args)
   if (parsed.kind === 'help') return 0
@@ -155,65 +168,98 @@ export async function handleSyncCommand(
     return 2
   }
 
-  const deps = await open()
   const controller = new AbortController()
   const cancel = () => controller.abort()
   process.once('SIGINT', cancel)
+  let deps: SyncDeps | undefined
   try {
-    let sources: ReturnType<SyncDeps['sourceService']['listSources']>
-    if (parsed.sourceId) {
-      let source: ReturnType<SyncDeps['sourceService']['findSourceById']> = null
-      try {
-        const sourceId = deps.sourceService.resolveSourceId(parsed.sourceId)
-        source = deps.sourceService.findSourceById(sourceId)
-      } catch {}
-      if (!source) {
-        console.error(`Source not found: "${parsed.sourceId}"`)
-        return 2
+    const daemon = routes.selectDaemon()
+    if (daemon) {
+      const result = await routes.daemonSync(
+        daemon,
+        {
+          ...(parsed.sourceId ? { source: parsed.sourceId } : {}),
+          mode: parsed.mode,
+        },
+        controller.signal,
+      )
+      const results: SourceSyncOutput[] = result.results.map((sourceResult) =>
+        sourceResult.status === 'completed'
+          ? {
+              sourceId: sourceResult.sourceId,
+              status: 'completed',
+              run: {
+                ...sourceResult.run,
+                lastWarning: sourceResult.run.lastWarning
+                  ? rpcWarning(sourceResult.run.lastWarning)
+                  : null,
+                warnings: sourceResult.run.warnings.map(rpcWarning),
+              },
+            }
+          : {
+              sourceId: sourceResult.sourceId,
+              status: 'failed',
+              warningsCount: sourceResult.diagnostics.warningsCount,
+              lastWarning: sourceResult.diagnostics.lastWarning
+                ? rpcWarning(sourceResult.diagnostics.lastWarning)
+                : null,
+              errorsCount: sourceResult.diagnostics.errorsCount,
+              lastError: sourceResult.diagnostics.lastError,
+              error: sourceResult.failure,
+              exitCode: mapRpcSyncFailureToExit(sourceResult.failure.code),
+            },
+      )
+      const output: SyncOutput = {
+        mode: result.mode,
+        results,
+        warnings: result.warnings.map((warning) => ({
+          sourceId: warning.sourceId,
+          ...rpcWarning(warning),
+        })),
       }
-      if (!source.sync_enabled) {
-        console.error(`Source is not sync-enabled: "${parsed.sourceId}"`)
-        return 2
-      }
-      sources = [source]
-    } else {
-      sources = deps.sourceService
-        .listSources()
-        .filter((source) => source.sync_enabled)
-        .filter((source) => {
-          const adapter = deps.registry.adapters.get({
-            id: source.adapter_id,
-          })
-          return (
-            !adapter ||
-            (adapter.capabilities.includes('sync') &&
-              adapter.operations.sync !== undefined)
-          )
-        })
-        .sort((left, right) => compareStrings(left.id, right.id))
+      const rendered = formatSyncOutput(output, parsed.format, parsed.json)
+      if (rendered) console.log(rendered)
+      return results.reduce(
+        (exitCode, item) =>
+          item.status === 'failed'
+            ? Math.max(exitCode, item.exitCode)
+            : exitCode,
+        0,
+      )
     }
 
-    const results: SourceSyncOutput[] = []
-    for (const source of sources) {
-      try {
-        const run = await services.syncSource({
-          db: deps.db,
-          registry: deps.registry,
-          authService: deps.authService,
-          logger: deps.logger,
-          sourceId: source.id,
-          mode: parsed.mode,
-          signal: controller.signal,
-        })
-        results.push({ sourceId: source.id, status: 'completed', run })
-      } catch (error) {
-        results.push(failedSource(source.id, error))
+    deps = await open()
+    const service = new SyncApplicationService({
+      db: deps.db,
+      registry: deps.registry,
+      authService: deps.authService,
+      logger: deps.logger,
+      sourceService: deps.sourceService,
+      syncSource: services.syncSource,
+    })
+    let result: RunSyncResult
+    try {
+      result = await service.run({
+        ...(parsed.sourceId ? { source: parsed.sourceId } : {}),
+        mode: parsed.mode,
+        signal: controller.signal,
+      })
+    } catch (error) {
+      if (error instanceof CtxindexValidationError) {
+        console.error(error.message)
+        return mapErrorToExit(error)
       }
+      throw error
     }
+    const results: SourceSyncOutput[] = result.results.map((sourceResult) =>
+      sourceResult.status === 'completed'
+        ? sourceResult
+        : failedSource(sourceResult),
+    )
     const output: SyncOutput = {
-      mode: parsed.mode,
+      mode: result.mode,
       results,
-      warnings: results.flatMap(warningsFor),
+      warnings: result.warnings,
     }
     const rendered = formatSyncOutput(output, parsed.format, parsed.json)
     if (rendered) console.log(rendered)
@@ -226,6 +272,6 @@ export async function handleSyncCommand(
     )
   } finally {
     process.removeListener('SIGINT', cancel)
-    await deps.close()
+    await deps?.close()
   }
 }

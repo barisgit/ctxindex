@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { CtxindexError, CtxindexSyncError } from '@ctxindex/core/errors'
 import type { SyncRunResult } from '@ctxindex/core/sync'
+import { DaemonCliError, type DaemonSelection } from '../daemon/client'
 import {
   formatSyncOutput,
   handleSyncCommand,
+  mapRpcSyncFailureToExit,
   type SyncDeps,
   type SyncOutput,
+  type SyncRouteServices,
   type SyncServices,
 } from '../sync/runner'
 
@@ -98,6 +101,176 @@ afterEach(() => {
 })
 
 describe('sync command', () => {
+  test.each([
+    ['auth_expired', 10],
+    ['auth_revoked', 10],
+    ['rate_limited', 20],
+    ['network', 30],
+    ['provider_unavailable', 30],
+    ['provider_bad_response', 30],
+    ['provider_quota', 30],
+    ['permission_denied', 40],
+    ['unknown', 50],
+    ['cancelled', 130],
+  ] as const)('maps RPC sync code %s to direct exit %i', (code, exitCode) => {
+    expect(mapRpcSyncFailureToExit(code)).toBe(exitCode)
+  })
+
+  test('malformed sync performs zero discovery, transport, or direct open', async () => {
+    spyOn(console, 'error').mockImplementation(() => {})
+    let touched = 0
+    const routes: SyncRouteServices = {
+      selectDaemon: () => {
+        touched += 1
+        return null
+      },
+      daemonSync: async () => {
+        touched += 1
+        throw new Error('must not call transport')
+      },
+    }
+    const setup = harness({})
+    expect(
+      await handleSyncCommand(
+        ['--unknown'],
+        async () => {
+          touched += 1
+          return setup.open()
+        },
+        setup.services,
+        routes,
+      ),
+    ).toBe(2)
+    expect(touched).toBe(0)
+  })
+
+  test('selected RPC preserves sync JSON values without an envelope or direct open', async () => {
+    const log = spyOn(console, 'log').mockImplementation(() => {})
+    let opened = false
+    const routes: SyncRouteServices = {
+      selectDaemon: () => ({}) as DaemonSelection,
+      daemonSync: async () => ({
+        mode: 'sync',
+        results: [
+          {
+            sourceId: 'source-a',
+            status: 'completed',
+            run: completed,
+          },
+        ],
+        warnings: [
+          {
+            sourceId: 'source-a',
+            code: 'binary',
+            message: 'Skipped binary file',
+          },
+        ],
+      }),
+    }
+    expect(
+      await handleSyncCommand(
+        ['--json'],
+        async () => {
+          opened = true
+          throw new Error('selected RPC must not open direct deps')
+        },
+        harness({}).services,
+        routes,
+      ),
+    ).toBe(0)
+    expect(opened).toBe(false)
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      mode: 'sync',
+      results: [{ sourceId: 'source-a', status: 'completed', run: completed }],
+      warnings: [
+        {
+          sourceId: 'source-a',
+          code: 'binary',
+          message: 'Skipped binary file',
+        },
+      ],
+    })
+    expect(String(log.mock.calls[0]?.[0])).not.toContain('"ok"')
+  })
+
+  test('selected RPC preserves the established failed-sync projection exactly', async () => {
+    const log = spyOn(console, 'log').mockImplementation(() => {})
+    const expected = {
+      sourceId: 'source-a',
+      status: 'failed' as const,
+      warningsCount: 1,
+      lastWarning: {
+        code: 'degraded',
+        message: 'partial provider response',
+        ref: 'ctx://source-a/message/1',
+      },
+      errorsCount: 1,
+      lastError: 'Sync failed for Source "source-a" (network)',
+      error: {
+        code: 'network',
+        message: 'Sync failed for Source "source-a" (network)',
+      },
+      exitCode: 30,
+    }
+    expect(
+      await handleSyncCommand(
+        ['--json'],
+        async () => {
+          throw new Error('selected RPC must not open direct deps')
+        },
+        harness({}).services,
+        {
+          selectDaemon: () => ({}) as DaemonSelection,
+          daemonSync: async () => ({
+            mode: 'sync',
+            results: [
+              {
+                sourceId: expected.sourceId,
+                status: 'failed',
+                failure: expected.error,
+                diagnostics: {
+                  warningsCount: expected.warningsCount,
+                  lastWarning: expected.lastWarning,
+                  errorsCount: 1,
+                  lastError: expected.lastError,
+                },
+              },
+            ],
+            warnings: [],
+          }),
+        },
+      ),
+    ).toBe(30)
+    expect(JSON.parse(String(log.mock.calls[0]?.[0])).results[0]).toEqual(
+      expected,
+    )
+  })
+
+  test('selected unreachable sync rejects unavailable without direct fallback', async () => {
+    let opened = false
+    await expect(
+      handleSyncCommand(
+        [],
+        async () => {
+          opened = true
+          throw new Error('must not open')
+        },
+        harness({}).services,
+        {
+          selectDaemon: () => ({}) as DaemonSelection,
+          daemonSync: async () => {
+            throw new DaemonCliError({
+              kind: 'daemon_unavailable',
+              code: 'daemon_unavailable',
+              message: 'The local daemon is unavailable.',
+            })
+          },
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'daemon_unavailable' })
+    expect(opened).toBe(false)
+  })
+
   test('renders stable summary and compact output', () => {
     const output: SyncOutput = {
       mode: 'sync',
