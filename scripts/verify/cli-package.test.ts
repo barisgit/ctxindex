@@ -35,9 +35,9 @@ test('the private monorepo builds one public installable ctxindex package', asyn
   })
   expect(cli.private).not.toBe(true)
   expect(cli.scripts?.build).toBe('bun run build:package')
-  expect(cli.scripts?.['build:package']).toContain('bun build')
-  expect(cli.scripts?.['build:package']).toContain('--target bun')
-  expect(cli.scripts?.['build:package']).toContain('--external keytar')
+  expect(cli.scripts?.['build:package']).toBe(
+    'bun ../../scripts/release/build-cli-package.ts',
+  )
   expect(Object.values(cli.dependencies ?? {})).not.toContain('workspace:*')
 
   for (const dependency of [
@@ -63,5 +63,17 @@ test('contributor docs use Bun global link registration from the CLI workspace',
     const content = await Bun.file(path).text()
     expect(content).toContain('bun link')
     expect(content).not.toContain('bun link --global')
+  }
+})
+
+test('trusted-publisher guidance declares the npm publish action', async () => {
+  for (const path of [
+    'docs/release/npm.md',
+    'openspec/changes/ship-installable-npm-cli/implementation.md',
+    'openspec/specs/cli-distribution/implementation.md',
+  ]) {
+    expect(await Bun.file(path).text()).toContain(
+      'Allowed actions: `npm publish`',
+    )
   }
 })

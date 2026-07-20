@@ -36,7 +36,7 @@ these steps:
 3. Manually publish that exact inspected tarball with the owner's required 2FA.
 4. In npm package settings, add a GitHub Actions trusted publisher for repository
    `barisgit/ctxindex`, workflow filename `release.yml`, and environment
-   `npm-production`.
+   `npm-production`. Set Allowed actions: `npm publish`.
 5. In GitHub, create and protect the `npm-production` environment with required
    reviewers before approving later OIDC publication.
 

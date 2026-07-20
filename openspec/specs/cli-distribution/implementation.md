@@ -22,6 +22,9 @@ executable, requires Bun 1.3.14, declares the MIT license, and retains only
 `keytar@7.9.0` as an external runtime dependency. `trustedDependencies` permits
 Bun to install the native `keytar` module. No runtime dependency or bundled
 import may use the workspace protocol or an internal `@ctxindex/*` package.
+Only the CLI version is injected from the source manifest. The build rewrites
+dependency `__dirname` references to the bundle directory so the executable has
+no development manifest or absolute source-checkout path after relocation.
 
 The flow is source entrypoint → Bun-target bundle → minimal staging directory →
 allowlisted `.tgz` → isolated global installation → protected publication.
@@ -65,5 +68,6 @@ immediately before tokenless trusted publication.
 The first package publication remains a Human checkpoint: inspect and manually
 publish the exact verified MIT-licensed tarball using package-owner 2FA, then
 configure npm's trusted publisher for `barisgit/ctxindex`, `release.yml`, and
-`npm-production`, protect the matching GitHub environment, and approve later
-OIDC releases. Automation never bootstraps package ownership.
+`npm-production` with Allowed actions: `npm publish`, protect the matching
+GitHub environment, and approve later OIDC releases. Automation never
+bootstraps package ownership.

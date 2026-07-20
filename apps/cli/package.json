@@ -25,7 +25,7 @@
   },
   "scripts": {
     "build": "bun run build:package",
-    "build:package": "bun build bin/ctxindex.mjs --target bun --external keytar --outfile dist/ctxindex.mjs",
+    "build:package": "bun ../../scripts/release/build-cli-package.ts",
     "lint": "biome check .",
     "typecheck": "tsgo --noEmit -p tsconfig.json",
     "test": "bun test",

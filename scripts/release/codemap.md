@@ -7,10 +7,14 @@ artifact without publishing from local development or touching user state.
 
 ## Design / patterns
 
-- `cli-package.ts` is the package-policy owner. It builds the Bun-target bundle,
-  creates a minimal staging manifest, packs an allowlisted archive, computes
+- `build-cli-package.ts` is the bundle-policy owner. It emits the Bun-target CLI
+  bundle with only `keytar` external, injects the package version, rewrites
+  thread-stream/Pino path assumptions for a relocatable `import.meta.dir`
+  bundle, and rejects output containing the source-checkout path.
+- `cli-package.ts` is the package-policy owner. It creates a minimal staging manifest, packs an allowlisted archive, computes
   normalized content digests, and rejects unsafe paths, unexpected files,
-  workspace imports/specifiers, or credential-like content.
+  workspace imports/specifiers, development manifests, absolute checkout paths,
+  or credential-like content.
 - Its exact-tarball smoke creates temporary state outside the checkout, installs
   globally under isolated Bun directories, and proves the installed bin, native
   `keytar`, bundled skills, embedded SQLite migrations, and explicit TypeScript
@@ -21,7 +25,7 @@ artifact without publishing from local development or touching user state.
 
 ## Data & control flow
 
-1. The CLI workspace entrypoint is bundled while only `keytar` remains external.
+1. `apps/cli`'s `build:package` calls `build-cli-package.ts` to bundle the CLI while only `keytar` remains external.
 2. The bundle, package README, canonical root license, and generated manifest are
    copied into ignored staging state and packed once.
 3. Archive inventory and content are verified before an isolated global install.

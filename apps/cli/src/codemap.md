@@ -6,7 +6,7 @@ Implements the CLI application layer: registers the citty command tree, parses a
 
 ## Design / patterns
 
-- `main.ts` is the composition root. It registers explicit `client`, `account`, and `source` lifecycle commands; the removed `auth` command is neither registered nor aliased.
+- `main.ts` is the composition root. It registers explicit `client`, `account`, and `source` lifecycle commands; the removed `auth` command is neither registered nor aliased. Its root-command version comes from build-time `__CTXINDEX_VERSION__`, injected from `apps/cli/package.json` by `scripts/release/build-cli-package.ts`, with `0.0.0` as the unbundled fallback.
 - `args/` is pure parsing, `commands/` is the thin citty adapter layer, workflow folders own multi-step orchestration, and `format/` owns presentation and exit mapping.
 - `deps.ts` constructs one shared secret runtime and wires `OAuthClientService`, `AuthService`, `AccountService`, `SourceService`, registry, and provider-operation services.
 - `definitions.ts` loads configured Extensions; `describe` and generated Source options derive runtime truth from those registries, and human-readable Action descriptions retain strict `oneOf`/`anyOf` input branches.

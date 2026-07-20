@@ -148,6 +148,77 @@ test.each([
     ],
   },
   {
+    name: 'workspace metadata in executable',
+    files: [
+      {
+        path: 'package/package.json',
+        content: JSON.stringify({
+          name: 'ctxindex',
+          license: 'MIT',
+          bin: { ctxindex: 'dist/ctxindex.mjs' },
+          files: ['dist/ctxindex.mjs', 'README.md', 'LICENSE'],
+          engines: { bun: '1.3.14' },
+          dependencies: { keytar: '7.9.0' },
+          trustedDependencies: ['keytar'],
+        }),
+      },
+      { path: 'package/LICENSE', content: 'MIT License\n' },
+      { path: 'package/README.md', content: '# ctxindex' },
+      {
+        path: 'package/dist/ctxindex.mjs',
+        content: '#!/usr/bin/env bun\nconst dependency = "workspace:*"',
+      },
+    ],
+  },
+  {
+    name: 'source checkout path in executable',
+    files: [
+      {
+        path: 'package/package.json',
+        content: JSON.stringify({
+          name: 'ctxindex',
+          license: 'MIT',
+          bin: { ctxindex: 'dist/ctxindex.mjs' },
+          files: ['dist/ctxindex.mjs', 'README.md', 'LICENSE'],
+          engines: { bun: '1.3.14' },
+          dependencies: { keytar: '7.9.0' },
+          trustedDependencies: ['keytar'],
+        }),
+      },
+      { path: 'package/LICENSE', content: 'MIT License\n' },
+      { path: 'package/README.md', content: '# ctxindex' },
+      {
+        path: 'package/dist/ctxindex.mjs',
+        content:
+          '#!/usr/bin/env bun\nconst buildPath = "/home/runner/work/ctxindex/ctxindex/node_modules/pino/lib"',
+      },
+    ],
+  },
+  {
+    name: 'development manifest in executable',
+    files: [
+      {
+        path: 'package/package.json',
+        content: JSON.stringify({
+          name: 'ctxindex',
+          license: 'MIT',
+          bin: { ctxindex: 'dist/ctxindex.mjs' },
+          files: ['dist/ctxindex.mjs', 'README.md', 'LICENSE'],
+          engines: { bun: '1.3.14' },
+          dependencies: { keytar: '7.9.0' },
+          trustedDependencies: ['keytar'],
+        }),
+      },
+      { path: 'package/LICENSE', content: 'MIT License\n' },
+      { path: 'package/README.md', content: '# ctxindex' },
+      {
+        path: 'package/dist/ctxindex.mjs',
+        content:
+          '#!/usr/bin/env bun\nconst manifest = { devDependencies: { typescript: "latest" } }',
+      },
+    ],
+  },
+  {
     name: 'secret content',
     files: [
       {
@@ -189,6 +260,22 @@ test('packs allowlisted reproducible contents from unchanged source', async () =
       'package/package.json',
     ])
     expect(() => assertSafePackageFiles(first)).not.toThrow()
+    const executable = first.find(
+      ({ path }) => path === 'package/dist/ctxindex.mjs',
+    )
+    expect(executable).toBeDefined()
+    expect(new TextDecoder().decode(executable?.content)).not.toContain(
+      'workspace:',
+    )
+    expect(new TextDecoder().decode(executable?.content)).not.toContain(
+      process.cwd(),
+    )
+    expect(new TextDecoder().decode(executable?.content)).not.toContain(
+      'devDependencies',
+    )
+    expect(new TextDecoder().decode(executable?.content)).not.toContain(
+      'publishConfig',
+    )
     expect(packageContentManifest(first)).toEqual(
       packageContentManifest(second),
     )

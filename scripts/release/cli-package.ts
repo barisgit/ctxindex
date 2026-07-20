@@ -175,6 +175,21 @@ export function assertSafePackageFiles(files: readonly PackageFile[]): void {
   ) {
     throw new TypeError('Published executable contains a workspace import')
   }
+  if (executable.includes('workspace:')) {
+    throw new TypeError('Published executable contains workspace metadata')
+  }
+  if (executable.includes('devDependencies')) {
+    throw new TypeError('Published executable contains a development manifest')
+  }
+  if (
+    /["'`](?:\/(?:[^"'`/]+\/)*|[A-Za-z]:[\\/](?:[^"'`\\/]+[\\/])*)(?:node_modules|apps[\\/]cli|packages)(?:[\\/][^"'`]*)?["'`]/.test(
+      executable,
+    )
+  ) {
+    throw new TypeError(
+      'Published executable contains an absolute source checkout path',
+    )
+  }
 }
 
 export function createPublishManifest(

@@ -7,7 +7,7 @@ Provides repository-level executable tooling: policy verification gates under `s
 ## Design/patterns
 
 - Verification scripts are deterministic command-line gates: they scan production source/config, optionally spawn or import runtime targets, print findings, and signal success or failure by exit status. The full-suite wrapper installs a temporary Keychain mock; completed milestone architecture assertions live in normal discovered tests rather than exhausted red contracts. See `scripts/verify/codemap.md`.
-- Release scripts stage and inspect a minimal CLI package, smoke the exact archive in isolated global/state directories, and fail closed on invalid, unbumped, reversed, already raced, or indeterminate npm versions. See `scripts/release/codemap.md`.
+- Release scripts build, stage, and inspect a minimal CLI package, smoke the exact archive in isolated global/state directories, and fail closed on invalid, unbumped, reversed, already raced, or indeterminate npm versions. See `scripts/release/codemap.md`.
 
 - `with-timeout.ts` is a process-supervisor wrapper. It runs a command in a detached process group where supported, forwards terminal streams/signals, and applies TERM-then-KILL timeout escalation.
 

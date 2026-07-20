@@ -1,5 +1,4 @@
 import { type CommandDef, defineCommand, runMain, showUsage } from 'citty'
-import pkg from '../package.json' with { type: 'json' }
 import { accountCommand } from './commands/account'
 import { actionCommand } from './commands/action'
 import { artifactCommand } from './commands/artifact'
@@ -23,6 +22,10 @@ import { mapErrorToExit } from './format/exit'
 
 const LOG_LEVELS = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'] as const
 type LogLevelName = (typeof LOG_LEVELS)[number]
+
+declare const __CTXINDEX_VERSION__: string
+const cliVersion =
+  typeof __CTXINDEX_VERSION__ === 'string' ? __CTXINDEX_VERSION__ : '0.0.0'
 
 // Keep custom help sections on the same color policy as citty's renderer.
 const noColor =
@@ -164,7 +167,7 @@ function captureProcessExit(): () => void {
 export const rootCommand = defineCommand({
   meta: {
     name: 'ctxindex',
-    version: pkg.version ?? '0.0.0',
+    version: cliVersion,
     description: 'Local context indexing CLI',
   },
   subCommands: {
