@@ -16,4 +16,4 @@
 ## 4. Doctrine, maps, and final verification
 
 - [x] 4.1 Promote the continuation interfaces/data flow and Microsoft cursor/unread doctrine into `openspec/specs/search-routing/implementation.md` and `openspec/specs/microsoft-graph-adapters/implementation.md`, refresh affected codemaps through the cartography skill, and run documentation/drift checks.
-- [ ] 4.2 Run focused package tests, `bun run ci`, `bunx openspec validate --all --strict`, and the `openspec-verify-change` workflow; address all findings and obtain independent read-only review.
+- [x] 4.2 Run focused package tests, `bun run ci`, `bunx openspec validate --all --strict`, and the `openspec-verify-change` workflow; address all findings and obtain independent read-only review.

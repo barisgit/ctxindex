@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'bun:test'
-import { CtxindexSyncError } from '@ctxindex/core/errors'
+import {
+  CtxindexSyncError,
+  CtxindexValidationError,
+} from '@ctxindex/core/errors'
 import type { SearchContext } from '@ctxindex/extension-sdk'
 import { gmailAdapterDefinition } from './definition'
 
@@ -60,6 +63,23 @@ function searchRemote() {
 }
 
 describe('Gmail searchRemote', () => {
+  test('rejects unsupported continuation before provider I/O', async () => {
+    let calls = 0
+    const error = await searchRemote()(
+      context(
+        { text: 'resume', limit: 10, continuation: 'opaque-next-page' },
+        (async () => {
+          calls += 1
+          return Response.json({ messages: [] })
+        }) as unknown as typeof globalThis.fetch,
+      ),
+    ).catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(CtxindexValidationError)
+    expect(error).toMatchObject({ code: 'invalid_filter' })
+    expect(calls).toBe(0)
+  })
+
   test.each([
     [401, 'auth_expired'],
     [403, 'permission_denied'],

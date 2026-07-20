@@ -1,4 +1,7 @@
-import { CtxindexSyncError } from '@ctxindex/core/errors'
+import {
+  CtxindexSyncError,
+  CtxindexValidationError,
+} from '@ctxindex/core/errors'
 import type {
   SearchContext,
   SearchRemoteResource,
@@ -136,6 +139,12 @@ function resource(
 export async function gmailSearchRemote(
   context: SearchContext,
 ): Promise<SearchRemoteResult> {
+  if (context.query.continuation !== undefined) {
+    throw new CtxindexValidationError(
+      'invalid_filter',
+      'Gmail mailbox remote search does not support continuation',
+    )
+  }
   const itemLimit = Math.min(Math.max(context.query.limit, 0), MAX_ITEMS)
   const ids: string[] = []
   const seen = new Set<string>()
