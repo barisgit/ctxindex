@@ -285,16 +285,12 @@ export class ArtifactService {
       throw new CtxindexNotFoundError(`Artifact descriptor not found: ${ref}`)
 
     const source = this.input.db
-      .prepare('SELECT adapter_id, adapter_version FROM sources WHERE id = ?')
+      .prepare('SELECT adapter_id FROM sources WHERE id = ?')
       .get(parseRef(ref).sourceId) as {
       adapter_id: string
-      adapter_version: number
     } | null
     if (!source) throw new CtxindexNotFoundError('Source not found')
-    const adapter = this.input.registry.adapters.get({
-      id: source.adapter_id,
-      version: source.adapter_version,
-    })
+    const adapter = this.input.registry.adapters.get({ id: source.adapter_id })
     if (
       !adapter?.capabilities.includes('download') ||
       !adapter.operations.download

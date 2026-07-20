@@ -1,0 +1,150 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-production
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: Release gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      publish: ${{ steps.gate.outputs.publish }}
+      version: ${{ steps.gate.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Check version and registry
+        id: gate
+        run: bun scripts/release/release-gate.ts gate "${{ github.event.before }}"
+
+  ci:
+    name: CI
+    needs: gate
+    if: needs.gate.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Add local binaries to PATH
+        run: echo "${{ github.workspace }}/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: install
+        run: bun install --frozen-lockfile
+      - name: lint
+        run: biome check .
+      - name: typecheck
+        run: tsgo --noEmit -p tsconfig.base.json
+      - name: build
+        run: bun run build
+      - name: package-dependencies
+        run: bun run scripts/verify/package-dependencies.ts
+      - name: architecture-lint
+        run: bun run scripts/verify/architecture-lint.ts
+      - name: cli-no-business-logic
+        run: bun run scripts/verify/cli-no-business-logic.ts
+      - name: cli-framework-citty
+        run: bun run scripts/verify/cli-framework-citty.ts
+      - name: cli-thin-lines
+        run: bun run scripts/verify/cli-thin-lines.ts
+      - name: exports-map
+        run: bun run scripts/verify/exports-map.ts
+      - name: full-test-suite
+        run: bash scripts/verify/full-test-suite.sh
+
+  artifact:
+    name: Build, pack, and smoke
+    needs: [gate, ci]
+    if: needs.gate.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Build
+        run: bun run build:cli-package
+      - name: Pack
+        id: pack
+        run: |
+          archive="dist/npm/artifacts/ctxindex-${{ needs.gate.outputs.version }}.tgz"
+          bun run pack:cli-package
+          test -f "$archive"
+          sha256sum "$archive" > "$archive.sha256"
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+      - name: Smoke
+        run: bun run smoke:cli-package -- "${{ steps.pack.outputs.archive }}"
+      - name: Upload exact artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ctxindex-${{ needs.gate.outputs.version }}
+          path: |
+            ${{ steps.pack.outputs.archive }}
+            ${{ steps.pack.outputs.archive }}.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish
+    needs: [gate, artifact]
+    if: needs.gate.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: npm-production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Set up Node for trusted publishing
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - name: Install trusted-publishing npm CLI
+        run: npm install --global npm@11.5.1
+      - name: Download exact artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ctxindex-${{ needs.gate.outputs.version }}
+          path: dist/npm/artifacts
+      - name: Verify transferred artifact
+        run: sha256sum --check "dist/npm/artifacts/ctxindex-${{ needs.gate.outputs.version }}.tgz.sha256"
+      - name: Repeat exact registry preflight
+        run: bun scripts/release/release-gate.ts assert-absent "${{ needs.gate.outputs.version }}"
+      - name: Publish
+        run: npm publish "dist/npm/artifacts/ctxindex-${{ needs.gate.outputs.version }}.tgz" --access public

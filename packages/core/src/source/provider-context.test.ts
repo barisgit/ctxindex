@@ -11,9 +11,13 @@ import { testOAuthProvider } from '../testing/oauth-provider'
 import { createSourceProviderContext } from './provider-context'
 
 const scope = 'scope:read'
+const provider = testOAuthProvider({
+  id: 'google',
+  authorizationUrl: 'https://accounts.google.com/auth',
+  tokenUrl: 'https://oauth2.googleapis.com/token',
+})
 const adapter = defineAdapter({
   id: 'test.oauth',
-  version: 1,
   configSchema: z
     .object({
       safe: z.string().optional(),
@@ -21,15 +25,8 @@ const adapter = defineAdapter({
       client_secret: z.string().optional(),
     })
     .strict(),
-  auth: {
-    kind: 'oauth2',
-    provider: testOAuthProvider({
-      id: 'google',
-      authorizationUrl: 'https://accounts.google.com/auth',
-      tokenUrl: 'https://oauth2.googleapis.com/token',
-    }),
-    scopes: [scope],
-  },
+  provider,
+  access: { scopes: [scope] },
   providerApiHosts: ['provider.example'],
   profiles: [],
   routing: 'indexed',
@@ -40,9 +37,23 @@ const adapter = defineAdapter({
 const registry = createExtensionRegistry([
   defineExtension({
     id: 'test.oauth-extension',
-    version: 1,
-    profiles: [],
     adapters: [adapter],
+  }),
+])
+const providerlessConfigSchema = z.object({ path: z.string() }).strict()
+const providerlessAdapter = defineAdapter({
+  id: 'test.providerless',
+  configSchema: providerlessConfigSchema,
+  profiles: [],
+  routing: 'indexed',
+  capabilities: [],
+  operations: {},
+  actions: {},
+})
+const providerlessRegistry = createExtensionRegistry([
+  defineExtension({
+    id: 'test.providerless-extension',
+    adapters: [providerlessAdapter],
   }),
 ])
 
@@ -76,8 +87,8 @@ function insertGrant(
   ).run(accountId, options.provider ?? 'google', id, `subject-${id}`, now, now)
   db.prepare(
     `INSERT INTO grants
-       (id, account_id, provider, scopes_json, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+       (id, account_id, provider, scopes_json, app_config_ref, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'secret://test/app', ?, ?)`,
   ).run(
     id,
     accountId,
@@ -96,8 +107,8 @@ function insertSource(
   const now = Date.now()
   db.prepare(
     `INSERT INTO sources
-       (id, realm_id, label, adapter_id, adapter_version, grant_id, config_json, sync_enabled, created_at, updated_at)
-     VALUES ('source-1', 'realm-1', 'source-1', 'test.oauth', 1, ?, ?, 1, ?, ?)`,
+       (id, realm_id, label, adapter_id, grant_id, config_json, sync_enabled, created_at, updated_at)
+     VALUES ('source-1', 'realm-1', 'source-1', 'test.oauth', ?, ?, 1, ?, ?)`,
   ).run(grantId, JSON.stringify(config), now, now)
 }
 
@@ -123,6 +134,34 @@ afterEach(() => {
 })
 
 describe('createSourceProviderContext', () => {
+  test('providerless Sources bypass Grant and token resolution', async () => {
+    const db = await freshDb()
+    const now = Date.now()
+    db.prepare(
+      `INSERT INTO sources
+         (id, realm_id, label, adapter_id, grant_id, config_json, sync_enabled, created_at, updated_at)
+       VALUES ('source-local', 'realm-1', 'source-local', 'test.providerless', NULL, '{"path":"/tmp"}', 1, ?, ?)`,
+    ).run(now, now)
+    let tokenResolutions = 0
+    const context = await createSourceProviderContext({
+      db,
+      sourceId: 'source-local',
+      registry: providerlessRegistry,
+      authService: authService(async () => {
+        tokenResolutions++
+        throw new Error('providerless Source resolved a token')
+      }),
+      logger,
+    })
+
+    expect(context.adapter).toBe(providerlessAdapter)
+    expect(context.source).toEqual({
+      id: 'source-local',
+      config: { path: '/tmp' },
+    })
+    expect(tokenResolutions).toBe(0)
+  })
+
   test('passes declared API hosts to the default global egress chokepoint', async () => {
     const db = await freshDb()
     insertGrant(db, 'grant-b')

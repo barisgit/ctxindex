@@ -4,289 +4,88 @@
 
 ## Interfaces
 
-These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
-
-### @ctxindex/core — Account records and inventory
+### @ctxindex/core — private Grant state
 
 ```ts
-export interface VerifiedAccountIdentityInput {
-  readonly kind: string
-  readonly value: string
+export interface GrantAppSnapshot {
+  readonly providerId: string
+  readonly appLabel: string
+  readonly configRefs: Readonly<Record<string, SecretRef>>
 }
 
-export interface UpsertAccountInput {
-  readonly provider: string
-  readonly externalUserId: string
-  readonly label?: string
-  readonly verifiedIdentities: readonly VerifiedAccountIdentityInput[]
-}
-
-export interface UpsertAccountResult {
-  readonly accountId: string
-}
-
-export type AccountExpiryState = 'active' | 'expired' | 'unknown'
-
-export interface AccountInventoryRealm {
-  readonly id: string
-  readonly slug: string
-  readonly label: string
-}
-
-export interface AccountInventoryAdapter {
-  readonly id: string
-  readonly version: number
-}
-
-export interface AccountInventorySource {
-  readonly id: string
-  readonly label: string
-  readonly adapter: AccountInventoryAdapter
-  readonly realm: AccountInventoryRealm
-}
-
-export interface AccountInventoryGrant {
-  readonly id: string
-  readonly scopes: readonly string[]
-  readonly expiresAt: number | null
-  readonly expiryState: AccountExpiryState
-  readonly sources: readonly AccountInventorySource[]
-}
-
-export interface AccountInventoryItem {
-  readonly id: string
-  readonly provider: string
-  readonly label: string | null
-  readonly grants: readonly AccountInventoryGrant[]
-}
-
-export interface AccountServiceDeps {
-  readonly db: CtxindexDatabase
-  readonly now?: () => number
-}
-
-export interface AccountService {
-  upsertAccount(input: UpsertAccountInput): UpsertAccountResult
-  listAccountInventory(): AccountInventoryItem[]
-}
-```
-
-### @ctxindex/core — Grant and authorization contracts
-
-```ts
 export interface GrantRow {
   readonly id: string
   readonly accountId: string
-  readonly provider: string
-  readonly accountLabel: string | null
+  readonly providerId: string
   readonly scopes: readonly string[]
-  readonly accessTokenRef: string | null
-  readonly refreshTokenRef: string | null
-  readonly clientIdRef: string | null
-  readonly clientSecretRef: string | null
+  readonly appSnapshot: GrantAppSnapshot
+  readonly accessTokenRef: SecretRef | null
+  readonly refreshTokenRef: SecretRef | null
   readonly expiresAt: number | null
-  readonly createdAt: number
-  readonly updatedAt: number
 }
 
-export interface AddGrantInput {
-  readonly provider: string
-  readonly account: Omit<UpsertAccountInput, 'provider'>
-  readonly scopes: readonly string[]
-  readonly clientId: string
-  readonly clientSecret?: string
-  readonly accessToken?: string
-  readonly refreshToken: string
-  readonly expiresAt?: number
-}
-
-export interface AddGrantResult {
-  readonly grantId: string
-  readonly accountId: string
-}
-
-export interface AuthDependencies {
-  readonly db: CtxindexDatabase
-  readonly store: SecretsStore
-  readonly logger: Logger
-  readonly registry: AdapterRegistry
-  readonly readEnvironment?: (name: string) => string | undefined
-  readonly now?: () => number
-}
-
-export interface AuthService {
-  addGrant(input: AddGrantInput): Promise<AddGrantResult>
-  removeAccount(label: string): Promise<void>
-  getGrantById(grantId: string): Promise<GrantRow | null>
-  listGrants(provider?: string): Promise<readonly GrantRow[]>
-  resolveLinkedGrantAccessToken(
-    grantId: string,
-    options?: { readonly forceRefresh?: boolean },
-  ): Promise<string>
-  refreshAccessToken(grantId: string): Promise<string>
-}
-```
-
-### @ctxindex/core — provider authorization
-
-```ts
 export interface AuthorizeProviderInput {
-  readonly provider: string
-  readonly mode: 'loopback' | 'from-env'
-  readonly client?: string
-  readonly label?: string
+  readonly providerId: string
+  readonly appLabel: string
+  readonly accountLabel?: string
 }
 
-export interface AuthorizeProviderDependencies {
-  readonly registry: AdapterRegistry
-  readonly authService: AuthService
-  readonly resolveClient: (
-    input: ResolveOAuthClientInput,
-  ) => Promise<ResolvedOAuthClient>
-  readonly readEnvironment?: (name: string) => string | undefined
-  readonly launchBrowser?: (url: string) => Promise<void> | void
-  readonly emitAuthorizationUrl?: (url: string) => void
-  readonly now?: () => number
-}
-
-export interface AuthorizeProviderResult extends AddGrantResult {
-  readonly provider: string
+export interface AuthorizeProviderResult {
+  readonly accountId: string
+  readonly providerId: string
   readonly scopes: readonly string[]
 }
-
-export async function authorizeProvider(
-  input: AuthorizeProviderInput,
-  deps: AuthorizeProviderDependencies,
-): Promise<AuthorizeProviderResult>;
 ```
 
-### @ctxindex/core — Grant compatibility
+Grant ids and snapshots remain private implementation state. Public Account inventory projects Account identity, label, Provider, expiry, and bound Sources without exposing Grant selectors, App configuration, or secret references.
 
-```ts
-export interface GrantCompatibilityInput {
-  readonly provider: string
-  readonly scopes: unknown
-}
-
-export function providerIdForAuth(auth: AdapterAuthSpec): string | undefined;
-
-export function isGrantCompatible(
-  auth: AdapterAuthSpec,
-  grant: GrantCompatibilityInput,
-): boolean;
-```
-
-### @ctxindex/core — authorized provider context
-
-```ts
-export type SourceProviderFetch = (
-  url: string,
-  init?: RequestInit,
-) => Promise<Response>
-
-export interface SourceProviderContext {
-  readonly adapter: AnyAdapterDefinition
-  readonly source: AdapterSourceContext
-  readonly fetch: typeof fetch
-  readonly logger: AdapterLogger
-}
-
-export interface CreateSourceProviderContextInput {
-  readonly db: CtxindexDatabase
-  readonly sourceId: string
-  readonly registry: ExtensionRegistry
-  readonly authService: Pick<AuthService, 'resolveLinkedGrantAccessToken'>
-  readonly logger: AdapterLogger
-  readonly fetch?: SourceProviderFetch
-  readonly retryUnauthorized?: boolean
-}
-
-export async function createSourceProviderContext(
-  input: CreateSourceProviderContextInput,
-): Promise<SourceProviderContext>;
-```
-
-### @ctxindex/core — Account service boundary
-
-```ts
-export function createAccountService(deps: AccountServiceDeps): AccountService;
-```
-
-### @ctxindex/core — authorization service boundary
-
-```ts
-export function createAuthService(deps: AuthDependencies): AuthService;
-```
-
-### @ctxindex/core — OAuth selection
+### @ctxindex/core — exact Provider selection
 
 ```ts
 export interface OAuthSelection {
-  readonly provider: NonNullable<
-    ReturnType<AdapterRegistry['getOAuthProvider']>
-  >
+  readonly provider: AnyProviderDefinition
+  readonly app: AnyOAuthAppDefinition | ResolvedLocalOAuthApp
   readonly operationScopes: readonly string[]
   readonly requestedScopes: readonly string[]
 }
 
 export function resolveOAuthSelection(
-  registry: AdapterRegistry,
+  registry: CompleteRegistry,
   providerId: string,
+  appLabel: string,
 ): OAuthSelection;
-
-export function selectedOAuthScopes(
-  registry: AdapterRegistry,
-  providerId: string,
-): readonly string[];
 ```
 
-### @ctxindex/core — OAuth token exchange
+Selection resolves exact semantic Provider and exact `(providerId,label)` OAuth App identity before secrets, persistence, browser launch, or Provider egress. Requested scopes are the Provider base scopes plus the sorted union from every active Adapter importing that Provider id. Providerless Adapters never enter this path.
+
+### @ctxindex/core — authorized Provider context
 
 ```ts
-export interface OAuthTokenResponse {
-  readonly accessToken: string
-  readonly refreshToken?: string
-  readonly expiresIn: number
-  readonly scope?: string
+export interface CreateSourceProviderContextInput {
+  readonly db: CtxindexDatabase
+  readonly sourceId: string
+  readonly registry: CompleteRegistry
+  readonly authService: Pick<AuthService, 'resolveLinkedGrantAccessToken'>
+  readonly logger: AdapterLogger
+  readonly fetch?: SourceProviderFetch
+  readonly retryUnauthorized?: boolean
 }
-
-export async function postOAuthToken(input: {
-  readonly provider: OAuthProviderSpec
-  readonly endpoint: string
-  readonly clientId: string
-  readonly clientSecret?: string
-  readonly grant: OAuthGrant
-}): Promise<OAuthTokenResponse>;
 ```
 
-### @ctxindex/core — OAuth loopback
-
-```ts
-export interface OAuthLoopbackResult {
-  readonly code: string
-  readonly codeVerifier: string
-  readonly redirectUri: string
-  readonly authorizationUrl: string
-}
-
-export async function openOAuthLoopback(input: {
-  readonly provider: OAuthProviderSpec
-  readonly authorizationEndpoint: string
-  readonly clientId: string
-  readonly scopes: readonly string[]
-  readonly timeoutMs?: number
-  readonly noBrowser?: boolean
-  readonly launchBrowser?: (url: string) => Promise<void> | void
-  readonly emitAuthorizationUrl?: (url: string) => void
-}): Promise<OAuthLoopbackResult>;
-```
+Source creation and operations bind through the Adapter's exact imported active Provider. OAuth2-backed Adapters require a matching Account and all Adapter scopes; `none` Providers and providerless Adapters require no Account or Grant. Read contexts may perform one 401 refresh retry. Action contexts set `retryUnauthorized: false`.
 
 ## Implementation doctrine
 
-`@ctxindex/core` owns Account persistence and inventory plus provider-neutral authorization, scope selection, loopback PKCE/state, token and identity validation, Grant persistence, refresh, and authorized fetch. Adapters provide declarative provider metadata; provider response normalization remains Adapter-owned.
+Provider-neutral core owns Account persistence, App selection, scope selection, loopback PKCE/state, token and identity validation, Grant persistence, refresh, and authorized fetch. Provider definitions own OAuth endpoints, identity, App schema, registration policy, base scopes, and authorization hosts; Adapters own only operation scopes and Provider API hosts.
 
-Secret values are written before the Account/Grant transaction and cleaned if persistence fails. Reauthorization updates the Account's stable Grant in place. Refresh rotation writes the replacement, transactionally updates references, then deletes superseded references. Read contexts may request one 401 refresh retry; Action contexts set `retryUnauthorized: false`.
+Authorization copies the exact selected App configuration into new Grant-owned secret references before committing Account/Grant state. Reauthorization durably swaps the replacement snapshot before cleaning superseded references. Refresh uses the Grant snapshot and never current App inventory or Provider environment mappings. Rotated refresh tokens follow the same write-verify-swap-clean order.
+
+Authorization, refresh, and removal use one process-wide asynchronous queue keyed by exact Provider and external user id. Each operation re-reads current Grant state after entering the Account critical section, and removal additionally revalidates its exact label selector before deletion. Same-Account replacements therefore clean the state they actually supersede, a stale old-label removal cannot delete a renamed Account, and unrelated Accounts remain concurrent.
+
+Authentication cleanup returns a failed-entry count instead of discarding deletion failures. Pre-commit callers retain their original failure; post-commit reauthorization, refresh, and Account removal retain their usable committed result. Each nonzero count produces one warning through the injected logger whose bindings are exactly Provider id, Grant id, lifecycle phase, and failed-entry count. Account id, failed refs, credential keys, caught backend errors, App config, token material, and other sensitive fields never enter the warning.
+
+Account removal commits Account/Grant deletion and cleared Source bindings before physical cleanup. That database state stays authoritative when cleanup warns. Typed-ref deletion is idempotent: retrying a failed deletion, including after the physical row was already removed but its inventory entry remained, converges without recreating authorization state. Likewise, “authoritative Grant refs” means refs selected by the committed Grant row; superseded physical rows retained after cleanup failure are pending garbage, not live authorization state.
 
 ## Verification
 
-Account/auth tests cover identity upsert, scope normalization, compatibility, stable Grant updates, removal, refresh rotation, cleanup, and redaction. Loopback-only Google/Microsoft integration and CLI e2e tests exercise the common flow.
+Account/auth tests cover exact App selection, active-Adapter scope union, providerless bypass, identity upsert, scope validation, snapshot durability, explicit-gate same-Account reauthorization and refresh, queued rename/removal races, authoritative committed removal, idempotent cleanup retry, refresh rotation, cleanup failure counting, post-commit success preservation, warning redaction, and no automatic Action retry. Loopback-only Google/Microsoft and CLI e2e tests exercise the common flow.

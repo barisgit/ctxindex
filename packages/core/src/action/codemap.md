@@ -7,14 +7,14 @@ Application service for discovering and executing typed profile Actions against 
 ## Design/patterns
 
 - `describeAction()` in `describe.ts` joins the registry-level Action declaration with per-Source adapter availability; unavailable bindings are classified as `adapter_unavailable` or `action_unsupported`.
-- `runAction()` in `run.ts` is a validation-and-dispatch pipeline: Zod validates adapter output, profile schemas validate payloads, and explicit confirmation gates irreversible Actions.
+- `runAction()` in `run.ts` is a validation-and-dispatch pipeline: Zod validates adapter output, profile schemas validate payloads, explicit confirmation gates irreversible Actions, and selected-Source resolvers expose complete local Resources and verified cached Artifacts without provider reads.
 - Profile definitions own Action input/output contracts; adapters provide Source-specific `actions[actionId]` bindings. `index.ts` is the leaf barrel.
 
 ## Data & control flow
 
 1. `describeAction()` resolves `actionId` through `describeRegistry()`, queries Source adapter coordinates from SQLite, and reports whether each registered adapter exposes the Action.
 2. `runAction()` resolves the declaring profile, validates `actionInput`, checks effect confirmation, and loads the Source's adapter binding.
-3. Core injects a Source-scoped local Resource resolver that exposes completeness/deletion state without provider I/O, then `createSourceProviderContext()` supplies authenticated provider dependencies and `binding.run()` performs provider I/O.
+3. Core injects Source-scoped local Resource and cached Artifact resolvers that expose completeness/deletion state or copied verified bytes without provider I/O, then `createSourceProviderContext()` supplies authenticated provider dependencies and `binding.run()` performs provider I/O.
 4. The returned Ref, Source ownership, output profile, and payload are validated before `ResourceStore.upsert()` persists a complete `adhoc` Resource; the stored Resource and profile warnings are returned.
 
 ## Integration points

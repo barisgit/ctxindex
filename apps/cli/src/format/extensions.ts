@@ -1,5 +1,5 @@
 import type { ExtensionLoadProvenance } from '@ctxindex/core/extension'
-import { compareReferences } from '@ctxindex/core/registry'
+import { compareReferences, compareStrings } from '@ctxindex/core/registry'
 
 type ProvenanceWithAge = ExtensionLoadProvenance & {
   readonly snapshotAgeMs?: number
@@ -15,10 +15,8 @@ export function formatExtensions(
   registry: {
     list(): readonly {
       id: string
-      version: number
       profiles: readonly { id: string; version: number }[]
-      adapters: readonly { id: string; version: number }[]
-      docs?: { readonly summary: string }
+      adapters: readonly { id: string }[]
     }[]
   },
   jsonOutput: boolean,
@@ -27,7 +25,7 @@ export function formatExtensions(
 ): string {
   const provenanceByIdentity = new Map(
     provenance.map((item) => [
-      `${item.id}@${item.version}`,
+      item.id,
       item.kind === 'catalog'
         ? {
             ...item,
@@ -37,23 +35,17 @@ export function formatExtensions(
     ]),
   )
   const extensions = [...registry.list()]
-    .sort(compareReferences)
+    .sort((left, right) => compareStrings(left.id, right.id))
     .map((extension) => {
-      const source = provenanceByIdentity.get(
-        `${extension.id}@${extension.version}`,
-      )
+      const source = provenanceByIdentity.get(extension.id)
       return {
         id: extension.id,
-        version: extension.version,
-        ...(extension.docs?.summary === undefined
-          ? {}
-          : { summary: extension.docs.summary }),
         profiles: [...extension.profiles]
           .sort(compareReferences)
           .map(({ id, version }) => ({ id, version })),
         adapters: [...extension.adapters]
-          .sort(compareReferences)
-          .map(({ id, version }) => ({ id, version })),
+          .sort((left, right) => compareStrings(left.id, right.id))
+          .map(({ id }) => ({ id })),
         ...(source === undefined ? {} : { provenance: source }),
       }
     })
@@ -61,7 +53,7 @@ export function formatExtensions(
   return extensions
     .map(
       (extension) =>
-        `${extension.id}@${extension.version}${extension.summary ? `\t${extension.summary}` : ''}\tProfiles: ${extension.profiles.map((item) => `${item.id}@${item.version}`).join(', ') || 'none'}\tAdapters: ${extension.adapters.map((item) => `${item.id}@${item.version}`).join(', ') || 'none'}${extension.provenance === undefined ? '' : `\tProvenance: ${provenanceText(extension.provenance)}`}`,
+        `${extension.id}\tProfiles: ${extension.profiles.map((item) => `${item.id}@${item.version}`).join(', ') || 'none'}\tAdapters: ${extension.adapters.map((item) => item.id).join(', ') || 'none'}${extension.provenance === undefined ? '' : `\tProvenance: ${provenanceText(extension.provenance)}`}`,
     )
     .join('\n')
 }

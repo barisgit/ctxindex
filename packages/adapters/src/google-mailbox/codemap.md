@@ -6,7 +6,7 @@ Owns the complete `google.mailbox` Adapter module: configuration and definition,
 
 ## Design/patterns
 
-- `config.ts` owns `gmailSourceConfigSchema`; `definition.ts` binds the shared `googleOAuthProvider`, Gmail operation scopes, `gmail.googleapis.com` API-host authority, Profile-owned Draft schemas, and the module's operations into `gmailAdapterDefinition`.
+- `config.ts` owns `gmailSourceConfigSchema`; `definition.ts` directly binds the shared `googleOAuthProvider`, separately declares Gmail operation access scopes and `gmail.googleapis.com` API-host authority, and uses the concrete `communicationMessageProfile` for resource and Profile-owned Draft Action input/output contracts.
 - `message.ts` owns the provider DTO plus header, address, date, Message-ID, and References helpers; `response.ts` owns JSON decoding and HTTP-status-to-`CtxindexSyncError` mapping.
 - `url.ts` provides `gmailApiUrl()` and accepts non-production mock routing only through loopback `127.0.0.1`.
 - Capability files keep provider request construction and payload validation local to search, retrieve, download, and Draft behavior. `draft.ts` derives reply context from a complete local parent on create, resolves managed attachment bytes before fetch, then preserves the stored Draft recipient, subject, References, Gmail thread identity, and proven managed attachment set on update while requiring its immutable `replyToRef`.

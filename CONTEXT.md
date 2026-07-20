@@ -18,16 +18,16 @@ _Avoid_: Tenant, security boundary, account, global realm
 One configured connection to one collection of context through exactly one Source Adapter, belonging to exactly one Realm and carrying a globally unique local label.
 _Avoid_: Integration, connector instance, sync target
 
-**Client**:
-Persisted OAuth application credentials and configuration for one provider, identified by a label unique within that provider and used to authorize Accounts.
-_Avoid_: Account, Grant, runtime environment configuration
+**OAuth App**:
+One labeled OAuth application definition for a Provider, used to authorize Accounts. An OAuth App may be published by a trusted Extension or configured locally as bring-your-own-app state; its identity is the pair of Provider id and label.
+_Avoid_: Client, Account, Grant, runtime environment configuration
 
 **Account**:
 One stable authenticated external identity within a provider, carrying a globally unique local label and usable by one or more Sources.
 _Avoid_: User, Realm, Source
 
 **Grant**:
-The internal stable permission set and secret references through which ctxindex accesses one Account; reauthorization updates it in place.
+The internal stable permission set, token references, and OAuth App configuration snapshot through which ctxindex accesses one Account; reauthorization updates it in place.
 _Avoid_: Account, raw token, user-selected credential
 
 **Account Identity**:
@@ -35,6 +35,10 @@ An address or provider identity representing the Account owner for distinctions 
 _Avoid_: Sender, contact
 
 ### Extension model
+
+**Provider**:
+A reusable definition of external-service identity, authentication, registration, base scopes, and allowed network hosts. Provider-backed Source Adapters and OAuth Apps import the exact Provider definition they use.
+_Avoid_: Source Adapter, OAuth App, Account
 
 **Profile**:
 A versioned domain contract defining a Resource's shape and available vocabulary, including discovery fields, relations, artifacts, exports, and Actions.
@@ -53,12 +57,16 @@ A provider record occupying a timed interval or an all-day date range in one cal
 _Avoid_: Event, meeting
 
 **Source Adapter**:
-Provider-facing code that implements declared operations such as sync, remote search, retrieval, download, and Profile Actions for a Source.
+Code that implements declared operations such as sync, remote search, retrieval, download, and Profile Actions for a Source. A Source Adapter may import one exact Provider or be providerless.
 _Avoid_: Plugin, Extension, connector
 
 **Extension**:
-A distributable module bundling Profiles and Source Adapters without introducing a separate command surface.
+A plain exported definition root that bundles Source Adapters and OAuth Apps, may explicitly include standalone Providers or Profiles, and introduces no separate command surface or authoring dependency graph. Exact imported Provider and Profile values form its transitive definition graph.
 _Avoid_: Plugin, connector
+
+**Documentation Tree**:
+A bounded passive sidecar declared only by an Extension root. It contains authored Markdown and verified image assets projected separately from generated reference data; it never changes definition identity or behavior.
+_Avoid_: Embedded definition metadata, trusted HTML, hosted documentation service
 
 **Capability**:
 An operation class a Source Adapter explicitly declares and implements, making the operation discoverable without provider-specific knowledge.
@@ -98,10 +106,12 @@ _Avoid_: Source, import
 
 - A **Realm** contains zero or more **Sources**; every **Source** belongs to exactly one **Realm**.
 - An unscoped query considers all **Realms**; a realm-scoped query considers exactly the requested Realms.
-- A **Client** authorizes zero or more **Accounts** for its provider; Client labels are unique per provider.
+- An **OAuth App** authorizes zero or more **Accounts** for its **Provider**; OAuth App labels are unique per Provider.
 - A **Source** uses exactly one **Source Adapter** and may use one **Account** through that Account's **Grant**; Account and Source labels are globally unique.
-- One **Account** owns exactly one stable **Grant** and may back multiple **Sources**; reauthorization updates the Grant in place, and multiple compatible Sources may explicitly share it.
-- An **Extension** bundles one or more **Profiles** and **Source Adapters**.
+- One **Account** owns exactly one stable **Grant** and may back multiple **Sources**; reauthorization updates the Grant and its OAuth App snapshot in place, and multiple compatible Sources may explicitly share it.
+- An **Extension** exports one or more roots. Its imported **Providers** and **Profiles** are collected transitively through **Source Adapters** and **OAuth Apps**; standalone leaves may also be listed explicitly.
+- An **Extension** may own one **Documentation Tree** whose canonical Provider, Source Adapter, and versioned Profile routes bind to definitions in that Extension graph.
+- A provider-backed **Source Adapter** imports exactly one **Provider**. A providerless **Source Adapter** creates no OAuth App, Account, Grant, Provider access, or Provider egress requirement.
 - A **Profile** declares zero or more **Actions**; a **Source Adapter** implements the Actions it supports.
 - A **Source Adapter** emits **Resources** through sync, search, retrieval, and action results; each **Resource**'s **Profile** derives **Relations** and **Artifact** descriptors from its validated payload, and the owning Adapter downloads provider bytes for an **Artifact** on demand.
 - A **Resource** has one stable **Ref**, one primary **Profile**, and zero or more **Relations** and Profile-derived **Artifact** descriptors.

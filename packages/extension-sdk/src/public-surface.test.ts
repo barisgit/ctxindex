@@ -4,7 +4,6 @@ import type {
   ActionContext,
   ActionResource,
   AdapterActionBinding,
-  AdapterAuthSpec,
   AdapterCapability,
   AdapterDefinition,
   AdapterLogger,
@@ -13,22 +12,34 @@ import type {
   AdapterSourceContext,
   AnyAdapterDefinition,
   AnyExtensionDefinition,
+  AnyOAuthAppDefinition,
   AnyProfileDefinition,
+  AnyProviderDefinition,
   ArtifactDescriptor,
   DefinitionVersion,
+  DocumentationAssetMediaType,
+  DocumentationDeclaration,
+  DocumentationDirectoryDeclaration,
+  DocumentationFile,
+  DocumentationVirtualTreeDeclaration,
   DownloadContext,
-  ExtensionAuthoringHost,
   ExtensionDefinition,
   FieldType,
   InferProfilePayload,
-  OAuthProviderSpec,
+  NoneAuth,
+  OAuth2Auth,
+  OAuth2RegistrationPolicy,
+  OAuthAppDefinition,
+  OAuthProviderDefinition,
   ProfileAction,
   ProfileDefinition,
   ProfileExportRenderResult,
   ProfileField,
-  ProfileReference,
   ProfileRelationTarget,
   ProfileRelationTargets,
+  ProfileTarget,
+  ProviderAuth,
+  ProviderDefinition,
   ResolvedArtifactDescriptor,
   RetrieveContext,
   RetrievedResource,
@@ -51,7 +62,6 @@ type PublicTypeSurface = {
   actionContext: ActionContext
   actionResource: ActionResource
   adapterActionBinding: AdapterActionBinding
-  adapterAuthSpec: AdapterAuthSpec
   adapterCapability: AdapterCapability
   adapterDefinition: AdapterDefinition
   adapterLogger: AdapterLogger
@@ -60,22 +70,34 @@ type PublicTypeSurface = {
   adapterSourceContext: AdapterSourceContext
   anyAdapterDefinition: AnyAdapterDefinition
   anyExtensionDefinition: AnyExtensionDefinition
+  anyOAuthAppDefinition: AnyOAuthAppDefinition
   anyProfileDefinition: AnyProfileDefinition
+  anyProviderDefinition: AnyProviderDefinition
   artifactDescriptor: ArtifactDescriptor
   definitionVersion: DefinitionVersion
+  documentationAssetMediaType: DocumentationAssetMediaType
+  documentationDeclaration: DocumentationDeclaration
+  documentationDirectoryDeclaration: DocumentationDirectoryDeclaration
+  documentationFile: DocumentationFile
+  documentationVirtualTreeDeclaration: DocumentationVirtualTreeDeclaration
   downloadContext: DownloadContext
-  extensionAuthoringHost: ExtensionAuthoringHost
   extensionDefinition: ExtensionDefinition
   fieldType: FieldType
   inferredProfilePayload: InferProfilePayload<AnyProfileDefinition>
-  oauthProviderSpec: OAuthProviderSpec
+  noneAuth: NoneAuth
+  oauth2Auth: OAuth2Auth
+  oauth2RegistrationPolicy: OAuth2RegistrationPolicy
+  oauthAppDefinition: OAuthAppDefinition
+  oauthProviderDefinition: OAuthProviderDefinition
   profileAction: ProfileAction
   profileDefinition: ProfileDefinition
   profileExportRenderResult: ProfileExportRenderResult
   profileField: ProfileField
-  profileReference: ProfileReference
   profileRelationTarget: ProfileRelationTarget
   profileRelationTargets: ProfileRelationTargets
+  profileTarget: ProfileTarget
+  providerAuth: ProviderAuth
+  providerDefinition: ProviderDefinition
   resolvedArtifactDescriptor: ResolvedArtifactDescriptor
   retrievedResource: RetrievedResource
   retrieveContext: RetrieveContext
@@ -100,7 +122,6 @@ const publicSymbolNames = [
   'ActionContext',
   'ActionResource',
   'AdapterActionBinding',
-  'AdapterAuthSpec',
   'AdapterCapability',
   'AdapterDefinition',
   'AdapterLogger',
@@ -109,22 +130,34 @@ const publicSymbolNames = [
   'AdapterSourceContext',
   'AnyAdapterDefinition',
   'AnyExtensionDefinition',
+  'AnyOAuthAppDefinition',
   'AnyProfileDefinition',
+  'AnyProviderDefinition',
   'ArtifactDescriptor',
   'DefinitionVersion',
+  'DocumentationAssetMediaType',
+  'DocumentationDeclaration',
+  'DocumentationDirectoryDeclaration',
+  'DocumentationFile',
+  'DocumentationVirtualTreeDeclaration',
   'DownloadContext',
-  'ExtensionAuthoringHost',
   'ExtensionDefinition',
   'FieldType',
   'InferProfilePayload',
-  'OAuthProviderSpec',
+  'NoneAuth',
+  'OAuth2Auth',
+  'OAuth2RegistrationPolicy',
+  'OAuthAppDefinition',
+  'OAuthProviderDefinition',
   'ProfileAction',
   'ProfileDefinition',
   'ProfileExportRenderResult',
   'ProfileField',
-  'ProfileReference',
   'ProfileRelationTarget',
   'ProfileRelationTargets',
+  'ProfileTarget',
+  'ProviderAuth',
+  'ProviderDefinition',
   'ResolvedArtifactDescriptor',
   'RetrieveContext',
   'RetrievedResource',
@@ -139,9 +172,14 @@ const publicSymbolNames = [
   'SyncEmission',
   'SyncMode',
   'SyncedResource',
+  'auth',
   'defineAdapter',
   'defineExtension',
+  'defineOAuthApp',
   'defineProfile',
+  'defineProvider',
+  'docs',
+  'z',
 ]
 
 test('public index exports the exact symbol surface', async () => {
@@ -159,8 +197,13 @@ test('public index exports the exact symbol surface', async () => {
 
   expect(exportedNames).toEqual(publicSymbolNames)
   expect(Object.keys(runtimeSdk).sort()).toEqual([
+    'auth',
     'defineAdapter',
     'defineExtension',
+    'defineOAuthApp',
     'defineProfile',
+    'defineProvider',
+    'docs',
+    'z',
   ])
 })

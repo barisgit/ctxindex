@@ -22,11 +22,21 @@ async function git(cwd: string, args: string[]): Promise<string> {
 
 async function createCatalogRepository(sandbox: Sandbox): Promise<string> {
   const repository = join(sandbox.dir, 'catalog-repository')
+  const extensionPackage = join(repository, 'extension-package')
   await mkdir(repository, { recursive: true })
+  await mkdir(extensionPackage)
   await git(repository, ['init', '-b', 'main'])
   await writeFile(
-    join(repository, 'extension.ts'),
-    `export default ({ defineExtension }) => defineExtension({ id: 'fixture.catalog-extension', version: 1, profiles: [], adapters: [], docs: { summary: 'Catalog fixture' } })\n`,
+    join(extensionPackage, 'package.json'),
+    JSON.stringify({
+      name: '@fixture/catalog-extension',
+      type: 'module',
+      ctxindex: { extensions: ['./extension.js'] },
+    }),
+  )
+  await writeFile(
+    join(extensionPackage, 'extension.js'),
+    `export const buildMarker = 'initial'\nexport default { kind: 'extension', id: 'fixture.catalog-extension', adapters: [], oauthApps: [], providers: [], profiles: [] }\n`,
   )
   await writeFile(
     join(repository, 'ctxindex-catalog.json'),
@@ -41,7 +51,7 @@ async function createCatalogRepository(sandbox: Sandbox): Promise<string> {
         {
           id: 'fixture.catalog-extension',
           version: 1,
-          source: { kind: 'inline', path: 'extension.ts' },
+          source: { kind: 'inline', path: 'extension-package' },
         },
       ],
     }),
@@ -160,7 +170,7 @@ test('trusted local Git Catalog lifecycle refreshes on command and keeps startup
       extension: {
         id: 'fixture.catalog-extension',
         version: 1,
-        source_path: 'extension.ts',
+        source_path: 'extension-package',
       },
     })
     const shownValue = JSON.parse(shown.stdout)
@@ -168,10 +178,10 @@ test('trusted local Git Catalog lifecycle refreshes on command and keeps startup
     expect(shownValue.snapshot_age_ms).toBeNumber()
 
     await writeFile(
-      join(repository, 'extension.ts'),
-      `export default ({ defineExtension }) => defineExtension({ id: 'fixture.catalog-extension', version: 1, profiles: [], adapters: [], docs: { summary: 'Refreshed Catalog fixture' } })\n`,
+      join(repository, 'extension-package', 'extension.js'),
+      `export const buildMarker = 'refreshed'\nexport default { kind: 'extension', id: 'fixture.catalog-extension', adapters: [], oauthApps: [], providers: [], profiles: [] }\n`,
     )
-    await git(repository, ['add', 'extension.ts'])
+    await git(repository, ['add', 'extension-package/extension.js'])
     await git(repository, [
       '-c',
       'user.name=Fixture',
@@ -250,7 +260,7 @@ test('trusted local Git Catalog lifecycle refreshes on command and keeps startup
         catalog: 'fixture',
         commit: installedValue.commit,
         repository,
-        sourcePath: 'extension.ts',
+        sourcePath: 'extension-package',
         snapshotAcquiredAt: installedValue.snapshot_acquired_at,
         snapshotAgeMs: expect.any(Number),
       },
@@ -306,10 +316,59 @@ test('trusted local Git Catalog lifecycle refreshes on command and keeps startup
             'fixture',
             catalog.commit,
           ),
-          'extension.ts',
+          'extension-package',
+          'extension.js',
         ),
       ).exists(),
     ).toBe(true)
+  } finally {
+    await sandbox.cleanup()
+  }
+}, 15_000)
+
+test('Catalog install does not print imported exception messages', async () => {
+  const sandbox = await createSandbox()
+  try {
+    const repository = await createCatalogRepository(sandbox)
+    await writeFile(
+      join(repository, 'extension-package', 'extension.js'),
+      `throw new Error('super-secret-value')\n`,
+    )
+    await git(repository, ['add', 'extension-package/extension.js'])
+    await git(repository, [
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.invalid',
+      'commit',
+      '-m',
+      'throw during evaluation',
+    ])
+    await sandbox.run([
+      'extensions',
+      'catalog',
+      'add',
+      'fixture',
+      repository,
+      '--ref',
+      'refs/heads/main',
+      '--trust',
+    ])
+
+    const installed = await sandbox.run([
+      'extensions',
+      'install',
+      'fixture',
+      'fixture.catalog-extension@1',
+      '--trust',
+    ])
+
+    expect(installed.exitCode).toBe(50)
+    expect(installed.stdout).toBe('')
+    expect(installed.stderr).toContain(
+      'Catalog Extension fixture.catalog-extension: Extension entry could not be evaluated',
+    )
+    expect(installed.stderr).not.toContain('super-secret-value')
   } finally {
     await sandbox.cleanup()
   }

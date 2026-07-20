@@ -15,7 +15,7 @@ The `microsoft` OAuth provider SHALL use Microsoft identity platform authorizati
 - **THEN** its distinct stable identity is stored without changing Realm or Source selection
 
 ### Requirement: Microsoft mailbox provides normalized read access
-`microsoft.mailbox@1` SHALL implement federated discovery, complete retrieval, conversation Relations, attachment descriptors/download, and existing Profile exports through `communication.message@1`. Every Graph message request — including every page fetch of a remote search, initial page and `@odata.nextLink` continuations alike — SHALL explicitly opt into provider immutable ids via `Prefer: IdType="ImmutableId"`, every Ref SHALL be canonical and Source-scoped, and provider paging/errors SHALL map to existing normalized result/warning/error contracts. Draft create/update requests SHALL carry the same immutable-id preference so returned Draft Refs are immutable-id based.
+`microsoft.mailbox` SHALL implement federated discovery, complete retrieval, conversation Relations, attachment descriptors/download, and existing Profile exports through `communication.message@1`. Every Graph message request — including every page fetch of a remote search, initial page and `@odata.nextLink` continuations alike — SHALL explicitly opt into provider immutable ids via `Prefer: IdType="ImmutableId"`, every Ref SHALL be canonical and Source-scoped, and provider paging/errors SHALL map to existing normalized result/warning/error contracts. Draft create/update requests SHALL carry the same immutable-id preference so returned Draft Refs are immutable-id based.
 
 #### Scenario: Outlook discovery returns messages
 - **WHEN** an eligible Microsoft mailbox Source receives a generic remote search
@@ -45,7 +45,7 @@ Microsoft file attachment metadata SHALL become Profile-derived Artifact descrip
 - **THEN** download fails before auth or provider I/O
 
 ### Requirement: Outlook implements reversible Draft Actions
-`microsoft.mailbox@1` SHALL bind exactly `communication.message.draft.create` and `communication.message.draft.update` using delegated `Mail.ReadWrite` and MUST NOT request `Mail.Send`. Create SHALL perform exactly one provider Draft-create mutation and return a stable immutable-id Draft Ref. Update SHALL validate a canonical same-Source Draft Ref and complete replacement recipients/subject/text before exactly one provider update mutation, returning the same Ref. Core and Adapter mutation paths MUST NOT retry either operation automatically.
+`microsoft.mailbox` SHALL bind exactly `communication.message.draft.create` and `communication.message.draft.update` using delegated `Mail.ReadWrite` and MUST NOT request `Mail.Send`. Create SHALL perform exactly one provider Draft-create mutation and return a stable immutable-id Draft Ref. Update SHALL validate a canonical same-Source Draft Ref and complete replacement recipients/subject/text before exactly one provider update mutation, returning the same Ref. Core and Adapter mutation paths MUST NOT retry either operation automatically.
 
 #### Scenario: Outlook Draft is created
 - **WHEN** valid Draft input is run through an explicit Microsoft mailbox Source
@@ -60,7 +60,7 @@ Microsoft file attachment metadata SHALL become Profile-derived Artifact descrip
 - **THEN** no such Action or binding exists and no Graph send route is called
 
 ### Requirement: Microsoft Calendar shares the calendar Profile
-`microsoft.calendar@1` SHALL be an indexed, read-only Adapter for one explicitly selected/default Microsoft calendar and an explicit rolling past/future coverage window. For the default calendar it SHALL use the stable Graph v1.0 `/me/calendarView/delta` contract and persist opaque next/delta links only after commit. For an explicitly named calendar it SHALL use the stable Graph v1.0 `/me/calendars/{id}/calendarView` contract as a complete paged window scan with manifest reconciliation and SHALL NOT use the beta per-calendar delta route. Both paths SHALL normalize recurrence and time-zone/all-day semantics into `calendar.event@1` and emit tombstones only after a successful delta or complete scan. Event normalization SHALL treat explicit `null` values on optional Graph fields as absent rather than rejecting the event as malformed, and SHALL resolve occurrence-start provider time zones given either an IANA zone name or a Windows zone name (via a vetted CLDR windowsZones-derived mapping); names resolvable by neither route SHALL keep the stable `microsoft_calendar_unresolved_series_start` warning. It MUST expose no calendar mutation Action or write scope.
+`microsoft.calendar` SHALL be an indexed, read-only Adapter for one explicitly selected/default Microsoft calendar and an explicit rolling past/future coverage window. For the default calendar it SHALL use the stable Graph v1.0 `/me/calendarView/delta` contract and persist opaque next/delta links only after commit. For an explicitly named calendar it SHALL use the stable Graph v1.0 `/me/calendars/{id}/calendarView` contract as a complete paged window scan with manifest reconciliation and SHALL NOT use the beta per-calendar delta route. Both paths SHALL normalize recurrence and time-zone/all-day semantics into `calendar.event@1` and emit tombstones only after a successful delta or complete scan. Event normalization SHALL treat explicit `null` values on optional Graph fields as absent rather than rejecting the event as malformed, and SHALL resolve occurrence-start provider time zones given either an IANA zone name or a Windows zone name (via a vetted CLDR windowsZones-derived mapping); names resolvable by neither route SHALL keep the stable `microsoft_calendar_unresolved_series_start` warning. It MUST expose no calendar mutation Action or write scope.
 
 #### Scenario: Delta sync advances
 - **WHEN** all pages of a Microsoft calendar delta response succeed
@@ -100,4 +100,3 @@ Production requests SHALL contact only the declared Microsoft identity and Graph
 #### Scenario: Human Microsoft checkpoint completes
 - **WHEN** the user explicitly approves consent and the bounded live workflow
 - **THEN** redacted evidence records mailbox/calendar reads and one stable Draft create/update, followed by user confirmation that no message was sent
-

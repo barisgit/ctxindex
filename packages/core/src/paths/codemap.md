@@ -12,7 +12,7 @@ Centralizes resolution of ctxindex configuration, data, state, cache, and log di
 
 ## Data & control flow
 
-Each accessor reads the memoized environment via `getEnv()`, selects the highest-precedence root, and returns a path. `logDir()` derives `logs` beneath `stateDir()`.
+Each accessor reads only its requested `CTXINDEX_*_HOME` and matching `XDG_*_HOME` keys directly from `process.env`, selects the highest-precedence root, and returns a path. It does not snapshot unrelated credential environment variables. `logDir()` derives `logs` beneath `stateDir()`.
 
 ## Integration points
 

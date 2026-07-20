@@ -4,6 +4,7 @@ import {
   defineAdapter,
   defineExtension,
   defineProfile,
+  type SearchContext,
 } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
 import type { AuthService } from '../auth'
@@ -48,16 +49,9 @@ const profile = defineProfile({
       sender: { type: 'string[]', extract: (payload) => payload.sender ?? [] },
     },
   },
-  docs: { summary: 'Fake item', aliases: ['item'] },
 })
 
-async function remote({
-  source,
-  query,
-  signal,
-}: Parameters<
-  NonNullable<ReturnType<typeof defineAdapter>['operations']['searchRemote']>
->[0]) {
+async function remote({ source, query, signal }: SearchContext) {
   calls.push(source.id)
   signals.push(signal)
   startedAt.set(source.id, Date.now())
@@ -111,10 +105,8 @@ async function remote({
 const adapters = [
   defineAdapter({
     id: 'fake.indexed',
-    version: 1,
     configSchema: z.object({}).passthrough(),
-    auth: { kind: 'none' },
-    profiles: [{ id: 'fake.item', version: 1 }],
+    profiles: [profile],
     routing: 'indexed',
     capabilities: ['search-remote'],
     operations: { searchRemote: remote },
@@ -122,10 +114,8 @@ const adapters = [
   }),
   defineAdapter({
     id: 'fake.federated',
-    version: 1,
     configSchema: z.object({}).passthrough(),
-    auth: { kind: 'none' },
-    profiles: [{ id: 'fake.item', version: 1 }],
+    profiles: [profile],
     routing: 'federated',
     capabilities: ['search-remote'],
     operations: { searchRemote: remote },
@@ -133,10 +123,8 @@ const adapters = [
   }),
   defineAdapter({
     id: 'fake.local',
-    version: 1,
     configSchema: z.object({}).passthrough(),
-    auth: { kind: 'none' },
-    profiles: [{ id: 'fake.item', version: 1 }],
+    profiles: [profile],
     routing: 'indexed',
     capabilities: [],
     operations: {},
@@ -144,12 +132,10 @@ const adapters = [
   }),
   defineAdapter({
     id: 'fake.hybrid',
-    version: 1,
     configSchema: z
       .object({ sync_window_days: z.number().optional() })
       .passthrough(),
-    auth: { kind: 'none' },
-    profiles: [{ id: 'fake.item', version: 1 }],
+    profiles: [profile],
     routing: 'hybrid',
     capabilities: ['sync', 'search-remote'],
     operations: { sync: async () => {}, searchRemote: remote },
@@ -159,7 +145,6 @@ const adapters = [
 const registry = createExtensionRegistry([
   defineExtension({
     id: 'fake.search',
-    version: 1,
     profiles: [profile],
     adapters,
   }),
@@ -196,7 +181,7 @@ function addSource(
   } = {},
 ) {
   db.prepare(
-    `INSERT INTO sources (id, realm_id, label, adapter_id, adapter_version, config_json, sync_enabled, search_routing, created_at, updated_at) VALUES (?, 'realm-1', ?, ?, 1, ?, ?, ?, 1, 1)`,
+    `INSERT INTO sources (id, realm_id, label, adapter_id, config_json, sync_enabled, search_routing, created_at, updated_at) VALUES (?, 'realm-1', ?, ?, ?, ?, ?, 1, 1)`,
   ).run(
     id,
     `Test Source ${id}`,
@@ -358,7 +343,7 @@ describe('SearchPlanner', () => {
       realms: ['work'],
       sourceIds: [ids.unavailable],
       adapterId: 'missing.adapter',
-      kind: 'item',
+      kind: 'fake.item',
       explain: true,
     } as const
 
@@ -453,7 +438,7 @@ describe('SearchPlanner', () => {
 
     const result = await planner(db).search({
       text: 'x',
-      kind: 'item',
+      kind: 'fake.item',
       since: now - 1_000,
       now,
       explain: true,
@@ -595,7 +580,7 @@ describe('SearchPlanner', () => {
     const filters = {
       realms: ['work'],
       sourceIds: [ids.indexed],
-      kind: 'item',
+      kind: 'fake.item',
     } as const
 
     const ordinary = await service.search(filters)

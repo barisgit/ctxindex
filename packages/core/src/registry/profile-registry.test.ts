@@ -10,7 +10,6 @@ const profile = defineProfile({
   id: 'fake.note',
   version: 1,
   schema: z.object({ title: z.string() }),
-  docs: { summary: 'Fake notes', aliases: ['note'] },
 })
 
 describe('ProfileRegistry', () => {
@@ -21,6 +20,14 @@ describe('ProfileRegistry', () => {
       ]),
     ).toThrow(DefinitionRegistryError)
     expect(createProfileRegistry([profile]).list()).toEqual([profile])
+  })
+
+  test('enforces the shared route-safe Profile id grammar', () => {
+    for (const id of ['../escape', 'a'.repeat(129), '\uD800']) {
+      expect(() => createProfileRegistry([{ ...profile, id }])).toThrow(
+        DefinitionRegistryError,
+      )
+    }
   })
 
   test('rejects a non-function Profile summary projection', () => {
@@ -44,7 +51,23 @@ describe('ProfileRegistry', () => {
               effect: 'read',
               input: z.object({}),
               output: { id: 'fake.note', version: 1 },
-              docs: 'Invalid non-mutation Action',
+            },
+          },
+        } as never,
+      ]),
+    ).toThrow(DefinitionRegistryError)
+  })
+
+  test('rejects an Action output with an invalid Profile reference id', () => {
+    expect(() =>
+      createProfileRegistry([
+        {
+          ...profile,
+          actions: {
+            'fake.note.read': {
+              effect: 'reversible',
+              input: z.object({}),
+              output: { id: '../escape', version: 1 },
             },
           },
         } as never,
@@ -62,7 +85,6 @@ describe('ProfileRegistry', () => {
               effect: 'reversible',
               input: z.object({}),
               output: { id: 'fake.note', version: 1 },
-              docs: 'Invalid empty Action id',
             },
           },
         } as never,
@@ -74,6 +96,30 @@ describe('ProfileRegistry', () => {
     expect(() => createProfileRegistry([profile, { ...profile }])).toThrow(
       'Duplicate Profile fake.note@1',
     )
+  })
+
+  test('rejects removed embedded documentation metadata', () => {
+    expect(() =>
+      createProfileRegistry([
+        { ...profile, docs: { summary: 'legacy' } } as never,
+      ]),
+    ).toThrow(DefinitionRegistryError)
+    expect(() =>
+      createProfileRegistry([
+        {
+          ...profile,
+          search: {
+            fields: {
+              title: {
+                type: 'string',
+                extract: () => 'title',
+                docs: 'legacy',
+              },
+            },
+          },
+        },
+      ] as never),
+    ).toThrow(DefinitionRegistryError)
   })
 
   test('degrades unknown profile versions without throwing', () => {
@@ -97,19 +143,17 @@ describe('ProfileRegistry', () => {
   })
 })
 
-test('kind lookup prefers canonical ids and reports alias collisions', () => {
+test('kind lookup resolves canonical ids only', () => {
   const alphaV1 = defineProfile({
     id: 'alpha.record',
     version: 1,
     schema: z.object({}),
-    docs: { summary: 'Alpha.', aliases: ['docs'] },
   })
   const alphaV2 = defineProfile({ ...alphaV1, version: 2 })
   const beta = defineProfile({
     id: 'beta.record',
     version: 1,
     schema: z.object({}),
-    docs: { summary: 'Beta.', aliases: ['docs'] },
   })
   const registry = createProfileRegistry([beta, alphaV2, alphaV1])
 
@@ -119,9 +163,8 @@ test('kind lookup prefers canonical ids and reports alias collisions', () => {
     profiles: [{ version: 1 }, { version: 2 }],
   })
   expect(registry.resolveKind(' DOCS ')).toEqual({
-    status: 'ambiguous',
+    status: 'unknown',
     kind: 'docs',
-    candidates: ['alpha.record', 'beta.record'],
   })
   expect(registry.resolveKind('missing')).toEqual({
     status: 'unknown',

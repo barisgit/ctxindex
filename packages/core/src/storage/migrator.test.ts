@@ -159,14 +159,19 @@ test('fresh core migration creates only the generic V1 storage model', async () 
   expect(db.prepare('SELECT count(*) AS count FROM realms').get()).toEqual({
     count: 0,
   })
+  expect(
+    db
+      .prepare("SELECT name FROM pragma_table_info('sources') ORDER BY cid")
+      .all(),
+  ).not.toContainEqual({ name: 'adapter_version' })
   db.prepare(
     "INSERT INTO realms (id, slug, created_at) VALUES ('realm-1', 'work', 1)",
   ).run()
   db.prepare(
     `INSERT INTO sources (
-       id, realm_id, label, adapter_id, adapter_version, config_json, created_at,
+       id, realm_id, label, adapter_id, config_json, created_at,
        updated_at
-     ) VALUES ('source-1', 'realm-1', 'Fixture Source', 'fixture.adapter', 1, '{}', 1, 1)`,
+     ) VALUES ('source-1', 'realm-1', 'Fixture Source', 'fixture.adapter', '{}', 1, 1)`,
   ).run()
   expect(() =>
     db
@@ -248,7 +253,7 @@ test('field index enforces one typed value and ordered uniqueness', async () => 
 
   db.exec("INSERT INTO realms VALUES ('personal', 'personal', NULL, 1)")
   db.exec(
-    "INSERT INTO sources (id, realm_id, label, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAV', 'personal', 'Field Index Source', 'fake', 1, '{}', 1, 1)",
+    "INSERT INTO sources (id, realm_id, label, adapter_id, config_json, created_at, updated_at) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAV', 'personal', 'Field Index Source', 'fake', '{}', 1, 1)",
   )
   db.exec(
     "INSERT INTO resources (id, ref, source_id, realm_id, profile_id, profile_version, origin, created_at, updated_at) VALUES ('01ARZ3NDEKTSV4RRFFQ69G5FAW', 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/a', '01ARZ3NDEKTSV4RRFFQ69G5FAV', 'personal', 'fake.record', 1, 'synced', 1, 1)",
@@ -287,7 +292,7 @@ test('Resource FTS retains tombstone envelopes and removes hard-deleted rows', a
   await runMigrations(db)
   db.exec("INSERT INTO realms VALUES ('personal', 'personal', NULL, 1)")
   db.exec(
-    "INSERT INTO sources (id, realm_id, label, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES ('source', 'personal', 'Retention Source', 'fake', 1, '{}', 1, 1)",
+    "INSERT INTO sources (id, realm_id, label, adapter_id, config_json, created_at, updated_at) VALUES ('source', 'personal', 'Retention Source', 'fake', '{}', 1, 1)",
   )
   db.exec(
     "INSERT INTO resources (id, ref, source_id, realm_id, profile_id, profile_version, title, summary, origin, created_at, updated_at) VALUES ('resource', 'ctx://source/one', 'source', 'personal', 'fake.record', 1, 'Retained title', 'Retained summary', 'synced', 1, 1)",
@@ -385,9 +390,9 @@ test('fresh Artifact schema enforces ownership, stable refs, retention, and hash
   db.exec(`
     INSERT INTO realms (id, slug, created_at) VALUES ('realm', 'test', 1);
     INSERT INTO sources (
-      id, realm_id, label, adapter_id, adapter_version, config_json, created_at, updated_at
+      id, realm_id, label, adapter_id, config_json, created_at, updated_at
     ) VALUES (
-      '01ARZ3NDEKTSV4RRFFQ69G5FAV', 'realm', 'Artifact Source', 'fake', 1, '{}', 1, 1
+      '01ARZ3NDEKTSV4RRFFQ69G5FAV', 'realm', 'Artifact Source', 'fake', '{}', 1, 1
     );
     INSERT INTO resources (
       id, ref, source_id, realm_id, profile_id, profile_version, origin,

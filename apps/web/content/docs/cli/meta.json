@@ -7,7 +7,7 @@
     "extensions",
     "realm",
     "source",
-    "client",
+    "oauth-app",
     "account",
     "sync",
     "search",

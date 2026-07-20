@@ -97,9 +97,17 @@ function insertGrant(
   ).run(`account-${id}`, provider, `Account ${id}`, `subject-${id}`, now, now)
   db.prepare(
     `INSERT INTO grants
-       (id, account_id, provider, scopes_json, refresh_token_ref, created_at, updated_at)
-     VALUES (?, ?, ?, '[]', ?, ?, ?)`,
-  ).run(id, `account-${id}`, provider, refreshTokenRef, now, now)
+       (id, account_id, provider, scopes_json, app_config_ref, refresh_token_ref, created_at, updated_at)
+     VALUES (?, ?, ?, '[]', ?, ?, ?, ?)`,
+  ).run(
+    id,
+    `account-${id}`,
+    provider,
+    refreshTokenRef,
+    refreshTokenRef,
+    now,
+    now,
+  )
 }
 
 function grantRefreshRef(id: string): string {
@@ -231,6 +239,62 @@ test('backend switch preserves equal keys in different scopes and commits before
     cleanupPending: false,
     warnings: [],
   })
+})
+
+test('backend switch traverses local App config, Grant App snapshot, and token refs', async () => {
+  const fileStore = new MemorySecretsStore('file')
+  const keychainStore = new MemorySecretsStore('keychain')
+  const localConfigRef = await keychainStore.setSecret(
+    'google',
+    'oauth-app:local:config',
+    '{"clientId":"local"}',
+  )
+  const snapshotRef = await keychainStore.setSecret(
+    'google',
+    'grant:snapshot',
+    '{"clientId":"snapshot"}',
+  )
+  const refreshRef = await keychainStore.setSecret(
+    'google',
+    'grant:refresh',
+    'refresh',
+  )
+  db.prepare(
+    'INSERT INTO oauth_apps (provider_id, label, config_ref, created_at, updated_at) VALUES (?, ?, ?, 1, 1)',
+  ).run('google', 'local', localConfigRef)
+  insertGrant('grant', 'google', refreshRef)
+  db.prepare('UPDATE grants SET app_config_ref = ? WHERE id = ?').run(
+    snapshotRef,
+    'grant',
+  )
+  const manager = createSecretBackendManager({
+    db,
+    fileStore,
+    keychainStore,
+    logger,
+    backend: 'keychain',
+    commitBackend: async () => {},
+  })
+
+  await expect(manager.switchBackend('file')).resolves.toMatchObject({
+    copied: 3,
+    cleaned: 3,
+    cleanupPending: false,
+  })
+  expect(db.prepare('SELECT config_ref FROM oauth_apps').get()).toEqual({
+    config_ref: fileRef('google', 'oauth-app:local:config'),
+  })
+  expect(
+    db
+      .prepare(
+        'SELECT app_config_ref, refresh_token_ref FROM grants WHERE id = ?',
+      )
+      .get('grant'),
+  ).toEqual({
+    app_config_ref: fileRef('google', 'grant:snapshot'),
+    refresh_token_ref: fileRef('google', 'grant:refresh'),
+  })
+  expect(keychainStore.entries.size).toBe(0)
 })
 
 test('target copy failure leaves source refs usable and retry converges', async () => {

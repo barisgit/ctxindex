@@ -6,12 +6,11 @@ import type { CtxindexDatabase } from '../storage'
 interface SourceRow {
   readonly id: string
   readonly adapter_id: string
-  readonly adapter_version: number
 }
 
 export interface ActionSourceAvailability {
   readonly id: string
-  readonly adapter: { readonly id: string; readonly version: number }
+  readonly adapter: { readonly id: string }
   readonly available: boolean
   readonly reason?: 'adapter_unavailable' | 'action_unsupported'
 }
@@ -42,14 +41,10 @@ export function describeAction(
 
   const sources = input.sourceId
     ? (input.db
-        .prepare(
-          'SELECT id, adapter_id, adapter_version FROM sources WHERE id = ?',
-        )
+        .prepare('SELECT id, adapter_id FROM sources WHERE id = ?')
         .all(input.sourceId) as SourceRow[])
     : (input.db
-        .prepare(
-          'SELECT id, adapter_id, adapter_version FROM sources ORDER BY id',
-        )
+        .prepare('SELECT id, adapter_id FROM sources ORDER BY id')
         .all() as SourceRow[])
   if (input.sourceId && sources.length === 0) {
     throw new CtxindexNotFoundError(`Source not found: ${input.sourceId}`)
@@ -58,14 +53,11 @@ export function describeAction(
   return {
     ...action,
     sources: sources.map((source) => {
-      const adapter = input.registry.adapters.get({
-        id: source.adapter_id,
-        version: source.adapter_version,
-      })
+      const adapter = input.registry.adapters.get({ id: source.adapter_id })
       const available = adapter?.actions[input.actionId] !== undefined
       return {
         id: source.id,
-        adapter: { id: source.adapter_id, version: source.adapter_version },
+        adapter: { id: source.adapter_id },
         available,
         ...(available
           ? {}

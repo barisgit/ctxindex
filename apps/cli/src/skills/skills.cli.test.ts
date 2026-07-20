@@ -48,7 +48,7 @@ test('skills get returns bundled markdown', async () => {
   expect(result.stdout).not.toContain('reference/cli-overview')
   expect(result.stdout).not.toContain('```')
   expect(result.stdout).not.toMatch(
-    /^(?:\s*[-*+]\s+)?(?:init|realm|client|account|source)(?:\s|$|[/|])/m,
+    /^(?:\s*[-*+]\s+)?(?:init|realm|oauth-app|account|source)(?:\s|$|[/|])/m,
   )
 })
 

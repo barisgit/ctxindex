@@ -183,7 +183,6 @@ export async function handleSyncCommand(
         .filter((source) => {
           const adapter = deps.registry.adapters.get({
             id: source.adapter_id,
-            version: source.adapter_version,
           })
           return (
             !adapter ||

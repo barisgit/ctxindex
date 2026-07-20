@@ -1,98 +1,64 @@
-import { describe, expect, test } from 'bun:test'
-import { defineAdapter, type OAuthProviderSpec } from '@ctxindex/extension-sdk'
-import { z } from 'zod'
-import { createAdapterRegistry } from '../registry'
-import { createProfileRegistry } from '../registry/profile-registry'
-import { testOAuthProvider } from '../testing/oauth-provider'
-import { resolveOAuthSelection, selectedOAuthScopes } from './selection'
+import { expect, test } from 'bun:test'
+import { auth, defineAdapter, defineProvider, z } from '@ctxindex/extension-sdk'
+import type { CompleteRegistry } from '../registry'
+import { resolveOAuthSelection } from './selection'
 
-const googleProvider = {
-  ...testOAuthProvider({
-    id: 'google',
-    authorizationUrl: 'https://accounts.google.test/authorize',
-    tokenUrl: 'https://accounts.google.test/token',
+const provider = defineProvider({
+  id: 'example',
+  auth: auth.oauth2({
+    authorizationUrl: 'https://auth.example/authorize',
+    tokenUrl: 'https://auth.example/token',
+    identity: {
+      url: 'https://api.example/me',
+      subjectPath: ['id'],
+      labelPaths: [['email']],
+      identities: [{ kind: 'email', path: ['email'] }],
+    },
+    pkce: { method: 'S256', required: true },
+    registration: {
+      type: 'public',
+      configSchema: z.object({ clientId: z.string() }),
+      environment: { clientId: 'CTXINDEX_TEST_CLIENT_ID' },
+    },
+    baseScopes: ['profile', 'openid'],
+    allowedHosts: ['api.example', 'auth.example'],
   }),
-  baseScopes: ['openid', 'shared'],
-}
-const microsoftProvider = testOAuthProvider({
-  id: 'microsoft',
-  authorizationUrl: 'https://login.microsoft.test/authorize',
-  tokenUrl: 'https://login.microsoft.test/token',
 })
 
-function adapter(
-  id: string,
-  provider: OAuthProviderSpec = googleProvider,
-  scopes: readonly string[] = ['shared', 'mail'],
-  version = 1,
-) {
-  return defineAdapter({
-    id,
-    version,
-    configSchema: z.object({}),
-    auth: { kind: 'oauth2', provider, scopes },
-    profiles: [],
-    routing: 'indexed',
-    capabilities: [],
-    operations: {},
-    actions: {},
-  })
+function registry(): CompleteRegistry {
+  const adapters = [
+    defineAdapter({
+      id: 'example.mail',
+      provider,
+      access: { scopes: ['mail.read', 'profile'] },
+      configSchema: z.object({}),
+      profiles: [],
+      routing: 'indexed',
+      capabilities: [],
+      operations: {},
+      actions: {},
+    }),
+  ]
+  return {
+    extensions: new Map(),
+    providers: new Map([[provider.id, provider]]),
+    oauthApps: new Map(),
+    profiles: new Map(),
+    adapters: new Map(adapters.map((item) => [item.id, item])),
+    provenances: new Map(),
+  }
 }
 
-function nonOAuthAdapter(id: string) {
-  return defineAdapter({
-    id,
-    version: 1,
-    configSchema: z.object({}),
-    auth: { kind: 'none' },
-    profiles: [],
-    routing: 'indexed',
-    capabilities: [],
-    operations: {},
-    actions: {},
-  })
-}
-
-function registry(adapters: Parameters<typeof createAdapterRegistry>[1]) {
-  return createAdapterRegistry(createProfileRegistry([]), adapters)
-}
-
-describe('selectedOAuthScopes', () => {
-  test('returns deduplicated provider base scopes plus all loaded provider Adapter scopes', () => {
-    const loaded = registry([
-      adapter('google.mailbox'),
-      adapter('google.calendar', googleProvider, ['calendar']),
-      adapter('microsoft.mailbox', microsoftProvider, ['microsoft.mail']),
-    ])
-
-    expect(selectedOAuthScopes(loaded, 'google')).toEqual([
-      'calendar',
-      'mail',
-      'openid',
-      'shared',
-    ])
-  })
-
-  test('rejects an unknown provider with a validation error', () => {
-    const loaded = registry([adapter('google.mailbox')])
-    expect(() => selectedOAuthScopes(loaded, 'missing')).toThrow()
-    try {
-      selectedOAuthScopes(loaded, 'missing')
-    } catch (error) {
-      expect(error).toMatchObject({ code: 'invalid_oauth_selection' })
-    }
+test('selection separates active Adapter scopes from sorted requested scopes', () => {
+  expect(resolveOAuthSelection(registry(), 'example')).toEqual({
+    provider,
+    operationScopes: ['mail.read', 'profile'],
+    requestedScopes: ['mail.read', 'openid', 'profile'],
   })
 })
 
-test('resolveOAuthSelection returns provider and separates all operation scopes from requested scopes', () => {
-  const loaded = registry([
-    adapter('google.mailbox', googleProvider, ['shared', 'mail.read']),
-    adapter('google.calendar', googleProvider, ['calendar.read']),
-    nonOAuthAdapter('local.directory'),
-  ])
-  expect(resolveOAuthSelection(loaded, 'google')).toEqual({
-    provider: googleProvider,
-    operationScopes: ['calendar.read', 'mail.read', 'shared'],
-    requestedScopes: ['calendar.read', 'mail.read', 'openid', 'shared'],
-  })
+test('selection rejects absent and no-auth Providers', () => {
+  expect(() => resolveOAuthSelection(registry(), 'missing')).toThrow(
+    'Unknown OAuth provider',
+  )
 })

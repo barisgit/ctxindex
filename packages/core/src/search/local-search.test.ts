@@ -41,7 +41,6 @@ const searchProfile = defineProfile({
       },
     },
   },
-  docs: { summary: 'Test documents.', aliases: ['document', 'docs'] },
 })
 
 async function freshDb(): Promise<Database> {
@@ -50,8 +49,8 @@ async function freshDb(): Promise<Database> {
   await runMigrations(db)
   db.exec("INSERT INTO realms VALUES ('personal-id', 'personal', NULL, 1)")
   db.prepare(
-    'INSERT INTO sources (id, realm_id, label, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-  ).run(sourceId, 'personal-id', 'Personal Source', 'test', 1, '{}', 1, 1)
+    'INSERT INTO sources (id, realm_id, label, adapter_id, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  ).run(sourceId, 'personal-id', 'Personal Source', 'test', '{}', 1, 1)
   dbs.push(db)
   return db
 }
@@ -125,8 +124,8 @@ describe('LocalSearchExecutor', () => {
     const companySource = '01ARZ3NDEKTSV4RRFFQ69G5FB0'
     db.exec("INSERT INTO realms VALUES ('company-id', 'company', NULL, 1)")
     db.prepare(
-      'INSERT INTO sources (id, realm_id, label, adapter_id, adapter_version, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    ).run(companySource, 'company-id', 'Company Source', 'test', 1, '{}', 1, 1)
+      'INSERT INTO sources (id, realm_id, label, adapter_id, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    ).run(companySource, 'company-id', 'Company Source', 'test', '{}', 1, 1)
     const profiles = createProfileRegistry([searchProfile])
     const store = new ResourceStore(db, profiles)
     store.upsert({
@@ -166,7 +165,7 @@ describe('LocalSearchExecutor', () => {
     ).toThrow('Unknown Source "missing"')
   })
 
-  test('filters by kind aliases, occurredAt, and every V1 field type', async () => {
+  test('filters by canonical kind, occurredAt, and every V1 field type', async () => {
     const db = await freshDb()
     const profiles = createProfileRegistry([searchProfile])
     const store = new ResourceStore(db, profiles)
@@ -209,7 +208,7 @@ describe('LocalSearchExecutor', () => {
       search
         .search({
           text: '',
-          kind: ' DOCS ',
+          kind: ' TEST.DOCUMENT ',
           fields: filters,
           since: Date.parse('2026-01-01T00:00:00.000Z'),
           until: Date.parse('2026-01-01T00:00:00.000Z'),
@@ -231,12 +230,6 @@ describe('LocalSearchExecutor', () => {
         },
       },
     })
-    const collidingProfile = defineProfile({
-      id: 'other.document',
-      version: 1,
-      schema: z.object({}),
-      docs: { summary: 'Other.', aliases: ['docs'] },
-    })
     const base = new LocalSearchExecutor(
       db,
       createProfileRegistry([searchProfile]),
@@ -245,10 +238,6 @@ describe('LocalSearchExecutor', () => {
       db,
       createProfileRegistry([searchProfile, conflictingVersion]),
     )
-    const ambiguous = new LocalSearchExecutor(
-      db,
-      createProfileRegistry([searchProfile, collidingProfile]),
-    )
     const invalidQueries = [
       () =>
         base.search({
@@ -256,11 +245,10 @@ describe('LocalSearchExecutor', () => {
           fields: [{ name: 'text', value: 'x' }],
         }),
       () => base.search({ text: '" hostile', kind: 'missing' }),
-      () => ambiguous.search({ text: '" hostile', kind: 'docs' }),
       () =>
         base.search({
           text: '" hostile',
-          kind: 'document',
+          kind: 'test.document',
           fields: [{ name: 'missing', value: 'x' }],
         }),
       () =>
@@ -272,25 +260,25 @@ describe('LocalSearchExecutor', () => {
       () =>
         base.search({
           text: '" hostile',
-          kind: 'document',
+          kind: 'test.document',
           fields: [{ name: 'text', value: '   ' }],
         }),
       () =>
         base.search({
           text: '" hostile',
-          kind: 'document',
+          kind: 'test.document',
           fields: [{ name: 'score', value: 'NaN' }],
         }),
       () =>
         base.search({
           text: '" hostile',
-          kind: 'document',
+          kind: 'test.document',
           fields: [{ name: 'active', value: 'yes' }],
         }),
       () =>
         base.search({
           text: '" hostile',
-          kind: 'document',
+          kind: 'test.document',
           fields: [{ name: 'publishedAt', value: 'not-a-date' }],
         }),
     ]

@@ -59,8 +59,8 @@ async function fixture(
     "INSERT INTO realms (id, slug, label, created_at) VALUES ('realm', 'work', 'Work', 1)",
   )
   db.prepare(`INSERT INTO sources
-    (id, realm_id, label, adapter_id, adapter_version, config_json, sync_enabled, created_at, updated_at)
-    VALUES (?, 'realm', 'Artifact Service Source', 'fake.artifacts', 1, '{}', 1, 1, 1)`).run(
+    (id, realm_id, label, adapter_id, config_json, sync_enabled, created_at, updated_at)
+    VALUES (?, 'realm', 'Artifact Service Source', 'fake.artifacts', '{}', 1, 1, 1)`).run(
     sourceId,
   )
 
@@ -81,10 +81,8 @@ async function fixture(
   })
   const common = {
     id: 'fake.artifacts',
-    version: 1,
     configSchema: z.object({}).strict(),
-    auth: { kind: 'none' as const },
-    profiles: [{ id: 'fake.message', version: 1 }],
+    profiles: [profile],
     routing: 'indexed' as const,
     actions: {},
   }
@@ -107,7 +105,6 @@ async function fixture(
   const registry = createExtensionRegistry([
     defineExtension({
       id: 'fake.artifacts-extension',
-      version: 1,
       profiles: [profile],
       adapters: [adapter],
     }),
@@ -365,7 +362,6 @@ describe('ArtifactService', () => {
     const registry = createExtensionRegistry([
       defineExtension({
         id: 'bad-ext',
-        version: 1,
         profiles: [badProfile],
         adapters: [],
       }),

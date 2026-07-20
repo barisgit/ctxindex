@@ -138,16 +138,14 @@ test('production Adapter surface has no send permission, Action, or route', asyn
   const adapters = CTXINDEX_BUILTIN_EXTENSIONS.flatMap(
     (extension) => extension.adapters,
   )
-  const declaredScopes = adapters.flatMap((adapter) =>
-    adapter.auth.kind === 'oauth2' ? adapter.auth.scopes : [],
+  const declaredScopes = adapters.flatMap(
+    (adapter) => adapter.access?.scopes ?? [],
   )
   expect(declaredScopes.filter((scope) => /send/i.test(scope))).toEqual([])
 
   const actionIds = [
-    ...CTXINDEX_BUILTIN_EXTENSIONS.flatMap((extension) =>
-      extension.profiles.flatMap((profile) =>
-        Object.keys(profile.actions ?? {}),
-      ),
+    ...adapters.flatMap((adapter) =>
+      adapter.profiles.flatMap((profile) => Object.keys(profile.actions ?? {})),
     ),
     ...adapters.flatMap((adapter) => Object.keys(adapter.actions)),
   ]
@@ -179,10 +177,15 @@ test('Microsoft Calendar production surface is stable and read-only', async () =
 test('calendar vocabulary is Profile-owned and bundled declaratively', async () => {
   const profiles = await sourceTree(profileRoot)
   expect(profiles).toContain("id: 'calendar.event'")
-  expect(profiles).toContain("aliases: ['events']")
+  expect(profiles).not.toContain("aliases: ['events']")
 
-  const builtins = await Bun.file(new URL('builtins.ts', adapterRoot)).text()
-  expect(builtins).toContain('calendarEventProfile')
+  const calendarAdapters = await Promise.all([
+    Bun.file(new URL('google-calendar/definition.ts', adapterRoot)).text(),
+    Bun.file(new URL('microsoft/calendar/definition.ts', adapterRoot)).text(),
+  ])
+  expect(
+    calendarAdapters.every((source) => source.includes('calendarEventProfile')),
+  ).toBe(true)
   expect(await sourceTree(coreSourceRoot)).not.toContain('calendar.event')
 })
 
@@ -196,12 +199,12 @@ test('provider implementation and endpoint literals stay outside core and CLI', 
   ).toBe(false)
 })
 
-test('client and account CLIs have no literal long-lived credential inputs', async () => {
+test('OAuth App and Account CLIs have no literal long-lived credential inputs', async () => {
   const accessSources = (
     await Promise.all(
       [
-        'args/client.ts',
-        'commands/client.ts',
+        'args/oauth-app.ts',
+        'commands/oauth-app.ts',
         'args/account.ts',
         'commands/account.ts',
       ].map((path) => Bun.file(new URL(path, cliRoot)).text()),
@@ -217,23 +220,26 @@ test('client and account CLIs have no literal long-lived credential inputs', asy
 })
 
 test('OAuth declarations expose bounded hosts through the public SDK', async () => {
-  const adapterContract = await Bun.file(new URL('adapter.ts', sdkRoot)).text()
-  expect(adapterContract).toContain('allowedHosts')
+  const [adapterContract, providerContract] = await Promise.all([
+    Bun.file(new URL('adapter.ts', sdkRoot)).text(),
+    Bun.file(new URL('provider.ts', sdkRoot)).text(),
+  ])
+  expect(providerContract).toContain('allowedHosts')
   expect(adapterContract).toContain('providerApiHosts')
-  expect(adapterContract).toContain('identity')
+  expect(providerContract).toContain('identity')
   expect(adapterContract).toContain('provider')
 
   const declaredHosts = new Set<string>()
   for (const extension of CTXINDEX_BUILTIN_EXTENSIONS) {
     for (const adapter of extension.adapters) {
       for (const host of adapter.providerApiHosts ?? []) declaredHosts.add(host)
-      if (adapter.auth.kind !== 'oauth2') continue
-      for (const host of adapter.auth.provider.allowedHosts)
-        declaredHosts.add(host)
+      const provider = adapter.provider
+      if (provider?.auth.kind !== 'oauth2') continue
+      for (const host of provider.auth.allowedHosts) declaredHosts.add(host)
       for (const endpoint of [
-        adapter.auth.provider.authorizationUrl,
-        adapter.auth.provider.tokenUrl,
-        adapter.auth.provider.identity.url,
+        provider.auth.authorizationUrl,
+        provider.auth.tokenUrl,
+        provider.auth.identity.url,
       ])
         declaredHosts.add(new URL(endpoint).hostname)
     }
@@ -271,11 +277,13 @@ test('public Extension SDK is a stable barrel over core-independent modules', as
 
   expect(productionFiles).toEqual([
     'adapter.ts',
+    'documentation.ts',
     'extension.ts',
     'index.ts',
+    'oauth-app.ts',
     'operations.ts',
     'profile.ts',
-    'reference.ts',
+    'provider.ts',
   ])
 
   for (const filename of productionFiles) {

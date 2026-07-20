@@ -2,10 +2,10 @@ import { Database } from 'bun:sqlite'
 import { afterEach, describe, expect, test } from 'bun:test'
 import {
   type ActionContext,
-  type AdapterAuthSpec,
   defineAdapter,
   defineExtension,
   defineProfile,
+  type OAuthProviderDefinition,
   type RetrievedResource,
 } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
@@ -46,16 +46,12 @@ test('propagates storage failures without relabeling them as Adapter results', a
 })
 
 test('does not automatically retry an Action fetch after 401', async () => {
-  const auth = {
-    kind: 'oauth2' as const,
-    provider: testOAuthProvider({
-      id: 'google',
-      authorizationUrl: 'https://accounts.example/auth',
-      tokenUrl: 'https://oauth2.googleapis.com/token',
-    }),
-    scopes: ['scope:draft'],
-  }
-  const db = await freshDb({ auth, grantId: 'grant-once' })
+  const provider = testOAuthProvider({
+    id: 'google',
+    authorizationUrl: 'https://accounts.example/auth',
+    tokenUrl: 'https://oauth2.googleapis.com/token',
+  })
+  const db = await freshDb({ provider, grantId: 'grant-once' })
   let tokenCalls = 0
   let fetchCalls = 0
   const registry = registryWith(
@@ -64,7 +60,7 @@ test('does not automatically retry an Action fetch after 401', async () => {
       expect(response.status).toBe(401)
       return result()
     },
-    { auth },
+    { provider },
   )
 
   await runAction(
@@ -126,7 +122,6 @@ const outputProfile = defineProfile({
       effect: 'reversible',
       input: createDraftInput,
       output: { id: 'fake.message', version: 1 },
-      docs: 'Create a fake draft',
     },
   },
 })
@@ -146,7 +141,7 @@ afterEach(() => {
 async function freshDb(
   options: {
     adapterId?: string
-    auth?: AdapterAuthSpec
+    provider?: OAuthProviderDefinition
     grantId?: string
   } = {},
 ): Promise<Database> {
@@ -162,14 +157,14 @@ async function freshDb(
       "INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES ('account-1', 'google', 'Test', 'subject-1', 1, 1)",
     ).run()
     db.prepare(
-      `INSERT INTO grants (id, account_id, provider, scopes_json, created_at, updated_at)
-       VALUES (?, 'account-1', 'google', '["scope:draft"]', 1, 1)`,
+      `INSERT INTO grants (id, account_id, provider, scopes_json, app_config_ref, created_at, updated_at)
+       VALUES (?, 'account-1', 'google', '["scope:draft"]', 'secret://test/app', 1, 1)`,
     ).run(options.grantId)
   }
   db.prepare(
     `INSERT INTO sources
-       (id, realm_id, label, adapter_id, adapter_version, grant_id, config_json, sync_enabled, created_at, updated_at)
-     VALUES (?, 'realm-1', 'Action Source', ?, 1, ?, '{}', 1, 1, 1)`,
+       (id, realm_id, label, adapter_id, grant_id, config_json, sync_enabled, created_at, updated_at)
+     VALUES (?, 'realm-1', 'Action Source', ?, ?, '{}', 1, 1, 1)`,
   ).run(sourceId, options.adapterId ?? 'fake.actions', options.grantId ?? null)
   return db
 }
@@ -192,7 +187,7 @@ function registryWith(
     context: ActionContext<{ subject: string }>,
   ) => RetrievedResource | Promise<RetrievedResource>,
   options: {
-    auth?: AdapterAuthSpec
+    provider?: OAuthProviderDefinition
     adapterId?: string
     effect?: 'reversible' | 'irreversible'
   } = {},
@@ -204,35 +199,38 @@ function registryWith(
         effect: options.effect ?? 'reversible',
         input: createDraftInput,
         output: { id: 'fake.message', version: 1 },
-        docs: 'Create a fake draft',
       },
     },
   })
-  const adapter = defineAdapter({
+  const definition = {
     id: options.adapterId ?? 'fake.actions',
-    version: 1,
     configSchema: z.object({}).strict(),
-    auth: options.auth ?? { kind: 'none' },
-    providerApiHosts: ['provider.example'],
-    profiles: [{ id: 'fake.message', version: 1 }],
+    profiles: [profile],
     routing: 'indexed',
     capabilities: [],
     operations: {},
     actions: run
       ? {
           [actionId]: {
-            profile: { id: 'fake.message', version: 1 } as const,
+            profile,
             input: createDraftInput,
-            output: { id: 'fake.message', version: 1 } as const,
+            output: profile,
             run,
           },
         }
       : {},
-  })
+  } as const
+  const adapter = options.provider
+    ? defineAdapter({
+        ...definition,
+        provider: options.provider,
+        access: { scopes: ['scope:draft'] },
+        providerApiHosts: ['provider.example'],
+      })
+    : defineAdapter(definition)
   return createExtensionRegistry([
     defineExtension({
       id: `extension.${adapter.id}`,
-      version: 1,
       profiles: [profile],
       adapters: [adapter],
     }),
@@ -344,7 +342,7 @@ describe('runAction', () => {
     )
     expect(unavailable).toMatchObject({ code: 'action_unsupported' })
     expect(String(unavailable)).toContain('missing.adapter')
-    expect(String(unavailable)).toContain('fake.available@1')
+    expect(String(unavailable)).toContain('fake.available')
     expect(adapterCalls).toBe(0)
   })
 
@@ -390,16 +388,12 @@ describe('runAction', () => {
   })
 
   test('passes parsed input and the exact auth-bound Source provider context once', async () => {
-    const auth = {
-      kind: 'oauth2' as const,
-      provider: testOAuthProvider({
-        id: 'google',
-        authorizationUrl: 'https://accounts.example/auth',
-        tokenUrl: 'https://oauth2.googleapis.com/token',
-      }),
-      scopes: ['scope:draft'],
-    }
-    const db = await freshDb({ auth, grantId: 'grant-exact' })
+    const provider = testOAuthProvider({
+      id: 'google',
+      authorizationUrl: 'https://accounts.example/auth',
+      tokenUrl: 'https://oauth2.googleapis.com/token',
+    })
+    const db = await freshDb({ provider, grantId: 'grant-exact' })
     let adapterCalls = 0
     const tokenGrants: string[] = []
     const registry = registryWith(
@@ -414,7 +408,7 @@ describe('runAction', () => {
           payload: { subject: context.input.subject, provider: 'fake' },
         })
       },
-      { auth },
+      { provider },
     )
 
     const value = await runAction(
@@ -441,16 +435,12 @@ describe('runAction', () => {
   })
 
   test('provides a Source-scoped local Resource resolver before provider I/O', async () => {
-    const auth = {
-      kind: 'oauth2' as const,
-      provider: testOAuthProvider({
-        id: 'google',
-        authorizationUrl: 'https://accounts.example/auth',
-        tokenUrl: 'https://oauth2.googleapis.com/token',
-      }),
-      scopes: ['scope:draft'],
-    }
-    const db = await freshDb({ auth, grantId: 'grant-local-resolver' })
+    const provider = testOAuthProvider({
+      id: 'google',
+      authorizationUrl: 'https://accounts.example/auth',
+      tokenUrl: 'https://oauth2.googleapis.com/token',
+    })
+    const db = await freshDb({ provider, grantId: 'grant-local-resolver' })
     let tokenCalls = 0
     let fetchCalls = 0
     const registry = registryWith(
@@ -481,7 +471,7 @@ describe('runAction', () => {
         })
         return result()
       },
-      { auth },
+      { provider },
     )
     const store = new ResourceStore(db, registry.profiles)
     store.upsert({
@@ -585,22 +575,18 @@ describe('runAction', () => {
       await runAction(input(db, providerRegistry)).catch((error) => error),
     ).toBe(providerError)
 
-    const auth = {
-      kind: 'oauth2' as const,
-      provider: testOAuthProvider({
-        id: 'google',
-        authorizationUrl: 'https://accounts.example/auth',
-        tokenUrl: 'https://oauth2.googleapis.com/token',
-      }),
-      scopes: ['scope:draft'],
-    }
-    const authDb = await freshDb({ auth, grantId: 'grant-auth' })
+    const provider = testOAuthProvider({
+      id: 'google',
+      authorizationUrl: 'https://accounts.example/auth',
+      tokenUrl: 'https://oauth2.googleapis.com/token',
+    })
+    const authDb = await freshDb({ provider, grantId: 'grant-auth' })
     const authRegistry = registryWith(
       async (context) => {
         await context.fetch('https://provider.example/drafts')
         return result()
       },
-      { auth },
+      { provider },
     )
     const authError = new CtxindexAuthError(
       'token_refresh_failed',

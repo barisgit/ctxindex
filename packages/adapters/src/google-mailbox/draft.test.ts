@@ -4,6 +4,7 @@ import type { ActionArtifact, ActionContext } from '@ctxindex/extension-sdk'
 import {
   communicationMessageDraftCreateInputSchema,
   communicationMessageDraftUpdateInputSchema,
+  communicationMessageProfile,
 } from '@ctxindex/profiles'
 import { gmailAdapterDefinition } from './definition'
 import { buildGmailDraftRaw, gmailDraftCreate, gmailDraftUpdate } from './draft'
@@ -387,11 +388,8 @@ describe('gmailDraftCreate', () => {
 
     const binding =
       gmailAdapterDefinition.actions['communication.message.draft.create']
-    expect(binding?.profile).toEqual({
-      id: 'communication.message',
-      version: 1,
-    })
-    expect(binding?.output).toEqual({ id: 'communication.message', version: 1 })
+    expect(binding?.profile).toBe(communicationMessageProfile)
+    expect(binding?.output).toBe(communicationMessageProfile)
     expect(binding?.input).toBe(communicationMessageDraftCreateInputSchema)
     const resource = await binding?.run(context(input, mockedFetch))
 
@@ -880,11 +878,8 @@ describe('gmailDraftUpdate', () => {
 
     const binding =
       gmailAdapterDefinition.actions['communication.message.draft.update']
-    expect(binding?.profile).toEqual({
-      id: 'communication.message',
-      version: 1,
-    })
-    expect(binding?.output).toEqual({ id: 'communication.message', version: 1 })
+    expect(binding?.profile).toBe(communicationMessageProfile)
+    expect(binding?.output).toBe(communicationMessageProfile)
     expect(binding?.input).toBe(communicationMessageDraftUpdateInputSchema)
     const resource = await binding?.run(context(input, mockedFetch))
 

@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import type { OAuthProviderSpec } from '@ctxindex/extension-sdk'
+import type { OAuthProviderDefinition } from '@ctxindex/extension-sdk'
 import { CtxindexAuthError } from '../errors'
 
 const callbackPath = '/oauth/callback'
@@ -54,7 +54,7 @@ export interface OAuthLoopbackResult {
   readonly authorizationUrl: string
 }
 export async function openOAuthLoopback(input: {
-  readonly provider: OAuthProviderSpec
+  readonly provider: OAuthProviderDefinition
   readonly authorizationEndpoint: string
   readonly clientId: string
   readonly scopes: readonly string[]
@@ -73,7 +73,7 @@ export async function openOAuthLoopback(input: {
   const redirectUri = `http://localhost:${port}${callbackPath}`
   const authorization = new URL(input.authorizationEndpoint)
   for (const [name, value] of Object.entries(
-    input.provider.fixedAuthorizationParams ?? {},
+    input.provider.auth.fixedAuthorizationParams ?? {},
   ))
     authorization.searchParams.set(name, value)
   authorization.searchParams.set('client_id', input.clientId)

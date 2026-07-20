@@ -36,9 +36,9 @@ async function fixture(options: { purgeId?: () => string } = {}) {
   db.exec(`
     INSERT INTO realms (id, slug, created_at) VALUES ('realm', 'test', 1);
     INSERT INTO sources (
-      id, realm_id, label, adapter_id, adapter_version, config_json, created_at, updated_at
+      id, realm_id, label, adapter_id, config_json, created_at, updated_at
     ) VALUES (
-      '${sourceId}', 'realm', 'Artifact Store Source', 'fake', 1, '{}', 1, 1
+      '${sourceId}', 'realm', 'Artifact Store Source', 'fake', '{}', 1, 1
     );
     INSERT INTO resources (
       id, ref, source_id, realm_id, profile_id, profile_version, origin,
