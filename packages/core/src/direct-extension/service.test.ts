@@ -467,29 +467,36 @@ test('uninstall blocks dependent Sources and force removes only activation state
     label: 'alpha',
     adapterId: 'missing.adapter',
   }
+  const laterSource = {
+    id: 'source-3',
+    label: 'alpha',
+    adapterId: 'missing.adapter',
+  }
   await expect(
     service.uninstall({
       extensionId: 'example.direct',
       loadValidationContext: loadUninstallContext(registry, [
         source,
+        laterSource,
         earlierSource,
       ]),
       force: false,
     }),
   ).rejects.toMatchObject({
     code: 'extension_removal_blocked',
-    blockingSources: [earlierSource, source],
+    blockingSources: [earlierSource, laterSource, source],
   })
   expect(await store.readRecords()).toHaveLength(1)
   const result = await service.uninstall({
     extensionId: 'example.direct',
     loadValidationContext: loadUninstallContext(registry, [
       source,
+      laterSource,
       earlierSource,
     ]),
     force: true,
   })
-  expect(result.blockingSources).toEqual([earlierSource, source])
+  expect(result.blockingSources).toEqual([earlierSource, laterSource, source])
   expect(await store.readRecords()).toEqual([])
 })
 

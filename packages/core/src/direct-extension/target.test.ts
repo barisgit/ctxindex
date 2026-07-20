@@ -63,6 +63,8 @@ describe('direct Extension target parsing', () => {
     ['npm', 'https://user:secret@example.com/pkg.tgz'],
     ['git', 'git+https://token@example.com/repo.git'],
     ['git', 'ssh://user@example.com/repo.git'],
+    ['git', 'git+ssh://git:secret@example.com/repo.git'],
+    ['git', 'user@example.com:repo.git'],
   ] as const)('rejects embedded credentials for %s targets', (kind, target) => {
     expect(() =>
       parseDirectExtensionTarget(kind, target, {
@@ -70,6 +72,18 @@ describe('direct Extension target parsing', () => {
         validatePackageTarget() {},
       }),
     ).toThrow('must not contain credentials')
+  })
+
+  test.each([
+    'git+ssh://git@example.com/repository.git#main',
+    'git@example.com:repository.git#main',
+  ])('accepts credential-free Git SSH target %s', (target) => {
+    expect(
+      parseDirectExtensionTarget('git', target, {
+        cwd: '/workspace',
+        validatePackageTarget: validateDirectPackageTarget,
+      }),
+    ).toEqual({ kind: 'git', requestedTarget: target })
   })
 
   test('sanitizes requested target projection', () => {

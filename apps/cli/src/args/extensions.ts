@@ -230,7 +230,10 @@ export function parseExtensionsArgs(args: string[]): ExtensionsArgs {
       (directKind === 'npm' ||
         directKind === 'git' ||
         directKind === 'local') &&
-      rest.includes('--extension')
+      rest.some(
+        (argument) =>
+          argument === '--extension' || argument.startsWith('--extension='),
+      )
     ) {
       const parsed = parseFlags(rest, {
         booleanFlags: ['json'],

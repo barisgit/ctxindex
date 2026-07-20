@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { googleOAuthProvider } from '@ctxindex/adapters'
@@ -564,6 +564,84 @@ test('daemon startup loads local Extensions without network acquisition', async 
     await daemon.close(100)
   } finally {
     globalThis.fetch = originalFetch
+    await rm(sandbox, { recursive: true, force: true })
+    await rm(runtimeRoot, { recursive: true, force: true })
+  }
+})
+
+test('daemon startup loads direct pins and counts direct record diagnostics', async () => {
+  const sandbox = await mkdtemp(join(tmpdir(), 'ctxindex-daemon-direct-'))
+  const roots = {
+    configRoot: join(sandbox, 'config'),
+    dataRoot: join(sandbox, 'data'),
+    stateRoot: join(sandbox, 'state'),
+    cacheRoot: join(sandbox, 'cache'),
+  }
+  const runtimeRoot = `/tmp/ctxd-direct-${process.pid}`
+  await Promise.all(
+    Object.values(roots).map((path) => mkdir(path, { recursive: true })),
+  )
+  await writeFile(
+    join(roots.configRoot, 'direct-extensions.json'),
+    JSON.stringify({
+      schema_version: 1,
+      extensions: [
+        {
+          id: 'example.direct',
+          source: {
+            kind: 'npm',
+            requested_target: '@example/direct@^1',
+            exact_version: '1.2.3',
+          },
+          materialization_digest: 'a'.repeat(64),
+          package_root: 'node_modules/@example/direct',
+          installed_at: 10,
+          updated_at: 20,
+        },
+        {},
+      ],
+    }),
+  )
+  try {
+    const daemon = await startDaemon({
+      roots,
+      leaseBackend: { acquire: (input) => lease(input.purpose, []) },
+      endpointRuntimeRoot: runtimeRoot,
+      hooks: {
+        readMatchingMetadata: () => null,
+        assertDatabaseTarget: () => {},
+        readConfig: async () => defaultConfig(),
+        readInstalled: async () => [],
+        openDatabase: async () => ({ close: () => {} }) as never,
+        runMigrations: async () => {},
+        listLocalOAuthAppIdentities: () => [],
+        composeServices: () => ({
+          syncService: {
+            run: async () => ({ mode: 'sync', results: [], warnings: [] }),
+          },
+          sourceService: {
+            resolveSourceId: (value: string) => value,
+            getStatus: () => [],
+          },
+        }),
+        bind: () => ({ stop: () => {} }),
+        writeMetadata: () => {},
+        cleanupMetadata: () => 'removed',
+        removeEndpoint: () => {},
+      },
+    })
+    const health = await daemon.application.system.health(
+      {},
+      daemon.testContext(),
+    )
+    expect(health).toEqual(
+      expect.objectContaining({
+        ok: true,
+        value: expect.objectContaining({ extensionDiagnosticsCount: 2 }),
+      }),
+    )
+    await daemon.close(100)
+  } finally {
     await rm(sandbox, { recursive: true, force: true })
     await rm(runtimeRoot, { recursive: true, force: true })
   }

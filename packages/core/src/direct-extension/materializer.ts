@@ -185,10 +185,10 @@ function packageVersion(manifest: unknown): string {
   return version
 }
 
-function packageIntegrity(
+function packageLockEntry(
   lockText: string,
   packageName: string,
-): string | undefined {
+): readonly unknown[] | undefined {
   let lock: unknown
   try {
     let normalized = ''
@@ -223,10 +223,33 @@ function packageIntegrity(
   const packages = (lock as { packages?: unknown }).packages
   if (packages === null || typeof packages !== 'object') return undefined
   const entry = (packages as Record<string, unknown>)[packageName]
-  if (!Array.isArray(entry)) return undefined
-  const integrity = entry[3]
+  return Array.isArray(entry) ? entry : undefined
+}
+
+function packageIntegrity(
+  lockText: string,
+  packageName: string,
+): string | undefined {
+  const entry = packageLockEntry(lockText, packageName)
+  const integrity = entry?.[3]
   return typeof integrity === 'string' && integrity.startsWith('sha')
     ? integrity
+    : undefined
+}
+
+function packageGitCommit(
+  lockText: string,
+  packageName: string,
+): string | undefined {
+  const entry = packageLockEntry(lockText, packageName)
+  if (entry?.length !== 3) return undefined
+  const resolution = entry[0]
+  const revision = entry[2]
+  return typeof resolution === 'string' &&
+    /@(?:git\+|github:)/i.test(resolution) &&
+    typeof revision === 'string' &&
+    /^[0-9a-f]{40,64}$/.test(revision)
+    ? revision
     : undefined
 }
 
@@ -322,7 +345,7 @@ export class BunPackageMaterializer implements PackageMaterializer {
             ...(integrity === undefined ? {} : { integrity }),
           }
         } else {
-          const commit = /\b[0-9a-f]{40,64}\b/.exec(lockText)?.[0]
+          const commit = packageGitCommit(lockText, key)
           if (commit === undefined) {
             throw acquisitionFailure(
               'Package manager did not report an exact Git commit',

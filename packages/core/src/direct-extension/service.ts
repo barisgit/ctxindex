@@ -5,6 +5,7 @@ import {
   importExtensionPackageRoot,
   safeExtensionDiagnostic,
 } from '../extension'
+import { compareUnicodeCodePoints } from '../internal/code-point-order'
 import {
   buildCompleteCandidateRegistry,
   type CollectedExtension,
@@ -395,7 +396,11 @@ export class DirectExtensionService {
             before.has(source.adapterId) &&
             !postRemoval.adapters.has(source.adapterId),
         )
-        .sort((left, right) => left.label.localeCompare(right.label))
+        .sort(
+          (left, right) =>
+            compareUnicodeCodePoints(left.label, right.label) ||
+            compareUnicodeCodePoints(left.id, right.id),
+        )
       if (blockingSources.length > 0 && !input.force) {
         throw lifecycleError(
           'extension_removal_blocked',

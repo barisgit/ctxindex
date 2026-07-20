@@ -51,10 +51,12 @@ export function formatExtensions(
     .map((extension) => {
       const storedDirect = directById.get(extension.id)
       const loadedSource = provenanceByIdentity.get(extension.id)
+      const loadedDirect =
+        loadedSource?.kind === 'direct' ? loadedSource : undefined
       const source =
         storedDirect === undefined
           ? loadedSource
-          : {
+          : (loadedDirect ?? {
               id: storedDirect.id,
               kind: 'direct' as const,
               sourceKind: storedDirect.sourceKind,
@@ -63,10 +65,10 @@ export function formatExtensions(
               materializationDigest: storedDirect.materializationDigest,
               installedAt: storedDirect.installedAt,
               updatedAt: storedDirect.updatedAt,
-            }
+            })
       return {
         id: extension.id,
-        ...(storedDirect !== undefined && !loadedIds.has(extension.id)
+        ...(storedDirect !== undefined && loadedDirect === undefined
           ? { available: false as const }
           : {}),
         profiles: [...extension.profiles]

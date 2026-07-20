@@ -43,6 +43,8 @@ ctxindex extensions uninstall <id> [--force] [--json]
 
 Direct install and update print a trust notice before acquiring or importing the package. npm and Git targets are resolved to immutable metadata; local targets are copied into an immutable content-addressed snapshot. Startup loads only the stored pin: it never contacts the registry, Git remote, package manager, or original local directory. Package dependencies are ordinary imports and may come from npm, Git, or local package references; ctxindex does not maintain a separate Extension dependency graph.
 
+Direct lifecycle failures use stable exits: invalid targets, missing trust, and blocked removal exit `2`; package acquisition failures exit `30`; manifest, selection, integrity, or definition validation failures and complete-registry conflicts exit `50`. A failed install or update discards the staged candidate and preserves any prior direct record, immutable materialization, active definitions, Sources, and Source-owned data.
+
 If an Extension is unavailable or uninstalled, its Sources remain listed and their synced Resources remain locally searchable, but provider operations stop.
 
 ## JSON output
@@ -50,5 +52,5 @@ If an Extension is unavailable or uninstalled, its Sources remain listed and the
 All Extension lifecycle commands accept `--json`. Extension loading and acquisition diagnostics are written separately from stdout.
 
 <Callout title="Stable exit codes">
-Exit codes are API: `0` success; `2` invalid usage; `10` `needs_auth`; `20` rate limited; `30` network/provider or package acquisition; `40` permission denied; `50` validation, conflict, or other internal failure; `130` cancelled by SIGINT.
+Exit codes are API: `0` success; `2` invalid usage; `10` `needs_auth`; `20` rate limited; `30` network/provider or external package acquisition; `40` permission denied; `50` Extension validation/conflict, other validation/conflict, or internal failure; `130` cancelled by SIGINT.
 </Callout>

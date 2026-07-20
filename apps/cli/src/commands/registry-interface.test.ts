@@ -365,4 +365,35 @@ describe('extensions list interface', () => {
       }),
     ])
   })
+
+  test('keeps a failed direct pin unavailable when another origin shares its id', () => {
+    const result = JSON.parse(
+      formatExtensions(
+        {
+          list: () => [{ id: 'example.direct', profiles: [], adapters: [] }],
+        },
+        true,
+        [{ id: 'example.direct', kind: 'builtin' }],
+        [
+          {
+            id: 'example.direct',
+            sourceKind: 'npm',
+            requestedTarget: '@example/direct@^1',
+            resolvedIdentity: '1.2.3',
+            materializationDigest: 'b'.repeat(64),
+            installedAt: 100,
+            updatedAt: 200,
+          },
+        ],
+      ),
+    )
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: 'example.direct',
+        available: false,
+        provenance: expect.objectContaining({ kind: 'direct' }),
+      }),
+    ])
+  })
 })

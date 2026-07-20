@@ -132,10 +132,9 @@ test('runner receives executable and argv without shell interpolation', async ()
   }
 })
 
-test('Git materialization records the exact package-manager commit', async () => {
+async function materializeGit(lockText: string) {
   const root = await mkdtemp(join(tmpdir(), 'ctxindex-git-materializer-'))
   roots.push(root)
-  const commit = 'b'.repeat(40)
   const materializer = new BunPackageMaterializer({
     stagingParent: join(root, 'managed'),
     run: async (input) => {
@@ -160,13 +159,25 @@ test('Git materialization records the exact package-manager commit', async () =>
         ),
         JSON.stringify({ name: 'fixture-git-extension', version: '1.0.0' }),
       )
-      await writeFile(join(input.cwd, 'bun.lock'), `resolved = "${commit}"\n`)
+      await writeFile(join(input.cwd, 'bun.lock'), lockText)
     },
   })
-  const result = await materializer.materialize({
+  return materializer.materialize({
     kind: 'git',
     requestedTarget: 'git+https://example.com/repository.git#main',
   })
+}
+
+test('Git materialization records the selected package tuple commit', async () => {
+  const unrelatedCommit = 'a'.repeat(40)
+  const commit = 'b'.repeat(40)
+  const result = await materializeGit(`{
+    "lockfileVersion": 1,
+    "packages": {
+      "unrelated": ["unrelated@git+https://example.com/unrelated.git", {}, "${unrelatedCommit}"],
+      "fixture-git-extension": ["fixture-git-extension@git+https://example.com/repository.git", {}, "${commit}"],
+    },
+  }`)
   try {
     expect(result.source).toMatchObject({
       kind: 'git',
@@ -176,6 +187,19 @@ test('Git materialization records the exact package-manager commit', async () =>
   } finally {
     await result.cleanup()
   }
+})
+
+test('Git materialization ignores unrelated commits when the selected tuple has no exact revision', async () => {
+  const unrelatedCommit = 'a'.repeat(40)
+  await expect(
+    materializeGit(`{
+      "lockfileVersion": 1,
+      "packages": {
+        "unrelated": ["unrelated@git+https://example.com/unrelated.git", {}, "${unrelatedCommit}"],
+        "fixture-git-extension": ["fixture-git-extension@git+https://example.com/repository.git", {}, "main"],
+      },
+    }`),
+  ).rejects.toMatchObject({ code: 'extension_acquisition_failed' })
 })
 
 test('package process bounds output, timeout, cancellation, and temporary state', async () => {

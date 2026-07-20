@@ -5,6 +5,7 @@ import {
   DirectExtensionStore,
   parseDirectExtensionTarget,
   projectDirectExtensionRecord,
+  validateDirectExtensionId,
   validateDirectPackageTarget,
 } from '@ctxindex/core'
 import { CatalogService } from '@ctxindex/core/catalog'
@@ -189,6 +190,7 @@ export async function handleExtensionsCommand(
             validatePackageTarget: validateDirectPackageTarget,
           })
         : undefined
+    validateDirectExtensionId(parsed.extensionId)
     if (parsed.kind === 'direct-install' || parsed.kind === 'direct-update') {
       console.error(
         'Trust notice: this command acquires and executes third-party Extension code in-process; validation is not a sandbox.',

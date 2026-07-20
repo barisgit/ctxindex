@@ -8,12 +8,17 @@ const extensionIdSchema = z
   .regex(/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/)
 
 function credentialFree(value: string): boolean {
-  if (/^(?:git\+)?ssh:/i.test(value) || /^[^/@\s]+@[^/\s]+:/.test(value)) {
-    return false
-  }
+  const scpUser = /^([^/@\s]+)@[^/\s]+:/.exec(value)?.[1]
+  if (scpUser !== undefined) return scpUser === 'git'
   if (!/^[a-z][a-z0-9+.-]*:/i.test(value)) return true
   try {
     const parsed = new URL(value.replace(/^git\+/, ''))
+    if (parsed.protocol === 'ssh:') {
+      return (
+        parsed.password.length === 0 &&
+        (parsed.username.length === 0 || parsed.username === 'git')
+      )
+    }
     return parsed.username.length === 0 && parsed.password.length === 0
   } catch {
     return true

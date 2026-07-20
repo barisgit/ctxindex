@@ -22,6 +22,20 @@ describe('parseExtensionsArgs Catalog surface', () => {
       trust: true,
       json: true,
     })
+    expect(
+      parseExtensionsArgs([
+        'install',
+        'npm',
+        '@example/mail@^2',
+        '--extension=example.mail',
+      ]),
+    ).toEqual({
+      kind: 'direct-install',
+      sourceKind: 'npm',
+      target: '@example/mail@^2',
+      extensionId: 'example.mail',
+      json: false,
+    })
     expect(parseExtensionsArgs(['catalog', 'list', '--json'])).toEqual({
       kind: 'catalog-list',
       noRefresh: false,

@@ -93,10 +93,21 @@ test('collapses arbitrary injected Catalog service failures', async () => {
 
 test('direct install wires SIGINT cancellation into the Core lifecycle call', async () => {
   let received: AbortSignal | undefined
+  let cancel: (() => void) | undefined
+  const once = spyOn(process, 'once').mockImplementation(((
+    event: string,
+    listener: () => void,
+  ) => {
+    if (event === 'SIGINT') cancel = listener
+    return process
+  }) as typeof process.once)
+  const removeListener = spyOn(process, 'removeListener').mockImplementation(
+    (() => process) as typeof process.removeListener,
+  )
   const direct = {
     install: async (input: { readonly signal?: AbortSignal }) => {
       received = input.signal
-      process.emit('SIGINT')
+      cancel?.()
       throw Object.assign(new Error('cancelled'), {
         code: 'cancelled',
         exitCode: 130,
@@ -115,6 +126,50 @@ test('direct install wires SIGINT cancellation into the Core lifecycle call', as
     )
     expect(exitCode).toBe(130)
     expect(received?.aborted).toBe(true)
+  } finally {
+    removeListener.mockRestore()
+    once.mockRestore()
+    error.mockRestore()
+  }
+})
+
+test.each([
+  {
+    command: 'install',
+    args: [
+      'install',
+      'npm',
+      '@example/direct@1',
+      '--extension',
+      'Example.Mail',
+    ],
+  },
+  { command: 'update', args: ['update', 'Example.Mail'] },
+  { command: 'uninstall', args: ['uninstall', 'Example.Mail'] },
+])('invalid direct ids fail before loading Extension code: $command', async ({
+  args,
+}) => {
+  let definitionLoads = 0
+  let identityReads = 0
+  const error = spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    const exitCode = await handleExtensionsCommand(
+      [...args],
+      {} as CatalogService,
+      {} as DirectExtensionService,
+      async () => {
+        definitionLoads += 1
+        return emptyDefinitions()
+      },
+      async () => {
+        identityReads += 1
+        return []
+      },
+      async () => [],
+    )
+    expect(exitCode).toBe(2)
+    expect(definitionLoads).toBe(0)
+    expect(identityReads).toBe(0)
   } finally {
     error.mockRestore()
   }

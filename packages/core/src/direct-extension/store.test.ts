@@ -96,6 +96,52 @@ describe('direct Extension records', () => {
     ).toThrow()
   })
 
+  test.each([
+    'git+ssh://git@example.com/repository.git#main',
+    'git@example.com:repository.git#main',
+  ])('persists credential-free Git SSH target %s', async (requestedTarget) => {
+    const root = await mkdtemp(join(tmpdir(), 'ctxindex-direct-ssh-'))
+    roots.push(root)
+    const store = new DirectExtensionStore({
+      configRoot: join(root, 'config'),
+      dataRoot: join(root, 'data'),
+    })
+    const installed = {
+      ...record(),
+      source: {
+        kind: 'git' as const,
+        requested_target: requestedTarget,
+        commit: 'b'.repeat(40),
+      },
+    }
+
+    await store.writeRecords([installed])
+
+    expect(await store.readRecords()).toEqual([installed])
+  })
+
+  test.each([
+    'git+ssh://git:secret@example.com/repository.git',
+    'git+ssh://user@example.com/repository.git',
+    'user@example.com:repository.git',
+  ])('rejects credentialed Git SSH target %s', (requestedTarget) => {
+    expect(() =>
+      directExtensionDocumentSchema.parse({
+        schema_version: 1,
+        extensions: [
+          {
+            ...record(),
+            source: {
+              kind: 'git',
+              requested_target: requestedTarget,
+              commit: 'b'.repeat(40),
+            },
+          },
+        ],
+      }),
+    ).toThrow()
+  })
+
   test('derives managed paths from a digest without persisting them', () => {
     const path = directExtensionMaterializationPath('/data', 'b'.repeat(64))
     expect(path).toBe(

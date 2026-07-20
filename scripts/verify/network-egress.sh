@@ -2,6 +2,9 @@
 # VAL-NETWORK-EGRESS: static + runtime audit for provider network egress.
 set -euo pipefail
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$REPO_ROOT"
+
 ALLOWLIST=(
   "oauth2.googleapis.com"
   "accounts.google.com"
@@ -18,6 +21,12 @@ PRODUCTION_RUNTIME_ROOTS=(
   "packages/adapters/src"
   "apps/cli/src"
 )
+for scan_root in "${PRODUCTION_RUNTIME_ROOTS[@]}"; do
+  if [[ ! -d "$scan_root" ]]; then
+    echo "VAL-NETWORK-EGRESS FAIL: production scan root is missing: $scan_root" >&2
+    exit 1
+  fi
+done
 violations="$(mktemp)"
 trap 'rm -f "$violations"' EXIT
 
