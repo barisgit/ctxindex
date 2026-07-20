@@ -118,9 +118,33 @@ test('oauth-app validates providers and manages safe labeled inventory', async (
     const initialized = await sandbox.run(['init'])
     expect(initialized.exitCode, initialized.stderr).toBe(0)
 
-    const empty = await sandbox.run(['oauth-app', 'list', '--json'])
-    expect(empty.exitCode, empty.stderr).toBe(0)
-    expect(empty.stdout).toBe('[]\n')
+    const managed = await sandbox.run(['oauth-app', 'list', '--json'])
+    expect(managed.exitCode, managed.stderr).toBe(0)
+    expect(managed.stdout).not.toMatch(
+      /clientId|clientSecret|apps\.googleusercontent|GOCSPX|22d1ed12/i,
+    )
+    expect(JSON.parse(managed.stdout)).toEqual([
+      {
+        providerId: 'google',
+        label: 'ctxindex',
+        origin: 'extension',
+        provenance: {
+          kind: 'extension',
+          source: 'builtin',
+          packageName: '@ctxindex/adapters',
+        },
+      },
+      {
+        providerId: 'microsoft',
+        label: 'ctxindex',
+        origin: 'extension',
+        provenance: {
+          kind: 'extension',
+          source: 'builtin',
+          packageName: '@ctxindex/adapters',
+        },
+      },
+    ])
 
     const unknown = await sandbox.run(
       ['oauth-app', 'add', 'fastmail', 'work', '--from-env'],
@@ -180,6 +204,16 @@ test('oauth-app validates providers and manages safe labeled inventory', async (
     expect(JSON.parse(listedJson.stdout)).toEqual([
       {
         providerId: 'google',
+        label: 'ctxindex',
+        origin: 'extension',
+        provenance: {
+          kind: 'extension',
+          source: 'builtin',
+          packageName: '@ctxindex/adapters',
+        },
+      },
+      {
+        providerId: 'google',
         label: 'personal',
         origin: 'local',
         provenance: { kind: 'local' },
@@ -189,6 +223,16 @@ test('oauth-app validates providers and manages safe labeled inventory', async (
         label: 'work',
         origin: 'local',
         provenance: { kind: 'local' },
+      },
+      {
+        providerId: 'microsoft',
+        label: 'ctxindex',
+        origin: 'extension',
+        provenance: {
+          kind: 'extension',
+          source: 'builtin',
+          packageName: '@ctxindex/adapters',
+        },
       },
       {
         providerId: 'microsoft',

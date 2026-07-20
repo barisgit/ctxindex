@@ -68,7 +68,9 @@ OAuth2 Provider registration maps each top-level App config-schema key to one va
 
 Core owns OAuth App inventory, local BYOA persistence, exact resolution, and collision handling. Complete-registry validation owns Extension App policy and cross-origin duplicate rejection. Fresh storage uses OAuth App terminology and has no Client table, view, service, command, alias, or compatibility path.
 
-Account authorization resolves exact `(providerId,label)`, validates the App against the active semantic Provider, and creates a private Grant-owned snapshot. Removing an App affects future authorization only.
+Account authorization with an explicit App label bypasses managed selection. With no label, core's pure host-policy resolver returns one exact managed label only after matching the active App, its owning Extension, and accepted provenance. Missing, inactive, mismatched, or ambiguous policy fails before config or secret reads, persistence, browser launch, or Provider egress; it never guesses a local or unreviewed App.
+
+Both paths then use the same exact `(providerId,label)` resolver, validate the App against the active semantic Provider, request the unchanged Provider-base plus all-active-Adapter scope union, and create a private Grant-owned snapshot. Removing an App affects future authorization only.
 
 ## Verification
 

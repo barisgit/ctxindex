@@ -24,6 +24,19 @@ ctxindex oauth-app remove <provider> <label>
 
 Use `ctxindex describe` to discover active Providers and `ctxindex oauth-app list` to discover exact App labels. Config values and generic JSON are not accepted as command arguments.
 
+`ctxindex account add <provider>` may omit `--app` only when one active Extension App exactly matches the host's managed-App policy. Omission never guesses a local or unreviewed App. To choose any App deterministically, including local BYOA, pass its exact label:
+
+```sh
+ctxindex account add <provider> --app <label>
+```
+
+If no managed default is available, create a local App from the Provider's environment mapping and then select it explicitly:
+
+```sh
+ctxindex oauth-app add <provider> <label> --from-env
+ctxindex account add <provider> --app <label>
+```
+
 ## JSON output
 
 Only `oauth-app list` accepts `--json`. Each item contains only Provider id, label, origin, and safe provenance.

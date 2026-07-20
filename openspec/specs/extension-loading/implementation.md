@@ -61,7 +61,7 @@ Absent or invalid Extension code leaves Sources unavailable for Provider operati
 
 Trusted entry modules use ordinary package imports and export shallow plain Extension values. The SDK exports factories and `z`; the host injects no authoring object and invokes no callback. Structural discriminators, not `instanceof` or physical SDK identity, identify candidates.
 
-Root provenance is diagnostic only. Load order, origin priority, package version, integrity, path, object identity, and function text do not select duplicate winners. Complete candidate validation succeeds before active registry mutation.
+Root provenance is retained as safe immutable acquisition evidence. A separate host release-policy matcher may consume it after duplicate-free activation solely to determine managed-App eligibility. Provenance, load order, origin priority, package version, integrity, path, object identity, and function text never establish leaf identity or equivalence and never select duplicate winners. Extension exports and package or Catalog manifests carry no authored managed authority. Complete candidate validation succeeds before active registry mutation.
 
 Direct local/Git/npm installation delegates acquired roots and safe generic provenance to the common entry, collection, exact-selection, and activation seams. Strict direct records derive content-addressed package roots under the current data root. Startup verifies those pins and degrades only the invalid Extension without invoking Bun, Git, npm, or the original local path.
 

@@ -5,7 +5,7 @@ export type AccountArgs =
       readonly kind: 'add'
       readonly provider: string
       readonly label?: string
-      readonly app: string
+      readonly app?: string
     }
   | { readonly kind: 'list'; readonly json: boolean }
   | { readonly kind: 'remove'; readonly label: string }
@@ -13,7 +13,7 @@ export type AccountArgs =
   | { readonly kind: 'unknown'; readonly message: string }
 
 export const accountUsage =
-  'account add <provider> --app <label> [--label <label>] | account list [--json] | account remove <label>'
+  'account add <provider> [--app <label>] [--label <label>] | account list [--json] | account remove <label>'
 
 export function parseAccountArgs(args: string[]): AccountArgs {
   if (hasHelpFlag(args)) return { kind: 'help' }
@@ -49,15 +49,10 @@ export function parseAccountArgs(args: string[]): AccountArgs {
     }
     const label = stringFlag(flags, 'label')
     const app = stringFlag(flags, 'app')
-    if (app === undefined)
-      return {
-        kind: 'unknown',
-        message: 'account add: --app is required',
-      }
     return {
       kind: 'add',
       provider: positional[0] as string,
-      app,
+      ...(app !== undefined ? { app } : {}),
       ...(label !== undefined ? { label } : {}),
     }
   }

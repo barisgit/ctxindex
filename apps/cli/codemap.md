@@ -14,7 +14,7 @@ Packages the Bun-executed `ctxindex` command-line application, from its executab
 
 1. Bun starts `apps/cli/bin/ctxindex.mjs` with process argv.
 2. The shim calls `apps/cli/src/main.ts#runCli(process.argv.slice(2))`.
-3. `runCli` dispatches through the command tree with a build-injected `__CTXINDEX_VERSION__`, falling back to `0.0.0` outside the bundle. Handlers fully parse arguments before dependency or transport work. Realm, Source, sync, status, search, get, and thread commands use exact-tuple discovery or a test endpoint to select the daemon, with no selected-route fallback; direct stateful dependencies require explicit initialization and retain a shared database lease. OAuth onboarding remains `oauth-app` -> `account --app` -> `source`. `daemon serve` launches the foreground entrypoint; health and shutdown are typed projections.
+3. `runCli` dispatches through the command tree with a build-injected `__CTXINDEX_VERSION__`, falling back to `0.0.0` outside the bundle. Handlers fully parse arguments before dependency or transport work. Realm, Source, sync, status, search, get, and thread commands use exact-tuple discovery or a test endpoint to select the daemon, with no selected-route fallback; direct stateful dependencies require explicit initialization and retain a shared database lease. Account onboarding uses a policy-matched managed App when `--app` is omitted or an exact explicitly selected Extension/local App, then binds the resulting Account to a Source. `daemon serve` launches the foreground entrypoint; health and shutdown are typed projections.
 4. The returned numeric status is assigned to `process.exitCode` by the shim.
 
 ## Integration points
