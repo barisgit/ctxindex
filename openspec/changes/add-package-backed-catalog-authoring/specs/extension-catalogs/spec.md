@@ -92,15 +92,20 @@ Each acquired Catalog snapshot MUST contain a UTF-8 generated
 be strict schema version `2`, reject unknown fields at every level, and contain
 only Catalog identity/summary, credential-free generation metadata, and at most
 256 versionless Extension entries. Every entry MUST contain stable Extension id,
-optional summary, and exactly one closed source variant:
+optional summary, and exactly one variant from this closed set:
 
 - a literal source with one normalized declared module path, Catalog id, and
   non-negative nested entry index; or
-- a package source with explicit `npm`, `git`, or `local` kind, sanitized
-  requested target, exact resolved identity, required integrity or content
-  digest applicable to that source, one contained content-addressed exact
-  dependency-resolution artifact produced by the generic installer, and
-  materialization digest.
+- an npm package source with sanitized requested target, exact `version`,
+  required `integrity`, one contained content-addressed exact dependency-
+  resolution artifact produced by the generic installer, and materialization
+  digest;
+- a Git package source with sanitized requested target, exact `commit`, one
+  contained content-addressed exact dependency-resolution artifact produced by
+  the generic installer, and materialization digest; or
+- a local package source with normalized contained `path`, required
+  `contentDigest`, one contained content-addressed exact dependency-resolution
+  artifact produced by the generic installer, and materialization digest.
 
 Author-machine absolute paths, credentials, package-manager authentication,
 JavaScript export names, Extension definition versions, registry overrides,
@@ -182,14 +187,19 @@ Catalog curation provenance MUST retain Catalog local name/id, repository, exact
 commit, snapshot acquisition time, exact entry source locator, Extension id, and
 the linked generic execution pin. It MUST NOT duplicate managed paths,
 package-manager authentication, or mutable execution state. Reinstall MUST
-publish and validate the generic executable record before atomically replacing
-the curation link. An identical complete pair is idempotent; failure preserves
-the previous pair.
+stage the validated execution record and curation link as distinct members of
+one inactive activation generation, durably persist that complete generation,
+atomically replace the stable Extension id's single active-generation pointer,
+and durably commit the replacement by fsyncing the pointer directory before any
+prior-generation cleanup. An identical complete generation is idempotent;
+failure before the durable pointer commit preserves both complete recovery
+choices, and failure after it can leave only inactive retryable cleanup state.
 
 Catalog install MUST require separate exact-install execution trust, reproduce
 the snapshot's exact generic dependency-resolution artifact and source pin,
-select the stable Extension id through the common validator, and publish no new
-curation link until generic installation succeeds.
+select the stable Extension id through the common validator, and replace no
+active-generation pointer until generic installation and complete validation
+succeed.
 
 #### Scenario: Catalog refresh advances after install
 - **WHEN** refresh pins a newer commit or a snapshot with a different package
@@ -201,6 +211,12 @@ curation link until generic installation succeeds.
 - **WHEN** exact dependency replay, digest verification, root selection, or
   complete-registry validation fails
 - **THEN** prior execution and curation provenance remain active unchanged
+
+#### Scenario: Activation is interrupted
+- **WHEN** replacement is interrupted before or after the active-generation
+  pointer is atomically replaced
+- **THEN** recovery exposes either the complete prior pair or the complete new
+  pair, never an execution record and curation link from different generations
 
 ### Requirement: Safe removal, uninstall, and retained state
 Catalog removal MUST fail while any curation link references that configured

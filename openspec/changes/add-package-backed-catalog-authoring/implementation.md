@@ -115,20 +115,43 @@ export interface CatalogLiteralSource {
   readonly entryIndex: number
 }
 
-// Exact resolved fields are schema-derived from the generic installer result.
+export interface CatalogDependencyResolutionArtifact {
+  readonly format: string
+  readonly path: string
+  readonly digest: string
+}
+
+export interface CatalogNpmPackageResolution {
+  readonly kind: 'npm'
+  readonly requestedTarget: string
+  readonly version: string
+  readonly integrity: string
+  readonly dependencyResolution: CatalogDependencyResolutionArtifact
+  readonly materializationDigest: string
+}
+
+export interface CatalogGitPackageResolution {
+  readonly kind: 'git'
+  readonly requestedTarget: string
+  readonly commit: string
+  readonly dependencyResolution: CatalogDependencyResolutionArtifact
+  readonly materializationDigest: string
+}
+
+export interface CatalogLocalPackageResolution {
+  readonly kind: 'local'
+  readonly path: string
+  readonly contentDigest: string
+  readonly dependencyResolution: CatalogDependencyResolutionArtifact
+  readonly materializationDigest: string
+}
+
 export interface CatalogPackageSource {
   readonly kind: 'package'
-  readonly sourceKind: 'npm' | 'git' | 'local'
-  readonly requestedTarget: string
-  readonly resolvedIdentity: string
-  readonly integrity?: string
-  readonly contentDigest?: string
-  readonly dependencyResolution: {
-    readonly format: string
-    readonly path: string
-    readonly digest: string
-  }
-  readonly materializationDigest: string
+  readonly resolution:
+    | CatalogNpmPackageResolution
+    | CatalogGitPackageResolution
+    | CatalogLocalPackageResolution
 }
 
 export interface CatalogSnapshotEntry {
@@ -159,7 +182,7 @@ installer also emits a sanitized content-addressed exact dependency-resolution
 artifact that authoring copies into a contained Catalog path; its format, digest,
 and replay semantics remain installer-owned. Catalog adds only its closed
 snapshot wrapper and contained-path constraints. Exact
-required fields differ by source kind: npm retains exact version and available
+required fields differ by source kind: npm retains exact version and required
 integrity, Git retains exact commit, and local retains contained path plus content
 digest; every kind retains the generic materialization digest.
 
@@ -169,6 +192,16 @@ Catalog authoring and install depend on, but do not own, these semantic
 operations from the canonical generic installer:
 
 ```ts
+export interface CatalogCurationProvenanceInput {
+  readonly extensionId: string
+  readonly catalogName: string
+  readonly catalogId: string
+  readonly repository: string
+  readonly commit: string
+  readonly snapshotAcquiredAt: number
+  readonly sourceLocator: string
+}
+
 export interface GenericExtensionPackageInstaller {
   resolveForAuthoring(input: {
     readonly source: ExtensionPackageTarget
@@ -180,15 +213,15 @@ export interface GenericExtensionPackageInstaller {
     readonly expected: ResolvedExtensionProvenance
     readonly dependencyResolutionArtifact: Uint8Array
     readonly extensionId: string
-    readonly baseRoot?: string
-    readonly activeCandidate: CompleteRegistryInput
+    readonly immutableSnapshot?: ImmutableSnapshotHandle
+    readonly curation?: CatalogCurationProvenanceInput
   }): Promise<GenericExtensionInstallationRecord>;
 
   installCollectedRoot(input: {
     readonly root: AnyExtensionDefinition
     readonly extensionId: string
-    readonly activeCandidate: CompleteRegistryInput
     readonly immutableOrigin: GenericResolvedOrigin
+    readonly curation?: CatalogCurationProvenanceInput
   }): Promise<GenericExtensionInstallationRecord>;
 }
 ```
@@ -199,6 +232,19 @@ Bun materializer, staging root, lifecycle lock, immutable publisher, manifest
 resolver, collectors, selector, validator, execution record, rollback, and
 referenced-only cleanup. Catalog core neither wraps shell commands nor performs
 source-kind-specific acquisition.
+
+`installExact` accepts only the snapshot's exact source-specific provenance,
+verified replay artifact, stable Extension id, and an immutable snapshot handle
+when a contained local path requires it, plus optional separately typed exact
+Catalog curation provenance. It does not accept an execution pin because the
+installer derives that from its validated result. The installer itself acquires
+into staging, resolves `ctxindex.extensions`, collects package roots, selects
+the exact id, reads the active registry and local OAuth App identities, builds
+the complete candidate, validates conflicts, constructs the curation link, and
+transactionally publishes both members. Catalog callers cannot supply or
+precompute a `CompleteRegistryInput` or execution record and cannot bypass any
+validation stage. `installCollectedRoot` follows the same internally owned
+active-state, complete-validation, and transaction path for literals.
 
 Build emits the authoring trust notice before any generic package or import
 effect, then selects the authored Catalog, maps literal entries to stable nested
@@ -236,11 +282,29 @@ execution record remains owned by `extension-installation` and contains no
 Catalog-shaped fields. The curation link joins them for inventory and lifecycle
 guards without becoming a loading source of truth.
 
-Install publishes a completely validated generic record first, then atomically
-switches its curation link under the generic lifecycle lock. Refresh changes only
-the configured Catalog record. Startup loads the generic execution record and
-joins optional curation metadata for safe diagnostics/output. Missing or
-mismatched joins degrade without acquisition or implicit repair.
+Execution and curation remain distinct typed records but activate as one durable
+generation. Under the generic lifecycle lock, install writes an inactive
+generation containing the validated generic execution record plus its optional
+Catalog curation link and fsyncs the generation and parent directory. It then
+writes and fsyncs a pointer candidate, atomically replaces the stable Extension
+id's active-generation pointer, and fsyncs the pointer directory. Only that
+directory fsync makes the activation commit durable and permits cleanup of the
+prior generation. Startup reads only pointer-reachable generations, so an
+interruption before the durable pointer commit retains whichever complete pair
+the recovered pointer names and an interruption after it observes the complete
+new pair. No intermediate state exposes a new execution record without its
+curation link or vice versa.
+
+Recovery under the same lock validates pointer targets, discards or reuses only
+inactive unreferenced generations, and retains a prior pointer on any malformed
+candidate. If interruption occurs between pointer rename and pointer-directory
+fsync, both complete generations remain; recovery accepts whichever complete
+generation the durable pointer names and treats the other as inactive. Cleanup
+of superseded generations and unreferenced materializations happens only after
+the directory fsync and is retryable; interruption can leak inert bytes but
+cannot lose or split active state. Refresh changes only the configured Catalog
+record. Missing or corrupt pointer-reachable state degrades without acquisition
+or implicit relinking.
 
 ### Catalog service and CLI composition
 
@@ -257,10 +321,12 @@ interfaces and never parse snapshots or package-manager results.
 ## Storage and State
 
 `catalogs.toml` advances to strict schema version 2 for configured inert Catalog
-records. Catalog curation links use a separate strict versioned document. The
-generic installation record and immutable materialization tree remain exactly
-where `extension-installation` owns them. Catalog code adds no package root,
-staging directory, lock file, or garbage collector.
+records. The generic installation store owns inactive activation-generation
+documents and one atomically replaced active-generation pointer map. Each
+generation stores separate execution and optional Catalog curation members; the
+pointer, not either member alone, grants activation. The generic immutable
+materialization tree remains where `extension-installation` owns it. Catalog code
+adds no package root, staging directory, lock file, or garbage collector.
 
 Catalog snapshots remain below `data/catalogs/<catalog-name>/<commit>` and carry
 generic dependency-resolution artifacts in normalized content-addressed paths.

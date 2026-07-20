@@ -26,9 +26,9 @@
 
 - [ ] 3.1 Add failing schema/path/store tests for versionless entries, closed
   literal/package source unions, source-specific exact generic provenance,
-  contained local targets and generic dependency-resolution artifacts, canonical
-  ordering, strict configured Catalog v2 records, and separate Catalog curation
-  links.
+  required npm `version`/`integrity`, Git `commit`, contained local `path`/
+  `contentDigest`, generic dependency-resolution artifacts, canonical ordering,
+  strict configured Catalog v2 records, and separate Catalog curation links.
 - [ ] 3.2 Replace pre-alpha versioned schema-v1 Catalog fixtures and records with
   fail-closed v2 state; add relocation and age tests without a compatibility
   reader or automatic deletion.
@@ -44,8 +44,10 @@
 - [ ] 4.2 Add failing injected-generic-installer tests for npm, Git, and contained
   local entries, sanitized requested targets, exact resolved provenance,
   replayable dependency-resolution artifacts, transitive range drift, exact
-  Extension selection, non-traversal of Catalog roots, and no Catalog-owned
-  registry/downloader/extractor/materialization behavior.
+  Extension selection, ordinary package dependency materialization, non-
+  traversal of ctxindex Extension dependency declarations and sibling roots,
+  non-traversal of Catalog roots, and no Catalog-owned registry/downloader/
+  extractor/materialization behavior.
 - [ ] 4.3 Add failing trust-order tests proving Catalog build itself is the
   non-interactive author grant, warns before package materialization/import,
   preserves valid JSON stdout, and publishes no execution record.
@@ -76,10 +78,18 @@
 - [ ] 6.3 Add failing npm/Git/local tests proving Catalog delegates exact-pin
   reproduction, exact dependency-lock replay, digests, locking, publication, and
   cleanup to the generic installer and never re-resolves mutable requested or
-  transitive targets.
+  transitive package targets. Prove `installExact` accepts only exact provenance,
+  replay artifact, stable Extension id, and any required immutable snapshot
+  handle; the generic installer itself collects/selects roots, reads active
+  registry/OAuth App identities, and complete-validates without a caller-supplied
+  `CompleteRegistryInput`.
 - [ ] 6.4 Add failing state tests for separate generic execution and Catalog
-  curation records, idempotence, atomic replacement, refresh-stable execution,
-  guarded Catalog removal/uninstall, and retained Source-owned data.
+  curation members in one activation generation, idempotence, interruption after
+  generation fsync but before pointer replacement, interruption after pointer
+  rename but before pointer-directory fsync, interruption after durable pointer
+  commit but before cleanup, malformed-pointer recovery, inactive-generation
+  cleanup, refresh-stable execution, guarded Catalog removal/uninstall, and
+  retained Source-owned data.
 - [ ] 6.5 Run shared installer, Catalog service, complete-registry, conflict,
   rollback, relocation, offline/degraded loading, and egress suites as the Slice
   gate.

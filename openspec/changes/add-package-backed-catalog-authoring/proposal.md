@@ -23,10 +23,11 @@ is the only path from curation metadata to trusted executable code.
   nested Catalog entry positions, never JavaScript export names.
 - Generate a strict canonical data-only snapshot before publication. Generation
   delegates target resolution and candidate inspection to the generic direct
-  installer primitive, then records its exact sanitized resolution, integrity
-  or content digest, contained exact dependency-resolution artifact, and
-  materialization digest. The explicit build command is the author's trust grant
-  and warns before evaluating package code.
+  installer primitive, then records source-specific exact fields: npm version
+  and integrity, Git commit, or contained local path and content digest, plus a
+  contained exact dependency-resolution artifact and materialization digest.
+  The explicit build command is the author's trust grant and warns before
+  evaluating package code.
 - Keep Catalog add, refresh, list, show, Marketplace search, and startup inert:
   they validate and project the committed snapshot without importing author
   modules, resolving targets, invoking Bun, or materializing packages.
@@ -37,7 +38,9 @@ is the only path from curation metadata to trusted executable code.
 - Persist Catalog curation provenance separately from generic executable
   installation provenance. Refresh may advance only Catalog state; running code
   remains pinned to its immutable materialization until another explicit trusted
-  install succeeds.
+  install succeeds. Execution and curation activate as one durable generation
+  through a single atomic pointer replacement plus directory fsync, so
+  interruption cannot expose a split pair.
 - Add deterministic Marketplace search across configured Catalog snapshots.
   Marketplace names the aggregate discovery/install experience; Catalog remains
   one distributable curated collection.

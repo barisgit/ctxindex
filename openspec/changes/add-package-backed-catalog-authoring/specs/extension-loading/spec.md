@@ -23,6 +23,35 @@ installed, or imported by Catalog refresh/search/list/startup.
   `ctxindex.extensions`
 - **THEN** ctxindex does not discover or import it
 
+### Requirement: Catalog package installation delegates to source-neutral seams
+Core SHALL expose source-neutral seams for package-target resolution,
+materialization of the ordinary transitive package dependency graph,
+`ctxindex.extensions` root collection, exact versionless Extension selection,
+complete candidate validation, and exact-pin reproduction. Explicit-path,
+Catalog, and direct package installation MUST delegate to the applicable shared
+seams.
+
+Package graph collection MUST mean only the package manager's ordinary
+transitive package dependencies. It MUST NOT interpret or traverse a ctxindex
+Extension dependency declaration, treat a sibling exported Extension root as a
+dependency, or automatically install either. Catalog code MAY provide safe
+curation provenance and one exact snapshot pin but MUST NOT implement a package-
+source-specific loader, maintain an Extension dependency graph, or bypass
+generic installation records and common activation.
+
+#### Scenario: Catalog package entry is installed
+- **WHEN** a trusted Catalog snapshot supplies npm, Git, or contained-local exact
+  provenance plus one stable Extension id
+- **THEN** Catalog delegates exact reproduction, package dependency
+  materialization, root collection, selection, and validation to the generic
+  installer and stores curation separately
+
+#### Scenario: Package exposes sibling roots or Extension dependency text
+- **WHEN** the selected package exports sibling Extension roots or code contains
+  a ctxindex Extension dependency declaration
+- **THEN** only the exact selected root is installed and neither construct is
+  traversed as an installable dependency
+
 ## MODIFIED Requirements
 
 ### Requirement: Installed Catalog Extension loading and provenance
@@ -41,15 +70,16 @@ preserve Source-owned state, and allow unrelated valid roots to load. It MUST
 NOT trigger repair or acquisition.
 
 #### Scenario: Catalog-curated Extension starts offline
-- **WHEN** valid generic execution state and its separate Catalog curation link
-  exist after relocation
+- **WHEN** one valid active generation contains generic execution state and its
+  separate Catalog curation member after relocation
 - **THEN** startup derives the managed path and loads the stable Extension id
   without Catalog, package-manager, network, or original-source access
 
-#### Scenario: Catalog curation link is orphaned
-- **WHEN** curation provenance names an absent or mismatched execution pin
+#### Scenario: Active generation is invalid
+- **WHEN** the active-generation pointer is missing, malformed, or names a
+  generation whose execution and curation members do not validate together
 - **THEN** startup reports the inconsistency without acquisition, implicit
-  relinking, Catalog refresh, or deletion of Source/Resource state
+  pointer repair, Catalog refresh, or deletion of Source/Resource state
 
 ### Requirement: Missing or invalid installed snapshots degrade without fetch
 The loader MUST report an Extension-scoped diagnostic when installed Catalog
@@ -61,26 +91,7 @@ Catalog/installation state, and MUST preserve Sources, Resources, Artifacts,
 snapshots, curation links, and unrelated installed Extensions.
 
 #### Scenario: Generic execution materialization is missing
-- **WHEN** installed Catalog curation links to an absent generic execution pin
+- **WHEN** a valid active generation refers to an absent generic execution
+  materialization
 - **THEN** the loader reports the unavailable Extension, performs no repository
   or package access, preserves materialized data, and loads unrelated valid roots
-
-## ADDED Requirements
-
-### Requirement: Catalog package installation delegates to source-neutral seams
-Core SHALL expose source-neutral seams for `ctxindex.extensions` entry
-resolution, root collection, transitive graph collection, exact versionless
-Extension selection, complete candidate validation, generic target
-resolution/materialization, and exact-pin reproduction. Explicit-path, Catalog,
-and direct package installation MUST delegate to the applicable shared seams.
-
-Catalog code MAY provide safe curation provenance and one exact snapshot pin but
-MUST NOT resolve package dependencies, implement a package-source-specific
-loader, maintain an Extension dependency graph, or bypass generic installation
-records and common activation.
-
-#### Scenario: Catalog package entry is installed
-- **WHEN** a trusted Catalog snapshot supplies npm, Git, or contained-local exact
-  provenance plus one stable Extension id
-- **THEN** Catalog delegates exact reproduction, collection, selection, and
-  validation to the generic installer and stores curation separately

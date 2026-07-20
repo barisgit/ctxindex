@@ -68,13 +68,24 @@ or weaken the package manager's lifecycle-script/trusted-dependency policy.
 ## ADDED Requirements
 
 ### Requirement: Catalog snapshots reproduce immutable package resolution
-The generic installer MUST accept a Catalog snapshot's sanitized requested target,
-exact resolved npm/Git/local provenance, and verified contained exact dependency-
-resolution artifact as a reproduction constraint. It MUST materialize the exact
-npm version, Git commit, or contained local package and replay the artifact's
-ordinary dependency graph without range drift, then verify applicable integrity/content digest,
-materialization digest, and stable Extension id before publication. It MUST NOT
-re-resolve a mutable range/ref to a different result.
+The generic installer MUST accept only a Catalog snapshot's source-specific exact
+provenance, verified contained dependency-resolution artifact, stable Extension
+id, immutable snapshot handle when required for a contained local path, and
+optional separately typed exact Catalog curation provenance. That curation input
+MUST NOT contain a caller-selected execution pin; the installer MUST derive and
+link its validated execution result. npm provenance MUST carry exact `version`
+and `integrity`; Git provenance MUST carry exact `commit`; local provenance MUST
+carry normalized contained `path` and `contentDigest`. All variants MUST carry
+the materialization digest and exact dependency-resolution artifact.
+
+The installer MUST internally acquire into staging, replay the artifact's
+ordinary transitive package dependency graph without range drift, resolve
+`package.json#ctxindex.extensions`, collect roots, select the exact Extension id,
+read the active registry and local OAuth App identities, build and validate the
+complete candidate registry, and publish. A Catalog caller MUST NOT supply a
+`CompleteRegistryInput`, preselected root, or precomputed active candidate for a
+package install. The installer MUST NOT re-resolve a mutable range/ref to a
+different result or permit Catalog composition to bypass complete validation.
 
 The generic execution record MUST remain origin-neutral. Catalog local name/id,
 repository, commit, snapshot age, and entry locator MUST live in a separate
@@ -98,6 +109,14 @@ curation link and MUST NOT alter materialization identity or activation behavior
 - **THEN** install replays the artifact's exact dependency pin or fails without
   constructing a different materialization
 
+#### Scenario: Catalog delegates an exact package constraint
+- **WHEN** Catalog install passes exact snapshot provenance, its verified
+  resolution artifact, stable Extension id, and any required immutable snapshot
+  handle to the generic installer
+- **THEN** the installer itself collects and selects roots, reads active state,
+  complete-validates the candidate, and publishes without accepting a caller-
+  constructed registry candidate
+
 ### Requirement: Catalog entries use common exact selection and complete validation
 Literal and package-backed Catalog entries MUST use the same versionless exact
 Extension selector and complete candidate-registry validator as direct, built-in,
@@ -112,14 +131,52 @@ origin may pre-register leaves, shadow by source priority, or win by load order.
 - **THEN** installation fails before activation or curation publication
 
 ### Requirement: Atomic Catalog-curated replacement
-Catalog install MUST serialize through the generic lifecycle lock. A complete
-candidate materialization and generic execution record MUST be published and
-validated before its separate Catalog curation link atomically becomes active.
-Any acquisition, import, selection, conflict, digest, record, or curation-link
-failure MUST preserve the prior runnable materialization and provenance pair.
+Catalog install MUST serialize through the generic lifecycle lock. The generic
+installer MUST write the validated execution record and separate Catalog
+curation link as distinct members of one inactive activation generation and
+fsync the complete generation and its parent directory. It MUST then write and
+fsync a pointer candidate, atomically replace the stable Extension id's active-
+generation pointer, and fsync the pointer directory. Only the pointer-directory
+fsync SHALL make activation durably committed and permit prior-generation
+cleanup. Startup MUST read only pointer-reachable generations.
+
+Recovery under the same lock MUST retain the prior pointer when a candidate is
+malformed, validate the pointer target before use, and discard or reuse only
+inactive unreferenced generations. Cleanup after pointer replacement MUST be
+retryable. Any acquisition, import, selection, conflict, digest, record, or
+curation failure before the durable pointer commit MUST preserve a complete
+recoverable prior generation. Interruption after it MAY leave inert bytes but
+MUST expose the complete new pair rather than split active state. Interruption
+between pointer rename and pointer-directory fsync MUST leave both complete
+generations available; recovery SHALL use whichever complete generation the
+durable pointer names.
 
 #### Scenario: Refreshed Catalog candidate is invalid
 - **WHEN** reinstall from a newer Catalog commit fails exact reproduction or
   complete-registry validation
 - **THEN** the prior installed Extension and prior Catalog curation link remain
   active unchanged
+
+#### Scenario: Interruption occurs before activation commit
+- **WHEN** the process stops after staging or fsync but before replacing the
+  active-generation pointer
+- **THEN** startup and recovery retain the complete prior execution-and-curation
+  pair and treat the candidate generation as inactive
+
+#### Scenario: Interruption occurs after activation commit
+- **WHEN** the process stops after replacing the active-generation pointer but
+  after fsyncing its directory and before superseded-generation cleanup
+- **THEN** startup exposes the complete new execution-and-curation pair and
+  recovery retries only cleanup of unreferenced state
+
+#### Scenario: Interruption occurs before pointer durability
+- **WHEN** the process stops after pointer rename but before pointer-directory
+  fsync
+- **THEN** both complete generations remain available and recovery exposes the
+  complete generation named by the durable pointer without split state
+
+#### Scenario: Active generation is invalid
+- **WHEN** startup or recovery encounters a missing, malformed, or mismatched
+  pointer-reachable generation
+- **THEN** it fails that Extension closed without acquisition, implicit repair,
+  or activation of an unreferenced generation

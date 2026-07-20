@@ -77,9 +77,11 @@ configured Catalogs.
    invoke Git/Bun, extract archives, publish package trees, lock lifecycle state,
    or collect garbage itself. Exact-target reproduction during install delegates
    to the corresponding generic installer operation and fails if resolution,
-   exact dependency graph, integrity/content digest, materialization digest,
-   selected id, or validation differs from the snapshot.
-   To make that graph replayable rather than merely identifiable, the generic
+   ordinary transitive package dependency graph, integrity/content digest,
+   materialization digest, selected id, or validation differs from the snapshot.
+   This graph never includes ctxindex Extension dependency declarations or
+   sibling exported Extension roots. To make the package graph replayable rather
+   than merely identifiable, the generic
    installer exports one bounded sanitized exact resolution artifact. Authoring
    commits it under a content-addressed contained path and the snapshot records
    its format/digest/path. Install verifies and passes the artifact back to the
@@ -93,9 +95,11 @@ configured Catalogs.
 5. **Schema version 2 is a closed inert snapshot.** Each entry has a stable
    Extension id, optional summary, and exactly one source. A literal source
    records the declared Catalog module, selected Catalog id, and stable nested
-   entry index. A package source records sanitized requested source kind/target
-   plus the generic installer's exact resolved identity, integrity or content
-   digest when applicable, a contained content-addressed exact dependency-
+   entry index. An npm source records sanitized requested target, exact version,
+   required integrity, dependency-resolution artifact, and materialization
+   digest. A Git source records sanitized requested target, exact commit,
+   dependency-resolution artifact, and materialization digest. A local source
+   records normalized contained path, required content digest, dependency-
    resolution artifact, and materialization digest. Generation metadata names
    the author package and module without credentials. No range is re-resolved by
    refresh or install; the requested target is explanatory/update provenance and
@@ -121,10 +125,15 @@ configured Catalogs.
    immutable materialization digest/path derivation, and lifecycle timestamps.
    A Catalog curation link separately owns Catalog local name/id, repository,
    exact commit, snapshot acquisition time, entry source locator, and the linked
-   execution pin. Startup depends only on the generic executable record. Catalog
-   refresh replaces only configured Catalog state. Reinstall validates and
-   publishes the new execution record before atomically replacing the curation
-   link; failure preserves both prior records.
+   execution pin. Catalog refresh replaces only configured Catalog state.
+   Reinstall writes execution and curation as distinct members of one inactive
+   activation generation, durably persists that complete generation, and makes
+   it visible through one atomic active-generation pointer replacement followed
+   by pointer-directory fsync. Startup reads only pointer-reachable generations.
+   No prior generation is cleaned before that durable commit. Interruption
+   before it leaves both complete recovery choices; interruption after it
+   exposes the complete new pair and leaves at most retryable inactive cleanup
+   state.
 
 9. **Marketplace preserves duplicate curation.** Search matches a
    case-insensitive substring over snapshot Extension id and summary, retains one
@@ -163,9 +172,10 @@ configured Catalogs.
   execution-trust flag and never describe validation as sandboxing.
 - [Duplicate curation can look repetitive] -> Keep provenance-visible rows and
   require exact Catalog selection instead of hidden ranking.
-- [Separate records can become inconsistent after interruption] -> Use the
-  generic lifecycle lock and validate-then-switch publication; treat an orphaned
-  curation link as a diagnostic without acquisition or implicit repair.
+- [Separate typed records could become inconsistent after interruption] -> Stage
+  them in one inactive activation generation and use a single durable pointer
+  switch plus directory fsync as the activation commit; recovery never activates
+  unreferenced state or cleans the prior generation before pointer durability.
 
 ## Migration Plan
 

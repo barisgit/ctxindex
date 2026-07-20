@@ -35,9 +35,10 @@ The CLI SHALL provide `extensions search [query] [--no-refresh]` as Marketplace
 search over every configured Catalog. It MUST delegate refresh, matching,
 ordering, and provenance to provider-neutral core. Text and JSON output MUST
 retain duplicate curation rows and include Catalog local name/id, stable
-Extension id, source kind, sanitized target and exact resolved identity when
-applicable, exact Catalog commit, and stored snapshot age. It MUST NOT expose an
-implicit preferred Catalog or install source.
+Extension id, source kind, source-specific exact npm version/integrity, Git
+commit, or contained local path/content digest when applicable, exact Catalog
+commit, and stored snapshot age. It MUST NOT expose an implicit preferred Catalog
+or install source.
 
 #### Scenario: Marketplace search is requested as JSON
 - **WHEN** an agent invokes `extensions search calendar --json`
@@ -69,6 +70,21 @@ snapshot's requested npm range, Git ref, or local target to different code.
 - **WHEN** any involved Catalog fails to refresh before search
 - **THEN** CLI returns the mapped acquisition failure and emits no stale success
   payload
+
+### Requirement: Loaded Extension provenance output
+Loaded-Extension inventory MUST distinguish generic executable provenance from
+optional Catalog curation provenance. Catalog-curated output MUST include stable
+Extension id, source kind, source-specific exact npm version/integrity, Git
+commit, or contained local path/content digest, materialization digest, Catalog
+local name/id/repository/commit, and snapshot age. Literal entries MUST identify
+their pinned module and nested entry index. Output MUST NOT include an Extension
+definition version, JavaScript export name, credential, package-manager auth, or
+absolute managed path.
+
+#### Scenario: Offline loaded listing is requested
+- **WHEN** an agent lists loaded Extensions after a Catalog install
+- **THEN** CLI renders both provenance layers from persisted state without
+  refresh, package-manager, registry, Git, original-local-path, or import effects
 
 ## MODIFIED Requirements
 
@@ -145,8 +161,6 @@ and ctxindex state relocation with upstream access disabled.
 - **THEN** offline loading/listing succeeds from exact pins with separate
   curation provenance and no project-local, package-manager, or network access
 
-## MODIFIED Requirements
-
 ### Requirement: Deterministic direct Extension lifecycle commands
 The CLI SHALL retain these direct-install forms alongside loaded-Extension and
 Catalog commands:
@@ -209,20 +223,3 @@ provenance without leaking embedded or ambient credentials.
 - **WHEN** an agent uninstalls the stable id of a Catalog-curated Extension
 - **THEN** CLI removes generic execution plus Catalog curation state without a
   removed definition-version selector and preserves Source-owned data
-
-## ADDED Requirements
-
-### Requirement: Loaded Extension provenance output
-Loaded-Extension inventory MUST distinguish generic executable provenance from
-optional Catalog curation provenance. Catalog-curated output MUST include stable
-Extension id, source kind, sanitized requested target, exact resolved identity,
-integrity/content and materialization digests applicable to the source, Catalog
-local name/id/repository/commit, and snapshot age. Literal entries MUST identify
-their pinned module and nested entry index. Output MUST NOT include an Extension
-definition version, JavaScript export name, credential, package-manager auth, or
-absolute managed path.
-
-#### Scenario: Offline loaded listing is requested
-- **WHEN** an agent lists loaded Extensions after a Catalog install
-- **THEN** CLI renders both provenance layers from persisted state without
-  refresh, package-manager, registry, Git, original-local-path, or import effects
