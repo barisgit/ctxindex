@@ -40,9 +40,10 @@ Division of labor with the surrounding ecosystem:
   ten auth/identity/search/artifact silos, while one future ctxindex MCP could
   expose the shared data plane.
 - **ACF** (`../agent-capability-format`): future distribution of agent-facing
-  skill docs. ctxindex extension packages therefore bundle adapters/profiles
-  ONLY, not skills. The existing `ctxindex skills` surface remains for bundled
-  docs but is expected to be superseded by ACF emission.
+  skill docs. ctxindex Extensions may bundle Providers, OAuth Apps, Profiles,
+  Adapters, and one passive documentation sidecar, but not agent workflow
+  skills. The existing `ctxindex skills` surface remains for bundled workflow
+  docs but may later be superseded by ACF emission.
 
 Explicitly out of scope: SaaS/remote canonical store, arbitrary provider
 automation, agent workflow policy, and a universal sync protocol. Typed
@@ -53,10 +54,10 @@ Profile Actions are in scope; arbitrary Extension subcommands are not.
 | # | Decision | Choice | Notes |
 |---|----------|--------|-------|
 | D1 | Extension power | Adapters with open `kind`/profiles, canonical operations. No arbitrary CLI subcommands | Revisit arbitrary commands only with demonstrated need |
-| D2 | Extension loading | In-process dynamic `import()` of TS/JS, full trust, factory-receives-API | Bun executes TS natively; out-of-process protocol deferred |
-| D3 | Binary distribution | Compiled Bun binary retained; extensions never import runtime code — type-only imports + host-provided API object | Verified with Bun 1.3.13/1.3.14; 1.3.12 fails, so the project is pinned to 1.3.14. Regression test at `apps/cli/src/e2e/compiled-extension.e2e.test.ts` |
+| D2 | Extension loading | In-process dynamic `import()` of TS/JS with full trust; Extensions use ordinary runtime imports from the private SDK workspace, while operation effects arrive through host-provided contexts | Bun executes TS natively; out-of-process protocol deferred |
+| D3 | Binary distribution | Compiled Bun binary retained; external packages bundle/import the Extension SDK contract but do not import core runtime internals | Verified with Bun 1.3.13/1.3.14; 1.3.12 fails, so the project is pinned to 1.3.14. Regression test at `apps/cli/src/e2e/compiled-extension.e2e.test.ts` |
 | D4 | Universal ref | `ctx://<source-id>/<adapter-opaque-suffix>` for every resource, indexed or not | Provider-native URIs kept as metadata |
-| D5 | Auth ownership | Declarative specs (oauth2/api-key/basic/none) run by core + minimal namespaced secret bucket as escape hatch | OAuth refresh, `needs_auth`, exit 10 stay uniform |
+| D5 | Auth ownership | Declarative `oauth2` or `none` Provider auth runs through core; API-key, basic, and custom secret-bucket forms remain deferred until a concrete Provider requires them | OAuth refresh, `needs_auth`, exit 10 stay uniform |
 | D6 | Source concept | Source = configured connection; sync is optional per-source | One noun; `source add --no-sync` |
 | D7 | Search default | Hybrid orchestration; adapter decides per source with sync-coverage knowledge; `--local-only` / `--remote` override | PROVISIONAL — validate by dogfooding partial Gmail sync |
 | D8 | Artifacts | Managed content-addressed store; V1 has one `cached` retention class, retained until explicit purge; `--output` copies out | No automatic age, quota, or pressure eviction in V1 |
@@ -70,7 +71,7 @@ Profile Actions are in scope; arbitrary Extension subcommands are not.
 | D16 | Capabilities | Const array of enum flags: `["sync", "search-remote", "retrieve", "download"]`; search MODE moves to routing | |
 | D17 | Distribution | Explicit local package roots and exact installed Catalog snapshots use `package.json` `ctxindex.extensions`; persistent direct local/Git/npm installation remains a dependent change | Package tooling resolves dependencies; activation reuses one manifest/collector seam |
 | D18 | CLI dynamism | Generic verbs derive their whole argument space from registries (kinds, fields, formats, adapter flags from config schemas). NO parallel command/alias declarations. Typed subcommand registration through the registry machinery is the only future alternative (deferred) | Derive, never declare twice |
-| D19 | Docs | Runtime definitions contain no embedded normative `docs`; separately versioned documentation sidecars are deferred, while `ctxindex describe` renders structural registry metadata | Documentation never changes definition identity or activation |
+| D19 | Docs | An Extension root may declare one passive documentation sidecar; core validates it and exposes a transport-neutral projection separately from generated registry reference data, while CLI, web, and agent presentation consumers remain deferred | Documentation never changes definition identity or activation |
 | D20 | Realms | Keep user-defined operating contexts; every Source has exactly one; no `global` Realm; explicit filters are exact | Personal/company/university are real reasoning boundaries, not security boundaries |
 | D21 | Provider Actions | Profiles declare typed Actions; Adapters implement them through a Source; no arbitrary command surface | V1 ships reversible email Draft create/update only; sending deferred |
 | D22 | Release baseline | This architecture is V1; prototype code/data are disposable | No schema migration, CLI compatibility, or stored-payload upgrade machinery |
@@ -390,13 +391,15 @@ timeout degrades stragglers to warnings.
 
 ## 9. Extension SDK and loading (D2/D3/D11)
 
-**D3 result — passed (2026-07-13, requires Bun >=1.3.13).** A relocated
-`bun build --compile` executable, launched from `/`, dynamically imported an
-external `.ts` extension through a `file:` URL. The extension used TypeScript
-syntax, a type-only authoring import, a relative `.ts` runtime import, its own
-`node_modules` dependency, and the host-provided factory API. The retained
-regression check is `apps/cli/src/e2e/compiled-extension.e2e.test.ts`. Bun 1.3.12
-was killed with exit 137 at dynamic import; 1.3.13 and 1.3.14 passed. The root
+**D3 result — passed (2026-07-13, requires Bun >=1.3.13).** The original spike
+proved that a relocated `bun build --compile` executable could dynamically
+import external TypeScript. The retained regression now installs the private
+`@ctxindex/extension-sdk` workspace into an external package, builds that
+package, relocates the compiled host, and loads the package's manifest entry.
+The Extension uses TypeScript syntax, runtime SDK factory imports, a relative
+runtime import, and its own dependency; there is no host-provided factory API.
+The check is `apps/cli/src/e2e/compiled-extension.e2e.test.ts`. Bun 1.3.12 was
+killed with exit 137 at dynamic import; 1.3.13 and 1.3.14 passed. The root
 toolchain pin is therefore Bun 1.3.14.
 
 Authoring — top-level pure factories, pi-style:
@@ -408,11 +411,11 @@ import { communication } from "@ctxindex/profiles";  // typed descriptors of bun
 
 - Factories return plain versioned definition objects; no module-level mutable
   state, no `instanceof` across package copies. Binding is by `(id, version)`.
-- `@ctxindex/extension-sdk` and `@ctxindex/profiles` are types+schemas
-  packages for authoring DX; runtime values (zod instance, logger, authorized
-  fetch, secrets, artifact sink) arrive via the host-provided context objects,
-  while the SDK exports its supported `z`; logger, controlled fetch, and sinks
-  arrive through host-provided operation contexts so the compiled binary stays sealed.
+- `@ctxindex/extension-sdk` and `@ctxindex/profiles` are private workspace
+  packages for authoring and runtime contracts. Extensions import the SDK's
+  factories and supported `z` directly; logger, controlled fetch, secrets,
+  artifact sinks, and Resource lookup arrive through host-provided operation
+  contexts so the compiled host keeps orchestration and storage internals sealed.
 - Extensions may have their own `node_modules` for their own deps.
 - Internals mirror lume/sessionloom patterns: const-generic registries
   (`createProfileRegistry([...] as const)`, `createAdapterRegistry`) inferring
@@ -489,7 +492,7 @@ Example verb collapse: the Hermes CLI's bespoke `mail senders` becomes
 - `docs/milestones/V1.md` owns first-release scope and vertical slices.
 - Selective `openspec/specs/<capability>/implementation.md` sidecars own reference implementation doctrine; the module-architecture sidecar owns cross-cutting runtime, package, and testing choices.
 - This document owns cross-cutting rationale and decisions D1–D22.
-- `openspec/changes/v1-context-access-layer/` owns active capability specs and tasks.
+- `openspec/changes/archive/2026-07-17-v1-context-access-layer/` preserves the completed V1 change evidence; `openspec list` is authoritative for the current active-change inventory.
 
 The documents describe V1 directly. Prototype code, tables, CLI behavior, and
 local databases are not treated as a prior release and receive no migration or

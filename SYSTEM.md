@@ -81,7 +81,7 @@ The CLI is the agent integration surface. Agents compose generic commands with `
 
 The public landing and documentation web surface is a non-normative projection of those contracts. Documentation pages are prerendered, while site search needs a compatible Next.js server or serverless runtime. The site stores no ctxindex user or provider state and does not operate a hosted Extension marketplace.
 
-Package responsibilities are stable: `@ctxindex/cli` parses, composes, formats, and maps final exits; `@ctxindex/core` owns provider-neutral runtime and storage; `@ctxindex/extension-sdk` owns public authoring contracts; `@ctxindex/profiles` owns bundled vocabulary; and `@ctxindex/adapters` owns provider transport and normalization.
+Package responsibilities are stable: the public unscoped `ctxindex` package parses, composes, formats, and maps final exits; private workspace packages `@ctxindex/core`, `@ctxindex/extension-sdk`, `@ctxindex/profiles`, and `@ctxindex/adapters` respectively own provider-neutral runtime and storage, public authoring contracts, bundled vocabulary, and provider transport and normalization.
 
 ## 3. Domain model
 

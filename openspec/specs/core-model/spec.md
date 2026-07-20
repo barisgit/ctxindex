@@ -48,7 +48,7 @@ The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**, **SHOULD NOT**, 
 ### Requirement: Core domain model
 The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.
 
-- An **Extension** is one distributable, atomically activated plain definition that composes any number of imported Source Adapters and OAuth Apps plus optional standalone Providers and Profiles. It has no runtime Extension dependency graph. Built-in and external Extensions have identical authoring, collection, validation, and activation semantics; only acquisition and distribution differ.
+- An **Extension** is one distributable, atomically activated plain definition that composes any number of imported Source Adapters and OAuth Apps plus optional standalone Providers and Profiles. It MAY declare one passive documentation sidecar that remains separate from runtime definition identity and behavior. It has no runtime Extension dependency graph. Built-in and external Extensions have identical authoring, collection, validation, and activation semantics; only acquisition and distribution differ.
 - A **Provider** is an ID-addressed declaration of one external authority and exactly one currently supported direct authentication form, `oauth2` or `none`. At most one semantically distinct Provider per id may be active. Package version, integrity, and physical location are provenance, not Provider identity.
 - An **OAuth App** is an Extension leaf authored with one exact imported OAuth2 Provider and `{ label, config }`, or a local secret-backed BYOA record. Its identity is `(providerId,label)`. Extension Apps require public registration policy; confidential Apps remain local or future hosted configuration. Duplicate identities MUST reject and BYOA MUST NOT shadow.
 - A **Profile** is a versioned schema-backed domain declaration. Authors bind it by importing the exact Profile value. Profiles are the ONLY mechanism for domain semantics; core MUST NOT contain domain-specific code paths. `@ctxindex/profiles` is an ordinary library, not an always-selected Extension.
@@ -68,7 +68,7 @@ The active registry MUST validate complete selected root graphs before mutation.
 
 Separate physical SDK/Zod copies MUST remain authoring/type-compatible and structurally collectable. Their executable/schema-bearing definitions MUST NOT coalesce merely because root version, integrity, commit, path, provenance, or function text matches. Root provenance MUST be retained only for diagnostics and MUST NOT participate in leaf identity or equivalence. Conflicts MUST reject without mutation; load order, origin priority, `instanceof`, and object identity MUST NOT choose a winner.
 
-Definition factories MUST return shallow plain structurally validated values with stable kind discriminators and exact imported-value inference. Embedded definition documentation is outside this contract and SHALL be provided only by a future sidecar design.
+Definition factories MUST return shallow plain structurally validated values with stable kind discriminators and exact imported-value inference. Provider, Profile, Adapter, and OAuth App definitions MUST NOT embed documentation. Extension documentation MUST use the separately owned passive sidecar contract and, after successful documentation validation, MUST NOT change definition identity, activated definition semantics, or runtime operations.
 
 #### Scenario: Exact imported values preserve authoring inference
 - **WHEN** an Adapter or OAuth App receives an imported Provider or Profile definition
@@ -101,6 +101,10 @@ Definition factories MUST return shallow plain structurally validated values wit
 #### Scenario: OAuth App identity never shadows
 - **WHEN** an Extension App and local BYOA App share one `(providerId,label)`
 - **THEN** activation rejects the duplicate without choosing a winner
+
+#### Scenario: Passive documentation does not alter runtime identity
+- **WHEN** an Extension declares a valid passive documentation sidecar
+- **THEN** after successful documentation validation, the sidecar is projected separately without changing definition identity, activated definition semantics, or runtime operations
 
 ### Requirement: Resource identity, deletion, and Relations
 The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.
