@@ -14,7 +14,7 @@ Owns the complete `google.mailbox` Adapter module: configuration and definition,
 ## Data & control flow
 
 1. Core invokes an operation from `gmailAdapterDefinition` with an SDK context whose `fetch` implementation permits only the Adapter-declared `gmail.googleapis.com` host (plus non-production loopback mocks).
-2. The operation builds its Gmail endpoint through `gmailApiUrl()` and sends the provider request through `context.fetch`.
+2. Remote search rejects the generic continuation input before provider I/O because Gmail does not implement resumable ctxindex cursors; otherwise the operation builds its Gmail endpoint through `gmailApiUrl()` and sends the provider request through `context.fetch`.
 3. `gmailJson()` maps non-success statuses to stable sync errors and decodes JSON; each operation validates the payload it owns.
 4. Draft create branches resolve every selected same-Source managed Artifact from verified cache before fetch and use the shared deterministic MIME renderer for one `drafts.create` mutation. Update performs one full-MIME `drafts.update`, replaying a proven managed set exactly; unknown provenance or unavailable bytes fail locally. Reply paths additionally preserve stored thread/headers rather than mutable parent metadata, and Gmail must return that thread before the canonical Draft Resource is materialized.
 

@@ -268,3 +268,13 @@ test('OAuth guidance derives provider vocabulary from describe output', async ()
   )
   expect(skill).not.toMatch(/CTXINDEX_(?:GOOGLE|MICROSOFT|GMAIL)_/)
 })
+
+test('remote mailbox guidance teaches exact booleans and resumable continuation', async () => {
+  const skill = await readSkill()
+  expect(skill).toContain('--field unread=true')
+  expect(skill).toContain('--field unread=false')
+  expect(skill).toContain('--continuation <pagination.continuation>')
+  expect(skill).toContain('pagination.hasMore')
+  expect(skill).toContain('`truncated` warning')
+  expect(skill).toContain('`--offset` remains local pagination only')
+})

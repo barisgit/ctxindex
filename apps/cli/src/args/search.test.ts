@@ -84,17 +84,69 @@ describe('search CLI arguments', () => {
     })
   })
 
-  test('rejects bare search, query-less --remote, and non-local --offset', () => {
+  test('accepts constrained query-less remote search and opaque continuation', () => {
+    expect(
+      parseSearchArgs([
+        '--remote',
+        '--source',
+        'work-outlook',
+        '--kind',
+        'communication.message',
+      ]),
+    ).toEqual({
+      kind: 'search',
+      json: false,
+      refs: false,
+      input: {
+        sourceIds: ['work-outlook'],
+        kind: 'communication.message',
+        remote: true,
+      },
+    })
+    expect(
+      parseSearchArgs([
+        'quarterly',
+        '--remote',
+        '--source',
+        'work-outlook',
+        '--continuation',
+        'opaque-next-page',
+      ]),
+    ).toMatchObject({
+      kind: 'search',
+      input: {
+        text: 'quarterly',
+        sourceIds: ['work-outlook'],
+        remote: true,
+        continuation: 'opaque-next-page',
+      },
+    })
+  })
+
+  test('rejects bare search and invalid pagination combinations', () => {
     expect(parseSearchArgs([])).toMatchObject({
       kind: 'unknown',
       message:
         'search: provide <query> or at least one filter (--realm/--adapter/--source/--kind/--field/--since/--until/--include-deleted)',
     })
     expect(parseSearchArgs(['--json'])).toMatchObject({ kind: 'unknown' })
-    expect(parseSearchArgs(['--realm', 'work', '--remote'])).toMatchObject({
+    for (const args of [
+      ['x', '--remote', '--source', 'a', '--continuation='],
+      ['x', '--remote', '--source', 'a', '--continuation', '   '],
+    ]) {
+      expect(parseSearchArgs(args)).toMatchObject({
+        kind: 'unknown',
+        message: 'search: --continuation requires a token',
+      })
+    }
+    expect(parseSearchArgs(['--remote', '--include-deleted'])).toMatchObject({
       kind: 'unknown',
       message:
-        'search: --remote requires <query>; filter-only remote enumeration is not supported',
+        'search: query-less --remote requires a narrowing Realm, Adapter, Source, kind, field, or time filter',
+    })
+    expect(parseSearchArgs(['--realm', 'work', '--remote'])).toMatchObject({
+      kind: 'search',
+      input: { realms: ['work'], remote: true },
     })
     expect(parseSearchArgs(['x', '--offset', '5'])).toMatchObject({
       kind: 'unknown',
@@ -118,5 +170,32 @@ describe('search CLI arguments', () => {
     expect(parseSearchArgs(['--realm', 'work', '--limit', '-1'])).toMatchObject(
       { kind: 'unknown', message: 'search: invalid --limit: -1' },
     )
+    for (const args of [
+      ['x', '--continuation', 'next'],
+      ['x', '--remote', '--continuation', 'next'],
+      [
+        'x',
+        '--remote',
+        '--source',
+        'a',
+        '--source',
+        'b',
+        '--continuation',
+        'next',
+      ],
+      [
+        'x',
+        '--remote',
+        '--source',
+        'a',
+        '--offset',
+        '1',
+        '--continuation',
+        'next',
+      ],
+      ['x', '--local-only', '--source', 'a', '--continuation', 'next'],
+    ]) {
+      expect(parseSearchArgs(args)).toMatchObject({ kind: 'unknown' })
+    }
   })
 })
