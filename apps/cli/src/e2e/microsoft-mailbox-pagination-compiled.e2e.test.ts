@@ -79,8 +79,16 @@ test('relocated compiled CLI resumes Microsoft mailbox enumeration beyond 50', a
     for (const args of [
       ['init'],
       ['realm', 'add', 'work'],
-      ['client', 'add', 'microsoft', '--from-env'],
-      ['account', 'add', 'microsoft', '--label', 'compiled-outlook'],
+      ['oauth-app', 'add', 'microsoft', 'microsoft', '--from-env'],
+      [
+        'account',
+        'add',
+        'microsoft',
+        '--app',
+        'microsoft',
+        '--label',
+        'compiled-outlook',
+      ],
       [
         'source',
         'add',
