@@ -179,3 +179,4 @@ Profiles own validation, titles/summaries, chunks, typed fields, Relations, Arti
 ## Verification
 
 SDK factory/public-surface tests protect inference and contracts. Profile tests protect schemas and deterministic projections. Registry and CLI interface tests cover validation, duplicate rejection, aliases, and generated describe metadata.
+Draft create's standalone and reply branches optionally accept an ordered non-empty array of strict `{ ref }` managed attachment selectors, bounded by shared portable count and aggregate-byte constants. Callers cannot provide paths, bytes, provider ids, filenames, media types, or size overrides, and update schemas remain attachment-free. Draft Action results record `managedAttachmentRefs`, including an explicit empty array when absence is proven; this provenance is not a provider-derived Artifact descriptor.

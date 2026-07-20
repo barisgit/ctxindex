@@ -10,6 +10,7 @@ import type { LocalSearchFieldFilter } from './types'
 export interface SearchPreflightInput {
   readonly text: string
   readonly limit: number
+  readonly continuation?: string
   readonly kind?: string
   readonly fields?: readonly LocalSearchFieldFilter[]
   readonly since?: number
@@ -111,6 +112,9 @@ export function resolveSearchQuery(
   return {
     text: input.text,
     limit: input.limit,
+    ...(input.continuation === undefined
+      ? {}
+      : { continuation: input.continuation }),
     ...(kind === undefined ? {} : { kind }),
     ...(fields === undefined || fields.length === 0 ? {} : { fields }),
     ...(input.since === undefined ? {} : { since: input.since }),

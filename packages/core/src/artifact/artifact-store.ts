@@ -9,6 +9,7 @@ import {
   mkdtemp,
   open,
   readdir,
+  readFile,
   rename,
   rm,
   stat,
@@ -397,7 +398,7 @@ export class ArtifactStore {
     }
   }
 
-  async get(ref: string): Promise<Artifact | undefined> {
+  private metadata(ref: string): Artifact | undefined {
     parseRef(ref)
     const row = this.db
       .prepare('SELECT * FROM artifacts WHERE ref = ?')
@@ -417,8 +418,58 @@ export class ArtifactStore {
         `Artifact metadata has an invalid local path: ${ref}`,
       )
     }
-    await verifyObject(join(this.root, expectedPath), hex, row.byte_size)
     return fromRow(row)
+  }
+
+  async get(ref: string): Promise<Artifact | undefined> {
+    const artifact = this.metadata(ref)
+    if (!artifact) return undefined
+    const hex = artifact.contentHash.slice(HASH_PREFIX.length)
+    await verifyObject(
+      join(this.root, artifact.localPath),
+      hex,
+      artifact.byteSize,
+    )
+    return artifact
+  }
+
+  async read(
+    ref: string,
+    maxByteSize?: number,
+  ): Promise<
+    { readonly artifact: Artifact; readonly bytes: Uint8Array } | undefined
+  > {
+    const artifact = this.metadata(ref)
+    if (!artifact) return undefined
+    if (
+      maxByteSize !== undefined &&
+      (!Number.isSafeInteger(maxByteSize) ||
+        maxByteSize < 0 ||
+        artifact.byteSize > maxByteSize)
+    )
+      throw new CtxindexValidationError(
+        'invalid_action_input',
+        `Artifact "${ref}" exceeds the remaining ${maxByteSize}-byte read limit`,
+      )
+    const hex = artifact.contentHash.slice(HASH_PREFIX.length)
+    await verifyObject(
+      join(this.root, artifact.localPath),
+      hex,
+      artifact.byteSize,
+    )
+    const bytes = new Uint8Array(
+      await readFile(join(this.root, artifact.localPath)),
+    )
+    const contentHash = `${HASH_PREFIX}${createHash('sha256').update(bytes).digest('hex')}`
+    if (
+      bytes.byteLength !== artifact.byteSize ||
+      contentHash !== artifact.contentHash
+    )
+      throw integrityError(`Artifact cache object failed verification: ${ref}`)
+    return {
+      artifact,
+      bytes: bytes.slice(),
+    }
   }
 
   async copyTo(ref: string, outputPath: string): Promise<void> {

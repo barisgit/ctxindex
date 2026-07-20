@@ -106,6 +106,15 @@ export class CtxindexValidationError extends CtxindexError {
   }
 }
 
+export class CtxindexContinuationError extends CtxindexValidationError {
+  override readonly code = 'invalid_filter'
+
+  constructor(message: string, options?: CtxindexErrorOptions) {
+    super('invalid_filter', message, options)
+    this.name = 'CtxindexContinuationError'
+  }
+}
+
 export type CtxindexConfigErrorCode =
   | 'secret_must_be_uri'
   | 'secret_uri_invalid'

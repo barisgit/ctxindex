@@ -11,7 +11,8 @@ Pure argv parsing into typed discriminated command unions.
 - `account.ts` requires an exact OAuth App label for provider authorization and accepts optional Account labels, deterministic inventory, and label removal.
 - `source.ts` derives `--config-*` values from registry descriptions, accepts `--label` and Account label/Account ID references, and rejects removed `--name`, `--display-name`, and direct Grant-ID selection forms.
 - Ref-bearing parsers validate stable `ctx://` / Artifact Refs; search/sync/status/Action source flags remain strings for later label-or-ID resolution.
-- `extensions.ts` keeps exact Catalog `<id>@<version>` selectors distinct from direct `npm|git|local` target plus `--extension <id>` forms, and owns direct update/uninstall/force grammar without performing acquisition.
+- `search.ts` permits query-less filtered remote execution and accepts a non-blank opaque `--continuation` only with `--remote`, exactly one `--source`, and no `--offset`; offsets remain local-only pagination.
+- `extensions.ts` keeps exact Catalog `<id>@<version>` selectors and trust/refresh flags distinct from direct `npm|git|local` target plus `--extension <id>` forms, and owns direct update/uninstall/force grammar without performing acquisition.
 
 ## Data & control flow
 

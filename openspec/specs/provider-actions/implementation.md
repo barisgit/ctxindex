@@ -38,6 +38,15 @@ export interface AdapterActionBinding<
 ### @ctxindex/extension-sdk — Action operation context
 
 ```ts
+export interface ActionArtifact {
+  readonly ref: string
+  readonly originRef: string
+  readonly filename: string
+  readonly mediaType: string
+  readonly byteSize: number
+  readonly bytes: Uint8Array
+}
+
 export interface ActionResource {
   readonly ref: string
   readonly sourceId: string
@@ -51,6 +60,10 @@ export interface ActionContext<TInput = unknown> extends ProviderContext {
   readonly input: TInput
   readonly signal: AbortSignal
   readonly resolveResource: (ref: string) => ActionResource | null
+  readonly resolveArtifact: (
+    ref: string,
+    maxByteSize?: number,
+  ) => Promise<ActionArtifact | null>
 }
 ```
 
@@ -178,6 +191,8 @@ export async function handleActionCommand(
 Profiles own Action ids, input schemas, output Profile, effect, docs, and examples. Adapters bind implementations only for declared Actions. Core resolves the Source-bound binding, validates input before provider I/O, enforces effect confirmation, and injects a generic Source-scoped local Resource resolver before creating the provider context. The resolver exposes stored completeness and deletion state, rejects cross-Source Refs, and never retrieves or authenticates. Core validates the returned Ref/Profile/payload and stores complete ad-hoc output. Automatic 401 retry is disabled.
 
 Gmail Draft identity uses the immutable Draft id; Outlook requests immutable Graph ids. Portable strict union inputs keep standalone content replacement unchanged while reply branches accept only local parent Ref and body text. A standalone update rejects a locally stored target that already carries reply context. Reply creation derives recipient, subject, and threading state locally; update preserves the stored Draft context while validating parent and provider identity before one provider mutation. MIME header values reject CR/LF. The CLI recursively renders each strict union branch and exposes only registry-derived `action describe` and `action run`; no provider-specific parallel command family or send route exists.
+
+Draft create may name an ordered, non-empty set of strict managed Artifact Refs. Core supplies a selected-Source resolver that returns only current descriptor metadata and verified cached bytes without provider access. Adapters resolve and validate the complete set before their first fetch, render one deterministic safe MIME mutation, and record ordered `managedAttachmentRefs`. Update never accepts an attachment collection mutation: Microsoft omits attachments from its PATCH, while Gmail replays a locally proven managed set or fails before provider I/O when provenance or bytes are unavailable.
 
 ## Verification
 
