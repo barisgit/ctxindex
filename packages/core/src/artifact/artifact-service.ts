@@ -168,6 +168,7 @@ export class ArtifactService {
   async resolveCached(
     ref: string,
     sourceId: string,
+    maxByteSize?: number,
   ): Promise<ActionArtifact | null> {
     const parsed = parseRef(ref)
     if (parsed.sourceId !== sourceId)
@@ -192,7 +193,16 @@ export class ArtifactService {
         'invalid_artifact_ref',
         `Artifact descriptor lacks a filename: ${ref}`,
       )
-    const cached = await this.store.read(ref)
+    if (
+      maxByteSize !== undefined &&
+      descriptor.byteSize !== undefined &&
+      descriptor.byteSize > maxByteSize
+    )
+      throw new CtxindexValidationError(
+        'invalid_action_input',
+        `Artifact "${ref}" exceeds the remaining ${maxByteSize}-byte Action limit`,
+      )
+    const cached = await this.store.read(ref, maxByteSize)
     if (!cached) return null
     const mediaType = descriptor.mediaType ?? 'application/octet-stream'
     if (

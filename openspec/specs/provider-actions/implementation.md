@@ -60,7 +60,10 @@ export interface ActionContext<TInput = unknown> extends ProviderContext {
   readonly input: TInput
   readonly signal: AbortSignal
   readonly resolveResource: (ref: string) => ActionResource | null
-  readonly resolveArtifact: (ref: string) => Promise<ActionArtifact | null>
+  readonly resolveArtifact: (
+    ref: string,
+    maxByteSize?: number,
+  ) => Promise<ActionArtifact | null>
 }
 ```
 

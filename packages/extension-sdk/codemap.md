@@ -10,7 +10,7 @@ Defines the private workspace authoring/runtime contract for ctxindex Extension 
 - Generic identity factories (`defineProvider`, `defineOAuthApp`, `defineProfile`, `defineAdapter`, and `defineExtension`) add a discriminating `kind` while retaining literal definition data through inference.
 - `docs('./docs')` returns a pure relative descriptor; generated builds may instead supply one eager virtual tree of Markdown strings and image bytes. Only Extension roots carry either declaration.
 - Provider policy is separate from Adapter behavior: a Provider owns authentication and network policy, OAuth Apps supply schema-typed registrations, and Adapters declare source-specific scopes, API hosts, capabilities, and Actions.
-- Capability-gated operation contracts and callback contexts let providers run independently of core orchestration and persistence. `ActionContext.resolveResource` and `resolveArtifact` are narrow, read-only selected-Source seams; the latter exposes copied verified bytes without a storage path or provider access.
+- Capability-gated operation contracts and callback contexts let providers run independently of core orchestration and persistence. `ActionContext.resolveResource` and `resolveArtifact` are narrow, read-only selected-Source seams; the latter accepts an optional maximum byte size and exposes copied verified bytes without a storage path or provider access.
 - Full symbol-level map: `packages/extension-sdk/src/codemap.md`.
 
 ## Data & control flow

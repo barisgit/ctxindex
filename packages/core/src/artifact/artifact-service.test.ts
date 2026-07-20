@@ -151,6 +151,9 @@ describe('ArtifactService', () => {
       (await f.service.resolveCached(artifactRef, sourceId))?.bytes,
     ).toEqual(new Uint8Array(bytes))
     expect(f.calls()).toBe(1)
+    await expect(
+      f.service.resolveCached(artifactRef, sourceId, bytes.length - 1),
+    ).rejects.toMatchObject({ code: 'invalid_action_input' })
 
     await expect(
       f.service.resolveCached(

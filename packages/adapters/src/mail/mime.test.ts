@@ -88,14 +88,23 @@ describe('Draft MIME', () => {
   test('resolves in order and gives download guidance without provider I/O', async () => {
     const first = artifact()
     const second = artifact({ ref: `${first.ref}-2`, filename: 'second.bin' })
+    const remainingBudgets: Array<number | undefined> = []
     const resolved = await resolveDraftAttachments(
       {
-        resolveArtifact: async (ref) =>
-          [first, second].find((candidate) => candidate.ref === ref) ?? null,
+        resolveArtifact: async (ref, maxByteSize) => {
+          remainingBudgets.push(maxByteSize)
+          return (
+            [first, second].find((candidate) => candidate.ref === ref) ?? null
+          )
+        },
       },
       [{ ref: second.ref }, { ref: first.ref }],
     )
     expect(resolved.map((value) => value.ref)).toEqual([second.ref, first.ref])
+    expect(remainingBudgets).toEqual([
+      MAX_DRAFT_ATTACHMENT_BYTES,
+      MAX_DRAFT_ATTACHMENT_BYTES - second.byteSize,
+    ])
     const error = await resolveDraftAttachments(
       { resolveArtifact: async () => null },
       [{ ref: first.ref }],

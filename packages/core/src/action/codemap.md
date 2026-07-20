@@ -7,7 +7,7 @@ Application service for discovering and executing typed profile Actions against 
 ## Design/patterns
 
 - `describeAction()` in `describe.ts` joins the registry-level Action declaration with per-Source adapter availability; unavailable bindings are classified as `adapter_unavailable` or `action_unsupported`.
-- `runAction()` in `run.ts` is a validation-and-dispatch pipeline: Zod validates adapter output, profile schemas validate payloads, explicit confirmation gates irreversible Actions, and selected-Source resolvers expose complete local Resources and verified cached Artifacts without provider reads.
+- `runAction()` in `run.ts` is a validation-and-dispatch pipeline: Zod validates adapter output, profile schemas validate payloads, explicit confirmation gates irreversible Actions, and selected-Source resolvers expose complete local Resources and size-bounded verified cached Artifacts without provider reads.
 - Profile definitions own Action input/output contracts; adapters provide Source-specific `actions[actionId]` bindings. `index.ts` is the leaf barrel.
 
 ## Data & control flow

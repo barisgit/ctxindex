@@ -118,7 +118,9 @@ describe('Microsoft threaded reply Drafts', () => {
     const resource = await microsoftDraftCreate(
       context(
         {
-          to: ['recipient@example.test'],
+          to: ['Doe, Jane <jane@example.test>', 'recipient@example.test'],
+          cc: ['Copy Person <copy@example.test>'],
+          bcc: ['blind@example.test'],
           subject: 'Attached',
           bodyText: 'See file.',
           attachments: [{ ref: managedArtifact.ref }],
@@ -150,12 +152,85 @@ describe('Microsoft threaded reply Drafts', () => {
     const mime = Buffer.from(String(calls[0]?.init?.body), 'base64').toString()
     expect(mime).toContain('Content-Type: multipart/mixed;')
     expect(mime).toContain(
+      'To: "Doe, Jane" <jane@example.test>, recipient@example.test',
+    )
+    expect(mime).toContain('Cc: Copy Person <copy@example.test>')
+    expect(mime).toContain('Bcc: blind@example.test')
+    expect(mime).toContain(
       'Content-Disposition: attachment; filename="report.bin"',
     )
     expect(mime).toContain('AAH+/w==')
     expect(resource.payload).toMatchObject({
       managedAttachmentRefs: [managedArtifact.ref],
     })
+  })
+
+  test.each([
+    {
+      path: 'to',
+      recipient: 'bad:local@example.test',
+      transport: 'attachment MIME create',
+    },
+    {
+      path: 'cc',
+      recipient: 'bad(comment)@example.test',
+      transport: 'attachment MIME create',
+    },
+    {
+      path: 'bcc',
+      recipient: 'Bad\u0000 Name <valid@example.test>',
+      transport: 'attachment MIME create',
+    },
+    {
+      path: 'to',
+      recipient: 'bad"quote@example.test',
+      transport: 'JSON create',
+    },
+    {
+      path: 'cc',
+      recipient: 'missing-at.example.test',
+      transport: 'JSON update',
+    },
+    {
+      path: 'bcc',
+      recipient: 'bad\u007f@example.test',
+      transport: 'JSON update',
+    },
+  ] as const)('rejects malformed $path recipients before $transport Graph I/O', async ({
+    path,
+    recipient,
+    transport,
+  }) => {
+    let fetchCalls = 0
+    const input = {
+      ...(transport === 'JSON update'
+        ? { ref: `ctx://${sourceId}/draft/standalone-1` }
+        : {}),
+      to: path === 'to' ? [recipient] : ['valid@example.test'],
+      ...(path === 'cc' ? { cc: [recipient] } : {}),
+      ...(path === 'bcc' ? { bcc: [recipient] } : {}),
+      subject: 'Malformed recipient',
+      bodyText: 'Must fail locally.',
+      ...(transport === 'attachment MIME create'
+        ? { attachments: [{ ref: managedArtifact.ref }] }
+        : {}),
+    }
+    const action =
+      transport === 'JSON update' ? microsoftDraftUpdate : microsoftDraftCreate
+    const error = await action(
+      context(
+        input,
+        (async () => {
+          fetchCalls += 1
+          throw new Error('must not fetch')
+        }) as unknown as typeof fetch,
+        [],
+        async (ref) => (ref === managedArtifact.ref ? managedArtifact : null),
+      ),
+    ).catch((caught) => caught)
+
+    expect(error).toMatchObject({ code: 'invalid_action_input' })
+    expect(fetchCalls).toBe(0)
   })
 
   test('rejects standalone update of a locally stored reply Draft before fetch', async () => {

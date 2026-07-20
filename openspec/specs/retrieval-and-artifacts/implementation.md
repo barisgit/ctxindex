@@ -96,7 +96,7 @@ export class ArtifactStore {
     ): Promise<Artifact>;
   async createWriter(): Promise<ArtifactWriter>;
   async get(ref: string): Promise<Artifact | undefined>;
-  async read(ref: string): Promise<
+  async read(ref: string, maxByteSize?: number): Promise<
     { readonly artifact: Artifact; readonly bytes: Uint8Array } | undefined
   >;
   async copyTo(ref: string, outputPath: string): Promise<void>;
@@ -143,6 +143,7 @@ export class ArtifactService {
   async resolveCached(
     ref: string,
     sourceId: string,
+    maxByteSize?: number,
   ): Promise<ActionArtifact | null>;
   async download(
       ref: string,
@@ -234,7 +235,7 @@ Source retrieval parses the Ref, checks `ResourceStore`, invokes the bound Adapt
 
 Profiles derive Artifact descriptors. `ArtifactService` streams Adapter downloads into `ArtifactStore`; the store hashes while writing and commits immutable SHA-256 CAS objects plus SQLite metadata. V1 uses `cached` retention until explicit purge. Output copies do not transfer store ownership.
 
-Action attachment resolution revalidates exact current descriptor membership and selected-Source ownership, then reads a copied byte array only after the CAS hash, size, path, origin, media type, and declared size agree. It never downloads missing bytes. Purge leaves the descriptor discoverable but makes Action resolution return unavailable until an explicit Artifact download rematerializes the cache.
+Action attachment resolution revalidates exact current descriptor membership and selected-Source ownership, rejects an optional maximum-size violation from descriptor or cache metadata before filesystem access, then reads a copied byte array only after the CAS hash, size, path, origin, media type, and declared size agree. It never downloads missing bytes. Purge leaves the descriptor discoverable but makes Action resolution return unavailable until an explicit Artifact download rematerializes the cache.
 
 ## Verification
 

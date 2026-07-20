@@ -149,8 +149,8 @@ export async function runAction(
     logger: input.logger,
     ...(input.fetch ? { fetch: input.fetch } : {}),
   })
-  const resolveArtifact = (ref: string) =>
-    artifacts.resolveCached(ref, input.sourceId)
+  const resolveArtifact = (ref: string, maxByteSize?: number) =>
+    artifacts.resolveCached(ref, input.sourceId, maxByteSize)
 
   const provider = await createSourceProviderContext({
     db: input.db,

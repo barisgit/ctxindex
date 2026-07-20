@@ -53,7 +53,10 @@ export async function resolveDraftAttachments(
   for (const { ref } of refs) {
     if (seen.has(ref)) invalidAttachment(`Duplicate Draft attachment: ${ref}`)
     seen.add(ref)
-    const artifact = await context.resolveArtifact(ref)
+    const artifact = await context.resolveArtifact(
+      ref,
+      MAX_DRAFT_ATTACHMENT_BYTES - totalBytes,
+    )
     if (!artifact)
       throw new CtxindexValidationError(
         'invalid_action_input',

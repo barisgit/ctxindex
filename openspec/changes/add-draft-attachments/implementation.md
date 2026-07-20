@@ -27,15 +27,18 @@ export interface ActionContext<TInput = unknown> extends ProviderContext {
   readonly input: TInput
   readonly signal: AbortSignal
   readonly resolveResource: (ref: string) => ActionResource | null
-  readonly resolveArtifact: (ref: string) => Promise<ActionArtifact | null>
+  readonly resolveArtifact: (
+    ref: string,
+    maxByteSize?: number,
+  ) => Promise<ActionArtifact | null>
 }
 ```
 
-`ArtifactStore` adds a verified byte-read operation that returns immutable metadata plus a copied `Uint8Array`; it never exposes a local CAS path through the SDK. `ArtifactService` reuses the same current Profile descriptor extraction used by list/download, identifies the exact owning Resource, verifies Source ownership and current descriptor membership, reads the cached Artifact, compares effective descriptor metadata with the cache row, and returns an Action-safe value. Missing cache content returns `null`; invalid descriptors, integrity failures, and Source mismatches retain typed errors.
+`ArtifactStore` adds a verified byte-read operation that returns immutable metadata plus a copied `Uint8Array`; it never exposes a local CAS path through the SDK. The optional maximum read size is checked against stored metadata before filesystem verification or byte allocation. `ArtifactService` reuses the same current Profile descriptor extraction used by list/download, identifies the exact owning Resource, verifies Source ownership and current descriptor membership, enforces the caller's remaining byte budget against descriptor and cache metadata, reads the cached Artifact, compares effective descriptor metadata with the cache row, and returns an Action-safe value. Missing cache content returns `null`; invalid descriptors, integrity failures, Source mismatches, and over-budget reads retain typed errors.
 
 Core constructs `resolveResource` and `resolveArtifact` before provider context construction. Provider token resolution remains lazy inside `fetch`, so adapters await and validate every requested Artifact before their first fetch. The create input schemas add `attachments?: readonly { readonly ref: string }[]` to both strict branches. Draft payloads add `managedAttachmentRefs?: readonly string[]` so new Action results can distinguish a proven empty set from unknown legacy state.
 
-A shared adapter-internal MIME renderer accepts validated envelope headers, normalized text, and ordered resolved Artifacts. It applies fixed CRLF line endings, base64 attachment encoding and folding, encoded filenames, validated media types, and a deterministic collision-free multipart boundary. Gmail base64url-encodes the rendered MIME; Microsoft base64-encodes it. Existing provider-specific response parsers remain responsible for stable Draft identities and normalized message fields.
+A shared adapter-internal MIME renderer accepts validated envelope headers, normalized text, and ordered resolved Artifacts. Resolution passes the decreasing portable byte allowance to core so an oversized cache entry fails before its bytes are allocated. The renderer applies fixed CRLF line endings, base64 attachment encoding and folding, encoded filenames, validated media types, and a deterministic collision-free multipart boundary. Gmail base64url-encodes the rendered MIME; Microsoft base64-encodes it after normalizing standalone and reply recipients through the same Graph recipient seam, including quoting comma-containing display names. Existing provider-specific response parsers remain responsible for stable Draft identities and normalized message fields.
 
 ## Storage and State
 

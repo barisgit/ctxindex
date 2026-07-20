@@ -148,7 +148,7 @@ flowchart LR
   OA["OAuth App\n(provider + label)"] -- authorizes --> A["Account\n(global label)"]
   A -- owns exactly one --> G["Grant\n(scopes + App snapshot + tokens)"]
   G -- binds explicitly --> S["Source\n(global label)"]
-  R[Realm] -- contains exactly one Realm per Source --> S
+  S -- belongs to exactly one --> R[Realm]
   S --> AD[Source Adapter]
 ```
 
@@ -221,11 +221,11 @@ V1 exposes exactly:
 
 Google and Microsoft mailbox Adapters bind the same strict provider-independent unions. Standalone create returns a normalized message Resource; standalone update replaces complete recipients, subject, and text for an existing same-Source Draft while preserving its Ref.
 
-Both create branches can select an ordered non-empty set of same-Source managed Artifact Refs. Each Ref must remain a current Profile-derived descriptor with integrity-verified cached bytes; ctxindex rejects foreign, missing, purged, mismatched, duplicate, unsafe, or over-limit inputs before authentication or provider mutation. Gmail and Microsoft then include every exact byte in one deterministic MIME Draft request and record ordered `managedAttachmentRefs`, including an explicit empty array when no managed attachment was selected.
+Both create branches record ordered, possibly-empty same-Source managed Artifact Refs in `managedAttachmentRefs`. When input selects one or more attachments, each Ref must remain a current Profile-derived descriptor with integrity-verified cached bytes; ctxindex rejects foreign, missing, purged, mismatched, duplicate, unsafe, or over-limit inputs before authentication or provider mutation. Gmail and Microsoft then include every exact byte in one deterministic MIME Draft request; attachment-free creates record an explicit empty array.
 
-The reply branch accepts only a same-Source parent Ref and body text. Before authentication or provider I/O, it resolves complete local message state, rejects missing, partial, deleted, cross-Source, and Draft parents, and derives the first Reply-To or From recipient, deterministic subject, and thread headers. Callers cannot override recipients or subject, and reply-all is absent. Gmail writes one MIME Draft into the parent's thread. Microsoft uses Graph's native `createReply`; later reply updates prove the locally stored parent is unchanged before one PATCH. Standalone update cannot erase a locally stored reply Draft's immutable context. Both return a complete Draft Resource with stable Ref and `replyToRef`.
+The reply branch accepts only a same-Source parent Ref and body text. Before authentication or provider I/O, it resolves complete local message state, rejects missing, partial, deleted, cross-Source, and Draft parents, and derives the first Reply-To or From recipient, deterministic subject, and thread headers. Callers cannot override recipients or subject, and reply-all is absent. Gmail writes one MIME Draft into the parent's thread. Microsoft uses Graph's native `createReply`; later reply updates prove the locally stored parent is unchanged before one PATCH. Standalone update cannot erase a locally stored reply Draft's immutable context. Both return a complete Draft Resource with stable Ref, immutable `replyToRef`, and ordered `managedAttachmentRefs` provenance.
 
-Update never accepts attachment changes. Microsoft preserves the provider attachment collection by omitting it from the one PATCH. Gmail replaces full MIME, so it replays every exact managed byte from locally proven provenance; an unknown legacy set or unavailable cached byte makes the Action fail locally instead of risking attachment loss.
+Update never accepts attachment changes. Microsoft preserves the provider attachment collection by omitting it from the one PATCH and retains any locally known managed provenance in the returned projection. Gmail replaces full MIME, so it replays every exact managed byte from locally proven provenance; an unknown legacy set or unavailable cached byte makes the Action fail locally instead of risking attachment loss.
 
 There is no send, reply-send, forward-send, calendar mutation, or other provider mutation. Microsoft’s narrow Draft-capable permission includes message write access but excludes `Mail.Send`. Ambiguous mutation outcomes are not automatically retried. Agent wording, approval, and workflow policy stay outside ctxindex; text becomes a Draft only after provider persistence succeeds.
 

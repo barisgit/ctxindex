@@ -56,6 +56,35 @@ interface MicrosoftReplyDetails {
   readonly references: readonly string[]
 }
 
+interface MicrosoftRecipient {
+  readonly emailAddress: {
+    readonly address: string
+    readonly name?: string
+  }
+}
+
+const MAILBOX_PATTERN =
+  /^[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-]+(?:\.[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/u
+
+function hasControlCharacter(value: string): boolean {
+  for (const character of value) {
+    const codePoint = character.codePointAt(0)
+    if (
+      codePoint !== undefined &&
+      (codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f))
+    )
+      return true
+  }
+  return false
+}
+
+function validMailbox(value: string): boolean {
+  const localPart = value.slice(0, value.indexOf('@'))
+  return (
+    value.length <= 254 && localPart.length <= 64 && MAILBOX_PATTERN.test(value)
+  )
+}
+
 function parseCreateInput(input: unknown): MicrosoftDraftCreateInput {
   const parsed = communicationMessageDraftCreateInputSchema.safeParse(input)
   if (!parsed.success)
@@ -78,14 +107,15 @@ function parseUpdateInput(input: unknown): MicrosoftDraftUpdateInput {
   return parsed.data
 }
 
-function recipient(value: string) {
+function recipient(value: string): MicrosoftRecipient {
   const trimmed = value.trim()
-  const named = /^(.*?)\s*<([^<>]+)>$/.exec(value)
+  const named = /^(.*?)\s*<([^<>]+)>$/.exec(trimmed)
   const name = named?.[1]?.trim()
   const address = named?.[2]?.trim()
   if (
-    (named && (!name || !address || /[<>\s]/.test(address))) ||
-    (!named && (!trimmed || /[<>\s]/.test(trimmed)))
+    hasControlCharacter(trimmed) ||
+    (named && (!name || !address || !validMailbox(address))) ||
+    (!named && !validMailbox(trimmed))
   )
     throw new CtxindexValidationError(
       'invalid_action_input',
@@ -98,6 +128,19 @@ function recipient(value: string) {
 
 function recipients(values: readonly string[]) {
   return values.map(recipient)
+}
+
+function mimeRecipient(value: string): string {
+  const { name, address } = recipient(value).emailAddress
+  if (!name) return address
+  const renderedName = /[(),.:;<>@[\]"\\]/.test(name)
+    ? `"${name.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`
+    : name
+  return `${renderedName} <${address}>`
+}
+
+function mimeRecipients(values: readonly string[]): string {
+  return values.map(mimeRecipient).join(', ')
 }
 
 function replacement(
@@ -253,9 +296,9 @@ function mimeHeaders(
     | MicrosoftStandaloneDraftUpdateInput,
 ): string[] {
   return [
-    `To: ${input.to.join(', ')}`,
-    ...(input.cc?.length ? [`Cc: ${input.cc.join(', ')}`] : []),
-    ...(input.bcc?.length ? [`Bcc: ${input.bcc.join(', ')}`] : []),
+    `To: ${mimeRecipients(input.to)}`,
+    ...(input.cc?.length ? [`Cc: ${mimeRecipients(input.cc)}`] : []),
+    ...(input.bcc?.length ? [`Bcc: ${mimeRecipients(input.bcc)}`] : []),
     `Subject: ${input.subject}`,
   ]
 }
@@ -266,7 +309,7 @@ function replyMime(
   attachments: Parameters<typeof renderMimeMessage>[0]['attachments'],
 ): string {
   const headers = [
-    `To: ${details.recipient}`,
+    `To: ${mimeRecipient(details.recipient)}`,
     `Subject: ${details.subject}`,
     ...(details.inReplyTo ? [`In-Reply-To: ${details.inReplyTo}`] : []),
     ...(details.references.length > 0
