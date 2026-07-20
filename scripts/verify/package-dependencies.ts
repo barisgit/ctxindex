@@ -1,8 +1,16 @@
 #!/usr/bin/env bun
 import type { Dirent } from 'node:fs'
-import { readdir, readFile } from 'node:fs/promises'
+import { readdir, readFile, realpath, stat } from 'node:fs/promises'
 import { builtinModules } from 'node:module'
-import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import {
+  dirname,
+  extname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from 'node:path'
 import ts from 'typescript'
 
 const sourceExtensions = new Set([
@@ -33,6 +41,31 @@ const frameworkPackagePeers = new Map([['next', ['react', 'react-dom']]])
 const builtins = new Set(
   builtinModules.map((name) => name.replace(/^node:/, '')),
 )
+const rpcForbiddenBuiltinRoots = new Set([
+  'child_process',
+  'cluster',
+  'fs',
+  'process',
+  'worker_threads',
+])
+const rpcForbiddenStoragePackages = new Set([
+  'better-sqlite3',
+  'drizzle-orm',
+  'sqlite3',
+])
+const rpcAllowedOrpcEntryPoints = new Set(['@orpc/contract', '@orpc/server'])
+const localDaemonAllowedBuiltinRoots = new Set(['crypto', 'fs', 'os', 'path'])
+const providerHosts = [
+  'accounts.google.com',
+  'gmail.googleapis.com',
+  'graph.microsoft.com',
+  'login.microsoftonline.com',
+  'oauth2.googleapis.com',
+  'openidconnect.googleapis.com',
+  'www.googleapis.com',
+]
+const rawSqlPattern =
+  /^\s*(?:INSERT|UPDATE|DELETE|SELECT|CREATE|ALTER|DROP)\s+/i
 
 function compareStrings(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0
@@ -62,6 +95,29 @@ export function extractPackageImports(
   fileName: string,
   localSpecifierPatterns: readonly string[] = [],
 ): string[] {
+  const imports = new Set<string>()
+  for (const specifier of extractModuleSpecifiers(source, fileName)) {
+    if (
+      ignoredFrameworkSpecifiers.has(specifier) ||
+      localSpecifierPatterns.some((pattern) => {
+        const wildcard = pattern.indexOf('*')
+        if (wildcard === -1) return specifier === pattern
+        return (
+          specifier.startsWith(pattern.slice(0, wildcard)) &&
+          specifier.endsWith(pattern.slice(wildcard + 1))
+        )
+      })
+    )
+      continue
+    for (const peer of frameworkSpecifierPeers.get(specifier) ?? [])
+      imports.add(peer)
+    const packageName = packageNameFromSpecifier(specifier)
+    if (packageName) imports.add(packageName)
+  }
+  return [...imports].sort(compareStrings)
+}
+
+function extractModuleSpecifiers(source: string, fileName: string): string[] {
   const sourceFile = ts.createSourceFile(
     fileName,
     source,
@@ -72,22 +128,7 @@ export function extractPackageImports(
 
   const addSpecifier = (node: ts.Expression | undefined): void => {
     if (!node || !ts.isStringLiteralLike(node)) return
-    if (
-      ignoredFrameworkSpecifiers.has(node.text) ||
-      localSpecifierPatterns.some((pattern) => {
-        const wildcard = pattern.indexOf('*')
-        if (wildcard === -1) return node.text === pattern
-        return (
-          node.text.startsWith(pattern.slice(0, wildcard)) &&
-          node.text.endsWith(pattern.slice(wildcard + 1))
-        )
-      })
-    )
-      return
-    for (const peer of frameworkSpecifierPeers.get(node.text) ?? [])
-      imports.add(peer)
-    const packageName = packageNameFromSpecifier(node.text)
-    if (packageName) imports.add(packageName)
+    imports.add(node.text)
   }
 
   const visit = (node: ts.Node): void => {
@@ -121,8 +162,214 @@ export function extractPackageImports(
   return [...imports].sort(compareStrings)
 }
 
+function isOutsideDirectory(directory: string, target: string): boolean {
+  const relativeTarget = relative(directory, target)
+  return (
+    relativeTarget === '..' ||
+    relativeTarget.startsWith(`..${sep}`) ||
+    isAbsolute(relativeTarget)
+  )
+}
+
+async function existingImportTargets(
+  specifier: string,
+  fileName: string,
+): Promise<string[]> {
+  const target = isAbsolute(specifier)
+    ? resolve(specifier)
+    : resolve(dirname(fileName), specifier)
+  const candidates = extname(target)
+    ? [target]
+    : [
+        target,
+        ...[...sourceExtensions].map((extension) => `${target}${extension}`),
+        ...[...sourceExtensions].map((extension) =>
+          join(target, `index${extension}`),
+        ),
+      ]
+  const targets: string[] = []
+  for (const candidate of candidates) {
+    try {
+      const physicalTarget = await realpath(candidate)
+      if ((await stat(physicalTarget)).isFile()) targets.push(physicalTarget)
+    } catch {
+      // Missing candidates are handled by lexical containment.
+    }
+  }
+  return targets
+}
+
+async function isLocalPackageEscape(
+  specifier: string,
+  fileName: string,
+  packageDirectory: string,
+  physicalPackageDirectory: string,
+): Promise<boolean> {
+  if (!specifier.startsWith('.') && !isAbsolute(specifier)) return false
+  const lexicalTarget = isAbsolute(specifier)
+    ? resolve(specifier)
+    : resolve(dirname(fileName), specifier)
+  if (isOutsideDirectory(resolve(packageDirectory), lexicalTarget)) return true
+  return (await existingImportTargets(specifier, fileName)).some((target) =>
+    isOutsideDirectory(physicalPackageDirectory, target),
+  )
+}
+
+async function extractRpcBoundaryUses(
+  source: string,
+  fileName: string,
+  packageDirectory: string,
+  physicalPackageDirectory: string,
+  applicationPackages: ReadonlySet<string>,
+): Promise<string[]> {
+  const uses = new Set<string>()
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+  )
+
+  for (const specifier of extractModuleSpecifiers(source, fileName)) {
+    const packageName = packageNameFromSpecifier(specifier)
+    const builtinRoot = specifier.replace(/^node:/, '').split('/')[0]
+    if (
+      packageName === '@ctxindex/core' ||
+      packageName === '@ctxindex/adapters' ||
+      packageName === '@ctxindex/local-daemon' ||
+      (packageName !== undefined && applicationPackages.has(packageName))
+    )
+      uses.add(packageName)
+    if (
+      (await isLocalPackageEscape(
+        specifier,
+        fileName,
+        packageDirectory,
+        physicalPackageDirectory,
+      )) ||
+      (specifier.startsWith('@orpc/') &&
+        !rpcAllowedOrpcEntryPoints.has(specifier)) ||
+      specifier === 'bun' ||
+      (specifier.startsWith('bun:') && specifier !== 'bun:test') ||
+      rpcForbiddenBuiltinRoots.has(builtinRoot) ||
+      (packageName !== undefined &&
+        rpcForbiddenStoragePackages.has(packageName)) ||
+      /(?:^|\/)apps\//.test(specifier) ||
+      /(?:^|\/)(?:format|formatter|formatters)(?:\/|$)/.test(specifier)
+    )
+      uses.add(specifier)
+  }
+
+  for (const use of extractForbiddenRuntimeUses(sourceFile)) uses.add(use)
+
+  return [...uses].sort(compareStrings)
+}
+
+async function extractLocalDaemonBoundaryUses(
+  source: string,
+  fileName: string,
+  packageDirectory: string,
+  physicalPackageDirectory: string,
+  applicationPackages: ReadonlySet<string>,
+): Promise<string[]> {
+  const uses = new Set<string>()
+  const allowTestRuntimePrimitives = isRuntimeTestSupportFile(fileName)
+  const sourceFile = ts.createSourceFile(
+    fileName,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+  )
+
+  for (const specifier of extractModuleSpecifiers(source, fileName)) {
+    if (specifier === 'bun:test') continue
+    const packageName = packageNameFromSpecifier(specifier)
+    const builtinRoot = specifier.replace(/^node:/, '').split('/')[0]
+    const allowedTestProcessImport =
+      allowTestRuntimePrimitives && builtinRoot === 'process'
+    if (packageName !== undefined)
+      uses.add(
+        rpcForbiddenStoragePackages.has(packageName) ? specifier : packageName,
+      )
+    if (
+      (await isLocalPackageEscape(
+        specifier,
+        fileName,
+        packageDirectory,
+        physicalPackageDirectory,
+      )) ||
+      (specifier === 'bun' && !allowTestRuntimePrimitives) ||
+      specifier.startsWith('bun:') ||
+      (packageName === undefined &&
+        !specifier.startsWith('.') &&
+        !specifier.startsWith('/') &&
+        !specifier.startsWith('#') &&
+        !localDaemonAllowedBuiltinRoots.has(builtinRoot) &&
+        !allowedTestProcessImport) ||
+      (packageName !== undefined && applicationPackages.has(packageName)) ||
+      /(?:^|\/)apps\//.test(specifier) ||
+      /(?:^|\/)(?:format|formatter|formatters)(?:\/|$)/.test(specifier)
+    )
+      uses.add(specifier)
+  }
+
+  for (const use of extractForbiddenRuntimeUses(
+    sourceFile,
+    allowTestRuntimePrimitives,
+  ))
+    uses.add(use)
+
+  return [...uses].sort(compareStrings)
+}
+
+function isRuntimeTestSupportFile(fileName: string): boolean {
+  const normalized = fileName.replaceAll('\\', '/')
+  return (
+    /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(normalized) ||
+    normalized.includes('/src/testing/')
+  )
+}
+
+function extractForbiddenRuntimeUses(
+  sourceFile: ts.SourceFile,
+  allowBunAndProcess = false,
+): string[] {
+  const uses = new Set<string>()
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isPropertyAccessExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'Bun' &&
+      !allowBunAndProcess
+    ) {
+      uses.add(`Bun.${node.name.text}`)
+    } else if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'fetch'
+    ) {
+      uses.add('fetch')
+    } else if (
+      ts.isIdentifier(node) &&
+      node.text === 'process' &&
+      !allowBunAndProcess
+    ) {
+      uses.add('process')
+    } else if (ts.isStringLiteralLike(node)) {
+      if (rawSqlPattern.test(node.text)) uses.add('raw-sql')
+      for (const host of providerHosts) {
+        if (node.text.includes(host)) uses.add(`provider-url:${host}`)
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(sourceFile)
+  return [...uses].sort(compareStrings)
+}
+
 interface PackageJson {
   name: string
+  private?: boolean
   dependencies?: Record<string, string>
   devDependencies?: Record<string, string>
 }
@@ -173,7 +420,10 @@ async function discoverSourceFiles(
         files.push(...(await discoverSourceFiles(path, packageRoot)))
       continue
     }
-    if (entry.isFile() && sourceExtensions.has(extname(entry.name)))
+    if (
+      (entry.isFile() || entry.isSymbolicLink()) &&
+      sourceExtensions.has(extname(entry.name))
+    )
       files.push(path)
   }
 
@@ -290,6 +540,8 @@ export async function discoverWorkspacePackages(
 export interface DependencyViolation {
   type:
     | 'external-direction'
+    | 'local-daemon-boundary'
+    | 'rpc-boundary'
     | 'undeclared-dependency'
     | 'unused-dependency'
     | 'workspace-direction'
@@ -335,6 +587,13 @@ export async function verifyWorkspaceDependencies(
   const workspaceNames = new Set(
     packages.map((workspacePackage) => workspacePackage.name),
   )
+  const applicationPackages = new Set(
+    packages
+      .filter((workspacePackage) =>
+        workspacePackage.directory.replaceAll('\\', '/').includes('/apps/'),
+      )
+      .map((workspacePackage) => workspacePackage.name),
+  )
   const violations: DependencyViolation[] = []
 
   for (const workspacePackage of packages) {
@@ -342,13 +601,70 @@ export async function verifyWorkspaceDependencies(
     const localSpecifierPatterns = await readLocalSpecifierPatterns(
       workspacePackage.directory,
     )
+    const packageBoundaryDependencies = new Set<string>()
+    const physicalPackageDirectory = await realpath(workspacePackage.directory)
+    const isProtectedPackage =
+      workspacePackage.name === '@ctxindex/rpc' ||
+      workspacePackage.name === '@ctxindex/local-daemon'
+    if (
+      (workspacePackage.name === '@ctxindex/rpc' ||
+        workspacePackage.name === '@ctxindex/local-daemon') &&
+      workspacePackage.manifest.private !== true
+    )
+      packageBoundaryDependencies.add('package-private')
     for (const file of workspacePackage.files) {
+      if (isProtectedPackage) {
+        let physicalFile: string
+        try {
+          physicalFile = await realpath(file)
+        } catch {
+          packageBoundaryDependencies.add(
+            `source-escape:${relative(workspacePackage.directory, file).replaceAll('\\', '/')}`,
+          )
+          continue
+        }
+        if (isOutsideDirectory(physicalPackageDirectory, physicalFile)) {
+          packageBoundaryDependencies.add(
+            `source-escape:${relative(workspacePackage.directory, file).replaceAll('\\', '/')}`,
+          )
+        }
+      }
+      const source = await readFile(file, 'utf8')
       for (const dependency of extractPackageImports(
-        await readFile(file, 'utf8'),
+        source,
         file,
         localSpecifierPatterns,
       ))
         imports.add(dependency)
+      if (workspacePackage.name === '@ctxindex/rpc') {
+        for (const dependency of await extractRpcBoundaryUses(
+          source,
+          file,
+          workspacePackage.directory,
+          physicalPackageDirectory,
+          applicationPackages,
+        ))
+          packageBoundaryDependencies.add(dependency)
+      } else if (workspacePackage.name === '@ctxindex/local-daemon') {
+        for (const dependency of await extractLocalDaemonBoundaryUses(
+          source,
+          file,
+          workspacePackage.directory,
+          physicalPackageDirectory,
+          applicationPackages,
+        ))
+          packageBoundaryDependencies.add(dependency)
+      }
+    }
+    for (const dependency of packageBoundaryDependencies) {
+      violations.push({
+        type:
+          workspacePackage.name === '@ctxindex/rpc'
+            ? 'rpc-boundary'
+            : 'local-daemon-boundary',
+        packageName: workspacePackage.name,
+        dependency,
+      })
     }
 
     const runtimeDeclared = new Set(

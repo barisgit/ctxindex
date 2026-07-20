@@ -124,6 +124,7 @@ defineAdapter({
     searchRemote: async (context): Promise<SearchRemoteResult> => {
       const text: string = context.query.text
       const limit: number = context.query.limit
+      const continuation: string | undefined = context.query.continuation
       const since: number | undefined = context.query.since
       const until: number | undefined = context.query.until
       const fields = context.query.fields
@@ -132,6 +133,7 @@ defineAdapter({
       void until
       void fields
       void aborted
+      void continuation
       return {
         resources: [
           {
@@ -142,6 +144,7 @@ defineAdapter({
           },
         ].slice(0, limit),
         warnings: [],
+        continuation: 'next-page',
       }
     },
   },
@@ -255,12 +258,16 @@ defineAdapter({
         const resolved = context.resolveResource(
           'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/note/1',
         )
+        const artifact = context.resolveArtifact(
+          'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/note/1/attachment/1',
+        )
         void sourceId
         void inputTitle
         void signal
         void fetch
         void logger
         void resolved
+        void artifact
         return actionResult
       },
     },
@@ -356,6 +363,7 @@ describe('extension SDK definition factories', () => {
     const result = {
       resources: [],
       warnings: [],
+      continuation: 'next-page',
       // @ts-expect-error provider results do not expose scores
       score: 1,
     } satisfies SearchRemoteResult
@@ -366,6 +374,7 @@ describe('extension SDK definition factories', () => {
       score: 1,
     } satisfies SearchRemoteResource
     expect(result.resources).toEqual([])
+    expect(result.continuation).toBe('next-page')
     expect(resource.ref).toContain('/note/1')
   })
 })

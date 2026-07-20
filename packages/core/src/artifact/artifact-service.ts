@@ -1,4 +1,5 @@
 import type {
+  ActionArtifact,
   ArtifactDescriptor,
   ResolvedArtifactDescriptor,
 } from '@ctxindex/extension-sdk'
@@ -162,6 +163,66 @@ export class ArtifactService {
     const resource = this.resources.get(ref)
     if (!resource) throw new CtxindexNotFoundError(`Resource not found: ${ref}`)
     return descriptors(resource, this.input)
+  }
+
+  async resolveCached(
+    ref: string,
+    sourceId: string,
+    maxByteSize?: number,
+  ): Promise<ActionArtifact | null> {
+    const parsed = parseRef(ref)
+    if (parsed.sourceId !== sourceId)
+      throw new CtxindexValidationError(
+        'ref_source_mismatch',
+        `Ref "${ref}" does not belong to Source "${sourceId}"`,
+      )
+    const row = (
+      this.input.db
+        .prepare(
+          'SELECT ref FROM resources WHERE deleted_at IS NULL AND hydrated_at IS NOT NULL AND source_id = ? ORDER BY length(ref) DESC',
+        )
+        .all(sourceId) as { ref: string }[]
+    ).find((candidate) => ref.startsWith(`${candidate.ref}/`))
+    if (!row) return null
+    const descriptor = (await this.list(row.ref)).artifacts.find(
+      (candidate) => candidate.ref === ref,
+    )
+    if (!descriptor) return null
+    if (!descriptor.filename)
+      throw new CtxindexValidationError(
+        'invalid_artifact_ref',
+        `Artifact descriptor lacks a filename: ${ref}`,
+      )
+    if (
+      maxByteSize !== undefined &&
+      descriptor.byteSize !== undefined &&
+      descriptor.byteSize > maxByteSize
+    )
+      throw new CtxindexValidationError(
+        'invalid_action_input',
+        `Artifact "${ref}" exceeds the remaining ${maxByteSize}-byte Action limit`,
+      )
+    const cached = await this.store.read(ref, maxByteSize)
+    if (!cached) return null
+    const mediaType = descriptor.mediaType ?? 'application/octet-stream'
+    if (
+      cached.artifact.originRef !== row.ref ||
+      cached.artifact.mediaType !== mediaType ||
+      (descriptor.byteSize !== undefined &&
+        descriptor.byteSize !== cached.artifact.byteSize)
+    )
+      throw new CtxindexError(
+        `Artifact descriptor no longer matches cached metadata: ${ref}`,
+        'data_integrity',
+      )
+    return {
+      ref,
+      originRef: row.ref,
+      filename: descriptor.filename,
+      mediaType,
+      byteSize: cached.artifact.byteSize,
+      bytes: cached.bytes,
+    }
   }
 
   async download(

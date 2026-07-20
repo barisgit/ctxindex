@@ -15,7 +15,7 @@ Owns Bun SQLite database creation, runtime pragmas, first-run filesystem/bootstr
 ## Data & control flow
 
 1. `bootstrapDatabase()` creates config/data/state/cache/log directories with mode `0700`, writes config if absent, normalizes secret material to `0600`, and opens the default database.
-2. `openDatabase()` creates the parent directory, opens `ctxindex.sqlite`, and applies connection pragmas.
+2. `openDatabase()` creates the parent directory, opens `ctxindex.sqlite`, and applies connection pragmas; `openReadonlyDatabase()` opens an existing file without creating, migrating, or enabling write-oriented pragmas.
 3. `runMigrations()` inspects the migration ledger and existing user tables, rejects prototype or unmanaged databases, creates the ledger only when absent, then applies pending `coreMigrations` transactionally; lock exhaustion is normalized through the shared storage helper.
 4. Bootstrap always closes the database in `finally`; other services receive an open `CtxindexDatabase` and manage their own query lifetime.
 
@@ -23,5 +23,5 @@ Owns Bun SQLite database creation, runtime pragmas, first-run filesystem/bootstr
 
 - Paths/config come from `packages/core/src/paths/` and `packages/core/src/config/`; migration SQL comes from `packages/core/src/migrations/index.ts`.
 - All core persistence services type against `CtxindexDatabase`, including Source, Resource, Relation, Artifact, Auth, Realm, Search, Secrets, Thread, and Sync modules.
-- `apps/cli/src/commands/init.ts` calls `bootstrapDatabase()`; `apps/cli/src/commands/db.ts` opens/closes command-scoped connections.
+- `apps/cli/src/direct-database.ts` wraps `bootstrapDatabase()` and direct command-scoped database open/close in retained shared lease ownership; `apps/cli/src/commands/init.ts` delegates initialization to that boundary.
 - `index.ts` re-exports database, bootstrap, and migration APIs through `@ctxindex/core/storage`.

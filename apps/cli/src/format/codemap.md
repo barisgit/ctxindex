@@ -10,7 +10,7 @@ Pure presentation and process-exit adapters for stable text, compact, Markdown, 
 - `account.ts` renders Accounts, authorization expiry state, and required Source labels without Grant identifiers or scopes; `source.ts` projects the single Source label field that replaced display name and omits internal Grant IDs from JSON.
 - Registry renderers derive Provider auth/registration metadata, Adapter access scopes, config flags, and Actions from loaded definitions. Text and Markdown Action renderers expand top-level `oneOf`/`anyOf` inputs into numbered branches.
 - Catalog formatters render deterministic persisted pins, entries, install/uninstall provenance, and loaded registry origins in text or JSON; acquisition timestamps remain intact and derived non-negative snapshot age is surfaced at formatting time.
-- `exit.ts` maps typed core errors to SPEC-stable numeric outcomes and `runWithExit` assigns `process.exitCode`.
+- `exit.ts` centralizes exhaustive auth, sync/provider, and validation code classification. Typed direct errors retain class-specific behavior, while transported application failures use their closed taxonomy discriminator so lookup `not_found` remains exit `2` and sync `not_found` remains exit `50`; daemon/prototype ownership failures use `50`, and cancellation uses `130`.
 
 ## Data & control flow
 

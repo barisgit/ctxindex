@@ -3,7 +3,9 @@
 The repository root remains private. `apps/cli` supplies the public, unscoped
 `ctxindex` package, while `scripts/release/cli-package.ts` constructs a minimal
 staging package containing only `package.json`, `README.md`, `LICENSE`, and the
-Bun-target `dist/ctxindex.mjs` executable. The generated manifest has no
+bundled CLI entrypoint `dist/ctxindex.mjs` plus its private sibling
+`dist/ctxindex-daemon` executable. The generated manifest exposes only the
+`ctxindex` command and has no
 `workspace:*` runtime dependency; only `keytar@7.9.0` remains external so Bun can
 install its native module.
 

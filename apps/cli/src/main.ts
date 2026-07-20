@@ -13,12 +13,14 @@ import { realmCommand } from './commands/realm'
 import { searchCommand } from './commands/search'
 import { secretsCommand } from './commands/secrets'
 import { skillsCommand } from './commands/skills'
-import { sourceCommand } from './commands/source'
+import { createSourceCommandRuntime, sourceCommand } from './commands/source'
 import { statusCommand } from './commands/status'
 import { syncCommand } from './commands/sync'
 import { threadCommand } from './commands/thread'
+import { daemonCommand } from './daemon/command'
 import { setCliLogLevel } from './deps'
 import { mapErrorToExit } from './format/exit'
+import type { SourceCommandDeps } from './source/handle-source-command'
 
 const LOG_LEVELS = ['trace', 'debug', 'info', 'warn', 'error', 'fatal'] as const
 type LogLevelName = (typeof LOG_LEVELS)[number]
@@ -133,13 +135,16 @@ function staticSubCommands(
     : undefined
 }
 
-function cittyCommandSelectionExit(args: string[]): number | undefined {
+function cittyCommandSelectionExit(
+  root: CommandDef,
+  args: string[],
+): number | undefined {
   const commandIndex = args.findIndex((arg) => !arg.startsWith('-'))
   if (commandIndex === -1) return undefined
   const commandName = args[commandIndex]
   if (commandName === undefined) return undefined
 
-  const command = staticSubCommands(rootCommand)?.[commandName]
+  const command = staticSubCommands(root)?.[commandName]
   if (!command) return mapErrorToExit({ code: 'invalid_args' })
 
   const subCommands = staticSubCommands(command)
@@ -164,35 +169,47 @@ function captureProcessExit(): () => void {
   }
 }
 
-export const rootCommand = defineCommand({
-  meta: {
-    name: 'ctxindex',
-    version: cliVersion,
-    description: 'Local context indexing CLI',
-  },
-  subCommands: {
-    init: initCommand,
-    account: accountCommand,
-    'oauth-app': oauthAppCommand,
-    describe: describeCommand,
-    extensions: extensionsCommand,
-    action: actionCommand,
-    artifact: artifactCommand,
-    purge: purgeCommand,
-    realm: realmCommand,
-    source: sourceCommand,
-    sync: syncCommand,
-    get: getCommand,
-    export: exportCommand,
-    thread: threadCommand,
-    search: searchCommand,
-    status: statusCommand,
-    secrets: secretsCommand,
-    skills: skillsCommand,
-  },
-})
+function createRootCommand(source: CommandDef = sourceCommand): CommandDef {
+  return defineCommand({
+    meta: {
+      name: 'ctxindex',
+      version: cliVersion,
+      description: 'Local context indexing CLI',
+    },
+    subCommands: {
+      init: initCommand,
+      account: accountCommand,
+      'oauth-app': oauthAppCommand,
+      describe: describeCommand,
+      daemon: daemonCommand,
+      extensions: extensionsCommand,
+      action: actionCommand,
+      artifact: artifactCommand,
+      purge: purgeCommand,
+      realm: realmCommand,
+      source: source,
+      sync: syncCommand,
+      get: getCommand,
+      export: exportCommand,
+      thread: threadCommand,
+      search: searchCommand,
+      status: statusCommand,
+      secrets: secretsCommand,
+      skills: skillsCommand,
+    },
+  })
+}
 
-export async function runCli(args: string[]): Promise<number> {
+export const rootCommand = createRootCommand()
+
+export interface RunCliDeps {
+  readonly source?: SourceCommandDeps
+}
+
+export async function runCli(
+  args: string[],
+  deps: RunCliDeps = {},
+): Promise<number> {
   process.exitCode = 0
   const { rest, level, error } = extractLogLevel(args)
   if (error) {
@@ -207,10 +224,15 @@ export async function runCli(args: string[]): Promise<number> {
   setCliLogLevel(
     isLogLevelName(level ?? '') ? (level as LogLevelName) : undefined,
   )
+  const sourceRuntime = createSourceCommandRuntime(
+    rest[0] === 'source' ? rest.slice(1) : [],
+    deps.source,
+  )
+  const invocationCommand = createRootCommand(sourceRuntime.command)
 
   const restoreExit = captureProcessExit()
   try {
-    await runMain(rootCommand, {
+    await runMain(invocationCommand, {
       rawArgs:
         rest.length === 0 ? ['--help'] : preserveRealmNameShortHelpValue(rest),
       showUsage: async (command, parent) => {
@@ -219,10 +241,15 @@ export async function runCli(args: string[]): Promise<number> {
       },
     })
   } finally {
+    await sourceRuntime.close()
     restoreExit()
   }
   const exitCode = Number(process.exitCode ?? 0)
+  const sourceRouteError = sourceRuntime.error()
+  if (exitCode === 1 && sourceRouteError !== undefined) {
+    return mapErrorToExit(sourceRouteError)
+  }
   return exitCode === 1
-    ? (cittyCommandSelectionExit(rest) ?? exitCode)
+    ? (cittyCommandSelectionExit(invocationCommand, rest) ?? exitCode)
     : exitCode
 }

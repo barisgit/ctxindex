@@ -77,7 +77,12 @@ test('publish metadata contains only the installable runtime contract', () => {
     bugs: { url: 'https://github.com/barisgit/ctxindex/issues' },
     type: 'module',
     bin: { ctxindex: 'dist/ctxindex.mjs' },
-    files: ['dist/ctxindex.mjs', 'README.md', 'LICENSE'],
+    files: [
+      'dist/ctxindex.mjs',
+      'dist/ctxindex-daemon',
+      'README.md',
+      'LICENSE',
+    ],
     engines: { bun: '1.3.14' },
     repository: {
       type: 'git',
@@ -120,6 +125,10 @@ test('safe package files have order-independent content manifests', () => {
   )
   const files = [
     { path: 'package/LICENSE', content: 'MIT License\n' },
+    {
+      path: 'package/dist/ctxindex-daemon',
+      content: '#!/usr/bin/env bun\n',
+    },
     { path: 'package/dist/ctxindex.mjs', content: '#!/usr/bin/env bun\n' },
     { path: 'package/README.md', content: '# ctxindex\n' },
     { path: 'package/package.json', content: manifest },
@@ -296,6 +305,7 @@ test('packs allowlisted reproducible contents from unchanged source', async () =
     expect(first.map(({ path }) => path).sort()).toEqual([
       'package/LICENSE',
       'package/README.md',
+      'package/dist/ctxindex-daemon',
       'package/dist/ctxindex.mjs',
       'package/package.json',
     ])
@@ -303,7 +313,11 @@ test('packs allowlisted reproducible contents from unchanged source', async () =
     const executable = first.find(
       ({ path }) => path === 'package/dist/ctxindex.mjs',
     )
+    const daemonExecutable = first.find(
+      ({ path }) => path === 'package/dist/ctxindex-daemon',
+    )
     expect(executable).toBeDefined()
+    expect(daemonExecutable).toBeDefined()
     expect(new TextDecoder().decode(executable?.content)).not.toContain(
       'workspace:',
     )

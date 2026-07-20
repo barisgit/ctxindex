@@ -13,6 +13,7 @@ import {
   deriveCommunicationMessageReplySubject,
 } from '@ctxindex/profiles'
 import { z } from 'zod'
+import { renderMimeMessage, resolveDraftAttachments } from '../mail/mime'
 import { gmailJson } from './response'
 import { gmailApiUrl } from './url'
 
@@ -300,6 +301,21 @@ export async function gmailDraftUpdate(
 ): Promise<RetrievedResource> {
   const input = parseDraftUpdateInput(context.input)
   const addressedDraftId = providerDraftId(input.ref, context.source.id)
+  const storedDraft = localMessage(context, input.ref, true)
+  if (storedDraft.providerDraftId !== addressedDraftId)
+    throw new CtxindexValidationError(
+      'invalid_action_input',
+      `Draft "${input.ref}" does not match its stored provider Draft identity`,
+    )
+  if (storedDraft.managedAttachmentRefs === undefined)
+    throw new CtxindexValidationError(
+      'invalid_action_input',
+      `Draft "${input.ref}" lacks managed attachment provenance and cannot be replaced safely`,
+    )
+  const attachments = await resolveDraftAttachments(
+    context,
+    storedDraft.managedAttachmentRefs.map((ref) => ({ ref })),
+  )
   if (!isReplyInput(input)) rejectStoredReplyDraftUpdate(context, input.ref)
   const details = isReplyInput(input)
     ? validateReplyUpdate(context, input)
@@ -317,7 +333,7 @@ export async function gmailDraftUpdate(
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           message: {
-            raw: buildValidatedGmailDraftRaw(input, details),
+            raw: buildValidatedGmailDraftRaw(input, details, attachments),
             ...(details ? { threadId: details.threadId } : {}),
           },
         }),
@@ -348,6 +364,7 @@ export async function gmailDraftUpdate(
     bcc: details ? [] : (standalone?.bcc ?? []),
     subject: details?.subject ?? standalone?.subject,
     bodyText: input.bodyText,
+    managedAttachmentRefs: [...storedDraft.managedAttachmentRefs],
     ...(details
       ? {
           inReplyTo: details.inReplyTo,
@@ -389,6 +406,7 @@ function parseDraftCreateInput(input: unknown): GmailDraftCreateInput {
 function buildValidatedGmailDraftRaw(
   input: GmailDraftCreateInput | GmailDraftUpdateInput,
   details?: GmailReplyDetails,
+  attachments: Parameters<typeof renderMimeMessage>[0]['attachments'] = [],
 ): string {
   const standalone = details
     ? undefined
@@ -402,18 +420,18 @@ function buildValidatedGmailDraftRaw(
     headers.push(`Bcc: ${standalone.bcc.join(', ')}`)
   headers.push(
     `Subject: ${subjectHeader(details?.subject ?? standalone?.subject ?? '')}`,
+  )
+  headers.push(
     ...(details
       ? [
           `In-Reply-To: ${details.inReplyTo}`,
           `References: ${details.references.join(' ')}`,
         ]
       : []),
-    'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=UTF-8',
-    'Content-Transfer-Encoding: 8bit',
   )
-  const body = input.bodyText.replace(/\r\n|\r|\n/g, '\r\n')
-  return Buffer.from(`${headers.join('\r\n')}\r\n\r\n${body}`)
+  return Buffer.from(
+    renderMimeMessage({ headers, bodyText: input.bodyText, attachments }),
+  )
     .toString('base64url')
     .replaceAll('=', '')
 }
@@ -432,13 +450,14 @@ export async function gmailDraftCreate(
   const standalone = details
     ? undefined
     : (input as GmailStandaloneDraftCreateInput)
+  const attachments = await resolveDraftAttachments(context, input.attachments)
   const response = await gmailJson(
     await context.fetch(gmailApiUrl('/gmail/v1/users/me/drafts'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         message: {
-          raw: buildValidatedGmailDraftRaw(input, details),
+          raw: buildValidatedGmailDraftRaw(input, details, attachments),
           ...(details ? { threadId: details.threadId } : {}),
         },
       }),
@@ -472,6 +491,7 @@ export async function gmailDraftCreate(
         }),
     subject: details?.subject ?? standalone?.subject,
     bodyText: input.bodyText,
+    managedAttachmentRefs: attachments.map((artifact) => artifact.ref),
     ...(details
       ? {
           inReplyTo: details.inReplyTo,

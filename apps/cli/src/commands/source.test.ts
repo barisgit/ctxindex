@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import type { SourceDescription } from '@ctxindex/core/registry'
-import { generatedSourceConfigArgs, sourceCommand } from './source'
+import { generatedSourceConfigArgs } from '../args/source'
+import { sourceCommand } from './source'
 
 test('aggregates same-named generated options without losing Adapter ownership', () => {
   const source = (id: string, type: string): SourceDescription => ({

@@ -45,4 +45,47 @@ describe('get output', () => {
     )
     error.mockRestore()
   })
+
+  test('selected daemon get preserves output without opening direct dependencies', async () => {
+    const log = spyOn(console, 'log').mockImplementation(() => {})
+    let opened = false
+    try {
+      const exit = await handleGetCommand(['--json', result.resource.ref], {
+        selectDaemon: () => ({}) as never,
+        get: async () => result as never,
+        open: async () => {
+          opened = true
+          throw new Error('direct dependencies opened')
+        },
+      })
+      expect(exit).toBe(0)
+      expect(opened).toBe(false)
+      expect(log).toHaveBeenCalledWith(formatGetJson(result))
+    } finally {
+      log.mockRestore()
+    }
+  })
+
+  test('direct get normalizes SIGINT to cancelled before local retrieval', async () => {
+    const error = spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const exit = await handleGetCommand([result.resource.ref], {
+        selectDaemon: () => null,
+        get: async () => {
+          throw new Error('daemon transport invoked')
+        },
+        open: async () => {
+          process.emit('SIGINT')
+          return {
+            close: async () => {},
+          } as never
+        },
+      })
+
+      expect(exit).toBe(130)
+    } finally {
+      process.removeAllListeners('SIGINT')
+      error.mockRestore()
+    }
+  })
 })
