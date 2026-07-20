@@ -103,6 +103,49 @@ test('Microsoft mock rejects annotation selection and pages attachments', async 
   expect(second['@odata.nextLink']).toBeUndefined()
 })
 
+test('Microsoft mock accepts documented message filtering and rejects invented search syntax', async () => {
+  const server = startMockGraph({
+    messages: [
+      {
+        id: 'unread',
+        conversationId: 'conversation',
+        internetMessageId: '<unread@example.test>',
+        subject: 'Quarterly review',
+        bodyPreview: 'Unread preview',
+        body: 'Unread body',
+        from: { address: 'sender@example.test' },
+        to: [{ address: 'recipient@example.test' }],
+        receivedDateTime: '2026-07-18T10:00:00Z',
+        lastModifiedDateTime: '2026-07-18T10:00:00Z',
+      },
+    ],
+  })
+  servers.push(server)
+  const messagesUrl = `${server.baseUrl}/v1.0/me/messages`
+  const headers = { prefer: 'IdType="ImmutableId"' }
+
+  const filtered = await fetch(`${messagesUrl}?$filter=isRead%20eq%20false`, {
+    headers,
+  })
+  expect(filtered.status).toBe(200)
+  expect(
+    ((await filtered.json()) as { value: Array<{ id: string }> }).value.map(
+      ({ id }) => id,
+    ),
+  ).toEqual(['unread'])
+
+  for (const query of [
+    '$search=%22*%22',
+    '$search=%22IsRead:false%22',
+    '$search=%22quarterly%22&$filter=isRead%20eq%20false',
+    '$filter=IsRead:false',
+  ]) {
+    expect((await fetch(`${messagesUrl}?${query}`, { headers })).status).toBe(
+      400,
+    )
+  }
+})
+
 test('Microsoft mock pages default delta and named scans with stateful changes and expiry', async () => {
   const server = startMockGraph({
     calendarEvents: {

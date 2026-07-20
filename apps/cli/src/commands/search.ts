@@ -69,19 +69,17 @@ export const searchCommand = defineCommand({
     until: { type: 'string', description: 'End ISO date' },
     limit: { type: 'string', description: 'Result limit' },
     offset: { type: 'string', description: 'Local pagination offset' },
+    continuation: {
+      type: 'string',
+      description: 'Opaque continuation for one exact remote Source',
+    },
     'include-deleted': {
       type: 'boolean',
       description: 'Include deleted local Resources',
     },
     refs: { type: 'boolean', description: 'Print Resource Refs only' },
-    'local-only': {
-      type: 'boolean',
-      description: 'Search local projections only',
-    },
-    remote: {
-      type: 'boolean',
-      description: 'Search remote-capable Sources only',
-    },
+    'local-only': { type: 'boolean', description: 'Search local only' },
+    remote: { type: 'boolean', description: 'Search remote Sources only' },
     explain: { type: 'boolean', description: 'Explain per-Source routing' },
     json: { type: 'boolean', description: 'Print deterministic JSON' },
   },
