@@ -26,7 +26,6 @@ const resultSchema = z.object({
 
 interface SourceActionRow {
   readonly adapter_id: string
-  readonly adapter_version: number
 }
 
 export interface RunActionInput
@@ -99,25 +98,22 @@ export async function runAction(
   }
 
   const source = input.db
-    .prepare('SELECT adapter_id, adapter_version FROM sources WHERE id = ?')
+    .prepare('SELECT adapter_id FROM sources WHERE id = ?')
     .get(input.sourceId) as SourceActionRow | null
   if (!source) {
     throw new CtxindexNotFoundError(`Source not found: ${input.sourceId}`)
   }
-  const adapter = input.registry.adapters.get({
-    id: source.adapter_id,
-    version: source.adapter_version,
-  })
+  const adapter = input.registry.adapters.get({ id: source.adapter_id })
   const binding = adapter?.actions[input.actionId]
   if (!adapter || !binding) {
     const available = input.registry.adapters
       .list()
       .filter((candidate) => input.actionId in candidate.actions)
-      .map((candidate) => `${candidate.id}@${candidate.version}`)
+      .map((candidate) => candidate.id)
       .sort()
     throw new CtxindexValidationError(
       'action_unsupported',
-      `Action ${input.actionId} is unsupported for Source ${input.sourceId} using Adapter ${source.adapter_id}@${source.adapter_version}; available implementing Adapters: ${available.join(', ') || 'none'}`,
+      `Action ${input.actionId} is unsupported for Source ${input.sourceId} using Adapter ${source.adapter_id}; available implementing Adapters: ${available.join(', ') || 'none'}`,
     )
   }
 

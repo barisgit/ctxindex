@@ -43,16 +43,16 @@ A Source can participate in sync, remote search, retrieval, Artifact download, a
 ## Authentication records have separate jobs
 
 ```text
-Client ──authorizes──> Account ──owns──> Grant
-                                         │
-                                         └──explicitly bound by──> Source
+OAuth App ──authorizes──> Account ──owns──> Grant
+                                             │
+                                             └──explicitly bound by──> Source
 ```
 
 | Term | Responsibility |
 | --- | --- |
-| **Client** | Persisted OAuth application credentials and configuration for one provider. Its label is unique within that provider. |
+| **OAuth App** | One labeled application definition for a Provider, contributed by an Extension or configured locally. Its identity is `(provider id, label)`. |
 | **Account** | One stable authenticated external identity within a provider. Its local label is globally unique. |
-| **Grant** | The Account's stable normalized permission set and secret references. Reauthorization updates it in place. |
+| **Grant** | The Account's private normalized permissions, token references, and OAuth App snapshot. Reauthorization updates it in place. |
 
 Verified provider addresses are **Account Identities**; they are not the Account's stable identity key.
 
@@ -60,7 +60,7 @@ An authenticated Source binds explicitly to one compatible Grant. One Account an
 
 This separation supports common configurations without collapsing concepts:
 
-- one Client can authorize multiple Accounts for its provider;
+- one OAuth App can authorize multiple Accounts for its Provider;
 - one Account can expose separate mailbox and calendar Sources;
 - one calendar Account can expose multiple Sources, one per selected calendar;
 - compatible Sources can share a Grant while remaining in different Realms.

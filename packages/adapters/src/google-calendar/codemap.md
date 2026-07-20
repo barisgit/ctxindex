@@ -2,11 +2,11 @@
 
 ## Responsibility
 
-Owns the read-only indexed `google.calendar@1` Source Adapter for one explicitly selected Google calendar, translating Calendar API events into complete provider-neutral `calendar.event@1` Resources.
+Owns the read-only indexed `google.calendar` Source Adapter for one explicitly selected Google calendar, translating Calendar API events into complete provider-neutral `calendar.event@1` Resources.
 
 ## Design
 
-- `definition.ts` declares the Adapter, shared Google OAuth identity, narrow events-read scope, API host, strict generated config, indexed sync/retrieve capabilities, and zero Actions.
+- `definition.ts` declares the Adapter, directly links the shared Google Provider and concrete `calendarEventProfile`, separates its narrow events-read access scope, declares the API host and strict generated config, and exposes indexed sync/retrieve capabilities with zero Actions.
 - `config.ts` defaults one calendar id plus positive past/future coverage days. `url.ts` selects the production Calendar host or an explicit loopback-only nonproduction mock base.
 - `response.ts` validates event pages and maps HTTP status to stable provider errors; sync-token invalidation remains a private control signal used only by list sync.
 - `event.ts` validates Google event variants, strips markup to visibility-safe text, normalizes timed/all-day/participant/recurrence/provider metadata, emits exact Source-scoped event and series Refs, and returns bounded deterministic warnings for safely skippable variants.

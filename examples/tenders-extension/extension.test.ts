@@ -1,62 +1,91 @@
 import { describe, expect, test } from 'bun:test'
 import { resolve } from 'node:path'
-import { defaultConfig } from '@ctxindex/core/config'
-import { loadExtensions } from '@ctxindex/core/extension'
+import {
+  importPackageEntries,
+  resolvePackageEntries,
+} from '@ctxindex/core/extension'
+import extension, {
+  tenderAdapter,
+  tenderProfile,
+  tenderSchema,
+} from './extension'
 
 const extensionPath = resolve(import.meta.dir, 'extension.ts')
 
 describe('external tenders Extension proof', () => {
-  test('loads exact definitions from an explicit path', async () => {
-    const result = await loadExtensions({
-      config: {
-        ...defaultConfig(),
-        extensions: { paths: [extensionPath] },
-      },
-      builtins: [],
+  test('exports ordinary SDK values with a providerless Adapter', () => {
+    expect(extension).toMatchObject({
+      kind: 'extension',
+      id: 'enarocanje.proof',
+      adapters: [tenderAdapter],
     })
-
-    expect(result.diagnostics).toEqual([])
-    expect(
-      result.registry.list().map(({ id, version }) => ({ id, version })),
-    ).toEqual([{ id: 'enarocanje.proof', version: 1 }])
-
-    const profile = result.registry.profiles.get({
-      id: 'enarocanje.tender',
-      version: 1,
+    expect(extension).not.toHaveProperty('version')
+    expect(extension).not.toHaveProperty('dependencies')
+    expect(tenderAdapter).toMatchObject({
+      kind: 'adapter',
+      id: 'enarocanje.fixture',
+      profiles: [tenderProfile],
     })
-    expect(profile?.docs?.aliases).toEqual(['tenders'])
-    expect(Object.keys(profile?.search?.fields ?? {})).toEqual([
+    expect(tenderAdapter).not.toHaveProperty('version')
+    expect(tenderAdapter).not.toHaveProperty('provider')
+    expect(tenderAdapter).not.toHaveProperty('access')
+    expect(tenderAdapter).not.toHaveProperty('auth')
+    expect(tenderProfile.schema).toBe(tenderSchema)
+  })
+
+  test('keeps leaf definitions documentation-free and declares one root sidecar', () => {
+    expect(tenderProfile).not.toHaveProperty('docs')
+    expect(tenderAdapter).not.toHaveProperty('docs')
+    expect(extension.docs).toEqual({ kind: 'directory', path: './docs' })
+    expect(Object.keys(tenderProfile.search?.fields ?? {})).toEqual([
       'reference',
       'buyer',
       'status',
       'deadline',
       'publishedAt',
     ])
-    expect(profile?.actions).toBeUndefined()
-    expect(profile?.artifacts).toBeUndefined()
-    expect(profile?.exports).toBeUndefined()
-    expect(profile?.relations).toBeUndefined()
-
-    const adapter = result.registry.adapters.get({
-      id: 'enarocanje.fixture',
-      version: 1,
-    })
-    expect(adapter).toMatchObject({
-      auth: { kind: 'none' },
-      profiles: [{ id: 'enarocanje.tender', version: 1 }],
+    expect(tenderProfile.actions).toBeUndefined()
+    expect(tenderProfile.artifacts).toBeUndefined()
+    expect(tenderProfile.exports).toBeUndefined()
+    expect(tenderProfile.relations).toBeUndefined()
+    expect(tenderAdapter).toMatchObject({
+      profiles: [tenderProfile],
       routing: 'indexed',
       capabilities: ['sync'],
       actions: {},
     })
-    expect(Object.keys(adapter?.operations ?? {})).toEqual(['sync'])
-    expect(adapter?.configSchema.safeParse({}).success).toBe(true)
-    expect(adapter?.configSchema.safeParse({ unexpected: true }).success).toBe(
-      false,
-    )
+    expect(Object.keys(tenderAdapter.operations)).toEqual(['sync'])
+    expect(tenderAdapter.configSchema.safeParse({}).success).toBe(true)
+    expect(
+      tenderAdapter.configSchema.safeParse({ unexpected: true }).success,
+    ).toBe(false)
+  })
+
+  test('is discoverable through its package-owned ctxindex.extensions entry', async () => {
+    const packageRoot = import.meta.dir
+    const manifest = await Bun.file(resolve(packageRoot, 'package.json')).json()
+    expect(manifest).toMatchObject({
+      type: 'module',
+      ctxindex: { extensions: ['./extension.ts'] },
+      dependencies: { '@ctxindex/extension-sdk': 'workspace:*' },
+    })
+    const resolved = await resolvePackageEntries(packageRoot, manifest, {
+      origin: 'explicit-path',
+    })
+    const collected = await importPackageEntries(resolved)
+    expect(collected.map(({ definition }) => definition.id)).toEqual([
+      extension.id,
+    ])
+    expect(collected[0]?.definition).not.toHaveProperty('docs')
+    expect(collected[0]?.documentation?.files.map(({ path }) => path)).toEqual([
+      'README.md',
+      'adapters/enarocanje.fixture.md',
+      'profiles/enarocanje.tender@1.md',
+    ])
   })
 })
 
-test('uses only the public type-only SDK import and is not bundled', async () => {
+test('uses ordinary public SDK imports and is not bundled', async () => {
   const productionFiles = (
     await Array.fromAsync(
       new Bun.Glob('**/*.ts').scan({ cwd: import.meta.dir, absolute: true }),
@@ -69,13 +98,15 @@ test('uses only the public type-only SDK import and is not bundled', async () =>
     true,
   )
 
+  let sdkImportCount = 0
   for (const path of productionFiles) {
     const source = await Bun.file(path).text()
-    const publicTypeImport =
-      /import\s+type\s+\{\s*ExtensionAuthoringHost\s*\}\s+from\s+['"]@ctxindex\/extension-sdk['"]\s*/g
-    const withoutPublicTypeImport = source.replace(publicTypeImport, '')
-    expect(withoutPublicTypeImport).not.toContain('@ctxindex/')
+    expect(source).not.toContain('ExtensionAuthoringHost')
+    expect(source).not.toMatch(/export\s+default\s+function/)
+    expect(source).not.toContain('host.')
+    sdkImportCount += source.match(/@ctxindex\/extension-sdk/g)?.length ?? 0
   }
+  expect(sdkImportCount).toBe(1)
 
   const { CTXINDEX_BUILTIN_EXTENSIONS } = await import('@ctxindex/adapters')
   expect(
@@ -84,32 +115,17 @@ test('uses only the public type-only SDK import and is not bundled', async () =>
     ),
   ).toBe(false)
   expect(
-    CTXINDEX_BUILTIN_EXTENSIONS.flatMap((extension) => extension.adapters).some(
-      (adapter) => String(adapter.id) === 'enarocanje.fixture',
+    CTXINDEX_BUILTIN_EXTENSIONS.some((extension) =>
+      extension.adapters.some(
+        (adapter) => String(adapter.id) === 'enarocanje.fixture',
+      ),
     ),
   ).toBe(false)
 })
 
 test('emits deterministic complete Resources and an ordered checkpoint without provider egress', async () => {
-  const result = await loadExtensions({
-    config: {
-      ...defaultConfig(),
-      extensions: { paths: [extensionPath] },
-    },
-    builtins: [],
-  })
-  const profile = result.registry.profiles.get({
-    id: 'enarocanje.tender',
-    version: 1,
-  })
-  const adapter = result.registry.adapters.get({
-    id: 'enarocanje.fixture',
-    version: 1,
-  })
-  const sync = adapter?.operations.sync
-  if (!profile || typeof sync !== 'function') {
-    throw new Error('loaded tenders definitions are incomplete')
-  }
+  const profile = tenderProfile
+  const sync = tenderAdapter.operations.sync
 
   const sourceId = '01J00000000000000000000000'
   const emissions: unknown[] = []

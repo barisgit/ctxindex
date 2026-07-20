@@ -4,193 +4,67 @@
 
 ## Interfaces
 
-These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
-
-### @ctxindex/extension-sdk — Extension authoring contracts
+### @ctxindex/core — package entry and root collection seams
 
 ```ts
-export interface ExtensionDefinition<
-  TId extends string = string,
-  TVersion extends number = number,
-  TProfiles extends
-    readonly AnyProfileDefinition[] = readonly AnyProfileDefinition[],
-  TAdapters extends
-    readonly AnyAdapterDefinition[] = readonly AnyAdapterDefinition[],
-> {
-  readonly id: TId
-  readonly version: TVersion
-  readonly profiles: TProfiles
-  readonly adapters: TAdapters
-  readonly docs?: { readonly summary: string }
+export type DefinitionModule = Readonly<Record<string, unknown>>
+
+export interface ResolvedPackageEntries {
+  readonly entries: readonly string[]
+  readonly provenance: Omit<DefinitionProvenance, 'entry' | 'exportName'>
 }
 
-export type AnyExtensionDefinition = ExtensionDefinition
+export function resolvePackageEntries(
+  packageRoot: string,
+  packageJson: unknown,
+  provenance: ResolvedPackageEntries['provenance'],
+): Promise<ResolvedPackageEntries>;
 
-export interface ExtensionAuthoringHost {
-  readonly z: typeof import('zod').z
-  readonly defineProfile: typeof defineProfile
-  readonly defineAdapter: typeof defineAdapter
-  readonly defineExtension: typeof defineExtension
-}
+export function collectExtensionExports(
+  module: DefinitionModule,
+  entry: string,
+  provenance: ResolvedPackageEntries['provenance'],
+): readonly CollectedExtension[];
 
-export function defineExtension<
-  const TId extends string,
-  const TVersion extends number,
-  const TProfiles extends readonly AnyProfileDefinition[],
-  const TAdapters extends readonly AnyAdapterDefinition[],
->(
-  definition: ExtensionDefinition<TId, TVersion, TProfiles, TAdapters>,
-): ExtensionDefinition<TId, TVersion, TProfiles, TAdapters>;
+export function selectExactExtension(
+  collected: readonly CollectedExtension[],
+  id: string,
+): CollectedExtension;
 ```
 
-### @ctxindex/core — Extension loading
+`resolvePackageEntries` validates the ordered unique `package.json` `ctxindex.extensions` module paths, including containment after symlink resolution. Namespace collection inspects top-level values, structurally validates values claiming the Extension discriminator, ignores unrelated exports, and never invokes functions.
+
+`importPackageEntries` also supplies each acquired entry's file URL to the shared documentation resolver. Whole-package import resolves every collected root. The exact-id seam collects all roots to prove unique selection, then resolves only the selected root's sidecar; invalid documentation on an unselected sibling cannot block an exact installed or direct import. The resolver binds an Extension-root `docs('./docs')` descriptor beside that entry, produces portable logical content, and removes the descriptor before complete-registry validation. Virtual built-in trees enter the same resolver. `LoadExtensionsResult.documentation` is built only from roots that survive atomic candidate validation.
+
+### @ctxindex/core — reachable graph and complete registry
 
 ```ts
-export interface ExtensionLoadDiagnostic {
-  readonly path: string
-  readonly message: string
-}
+export function collectExtensionGraph(
+  root: AnyExtensionDefinition,
+  provenance: DefinitionProvenance,
+): CollectedExtensionGraph;
 
-export interface LoadExtensionsInput {
-  readonly config: CtxindexConfig
-  readonly builtins: readonly AnyExtensionDefinition[]
-  readonly installed?: readonly InstalledExtensionRecord[]
-  readonly dataRoot?: string
-}
-
-export type ExtensionLoadProvenance =
-  | {
-      readonly id: string
-      readonly version: number
-      readonly kind: 'builtin'
-    }
-  | {
-      readonly id: string
-      readonly version: number
-      readonly kind: 'path'
-      readonly path: string
-    }
-  | {
-      readonly id: string
-      readonly version: number
-      readonly kind: 'catalog'
-      readonly catalog: string
-      readonly catalogId: string
-      readonly repository: string
-      readonly commit: string
-      readonly snapshotAcquiredAt: number
-      readonly sourcePath: string
-    }
-
-export interface LoadExtensionsResult {
-  readonly registry: ExtensionRegistry
-  readonly diagnostics: readonly ExtensionLoadDiagnostic[]
-  readonly provenance: readonly ExtensionLoadProvenance[]
-}
-
-export async function loadExtensions(
-  input: LoadExtensionsInput,
-): Promise<LoadExtensionsResult>;
-
-export async function importExtensionDefinition(
-  extensionPath: string,
-): Promise<AnyExtensionDefinition>;
+export function buildCompleteCandidateRegistry(
+  input: CandidateRegistryInput,
+): CompleteRegistry;
 ```
 
-### @ctxindex/core — Profile resolution
+Traversal follows exact Provider/Profile values imported by Adapters and OAuth Apps and includes explicit standalone Provider/Profile leaves. Complete candidate validation is order-independent and atomic. Its shared definition-id validator accepts at most 128 lowercase ASCII characters composed of alphanumeric segments separated by one `.`, `_`, or `-`, allowing authored and generated routes to use stable ids directly. OAuth App duplicates always conflict. Exact reused non-App objects may coalesce; distinct executable/schema-bearing same-identity values conflict; distinct pure declarative values coalesce only through canonical structural equality.
 
-```ts
-export interface UnknownProfileWarning {
-  readonly code: 'unknown_profile_version'
-  readonly profileId: string
-  readonly profileVersion: number
-}
+Built-in namespaces, explicit-path packages, and Catalog snapshots use these same seams. Acquisition and dependency materialization happen before this boundary and remain source-specific; core resolves no Extension dependency graph.
 
-export type ProfileResolution =
-  | { readonly status: 'known'; readonly profile: AnyProfileDefinition }
-  | {
-      readonly status: 'degraded'
-      readonly id: string
-      readonly version: number
-    }
+### Degraded loading
 
-export type KindResolution =
-  | {
-      readonly status: 'known'
-      readonly id: string
-      readonly profiles: readonly AnyProfileDefinition[]
-    }
-  | {
-      readonly status: 'ambiguous'
-      readonly kind: string
-      readonly candidates: readonly string[]
-    }
-  | { readonly status: 'unknown'; readonly kind: string }
-
-export interface ProfileRegistryOptions {
-  readonly onWarning?: (warning: UnknownProfileWarning) => void
-}
-
-export class ProfileRegistry {
-  readonly #profiles = new Map<string, AnyProfileDefinition>()
-  constructor(
-      profiles: readonly AnyProfileDefinition[],
-      readonly options: ProfileRegistryOptions = {},
-    );
-  list(): readonly AnyProfileDefinition[];
-  get(reference: ProfileReference): AnyProfileDefinition | undefined;
-  resolveKind(value: string): KindResolution;
-  resolve(reference: ProfileReference): ProfileResolution;
-}
-
-export function createProfileRegistry(
-  profiles: readonly AnyProfileDefinition[],
-  options?: ProfileRegistryOptions,
-): ProfileRegistry;
-```
-
-### @ctxindex/core — definition registries
-
-```ts
-export class AdapterRegistry {
-  readonly #adapters = new Map<string, AnyAdapterDefinition>()
-  readonly #oauthProviders = new Map<string, OAuthProviderSpec>()
-  constructor(
-      readonly profiles: ProfileRegistry,
-      adapters: readonly AnyAdapterDefinition[],
-    );
-  list(): readonly AnyAdapterDefinition[];
-  get(reference: ProfileReference): AnyAdapterDefinition | undefined;
-  getOAuthProvider(id: string): OAuthProviderSpec | undefined;
-}
-
-export function createAdapterRegistry(
-  profiles: ProfileRegistry,
-  adapters: readonly AnyAdapterDefinition[],
-): AdapterRegistry;
-
-export class ExtensionRegistry {
-  #extensions: readonly AnyExtensionDefinition[]
-  #profiles: ProfileRegistry
-  #adapters: AdapterRegistry
-  constructor(extensions: readonly AnyExtensionDefinition[]);
-  get profiles(): ProfileRegistry;
-  get adapters(): AdapterRegistry;
-  list(): readonly AnyExtensionDefinition[];
-  register(extension: AnyExtensionDefinition): void;
-}
-
-export function createExtensionRegistry(
-  extensions: readonly AnyExtensionDefinition[] = [],
-): ExtensionRegistry;
-```
+Absent or invalid Extension code leaves Sources unavailable for Provider operations while preserving stored Resource envelopes and payloads. Vocabulary needing an unavailable Profile reports degradation; no implicit foundational Profile Extension is synthesized.
 
 ## Implementation doctrine
 
-`@ctxindex/core` loads explicit `config.extensions.paths` entries and exact installed Catalog provenance. Each trusted module default-exports a factory receiving `ExtensionAuthoringHost`; runtime facilities are host-supplied, while type-only imports and Extension-local dependencies remain possible. `importExtensionDefinition()` is the single authoring-host seam shared by startup and pre-install validation.
+Trusted entry modules use ordinary package imports and export shallow plain Extension values. The SDK exports factories and `z`; the host injects no authoring object and invokes no callback. Structural discriminators, not `instanceof` or physical SDK identity, identify candidates.
 
-Built-ins register first, followed by explicit paths and then installed Catalog entries. Catalog locations derive from portable provenance and validate their snapshot manifest, exact source path, and `(id, version)` before registry activation. Import, factory, schema, duplicate-id, provenance, or capability-consistency failures become path-scoped diagnostics and activate none of the failing Extension. The loader never acquires or mutates Catalog state; loaded Catalog provenance carries snapshot acquisition time so formatting can surface age offline. Registry binding uses `(id, version)`, never object identity. Missing Extensions leave locally stored Resources readable while provider operations report unavailability.
+Root provenance is diagnostic only. Load order, origin priority, package version, integrity, path, object identity, and function text do not select duplicate winners. Complete candidate validation succeeds before active registry mutation.
+
+Persistent direct local/Git/npm installation remains deferred. Existing explicit-path and Catalog acquisition delegate materialized roots and safe provenance to the common entry, collection, selection, and activation seams.
 
 ## Verification
 
-Loader and registry tests cover atomic validation, duplicate/version behavior, host factories, Catalog provenance, missing snapshots, identity mismatches, and diagnostics. The relocated external-Extension and local-Git-Catalog e2e gates cover TypeScript, relative imports, installed provenance, and Extension-local dependencies under Bun 1.3.14.
+Loader/registry tests cover multiple roots per module, malformed claimed roots, callback non-invocation, contained paths, transitive collection, standalone leaves, duplicate rules, cross-copy structural authoring, atomicity, Catalog delegation, documentation resolution, and degraded data access. The relocated Bun 1.3.14 gate uses ordinary SDK imports, SDK-exported `z`, a relative TypeScript module, and a package-managed runtime dependency outside the repository. Built-in documentation directories are resolved at package/build staging into `packages/adapters/src/generated/documentation.ts`; freshness tests compare source directories and embedded virtual trees through the same core resolver, and the relocated compiled-host gate reads that projection without checkout files.

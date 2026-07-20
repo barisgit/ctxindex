@@ -239,20 +239,34 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
     await ok(['realm', 'add', 'work'])
     await ok(['realm', 'add', 'files'])
 
-    await ok(['client', 'add', 'google', '--from-env'])
-    await ok(['client', 'add', 'microsoft', '--from-env'])
-    await ok(['account', 'add', 'google', '--label', 'personal'], {
-      ...baseEnv,
-      ...personalGmail.env(sandbox),
-      CTXINDEX_GOOGLE_CALENDAR_MOCK_BASE_URL: googleCalendar.baseUrl,
-    })
-    await ok(['account', 'add', 'google', '--label', 'work'], {
-      ...baseEnv,
-      ...workGmail.env(sandbox),
-      CTXINDEX_GOOGLE_CALENDAR_MOCK_BASE_URL: googleCalendar.baseUrl,
-    })
+    await ok(['oauth-app', 'add', 'google', 'google', '--from-env'])
+    await ok(['oauth-app', 'add', 'microsoft', 'microsoft', '--from-env'])
     await ok(
-      ['account', 'add', 'microsoft', '--label', 'microsoft-work'],
+      ['account', 'add', 'google', '--app', 'google', '--label', 'personal'],
+      {
+        ...baseEnv,
+        ...personalGmail.env(sandbox),
+        CTXINDEX_GOOGLE_CALENDAR_MOCK_BASE_URL: googleCalendar.baseUrl,
+      },
+    )
+    await ok(
+      ['account', 'add', 'google', '--app', 'google', '--label', 'work'],
+      {
+        ...baseEnv,
+        ...workGmail.env(sandbox),
+        CTXINDEX_GOOGLE_CALENDAR_MOCK_BASE_URL: googleCalendar.baseUrl,
+      },
+    )
+    await ok(
+      [
+        'account',
+        'add',
+        'microsoft',
+        '--app',
+        'microsoft',
+        '--label',
+        'microsoft-work',
+      ],
       baseEnv,
     )
 
@@ -374,9 +388,7 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
     const accounts = deterministicJson(accountsResult.stdout) as {
       provider: string
       label: string
-      grants: {
-        scopes: string[]
-      }[]
+      sources: { id: string }[]
     }[]
     expect(accounts).toHaveLength(3)
     expect(accounts.map(({ label }) => label)).toEqual([
@@ -384,12 +396,8 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
       'work',
       'microsoft-work',
     ])
-    expect(accounts.flatMap(({ grants: nested }) => nested)).toHaveLength(3)
-    expect(
-      accounts.flatMap(({ grants: nested }) =>
-        nested.map(({ scopes }) => scopes),
-      ),
-    ).toEqual(grants.map(({ scopes_json }) => JSON.parse(scopes_json)))
+    expect(accounts.flatMap(({ sources }) => sources)).toHaveLength(5)
+    expect(accountsResult.stdout).not.toMatch(/grant|scope/i)
     for (const canary of [
       'google-personal-subject-canary',
       'google-work-subject-canary',
@@ -408,7 +416,6 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
     const sources = deterministicJson(sourcesResult.stdout) as {
       id: string
       label: string
-      grantId: string | null
       realmSlug: string
     }[]
     expect(sources).toHaveLength(6)
@@ -432,7 +439,7 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
         localSourceLabel,
       ]),
     )
-    expect(sources.find(({ id }) => id === localSource)?.grantId).toBeNull()
+    expect(sourcesResult.stdout).not.toMatch(/grant/i)
 
     for (const source of [
       personalCalendarLabel,

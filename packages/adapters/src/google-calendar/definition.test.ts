@@ -1,9 +1,4 @@
 import { describe, expect, test } from 'bun:test'
-import {
-  createExtensionRegistry,
-  describeRegistry,
-} from '@ctxindex/core/registry'
-import { defineExtension } from '@ctxindex/extension-sdk'
 import { calendarEventProfile } from '@ctxindex/profiles'
 import { googleOAuthProvider } from '../google-oauth-provider'
 import {
@@ -47,56 +42,31 @@ describe('google.calendar definition', () => {
   test('uses the shared Google identity contract and only Calendar read scope', () => {
     expect(googleCalendarAdapterDefinition).toMatchObject({
       id: 'google.calendar',
-      version: 1,
-      profiles: [{ id: 'calendar.event', version: 1 }],
+      provider: googleOAuthProvider,
+      access: {
+        scopes: ['https://www.googleapis.com/auth/calendar.events.readonly'],
+      },
+      profiles: [calendarEventProfile],
       routing: 'indexed',
       capabilities: ['sync', 'retrieve'],
       providerApiHosts: ['www.googleapis.com'],
       actions: {},
-      docs: { summary: 'Google Calendar events from one selected calendar.' },
     })
-    expect(googleCalendarAdapterDefinition.auth).toEqual({
-      kind: 'oauth2',
-      provider: googleOAuthProvider,
-      scopes: ['https://www.googleapis.com/auth/calendar.events.readonly'],
-    })
+    expect(googleCalendarAdapterDefinition).not.toHaveProperty('version')
+    expect(googleCalendarAdapterDefinition).not.toHaveProperty('auth')
+    expect(googleCalendarAdapterDefinition).not.toHaveProperty('docs')
+    expect(googleCalendarAdapterDefinition.provider).toBe(googleOAuthProvider)
+    expect(googleCalendarAdapterDefinition.profiles[0]).toBe(
+      calendarEventProfile,
+    )
     expect(googleCalendarAdapterDefinition.operations.sync).toBeFunction()
     expect(googleCalendarAdapterDefinition.operations.retrieve).toBeFunction()
   })
 
-  test('publishes generated config and zero Calendar Actions', () => {
-    const registry = createExtensionRegistry([
-      defineExtension({
-        id: 'ctxindex.google-calendar.definition-test',
-        version: 1,
-        profiles: [calendarEventProfile],
-        adapters: [googleCalendarAdapterDefinition],
-      }),
-    ])
-    const description = describeRegistry(registry)
-
-    expect(description.sources[0]).toMatchObject({
-      id: 'google.calendar',
-      profiles: [{ id: 'calendar.event', version: 1 }],
-      capabilities: ['retrieve', 'sync'],
-      configOptions: [
-        expect.objectContaining({
-          property: 'calendar_id',
-          flag: '--config-calendar-id',
-          default: 'primary',
-        }),
-        expect.objectContaining({
-          property: 'future_days',
-          flag: '--config-future-days',
-          default: 730,
-        }),
-        expect.objectContaining({
-          property: 'past_days',
-          flag: '--config-past-days',
-          default: 365,
-        }),
-      ],
-    })
-    expect(description.actions).toEqual([])
+  test('publishes strict config and zero Calendar Actions', () => {
+    expect(googleCalendarAdapterDefinition.configSchema).toBe(
+      googleCalendarSourceConfigSchema,
+    )
+    expect(googleCalendarAdapterDefinition.actions).toEqual({})
   })
 })

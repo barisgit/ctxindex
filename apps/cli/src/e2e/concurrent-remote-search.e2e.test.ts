@@ -155,8 +155,16 @@ test('compiled CLI serializes concurrent remote-search cache batches across proc
 
     await ok(['init'])
     await ok(['realm', 'add', 'work'])
-    await ok(['client', 'add', 'microsoft', '--from-env'])
-    await ok(['account', 'add', 'microsoft', '--label', 'work'])
+    await ok(['oauth-app', 'add', 'microsoft', 'microsoft', '--from-env'])
+    await ok([
+      'account',
+      'add',
+      'microsoft',
+      '--app',
+      'microsoft',
+      '--label',
+      'work',
+    ])
     const source = await ok([
       'source',
       'add',

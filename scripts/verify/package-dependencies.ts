@@ -124,6 +124,7 @@ export function extractPackageImports(
 interface PackageJson {
   name: string
   dependencies?: Record<string, string>
+  devDependencies?: Record<string, string>
 }
 
 interface RootPackageJson {
@@ -144,7 +145,19 @@ export interface WorkspacePackage {
   files: string[]
 }
 
-async function discoverSourceFiles(directory: string): Promise<string[]> {
+async function isNestedPackageRoot(directory: string): Promise<boolean> {
+  try {
+    await readFile(join(directory, 'package.json'), 'utf8')
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function discoverSourceFiles(
+  directory: string,
+  packageRoot = directory,
+): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true })
   const files: string[] = []
 
@@ -153,8 +166,11 @@ async function discoverSourceFiles(directory: string): Promise<string[]> {
   )) {
     const path = join(directory, entry.name)
     if (entry.isDirectory()) {
-      if (!ignoredDirectories.has(entry.name))
-        files.push(...(await discoverSourceFiles(path)))
+      if (
+        !ignoredDirectories.has(entry.name) &&
+        (path === packageRoot || !(await isNestedPackageRoot(path)))
+      )
+        files.push(...(await discoverSourceFiles(path, packageRoot)))
       continue
     }
     if (entry.isFile() && sourceExtensions.has(extname(entry.name)))
@@ -286,7 +302,10 @@ function allowedWorkspaceDependencies(
   workspacePackages: readonly WorkspacePackage[],
 ): Set<string> {
   const relativeDirectory = workspacePackage.directory.replaceAll('\\', '/')
-  if (relativeDirectory.includes('/apps/')) {
+  if (
+    relativeDirectory.includes('/apps/') ||
+    relativeDirectory.includes('/examples/')
+  ) {
     return new Set(
       workspacePackages
         .filter((candidate) =>
@@ -332,9 +351,13 @@ export async function verifyWorkspaceDependencies(
         imports.add(dependency)
     }
 
-    const declared = new Set(
+    const runtimeDeclared = new Set(
       Object.keys(workspacePackage.manifest.dependencies ?? {}),
     )
+    const declared = new Set([
+      ...runtimeDeclared,
+      ...Object.keys(workspacePackage.manifest.devDependencies ?? {}),
+    ])
     addDeclaredFrameworkPeers(imports, declared)
     imports.delete(workspacePackage.name)
 
@@ -347,7 +370,7 @@ export async function verifyWorkspaceDependencies(
         })
       }
     }
-    for (const dependency of declared) {
+    for (const dependency of runtimeDeclared) {
       if (!imports.has(dependency)) {
         violations.push({
           type: 'unused-dependency',
@@ -371,7 +394,7 @@ export async function verifyWorkspaceDependencies(
         })
       }
     }
-    for (const dependency of declared) {
+    for (const dependency of runtimeDeclared) {
       if (
         (workspacePackage.name === '@ctxindex/extension-sdk' ||
           workspacePackage.name === '@ctxindex/profiles') &&

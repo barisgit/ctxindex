@@ -26,18 +26,28 @@ Implementation sidecars describe seams at the module/package level; `codemap.md`
 | Change | Owner |
 | --- | --- |
 | Domain vocabulary, portable semantics, searchable fields, export formats, typed Actions | Profiles |
-| Provider authentication, discovery, retrieval, synchronization, artifacts, and mutations | Adapters |
-| A distributable set of Profiles and Adapters | Extensions |
+| External-service authentication, registration, base scopes, identity, and allowed hosts | Providers |
+| Source configuration, requested access, discovery, retrieval, synchronization, artifacts, and mutations | Adapters |
+| A distributable plain-value root of Adapters, OAuth Apps, and optional standalone Providers/Profiles | Extensions |
 | Realm, Source, Resource, Ref, storage, orchestration, and other shared runtime behavior | Provider-neutral core |
 | Argument parsing, generated help, formatting, and service delegation | Thin CLI |
 
-Profiles define domain vocabulary; Adapters perform provider I/O; Extensions only bundle definitions. Core must remain provider-neutral, and the CLI must not absorb business logic. Repository gates such as `scripts/verify/module-architecture.test.ts`, `scripts/verify/cli-no-business-logic.ts`, and `scripts/verify/cli-thin-lines.ts` enforce these boundaries.
+Profiles define domain vocabulary; Providers define reusable external-service authorization; Adapters perform Source I/O and may be provider-bound or providerless; Extensions only bundle exact imported plain values. Core must remain provider-neutral, and the CLI must not absorb business logic. Repository gates such as `scripts/verify/module-architecture.test.ts`, `scripts/verify/cli-no-business-logic.ts`, and `scripts/verify/cli-thin-lines.ts` enforce these boundaries.
 
 For non-trivial behavior changes, work from the active OpenSpec change and apply tasks in dependency order. If no current capability or approved change owns a new contract, create the OpenSpec change before implementation. Trivial fixes may proceed directly when they do not alter a stable contract.
 
 ## Start the development CLI
 
-Run from the repository root. The supported development invocation is `bun cli` (or `bun run cli` from the repository root or `apps/cli`); there is no `bun link` workflow.
+Run from the repository root. The checkout-oriented development invocation is
+`bun cli` (or `bun run cli` from the repository root or `apps/cli`). To exercise
+the installable package bin, build it and register the CLI workspace with Bun:
+
+```sh
+cd apps/cli
+bun run build:package
+bun link
+ctxindex --help
+```
 
 ```sh
 bun install
@@ -104,7 +114,7 @@ bun cli skills get getting-started --inline
 bun cli skills path
 ```
 
-## Configure secrets, clients, and Accounts
+## Configure secrets, OAuth Apps, and Accounts
 
 Inspect the configured secret backend or switch it explicitly. A switch copies and verifies stored values before committing configuration and cleaning the old backend; secret values are never accepted on this command line.
 
@@ -114,26 +124,26 @@ bun cli secrets backend set keychain
 bun cli secrets backend set file
 ```
 
-Discover OAuth provider IDs, exact Adapter scopes, API hosts, and safe client environment variable names from the loaded registry rather than copying provider-specific vocabulary into prompts or scripts. The CLI does not prompt for credentials and never accepts secret values on argv. `client add --from-env` reads the provider's declared environment values once and persists them through the configured secrets backend; later authorization never resolves client credentials from the environment. An Account loopback flow may open a browser only after explicit operator approval.
+Discover OAuth Provider ids, exact Adapter scopes, API hosts, App labels, and local-App environment mapping from the loaded registry and safe inventory rather than copying provider-specific vocabulary into prompts or scripts. The CLI does not prompt for credentials and never accepts App config or secret values on argv. `oauth-app add <provider> <label> --from-env` reads the Provider's complete declared environment mapping once, validates it, and persists it through the configured secrets backend; later authorization snapshots the selected App into the private Grant and never rereads App config from the environment. An Account loopback flow may open a browser only after explicit operator approval.
 
 ```sh
 bun cli describe adapter <adapter-id>
 bun cli describe adapter <adapter-id> --json
-bun cli client add <provider> --from-env
-bun cli client list
-bun cli account add <provider>
+bun cli oauth-app add <provider> <app-label> --from-env
+bun cli oauth-app list
+bun cli account add <provider> --app <app-label>
 bun cli account list --json
 ```
 
-When a provider has multiple persisted Clients, pass `--client <label>` to `account add`; with exactly one, it is selected automatically. Client labels default to the provider ID and are unique per provider. Account labels default to the verified provider identity. Source labels default to `<account-label>-<adapter-tail>` or `<adapter-tail>` without an Account. Account and Source labels are globally unique. Labels remain verbatim, and collisions fail with exit 2 instead of prompting or auto-suffixing.
+OAuth App selection is always exact and explicit through `--app <label>`. App labels are unique per Provider across trusted Extension Apps and local BYOA Apps; neither origin can shadow the other. `oauth-app list` exposes only Provider id, label, origin, and safe provenance. Account labels default to the verified provider identity. Source labels default to `<account-label>-<adapter-tail>` or `<adapter-tail>` without an Account. Account and Source labels are globally unique. Labels remain verbatim, and collisions fail with exit 2 instead of prompting or auto-suffixing.
 
-Re-running `account add` for the same identity updates its Grant in place so existing Source bindings remain valid. `client remove <provider> <label>` removes Client metadata and secrets without breaking existing Grants. `account remove <label>` removes the Account and Grant while leaving bound Sources configured as `needs_auth`.
+Re-running `account add` for the same identity updates its Grant and App snapshot in place so existing Source bindings remain valid. `oauth-app remove <provider> <label>` removes local App metadata and config without breaking existing Grants; Extension Apps are removed only by changing the active Extension set. `account remove <label>` removes the Account and Grant while leaving bound Sources configured as `needs_auth`.
 
 Account authorization requests the provider base scopes plus the sorted union of all loaded Adapters for that provider. Calendar Adapters are indexed and read-only: synchronize them before local event searches, and do not invent Actions absent from `describe`. Keep personal and work Sources in explicit separate Realms; an unscoped search spans both, while an explicit Realm filter is exact.
 
 ```sh
-bun cli client add <provider-id> --label <client-label> --from-env
-bun cli account add <provider-id> --client <client-label> --label <account-label>
+bun cli oauth-app add <provider-id> <app-label> --from-env
+bun cli account add <provider-id> --app <app-label> --label <account-label>
 bun cli account list --json
 bun cli source add <calendar-adapter-id> --realm <realm> --account <account-label> --label '<calendar-label>' <generated-calendar-options>
 bun cli sync --source <calendar-label> --json

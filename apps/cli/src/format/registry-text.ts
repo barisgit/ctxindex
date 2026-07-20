@@ -1,9 +1,11 @@
-import type { RegistryDescription } from '@ctxindex/core/registry'
+import type {
+  RegistryDescription,
+  SourceDescription,
+} from '@ctxindex/core/registry'
 
 import type { RegistryView } from './registry-projection'
 import {
   json,
-  prettyJson,
   record,
   schemaConstraints,
   schemaType,
@@ -93,48 +95,35 @@ function stringValues(value: unknown): string[] {
     : []
 }
 
-function formatAuthText(
-  auth: object,
-  providerApiHosts: readonly string[],
-): string[] {
-  const value = record(auth)
-  if (!value || typeof value.kind !== 'string') return [`  auth: ${json(auth)}`]
-  const lines = [`  auth: ${value.kind}`]
-  const provider = record(value.provider)
-  if (provider) {
-    if (typeof provider.id === 'string')
-      lines.push(`    provider: ${provider.id}`)
-    if (typeof provider.authorizationUrl === 'string')
-      lines.push(`    authorization URL: ${provider.authorizationUrl}`)
-    if (typeof provider.tokenUrl === 'string')
-      lines.push(`    token URL: ${provider.tokenUrl}`)
-    const authHosts = stringValues(provider.allowedHosts)
-    if (authHosts.length > 0)
-      lines.push(`    auth hosts: ${authHosts.join(', ')}`)
-    const baseScopes = stringValues(provider.baseScopes)
-    if (baseScopes.length > 0)
-      lines.push(`    provider base scopes: ${baseScopes.join(', ')}`)
-    const environment = record(provider.environment)
-    if (environment) {
-      const values = [
-        typeof environment.clientId === 'string'
-          ? `client-id=${environment.clientId}`
-          : undefined,
-        typeof environment.clientSecret === 'string'
-          ? `client-secret=${environment.clientSecret}`
-          : undefined,
-        typeof environment.refreshToken === 'string'
-          ? `refresh-token=${environment.refreshToken}`
-          : undefined,
-      ].filter((item): item is string => item !== undefined)
-      if (values.length > 0) lines.push(`    environment: ${values.join(', ')}`)
-    }
+function formatProviderText(source: SourceDescription): string[] {
+  if (!source.provider) return ['  provider: none']
+  const auth = record(source.provider.auth)
+  const lines = [`  provider: ${source.provider.id}`]
+  if (auth && typeof auth.kind === 'string') lines.push(`  auth: ${auth.kind}`)
+  if (auth && typeof auth.authorizationUrl === 'string')
+    lines.push(`    authorization URL: ${auth.authorizationUrl}`)
+  if (auth && typeof auth.tokenUrl === 'string')
+    lines.push(`    token URL: ${auth.tokenUrl}`)
+  const authHosts = stringValues(auth?.allowedHosts)
+  if (authHosts.length > 0)
+    lines.push(`    auth hosts: ${authHosts.join(', ')}`)
+  const baseScopes = stringValues(auth?.baseScopes)
+  if (baseScopes.length > 0)
+    lines.push(`    provider base scopes: ${baseScopes.join(', ')}`)
+  const registration = record(auth?.registration)
+  const environment = record(registration?.environment)
+  if (environment) {
+    const values = Object.entries(environment)
+      .filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string',
+      )
+      .map(([field, name]) => `${field}=${name}`)
+    if (values.length > 0) lines.push(`    environment: ${values.join(', ')}`)
   }
-  if (Array.isArray(value.scopes)) {
-    lines.push(`    Adapter scopes: ${stringValues(value.scopes).join(', ')}`)
-  }
-  if (providerApiHosts.length > 0)
-    lines.push(`  provider API hosts: ${providerApiHosts.join(', ')}`)
+  if (source.access)
+    lines.push(`    Adapter scopes: ${source.access.scopes.join(', ')}`)
+  if (source.providerApiHosts.length > 0)
+    lines.push(`  provider API hosts: ${source.providerApiHosts.join(', ')}`)
   return lines
 }
 
@@ -143,17 +132,12 @@ function formatCompactRegistryText(description: RegistryDescription): string {
   if (description.kinds.length > 0) {
     lines.push(`PROFILES (${description.kinds.length})`)
     for (const kind of description.kinds)
-      lines.push(
-        `  ${kind.id}@${kind.version}${kind.summary ? ` - ${kind.summary}` : ''}`,
-      )
+      lines.push(`  ${kind.id}@${kind.version}`)
   }
   if (description.sources.length > 0) {
     if (lines.length > 0) lines.push('')
     lines.push(`ADAPTERS (${description.sources.length})`)
-    for (const source of description.sources)
-      lines.push(
-        `  ${source.id}@${source.version}${source.summary ? ` - ${source.summary}` : ''}`,
-      )
+    for (const source of description.sources) lines.push(`  ${source.id}`)
   }
   if (description.actions.length > 0) {
     if (lines.length > 0) lines.push('')
@@ -179,41 +163,29 @@ export function formatRegistryText(
   const lines: string[] = []
   for (const kind of description.kinds) {
     lines.push(`PROFILE ${kind.id}@${kind.version}`)
-    if (kind.summary) lines.push(`  ${kind.summary}`)
-    if (kind.aliases.length) lines.push(`  aliases: ${kind.aliases.join(', ')}`)
     for (const field of kind.fields)
-      lines.push(
-        `  field ${field.name} <${field.type}>${field.docs ? ` - ${field.docs}` : ''}`,
-      )
+      lines.push(`  field ${field.name} <${field.type}>`)
     for (const format of kind.formats)
       lines.push(`  format ${format.name} (${format.mediaType})`)
   }
   for (const source of description.sources) {
-    lines.push(`ADAPTER ${source.id}@${source.version}`)
-    if (source.summary) lines.push(`  ${source.summary}`)
+    lines.push(`ADAPTER ${source.id}`)
     lines.push(`  routing: ${source.routing}`)
-    lines.push(...formatAuthText(source.auth, source.providerApiHosts))
+    lines.push(...formatProviderText(source))
     lines.push(`  capabilities: ${source.capabilities.join(', ') || 'none'}`)
     for (const option of source.configOptions)
       lines.push(
-        `  ${option.flag} <${option.type}>${option.required ? ' required' : ''}${option.docs ? ` - ${option.docs}` : ''}${option.default !== undefined ? `${option.docs ? ';' : ' -'} default: ${json(option.default)}` : ''}`,
+        `  ${option.flag} <${option.type}>${option.required ? ' required' : ''}${option.default !== undefined ? ` - default: ${json(option.default)}` : ''}`,
       )
   }
   for (const action of description.actions) {
     lines.push(
       `ACTION ${action.id} (${action.profile.id}@${action.profile.version}, ${action.effect})`,
     )
-    lines.push(`  ${action.docs}`)
     lines.push('  input:', ...formatInputText(action.input))
     lines.push(`  output: ${action.output.id}@${action.output.version}`)
     lines.push(
-      `  adapters: ${action.adapters.map((adapter) => `${adapter.id}@${adapter.version}`).join(', ') || 'none'}`,
-    )
-    lines.push(
-      '  examples:',
-      ...prettyJson(action.examples)
-        .split('\n')
-        .map((line) => `    ${line}`),
+      `  adapters: ${action.adapters.map((adapter) => adapter.id).join(', ') || 'none'}`,
     )
   }
   return lines.join('\n')

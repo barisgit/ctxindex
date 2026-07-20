@@ -39,30 +39,30 @@ function isInside(root: string, target: string): boolean {
   )
 }
 
-async function validateSnapshotFile(
+async function validateSnapshotPath(
   snapshotRoot: string,
   relativePath: string,
   kind: 'source' | 'setup',
 ): Promise<void> {
   const path = validateCatalogRelativePath(relativePath)
   const canonicalRoot = await realpath(snapshotRoot)
-  let canonicalFile: string
+  let canonicalTarget: string
   try {
-    canonicalFile = await realpath(resolve(snapshotRoot, path))
+    canonicalTarget = await realpath(resolve(snapshotRoot, path))
   } catch (cause) {
-    throw new TypeError(
-      `Catalog ${kind} path does not identify a file: ${path}`,
-      {
-        cause,
-      },
-    )
+    throw new TypeError(`Catalog ${kind} path does not exist: ${path}`, {
+      cause,
+    })
   }
-  if (!isInside(canonicalRoot, canonicalFile)) {
+  if (!isInside(canonicalRoot, canonicalTarget)) {
     throw new TypeError(`Catalog ${kind} path escapes snapshot: ${path}`)
   }
-  const info = await stat(canonicalFile)
-  if (!info.isFile()) {
-    throw new TypeError(`Catalog ${kind} path is not a regular file: ${path}`)
+  const info = await stat(canonicalTarget)
+  if (kind === 'source' && !info.isDirectory()) {
+    throw new TypeError(`Catalog source path is not a package root: ${path}`)
+  }
+  if (kind === 'setup' && !info.isFile()) {
+    throw new TypeError(`Catalog setup path is not a regular file: ${path}`)
   }
   if (kind === 'setup' && info.size > CATALOG_SETUP_MAX_BYTES) {
     throw new TypeError(`Catalog setup file exceeds 1 MiB: ${path}`)
@@ -100,9 +100,9 @@ export async function validateCatalogSnapshot(
   }
   const manifest = parseCatalogManifest(manifestText)
   for (const entry of manifest.extensions) {
-    await validateSnapshotFile(snapshotRoot, entry.source.path, 'source')
+    await validateSnapshotPath(snapshotRoot, entry.source.path, 'source')
     if (entry.setup !== undefined) {
-      await validateSnapshotFile(snapshotRoot, entry.setup.path, 'setup')
+      await validateSnapshotPath(snapshotRoot, entry.setup.path, 'setup')
     }
   }
   return manifest

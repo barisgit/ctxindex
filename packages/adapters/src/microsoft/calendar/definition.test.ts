@@ -1,9 +1,4 @@
 import { describe, expect, test } from 'bun:test'
-import {
-  createExtensionRegistry,
-  describeRegistry,
-} from '@ctxindex/core/registry'
-import { defineExtension } from '@ctxindex/extension-sdk'
 import { calendarEventProfile } from '@ctxindex/profiles'
 import { microsoftOAuthProvider } from '../provider'
 import {
@@ -47,21 +42,25 @@ describe('microsoft.calendar definition', () => {
   test('uses shared Microsoft identity and only read-only Calendar scope', () => {
     expect(microsoftCalendarAdapterDefinition).toMatchObject({
       id: 'microsoft.calendar',
-      version: 1,
-      auth: {
-        kind: 'oauth2',
-        provider: microsoftOAuthProvider,
+      provider: microsoftOAuthProvider,
+      access: {
         scopes: ['Calendars.Read'],
       },
       providerApiHosts: ['graph.microsoft.com'],
-      profiles: [{ id: 'calendar.event', version: 1 }],
+      profiles: [calendarEventProfile],
       routing: 'indexed',
       capabilities: ['sync', 'retrieve'],
       actions: {},
-      docs: {
-        summary: 'Microsoft Calendar events from one selected calendar.',
-      },
     })
+    expect(microsoftCalendarAdapterDefinition).not.toHaveProperty('version')
+    expect(microsoftCalendarAdapterDefinition).not.toHaveProperty('auth')
+    expect(microsoftCalendarAdapterDefinition).not.toHaveProperty('docs')
+    expect(microsoftCalendarAdapterDefinition.provider).toBe(
+      microsoftOAuthProvider,
+    )
+    expect(microsoftCalendarAdapterDefinition.profiles[0]).toBe(
+      calendarEventProfile,
+    )
     expect(microsoftCalendarAdapterDefinition.operations.sync).toBeFunction()
     expect(
       microsoftCalendarAdapterDefinition.operations.retrieve,
@@ -71,38 +70,10 @@ describe('microsoft.calendar definition', () => {
     )
   })
 
-  test('publishes generated config and zero Calendar Actions', () => {
-    const registry = createExtensionRegistry([
-      defineExtension({
-        id: 'ctxindex.microsoft-calendar.definition-test',
-        version: 1,
-        profiles: [calendarEventProfile],
-        adapters: [microsoftCalendarAdapterDefinition],
-      }),
-    ])
-    const description = describeRegistry(registry)
-    expect(description.sources[0]).toMatchObject({
-      id: 'microsoft.calendar',
-      profiles: [{ id: 'calendar.event', version: 1 }],
-      capabilities: ['retrieve', 'sync'],
-      configOptions: [
-        expect.objectContaining({
-          property: 'calendar_id',
-          flag: '--config-calendar-id',
-          default: 'default',
-        }),
-        expect.objectContaining({
-          property: 'future_days',
-          flag: '--config-future-days',
-          default: 730,
-        }),
-        expect.objectContaining({
-          property: 'past_days',
-          flag: '--config-past-days',
-          default: 365,
-        }),
-      ],
-    })
-    expect(description.actions).toEqual([])
+  test('publishes strict config and zero Calendar Actions', () => {
+    expect(microsoftCalendarAdapterDefinition.configSchema).toBe(
+      microsoftCalendarSourceConfigSchema,
+    )
+    expect(microsoftCalendarAdapterDefinition.actions).toEqual({})
   })
 })

@@ -3,6 +3,7 @@ import { CtxindexConfigError } from '../errors'
 import {
   assertSecretUri,
   getEnv,
+  readEnvironmentVariable,
   resetEnvForTests,
   resolveEnvUri,
 } from './index'
@@ -49,6 +50,17 @@ test('resetEnvForTests invalidates memoized env', () => {
 
   resetEnvForTests()
   expect(getEnv().RESETTABLE_ENV_VALUE).toBe('after')
+})
+
+test('central environment reads accept every safe variable name', () => {
+  process.env.GOOGLE_CLIENT_ID = 'public-client'
+  process.env._PRIVATE_CLIENT_ID = 'private-client'
+  process.env['1INVALID_CLIENT_ID'] = 'invalid-client'
+  resetEnvForTests()
+
+  expect(readEnvironmentVariable('GOOGLE_CLIENT_ID')).toBe('public-client')
+  expect(readEnvironmentVariable('_PRIVATE_CLIENT_ID')).toBe('private-client')
+  expect(readEnvironmentVariable('1INVALID_CLIENT_ID')).toBeUndefined()
 })
 
 test('lowercase rejected', () => {

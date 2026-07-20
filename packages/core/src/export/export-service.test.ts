@@ -35,8 +35,8 @@ async function freshDb(): Promise<Database> {
   ).run()
   db.prepare(
     `INSERT INTO sources
-       (id, realm_id, adapter_id, adapter_version, label, config_json, sync_enabled, created_at, updated_at)
-     VALUES (?, 'realm-1', 'fake.export', 1, ?, '{}', 1, 1, 1)`,
+       (id, realm_id, adapter_id, label, config_json, sync_enabled, created_at, updated_at)
+     VALUES (?, 'realm-1', 'fake.export', ?, '{}', 1, 1, 1)`,
   ).run(sourceId, sourceId)
   return db
 }
@@ -47,10 +47,8 @@ function registryWith(
 ) {
   const common = {
     id: 'fake.export',
-    version: 1,
     configSchema: z.object({}).strict(),
-    auth: { kind: 'none' },
-    profiles: profile ? [{ id: profile.id, version: profile.version }] : [],
+    profiles: profile ? [profile] : [],
     routing: 'indexed',
     actions: {},
   } as const
@@ -64,7 +62,6 @@ function registryWith(
   return createExtensionRegistry([
     defineExtension({
       id: 'fake.extension',
-      version: 1,
       profiles: profile ? [profile] : [],
       adapters: [adapter],
     }),
@@ -104,10 +101,8 @@ describe('exportSourceResource', () => {
     })
     const adapter = defineAdapter({
       id: 'fake.export',
-      version: 1,
       configSchema: z.object({}).strict(),
-      auth: { kind: 'none' },
-      profiles: [{ id: 'fake.item', version: 1 }],
+      profiles: [profile],
       routing: 'indexed',
       capabilities: ['retrieve'],
       operations: {
@@ -120,7 +115,6 @@ describe('exportSourceResource', () => {
     const registry = createExtensionRegistry([
       defineExtension({
         id: 'fake.extension',
-        version: 1,
         profiles: [profile],
         adapters: [adapter],
       }),

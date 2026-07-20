@@ -1,4 +1,5 @@
 export * from './compare'
+export * from './complete-registry'
 export * from './definition-registries'
 export * from './describe'
 export * from './errors'

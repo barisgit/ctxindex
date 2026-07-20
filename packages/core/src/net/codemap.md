@@ -16,7 +16,7 @@ A caller passes a URL, optional `RequestInit`, and an explicit allowed-host list
 
 ## Integration points
 
-- OAuth token and identity modules pass `OAuthProviderSpec.allowedHosts`.
+- OAuth token and identity modules pass the exact imported OAuth2 Provider's `auth.allowedHosts`.
 - `packages/core/src/source/provider-context.ts` passes the selected Adapter's `providerApiHosts` and rechecks requests before token resolution.
 - Adapter operation contexts receive the resulting egress-enforcing fetch implementation.
 - Depends on `packages/core/src/errors.ts` for policy failures.
