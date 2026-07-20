@@ -130,6 +130,15 @@ describe('search CLI arguments', () => {
         'search: provide <query> or at least one filter (--realm/--adapter/--source/--kind/--field/--since/--until/--include-deleted)',
     })
     expect(parseSearchArgs(['--json'])).toMatchObject({ kind: 'unknown' })
+    for (const args of [
+      ['x', '--remote', '--source', 'a', '--continuation='],
+      ['x', '--remote', '--source', 'a', '--continuation', '   '],
+    ]) {
+      expect(parseSearchArgs(args)).toMatchObject({
+        kind: 'unknown',
+        message: 'search: --continuation requires a token',
+      })
+    }
     expect(parseSearchArgs(['--remote', '--include-deleted'])).toMatchObject({
       kind: 'unknown',
       message:

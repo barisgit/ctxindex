@@ -36,7 +36,7 @@ ctxindex search "flight receipt" \
 
 An omitted Realm spans all Realms. `--realm company` is exact and never includes personal Sources implicitly. Gmail and Outlook mailbox Sources use provider search when routing requires it, but return the same result envelope and stable Ref shape.
 
-To list recent unread mail without inventing query text, select one remote mailbox and use the Profile's exact boolean field. Inspect `pagination.hasMore` and repeat the unchanged request with its opaque continuation:
+To list recent unread mail without inventing query text, select one remote mailbox and use the Profile's exact boolean field. When the selected Adapter returns an opaque continuation, inspect `pagination.hasMore` and repeat the unchanged request. The current Microsoft mailbox Adapter supports this flow; Gmail returns no continuation and rejects a supplied token as `invalid_filter` before provider I/O:
 
 ```sh
 ctxindex search --remote \
@@ -57,7 +57,7 @@ ctxindex search --remote \
   --json
 ```
 
-`unread=true` and `unread=false` are exact booleans. Remote continuation cannot be combined with local `--offset`, and a `truncated` warning with a non-null continuation means more provider results are resumable.
+`unread=true` and `unread=false` are exact booleans. Remote continuation cannot be combined with local `--offset`, and a `truncated` warning with a non-null continuation means more provider results are resumable. A truncation warning without a continuation is not resumable through `--continuation`.
 
 ## Retrieve a message and its thread
 

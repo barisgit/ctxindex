@@ -8,7 +8,7 @@ import {
 } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
 import type { AuthService } from '../auth'
-import { CtxindexValidationError } from '../errors'
+import { CtxindexContinuationError, CtxindexValidationError } from '../errors'
 import type { Logger } from '../logger'
 import { createExtensionRegistry } from '../registry'
 import { ResourceStore } from '../resource'
@@ -41,6 +41,7 @@ let barrierPeer: string | undefined
 let releaseBarrier: (() => void) | undefined
 let continuationSource: string | undefined
 let validationFailureSource: string | undefined
+let continuationValidationFailureSource: string | undefined
 
 const profile = defineProfile({
   id: 'fake.item',
@@ -81,6 +82,11 @@ async function remote({ source, query, signal }: SearchContext) {
   if (source.id === validationFailureSource) {
     throw new CtxindexValidationError(
       'invalid_filter',
+      'provider filter is unsupported',
+    )
+  }
+  if (source.id === continuationValidationFailureSource) {
+    throw new CtxindexContinuationError(
       'continuation does not match this search',
     )
   }
@@ -240,6 +246,7 @@ afterEach(() => {
   releaseBarrier = undefined
   continuationSource = undefined
   validationFailureSource = undefined
+  continuationValidationFailureSource = undefined
   for (const db of dbs.splice(0)) db.close()
 })
 
@@ -653,7 +660,7 @@ describe('SearchPlanner', () => {
   test('propagates Adapter continuation validation as invalid usage', async () => {
     const db = await database()
     addSource(db, ids.federated, 'fake.federated')
-    validationFailureSource = ids.federated
+    continuationValidationFailureSource = ids.federated
 
     await expect(
       planner(db).search({
@@ -666,6 +673,57 @@ describe('SearchPlanner', () => {
       code: 'invalid_filter',
       message: 'continuation does not match this search',
     })
+  })
+
+  test('degrades one ordinary Adapter validation failure without aborting peer Sources', async () => {
+    const db = await database()
+    addSource(db, ids.federated, 'fake.federated')
+    addSource(db, ids.federated2, 'fake.federated')
+    validationFailureSource = ids.federated
+
+    const result = await planner(db).search({
+      text: 'ordinary',
+      remote: true,
+      sourceIds: [ids.federated, ids.federated2],
+    })
+
+    expect(calls).toEqual([ids.federated, ids.federated2])
+    expect(result.results).toHaveLength(2)
+    expect(
+      result.results.every(({ sourceId }) => sourceId === ids.federated2),
+    ).toBe(true)
+    expect(result.warnings).toContainEqual({
+      sourceId: ids.federated,
+      code: 'invalid_filter',
+      message: 'provider filter is unsupported',
+    })
+  })
+
+  test('degrades an ordinary validation failure during exact continuation resume', async () => {
+    const db = await database()
+    addSource(db, ids.federated, 'fake.federated')
+    validationFailureSource = ids.federated
+
+    const result = await planner(db).search({
+      text: 'ordinary',
+      remote: true,
+      sourceIds: [ids.federated],
+      continuation: 'adapter-next-page',
+    })
+
+    expect(result.results).toEqual([])
+    expect(result.pagination).toEqual({
+      limit: 20,
+      hasMore: false,
+      continuation: null,
+    })
+    expect(result.warnings).toEqual([
+      {
+        sourceId: ids.federated,
+        code: 'invalid_filter',
+        message: 'provider filter is unsupported',
+      },
+    ])
   })
 
   test('includes local tombstones only when requested and exposes their deletion time', async () => {

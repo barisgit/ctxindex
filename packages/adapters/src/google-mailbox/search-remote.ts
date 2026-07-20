@@ -1,6 +1,6 @@
 import {
+  CtxindexContinuationError,
   CtxindexSyncError,
-  CtxindexValidationError,
 } from '@ctxindex/core/errors'
 import type {
   SearchContext,
@@ -140,8 +140,7 @@ export async function gmailSearchRemote(
   context: SearchContext,
 ): Promise<SearchRemoteResult> {
   if (context.query.continuation !== undefined) {
-    throw new CtxindexValidationError(
-      'invalid_filter',
+    throw new CtxindexContinuationError(
       'Gmail mailbox remote search does not support continuation',
     )
   }

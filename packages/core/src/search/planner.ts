@@ -1,6 +1,6 @@
 import type { SearchRouting } from '@ctxindex/extension-sdk'
 import type { AuthService } from '../auth'
-import { CtxindexValidationError } from '../errors'
+import { CtxindexContinuationError, CtxindexValidationError } from '../errors'
 import type { Logger } from '../logger'
 import type { ExtensionRegistry } from '../registry'
 import { searchSourceRemote } from '../source'
@@ -317,7 +317,7 @@ export class SearchPlanner {
             outcome: remote.warnings.length === 0 ? 'success' : 'degraded',
           } as const
         } catch (cause) {
-          if (cause instanceof CtxindexValidationError) throw cause
+          if (cause instanceof CtxindexContinuationError) throw cause
           return {
             sourceId: plan.row.id,
             origin: [],

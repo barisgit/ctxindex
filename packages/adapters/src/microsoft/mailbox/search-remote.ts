@@ -1,4 +1,5 @@
 import {
+  CtxindexContinuationError,
   CtxindexSyncError,
   CtxindexValidationError,
 } from '@ctxindex/core/errors'
@@ -104,8 +105,7 @@ function continuationQueryIdentity(
 }
 
 function invalidContinuation(reason = 'is malformed'): never {
-  throw new CtxindexValidationError(
-    'invalid_filter',
+  throw new CtxindexContinuationError(
     `Microsoft mailbox continuation ${reason}`,
   )
 }

@@ -33,11 +33,11 @@ ctxindex search [options] [query]
 | `--explain` | Report each Source's route, search legs, coverage, and degradation. |
 | `--limit <number>` | Limit result count. |
 | `--offset <number>` | Set local pagination offset. Remote and mixed query searches reject it. |
-| `--continuation <token>` | Resume one exact remote Source using the opaque token returned in JSON pagination. Requires `--remote`, exactly one `--source`, and the unchanged query and limit. |
+| `--continuation <token>` | Resume one exact remote Source when its Adapter returned an opaque token in JSON pagination. Requires `--remote`, exactly one `--source`, and the unchanged query and limit. |
 
 Routing precedence is CLI override, then per-Source configuration, then the Adapter decision. Mixed local and remote results are interleaved and deduplicated by Ref; a remote failure can become a warning while local results survive.
 
-Local JSON pagination is `{ offset, limit, hasMore }`. One exact remote Source instead returns `{ limit, hasMore, continuation }`; repeat the unchanged remote search and `--limit` with `--continuation` while `hasMore` is true. Multi-Source remote searches do not expose one global continuation.
+Local JSON pagination is `{ offset, limit, hasMore }`. One exact remote Source instead returns `{ limit, hasMore, continuation }`; when its Adapter returns a non-null continuation, repeat the unchanged remote search and `--limit` with `--continuation` while `hasMore` is true. The Microsoft mailbox Adapter supports continuation. Gmail returns no continuation and rejects a supplied token as `invalid_filter` before provider I/O. Multi-Source remote searches do not expose one global continuation.
 
 ## Output flags
 

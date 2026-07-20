@@ -113,7 +113,10 @@ export function parseSearchArgs(args: string[]): SearchArgs {
   const offset = parseCount('offset', flags.offset, 0)
   if (!offset.ok) return { kind: 'unknown', message: offset.message }
   const continuation = stringFlag(flags, 'continuation')
-  if (flags.continuation !== undefined && continuation === undefined) {
+  if (
+    flags.continuation !== undefined &&
+    (continuation === undefined || continuation.trim().length === 0)
+  ) {
     return {
       kind: 'unknown',
       message: 'search: --continuation requires a token',
