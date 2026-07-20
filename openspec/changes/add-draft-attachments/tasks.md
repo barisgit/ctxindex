@@ -41,4 +41,5 @@
 - [x] 7.2 Promote applicable doctrine into every canonical capability implementation sidecar named by `implementation.md`.
 - [x] 7.3 Run `bun run ci`, `bunx openspec validate --all --strict`, `openspec-verify-change add-draft-attachments`, and `git diff --check`; resolve every critical or warning-level divergence.
 - [x] 7.4 Perform an independent final review for correctness, regressions, security, contract drift, and missing verification.
-- [ ] 7.5 Human live Draft checkpoint: prepare isolated state and exact harmless Gmail/Microsoft Draft create/update actions, pause for consent, then record only redacted visible Draft/no-send evidence after approval.
+- [x] 7.5 Human live Draft checkpoint: prepare isolated state and exact harmless Gmail/Microsoft Draft create/update actions, pause for consent, then record only redacted visible Draft/no-send evidence after approval.
+  - Redacted evidence (2026-07-20): isolated Gmail and Microsoft reply Draft creates each persisted one managed attachment, exact Draft Refs remained stable, body updates retained the attachment in native provider UI, nothing was sent, and a strict invalid attachment update was rejected before provider I/O.

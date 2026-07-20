@@ -36,6 +36,7 @@ Draft create/update already validate strict standalone or reply inputs, perform 
 
 - [A cached source Artifact is purged before a Gmail Draft update] -> Reject the update with download guidance before provider I/O; never silently drop the attachment.
 - [Provider-generated attachment ids are not returned by Draft creation] -> Record only managed input provenance, not invented Draft Artifact descriptors; later provider retrieval remains responsible for provider-derived descriptors.
+- [An exact get follows a Draft Action before provider retrieval] -> The complete local Action materialization exposes managed provenance but no invented provider-derived attachment descriptors. Native-provider acceptance confirmed the attachments persist; forcing a provider refresh for post-mutation descriptor introspection is separate retrieval behavior and remains out of scope.
 - [A caller wants to replace attachments] -> Require a future explicitly non-atomic or provider-specific design; this change preserves the portable one-mutation contract.
 - [MIME metadata can become a header-injection vector] -> Accept metadata only from validated descriptors, reject controls and invalid media types, and encode filenames instead of interpolating them raw.
 - [Attachment-bearing MIME can exceed a provider limit] -> Apply a documented conservative portable bound before mutation and still normalize provider size errors without retry.
