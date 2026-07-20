@@ -2,6 +2,7 @@ import {
   defineAdapter,
   defineExtension,
   defineProfile,
+  docs,
   z,
 } from '@ctxindex/extension-sdk'
 import { TENDER_FIXTURES } from './fixtures'
@@ -80,6 +81,7 @@ export const tenderAdapter = defineAdapter({
 const extension = defineExtension({
   id: 'enarocanje.proof',
   adapters: [tenderAdapter],
+  docs: docs('./docs'),
 })
 
 export default extension

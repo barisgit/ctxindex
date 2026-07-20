@@ -13,7 +13,7 @@ Defines the private `@ctxindex/core` workspace package, exposing provider-neutra
 ## Data & control flow
 
 1. Consumers import the root or a declared subpath; exports resolve directly to source capability indexes.
-2. Application composition loads built-in, manifest-declared explicit, and exact installed Catalog Extension entries through common export collection and complete-registry validation, opens storage, constructs typed secret, OAuth App, Account/private Grant, Realm, and Source services, then builds operation workflows.
+2. Application composition loads built-in, manifest-declared explicit, and exact installed Catalog Extension entries through common export collection, documentation resolution, and complete-registry validation, opens storage, constructs typed secret, OAuth App, Account/private Grant, Realm, and Source services, then builds operation workflows.
 3. Core validates calls against registries, constrains provider network contexts, persists normalized state when required, and returns typed results, warnings, or core errors.
 
 ## Integration points

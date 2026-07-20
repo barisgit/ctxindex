@@ -33,10 +33,10 @@ describe('external tenders Extension proof', () => {
     expect(tenderProfile.schema).toBe(tenderSchema)
   })
 
-  test('declares exact strict definitions without embedded docs', () => {
+  test('keeps leaf definitions documentation-free and declares one root sidecar', () => {
     expect(tenderProfile).not.toHaveProperty('docs')
     expect(tenderAdapter).not.toHaveProperty('docs')
-    expect(extension).not.toHaveProperty('docs')
+    expect(extension.docs).toEqual({ kind: 'directory', path: './docs' })
     expect(Object.keys(tenderProfile.search?.fields ?? {})).toEqual([
       'reference',
       'buyer',
@@ -73,7 +73,15 @@ describe('external tenders Extension proof', () => {
       origin: 'explicit-path',
     })
     const collected = await importPackageEntries(resolved)
-    expect(collected.map(({ definition }) => definition)).toEqual([extension])
+    expect(collected.map(({ definition }) => definition.id)).toEqual([
+      extension.id,
+    ])
+    expect(collected[0]?.definition).not.toHaveProperty('docs')
+    expect(collected[0]?.documentation?.files.map(({ path }) => path)).toEqual([
+      'README.md',
+      'adapters/enarocanje.fixture.md',
+      'profiles/enarocanje.tender@1.md',
+    ])
   })
 })
 

@@ -64,6 +64,10 @@ _Avoid_: Plugin, Extension, connector
 A plain exported definition root that bundles Source Adapters and OAuth Apps, may explicitly include standalone Providers or Profiles, and introduces no separate command surface or authoring dependency graph. Exact imported Provider and Profile values form its transitive definition graph.
 _Avoid_: Plugin, connector
 
+**Documentation Tree**:
+A bounded passive sidecar declared only by an Extension root. It contains authored Markdown and verified image assets projected separately from generated reference data; it never changes definition identity or behavior.
+_Avoid_: Embedded definition metadata, trusted HTML, hosted documentation service
+
 **Capability**:
 An operation class a Source Adapter explicitly declares and implements, making the operation discoverable without provider-specific knowledge.
 _Avoid_: Permission, Action
@@ -106,6 +110,7 @@ _Avoid_: Source, import
 - A **Source** uses exactly one **Source Adapter** and may use one **Account** through that Account's **Grant**; Account and Source labels are globally unique.
 - One **Account** owns exactly one stable **Grant** and may back multiple **Sources**; reauthorization updates the Grant and its OAuth App snapshot in place, and multiple compatible Sources may explicitly share it.
 - An **Extension** exports one or more roots. Its imported **Providers** and **Profiles** are collected transitively through **Source Adapters** and **OAuth Apps**; standalone leaves may also be listed explicitly.
+- An **Extension** may own one **Documentation Tree** whose canonical Provider, Source Adapter, and versioned Profile routes bind to definitions in that Extension graph.
 - A provider-backed **Source Adapter** imports exactly one **Provider**. A providerless **Source Adapter** creates no OAuth App, Account, Grant, Provider access, or Provider egress requirement.
 - A **Profile** declares zero or more **Actions**; a **Source Adapter** implements the Actions it supports.
 - A **Source Adapter** emits **Resources** through sync, search, retrieval, and action results; each **Resource**'s **Profile** derives **Relations** and **Artifact** descriptors from its validated payload, and the owning Adapter downloads provider bytes for an **Artifact** on demand.

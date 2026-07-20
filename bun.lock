@@ -88,6 +88,7 @@
         "@noble/hashes": "latest",
         "drizzle-orm": "latest",
         "keytar": "latest",
+        "mdast-util-from-markdown": "latest",
         "pino": "latest",
         "pino-pretty": "latest",
         "pino-roll": "latest",

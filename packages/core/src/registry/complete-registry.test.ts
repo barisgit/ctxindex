@@ -129,7 +129,73 @@ function build(roots: readonly CollectedExtension[]) {
   })
 }
 
+const boundaryDefinitionId = 'a'.repeat(128)
+const invalidDefinitionIds = [
+  'a'.repeat(129),
+  '../escape',
+  '\uD800',
+  'Uppercase',
+  'repeated..separator',
+] as const
+
 describe('buildCompleteCandidateRegistry', () => {
+  test('accepts the route-safe Extension id boundary and rejects invalid ids', () => {
+    expect(() =>
+      build([collected(extension(boundaryDefinitionId))]),
+    ).not.toThrow()
+    for (const invalidId of invalidDefinitionIds) {
+      expect(() => build([collected(extension(invalidId))])).toThrow(
+        'Invalid Extension definition',
+      )
+    }
+  })
+
+  test('accepts the route-safe Provider id boundary and rejects invalid ids', () => {
+    expect(() =>
+      build([
+        collected(
+          extension('fixture.valid-provider-id', {
+            providers: [provider(boundaryDefinitionId)],
+          }),
+        ),
+      ]),
+    ).not.toThrow()
+    for (const invalidId of invalidDefinitionIds) {
+      expect(() =>
+        build([
+          collected(
+            extension('fixture.invalid-provider-id', {
+              providers: [provider(invalidId)],
+            }),
+          ),
+        ]),
+      ).toThrow('Invalid Provider definition')
+    }
+  })
+
+  test('accepts the route-safe Adapter id boundary and rejects invalid ids', () => {
+    expect(() =>
+      build([
+        collected(
+          extension('fixture.valid-adapter-id', {
+            adapters: [adapter({ id: boundaryDefinitionId })],
+          }),
+        ),
+      ]),
+    ).not.toThrow()
+    for (const invalidId of invalidDefinitionIds) {
+      expect(() =>
+        build([
+          collected(
+            extension('fixture.invalid-adapter-id', {
+              adapters: [adapter({ id: invalidId })],
+            }),
+          ),
+        ]),
+      ).toThrow('Invalid Adapter definition')
+    }
+  })
+
   test('exposes deterministic reachable graph collection with provenance', () => {
     const note = profile()
     const local = provider()
@@ -924,7 +990,7 @@ describe('buildCompleteCandidateRegistry', () => {
     const documentedExtension = {
       ...extension('fixture.documented-extension'),
       docs: { summary: 'Removed' },
-    } as AnyExtensionDefinition
+    } as unknown as AnyExtensionDefinition
     const documentedProvider = {
       ...provider(),
       docs: { summary: 'Removed' },

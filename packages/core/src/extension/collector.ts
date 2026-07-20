@@ -30,6 +30,7 @@ function isExtension(value: Record<string, unknown>): boolean {
     'oauthApps',
     'profiles',
     'adapters',
+    'docs',
   ])
   return (
     Object.keys(value).every((key) => allowed.has(key)) &&

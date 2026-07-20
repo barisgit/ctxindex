@@ -15,8 +15,16 @@ import {
 } from '../registry/complete-registry'
 import { collectExtensionExports, type DefinitionModule } from './collector'
 import { safeExtensionDiagnostic } from './diagnostics'
-import { importExtensionPackageRoots } from './import'
-import { selectExactExtension } from './package-entry'
+import {
+  assertCompatibleExtensionDocumentation,
+  createDocumentationProjection,
+  type DocumentationProjection,
+  resolveCollectedExtensionDocumentation,
+} from './documentation'
+import {
+  importExtensionPackageRoot,
+  importExtensionPackageRoots,
+} from './import'
 
 export interface ExtensionLoadDiagnostic {
   readonly path: string
@@ -57,6 +65,7 @@ export interface LoadExtensionsResult {
   readonly completeRegistry: CompleteRegistry
   readonly diagnostics: readonly ExtensionLoadDiagnostic[]
   readonly provenance: readonly ExtensionLoadProvenance[]
+  readonly documentation: DocumentationProjection
 }
 
 export async function loadExtensions(
@@ -71,11 +80,13 @@ export async function loadExtensions(
       'loadExtensions requires an explicit built-in module namespace',
     )
   }
-  let activeRoots: readonly CollectedExtension[] = collectExtensionExports(
-    input.builtins,
-    'builtin:@ctxindex/adapters',
-    { origin: 'builtin', packageName: '@ctxindex/adapters' },
+  let activeRoots: readonly CollectedExtension[] = await Promise.all(
+    collectExtensionExports(input.builtins, 'builtin:@ctxindex/adapters', {
+      origin: 'builtin',
+      packageName: '@ctxindex/adapters',
+    }).map((root) => resolveCollectedExtensionDocumentation(root)),
   )
+  assertCompatibleExtensionDocumentation(activeRoots)
   const localOAuthAppIdentities = input.localOAuthAppIdentities ?? []
   let completeRegistry = buildCompleteCandidateRegistry({
     roots: activeRoots,
@@ -97,6 +108,7 @@ export async function loadExtensions(
     try {
       const roots = await importExtensionPackageRoots(extensionPath)
       const nextRoots = [...activeRoots, ...roots]
+      assertCompatibleExtensionDocumentation(nextRoots)
       const candidate = buildCompleteCandidateRegistry({
         roots: nextRoots,
         localOAuthAppIdentities,
@@ -148,12 +160,16 @@ export async function loadExtensions(
           'Installed Extension provenance does not match snapshot manifest',
         )
       }
-      const roots = await importExtensionPackageRoots(extensionPath, {
-        origin: 'catalog',
-        commit: installed.commit,
-      })
-      const selected = selectExactExtension(roots, installed.id)
+      const selected = await importExtensionPackageRoot(
+        extensionPath,
+        installed.id,
+        {
+          origin: 'catalog',
+          commit: installed.commit,
+        },
+      )
       const nextRoots = [...activeRoots, selected]
+      assertCompatibleExtensionDocumentation(nextRoots)
       const candidate = buildCompleteCandidateRegistry({
         roots: nextRoots,
         localOAuthAppIdentities,
@@ -184,5 +200,11 @@ export async function loadExtensions(
     }
   }
 
-  return { registry, completeRegistry, diagnostics, provenance }
+  return {
+    registry,
+    completeRegistry,
+    diagnostics,
+    provenance,
+    documentation: createDocumentationProjection(activeRoots),
+  }
 }

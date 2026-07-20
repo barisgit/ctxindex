@@ -557,7 +557,7 @@ function assertRejectedSurfaces(): void {
 
   defineExtension({
     id: 'fixture.documented-extension',
-    // @ts-expect-error Extension documentation belongs in deferred sidecars.
+    // @ts-expect-error Extension documentation requires the closed sidecar declaration.
     docs: { summary: 'Removed' },
   })
 
@@ -709,7 +709,6 @@ describe('extension SDK foundation', () => {
 
     expect(source).not.toContain('ExtensionAuthoringHost')
     expect(source).not.toContain('globalThis')
-    expect(source).not.toMatch(/\bdocs\b/)
     expect(source).not.toMatch(/\b(?:extensionRef|profileRef|providerRef)\b/)
     expect(source).not.toMatch(/\bclass\b/)
     expect(source).not.toMatch(/\binstanceof\b/)

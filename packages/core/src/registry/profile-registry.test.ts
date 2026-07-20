@@ -22,6 +22,14 @@ describe('ProfileRegistry', () => {
     expect(createProfileRegistry([profile]).list()).toEqual([profile])
   })
 
+  test('enforces the shared route-safe Profile id grammar', () => {
+    for (const id of ['../escape', 'a'.repeat(129), '\uD800']) {
+      expect(() => createProfileRegistry([{ ...profile, id }])).toThrow(
+        DefinitionRegistryError,
+      )
+    }
+  })
+
   test('rejects a non-function Profile summary projection', () => {
     expect(() =>
       createProfileRegistry([
@@ -43,6 +51,23 @@ describe('ProfileRegistry', () => {
               effect: 'read',
               input: z.object({}),
               output: { id: 'fake.note', version: 1 },
+            },
+          },
+        } as never,
+      ]),
+    ).toThrow(DefinitionRegistryError)
+  })
+
+  test('rejects an Action output with an invalid Profile reference id', () => {
+    expect(() =>
+      createProfileRegistry([
+        {
+          ...profile,
+          actions: {
+            'fake.note.read': {
+              effect: 'reversible',
+              input: z.object({}),
+              output: { id: '../escape', version: 1 },
             },
           },
         } as never,

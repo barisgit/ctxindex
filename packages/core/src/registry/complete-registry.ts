@@ -9,8 +9,10 @@ import type {
 import { z } from 'zod'
 import { isSafeEnvironmentVariableName } from '../config/env-loader'
 import { isEnvUri } from '../config/env-uri'
+import type { ResolvedDocumentationTree } from '../extension/documentation'
 import { compareUnicodeCodePoints } from '../internal/code-point-order'
 import { parseSecretRef } from '../secrets/types'
+import { isDefinitionId } from './definition-id'
 import {
   createProfileRegistry,
   DefinitionRegistryError,
@@ -29,6 +31,7 @@ export interface DefinitionProvenance {
 export interface CollectedExtension {
   readonly definition: AnyExtensionDefinition
   readonly provenance: DefinitionProvenance
+  readonly documentation?: ResolvedDocumentationTree
 }
 
 export interface CollectedExtensionGraph {
@@ -339,8 +342,7 @@ function validateExtensionDefinition(
   if (
     !isObject(extension) ||
     extension.kind !== 'extension' ||
-    typeof extension.id !== 'string' ||
-    extension.id.length === 0 ||
+    !isDefinitionId(extension.id) ||
     !Array.isArray(extension.providers) ||
     !Array.isArray(extension.oauthApps) ||
     !Array.isArray(extension.profiles) ||
@@ -361,8 +363,7 @@ function validateProviderDefinition(
   if (
     !isObject(provider) ||
     provider.kind !== 'provider' ||
-    typeof provider.id !== 'string' ||
-    provider.id.length === 0 ||
+    !isDefinitionId(provider.id) ||
     !isObject(provider.auth) ||
     !exactKeys(provider, ['kind', 'id', 'auth'], ['kind', 'id', 'auth']) ||
     (provider.auth.kind !== 'none' && provider.auth.kind !== 'oauth2')
@@ -383,8 +384,7 @@ function validateProfileDefinition(
   if (
     !isObject(profile) ||
     profile.kind !== 'profile' ||
-    typeof profile.id !== 'string' ||
-    profile.id.length === 0 ||
+    !isDefinitionId(profile.id) ||
     typeof profile.version !== 'number' ||
     !Number.isInteger(profile.version) ||
     profile.version <= 0 ||
@@ -427,8 +427,7 @@ function validateAdapterDefinition(
   }
   if (
     adapter.kind !== 'adapter' ||
-    typeof adapter.id !== 'string' ||
-    adapter.id.length === 0 ||
+    !isDefinitionId(adapter.id) ||
     !isSchema(adapter.configSchema) ||
     !Array.isArray(adapter.profiles) ||
     !Array.isArray(adapter.capabilities) ||

@@ -6,6 +6,7 @@ import {
   defineAdapter,
   defineExtension,
   defineOAuthApp,
+  docs,
 } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
 import { catalogSnapshotPath, type InstalledExtensionRecord } from '../catalog'
@@ -64,6 +65,119 @@ describe('loadExtensions', () => {
         exportName: 'default',
       },
     ])
+  })
+
+  test('binds package-sidecar documentation before atomic activation', async () => {
+    const extensionPath = await mkdtemp(
+      join(import.meta.dir, '.documented-extension-'),
+    )
+    try {
+      await writeExtensionPackage(
+        extensionPath,
+        `import { defineExtension, docs } from '@ctxindex/extension-sdk'
+export default defineExtension({ id: 'fixture.documented', docs: docs('./docs') })
+`,
+      )
+      await mkdir(join(extensionPath, 'docs'))
+      await writeFile(join(extensionPath, 'docs/README.md'), '# Package docs')
+
+      const result = await loadExtensions({
+        config: {
+          ...defaultConfig(),
+          extensions: { paths: [extensionPath] },
+        },
+        builtins: {},
+      })
+
+      expect(result.registry.list().map(({ id }) => id)).toEqual([
+        'fixture.documented',
+      ])
+      expect(
+        result.documentation.get('fixture.documented', 'README.md'),
+      ).toMatchObject({ content: '# Package docs', origin: 'authored' })
+
+      await writeFile(
+        join(extensionPath, 'docs/README.md'),
+        '[unsafe](file:///etc/passwd)',
+      )
+      const invalid = await loadExtensions({
+        config: {
+          ...defaultConfig(),
+          extensions: { paths: [extensionPath] },
+        },
+        builtins: {},
+      })
+      expect(invalid.registry.list()).toEqual([])
+      expect(invalid.documentation.list()).toEqual([])
+      expect(invalid.diagnostics).toEqual([
+        {
+          path: extensionPath,
+          message: 'Invalid Extension documentation at README.md',
+        },
+      ])
+    } finally {
+      await rm(extensionPath, { recursive: true, force: true })
+    }
+  })
+
+  test('keeps documentation projection non-throwing for unrepresentable schemas', async () => {
+    const adapter = defineAdapter({
+      id: 'fixture.transformed',
+      configSchema: z.object({ value: z.string() }).transform(({ value }) => ({
+        value: value.trim(),
+      })),
+      profiles: [],
+      routing: 'indexed',
+      capabilities: [],
+      operations: {},
+      actions: {},
+    })
+    const builtin = defineExtension({
+      id: 'fixture.unrepresentable-schema',
+      adapters: [adapter],
+    })
+
+    const result = await loadExtensions({
+      config: defaultConfig(),
+      builtins: { builtin },
+    })
+
+    expect(result.registry.adapters.get({ id: adapter.id })).toBe(adapter)
+    expect(
+      result.documentation.get(
+        builtin.id,
+        'generated/adapters/fixture.transformed.json',
+      ),
+    ).toBeDefined()
+  })
+
+  test.each([
+    ['documentation-free', defineExtension({ id: 'fixture.shared-export' })],
+    [
+      'documented',
+      defineExtension({
+        id: 'fixture.shared-documented-export',
+        docs: docs({
+          index: 'README.md',
+          files: [
+            {
+              path: 'README.md',
+              kind: 'markdown',
+              mediaType: 'text/markdown',
+              content: '# Shared',
+            },
+          ],
+        }),
+      }),
+    ],
+  ] as const)('coalesces repeated %s Extension exports', async (_, shared) => {
+    const result = await loadExtensions({
+      config: defaultConfig(),
+      builtins: { default: shared, shared },
+    })
+
+    expect(result.registry.list().map(({ id }) => id)).toEqual([shared.id])
+    expect(result.diagnostics).toEqual([])
   })
   test('loads built-ins first and reports an external id conflict', async () => {
     const builtin = defineExtension({
