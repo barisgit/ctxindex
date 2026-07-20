@@ -1,6 +1,4 @@
-import { Database } from 'bun:sqlite'
-import { existsSync } from 'node:fs'
-import { type CtxindexDatabase, databasePath } from '../storage'
+import type { CtxindexDatabase } from '../storage'
 
 export interface LocalOAuthAppIdentity {
   readonly providerId: string
@@ -15,6 +13,12 @@ interface LocalOAuthAppIdentityRow {
 export function listLocalOAuthAppIdentities(
   db: Pick<CtxindexDatabase, 'prepare'>,
 ): readonly LocalOAuthAppIdentity[] {
+  const table = db
+    .prepare(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'oauth_apps'",
+    )
+    .get()
+  if (!table) return []
   return (
     db
       .prepare(
@@ -22,22 +26,4 @@ export function listLocalOAuthAppIdentities(
       )
       .all() as readonly LocalOAuthAppIdentityRow[]
   ).map((row) => ({ providerId: row.provider_id, label: row.label }))
-}
-
-export function readLocalOAuthAppIdentities(
-  path: string = databasePath(),
-): readonly LocalOAuthAppIdentity[] {
-  if (!existsSync(path)) return []
-
-  const db = new Database(path, { readonly: true, strict: true })
-  try {
-    const table = db
-      .prepare(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'oauth_apps'",
-      )
-      .get()
-    return table ? listLocalOAuthAppIdentities(db) : []
-  } finally {
-    db.close()
-  }
 }

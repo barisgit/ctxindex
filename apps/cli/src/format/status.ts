@@ -12,7 +12,7 @@ function warningText(row: StatusRow): string | null {
 }
 
 export function formatStatus(
-  rows: StatusRow[],
+  rows: readonly StatusRow[],
   opts: { readonly json: boolean; readonly format?: 'summary' | 'compact' },
 ): string {
   if (opts.json) return JSON.stringify(rows, null, 2)

@@ -13,6 +13,7 @@
   },
   "files": [
     "dist/ctxindex.mjs",
+    "dist/ctxindex-daemon",
     "README.md"
   ],
   "engines": {
@@ -44,6 +45,9 @@
     "@ctxindex/adapters": "workspace:*",
     "@ctxindex/core": "workspace:*",
     "@ctxindex/extension-sdk": "workspace:*",
+    "@ctxindex/local-daemon": "workspace:*",
+    "@ctxindex/rpc": "workspace:*",
+    "@orpc/client": "1.14.8",
     "citty": "latest",
     "cli-table3": "^0.6.5",
     "zod": "latest"

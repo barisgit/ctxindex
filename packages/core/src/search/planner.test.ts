@@ -544,6 +544,26 @@ describe('SearchPlanner', () => {
     )
   })
 
+  test('propagates caller cancellation into active remote searches', async () => {
+    const db = await database()
+    addSource(db, ids.federated, 'fake.federated')
+    timeoutSource = ids.federated
+    const controller = new AbortController()
+    const pending = planner(db).search({
+      text: 'x',
+      signal: controller.signal,
+      timeoutMs: 10_000,
+    })
+    while (signals.length === 0) await Promise.resolve()
+    controller.abort(new DOMException('cancelled', 'AbortError'))
+
+    await expect(pending).rejects.toMatchObject({
+      name: 'AbortError',
+      message: 'cancelled',
+    })
+    expect(signals[0]?.aborted).toBe(true)
+  })
+
   test('filter-only enumeration is local-only and never invokes remote search', async () => {
     const db = await database()
     addSource(db, ids.indexed, 'fake.indexed')

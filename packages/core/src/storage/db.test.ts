@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { CtxindexError } from '../errors'
-import { applyPragmas, openDatabase } from './db'
+import { applyPragmas, openDatabase, openReadonlyDatabase } from './db'
 
 test('configures the busy timeout before lock-sensitive pragmas', () => {
   const statements: string[] = []
@@ -16,6 +16,39 @@ test('configures the busy timeout before lock-sensitive pragmas', () => {
 
   expect(statements[0]).toBe('PRAGMA busy_timeout = 5000;')
   expect(statements).toContain('PRAGMA journal_mode = WAL;')
+})
+
+test('opens an existing database read-only without changing its schema', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'ctxindex-readonly-open-'))
+  const path = join(directory, 'ctxindex.sqlite')
+  const writable = new Database(path, { create: true })
+  writable.exec('CREATE TABLE preserved (id INTEGER PRIMARY KEY)')
+  writable.close()
+
+  try {
+    const readonly = openReadonlyDatabase(path)
+    expect(
+      readonly
+        .query(
+          "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+        )
+        .all(),
+    ).toEqual([{ name: 'preserved' }])
+    expect(() => readonly.exec('CREATE TABLE forbidden (id INTEGER)')).toThrow()
+    readonly.close()
+
+    const verification = new Database(path, { readonly: true })
+    expect(
+      verification
+        .query(
+          "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name",
+        )
+        .all(),
+    ).toEqual([{ name: 'preserved' }])
+    verification.close()
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
 })
 
 test('installs the busy bound before lock-sensitive database setup', async () => {

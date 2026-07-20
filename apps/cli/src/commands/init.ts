@@ -1,11 +1,9 @@
-import { initializeSecretBackend } from '@ctxindex/core/secrets'
-import { bootstrapDatabase } from '@ctxindex/core/storage'
 import { defineCommand } from 'citty'
+import { initializeDirectStorage } from '../direct-database'
 import { runWithExit } from '../format/exit'
 
 export async function initCtxindex(): Promise<void> {
-  await initializeSecretBackend()
-  await bootstrapDatabase()
+  await initializeDirectStorage()
 }
 
 export const initCommand = defineCommand({

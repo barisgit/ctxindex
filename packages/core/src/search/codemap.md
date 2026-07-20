@@ -15,7 +15,7 @@ Implements validated local SQLite search and multi-Source routing that unifies i
 
 1. `SearchPlanner.search()` validates options through `resolveSearchQuery()`, selects Sources, and calls `plan()` for routing decisions.
 2. Local legs call `LocalSearchExecutor.search()`, which validates Realm/Source/kind filters, queries `resources_fts` and `chunks_fts` (or all Resources for empty text), joins typed `field_index` filters, ranks candidates, and limits results.
-3. Remote legs run concurrently with per-Source abort timeouts through `source/searchSourceRemote()`; ordinary per-Source failures, including unsupported filters, become warnings/degraded outcomes rather than aborting peer Sources. A resumed exact-Source request passes one opaque continuation to the selected Adapter, and its continuation validation remains terminal invalid usage.
+3. Remote legs run concurrently through `source/searchSourceRemote()` with per-Source timeouts linked to the caller signal; caller cancellation aborts active provider legs, while ordinary per-Source failures, including unsupported filters, become warnings/degraded outcomes rather than aborting peers. A resumed exact-Source request passes one opaque continuation to the selected Adapter, and its continuation validation remains terminal invalid usage.
 4. Local and provider origins are interleaved, deduplicated by Ref, and limited. Local execution returns offset pagination; one-Source remote execution returns `{ limit, hasMore, continuation }`; warnings and optional `SourceSearchExplain` accompany either result.
 
 ## Integration points

@@ -10,10 +10,13 @@ import {
 } from '@ctxindex/core'
 import { CatalogService } from '@ctxindex/core/catalog'
 import { safeExtensionDiagnostic } from '@ctxindex/core/extension'
-import { readLocalOAuthAppIdentities } from '@ctxindex/core/oauth-app'
 import { dataDir } from '@ctxindex/core/paths'
 import { parseExtensionsArgs } from '../args/extensions'
 import { loadCliDefinitions, printExtensionDiagnostics } from '../definitions'
+import {
+  PrototypeUnsupportedError,
+  readLeasedLocalOAuthAppIdentities,
+} from '../direct-database'
 import {
   formatCatalog,
   formatCatalogExtension,
@@ -55,7 +58,7 @@ export async function handleExtensionsCommand(
   catalogs: CatalogService = new CatalogService(),
   direct: DirectExtensionService = createDirectExtensionService(),
   loadDefinitions: typeof loadCliDefinitions = loadCliDefinitions,
-  readOAuthAppIdentities: typeof readLocalOAuthAppIdentities = readLocalOAuthAppIdentities,
+  readOAuthAppIdentities: typeof readLeasedLocalOAuthAppIdentities = readLeasedLocalOAuthAppIdentities,
   readSourceBindings: typeof readDirectExtensionSourceBindings = readDirectExtensionSourceBindings,
 ): Promise<number> {
   const parsed = parseExtensionsArgs(args)
@@ -136,7 +139,7 @@ export async function handleExtensionsCommand(
       return 0
     }
     if (parsed.kind === 'catalog-install') {
-      const localOAuthAppIdentities = readOAuthAppIdentities()
+      const localOAuthAppIdentities = await readOAuthAppIdentities()
       const loaded = await loadDefinitions({ localOAuthAppIdentities })
       printExtensionDiagnostics(loaded.diagnostics)
       const replaceableCatalog = loaded.provenance.find(
@@ -191,7 +194,7 @@ export async function handleExtensionsCommand(
         'Trust notice: this command acquires and executes third-party Extension code in-process; validation is not a sandbox.',
       )
     }
-    const localOAuthAppIdentities = readOAuthAppIdentities()
+    const localOAuthAppIdentities = await readOAuthAppIdentities()
     const loaded = await loadDefinitions({ localOAuthAppIdentities })
     printExtensionDiagnostics(loaded.diagnostics)
     if (parsed.kind === 'direct-install') {
@@ -259,6 +262,10 @@ export async function handleExtensionsCommand(
     return 0
   } catch (error) {
     const code = (error as { code?: unknown }).code
+    if (error instanceof PrototypeUnsupportedError) {
+      console.error(error.message)
+      return mapErrorToExit(error)
+    }
     if (
       error instanceof Error &&
       typeof code === 'string' &&

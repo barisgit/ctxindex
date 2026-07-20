@@ -1,13 +1,10 @@
 import { Database } from 'bun:sqlite'
 import { afterEach, expect, test } from 'bun:test'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runMigrations } from '../storage'
-import {
-  listLocalOAuthAppIdentities,
-  readLocalOAuthAppIdentities,
-} from './local-identities'
+import { listLocalOAuthAppIdentities } from './local-identities'
 
 const cleanups: Array<() => void | Promise<void>> = []
 
@@ -21,25 +18,7 @@ async function databasePath(): Promise<string> {
   return join(root, 'ctxindex.sqlite')
 }
 
-test('read-only OAuth App identity lookup does not create or migrate SQLite', async () => {
-  const path = await databasePath()
-  expect(readLocalOAuthAppIdentities(path)).toEqual([])
-  expect(await Bun.file(path).exists()).toBe(false)
-  expect(await Bun.file(`${path}-wal`).exists()).toBe(false)
-  expect(await Bun.file(`${path}-shm`).exists()).toBe(false)
-
-  const bare = new Database(path, { create: true })
-  bare.exec('CREATE TABLE sentinel (value TEXT)')
-  bare.close()
-  const before = await readFile(path)
-
-  expect(readLocalOAuthAppIdentities(path)).toEqual([])
-  expect(await readFile(path)).toEqual(before)
-  expect(await Bun.file(`${path}-wal`).exists()).toBe(false)
-  expect(await Bun.file(`${path}-shm`).exists()).toBe(false)
-})
-
-test('lists local OAuth App identities deterministically from open and read-only databases', async () => {
+test('lists local OAuth App identities deterministically from an open database', async () => {
   const path = await databasePath()
   const db = new Database(path, { create: true })
   cleanups.push(() => db.close())
@@ -55,5 +34,13 @@ test('lists local OAuth App identities deterministically from open and read-only
     { providerId: 'microsoft', label: 'work' },
   ]
   expect(listLocalOAuthAppIdentities(db)).toEqual(expected)
-  expect(readLocalOAuthAppIdentities(path)).toEqual(expected)
+})
+
+test('returns an empty inventory when an open partial database has no OAuth App table', async () => {
+  const path = await databasePath()
+  const db = new Database(path, { create: true })
+  cleanups.push(() => db.close())
+  db.exec('CREATE TABLE preserved (id INTEGER PRIMARY KEY)')
+
+  expect(listLocalOAuthAppIdentities(db)).toEqual([])
 })

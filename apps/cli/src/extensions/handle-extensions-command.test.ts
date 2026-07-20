@@ -4,6 +4,7 @@ import type { CatalogService } from '@ctxindex/core/catalog'
 import * as extensionRuntime from '@ctxindex/core/extension'
 import { createExtensionRegistry } from '@ctxindex/core/registry'
 import type { CliDefinitions } from '../definitions'
+import { PrototypeUnsupportedError } from '../direct-database'
 import {
   handleExtensionsCommand,
   runWithSigintCancellation,
@@ -44,6 +45,27 @@ test('does not export host diagnostic marker APIs', () => {
   expect(Object.keys(extensionRuntime)).not.toContain(
     'isExtensionHostDiagnostic',
   )
+})
+
+test('database ownership conflict remains actionable and exits 50', async () => {
+  const error = spyOn(console, 'error').mockImplementation(() => {})
+  const catalogs = {
+    list: async () => {
+      throw new PrototypeUnsupportedError()
+    },
+  } as unknown as CatalogService
+  try {
+    const exitCode = await handleExtensionsCommand(
+      ['catalog', 'list', '--no-refresh'],
+      catalogs,
+    )
+    expect(exitCode).toBe(50)
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining('unavailable while the local daemon owns'),
+    )
+  } finally {
+    error.mockRestore()
+  }
 })
 
 test('collapses arbitrary injected Catalog service failures', async () => {
@@ -88,7 +110,7 @@ test('direct install wires SIGINT cancellation into the Core lifecycle call', as
       {} as CatalogService,
       direct,
       async () => emptyDefinitions(),
-      () => [],
+      async () => [],
       () => [],
     )
     expect(exitCode).toBe(130)
