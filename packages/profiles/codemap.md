@@ -15,7 +15,7 @@ Defines ctxindex's bundled provider-neutral Profile vocabularies in the private 
 
 1. Adapters validate produced payloads with `calendarEventSchema`, `communicationMessageSchema`, or `fileSchema`.
 2. Core invokes Profile search, relation, artifact, export, and Action declarations while it materializes, indexes, presents, or acts on Resources.
-3. Communication-message draft schemas accept strict standalone content or strict reply content. Supporting Adapters use the exported helpers to derive reply recipient, normalized subject, and deduplicated RFC References; `chunkText` produces searchable file chunks.
+3. Communication-message Draft schemas accept strict standalone content or strict reply content; create alone may select an ordered non-empty set of managed Artifact Refs, while results can retain ordered `managedAttachmentRefs`. Supporting Adapters use the exported helpers to derive reply recipient, normalized subject, and deduplicated RFC References; `chunkText` produces searchable file chunks.
 
 ## Integration points
 

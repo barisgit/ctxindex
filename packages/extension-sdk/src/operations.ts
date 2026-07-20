@@ -127,8 +127,21 @@ export interface ActionResource {
   readonly payload: unknown | null
 }
 
+export interface ActionArtifact {
+  readonly ref: string
+  readonly originRef: string
+  readonly filename: string
+  readonly mediaType: string
+  readonly byteSize: number
+  readonly bytes: Uint8Array
+}
+
 export interface ActionContext<TInput = unknown> extends ProviderContext {
   readonly input: TInput
   readonly signal: AbortSignal
   readonly resolveResource: (ref: string) => ActionResource | null
+  readonly resolveArtifact: (
+    ref: string,
+    maxByteSize?: number,
+  ) => Promise<ActionArtifact | null>
 }

@@ -10,7 +10,7 @@ Defines the stateless public TypeScript contract used to author ctxindex Provide
 - `oauth-app.ts`: binds one OAuth2 Provider to a labelled registration config validated by that Provider's registration schema. `defineOAuthApp` tags the resulting app as `oauth-app` and preserves its literal Provider, label, and config types.
 - `profile.ts`: defines schema-backed Profile identity, search projections, relation/artifact/export hooks, and reversible or irreversible Action declarations. `defineProfile` adds the `profile` discriminator while retaining literal IDs, versions, and Zod inference.
 - `adapter.ts`: declares source config, targeted Profiles, routing, capability-gated operations, and Profile Action bindings. An Adapter may bind a Provider; OAuth2 Providers require Adapter access scopes, while `none` Providers prohibit them. `providerApiHosts` further scopes permitted provider egress. `AdapterOperationsFor` uses a private conditional type to require exactly the operations selected by `capabilities`.
-- `operations.ts`: provides the provider-operation contexts and value contracts for sync emissions, remote search with opaque continuation input/output, retrieval, artifact download, and Actions. `ActionContext.resolveResource` offers a read-only selected-Source Resource lookup without exposing persistence.
+- `operations.ts`: provides the provider-operation contexts and value contracts for sync emissions, remote search with opaque continuation input/output, retrieval, artifact download, and Actions. `ActionContext.resolveResource` offers a read-only selected-Source Resource lookup without exposing persistence, while `resolveArtifact` accepts an optional maximum byte size and exposes safe descriptor metadata plus copied integrity-verified bytes without storage paths or provider access.
 - `extension.ts`: composes an Extension root from Providers, OAuth Apps, Profiles, and Adapters; `defineExtension` supplies omitted collections as empty arrays and adds the `extension` discriminator.
 - `documentation.ts`: defines the closed directory-or-virtual documentation declaration and the pure overloaded `docs()` helper; it performs no I/O and captures no module location.
 
@@ -18,7 +18,7 @@ Defines the stateless public TypeScript contract used to author ctxindex Provide
 
 1. An extension author defines Provider policy, optional OAuth App registrations, schema-backed Profiles, and capability-constrained Adapters, then groups any root definitions and optional passive documentation declaration with `defineExtension`.
 2. Core follows the declared definitions to validate and register the reachable graph. For Adapter operations it supplies `SyncContext`, `SearchContext`, `RetrieveContext`, `DownloadContext`, or typed `ActionContext`; remote search Adapters may consume and return opaque continuation tokens.
-3. Operations return Resources/results or use callbacks to emit sync resources, removals, checkpoints, warnings, artifacts, and byte chunks. Action handlers can resolve local Resources before deriving a provider mutation.
+3. Operations return Resources/results or use callbacks to emit sync resources, removals, checkpoints, warnings, artifacts, and byte chunks. Action handlers can resolve selected-Source local Resources and cached Artifacts before deriving a provider mutation.
 4. Core validates and materializes the values; the SDK owns no storage, network calls, or runtime state.
 
 ## Integration points

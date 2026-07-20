@@ -111,6 +111,20 @@ test('streams bytes into the managed CAS before recording metadata', async () =>
   })
 })
 
+test('read rejects an oversized cache entry before filesystem access', async () => {
+  const { root, store } = await fixture()
+  const artifact = await writeArtifact(store, artifactRef, 'hello world')
+
+  expect(await store.read(artifactRef, artifact.byteSize)).toMatchObject({
+    artifact: { ref: artifactRef, byteSize: artifact.byteSize },
+    bytes: new TextEncoder().encode('hello world'),
+  })
+  await rm(join(root, artifact.localPath))
+  await expect(
+    store.read(artifactRef, artifact.byteSize - 1),
+  ).rejects.toMatchObject({ code: 'invalid_action_input' })
+})
+
 test('a filesystem failure after metadata deletion leaves safe orphan bytes for the next purge', async () => {
   const purgeId = '01ARZ3NDEKTSV4RRFFQ69G5FAV'
   const { db, root, store } = await fixture({ purgeId: () => purgeId })
