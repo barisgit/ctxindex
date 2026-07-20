@@ -96,3 +96,54 @@ test('loads a valid direct pin offline and degrades a missing pin per Extension'
     ]),
   )
 })
+
+test('preserves npm integrity in loaded direct provenance', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'ctxindex-direct-npm-loader-'))
+  roots.push(root)
+  const dataRoot = join(root, 'data')
+  const staging = join(root, 'staging')
+  await mkdir(join(staging, 'package'), { recursive: true })
+  await writeFile(
+    join(staging, 'package', 'package.json'),
+    JSON.stringify({ ctxindex: { extensions: ['./entry.ts'] } }),
+  )
+  await writeFile(
+    join(staging, 'package', 'entry.ts'),
+    `export default { kind: 'extension', id: 'example.npm', providers: [], oauthApps: [], profiles: [], adapters: [] }\n`,
+  )
+  const digest = await hashDirectory(staging)
+  const store = new DirectExtensionStore({
+    configRoot: join(root, 'config'),
+    dataRoot,
+  })
+  await store.publishMaterialization(staging, digest)
+  const installed: DirectExtensionInstallationRecord = {
+    id: 'example.npm',
+    source: {
+      kind: 'npm',
+      requested_target: '@example/npm@^1',
+      exact_version: '1.2.3',
+      integrity: 'sha512-exact',
+    },
+    materialization_digest: digest,
+    package_root: 'package',
+    installed_at: 1,
+    updated_at: 1,
+  }
+
+  const loaded = await loadExtensions({
+    config: defaultConfig(),
+    builtins: {},
+    directInstalled: [installed],
+    dataRoot,
+  })
+
+  expect(loaded.provenance).toEqual([
+    expect.objectContaining({
+      id: 'example.npm',
+      kind: 'direct',
+      sourceKind: 'npm',
+      resolvedIdentity: '1.2.3 (sha512-exact)',
+    }),
+  ])
+})

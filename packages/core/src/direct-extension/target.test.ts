@@ -122,4 +122,35 @@ describe('direct Extension target parsing', () => {
       validateDirectPackageTarget('git', 'git+file:///tmp/repository#main'),
     ).not.toThrow()
   })
+
+  test.each([
+    'fixture@github:owner/repository',
+    'fixture@gitlab:owner/repository',
+    'fixture@bitbucket:owner/repository',
+    'fixture@owner/repository',
+    'fixture@owner/repository#main',
+    '@scope/fixture@owner/repository',
+    'git@github.com:owner/repository.git',
+    'fixture@ssh://git@github.com/owner/repository.git',
+    'fixture@git@github.com:owner/repository.git',
+  ])('requires explicit Git kind for hosted repository spec %s', (target) => {
+    expect(() => validateDirectPackageTarget('npm', target)).toThrow(
+      'Invalid npm package target',
+    )
+  })
+
+  test.each([
+    'fixture',
+    'fixture@latest',
+    'fixture@next',
+    'fixture@^1.2.3',
+    'fixture@~1.2.3',
+    '@scope/fixture',
+    '@scope/fixture@latest',
+    '@scope/fixture@^1.2.3',
+    'fixture@npm:other@^1',
+    'fixture@1.2.3-beta.1',
+  ])('keeps npm package range or tag %s classified as npm', (target) => {
+    expect(() => validateDirectPackageTarget('npm', target)).not.toThrow()
+  })
 })

@@ -75,7 +75,12 @@ export function validateDirectPackageTarget(
       packageSeparator === -1 ? undefined : target.slice(packageSeparator + 1)
     if (
       spec !== undefined &&
-      (/^(?:\.?\.?\/|\/|file:|git(?:\+|:)|https?:)/i.test(spec) ||
+      (/^(?:\.?\.?\/|\/|file:|git(?:\+|:)|https?:|ssh:|github:|gitlab:|bitbucket:)/i.test(
+        spec,
+      ) ||
+        /^[a-z0-9_.-]+\/[a-z0-9_.-]+(?:#[^\s]+)?$/i.test(spec) ||
+        /^[^/@\s]+@[a-z0-9.-]+:[^\s]+$/i.test(spec) ||
+        /^(?!npm:)[a-z0-9.-]+:[^\s]+$/i.test(spec) ||
         spec.length === 0)
     ) {
       throw new TypeError('Invalid npm package target')

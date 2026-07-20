@@ -9,6 +9,7 @@ import {
   type DirectExtensionInstallationRecord,
   directExtensionMaterializationPath,
   hashDirectory,
+  projectDirectExtensionRecord,
 } from '../direct-extension'
 import { dataDir } from '../paths'
 import { createExtensionRegistry, type ExtensionRegistry } from '../registry'
@@ -260,17 +261,13 @@ export async function loadExtensions(
       )
       activeRoots = nextRoots
       completeRegistry = candidate
+      const projected = projectDirectExtensionRecord(installed)
       provenance.push({
         id: installed.id,
         kind: 'direct',
         sourceKind: installed.source.kind,
         requestedTarget: installed.source.requested_target,
-        resolvedIdentity:
-          installed.source.kind === 'npm'
-            ? installed.source.exact_version
-            : installed.source.kind === 'git'
-              ? installed.source.commit
-              : installed.source.content_digest,
+        resolvedIdentity: projected.resolvedIdentity,
         materializationDigest: installed.materialization_digest,
         installedAt: installed.installed_at,
         updatedAt: installed.updated_at,

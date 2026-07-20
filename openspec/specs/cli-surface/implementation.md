@@ -20,6 +20,7 @@ export interface CliDeps {
   readonly authService: AuthService
   readonly oauthAppService: OAuthAppService
   readonly registry: ExtensionRegistry
+  readonly completeRegistry: CompleteRegistry
   readonly threadService: ThreadService
   readonly artifactService: ArtifactService
   close(): Promise<void>
@@ -40,7 +41,8 @@ export async function assertInitialized(): Promise<void>;
 export async function openDeps(
   opts: {
     readonly config?: CtxindexConfig
-    readonly registry?: ExtensionRegistry
+    readonly definitions?: CliDefinitions
+    readonly databaseOwnership?: DirectDatabaseOwnership
   } = {},
 ): Promise<CliDeps>;
 ```
@@ -53,7 +55,14 @@ export interface CliDefinitions extends LoadExtensionsResult {
   readonly description: RegistryDescription
 }
 
-export async function loadCliDefinitions(): Promise<CliDefinitions>;
+export interface LoadCliDefinitionsOptions {
+  readonly config?: CtxindexConfig
+  readonly localOAuthAppIdentities?: readonly OAuthAppIdentity[]
+}
+
+export async function loadCliDefinitions(
+  options: LoadCliDefinitionsOptions = {},
+): Promise<CliDefinitions>;
 
 ```
 
@@ -229,11 +238,16 @@ export type ExtensionsArgs =
       readonly trust: true
       readonly json: boolean
     }
-  | { readonly kind: 'catalog-list'; readonly json: boolean }
+  | {
+      readonly kind: 'catalog-list'
+      readonly noRefresh: boolean
+      readonly json: boolean
+    }
   | {
       readonly kind: 'catalog-show'
       readonly name: string
       readonly extension?: ExtensionSelector
+      readonly noRefresh: boolean
       readonly json: boolean
     }
   | {
@@ -247,15 +261,34 @@ export type ExtensionsArgs =
       readonly json: boolean
     }
   | {
-      readonly kind: 'install'
+      readonly kind: 'catalog-install'
       readonly catalog: string
       readonly extension: ExtensionSelector
       readonly trust: true
+      readonly noRefresh: boolean
       readonly json: boolean
     }
   | {
-      readonly kind: 'uninstall'
+      readonly kind: 'catalog-uninstall'
       readonly extension: ExtensionSelector
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'direct-install'
+      readonly sourceKind: 'npm' | 'git' | 'local'
+      readonly target: string
+      readonly extensionId: string
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'direct-update'
+      readonly extensionId: string
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'direct-uninstall'
+      readonly extensionId: string
+      readonly force: boolean
       readonly json: boolean
     }
   | { readonly kind: 'help' }
