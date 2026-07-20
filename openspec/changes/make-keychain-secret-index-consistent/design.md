@@ -40,11 +40,11 @@ Once reauthorization or refresh has durably replaced database references, failur
 
 ### Use one retryable probe identity
 
-The Keychain availability probe writes one reserved credential identity, reads it back, and attempts deletion in all paths after a successful write. A read or deletion failure returns the existing bounded backend error. Reusing the reserved identity means a later probe overwrites and retries cleanup of the same row instead of accumulating an unbounded series of probe credentials.
+The Keychain availability probe writes one reserved credential identity in a service namespace structurally outside the `ctxindex/<scope>` user/provider namespace, reads it back, and attempts deletion in all paths after a successful write. A read or deletion failure returns the existing bounded backend error. Reusing the reserved identity means a later probe overwrites and retries cleanup of the same row instead of accumulating an unbounded series of probe credentials, while the distinct service prevents collision with any valid scoped secret.
 
 ### Serialize mutations per Account identity
 
-Grant authorization, refresh, and Account removal join a module-owned asynchronous queue keyed by exact Provider and external user id. A waiter re-reads current Grant state inside the critical section before writing or refreshing. Unrelated Accounts remain concurrent, while same-Account operations clean the references they actually supersede and leave only the final committed App/token references live.
+Grant authorization, refresh, and Account removal join a module-owned asynchronous queue keyed by exact Provider and external user id. A waiter re-reads current Grant state inside the critical section before writing or refreshing. Removal also revalidates the exact requested label after waiting, so a queued authorization rename invalidates an old-label removal instead of deleting the renamed Account. Unrelated Accounts remain concurrent, while same-Account operations clean the references they actually supersede and leave only the final committed App/token references live.
 
 ## Risks / Trade-offs
 

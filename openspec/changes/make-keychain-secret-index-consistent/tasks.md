@@ -4,6 +4,7 @@
 - [x] 1.2 Serialize Keychain inventory-bearing operations process-wide and make set/delete ordering failure-aware without changing `SecretsStore` or typed refs.
 - [x] 1.3 Add failure-ordering coverage for inventory publication, credential persistence, compensation, and retryable deletion; run focused Keychain tests, core typecheck, lint, and secret redaction/architecture gates.
 - [x] 1.4 Add failing probe read/delete cleanup coverage and use one stable probe identity whose cleanup is always attempted and retryable.
+- [x] 1.5 Keep the probe service structurally outside normal scoped-secret services and add a collision regression.
 
 ## 2. Authentication cleanup visibility
 
@@ -12,6 +13,7 @@
 - [x] 2.3 Run focused Grant/auth/refresh tests and stable exit/redaction checks.
 - [x] 2.4 Add deterministic failing concurrent reauthorization and refresh coverage proving losing fresh refs can be stranded.
 - [x] 2.5 Serialize authorization, refresh, and removal per exact Account identity and re-read Grant state inside the critical section.
+- [x] 2.6 Revalidate the requested Account label after queued work and cover a deterministic rename/removal race.
 
 ## 3. Doctrine and final verification
 

@@ -119,6 +119,36 @@ describe('KeychainBackend', () => {
     await expect(firstProbe).rejects.not.toThrow('PROBE-DELETE-FAILURE-CANARY')
   })
 
+  test('probe identity cannot collide with a normal scoped secret', async () => {
+    const values = new Map<string, string>()
+    const backend = new KeychainBackend({
+      importKeytar: async () =>
+        ({
+          async getPassword(service: string, account: string) {
+            return values.get(`${service}\u0000${account}`) ?? null
+          },
+          async setPassword(service: string, account: string, value: string) {
+            values.set(`${service}\u0000${account}`, value)
+          },
+          async deletePassword(service: string, account: string) {
+            return values.delete(`${service}\u0000${account}`)
+          },
+        }) as unknown as KeytarShim,
+    })
+    const ref = await backend.setSecret(
+      'probe',
+      '__ctxindex_probe__',
+      'REAL-SECRET-CANARY',
+    )
+
+    await expect(backend.probeAvailable()).resolves.toBeUndefined()
+
+    await expect(backend.getSecret(ref)).resolves.toBe('REAL-SECRET-CANARY')
+    expect(await backend.listKeys()).toEqual([
+      { ref, scope: 'probe', key: '__ctxindex_probe__' },
+    ])
+  })
+
   test('concurrent writes across backend instances preserve every index entry', async () => {
     const values = new Map<string, string>()
     const keytar = {

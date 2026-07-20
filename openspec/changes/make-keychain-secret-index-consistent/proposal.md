@@ -6,8 +6,8 @@ Keychain-backed secret writes and deletes update a reserved inventory entry with
 
 - Serialize Keychain secret/index mutations so concurrent operations preserve every successful inventory change.
 - Keep an individual Keychain mutation failure-aware: a failed index update must not be reported as a successful secret write or delete.
-- Make Keychain availability probes use one stable retryable credential and always attempt cleanup after a successful probe write.
-- Serialize replacement and refresh mutations for the same Account so only the final committed Grant references remain live.
+- Make Keychain availability probes use one stable retryable credential outside the normal scoped-secret service namespace and always attempt cleanup after a successful probe write.
+- Serialize replacement, refresh, and removal mutations for the same Account so only the final committed Grant references remain live and removal revalidates its exact label after waiting.
 - Make post-commit authentication cleanup failures explicit through bounded, redacted warnings while preserving the already-committed Grant and successful authorization/refresh behavior.
 - Add deterministic mocked-Keychain concurrency and cleanup-failure coverage without accessing native Keychain state.
 - Preserve existing secret reference formats, public CLI behavior, and stable exit mappings.

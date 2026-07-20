@@ -5,7 +5,7 @@ Within one ctxindex process, Keychain-backed secret writes, deletes, and invento
 
 A write whose inventory publication fails MUST fail before reporting or returning a usable new reference. If credential persistence fails after inventory publication, the operation MUST attempt to restore the prior inventory and MUST fail with the existing bounded backend error. A delete whose credential or inventory mutation fails MUST fail without being reported as complete. Failed compensation MAY leave a stale discoverable inventory entry but MUST NOT expose secret values or references in diagnostics.
 
-The Keychain availability probe MUST use one stable reserved credential identity, MUST attempt deletion after every successful probe write even when the read fails, and MUST report read or cleanup failure as the existing bounded backend-unavailable error. A later probe MUST retry through the same identity rather than create another uniquely named probe credential.
+The Keychain availability probe MUST use one stable reserved credential identity in a service namespace structurally distinct from every valid `ctxindex/<scope>` secret service, MUST attempt deletion after every successful probe write even when the read fails, and MUST report read or cleanup failure as the existing bounded backend-unavailable error. A later probe MUST retry through the same identity rather than create another uniquely named probe credential. Probing MUST NOT overwrite or delete a scoped secret for any valid scope and key.
 
 #### Scenario: Concurrent writes preserve both entries
 - **WHEN** two Keychain secrets are written concurrently through separate backend instances in one process
@@ -22,6 +22,10 @@ The Keychain availability probe MUST use one stable reserved credential identity
 #### Scenario: Probe read or cleanup fails
 - **WHEN** the Keychain probe writes its reserved credential but reading or deleting it fails
 - **THEN** ctxindex attempts cleanup, reports the bounded backend-unavailable error, and the next probe retries the same credential identity without accumulating probe rows
+
+#### Scenario: Scoped secret resembles probe identity
+- **WHEN** a valid scoped secret uses `probe` and `__ctxindex_probe__` as its scope and key
+- **THEN** an availability probe uses a distinct service and leaves that secret unchanged
 
 ### Requirement: Authentication cleanup failures are explicit and redacted
 Authentication lifecycle cleanup MUST count failures instead of silently discarding them. Cleanup failure before an operation's durable commit MUST preserve the operation's original failure. Cleanup failure after a durable Grant replacement, token refresh, or Account removal MUST NOT roll back usable committed state or change the existing public result and exit mapping; it MUST emit one bounded structured warning containing a failure count and safe lifecycle context only.

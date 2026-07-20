@@ -13,6 +13,8 @@ class MemoryStore implements SecretsStore {
   failAllDeletes = false
   failWriteAt = 0
   writeDelayMs = 0
+  writeBarrier: Promise<void> | null = null
+  onWrite: (() => void) | null = null
   writes = 0
   async getSecret(ref: string) {
     const value = this.values.get(ref)
@@ -22,6 +24,8 @@ class MemoryStore implements SecretsStore {
   async setSecret(scope: string, key: string, value: string) {
     this.writes += 1
     if (this.failWriteAt === this.writes) throw new Error('write failed')
+    this.onWrite?.()
+    if (this.writeBarrier) await this.writeBarrier
     if (this.writeDelayMs > 0) await Bun.sleep(this.writeDelayMs)
     const ref = keychainRef(scope, key)
     this.values.set(ref, value)
@@ -309,6 +313,66 @@ test('concurrent reauthorization leaves only the winning Grant refs', async () =
     ['concurrent-a', 'refresh-a'],
     ['concurrent-b', 'refresh-b'],
   ]).toContainEqual(pair)
+})
+
+test('old-label removal cannot delete an Account renamed while queued', async () => {
+  const db = await database()
+  const store = new MemoryStore()
+  const service = createAuthService({
+    db,
+    store,
+    logger,
+    registry: registry(),
+    now: () => 1_000,
+  })
+  const account = {
+    externalUserId: 'subject',
+    label: 'Old label',
+    verifiedIdentities: [],
+  }
+  const first = await service.addGrant({
+    provider: 'example',
+    account,
+    scopes: ['openid'],
+    appConfig: { clientId: 'initial' },
+    refreshToken: 'initial-refresh',
+  })
+  let releaseWrite = () => {}
+  store.writeBarrier = new Promise<void>((resolve) => {
+    releaseWrite = resolve
+  })
+  let signalWrite = () => {}
+  const writeStarted = new Promise<void>((resolve) => {
+    signalWrite = resolve
+  })
+  store.onWrite = signalWrite
+
+  const rename = service.addGrant({
+    provider: 'example',
+    account: { ...account, label: 'New label' },
+    scopes: ['openid'],
+    appConfig: { clientId: 'replacement' },
+    refreshToken: 'replacement-refresh',
+  })
+  await writeStarted
+  const removal = service.removeAccount('Old label')
+  const removalOutcome = removal.then(
+    () => null,
+    (error: unknown) => error,
+  )
+  releaseWrite()
+  await expect(rename).resolves.toEqual(first)
+  expect(await removalOutcome).toMatchObject({
+    code: 'not_found',
+    message: 'account not found: "Old label"',
+  })
+
+  expect(
+    db.prepare('SELECT label FROM accounts WHERE id = ?').get(first.accountId),
+  ).toEqual({ label: 'New label' })
+  expect(db.prepare('SELECT COUNT(*) AS count FROM grants').get()).toEqual({
+    count: 1,
+  })
 })
 
 test('concurrent refresh leaves only current token refs', async () => {

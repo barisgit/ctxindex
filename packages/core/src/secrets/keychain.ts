@@ -14,7 +14,7 @@ type KeytarImporter = () => Promise<KeytarModule>
 
 const indexService = 'ctxindex'
 const indexAccount = '__ctxindex_keys__'
-const probeService = 'ctxindex/probe'
+const probeService = 'ctxindex.internal.probe'
 const probeAccount = '__ctxindex_probe__'
 let indexOperationTail: Promise<void> = Promise.resolve()
 

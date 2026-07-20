@@ -119,7 +119,7 @@ A Provider-backed Adapter whose exact Provider uses `none` MUST require no Accou
 - **THEN** it remains visible through `source list` and does not appear as a fabricated Account
 
 ### Requirement: Account removal deletes Grants and secrets explicitly
-`account remove <label>` SHALL delete the identified Account, its Grants, and their secret references. Sources bound to removed Grants remain configured with cleared Grant bindings and surface authentication failure through existing sync-status machinery rather than being deleted implicitly. Removing and later re-adding the same provider identity SHALL create a fresh Grant id and MUST NOT automatically rebind preserved Sources.
+`account remove <label>` SHALL delete the Account still identified by that exact label at the serialized deletion point, its Grants, and their secret references. If the resolved Account is renamed while removal waits behind another same-Account mutation, removal MUST fail as not found for the stale label and MUST NOT delete the renamed Account. Sources bound to removed Grants remain configured with cleared Grant bindings and surface authentication failure through existing sync-status machinery rather than being deleted implicitly. Removing and later re-adding the same provider identity SHALL create a fresh Grant id and MUST NOT automatically rebind preserved Sources.
 
 #### Scenario: Removal cleans secrets and preserves Sources
 - **WHEN** an Account backing a configured mailbox Source is removed
@@ -128,6 +128,10 @@ A Provider-backed Adapter whose exact Provider uses `none` MUST require no Accou
 #### Scenario: Re-adding does not heal preserved Sources
 - **WHEN** a removed provider identity is authorized again
 - **THEN** it receives a fresh Grant id and previously bound Sources remain `needs_auth` until recreated
+
+#### Scenario: Account is renamed while removal waits
+- **WHEN** removal resolves an old label and then waits behind reauthorization that renames the same Account
+- **THEN** removal fails for the stale label and the renamed Account, Grant, and secrets remain intact
 
 ### Requirement: Token refresh is provider-neutral and safe
 Authorized Provider reads SHALL use the Adapter's exact imported active Provider, the Account's matching private authorization, an unexpired access token when available, and the Grant-owned App snapshot for refresh. Removing the source App MUST affect only future authorization. Rotated refresh tokens MUST replace prior references safely. A 401 read MAY trigger the existing single refresh retry; Actions MUST NOT be retried automatically.
@@ -155,6 +159,8 @@ Grant reauthorization and token refresh MUST write replacement secret state befo
 
 Authorization, refresh, and removal mutations for the same exact Account identity MUST execute in one serialized order within a ctxindex process and MUST re-read current Grant state after entering that order. Concurrent successful replacements MUST leave only the final committed Grant's App and token references live. Mutations for unrelated Accounts MUST remain independently executable.
 
+An Account removal that waits behind another mutation MUST revalidate the exact requested label inside the serialized operation. If the Account was renamed while removal waited, removal MUST fail as not found for the stale label and MUST NOT delete the renamed Account, its Grant, or its secrets.
+
 #### Scenario: Reauthorization commits before cleanup warning
 - **WHEN** the same Account reauthorizes successfully and deletion of old App or token entries fails
 - **THEN** the stable Grant points to the replacement entries and the operation succeeds with one redacted cleanup-pending warning
@@ -170,6 +176,10 @@ Authorization, refresh, and removal mutations for the same exact Account identit
 #### Scenario: Same Account reauthorizes concurrently
 - **WHEN** two successful reauthorizations for the same Provider identity overlap in one process
 - **THEN** the stable Grant reflects one complete final authorization and no losing replacement references remain live
+
+#### Scenario: Removal waits behind Account rename
+- **WHEN** removal resolves an old label and then waits behind reauthorization that renames the same Account
+- **THEN** removal fails for the stale label and the renamed Account and Grant remain intact
 
 ### Requirement: Mailbox Account identities
 The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.

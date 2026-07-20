@@ -9,7 +9,7 @@ Provides typed opaque secret references, encrypted-file and OS-Keychain backends
 - `SecretsStore` in `types.ts` is the storage strategy interface; `FileBackend` and `KeychainBackend` emit and validate backend-qualified refs via `fileRef()`/`keychainRef()`.
 - `SecretVault` is the routing facade: reads/deletes follow `parseSecretRef(ref).backend`, writes go only to the configured backend, and backend unavailability is surfaced rather than silently falling back.
 - `FileBackend` uses a versioned XChaCha20-Poly1305 envelope with separate HKDF-derived key-material and ciphertext-integrity checks, PBKDF2-SHA256 passphrase derivation or a private 32-byte `secret.key`, deterministic scoped keys, atomic replacement, and mode-`0600`/directory-`0700` permissions.
-- `KeychainBackend` adapts `keytar`, maintains a reserved index for listing, serializes inventory-bearing operations process-wide across instances, performs a write/read/delete availability probe through one stable retryable credential, and refuses native Keychain access in non-live tests unless `CTXINDEX_KEYTAR_MOCK_FILE` is configured.
+- `KeychainBackend` adapts `keytar`, maintains a reserved index for listing, serializes inventory-bearing operations process-wide across instances, performs a write/read/delete availability probe through one stable retryable credential in a service outside the normal scoped-secret namespace, and refuses native Keychain access in non-live tests unless `CTXINDEX_KEYTAR_MOCK_FILE` is configured.
 - `SecretBackendManager` is a resumable copy-and-switch coordinator; `initializeSecretBackend()` separately owns one-time backend selection for a missing config.
 
 ## Data & control flow

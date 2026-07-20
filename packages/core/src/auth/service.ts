@@ -313,8 +313,8 @@ export function createAuthService(deps: AuthDependencies): AuthService {
         accountMutationKey(account.provider, account.external_user_id),
         async () => {
           const currentAccount = deps.db
-            .prepare('SELECT id FROM accounts WHERE id = ?')
-            .get(account.id) as { readonly id: string } | null
+            .prepare('SELECT id FROM accounts WHERE id = ? AND label = ?')
+            .get(account.id, label) as { readonly id: string } | null
           if (!currentAccount) {
             throw new CtxindexNotFoundError(`account not found: "${label}"`)
           }
