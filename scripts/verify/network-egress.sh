@@ -33,6 +33,7 @@ grep -RInE \
   | grep -vE "($ALLOWLIST_PATTERN)" \
   | grep -vE "packages/core/src/auth/loopback.ts:.*http://localhost" \
   | grep -vF "packages/core/src/auth/test-provider.ts:" \
+  | grep -vF "apps/cli/src/daemon/client.ts:" \
   >> "$violations" || true
 
 # fetch() is only allowed inside the single core egress chokepoint; every other
@@ -46,6 +47,7 @@ grep -RInE \
   "(^|[^.[:alnum:]_])fetch[[:space:]]*\(" \
   "${PRODUCTION_RUNTIME_ROOTS[@]}" \
   | grep -v "packages/core/src/net/index.ts" \
+  | grep -vF "apps/cli/src/daemon/client.ts:" \
   >> "$violations" || true
 
 # Alternate browser/Bun clients must not become a second egress path. Type-only

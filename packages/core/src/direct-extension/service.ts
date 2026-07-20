@@ -142,6 +142,18 @@ export interface DirectExtensionServiceOptions {
   readonly now?: () => number
 }
 
+export interface DirectExtensionValidationContext {
+  readonly registry: ExtensionRegistry
+  readonly roots?: readonly CollectedExtension[]
+  readonly localOAuthAppIdentities: readonly OAuthAppIdentity[]
+  readonly alternateOriginAvailable?: boolean
+}
+
+export interface DirectExtensionUninstallContext
+  extends DirectExtensionValidationContext {
+  readonly sources: readonly DirectExtensionSourceBinding[]
+}
+
 export class DirectExtensionService {
   readonly store: DirectExtensionStore
   readonly materializer: PackageMaterializer
@@ -154,15 +166,15 @@ export class DirectExtensionService {
   }
 
   async list(): Promise<readonly DirectExtensionInventoryEntry[]> {
-    return (await this.store.readRecords()).map(projectDirectExtensionRecord)
+    return (await this.store.readRecordsForLoading()).records.map(
+      projectDirectExtensionRecord,
+    )
   }
 
   async install(input: {
     readonly target: DirectExtensionTarget
     readonly extensionId: string
-    readonly registry: ExtensionRegistry
-    readonly roots?: readonly CollectedExtension[]
-    readonly localOAuthAppIdentities: readonly OAuthAppIdentity[]
+    readonly loadValidationContext: () => Promise<DirectExtensionValidationContext>
     readonly signal?: AbortSignal
   }): Promise<DirectExtensionInstallationRecord> {
     validateDirectExtensionId(input.extensionId)
@@ -174,16 +186,20 @@ export class DirectExtensionService {
           `Direct Extension ${input.extensionId} is already installed; use extensions update ${input.extensionId}`,
         )
       }
-      return this.acquireValidatePublish({ ...input, current })
+      const validation = await input.loadValidationContext()
+      return this.acquireValidatePublish({
+        target: input.target,
+        extensionId: input.extensionId,
+        ...validation,
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+        current,
+      })
     })
   }
 
   async update(input: {
     readonly extensionId: string
-    readonly registry: ExtensionRegistry
-    readonly roots?: readonly CollectedExtension[]
-    readonly localOAuthAppIdentities: readonly OAuthAppIdentity[]
-    readonly alternateOriginAvailable: boolean
+    readonly loadValidationContext: () => Promise<DirectExtensionValidationContext>
     readonly signal?: AbortSignal
   }): Promise<DirectExtensionInstallationRecord> {
     validateDirectExtensionId(input.extensionId)
@@ -196,12 +212,14 @@ export class DirectExtensionService {
           `Direct Extension ${input.extensionId} is not installed`,
         )
       }
+      const validation = await input.loadValidationContext()
       return this.acquireValidatePublish({
         target: targetFromRecord(previous),
         extensionId: input.extensionId,
-        registry: input.registry,
-        localOAuthAppIdentities: input.localOAuthAppIdentities,
-        alternateOriginAvailable: input.alternateOriginAvailable,
+        registry: validation.registry,
+        ...(validation.roots === undefined ? {} : { roots: validation.roots }),
+        localOAuthAppIdentities: validation.localOAuthAppIdentities,
+        alternateOriginAvailable: validation.alternateOriginAvailable === true,
         ...(input.signal === undefined ? {} : { signal: input.signal }),
         current,
         previous,
@@ -340,10 +358,7 @@ export class DirectExtensionService {
 
   async uninstall(input: {
     readonly extensionId: string
-    readonly registry: ExtensionRegistry
-    readonly roots?: readonly CollectedExtension[]
-    readonly sources: readonly DirectExtensionSourceBinding[]
-    readonly alternateOriginAvailable: boolean
+    readonly loadValidationContext: () => Promise<DirectExtensionUninstallContext>
     readonly force: boolean
   }): Promise<DirectExtensionUninstallResult> {
     validateDirectExtensionId(input.extensionId)
@@ -358,19 +373,23 @@ export class DirectExtensionService {
           `Direct Extension ${input.extensionId} is not installed`,
         )
       }
+      const validation = await input.loadValidationContext()
       const before = new Set(
-        input.registry.adapters.list().map((adapter) => adapter.id),
+        validation.registry.adapters.list().map((adapter) => adapter.id),
       )
       const postRemoval = buildCompleteCandidateRegistry({
         roots: rootsWithoutPriorDirect({
-          registry: input.registry,
-          ...(input.roots === undefined ? {} : { roots: input.roots }),
+          registry: validation.registry,
+          ...(validation.roots === undefined
+            ? {}
+            : { roots: validation.roots }),
           extensionId: input.extensionId,
-          alternateOriginAvailable: input.alternateOriginAvailable,
+          alternateOriginAvailable:
+            validation.alternateOriginAvailable === true,
         }),
-        localOAuthAppIdentities: [],
+        localOAuthAppIdentities: validation.localOAuthAppIdentities,
       })
-      const blockingSources = input.sources
+      const blockingSources = validation.sources
         .filter(
           (source) =>
             before.has(source.adapterId) &&

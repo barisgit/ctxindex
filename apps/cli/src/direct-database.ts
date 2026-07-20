@@ -1,4 +1,8 @@
 import {
+  type DirectExtensionSourceBinding,
+  readDirectExtensionSourceBindings,
+} from '@ctxindex/core/direct-extension'
+import {
   type LocalOAuthAppIdentity,
   listLocalOAuthAppIdentities,
 } from '@ctxindex/core/oauth-app'
@@ -68,6 +72,9 @@ export interface OpenLeasedDatabaseOptions {
 export interface DirectDatabaseOwnership {
   readonly target: string
   readLocalOAuthAppIdentities(): Promise<readonly LocalOAuthAppIdentity[]>
+  readDirectExtensionSourceBindings(): Promise<
+    readonly DirectExtensionSourceBinding[]
+  >
   open(): Promise<CtxindexDatabase>
   close(): void
 }
@@ -107,6 +114,18 @@ export function acquireDirectDatabaseOwnership(
       try {
         assertLeaseTarget()
         return listLocalOAuthAppIdentities(readonlyDb)
+      } finally {
+        readonlyDb.close()
+      }
+    },
+    async readDirectExtensionSourceBindings() {
+      assertOpen()
+      if (!(await Bun.file(target).exists())) return []
+      assertLeaseTarget()
+      const readonlyDb = (options.openReadonly ?? openReadonlyDatabase)(target)
+      try {
+        assertLeaseTarget()
+        return readDirectExtensionSourceBindings(readonlyDb)
       } finally {
         readonlyDb.close()
       }
@@ -183,6 +202,18 @@ export async function readLeasedLocalOAuthAppIdentities(
   const ownership = acquireDirectDatabaseOwnership({ ...options, target })
   try {
     return await ownership.readLocalOAuthAppIdentities()
+  } finally {
+    ownership.close()
+  }
+}
+
+export async function readLeasedDirectExtensionSourceBindings(
+  target = directDatabasePath(),
+  options: Omit<AcquireDirectDatabaseOwnershipOptions, 'target'> = {},
+): Promise<readonly DirectExtensionSourceBinding[]> {
+  const ownership = acquireDirectDatabaseOwnership({ ...options, target })
+  try {
+    return await ownership.readDirectExtensionSourceBindings()
   } finally {
     ownership.close()
   }

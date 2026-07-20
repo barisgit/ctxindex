@@ -5,7 +5,6 @@ import {
   DirectExtensionStore,
   parseDirectExtensionTarget,
   projectDirectExtensionRecord,
-  readDirectExtensionSourceBindings,
   validateDirectPackageTarget,
 } from '@ctxindex/core'
 import { CatalogService } from '@ctxindex/core/catalog'
@@ -15,6 +14,7 @@ import { parseExtensionsArgs } from '../args/extensions'
 import { loadCliDefinitions, printExtensionDiagnostics } from '../definitions'
 import {
   PrototypeUnsupportedError,
+  readLeasedDirectExtensionSourceBindings,
   readLeasedLocalOAuthAppIdentities,
 } from '../direct-database'
 import {
@@ -59,7 +59,7 @@ export async function handleExtensionsCommand(
   direct: DirectExtensionService = createDirectExtensionService(),
   loadDefinitions: typeof loadCliDefinitions = loadCliDefinitions,
   readOAuthAppIdentities: typeof readLeasedLocalOAuthAppIdentities = readLeasedLocalOAuthAppIdentities,
-  readSourceBindings: typeof readDirectExtensionSourceBindings = readDirectExtensionSourceBindings,
+  readSourceBindings: typeof readLeasedDirectExtensionSourceBindings = readLeasedDirectExtensionSourceBindings,
 ): Promise<number> {
   const parsed = parseExtensionsArgs(args)
   if (parsed.kind === 'help') return 0
@@ -205,9 +205,17 @@ export async function handleExtensionsCommand(
         direct.install({
           target: directTarget,
           extensionId: parsed.extensionId,
-          registry: loaded.registry,
-          roots: loaded.roots,
-          localOAuthAppIdentities,
+          loadValidationContext: async () => {
+            const freshLocalOAuthAppIdentities = await readOAuthAppIdentities()
+            const fresh = await loadDefinitions({
+              localOAuthAppIdentities: freshLocalOAuthAppIdentities,
+            })
+            return {
+              registry: fresh.registry,
+              roots: fresh.roots,
+              localOAuthAppIdentities: freshLocalOAuthAppIdentities,
+            }
+          },
           signal,
         }),
       )
@@ -224,13 +232,21 @@ export async function handleExtensionsCommand(
       const result = await runWithSigintCancellation((signal) =>
         direct.update({
           extensionId: parsed.extensionId,
-          registry: loaded.registry,
-          roots: loaded.roots,
-          localOAuthAppIdentities,
-          alternateOriginAvailable: loaded.provenance.some(
-            (entry) =>
-              entry.id === parsed.extensionId && entry.kind !== 'direct',
-          ),
+          loadValidationContext: async () => {
+            const freshLocalOAuthAppIdentities = await readOAuthAppIdentities()
+            const fresh = await loadDefinitions({
+              localOAuthAppIdentities: freshLocalOAuthAppIdentities,
+            })
+            return {
+              registry: fresh.registry,
+              roots: fresh.roots,
+              localOAuthAppIdentities: freshLocalOAuthAppIdentities,
+              alternateOriginAvailable: fresh.provenance.some(
+                (entry) =>
+                  entry.id === parsed.extensionId && entry.kind !== 'direct',
+              ),
+            }
+          },
           signal,
         }),
       )
@@ -247,13 +263,22 @@ export async function handleExtensionsCommand(
       formatDirectExtensionUninstall(
         await direct.uninstall({
           extensionId: parsed.extensionId,
-          registry: loaded.registry,
-          roots: loaded.roots,
-          sources: readSourceBindings(),
-          alternateOriginAvailable: loaded.provenance.some(
-            (entry) =>
-              entry.id === parsed.extensionId && entry.kind !== 'direct',
-          ),
+          loadValidationContext: async () => {
+            const freshLocalOAuthAppIdentities = await readOAuthAppIdentities()
+            const fresh = await loadDefinitions({
+              localOAuthAppIdentities: freshLocalOAuthAppIdentities,
+            })
+            return {
+              registry: fresh.registry,
+              roots: fresh.roots,
+              localOAuthAppIdentities: freshLocalOAuthAppIdentities,
+              alternateOriginAvailable: fresh.provenance.some(
+                (entry) =>
+                  entry.id === parsed.extensionId && entry.kind !== 'direct',
+              ),
+              sources: await readSourceBindings(),
+            }
+          },
           force: parsed.force,
         }),
         parsed.json,

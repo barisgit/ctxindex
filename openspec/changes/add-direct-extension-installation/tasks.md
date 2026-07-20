@@ -42,4 +42,4 @@
 ## 8. Doctrine and final verification
 
 - [x] 8.1 Promote applicable doctrine into `openspec/specs/extension-installation/implementation.md`, `extension-loading/implementation.md`, `cli-surface/implementation.md`, and `error-taxonomy/implementation.md`; sync behavioral deltas and refresh affected codemaps plus `SYSTEM.md` using their owning skills.
-- [ ] 8.2 Run every focused package/e2e gate, `bun run ci`, `bunx openspec validate --all --strict`, cartography no-drift, `git diff --check`, and `openspec-verify-change` before archive.
+- [x] 8.2 Run every focused package/e2e gate, `bun run ci`, `bunx openspec validate --all --strict`, cartography no-drift, `git diff --check`, and `openspec-verify-change` before archive.

@@ -111,7 +111,7 @@ test('direct install wires SIGINT cancellation into the Core lifecycle call', as
       direct,
       async () => emptyDefinitions(),
       async () => [],
-      () => [],
+      async () => [],
     )
     expect(exitCode).toBe(130)
     expect(received?.aborted).toBe(true)
