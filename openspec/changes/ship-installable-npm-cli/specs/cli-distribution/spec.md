@@ -30,12 +30,12 @@ The repository SHALL build and pack the CLI through deterministic commands. The 
 
 ### Requirement: Relocated installed behavior
 
-Automated verification MUST install the exact packed archive globally into a temporary isolated Bun home and MUST execute `ctxindex` from outside the repository with isolated configuration, data, state, and cache roots. The installed CLI MUST preserve generated help, OAuth App help before initialization, pre-initialization no-side-effect rejection, embedded bundled skills, fresh SQLite migration and native Bun runtime behavior, and explicit-path manifest-declared package-root TypeScript Extension loading. Existing relocated compiled CLI and Extension verification MUST remain green.
+Automated verification MUST install the exact packed archive globally into a temporary isolated Bun home and MUST execute `ctxindex` from outside the repository with isolated configuration, data, state, and cache roots. The installed CLI MUST preserve generated help, OAuth App help before initialization, pre-initialization no-side-effect rejection with guidance to run `ctxindex init`, embedded bundled skills, fresh SQLite migration and native Bun runtime behavior, and explicit-path manifest-declared package-root TypeScript Extension loading. Existing relocated compiled CLI and Extension verification MUST remain green.
 
 #### Scenario: Exact tarball executes outside checkout
 
 - **WHEN** the verified archive is globally installed in an isolated temporary Bun home and invoked from an unrelated working directory
-- **THEN** help, bundled skills, fresh initialization/storage, and external Extension loading succeed without resolving repository files
+- **THEN** help, package-appropriate `ctxindex init` guidance, bundled skills, fresh initialization/storage, and external Extension loading succeed without resolving repository files
 
 ### Requirement: Guarded trusted npm release
 

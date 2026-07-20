@@ -496,7 +496,10 @@ export async function smokeCliPackage(
   )
   if (
     preInit.exitCode !== 2 ||
-    !preInit.stderr.includes('ctxindex is not initialized; run bun cli init')
+    !preInit.stderr.includes(
+      'ctxindex is not initialized; run ctxindex init',
+    ) ||
+    preInit.stderr.includes('run bun cli init')
   ) {
     throw new Error(
       `Installed CLI did not reject pre-init OAuth App add safely: ${preInit.stderr || preInit.stdout}`,

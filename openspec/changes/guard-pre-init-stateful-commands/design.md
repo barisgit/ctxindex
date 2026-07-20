@@ -22,7 +22,7 @@
 
 2. `getDb()` enforces the precondition centrally for all database-backed command paths. `oauth-app add` preserves Provider validation on fresh state, then calls the same preflight before reading configuration environments; list/remove call it before dependencies. This closes the sensitive-input ordering gap without weakening existing Provider validation.
 
-3. The failure is a usage/precondition error with stable exit code 2 and the fixed message `ctxindex is not initialized; run bun cli init`. No native backend detail is exposed because no backend effect occurs.
+3. The failure is a usage/precondition error with stable exit code 2 and the fixed message `ctxindex is not initialized; run ctxindex init`. The public executable name keeps the guidance appropriate for installed-package use; repository invocation remains available as a contributor workflow. No native backend detail is exposed because no backend effect occurs.
 
 ## Risks / Trade-offs
 

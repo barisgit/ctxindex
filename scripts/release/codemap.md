@@ -18,7 +18,8 @@ artifact without publishing from local development or touching user state.
 - Its exact-tarball smoke creates temporary state outside the checkout, installs
   globally under isolated Bun directories, and proves the installed bin, native
   `keytar` when the host supplies its platform library, OAuth App help and pre-init
-  isolation, bundled skills, embedded SQLite migrations, and manifest-declared
+  isolation with package-appropriate `ctxindex init` guidance, bundled skills,
+  embedded SQLite migrations, and manifest-declared
   package-root TypeScript Extension loading. A Linux probe failure that reports
   unavailable `libsecret-1.so.0` is classified as `host-libsecret-unavailable`;
   every other native-load failure remains fatal.

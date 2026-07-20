@@ -48,7 +48,7 @@ test('account add requires initialization before OAuth App inventory or durable 
     ])
     expect(result.exitCode).toBe(2)
     expect(result.stderr).toContain(
-      'ctxindex is not initialized; run bun cli init',
+      'ctxindex is not initialized; run ctxindex init',
     )
     expect(result.stderr).not.toContain('OAuth App "missing"')
     expect(
@@ -84,7 +84,7 @@ test('account add rejects config-only partial initialization without opening sta
 
     expect(result.exitCode).toBe(2)
     expect(result.stderr).toContain(
-      'ctxindex is not initialized; run bun cli init',
+      'ctxindex is not initialized; run ctxindex init',
     )
     expect(await readFile(configPath)).toEqual(before)
     await expectDatabaseAbsent(sandbox.env.CTXINDEX_DATA_HOME)
@@ -118,7 +118,7 @@ test('account add rejects database-only partial initialization without opening s
 
     expect(result.exitCode).toBe(2)
     expect(result.stderr).toContain(
-      'ctxindex is not initialized; run bun cli init',
+      'ctxindex is not initialized; run ctxindex init',
     )
     expect(await readFile(path)).toEqual(before)
     expect(await Bun.file(`${path}-wal`).exists()).toBe(false)
