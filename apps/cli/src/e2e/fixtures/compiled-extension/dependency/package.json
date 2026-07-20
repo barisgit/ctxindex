@@ -2,5 +2,8 @@
   "name": "extension-fixture-dep",
   "version": "1.0.0",
   "type": "module",
-  "exports": "./index.js"
+  "exports": {
+    "types": "./index.d.ts",
+    "default": "./index.js"
+  }
 }

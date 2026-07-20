@@ -48,35 +48,59 @@ The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHOULD**, **SHOULD NOT**, 
 ### Requirement: Core domain model
 The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.
 
-- An **extension** is a distributable module providing profiles and source adapters through the public definition API. Bundled (built-in) extensions use the same contract; their only privileges are distributional (always present, loaded first, winning id conflicts with a diagnostic).
-- A **profile** is a versioned, schema-backed declaration of one domain shape plus the vocabulary core uses to serve it ([Profile vocabulary](../profile-vocabulary/spec.md)). Profiles are the ONLY mechanism for domain semantics; core MUST NOT contain domain-specific code paths.
-- A **source adapter** is code connecting one provider collection type, such as `google.mailbox` or `local.directory`. It declares capability flags, an auth spec, a config schema, and the profiles it emits.
-- An **action** is a typed provider-side mutation declared by a profile and implemented by a source adapter through a specific source.
-- A **realm** is a user-defined operating context, such as `personal`, `company`, or `university`, used to group sources that should be searched and reasoned about together.
-- A **client** is one persisted OAuth application configuration for a provider. Its label is unique within that provider, while its credentials are stored as typed secret references.
-- An **account** is one stable external authenticated identity within a provider. It has a globally unique local label; verified addresses are Account Identities, not its identity key.
-- A **grant** is the internal stable normalized permission set and secret reference for one account. Each account owns exactly one grant, which reauthorization updates in place; multiple compatible sources MAY explicitly share it.
-- A **source** is one labeled configured connection to one collection using exactly one source adapter. Its label is globally unique. Sync is an optional per-source setting; a Source with sync disabled may still participate in remote search, retrieval, download, and supported Actions.
-- A **resource** is one unit of context emitted by a source: an envelope (ref, primary profile id+version, title, times, origin) plus validated profile payload(s). The envelope kind IS the primary profile id.
-- A **ref** is the stable locator `ctx://<source-id>/<adapter-opaque-suffix>` for one resource, valid whether or not the resource is indexed. The suffix is adapter-owned and opaque to core. Provider-native URIs are envelope metadata, never addressing input.
-- A **chunk** is one searchable segment of a resource's extracted content.
-- An **artifact** is a Source-scoped descriptor derived by a Resource's Profile for downloadable bytes associated with that Resource. Artifact bytes enter the managed content-addressed cache only when download is requested. Purging the Artifact cache removes cached bytes and cache metadata while preserving the owning Resource and its descriptor.
+- An **Extension** is one distributable, atomically activated plain definition that composes any number of imported Source Adapters and OAuth Apps plus optional standalone Providers and Profiles. It has no runtime Extension dependency graph. Built-in and external Extensions have identical authoring, collection, validation, and activation semantics; only acquisition and distribution differ.
+- A **Provider** is an ID-addressed declaration of one external authority and exactly one currently supported direct authentication form, `oauth2` or `none`. At most one semantically distinct Provider per id may be active. Package version, integrity, and physical location are provenance, not Provider identity.
+- An **OAuth App** is an Extension leaf authored with one exact imported OAuth2 Provider and `{ label, config }`, or a local secret-backed BYOA record. Its identity is `(providerId,label)`. Extension Apps require public registration policy; confidential Apps remain local or future hosted configuration. Duplicate identities MUST reject and BYOA MUST NOT shadow.
+- A **Profile** is a versioned schema-backed domain declaration. Authors bind it by importing the exact Profile value. Profiles are the ONLY mechanism for domain semantics; core MUST NOT contain domain-specific code paths. `@ctxindex/profiles` is an ordinary library, not an always-selected Extension.
+- A **Source Adapter** connects one collection type. It declares capability flags, config, exact imported Profiles, operations, and Actions. A Provider-backed Adapter imports exactly one Provider and declares only Adapter-specific Provider access allowed by that Provider auth kind plus Provider egress. A providerless Adapter has no Provider, Account, Grant, auth, Provider access, or Provider egress contract.
+- An **Action** is a typed provider-side mutation declared by a Profile and implemented by a Source Adapter through a specific Source.
+- An **Account** is one stable authenticated identity within a Provider. It is authorized through one explicitly selected OAuth App where OAuth2 is required.
+- A **Grant** is private local state containing normalized permissions/token references and a Grant-owned snapshot of the exact OAuth App configuration selected for an Account. It MUST NOT be agent-facing configuration or inventory vocabulary.
+- A **Realm** is a user-defined context grouping Sources that should be searched and reasoned about together.
+- A **Source** is one labeled configured connection using one Source Adapter and belonging to one Realm.
+- A **Resource** is one context unit emitted by a Source: an envelope plus validated versioned Profile payload.
+- A **Ref** is `ctx://<source-id>/<adapter-opaque-suffix>` for one Resource.
+- An **Artifact** is a Source-scoped, Profile-derived descriptor for downloadable bytes associated with one Resource.
 
-Profile exports are rendered and streamed representations and MUST NOT be inserted into the Artifact cache or described as Artifacts unless a future explicit contract defines that behavior. Optional raw provider payload retention is separate support data and MUST NOT be represented as Artifact storage.
+An Extension root MUST transitively contribute Provider and Profile leaves reachable through its imported Adapters and OAuth Apps. Explicit Provider/Profile arrays MAY contribute standalone leaves not otherwise reachable. Package manifests and exact TypeScript imports own dependency acquisition; ctxindex MUST NOT expose `extensionRef`, `providerRef`, `profileRef`, or an Extension dependency graph.
 
-A source adapter MUST emit normalized core operations for searchable data. Adapters MUST NOT own database tables; all persistence flows through the generic core storage model ([generic storage](../generic-storage/spec.md)). Adapter-specific state lives in the sync cursor; downloaded Artifact bytes live in the managed content-addressed cache.
+The active registry MUST validate complete selected root graphs before mutation. Stable ids MUST remain semantic identity; Profile identity remains `(id,version)`. Repeated encounter of the exact same imported non-App object MAY coalesce as evidence of exact reuse, but object identity MUST NOT be a semantic key, precedence rule, or winner between distinct values. Distinct same-identity values containing any function or Zod schema MUST conflict because V1 has no package-authenticated per-leaf equivalence evidence. Distinct genuinely pure declarative values MAY coalesce only when canonical structural equality proves them equal. OAuth App identity duplicates MUST always conflict, including repeated reference to the same App object.
 
-#### Scenario: Core entities preserve their defined meanings and relationships
-- **WHEN** a conforming implementation exercises this contract
-- **THEN** it satisfies every applicable MUST and MUST NOT clause and treats SHOULD, SHOULD NOT, and MAY clauses according to their normative meanings
+Separate physical SDK/Zod copies MUST remain authoring/type-compatible and structurally collectable. Their executable/schema-bearing definitions MUST NOT coalesce merely because root version, integrity, commit, path, provenance, or function text matches. Root provenance MUST be retained only for diagnostics and MUST NOT participate in leaf identity or equivalence. Conflicts MUST reject without mutation; load order, origin priority, `instanceof`, and object identity MUST NOT choose a winner.
 
-#### Scenario: Artifact purge preserves descriptor identity
-- **WHEN** cached bytes and metadata for an Artifact are explicitly purged
-- **THEN** the owning Resource and its Profile-derived Artifact descriptor remain available for a later download
+Definition factories MUST return shallow plain structurally validated values with stable kind discriminators and exact imported-value inference. Embedded definition documentation is outside this contract and SHALL be provided only by a future sidecar design.
 
-#### Scenario: Export and raw payload paths remain separate
-- **WHEN** a Profile export is rendered or optional raw provider payload support is used
-- **THEN** neither representation is inserted into the Artifact cache or described as an Artifact without a separate explicit contract
+#### Scenario: Exact imported values preserve authoring inference
+- **WHEN** an Adapter or OAuth App receives an imported Provider or Profile definition
+- **THEN** TypeScript retains the imported literal ids, Profile versions, schemas, config, capability, and Action types without a string-reference fallback
+
+#### Scenario: Reachable leaves activate transitively
+- **WHEN** an Extension contains an Adapter importing one Provider and two Profiles
+- **THEN** complete-registry collection includes those exact leaves without an Extension dependency declaration or duplicate explicit arrays
+
+#### Scenario: Standalone leaf is explicit
+- **WHEN** an Extension intentionally publishes a Profile not reachable through an Adapter or OAuth App
+- **THEN** the Extension may list that exact Profile value in its explicit standalone Profiles array
+
+#### Scenario: Exact imported object reuse may coalesce
+- **WHEN** two reachable graph paths contain the exact same imported non-App Profile object
+- **THEN** validation may retain one contribution as exact reuse without treating its object identity as a semantic key or winner
+
+#### Scenario: Distinct executable copies conflict
+- **WHEN** separate physical packages contribute distinct same-id Profile or Adapter values containing a Zod schema or function
+- **THEN** validation rejects because executable/schema equivalence is unproven, regardless of matching root provenance or function text
+
+#### Scenario: Distinct pure declarative copies may coalesce
+- **WHEN** distinct same-id values contain no function or Zod schema and canonical structural equality proves them equal
+- **THEN** validation may coalesce them without using load order or root provenance
+
+#### Scenario: Providerless Adapter has no authorization model
+- **WHEN** a credential-free local Adapter is activated without a Provider
+- **THEN** it requires no Account or Grant and exposes no auth, Provider scopes, or Provider egress declaration
+
+#### Scenario: OAuth App identity never shadows
+- **WHEN** an Extension App and local BYOA App share one `(providerId,label)`
+- **THEN** activation rejects the duplicate without choosing a winner
 
 ### Requirement: Resource identity, deletion, and Relations
 The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.
@@ -109,6 +133,10 @@ ctxindex MUST behave as a local searchable mirror/index. External services and t
 Source adapters MUST NOT use exported files as their primary storage contract. File export MAY be offered as a separate feature.
 
 A local directory source MUST index files in place and MUST NOT copy every original file into ctxindex by default. It MAY store extracted text, chunks, hashes, and metadata in SQLite for search. Stored extracted text, chunks, and full-text indexes SHOULD be treated as purgeable and rebuildable from the canonical filesystem source.
+
+Artifact bytes enter the managed content-addressed cache only when download is requested. Cached bytes are purgeable; the Source-scoped Profile-derived Artifact descriptor remains available for a later download.
+
+Purging cached Artifact bytes preserves the Resource and its Profile-derived descriptor. Profile exports are rendered or streamed separately and do not enter the Artifact cache. Optional raw provider payload retention is separate support data, not an Artifact.
 
 #### Scenario: Canonical external data remains external while local projections stay rebuildable
 - **WHEN** a conforming implementation exercises this contract

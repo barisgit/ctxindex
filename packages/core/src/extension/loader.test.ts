@@ -1,16 +1,36 @@
 import { Database } from 'bun:sqlite'
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { defineAdapter, defineExtension } from '@ctxindex/extension-sdk'
+import {
+  defineAdapter,
+  defineExtension,
+  defineOAuthApp,
+} from '@ctxindex/extension-sdk'
 import { z } from 'zod'
 import { catalogSnapshotPath, type InstalledExtensionRecord } from '../catalog'
 import { defaultConfig } from '../config'
 import { runMigrations } from '../storage'
 import { createSandbox } from '../testing'
+import { testOAuthProvider } from '../testing/oauth-provider'
 import { loadExtensions } from './loader'
 
 const databases: Database[] = []
+
+async function writeExtensionPackage(
+  root: string,
+  source: string,
+): Promise<void> {
+  await mkdir(root, { recursive: true })
+  await writeFile(
+    join(root, 'package.json'),
+    JSON.stringify({
+      name: '@ctxindex/catalog-fixture',
+      ctxindex: { extensions: ['./entry.ts'] },
+    }),
+  )
+  await writeFile(join(root, 'entry.ts'), source)
+}
 
 afterEach(() => {
   for (const db of databases.splice(0)) db.close()
@@ -21,11 +41,11 @@ describe('loadExtensions', () => {
     const config = {
       ...defaultConfig(),
       extensions: {
-        paths: [resolve(import.meta.dir, 'fixtures/valid-extension.ts')],
+        paths: [resolve(import.meta.dir, 'fixtures/valid-package')],
       },
     }
 
-    const result = await loadExtensions({ config, builtins: [] })
+    const result = await loadExtensions({ config, builtins: {} })
 
     expect(result.registry.list().map(({ id }) => id)).toEqual([
       'fixture.external',
@@ -34,45 +54,51 @@ describe('loadExtensions', () => {
       result.registry.profiles.get({ id: 'fixture.note', version: 1 }),
     ).toBeDefined()
     expect(result.diagnostics).toEqual([])
+    expect(
+      result.completeRegistry.provenances.get('extension:fixture.external'),
+    ).toEqual([
+      {
+        origin: 'explicit-path',
+        packageName: '@ctxindex/fixture-valid',
+        entry: resolve(import.meta.dir, 'fixtures/valid-package/entry.ts'),
+        exportName: 'default',
+      },
+    ])
   })
   test('loads built-ins first and reports an external id conflict', async () => {
     const builtin = defineExtension({
       id: 'fixture.builtin',
-      version: 1,
       profiles: [],
       adapters: [],
     })
     const extensionPath = resolve(
       import.meta.dir,
-      'fixtures/conflicting-extension.ts',
+      'fixtures/conflicting-package',
     )
     const config = {
       ...defaultConfig(),
       extensions: { paths: [extensionPath] },
     }
 
-    const result = await loadExtensions({ config, builtins: [builtin] })
+    const result = await loadExtensions({ config, builtins: { builtin } })
 
     expect(result.registry.list()).toEqual([builtin])
     expect(result.diagnostics).toEqual([
       {
         path: extensionPath,
-        message: 'Duplicate Extension fixture.builtin@1',
+        message: 'Conflicting Extension definition',
       },
     ])
   })
 
   test('reports invalid Extensions without activating any of their definitions', async () => {
-    const extensionPath = resolve(
-      import.meta.dir,
-      'fixtures/invalid-extension.ts',
-    )
+    const extensionPath = resolve(import.meta.dir, 'fixtures/invalid-package')
     const config = {
       ...defaultConfig(),
       extensions: { paths: [extensionPath] },
     }
 
-    const result = await loadExtensions({ config, builtins: [] })
+    const result = await loadExtensions({ config, builtins: {} })
 
     expect(result.registry.list()).toEqual([])
     expect(
@@ -81,7 +107,6 @@ describe('loadExtensions', () => {
     expect(
       result.registry.adapters.get({
         id: 'fixture.invalid-adapter',
-        version: 1,
       }),
     ).toBeUndefined()
     expect(result.diagnostics).toEqual([
@@ -90,6 +115,176 @@ describe('loadExtensions', () => {
         message: 'Capability retrieve requires operation retrieve',
       },
     ])
+  })
+
+  test('collapses arbitrary configured-package evaluation failures', async () => {
+    const extensionPath = await mkdtemp(
+      join(import.meta.dir, '.throwing-extension-'),
+    )
+    try {
+      await writeExtensionPackage(
+        extensionPath,
+        `throw new Error('super-secret-value')\n`,
+      )
+
+      const result = await loadExtensions({
+        config: {
+          ...defaultConfig(),
+          extensions: { paths: [extensionPath] },
+        },
+        builtins: {},
+      })
+
+      expect(result.diagnostics).toEqual([
+        {
+          path: extensionPath,
+          message: 'Extension entry could not be evaluated',
+        },
+      ])
+      expect(JSON.stringify(result.diagnostics)).not.toContain(
+        'super-secret-value',
+      )
+    } finally {
+      await rm(extensionPath, { recursive: true, force: true })
+    }
+  })
+
+  test('collapses registry errors forged by exported getters', async () => {
+    const extensionPath = await mkdtemp(
+      join(import.meta.dir, '.throwing-getter-extension-'),
+    )
+    try {
+      await writeExtensionPackage(
+        extensionPath,
+        `import { DefinitionRegistryError } from '@ctxindex/core/registry'
+const extension = { kind: 'extension', id: 'fixture.throwing-getter', providers: [], oauthApps: [], profiles: [], adapters: [] }
+export default new Proxy(extension, {
+  ownKeys() {
+    throw new DefinitionRegistryError('orchid-river-742', 'invalid_definition')
+  },
+})
+`,
+      )
+
+      const result = await loadExtensions({
+        config: {
+          ...defaultConfig(),
+          extensions: { paths: [extensionPath] },
+        },
+        builtins: {},
+      })
+
+      expect(result.diagnostics).toEqual([
+        {
+          path: extensionPath,
+          message: 'Extension exports could not be inspected',
+        },
+      ])
+      expect(JSON.stringify(result.diagnostics)).not.toContain(
+        'orchid-river-742',
+      )
+    } finally {
+      await rm(extensionPath, { recursive: true, force: true })
+    }
+  })
+
+  test('ignores mutation of a public helper diagnostic rethrown by a getter', async () => {
+    const extensionPath = await mkdtemp(
+      join(import.meta.dir, '.mutated-diagnostic-extension-'),
+    )
+    try {
+      await writeExtensionPackage(
+        extensionPath,
+        `import { selectExactExtension } from '@ctxindex/core/extension'
+let diagnostic
+try {
+  selectExactExtension([], 'fixture.missing')
+} catch (cause) {
+  cause.message = 'orchid-river-742'
+  diagnostic = cause
+}
+const extension = { kind: 'extension', id: 'fixture.mutated-diagnostic', providers: [], oauthApps: [], profiles: [], adapters: [] }
+export default new Proxy(extension, {
+  ownKeys() {
+    throw diagnostic
+  },
+})
+`,
+      )
+
+      const result = await loadExtensions({
+        config: {
+          ...defaultConfig(),
+          extensions: { paths: [extensionPath] },
+        },
+        builtins: {},
+      })
+
+      expect(result.diagnostics).toEqual([
+        {
+          path: extensionPath,
+          message: 'Requested Extension was not exported',
+        },
+      ])
+      expect(JSON.stringify(result.diagnostics)).not.toContain(
+        'orchid-river-742',
+      )
+    } finally {
+      await rm(extensionPath, { recursive: true, force: true })
+    }
+  })
+
+  test('redacts invalid OAuth App config details from path diagnostics', async () => {
+    const extensionPath = await mkdtemp(
+      join(import.meta.dir, '.redaction-extension-'),
+    )
+    try {
+      await writeExtensionPackage(
+        extensionPath,
+        `import { auth, defineExtension, defineOAuthApp, defineProvider, z } from '@ctxindex/extension-sdk'
+const provider = defineProvider({
+  id: 'fixture.redaction-oauth',
+  auth: auth.oauth2({
+    authorizationUrl: 'https://auth.example.com/authorize',
+    tokenUrl: 'https://auth.example.com/token',
+    identity: { url: 'https://api.example.com/me', subjectPath: ['id'], labelPaths: [['email']], identities: [{ kind: 'email', path: ['email'] }] },
+    pkce: { method: 'S256', required: true },
+    registration: {
+      type: 'public',
+      configSchema: z.object({ clientId: z.string(), desktopSecret: z.string() }).transform(() => {
+        throw new Error('client-id-canary keychain:ctxindex/app/client-id clientId desktop-secret-canary')
+      }),
+      environment: { clientId: 'GOOGLE_CLIENT_ID', desktopSecret: 'GOOGLE_DESKTOP_SECRET' },
+    },
+    baseScopes: ['openid'],
+    allowedHosts: ['api.example.com', 'auth.example.com'],
+  }),
+})
+const app = defineOAuthApp(provider, { label: 'desktop', config: { clientId: 'client-id-canary', desktopSecret: 'desktop-secret-canary' } })
+export default defineExtension({ id: 'fixture.redaction', oauthApps: [app] })
+`,
+      )
+
+      const result = await loadExtensions({
+        config: {
+          ...defaultConfig(),
+          extensions: { paths: [extensionPath] },
+        },
+        builtins: {},
+      })
+
+      expect(result.diagnostics).toEqual([
+        {
+          path: extensionPath,
+          message: 'Invalid OAuth App config',
+        },
+      ])
+      expect(JSON.stringify(result.diagnostics)).not.toMatch(
+        /client-id-canary|keychain:|clientId|desktop-secret-canary/,
+      )
+    } finally {
+      await rm(extensionPath, { recursive: true, force: true })
+    }
   })
 
   test('Extension disappearance and reload leave stored sync and materialized rows byte-for-byte untouched', async () => {
@@ -101,9 +296,9 @@ describe('loadExtensions', () => {
     ).run()
     db.prepare(
       `INSERT INTO sources (
-         id, realm_id, adapter_id, adapter_version, label, config_json,
+         id, realm_id, adapter_id, label, config_json,
          sync_enabled, created_at, updated_at
-       ) VALUES ('source-1', 'realm-1', 'fixture.returned', 1, 'Fixture', '{}', 1, 1, 1)`,
+       ) VALUES ('source-1', 'realm-1', 'fixture.returned', 'Fixture', '{}', 1, 1, 1)`,
     ).run()
     db.prepare(
       `INSERT INTO source_sync_state (
@@ -135,20 +330,18 @@ describe('loadExtensions', () => {
         ...defaultConfig(),
         extensions: { paths: [missingPath] },
       },
-      builtins: [],
+      builtins: {},
     })
 
     expect(missing.diagnostics).toHaveLength(1)
     expect(
-      missing.registry.adapters.get({ id: 'fixture.returned', version: 1 }),
+      missing.registry.adapters.get({ id: 'fixture.returned' }),
     ).toBeUndefined()
     expect(snapshot()).toEqual(before)
 
     const adapter = defineAdapter({
       id: 'fixture.returned',
-      version: 1,
       configSchema: z.object({}),
-      auth: { kind: 'none' },
       profiles: [],
       routing: 'indexed',
       capabilities: [],
@@ -157,27 +350,53 @@ describe('loadExtensions', () => {
     })
     const restored = await loadExtensions({
       config: defaultConfig(),
-      builtins: [
-        defineExtension({
+      builtins: {
+        restored: defineExtension({
           id: 'fixture.returned-extension',
-          version: 1,
           profiles: [],
           adapters: [adapter],
         }),
-      ],
+      },
     })
 
     expect(
-      restored.registry.adapters.get({ id: 'fixture.returned', version: 1 }),
+      restored.registry.adapters.get({ id: 'fixture.returned' }),
     ).toBeDefined()
     expect(snapshot()).toEqual(before)
   })
-  test('requires callers to provide an explicit complete built-ins list', async () => {
+  test('requires callers to provide an explicit built-in module namespace', async () => {
     await expect(
       loadExtensions({ config: defaultConfig() } as never),
     ).rejects.toThrow(
-      'loadExtensions requires an explicit complete builtins list',
+      'loadExtensions requires an explicit built-in module namespace',
     )
+  })
+
+  test('rejects an Extension OAuth App that collides with a local BYOA identity', async () => {
+    const provider = testOAuthProvider({
+      id: 'fixture.oauth',
+      authorizationUrl: 'https://auth.example.com/authorize',
+      tokenUrl: 'https://auth.example.com/token',
+    })
+    const app = defineOAuthApp(provider, {
+      label: 'desktop',
+      config: { clientId: 'public-client' },
+    })
+
+    await expect(
+      loadExtensions({
+        config: defaultConfig(),
+        builtins: {
+          oauth: defineExtension({
+            id: 'fixture.oauth-extension',
+            oauthApps: [app],
+          }),
+        },
+        localOAuthAppIdentities: [
+          { providerId: provider.id, label: app.label },
+        ],
+      }),
+    ).rejects.toThrow('Duplicate OAuth App')
   })
 
   test('loads exact installed Catalog provenance offline', async () => {
@@ -190,9 +409,9 @@ describe('loadExtensions', () => {
         commit,
       )
       await mkdir(snapshot, { recursive: true })
-      await writeFile(
-        join(snapshot, 'extension.ts'),
-        `export default ({ defineExtension }) => defineExtension({ id: 'fixture.installed', version: 1, profiles: [], adapters: [] })\n`,
+      await writeExtensionPackage(
+        join(snapshot, 'extension-package'),
+        `export default { kind: 'extension', id: 'fixture.installed', providers: [], oauthApps: [], profiles: [], adapters: [] }\n`,
       )
       await writeFile(
         join(snapshot, 'ctxindex-catalog.json'),
@@ -203,7 +422,7 @@ describe('loadExtensions', () => {
             {
               id: 'fixture.installed',
               version: 1,
-              source: { kind: 'inline', path: 'extension.ts' },
+              source: { kind: 'inline', path: 'extension-package' },
             },
           ],
         }),
@@ -216,12 +435,12 @@ describe('loadExtensions', () => {
         repository: '/local/catalog.git',
         commit,
         snapshot_acquired_at: 1,
-        source_path: 'extension.ts',
+        source_path: 'extension-package',
       }
 
       const result = await loadExtensions({
         config: defaultConfig(),
-        builtins: [],
+        builtins: {},
         installed: [installed],
         dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
       })
@@ -233,14 +452,13 @@ describe('loadExtensions', () => {
       expect(result.provenance).toEqual([
         {
           id: 'fixture.installed',
-          version: 1,
           kind: 'catalog',
           catalog: 'fixture',
           catalogId: 'fixture.catalog',
           repository: '/local/catalog.git',
           commit,
           snapshotAcquiredAt: 1,
-          sourcePath: 'extension.ts',
+          sourcePath: 'extension-package',
         },
       ])
     } finally {
@@ -258,9 +476,9 @@ describe('loadExtensions', () => {
         commit,
       )
       await mkdir(snapshot, { recursive: true })
-      await writeFile(
-        join(snapshot, 'extension.ts'),
-        `export default ({ defineExtension }) => defineExtension({ id: 'fixture.builtin', version: 1, profiles: [], adapters: [] })\n`,
+      await writeExtensionPackage(
+        join(snapshot, 'extension-package'),
+        `export default { kind: 'extension', id: 'fixture.builtin', providers: [{ kind: 'provider', id: 'fixture.catalog-provider', auth: { kind: 'none' } }], oauthApps: [], profiles: [], adapters: [] }\n`,
       )
       await writeFile(
         join(snapshot, 'ctxindex-catalog.json'),
@@ -271,21 +489,20 @@ describe('loadExtensions', () => {
             {
               id: 'fixture.builtin',
               version: 1,
-              source: { kind: 'inline', path: 'extension.ts' },
+              source: { kind: 'inline', path: 'extension-package' },
             },
           ],
         }),
       )
       const builtin = defineExtension({
         id: 'fixture.builtin',
-        version: 1,
         profiles: [],
         adapters: [],
       })
 
       const result = await loadExtensions({
         config: defaultConfig(),
-        builtins: [builtin],
+        builtins: { builtin },
         installed: [
           {
             id: 'fixture.builtin',
@@ -295,7 +512,7 @@ describe('loadExtensions', () => {
             repository: '/local/catalog.git',
             commit,
             snapshot_acquired_at: 1,
-            source_path: 'extension.ts',
+            source_path: 'extension-package',
           },
         ],
         dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
@@ -303,12 +520,12 @@ describe('loadExtensions', () => {
 
       expect(result.registry.list()).toEqual([builtin])
       expect(result.provenance).toEqual([
-        { id: 'fixture.builtin', version: 1, kind: 'builtin' },
+        { id: 'fixture.builtin', kind: 'builtin' },
       ])
       expect(result.diagnostics).toEqual([
         {
-          path: join(snapshot, 'extension.ts'),
-          message: 'Duplicate Extension fixture.builtin@1',
+          path: join(snapshot, 'extension-package'),
+          message: 'Conflicting Extension definition',
         },
       ])
     } finally {
@@ -322,7 +539,7 @@ describe('loadExtensions', () => {
       const commit = 'b'.repeat(40)
       const result = await loadExtensions({
         config: defaultConfig(),
-        builtins: [],
+        builtins: {},
         installed: [
           {
             id: 'fixture.missing',
@@ -332,7 +549,7 @@ describe('loadExtensions', () => {
             repository: 'https://example.invalid/catalog.git',
             commit,
             snapshot_acquired_at: 1,
-            source_path: 'extension.ts',
+            source_path: 'extension-package',
           },
         ],
         dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
@@ -342,7 +559,7 @@ describe('loadExtensions', () => {
       expect(result.provenance).toEqual([])
       expect(result.diagnostics).toHaveLength(1)
       expect(result.diagnostics[0]?.message).toContain(
-        'missing ctxindex-catalog.json',
+        'Catalog Extension package could not be loaded',
       )
     } finally {
       await sandbox.cleanup()

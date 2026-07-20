@@ -16,14 +16,14 @@ Provides repository-level executable tooling: policy verification gates under `s
 ## Data & control flow
 
 1. Package scripts or operators invoke a verifier or `bun scripts/with-timeout.ts <timeoutSecs> [--] <cmd> [args...]`.
-2. Verifiers inspect discovered production paths, workspace imports/manifests, and package exports, then return contract-specific status output and exit codes.
+2. Verifiers inspect discovered production paths, root-declared workspace imports/manifests (including `examples/*`), and package exports, then return contract-specific status output and exit codes.
 3. `with-timeout.ts` parses the CLI timeout, optionally overrides it from `TEST_WALL_TIMEOUT_SECS`, spawns the child, and normally propagates its exit code. On timeout it signals the process group with `SIGTERM`, waits up to `KILL_GRACE_MS`, escalates to `SIGKILL`, and exits `124`; incoming `SIGINT`/`SIGTERM` are forwarded with exits `130`/`143`.
 4. `scripts/worktree-new.sh` accepts only `feature`, `fix`, `docs`, or `chore` branches, preflights existing refs for marker-aware root and package-local CLI wiring before attach, and creates the isolated directories and marker. Supported `bun cli` / `bun run cli` invocations then use `scripts/cli.sh`, which launches `apps/cli/bin/ctxindex.mjs` with isolated paths.
 
 ## Integration points
 
 - Root and `apps/cli/package.json` expose `cli` through `scripts/cli.sh`; the root manifest also exposes `with-timeout` and `ci`.
-- Verification targets include every `apps/*` and `packages/*` workspace, their manifests, CLI/core/Adapter architecture surfaces, and selected script sources.
+- Verification targets include every root-declared `apps/*`, `packages/*`, and `examples/*` workspace, their manifests, CLI/core/Adapter architecture surfaces, and selected script sources.
 - Detailed map: `scripts/verify/codemap.md`.
 - Package and release tooling map: `scripts/release/codemap.md`.
 - Runtime dependencies are Bun process/file APIs plus Node filesystem, path, URL, and child-process utilities.

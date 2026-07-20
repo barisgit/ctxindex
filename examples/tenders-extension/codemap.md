@@ -2,24 +2,25 @@
 
 ## Responsibility
 
-Provides a deterministic external Extension proof for public-procurement tenders. `extension.ts` defines the Extension, Profile, and fixture-backed sync Adapter; `fixtures.ts` supplies typed sample tender payloads.
+Provides a deterministic package-managed external Extension proof for public-procurement tenders. The private ESM workspace package `@ctxindex/example-tenders-extension` advertises `extension.ts` through `ctxindex.extensions`; the module defines the Extension, Profile, and fixture-backed sync Adapter.
 
 ## Design
 
-- `extension()` uses the authoring-host factory API (`ExtensionAuthoringHost`) rather than importing runtime internals.
-- `tenderSchema` is a strict host-provided Zod schema; `tenderProfile` maps payload fields into searchable title, occurrence time, chunks, and typed indexes.
-- `tenderAdapter` is an unauthenticated, indexed, sync-only Adapter. `TENDER_FIXTURES` is immutable deterministic input.
+- `extension.ts` imports `defineProfile`, `defineAdapter`, `defineExtension`, and `z` from the public SDK and exports ordinary plain values.
+- `tenderSchema` is strict; `tenderProfile` maps payload fields into searchable title, occurrence time, chunks, and typed indexes without embedded docs.
+- `tenderAdapter` is providerless, indexed, and sync-only. `TENDER_FIXTURES` is immutable deterministic input.
 
 ## Flow
 
-1. The Extension loader calls the default `extension(host)` export.
-2. `host.defineProfile()` creates `enarocanje.tender`; `host.defineAdapter()` creates `enarocanje.fixture`.
+1. Package entry resolution reads `./extension.ts`, imports it once, and collects the default `enarocanje.proof` root.
+2. The root reaches exact `enarocanje.tender` and `enarocanje.fixture` values without an Extension dependency graph.
 3. `operations.sync(context)` iterates `TENDER_FIXTURES`, emitting one `upsertResource` per tender with a source-scoped `ctx://` ref and parsed timestamps.
 4. Sync emits a final versioned `checkpoint` containing all fixture references.
-5. `host.defineExtension()` returns `enarocanje.proof` with the Profile and Adapter definitions.
+5. Complete-registry validation activates the collected graph; providerless execution bypasses authorization resolution.
 
 ## Integration
 
-- Depends on `@ctxindex/extension-sdk` for `ExtensionAuthoringHost` and on `examples/tenders-extension/fixtures.ts` for `TENDER_FIXTURES`.
-- Registers Profile ID `enarocanje.tender`, Adapter ID `enarocanje.fixture`, and Extension ID `enarocanje.proof` with the host.
-- Emits sync operations through the host-supplied `context.emit()` boundary; resource refs use `context.source.id`.
+- Declares `@ctxindex/extension-sdk` as its runtime workspace dependency and uses relative `fixtures.ts` for deterministic input.
+- Declares `@ctxindex/core` and `@ctxindex/adapters` as workspace dev dependencies used by tests for package-entry discovery and built-in Extension isolation.
+- Exports Profile ID `enarocanje.tender`, Adapter ID `enarocanje.fixture`, and Extension ID `enarocanje.proof` as ordinary values.
+- Emits sync operations through `context.emit()`; resource refs use `context.source.id`.

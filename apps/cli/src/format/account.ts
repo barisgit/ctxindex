@@ -6,9 +6,8 @@ function label(value: string | null, fallback: string): string {
 
 export function formatAccountAdded(result: {
   readonly accountId: string
-  readonly grantId: string
 }): string {
-  return `account added: ${result.accountId} grant=${result.grantId}`
+  return `account added: ${result.accountId}`
 }
 
 export function formatAccountRemoved(label: string): string {
@@ -26,17 +25,12 @@ export function formatAccountInventory(
   for (const account of accounts) {
     lines.push(
       `ACCOUNT ${account.id}  provider=${account.provider}  label=${label(account.label, '(unlabeled)')}`,
+      `  AUTH ${account.expiryState}  expiresAt=${account.expiresAt ?? '-'}`,
     )
-    for (const grant of account.grants) {
+    for (const source of account.sources) {
       lines.push(
-        `  GRANT ${grant.id}  ${grant.expiryState}  expiresAt=${grant.expiresAt ?? '-'}`,
-        `    scopes: ${grant.scopes.join(', ') || 'none'}`,
+        `  SOURCE ${source.id}  label=${JSON.stringify(source.label)}  adapter=${source.adapter.id}  realm=${source.realm.slug}`,
       )
-      for (const source of grant.sources) {
-        lines.push(
-          `    SOURCE ${source.id}  label=${JSON.stringify(source.label)}  adapter=${source.adapter.id}@${source.adapter.version}  realm=${source.realm.slug}`,
-        )
-      }
     }
   }
   return lines.join('\n')

@@ -97,13 +97,21 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
       expect(result.exitCode, result.stderr).toBe(0)
     }
 
-    const client = await sandbox.run(
-      ['client', 'add', 'google', '--from-env'],
+    const app = await sandbox.run(
+      ['oauth-app', 'add', 'google', 'google', '--from-env'],
       { env },
     )
-    expect(client.exitCode, client.stderr).toBe(0)
+    expect(app.exitCode, app.stderr).toBe(0)
     const account = await sandbox.run(
-      ['account', 'add', 'google', '--label', 'google-account'],
+      [
+        'account',
+        'add',
+        'google',
+        '--app',
+        'google',
+        '--label',
+        'google-account',
+      ],
       { env },
     )
     expect(account.exitCode, account.stderr).toBe(0)
@@ -130,8 +138,6 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
       'https://www.googleapis.com/auth/gmail.readonly',
       'openid',
     ])
-    const grantId = grants[0]?.id ?? ''
-
     const addSource = async (
       adapter: 'google.mailbox' | 'google.calendar',
       realm: 'work' | 'personal',
@@ -178,30 +184,31 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
     expect(listed.exitCode, listed.stderr).toBe(0)
     expect(listed.stdout).not.toContain('canary')
     expect(listed.stdout).not.toContain('mock-google-subject')
+    expect(listed.stdout).not.toMatch(/grant|scope/i)
     const inventory = JSON.parse(listed.stdout) as {
       label: string
-      grants: { id: string; sources: { label: string }[] }[]
+      sources: { label: string }[]
     }[]
     expect(inventory).toHaveLength(1)
     expect(inventory[0]?.label).toBe('google-account')
-    expect(inventory[0]?.grants).toHaveLength(1)
-    expect(inventory[0]?.grants[0]?.id).toBe(grantId)
+    expect(inventory[0]?.sources.map(({ label }) => label).sort()).toEqual(
+      [mailboxSourceLabel, personalSourceLabel, teamSourceLabel].sort(),
+    )
 
     const sourceList = await sandbox.run(['source', 'list', '--json'], { env })
     expect(sourceList.exitCode, sourceList.stderr).toBe(0)
     expect(sourceList.stdout).not.toContain('canary')
+    expect(sourceList.stdout).not.toMatch(/grant/i)
     expect(
       (
         JSON.parse(sourceList.stdout) as {
           label: string
           adapterId: string
-          grantId: string
         }[]
       )
-        .map(({ label, adapterId, grantId: listedGrantId }) => ({
+        .map(({ label, adapterId }) => ({
           label,
           adapterId,
-          grantId: listedGrantId,
         }))
         .sort((left, right) =>
           left.label < right.label ? -1 : left.label > right.label ? 1 : 0,
@@ -210,17 +217,14 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
       {
         label: personalSourceLabel,
         adapterId: 'google.calendar',
-        grantId,
       },
       {
         label: mailboxSourceLabel,
         adapterId: 'google.mailbox',
-        grantId,
       },
       {
         label: teamSourceLabel,
         adapterId: 'google.calendar',
-        grantId,
       },
     ])
 
@@ -251,7 +255,15 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
     })
 
     const workSearch = await sandbox.run(
-      ['search', 'roadmap', '--kind', 'events', '--realm', 'work', '--json'],
+      [
+        'search',
+        'roadmap',
+        '--kind',
+        'calendar.event',
+        '--realm',
+        'work',
+        '--json',
+      ],
       { env },
     )
     expect(workSearch.exitCode, workSearch.stderr).toBe(0)
@@ -276,7 +288,7 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
         'search',
         'roadmap',
         '--kind',
-        'events',
+        'calendar.event',
         '--realm',
         'personal',
         '--json',

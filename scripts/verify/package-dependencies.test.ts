@@ -118,28 +118,38 @@ test('applications may declare bundled source imports as development dependencie
   expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([])
 })
 
-test('development dependencies do not hide runtime imports outside the bundle package', async () => {
+test('example packages may use public packages as runtime or test dependencies', async () => {
   fixtureRoot = await createFixtureRoot()
   await writeFixture(
+    join(fixtureRoot, 'package.json'),
+    JSON.stringify({ workspaces: ['packages/*', 'examples/*'] }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'packages/extension-sdk/package.json'),
+    JSON.stringify({ name: '@ctxindex/extension-sdk', dependencies: {} }),
+  )
+  await writeFixture(
     join(fixtureRoot, 'packages/core/package.json'),
+    JSON.stringify({ name: '@ctxindex/core', dependencies: {} }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'examples/demo/package.json'),
     JSON.stringify({
-      name: '@ctxindex/core',
-      dependencies: {},
-      devDependencies: { hidden: 'latest' },
+      name: '@ctxindex/example-demo',
+      dependencies: { '@ctxindex/extension-sdk': 'workspace:*' },
+      devDependencies: { '@ctxindex/core': 'workspace:*' },
     }),
   )
   await writeFixture(
-    join(fixtureRoot, 'packages/core/src/index.ts'),
-    "import 'hidden'",
+    join(fixtureRoot, 'examples/demo/index.ts'),
+    "import '@ctxindex/extension-sdk'",
+  )
+  await writeFixture(
+    join(fixtureRoot, 'examples/demo/index.test.ts'),
+    "import '@ctxindex/core'",
   )
 
-  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([
-    {
-      type: 'undeclared-dependency',
-      packageName: '@ctxindex/core',
-      dependency: 'hidden',
-    },
-  ])
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([])
 })
 
 async function writeFixture(path: string, content: string): Promise<void> {
@@ -203,6 +213,28 @@ test('discovers package files under apps/* and packages/* without a source allow
     'apps/cli/tests/colocated.test.ts',
     'packages/core/extra/nested.mts',
   ])
+})
+
+test('does not attribute a nested fixture package to its containing workspace', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'apps/cli/package.json'),
+    JSON.stringify({ name: '@fixture/cli', dependencies: {} }),
+  )
+  await writeFixture(join(fixtureRoot, 'apps/cli/src/main.ts'), 'export {}')
+  await writeFixture(
+    join(fixtureRoot, 'apps/cli/fixtures/external/package.json'),
+    JSON.stringify({
+      name: '@fixture/external',
+      dependencies: { 'external-only': 'latest' },
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/cli/fixtures/external/index.ts'),
+    "import 'external-only'",
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([])
 })
 
 test('extracts static, re-export, dynamic import, and require specifiers only from syntax', () => {

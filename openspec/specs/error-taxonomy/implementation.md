@@ -35,7 +35,7 @@ export class CtxindexError extends Error {
 
 export type CtxindexAuthErrorCode =
   | 'needs_auth'
-  | 'missing_oauth_client_creds'
+  | 'missing_oauth_app_config'
   | 'invalid_grant'
   | 'invalid_client'
   | 'oauth_failed'
@@ -201,8 +201,10 @@ Core deep modules throw typed `CtxindexError` subclasses with stable machine cod
 
 One core storage classifier translates SQLite busy and locked result families, including extended result codes, to `CtxindexError` code `storage_busy` at database open/setup, migration, and Resource batch boundaries. Its public message identifies temporary local-storage unavailability and an actionable retry without copying backend codes or lock text; the original SQLite exception is retained as `cause` for diagnostics. Required operations use the existing generic exit-50 fallback, optional remote-search caching degrades to a successful warning, and cancellation retains its existing outcome and exit 130.
 
+`missing_oauth_app_config` is the sole persisted App/snapshot configuration failure code and retains exit `50`; no `missing_oauth_client_creds` alias exists. Unknown Provider/App selection, omitted `account add --app`, and missing or invalid `oauth-app add --from-env` configuration remain invalid usage at exit `2` and are rejected before effects.
+
 `@ctxindex/core` maps sync codes to run/status state and stable exits. The sync runner classifies validated warning emissions separately from thrown terminal errors; warning aggregation never changes the error-code mapping. `@ctxindex/cli` is the final error-translation boundary; command handlers do not invent independent mappings.
 
 ## Verification
 
-Error and exit-mapping tests cover every code family, cause preservation, sync state mapping, warning-only success, redaction, unknown-error fallback, and storage-contention normalization across setup, migration, and Resource writes. CLI command tests assert the stable public exit codes and absence of raw SQLite contention details.
+Error and exit-mapping tests cover every code family, cause preservation, sync state mapping, warning-only success, redaction, unknown-error fallback, and storage-contention normalization across setup, migration, and Resource writes. CLI command tests assert the stable public exit codes, the renamed App-config code, zero-effect invalid App selection/import, absence of the removed Client code, and absence of raw SQLite contention details.

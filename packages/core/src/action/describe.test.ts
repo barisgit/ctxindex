@@ -22,25 +22,21 @@ const profile = defineProfile({
       effect: 'reversible',
       input: actionInputSchema,
       output: { id: 'fake.note', version: 2 },
-      docs: 'Create a fake note.',
-      examples: [{ body: 'hello' }],
     },
   },
 })
 const boundAdapter = defineAdapter({
   id: 'fake.bound',
-  version: 3,
   configSchema: z.object({}).strict(),
-  auth: { kind: 'none' },
-  profiles: [{ id: 'fake.note', version: 2 }],
+  profiles: [profile],
   routing: 'indexed',
   capabilities: [],
   operations: {},
   actions: {
     [actionId]: {
-      profile: { id: 'fake.note', version: 2 },
+      profile,
       input: actionInputSchema,
-      output: { id: 'fake.note', version: 2 },
+      output: profile,
       async run() {
         adapterCalls += 1
         throw new Error('must not run')
@@ -50,9 +46,7 @@ const boundAdapter = defineAdapter({
 })
 const unboundAdapter = defineAdapter({
   id: 'fake.unbound',
-  version: 4,
   configSchema: z.object({}).strict(),
-  auth: { kind: 'none' },
   profiles: [],
   routing: 'indexed',
   capabilities: [],
@@ -63,7 +57,6 @@ let adapterCalls = 0
 const registry = createExtensionRegistry([
   defineExtension({
     id: 'fake.actions',
-    version: 1,
     profiles: [profile],
     adapters: [boundAdapter, unboundAdapter],
   }),
@@ -84,11 +77,11 @@ async function freshDb(): Promise<Database> {
     "INSERT INTO realms (id, slug, label, created_at) VALUES ('realm-1', 'work', 'Work', 1)",
   ).run()
   const insert = db.prepare(`INSERT INTO sources
-    (id, realm_id, label, adapter_id, adapter_version, config_json, sync_enabled, created_at, updated_at)
-    VALUES (?, 'realm-1', ?, ?, ?, '{}', 1, 1, 1)`)
-  insert.run('source-z', 'Bound Source', 'fake.bound', 3)
-  insert.run('source-a', 'Unbound Source', 'fake.unbound', 4)
-  insert.run('source-m', 'Missing Source', 'fake.missing', 9)
+    (id, realm_id, label, adapter_id, config_json, sync_enabled, created_at, updated_at)
+    VALUES (?, 'realm-1', ?, ?, '{}', 1, 1, 1)`)
+  insert.run('source-z', 'Bound Source', 'fake.bound')
+  insert.run('source-a', 'Unbound Source', 'fake.unbound')
+  insert.run('source-m', 'Missing Source', 'fake.missing')
   return db
 }
 
@@ -107,25 +100,23 @@ describe('describeAction', () => {
         additionalProperties: false,
       },
       output: { id: 'fake.note', version: 2 },
-      docs: 'Create a fake note.',
-      examples: [{ body: 'hello' }],
-      adapters: [{ id: 'fake.bound', version: 3 }],
+      adapters: [{ id: 'fake.bound' }],
       sources: [
         {
           id: 'source-a',
-          adapter: { id: 'fake.unbound', version: 4 },
+          adapter: { id: 'fake.unbound' },
           available: false,
           reason: 'action_unsupported',
         },
         {
           id: 'source-m',
-          adapter: { id: 'fake.missing', version: 9 },
+          adapter: { id: 'fake.missing' },
           available: false,
           reason: 'adapter_unavailable',
         },
         {
           id: 'source-z',
-          adapter: { id: 'fake.bound', version: 3 },
+          adapter: { id: 'fake.bound' },
           available: true,
         },
       ],
@@ -140,7 +131,7 @@ describe('describeAction', () => {
     ).toEqual([
       {
         id: 'source-z',
-        adapter: { id: 'fake.bound', version: 3 },
+        adapter: { id: 'fake.bound' },
         available: true,
       },
     ])

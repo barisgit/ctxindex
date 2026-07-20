@@ -68,10 +68,10 @@ if ! help_output=$(cd "$repo_root" && NO_COLOR=1 bun cli --help 2>"$version_stde
 fi
 
 for expected in \
-  'USAGE ctxindex init|account|client|describe|extensions|action|artifact|purge|realm|source|sync|get|export|thread|search|status|secrets|skills' \
+  'USAGE ctxindex init|account|oauth-app|describe|extensions|action|artifact|purge|realm|source|sync|get|export|thread|search|status|secrets|skills' \
   'init' \
   'account' \
-  'client' \
+  'oauth-app' \
   'realm' \
   'source' \
   'sync' \
@@ -84,12 +84,12 @@ for expected in \
   fi
 done
 
-if ! client_help=$(cd "$repo_root" && NO_COLOR=1 bun cli client --help 2>"$version_stderr"); then
+if ! oauth_app_help=$(cd "$repo_root" && NO_COLOR=1 bun cli oauth-app --help 2>"$version_stderr"); then
   cat "$version_stderr" >&2
-  die 'bun cli client --help failed'
+  die 'bun cli oauth-app --help failed'
 fi
-for expected in 'USAGE ctxindex client add|list|remove' 'add' 'list' 'remove'; do
-  grep -Fq "$expected" <<<"$client_help" || die "missing client help text: $expected"
+for expected in 'USAGE ctxindex oauth-app add|list|remove' 'add' 'list' 'remove'; do
+  grep -Fq "$expected" <<<"$oauth_app_help" || die "missing oauth-app help text: $expected"
 done
 
 if ! account_help=$(cd "$repo_root" && NO_COLOR=1 bun cli account --help 2>"$version_stderr"); then
@@ -100,7 +100,7 @@ for expected in 'USAGE ctxindex account add|list|remove' 'add' 'list' 'remove'; 
   grep -Fq "$expected" <<<"$account_help" || die "missing account help text: $expected"
 done
 
-# Per-command help sanity: source / skills / client / account subcommands enumerated.
+# Per-command help sanity: source / skills / oauth-app / account subcommands enumerated.
 if ! source_help=$(cd "$repo_root" && NO_COLOR=1 bun cli source --help 2>"$version_stderr"); then
   cat "$version_stderr" >&2
   die 'bun cli source --help failed'

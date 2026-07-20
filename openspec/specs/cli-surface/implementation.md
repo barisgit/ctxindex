@@ -18,7 +18,7 @@ export interface CliDeps {
   readonly secretBackendManager: SecretBackendManager
   readonly secretVault: SecretVault
   readonly authService: AuthService
-  readonly oauthClientService: OAuthClientService
+  readonly oauthAppService: OAuthAppService
   readonly registry: ExtensionRegistry
   readonly threadService: ThreadService
   readonly artifactService: ArtifactService
@@ -34,6 +34,8 @@ export interface SecretCliDeps {
   readonly secretBackendManager: SecretBackendManager
   close(): Promise<void>
 }
+
+export async function assertInitialized(): Promise<void>;
 
 export async function openDeps(
   opts: {
@@ -97,8 +99,8 @@ export type AccountArgs =
   | {
       readonly kind: 'add'
       readonly provider: string
+      readonly app: string
       readonly label?: string
-      readonly client?: string
     }
   | { readonly kind: 'list'; readonly json: boolean }
   | { readonly kind: 'remove'; readonly label: string }
@@ -157,12 +159,17 @@ export function parseArtifactDownloadArgs(
 ): ArtifactDownloadArgs;
 ```
 
-### @ctxindex/cli — Client arguments
+### @ctxindex/cli — OAuth App arguments
 
 ```ts
-export type ClientArgs =
-  | { readonly kind: 'add'; readonly provider: string; readonly label?: string }
-  | { readonly kind: 'list' }
+export type OAuthAppArgs =
+  | {
+      readonly kind: 'add'
+      readonly provider: string
+      readonly label: string
+      readonly fromEnv: true
+    }
+  | { readonly kind: 'list'; readonly json: boolean }
   | {
       readonly kind: 'remove'
       readonly provider: string
@@ -171,7 +178,7 @@ export type ClientArgs =
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
 
-export function parseClientArgs(args: string[]): ClientArgs;
+export function parseOAuthAppArgs(args: string[]): OAuthAppArgs;
 ```
 
 ### @ctxindex/cli — describe arguments
@@ -430,10 +437,12 @@ export function parsePurgeArtifactsArgs(args: string[]): PurgeArtifactsArgs;
 
 `@ctxindex/cli` is the composition root. It opens core services, loads the current registry once per command flow, parses non-interactively, invokes deep-module services through focused handlers, and owns readable/JSON output plus exit mapping.
 
-Parser unions are the command boundary. Registry-derived Source config, fields, kinds, exports, and Actions are resolved before service calls rather than duplicated as provider branches. Structured output writes data to stdout and human diagnostics to stderr; credential values and secret-store passphrases never enter argv.
+Database-backed command dependency setup requires both the persisted config and database created by explicit `init` before opening SQLite. The shared preflight fails with the fixed exit-2 guidance `ctxindex is not initialized; run bun cli init` and no durable side effects when either is absent. OAuth App add preserves loaded-Provider validation, then invokes the preflight before declared configuration environments are read; list/remove check before dependencies. `init` retains backend selection before database bootstrap. Help, argument parsing, Provider validation, and pure definition discovery remain available on fresh state.
+
+Parser unions are the command boundary. Registry-derived Source config, fields, kinds, exports, and Actions are resolved before service calls rather than duplicated as provider branches. The OAuth surface contains only `oauth-app` and `account` commands: App add requires exact Provider and label plus `--from-env`, and Account add requires exact `--app`. No `client` route or alias is parsed. Structured output writes safe projections to stdout and human diagnostics to stderr; App config, credential values, tokens, authorization codes, and secret-store passphrases never enter argv or output.
 
 The Extension command adapter delegates repository, manifest, persistence, refresh policy, and install behavior to `CatalogService`. Its parser owns only the closed nested command grammar, exact selectors, required independent trust flags, and `--no-refresh`; pure formatters render Catalog records and loaded origin provenance with non-negative snapshot age. Catalog list/show and install request refresh by default, while `--no-refresh` selects stored state. Startup and loaded-Extension listing never cross the Git acquisition boundary.
 
 ## Verification
 
-Argument tests cover every discriminated parser and invalid form. Command tests inject dependency/service interfaces. CLI e2e tests cover readable/JSON stream separation, stable exits, registry-derived help/describe behavior, bundled skills, local Catalog trust, default command-time refresh, stored-snapshot age and `--no-refresh`, observable refresh failure, offline startup/loading, and relocated compiled execution.
+Argument tests cover every discriminated parser and invalid form, including mandatory App labels and `--app`, zero-effect invalid selection, and rejection of every Client compatibility route. Command tests inject dependency/service interfaces. CLI e2e tests cover empty and config-only initialization guards with no OAuth App configuration or durable-state side effects, readable/JSON stream separation, stable exits, registry-derived help/describe behavior, bundled skills, local Catalog trust, default command-time refresh, stored-snapshot age and `--no-refresh`, observable refresh failure, offline startup/loading, and relocated compiled execution.

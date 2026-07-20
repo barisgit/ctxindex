@@ -58,6 +58,7 @@ export class CatalogService {
     readonly version: number
     readonly trust: boolean
     readonly registry: ExtensionRegistry
+    readonly localOAuthAppIdentities: readonly OAuthAppIdentity[]
     readonly refresh?: boolean
     readonly replaceableCatalog?: {
       readonly catalog: string

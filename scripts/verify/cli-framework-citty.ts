@@ -9,7 +9,7 @@ process.chdir(repoRoot)
 const mainFile = 'apps/cli/src/main.ts'
 const commandFiles = [
   'apps/cli/src/commands/account.ts',
-  'apps/cli/src/commands/client.ts',
+  'apps/cli/src/commands/oauth-app.ts',
   'apps/cli/src/commands/describe.ts',
   'apps/cli/src/commands/extensions.ts',
   'apps/cli/src/commands/init.ts',
@@ -131,7 +131,10 @@ async function main(): Promise<number> {
   for (const [label, command] of [
     ['help', ['bun', 'apps/cli/bin/ctxindex.mjs', '--help']],
     ['version', ['bun', 'apps/cli/bin/ctxindex.mjs', '--version']],
-    ['client-help', ['bun', 'apps/cli/bin/ctxindex.mjs', 'client', '--help']],
+    [
+      'oauth-app-help',
+      ['bun', 'apps/cli/bin/ctxindex.mjs', 'oauth-app', '--help'],
+    ],
     ['account-help', ['bun', 'apps/cli/bin/ctxindex.mjs', 'account', '--help']],
   ] as const) {
     const status = runNonemptyStdout(label, command)

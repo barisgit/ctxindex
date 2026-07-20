@@ -1,4 +1,4 @@
-import type { OAuthProviderSpec } from '@ctxindex/extension-sdk'
+import type { OAuthProviderDefinition } from '@ctxindex/extension-sdk'
 import { CtxindexAuthError } from '../errors'
 import { compareUnicodeCodePoints } from '../internal/code-point-order'
 import type { OAuthSelection } from './selection'
@@ -38,11 +38,11 @@ export function resolveInitialGrantedScopes(
 export function resolveRefreshGrantedScopes(
   scope: string | undefined,
   prior: readonly string[],
-  provider: OAuthProviderSpec,
+  provider: OAuthProviderDefinition,
 ): readonly string[] {
   if (scope === undefined) return normalizeOAuthScopes(prior)
   const normalized = normalizeOAuthScopes(scope)
-  const base = new Set(provider.baseScopes)
+  const base = new Set(provider.auth.baseScopes)
   requireScopes(
     normalized,
     prior.filter((item) => !base.has(item)),

@@ -1,4 +1,4 @@
-import type { OAuthProviderSpec } from '@ctxindex/extension-sdk'
+import type { OAuthProviderDefinition } from '@ctxindex/extension-sdk'
 import type { UpsertAccountInput } from '../account'
 import { CtxindexAuthError } from '../errors'
 import { egressFetch } from '../net'
@@ -20,7 +20,7 @@ function ownPath(value: unknown, path: JsonPath): unknown {
 }
 
 export async function fetchOAuthIdentity(input: {
-  provider: OAuthProviderSpec
+  provider: OAuthProviderDefinition
   endpoint: string
   accessToken: string
 }): Promise<Omit<UpsertAccountInput, 'provider'>> {
@@ -33,7 +33,7 @@ export async function fetchOAuthIdentity(input: {
         headers: { authorization: `Bearer ${input.accessToken}` },
         redirect: 'manual',
       },
-      input.provider.allowedHosts,
+      input.provider.auth.allowedHosts,
     )
   } catch (cause) {
     throw new CtxindexAuthError(
@@ -57,20 +57,20 @@ export async function fetchOAuthIdentity(input: {
       { cause },
     )
   }
-  const subject = ownPath(json, input.provider.identity.subjectPath)
+  const subject = ownPath(json, input.provider.auth.identity.subjectPath)
   if (typeof subject !== 'string' || subject.trim().length === 0)
     throw new CtxindexAuthError(
       'identity_response_invalid',
       'OAuth identity subject is missing or invalid',
     )
-  const label = input.provider.identity.labelPaths
+  const label = input.provider.auth.identity.labelPaths
     .map((path) => ownPath(json, path))
     .find(
       (value): value is string =>
         typeof value === 'string' && value.trim().length > 0,
     )
   const verifiedIdentities: { kind: string; value: string }[] = []
-  for (const declaration of input.provider.identity.identities) {
+  for (const declaration of input.provider.auth.identity.identities) {
     const value = ownPath(json, declaration.path)
     if (typeof value !== 'string' || value.trim().length === 0) continue
     if (declaration.verifiedPath) {

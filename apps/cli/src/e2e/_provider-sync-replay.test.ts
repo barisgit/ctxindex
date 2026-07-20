@@ -93,8 +93,16 @@ export async function runProviderSyncReplay<TRequest>(
   for (const args of [
     ['init'],
     ['realm', 'add', 'replay'],
-    ['client', 'add', driver.provider, '--from-env'],
-    ['account', 'add', driver.provider, '--label', driver.accountLabel],
+    ['oauth-app', 'add', driver.provider, driver.provider, '--from-env'],
+    [
+      'account',
+      'add',
+      driver.provider,
+      '--app',
+      driver.provider,
+      '--label',
+      driver.accountLabel,
+    ],
   ]) {
     const result = await sandbox.run(args, { env: driver.env })
     expect(result.exitCode, result.stderr).toBe(0)

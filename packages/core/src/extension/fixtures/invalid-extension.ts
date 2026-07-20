@@ -1,27 +1,30 @@
-import type { ExtensionAuthoringHost } from '@ctxindex/extension-sdk'
+import {
+  defineAdapter,
+  defineExtension,
+  defineProfile,
+  z,
+} from '@ctxindex/extension-sdk'
 
-export default function extension(host: ExtensionAuthoringHost) {
-  const profile = host.defineProfile({
-    id: 'fixture.invalid-note',
-    version: 1,
-    schema: host.z.object({ title: host.z.string() }),
-  })
-  const adapter = host.defineAdapter({
-    id: 'fixture.invalid-adapter',
-    version: 1,
-    configSchema: host.z.object({}),
-    auth: { kind: 'none' },
-    profiles: [{ id: profile.id, version: profile.version }],
-    routing: 'indexed',
-    capabilities: ['retrieve'],
-    operations: {} as never,
-    actions: {},
-  })
+export const invalidNoteProfile = defineProfile({
+  id: 'fixture.invalid-note',
+  version: 1,
+  schema: z.object({ title: z.string() }),
+})
 
-  return host.defineExtension({
-    id: 'fixture.invalid',
-    version: 1,
-    profiles: [profile],
-    adapters: [adapter],
-  })
-}
+export const invalidAdapter = defineAdapter({
+  id: 'fixture.invalid-adapter',
+  configSchema: z.object({}),
+  profiles: [invalidNoteProfile],
+  routing: 'indexed',
+  capabilities: ['retrieve'],
+  operations: {} as never,
+  actions: {},
+})
+
+export const validSibling = defineExtension({ id: 'fixture.valid-sibling' })
+
+export default defineExtension({
+  id: 'fixture.invalid',
+  profiles: [invalidNoteProfile],
+  adapters: [invalidAdapter],
+})
