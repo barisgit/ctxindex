@@ -16,7 +16,7 @@ Issue #61 needs a zero-portal common path. Issue #60 owns Google/Microsoft regis
 - Preserve explicit `--app` for local BYOA and any other Extension App.
 - Preserve the exact all-active-Adapter scope union for every selected App.
 - Keep provider-direct loopback PKCE, local secret storage, Grant snapshots, bounded egress, safe inventory, and stable exits.
-- Let generic runtime/CLI support land before production client identifiers exist.
+- Keep production registration metadata separate from synthetic automated authorization evidence and provider-verification claims.
 
 **Non-Goals:**
 
@@ -38,11 +38,11 @@ Issue #61 needs a zero-portal common path. Issue #60 owns Google/Microsoft regis
 
 5. **Provider registration remains the only config contract.** `defineOAuthApp` config is inferred and runtime-validated from the exact imported Provider's `auth.registration.configSchema`. The Provider also owns the environment mapping used only by local `oauth-app add --from-env`. A public Extension App may carry provider-issued non-confidential native-App metadata; inventory never reveals config. No production public identifier is required to implement or test selection.
 
-6. **Release provenance is matched, not embedded as authority.** Core compares active registry provenance with a host-owned immutable policy. The initial supported policy may name only bundled official packages; later immutable installed npm/Git/Catalog provenance can use the same interface when its acquisition contract is available. An external App that is not policy-matched remains fully usable through explicit `--app`; it is not rejected merely for copying a public id.
+6. **Release provenance is matched, not embedded as authority.** Core compares active registry provenance with a host-owned immutable policy. The initial supported policy names only bundled official packages; later immutable installed npm/Git/Catalog provenance may extend the interface when its acquisition contract is available. An external App that is not policy-matched remains fully usable through explicit `--app`; it is not rejected merely for copying a public id.
 
 7. **Failure never starts a second flow.** Missing/default-policy failures happen before secret reads, persistence, browser launch, or provider egress and exit as invalid usage. Once a managed authorization begins, provider rejection, quota, network, or permission failure retains its existing stable category, persists no partial Account/Grant, and appends explicit BYOA commands. No automatic credential switch or second browser is opened.
 
-8. **The generic slice lands with an empty production policy.** Tests inject invented Providers, Apps, Extension provenance, and loopback endpoints. Production code can ship resolution and CLI support while Google and Microsoft remain BYOA-only. Each real App is activated later by adding its ordinary OAuth App leaf and exact release-policy entry after issue #60 approves the public identifier and provider configuration.
+8. **Public registration metadata and verification are separate checkpoints.** Tests inject invented Providers, Apps, Extension provenance, and loopback endpoints; they never duplicate production client ids or perform live authorization. When the operator explicitly authorizes embedding provider-issued public native-App values, each real App may be contributed through its ordinary Extension leaf and exact release-policy entry before provider review completes. Its docs and release status remain explicit that verification, tenant consent, and scope approval are pending, and BYOA remains available.
 
 ## Risks / Trade-offs
 
@@ -54,8 +54,8 @@ Issue #61 needs a zero-portal common path. Issue #60 owns Google/Microsoft regis
 
 ## Migration Plan
 
-First land the generic policy type, matcher, resolver, CLI omission form, safe failures, and synthetic/compiled tests with no production managed entries. Fresh-state BYOA behavior and explicit `--app` remain unchanged; no database migration is needed because Grants already own exact App snapshots. After each issue #60 Human checkpoint, add that provider's ordinary OAuth App definition and one reviewed release-policy entry, run provider definition/conformance and compiled tests, then enable the omission default for that provider. Removing a policy entry later disables only future default selection; explicit App selection and existing Grant refresh remain intact.
+Land the generic policy type, matcher, resolver, CLI omission form, safe failures, and synthetic/compiled tests together with any explicitly authorized public native-App definitions. Fresh-state BYOA behavior and explicit `--app` remain unchanged; no database migration is needed because Grants already own exact App snapshots. Provider-console and live-consent Human checkpoints remain open until issue #60 confirms them, regardless of whether public metadata is embedded. Removing a policy entry later disables only future default selection; explicit App selection and existing Grant refresh remain intact.
 
 ## Open Questions
 
-- None for the generic slice. The final App labels, public identifiers, redirect registration details, and provider approval status are outputs of issue #60 and must not be invented here.
+- None. App labels and public identifiers must come from explicit operator authorization and provider registrations; verification status remains an issue #60 Human outcome and must not be inferred from embedded metadata.

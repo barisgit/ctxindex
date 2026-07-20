@@ -9,7 +9,7 @@ A fresh ctxindex installation still requires each user to create an OAuth applic
 - Preserve the current Provider-owned registration contract and exact dynamic scope union. Managed Apps do not add, remove, allowlist, or otherwise reinterpret Adapter scopes; provider approval can still reject scopes that were not approved for that App.
 - Keep authorization provider-direct and local through the existing state-checked S256 PKCE loopback flow. Public App registration metadata may ship in source or the compiled CLI, while tokens, Grant snapshots, local BYOA secrets, and personal data remain local.
 - Return deterministic `oauth-app add ... --from-env` and `account add ... --app ...` guidance when no managed App is available or a provider blocks it. Never retry automatically through another App after authorization starts.
-- Split the generic runtime/CLI slice, which can land using synthetic Apps and an empty production policy, from the Google and Microsoft public identifiers and provider/legal verification checkpoints in issue #60.
+- Keep automated runtime/CLI authorization evidence synthetic while allowing explicitly authorized public Google and Microsoft native-App registration metadata to ship before provider verification completes; documentation and status MUST NOT claim approval that has not happened.
 
 ## Capabilities
 
@@ -28,7 +28,7 @@ A fresh ctxindex installation still requires each user to create an OAuth applic
 ## Impact
 
 - `@ctxindex/extension-sdk` needs no parallel official-App factory: the accepted `defineProvider`, `defineOAuthApp`, and `defineExtension` contracts remain authoritative.
-- Official Google and Microsoft Extensions will eventually export ordinary OAuth App leaves alongside their Providers and Adapters. External Extensions may export Apps through exactly the same SDK; only host release policy determines which App, if any, is the omission default.
+- Official Google and Microsoft Extensions export ordinary OAuth App leaves alongside their Providers and Adapters. External Extensions may export Apps through exactly the same SDK; only host release policy determines which App, if any, is the omission default.
 - `@ctxindex/core` owns release-policy matching and exact managed-default resolution. `@ctxindex/cli` owns only parsing and safe formatting.
-- The smallest mergeable implementation contains generic policy/resolution, synthetic tests, CLI behavior, redaction, egress, and compiled coverage while the production managed-App policy remains empty. It requires no live credentials, public client identifiers, backend, ctxindex Account, relay, proxy, or provider data.
-- Issue #60 remains the Human/external owner for public identifiers, redirects, publisher/domain verification, scopes, legal surfaces, and provider approval. Each provider can be activated independently after that checkpoint.
+- The implementation contains generic policy/resolution, synthetic tests, CLI behavior, redaction, egress, and compiled coverage. Production public registration metadata is ordinary non-secret Extension App config and is never copied into mocked provider fixtures; no live credentials, backend, ctxindex Account, relay, proxy, or provider data are required.
+- Issue #60 remains the Human/external owner for redirects, publisher/domain verification, scopes, legal surfaces, and provider approval. Each embedded public registration can complete verification independently after its checkpoint.

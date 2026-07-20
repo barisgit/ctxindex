@@ -60,15 +60,15 @@ No authorization code, token, Grant snapshot, identity response, Source data, or
 - **WHEN** a later release removes the managed policy or App while an existing Grant refreshes
 - **THEN** refresh uses its existing Grant-owned App snapshot and local token references without consulting current managed policy
 
-### Requirement: Production activation is Human-gated and separable
-The generic managed-policy, resolution, CLI, redaction, egress, and compiled capability MUST be testable and mergeable with invented Provider/App definitions and an empty production managed-App policy. A production Google or Microsoft public App identity and policy entry MUST be added only after the corresponding issue #60 Human checkpoint confirms the public/native App type, exact redirect behavior, owned publisher/domain and policy surfaces, current requested scopes, provider approval state, and safe BYOA fallback.
+### Requirement: Public registration metadata and Human verification are separable
+The generic managed-policy, resolution, CLI, redaction, egress, and compiled capability MUST use invented Provider/App definitions for automated authorization. A production Google or Microsoft public App identity and policy entry MAY be added before provider verification only when the operator explicitly authorizes embedding the provider-issued public native-App metadata. Embedded metadata MUST NOT be treated as evidence that publisher, domain, consent, scope, tenant, or production verification has completed.
 
 Provider checkpoints MUST NOT commit secrets, tokens, authorization codes, legal identity artifacts, private provider payloads, or unredacted console evidence. Each provider MAY remain BYOA-only or be activated independently.
 
-#### Scenario: Generic slice contains no production identifier
-- **WHEN** generic managed-default tests and relocated compiled acceptance run before provider approval
-- **THEN** they use synthetic Apps and require no Google/Microsoft client id, credential, live login, or provider data
+#### Scenario: Automated authorization stays synthetic
+- **WHEN** managed-default tests and relocated compiled acceptance run before provider approval
+- **THEN** authorization uses synthetic Apps and requires no live login, credential, or provider data even when safe inventory includes a production App identity
 
-#### Scenario: One provider remains pending
-- **WHEN** Microsoft is approved but Google verification remains incomplete
-- **THEN** the release may activate only the Microsoft policy and App while Google continues requiring explicit App/BYOA selection
+#### Scenario: Embedded App remains unverified
+- **WHEN** a public App definition ships while its issue #60 verification checkpoint is incomplete
+- **THEN** docs and release status identify the pending verification, provider rejection remains possible, and local BYOA remains available

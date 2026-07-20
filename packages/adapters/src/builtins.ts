@@ -1,3 +1,4 @@
+import type { ManagedOAuthAppPolicy } from '@ctxindex/core/oauth-app'
 import {
   type AnyExtensionDefinition,
   defineExtension,
@@ -9,21 +10,23 @@ import {
 } from './generated/documentation'
 import { googleCalendarAdapterDefinition } from './google-calendar/definition'
 import { gmailAdapterDefinition } from './google-mailbox/definition'
+import { ctxindexGoogleOAuthApp } from './google-oauth-app'
 import { localDirectoryAdapterDefinition } from './local-directory/definition'
 import { microsoftCalendarAdapterDefinition } from './microsoft/calendar/definition'
 import { microsoftMailboxAdapterDefinition } from './microsoft/mailbox/definition'
+import { ctxindexMicrosoftOAuthApp } from './microsoft/oauth-app'
 
 export const ctxindexGoogleExtension = defineExtension({
   id: 'ctxindex.google',
   docs: ctxindexGoogleDocumentation,
-  oauthApps: [],
+  oauthApps: [ctxindexGoogleOAuthApp],
   adapters: [googleCalendarAdapterDefinition, gmailAdapterDefinition],
 })
 
 export const ctxindexMicrosoftExtension = defineExtension({
   id: 'ctxindex.microsoft',
   docs: ctxindexMicrosoftDocumentation,
-  oauthApps: [],
+  oauthApps: [ctxindexMicrosoftOAuthApp],
   adapters: [
     microsoftCalendarAdapterDefinition,
     microsoftMailboxAdapterDefinition,
@@ -49,3 +52,18 @@ export const CTXINDEX_BUILTIN_EXTENSIONS = [
   withoutDocumentation(ctxindexMicrosoftExtension),
   withoutDocumentation(ctxindexLocalExtension),
 ] as const
+
+export const CTXINDEX_MANAGED_OAUTH_APP_POLICIES = [
+  {
+    providerId: 'google',
+    label: ctxindexGoogleOAuthApp.label,
+    extensionId: ctxindexGoogleExtension.id,
+    distributions: [{ kind: 'bundled', packageName: '@ctxindex/adapters' }],
+  },
+  {
+    providerId: 'microsoft',
+    label: ctxindexMicrosoftOAuthApp.label,
+    extensionId: ctxindexMicrosoftExtension.id,
+    distributions: [{ kind: 'bundled', packageName: '@ctxindex/adapters' }],
+  },
+] as const satisfies readonly ManagedOAuthAppPolicy[]

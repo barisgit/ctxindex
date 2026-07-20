@@ -11,13 +11,13 @@
 
 `@ctxindex/extension-sdk` remains unchanged: `defineProvider` owns OAuth2 registration and `defineOAuthApp(exactProvider, { label, config })` creates the only Extension App shape. Neither factory accepts managed/default authority or a scope allowlist.
 
-Official and community Extension packages both export ordinary `defineExtension()` roots. The official Google and Microsoft packages eventually own their public App leaves and documentation, but the same leaves could be authored by any external package and selected explicitly.
+Official and community Extension packages both export ordinary `defineExtension()` roots. The official Google and Microsoft packages own their public App leaves and documentation, but the same leaves could be authored by any external package and selected explicitly.
 
-`@ctxindex/core` owns the host release policy, matching active App provenance, resolving an optional managed default to an exact `(providerId,label)`, and returning structured safe failure context. Existing OAuth App service, authorization, scope union, Grant snapshot, secret, and refresh seams remain authoritative.
+`@ctxindex/core` owns the provider-neutral policy types, active-App provenance matcher, optional managed-default resolver, and structured safe failure context. Release composition owns the concrete policy entries beside the bundled provider integrations; Extensions cannot author or supply them. Existing OAuth App service, authorization, scope union, Grant snapshot, secret, and refresh seams remain authoritative.
 
 `@ctxindex/cli` makes `--app` optional in parsing, delegates default resolution to core, and formats exact BYOA guidance. It owns no Provider ids, App labels, public identifiers, provenance rules, or provider-specific HTTP behavior.
 
-Issue #60 owns live provider setup and verification. No implementation task in the generic slice reads live credentials or provider state.
+Issue #60 owns live provider setup and verification. No automated task reads live credentials or provider state. Explicitly authorized public native-App registration values may be embedded only in their owning ordinary Extension App definitions.
 
 ## Interfaces and Data Flow
 
@@ -31,31 +31,13 @@ export interface ManagedOAuthAppPolicy {
   readonly distributions: readonly ManagedOAuthAppDistribution[]
 }
 
-export type ManagedOAuthAppDistribution =
-  | { readonly kind: 'bundled'; readonly packageName: string }
-  | {
-      readonly kind: 'package'
-      readonly packageName: string
-      readonly packageVersion: string
-      readonly integrity: string
-    }
-  | {
-      readonly kind: 'git'
-      readonly repository: string
-      readonly commit: string
-      readonly integrity: string
-    }
-  | {
-      readonly kind: 'catalog'
-      readonly catalogId: string
-      readonly repository: string
-      readonly commit: string
-      readonly sourcePath: string
-      readonly integrity: string
-    }
+export type ManagedOAuthAppDistribution = {
+  readonly kind: 'bundled'
+  readonly packageName: string
+}
 ```
 
-Only provenance variants already supported by the integrated acquisition/runtime model are accepted in the first implementation. Unsupported variants remain absent rather than approximated. Policy is host-owned immutable release data and is not loaded from Extension exports, package manifests, Catalog manifests, environment, or user config.
+Only exact bundled provenance is accepted in the first implementation. Package, Git, and Catalog variants remain absent until their immutable acquisition evidence can extend this interface without approximation. Policy is host-owned immutable release data and is not loaded from Extension exports, package manifests, Catalog manifests, environment, or user config.
 
 ```ts
 export type ManagedOAuthAppResolution =
@@ -106,11 +88,15 @@ Missing managed policy or provenance mismatch exits before secret/database/brows
 
 ## Verification
 
+### Human checkpoint inputs
+
+Issue #60 must compare provider-console configuration with the current loaded-registry result, not with a separately maintained allowlist. For this change's built-in registry, the derived Google union is `email`, `openid`, `https://www.googleapis.com/auth/calendar.events.readonly`, `https://www.googleapis.com/auth/gmail.compose`, and `https://www.googleapis.com/auth/gmail.readonly`. The derived Microsoft union is `Calendars.Read`, `Mail.ReadWrite`, `User.Read`, `offline_access`, and `openid`. Authorization binds an ephemeral IPv4 listener but sends the literal redirect URI `http://localhost:<ephemeral-port>/oauth/callback`; Google and Microsoft console setup must support that native-App loopback behavior. These are review inputs only, not evidence that either console registration or scope set has been approved.
+
 The generic no-identifier slice uses invented Provider/App definitions and synthetic provenance to cover exact policy match, missing policy, inactive App, provenance mismatch, ambiguous policy, explicit App override, unchanged scope union including a community Adapter, Provider rejection, no automatic fallback, safe guidance, redaction, and zero effects before selection failure.
 
-Focused CLI tests cover `account add <provider>` and explicit `--app`, no prompts, stable exits, and deterministic text/JSON. Existing OAuth App, auth, Grant snapshot, secret-backend, and scope-selection tests remain green. Relocated compiled tests embed only synthetic Apps and prove offline/default resolution with no undeclared egress. The production policy stays empty until provider checkpoints complete.
+Focused CLI tests cover `account add <provider>` and explicit `--app`, no prompts, stable exits, and deterministic text/JSON. Existing OAuth App, auth, Grant snapshot, secret-backend, and scope-selection tests remain green. Relocated compiled tests use synthetic authorization endpoints and prove offline/default resolution with no undeclared egress; they may assert safe inventory for production App identities but MUST NOT duplicate production config or perform live authorization.
 
-After each Human checkpoint, conformance tests may inspect the App leaf through the owning official Extension and assert policy identity/provenance without duplicating the public id into mocks. They must not perform live authorization in CI or commit provider-console evidence.
+Conformance tests may inspect each App leaf through its owning official Extension and assert policy identity/provenance without duplicating public registration values into mocks. They must not perform live authorization in CI, claim provider verification, or commit provider-console evidence.
 
 Final verification is all focused Slice gates, `bun run ci`, `bunx openspec validate --all --strict`, `openspec-verify-change`, cartography, and system-reference refresh after implementation.
 

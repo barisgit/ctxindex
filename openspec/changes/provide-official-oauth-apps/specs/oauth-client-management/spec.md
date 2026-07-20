@@ -12,5 +12,5 @@ An OAuth2 Account authorization request MUST resolve exactly one active Extensio
 - **THEN** its exact label is resolved before credential reads or network effects
 
 #### Scenario: Unknown or unavailable App fails before effects
-- **WHEN** explicit App selection is absent/unknown or managed-default resolution finds no exact eligible App
+- **WHEN** an explicit App label is unknown, or `--app` is omitted and managed-default resolution finds no exact eligible App
 - **THEN** it fails before secret reads/writes, persistence, browser launch, or Provider egress

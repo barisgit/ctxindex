@@ -38,6 +38,7 @@ test('built-in Source Adapter implementation is owned by provider modules', asyn
 
   expect(rootFiles).toEqual([
     'builtins.ts',
+    'google-oauth-app.ts',
     'google-oauth-provider.ts',
     'index.ts',
   ])

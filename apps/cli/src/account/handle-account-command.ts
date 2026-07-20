@@ -1,6 +1,13 @@
+import { CTXINDEX_MANAGED_OAUTH_APP_POLICIES } from '@ctxindex/adapters'
 import { authorizeProvider, resolveOAuthSelection } from '@ctxindex/core/auth'
 import { CtxindexValidationError } from '@ctxindex/core/errors'
-import type { OAuthAppInventoryItem } from '@ctxindex/core/oauth-app'
+import {
+  type ManagedOAuthAppPolicy,
+  type ManagedOAuthAppResolution,
+  type OAuthAppInventoryItem,
+  resolveManagedOAuthApp,
+} from '@ctxindex/core/oauth-app'
+import type { CompleteRegistry } from '@ctxindex/core/registry'
 import { accountUsage, parseAccountArgs } from '../args/account'
 import { assertInitialized } from '../commands/db'
 import { loadAuthDefinitionDeps, openAccountDeps, openDeps } from '../deps'
@@ -21,6 +28,50 @@ function availableOAuthAppLabels(
     .sort()
 }
 
+function localOAuthAppGuidance(providerId: string, label: string): string {
+  return [
+    `Configure a local OAuth App with: bun cli oauth-app add ${providerId} ${label} --from-env`,
+    `Then authorize with: bun cli account add ${providerId} --app ${label}`,
+  ].join('. ')
+}
+
+export function formatAccountCommandError(
+  error: unknown,
+  managedProviderId?: string,
+): string {
+  const message = error instanceof Error ? error.message : String(error)
+  return managedProviderId === undefined
+    ? message
+    : `${message}\n${localOAuthAppGuidance(managedProviderId, '<label>')}`
+}
+
+export function resolveAccountOAuthAppLabel(
+  registry: CompleteRegistry,
+  providerId: string,
+  explicitLabel?: string,
+  managed: {
+    readonly policies: readonly ManagedOAuthAppPolicy[]
+    readonly resolve: (
+      registry: CompleteRegistry,
+      policies: readonly ManagedOAuthAppPolicy[],
+      providerId: string,
+    ) => ManagedOAuthAppResolution
+  } = {
+    policies: CTXINDEX_MANAGED_OAUTH_APP_POLICIES,
+    resolve: resolveManagedOAuthApp,
+  },
+): string {
+  if (explicitLabel !== undefined) return explicitLabel
+
+  const resolution = managed.resolve(registry, managed.policies, providerId)
+  if (resolution.status === 'selected') return resolution.label
+
+  throw new CtxindexValidationError(
+    'invalid_oauth_selection',
+    `No managed OAuth App is available for Provider "${providerId}". ${localOAuthAppGuidance(providerId, '<label>')}`,
+  )
+}
+
 export async function handleAccountCommand(args: string[]): Promise<number> {
   const parsed = parseAccountArgs(args)
   if (parsed.kind === 'help') return 0
@@ -33,6 +84,7 @@ export async function handleAccountCommand(args: string[]): Promise<number> {
     | Awaited<ReturnType<typeof openDeps>>
     | Awaited<ReturnType<typeof openAccountDeps>>
     | undefined
+  let managedProviderId: string | undefined
   try {
     if (parsed.kind === 'list') {
       deps = await openAccountDeps()
@@ -57,32 +109,47 @@ export async function handleAccountCommand(args: string[]): Promise<number> {
       const opened = await openDeps()
       deps = opened
       resolveOAuthSelection(opened.completeRegistry, parsed.provider)
-      const availableApps = availableOAuthAppLabels(
-        opened.oauthAppService.listApps(),
+      const appLabel = resolveAccountOAuthAppLabel(
+        opened.completeRegistry,
         parsed.provider,
+        parsed.app,
       )
-      if (!availableApps.includes(parsed.app)) {
-        const guidance =
-          availableApps.length === 0
-            ? `Add it with: bun cli oauth-app add ${parsed.provider} ${parsed.app} --from-env`
-            : `Available labels: ${availableApps.join(', ')}`
-        throw new CtxindexValidationError(
-          'invalid_oauth_selection',
-          `OAuth App "${parsed.app}" is not available for Provider "${parsed.provider}". ${guidance}`,
-        )
+      if (parsed.app === undefined) managedProviderId = parsed.provider
+      let app: Awaited<ReturnType<typeof opened.oauthAppService.resolveApp>>
+      try {
+        app = await opened.oauthAppService.resolveApp(parsed.provider, appLabel)
+      } catch (error) {
+        if (
+          error instanceof CtxindexValidationError &&
+          error.code === 'invalid_oauth_selection'
+        ) {
+          const availableApps = availableOAuthAppLabels(
+            opened.oauthAppService.listApps(),
+            parsed.provider,
+          )
+          const guidance =
+            availableApps.length === 0
+              ? localOAuthAppGuidance(parsed.provider, appLabel)
+              : `Available labels: ${availableApps.join(', ')}`
+          throw new CtxindexValidationError(
+            'invalid_oauth_selection',
+            `OAuth App "${appLabel}" is not available for Provider "${parsed.provider}". ${guidance}`,
+            { cause: error },
+          )
+        }
+        throw error
       }
       const result = await authorizeProvider(
         {
           provider: parsed.provider,
-          app: parsed.app,
+          app: appLabel,
           mode: 'loopback',
           ...(parsed.label !== undefined ? { label: parsed.label } : {}),
         },
         {
           registry: opened.completeRegistry,
           authService: opened.authService,
-          resolveApp: (providerId, label) =>
-            opened.oauthAppService.resolveApp(providerId, label),
+          resolveApp: async () => app,
           emitAuthorizationUrl: (url) => console.log(`Open this URL: ${url}`),
         },
       )
@@ -90,7 +157,7 @@ export async function handleAccountCommand(args: string[]): Promise<number> {
     }
     return 0
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error))
+    console.error(formatAccountCommandError(error, managedProviderId))
     return mapErrorToExit(error)
   } finally {
     await deps?.close()
