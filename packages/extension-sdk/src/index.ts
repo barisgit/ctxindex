@@ -31,6 +31,7 @@ export {
   type OAuthProviderDefinition,
 } from './oauth-app'
 export type {
+  ActionArtifact,
   ActionContext,
   ActionResource,
   AdapterLogger,

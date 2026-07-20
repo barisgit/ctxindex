@@ -23,16 +23,46 @@ const communicationMessageDraftStandaloneContentShape = {
   bodyText: z.string(),
 }
 
+export const communicationMessageDraftAttachmentSchema = z
+  .object({ ref: z.string().min(1) })
+  .strict()
+
+export const MAX_DRAFT_ATTACHMENT_COUNT = 10
+export const MAX_DRAFT_ATTACHMENT_BYTES = 2 * 1024 * 1024
+
+const draftAttachmentsSchema = z
+  .array(communicationMessageDraftAttachmentSchema)
+  .min(1)
+  .max(MAX_DRAFT_ATTACHMENT_COUNT)
+  .superRefine((attachments, context) => {
+    const seen = new Set<string>()
+    for (const [index, attachment] of attachments.entries()) {
+      if (seen.has(attachment.ref))
+        context.addIssue({
+          code: 'custom',
+          message: 'Draft attachment Refs must be unique',
+          path: [index, 'ref'],
+        })
+      seen.add(attachment.ref)
+    }
+  })
+
 const communicationMessageDraftReplyContentShape = {
   replyToRef: z.string().min(1),
   bodyText: z.string(),
 }
 
 const communicationMessageDraftStandaloneCreateInputSchema = z
-  .object(communicationMessageDraftStandaloneContentShape)
+  .object({
+    ...communicationMessageDraftStandaloneContentShape,
+    attachments: draftAttachmentsSchema.optional(),
+  })
   .strict()
 const communicationMessageDraftReplyCreateInputSchema = z
-  .object(communicationMessageDraftReplyContentShape)
+  .object({
+    ...communicationMessageDraftReplyContentShape,
+    attachments: draftAttachmentsSchema.optional(),
+  })
   .strict()
 
 export const communicationMessageDraftCreateInputSchema = z.union([
@@ -113,6 +143,7 @@ export const communicationMessageSchema = z
     labels: z.array(z.string()).optional(),
     unread: z.boolean().optional(),
     attachments: z.array(artifactDescriptorSchema).optional(),
+    managedAttachmentRefs: z.array(z.string().min(1)).optional(),
   })
   .strict()
 

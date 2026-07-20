@@ -13,6 +13,7 @@ import {
   deriveCommunicationMessageReplySubject,
 } from '@ctxindex/profiles'
 import type { z } from 'zod'
+import { renderMimeMessage, resolveDraftAttachments } from '../../mail/mime'
 import { parseGraphMessage, retrievedResource } from './message'
 import { parseDraftRef } from './ref'
 import {
@@ -55,6 +56,35 @@ interface MicrosoftReplyDetails {
   readonly references: readonly string[]
 }
 
+interface MicrosoftRecipient {
+  readonly emailAddress: {
+    readonly address: string
+    readonly name?: string
+  }
+}
+
+const MAILBOX_PATTERN =
+  /^[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-]+(?:\.[\p{L}\p{N}!#$%&'*+/=?^_`{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/u
+
+function hasControlCharacter(value: string): boolean {
+  for (const character of value) {
+    const codePoint = character.codePointAt(0)
+    if (
+      codePoint !== undefined &&
+      (codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f))
+    )
+      return true
+  }
+  return false
+}
+
+function validMailbox(value: string): boolean {
+  const localPart = value.slice(0, value.indexOf('@'))
+  return (
+    value.length <= 254 && localPart.length <= 64 && MAILBOX_PATTERN.test(value)
+  )
+}
+
 function parseCreateInput(input: unknown): MicrosoftDraftCreateInput {
   const parsed = communicationMessageDraftCreateInputSchema.safeParse(input)
   if (!parsed.success)
@@ -77,14 +107,15 @@ function parseUpdateInput(input: unknown): MicrosoftDraftUpdateInput {
   return parsed.data
 }
 
-function recipient(value: string) {
+function recipient(value: string): MicrosoftRecipient {
   const trimmed = value.trim()
-  const named = /^(.*?)\s*<([^<>]+)>$/.exec(value)
+  const named = /^(.*?)\s*<([^<>]+)>$/.exec(trimmed)
   const name = named?.[1]?.trim()
   const address = named?.[2]?.trim()
   if (
-    (named && (!name || !address || /[<>\s]/.test(address))) ||
-    (!named && (!trimmed || /[<>\s]/.test(trimmed)))
+    hasControlCharacter(trimmed) ||
+    (named && (!name || !address || !validMailbox(address))) ||
+    (!named && !validMailbox(trimmed))
   )
     throw new CtxindexValidationError(
       'invalid_action_input',
@@ -97,6 +128,19 @@ function recipient(value: string) {
 
 function recipients(values: readonly string[]) {
   return values.map(recipient)
+}
+
+function mimeRecipient(value: string): string {
+  const { name, address } = recipient(value).emailAddress
+  if (!name) return address
+  const renderedName = /[(),.:;<>@[\]"\\]/.test(name)
+    ? `"${name.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`
+    : name
+  return `${renderedName} <${address}>`
+}
+
+function mimeRecipients(values: readonly string[]): string {
+  return values.map(mimeRecipient).join(', ')
 }
 
 function replacement(
@@ -246,22 +290,35 @@ function replyReplacement(details: MicrosoftReplyDetails, bodyText: string) {
   }
 }
 
-function replyMime(details: MicrosoftReplyDetails, bodyText: string): string {
+function mimeHeaders(
+  input:
+    | MicrosoftStandaloneDraftCreateInput
+    | MicrosoftStandaloneDraftUpdateInput,
+): string[] {
+  return [
+    `To: ${mimeRecipients(input.to)}`,
+    ...(input.cc?.length ? [`Cc: ${mimeRecipients(input.cc)}`] : []),
+    ...(input.bcc?.length ? [`Bcc: ${mimeRecipients(input.bcc)}`] : []),
+    `Subject: ${input.subject}`,
+  ]
+}
+
+function replyMime(
+  details: MicrosoftReplyDetails,
+  bodyText: string,
+  attachments: Parameters<typeof renderMimeMessage>[0]['attachments'],
+): string {
   const headers = [
-    `To: ${details.recipient}`,
+    `To: ${mimeRecipient(details.recipient)}`,
     `Subject: ${details.subject}`,
     ...(details.inReplyTo ? [`In-Reply-To: ${details.inReplyTo}`] : []),
     ...(details.references.length > 0
       ? [`References: ${details.references.join(' ')}`]
       : []),
-    'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=UTF-8',
-    'Content-Transfer-Encoding: 8bit',
   ]
-  const body = bodyText.replace(/\r\n|\r|\n/g, '\r\n')
-  return Buffer.from(`${headers.join('\r\n')}\r\n\r\n${body}`).toString(
-    'base64',
-  )
+  return Buffer.from(
+    renderMimeMessage({ headers, bodyText, attachments }),
+  ).toString('base64')
 }
 
 function normalizeBodyLineEndings(value: string): string {
@@ -276,6 +333,7 @@ function draftResource(
     readonly details: MicrosoftReplyDetails
     readonly bodyText: string
   },
+  managedAttachmentRefs?: readonly string[],
 ): RetrievedResource {
   const message = parseGraphMessage(value)
   if (
@@ -314,6 +372,9 @@ function draftResource(
   const payload = communicationMessageSchema.parse({
     ...basePayload,
     providerDraftId: message.id,
+    ...(managedAttachmentRefs !== undefined
+      ? { managedAttachmentRefs: [...managedAttachmentRefs] }
+      : {}),
     to: reply ? [reply.details.recipient] : (basePayload.to ?? []),
     cc: reply ? [] : (basePayload.cc ?? []),
     bcc: reply ? [] : (basePayload.bcc ?? []),
@@ -340,6 +401,8 @@ export async function microsoftDraftCreate(
   context: ActionContext<MicrosoftDraftCreateInput>,
 ): Promise<RetrievedResource> {
   const input = parseCreateInput(context.input)
+  const attachments = await resolveDraftAttachments(context, input.attachments)
+  const managedAttachmentRefs = attachments.map((artifact) => artifact.ref)
   if (isReplyInput(input)) {
     const details = replyDetails(context, input.replyToRef)
     const headers = graphHeaders(TEXT_BODY_PREFERENCE)
@@ -351,7 +414,7 @@ export async function microsoftDraftCreate(
       {
         method: 'POST',
         headers,
-        body: replyMime(details, input.bodyText),
+        body: replyMime(details, input.bodyText, attachments),
         signal: context.signal,
       },
     )
@@ -363,17 +426,36 @@ export async function microsoftDraftCreate(
         details,
         bodyText: input.bodyText,
       },
+      managedAttachmentRefs,
     )
   }
   const headers = graphHeaders(TEXT_BODY_PREFERENCE)
-  headers.set('content-type', 'application/json')
+  headers.set(
+    'content-type',
+    attachments.length > 0 ? 'text/plain' : 'application/json',
+  )
   const response = await context.fetch(graphUrl('/me/messages'), {
     method: 'POST',
     headers,
-    body: JSON.stringify(replacement(input)),
+    body:
+      attachments.length > 0
+        ? Buffer.from(
+            renderMimeMessage({
+              headers: mimeHeaders(input),
+              bodyText: input.bodyText,
+              attachments,
+            }),
+          ).toString('base64')
+        : JSON.stringify(replacement(input)),
     signal: context.signal,
   })
-  return draftResource(await graphJson(response), context.source.id)
+  return draftResource(
+    await graphJson(response),
+    context.source.id,
+    undefined,
+    undefined,
+    managedAttachmentRefs,
+  )
 }
 
 export async function microsoftDraftUpdate(
@@ -388,6 +470,18 @@ export async function microsoftDraftUpdate(
   const standalone = details
     ? undefined
     : (input as MicrosoftStandaloneDraftUpdateInput)
+  const storedResource = context.resolveResource(input.ref)
+  const stored =
+    storedResource?.profile.id === 'communication.message' &&
+    storedResource.profile.version === 1 &&
+    storedResource.completeness === 'complete' &&
+    storedResource.deletedAt === null
+      ? communicationMessageSchema.safeParse(storedResource.payload)
+      : undefined
+  const managedAttachmentRefs =
+    stored?.success && stored.data.providerDraftId === draftId
+      ? stored.data.managedAttachmentRefs
+      : undefined
   const headers = graphHeaders(TEXT_BODY_PREFERENCE)
   headers.set('content-type', 'application/json')
   const response = await context.fetch(
@@ -408,5 +502,6 @@ export async function microsoftDraftUpdate(
     context.source.id,
     draftId,
     details ? { details, bodyText: input.bodyText } : undefined,
+    managedAttachmentRefs,
   )
 }
