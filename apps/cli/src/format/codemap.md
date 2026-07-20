@@ -9,7 +9,7 @@ Pure presentation and process-exit adapters for stable text, compact, Markdown, 
 - `oauth-app.ts` renders only provider, label, origin, safe provenance, and lifecycle confirmations; config and secret refs/values never appear.
 - `account.ts` renders Accounts, authorization expiry state, and required Source labels without Grant identifiers or scopes; `source.ts` projects the single Source label field that replaced display name and omits internal Grant IDs from JSON.
 - Registry renderers derive Provider auth/registration metadata, Adapter access scopes, config flags, and Actions from loaded definitions. Text and Markdown Action renderers expand top-level `oneOf`/`anyOf` inputs into numbered branches.
-- Catalog formatters render deterministic persisted pins, entries, install/uninstall provenance, and loaded registry origins in text or JSON; acquisition timestamps remain intact and derived non-negative snapshot age is surfaced at formatting time.
+- Catalog formatters render deterministic persisted pins, entries, install/uninstall provenance, and snapshot age. Direct formatters expose credential-free requested targets and exact immutable provenance for install/update/list/uninstall results.
 - `exit.ts` maps typed core errors to SPEC-stable numeric outcomes and `runWithExit` assigns `process.exitCode`.
 
 ## Data & control flow

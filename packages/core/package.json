@@ -24,6 +24,7 @@
     "./registry": "./src/registry/index.ts",
     "./extension": "./src/extension/index.ts",
     "./catalog": "./src/catalog/index.ts",
+    "./direct-extension": "./src/direct-extension/index.ts",
     "./sync": "./src/sync/index.ts",
     "./search": "./src/search/index.ts",
     "./thread": "./src/thread/index.ts",

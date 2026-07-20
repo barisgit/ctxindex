@@ -1,9 +1,9 @@
 ---
 title: ctxindex extensions
-description: Inspect loaded Extensions and manage trusted local Git Catalogs.
+description: Inspect loaded Extensions and install trusted packages directly or through Git Catalogs.
 ---
 
-Extensions bundle Profiles and Source Adapters. External Extensions are trusted code loaded from explicit paths or installed from explicitly added Git Catalogs. Catalogs are merged into one local discovery surface; ctxindex does not operate a hosted marketplace.
+Extensions bundle Profiles, Providers, OAuth Apps, and Source Adapters. External Extensions are trusted code loaded from explicit paths, installed directly from npm/Git/local packages, or installed from explicitly added Git Catalogs. Catalogs are merged into one local discovery surface; ctxindex does not operate a hosted marketplace.
 
 ## Usage
 
@@ -16,6 +16,9 @@ ctxindex extensions catalog refresh <name> [--json]
 ctxindex extensions catalog remove <name> [--json]
 ctxindex extensions install <catalog> <id>@<version> --trust [--no-refresh] [--json]
 ctxindex extensions uninstall <id>@<version> [--json]
+ctxindex extensions install <npm|git|local> <target> --extension <id> [--json]
+ctxindex extensions update <id> [--json]
+ctxindex extensions uninstall <id> [--force] [--json]
 ```
 
 ## Commands and flags
@@ -28,12 +31,17 @@ ctxindex extensions uninstall <id>@<version> [--json]
 | `catalog show` | Refresh, then inspect one Catalog or exact Extension entry. |
 | `catalog refresh` | Explicitly acquire and persist a Catalog's latest immutable snapshot for its configured ref. |
 | `catalog remove` | Remove a Catalog registration when none of its Extensions remain installed. |
-| `install` | Install one exact `<id>@<version>` from a named Catalog after a separate code-execution trust acknowledgement. |
-| `uninstall` | Remove one installed Catalog Extension by exact `<id>@<version>`. |
+| `install <catalog> <id>@<version> --trust` | Install one exact version from a named Catalog after a separate code-execution trust acknowledgement. |
+| `install <npm|git|local> <target> --extension <id>` | Acquire one package and activate exactly the selected Extension root. |
+| `update <id>` | Re-acquire a directly installed Extension from its stored target and atomically replace its immutable pin. |
+| `uninstall <id> [--force]` | Remove a direct installation; normal removal is blocked while configured Sources need its Adapter. Force preserves Sources and indexed data in an unavailable state. |
+| `uninstall <id>@<version>` | Remove one installed Catalog Extension by exact version. |
 | `--no-refresh` | Use the stored Catalog snapshot for `catalog list`, `catalog show`, or `install` instead of refreshing first. |
 | `--json` | Print deterministic JSON for any listed operation. |
 
 `catalog add --trust` acknowledges trust in acquiring and reading that repository. `extensions install --trust` is a second, independent acknowledgement that the selected Extension executes in-process with the same privileges as ctxindex. Catalog listing, showing, and installation refresh by default; refresh failure is reported instead of silently falling back to stale data. Use `--no-refresh` deliberately for the stored snapshot. Startup, loaded-Extension listing, and uninstall remain offline.
+
+Direct install and update print a trust notice before acquiring or importing the package. npm and Git targets are resolved to immutable metadata; local targets are copied into an immutable content-addressed snapshot. Startup loads only the stored pin: it never contacts the registry, Git remote, package manager, or original local directory. Package dependencies are ordinary imports and may come from npm, Git, or local package references; ctxindex does not maintain a separate Extension dependency graph.
 
 If an Extension is unavailable or uninstalled, its Sources remain listed and their synced Resources remain locally searchable, but provider operations stop.
 
@@ -42,5 +50,5 @@ If an Extension is unavailable or uninstalled, its Sources remain listed and the
 All Extension lifecycle commands accept `--json`. Extension loading and acquisition diagnostics are written separately from stdout.
 
 <Callout title="Stable exit codes">
-Exit codes are API: `0` success; `2` invalid usage; `10` `needs_auth`; `20` rate limited; `30` network/provider; `40` permission denied; `50` other sync failure; `130` cancelled by SIGINT.
+Exit codes are API: `0` success; `2` invalid usage; `10` `needs_auth`; `20` rate limited; `30` network/provider or package acquisition; `40` permission denied; `50` validation, conflict, or other internal failure; `130` cancelled by SIGINT.
 </Callout>

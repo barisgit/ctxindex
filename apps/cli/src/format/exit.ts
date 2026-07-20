@@ -38,6 +38,15 @@ export function mapErrorToExit(err: unknown): number {
   if (code === 'sync_unsupported') return 2
   if (code === 'adapter_unavailable') return 50
   if (code === 'UNKNOWN_ADAPTER' || code === 'unknown_adapter') return 2
+  if (
+    code === 'extension_target_invalid' ||
+    code === 'extension_trust_required' ||
+    code === 'extension_removal_blocked'
+  )
+    return 2
+  if (code === 'extension_acquisition_failed') return 30
+  if (code === 'extension_validation_failed' || code === 'extension_conflict')
+    return 50
 
   if (err instanceof CtxindexNotFoundError) return 2
   if (err instanceof CtxindexSecretsError && err.code === 'invalid_ref')

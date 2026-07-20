@@ -8,6 +8,9 @@ type ProvenanceWithAge = ExtensionLoadProvenance & {
 function provenanceText(provenance: ProvenanceWithAge): string {
   if (provenance.kind === 'builtin') return 'builtin'
   if (provenance.kind === 'path') return `path ${provenance.path}`
+  if (provenance.kind === 'direct') {
+    return `direct ${provenance.sourceKind} ${provenance.requestedTarget} ${provenance.resolvedIdentity} ${provenance.materializationDigest}`
+  }
   return `catalog ${provenance.catalog} ${provenance.commit} ${provenance.repository} ${provenance.sourcePath}${provenance.snapshotAgeMs === undefined ? '' : ` age ${provenance.snapshotAgeMs}ms`}`
 }
 

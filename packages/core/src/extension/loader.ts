@@ -5,6 +5,11 @@ import {
   validateCatalogSnapshot,
 } from '../catalog'
 import type { CtxindexConfig } from '../config'
+import {
+  type DirectExtensionInstallationRecord,
+  directExtensionMaterializationPath,
+  hashDirectory,
+} from '../direct-extension'
 import { dataDir } from '../paths'
 import { createExtensionRegistry, type ExtensionRegistry } from '../registry'
 import {
@@ -35,6 +40,7 @@ export interface LoadExtensionsInput {
   readonly config: CtxindexConfig
   readonly builtins: DefinitionModule
   readonly installed?: readonly InstalledExtensionRecord[]
+  readonly directInstalled?: readonly DirectExtensionInstallationRecord[]
   readonly localOAuthAppIdentities?: readonly OAuthAppIdentity[]
   readonly dataRoot?: string
 }
@@ -58,6 +64,14 @@ export type ExtensionLoadProvenance =
       readonly commit: string
       readonly snapshotAcquiredAt: number
       readonly sourcePath: string
+    }
+  | {
+      readonly id: string
+      readonly kind: 'direct'
+      readonly sourceKind: DirectExtensionInstallationRecord['source']['kind']
+      readonly requestedTarget: string
+      readonly resolvedIdentity: string
+      readonly materializationDigest: string
     }
 
 export interface LoadExtensionsResult {
@@ -195,6 +209,73 @@ export async function loadExtensions(
         message: safeExtensionDiagnostic(
           cause,
           'Catalog Extension package could not be loaded',
+        ),
+      })
+    }
+  }
+
+  for (const installed of input.directInstalled ?? []) {
+    const materialization = directExtensionMaterializationPath(
+      input.dataRoot ?? dataDir(),
+      installed.materialization_digest,
+    )
+    const extensionPath = join(materialization, installed.package_root)
+    try {
+      if (
+        (await hashDirectory(materialization)) !==
+        installed.materialization_digest
+      ) {
+        throw new TypeError(
+          'Direct Extension materialization integrity mismatch',
+        )
+      }
+      const selected = await importExtensionPackageRoot(
+        extensionPath,
+        installed.id,
+        {
+          origin: 'direct',
+          ...(installed.source.kind === 'npm'
+            ? {
+                packageVersion: installed.source.exact_version,
+                ...(installed.source.integrity === undefined
+                  ? {}
+                  : { integrity: installed.source.integrity }),
+              }
+            : installed.source.kind === 'git'
+              ? { commit: installed.source.commit }
+              : {}),
+        },
+      )
+      const nextRoots = [...activeRoots, selected]
+      assertCompatibleExtensionDocumentation(nextRoots)
+      const candidate = buildCompleteCandidateRegistry({
+        roots: nextRoots,
+        localOAuthAppIdentities,
+      })
+      registry = createExtensionRegistry(
+        nextRoots.map(({ definition }) => definition),
+      )
+      activeRoots = nextRoots
+      completeRegistry = candidate
+      provenance.push({
+        id: installed.id,
+        kind: 'direct',
+        sourceKind: installed.source.kind,
+        requestedTarget: installed.source.requested_target,
+        resolvedIdentity:
+          installed.source.kind === 'npm'
+            ? installed.source.exact_version
+            : installed.source.kind === 'git'
+              ? installed.source.commit
+              : installed.source.content_digest,
+        materializationDigest: installed.materialization_digest,
+      })
+    } catch (cause) {
+      diagnostics.push({
+        path: `direct:${installed.id}`,
+        message: safeExtensionDiagnostic(
+          cause,
+          'Direct Extension package could not be loaded',
         ),
       })
     }

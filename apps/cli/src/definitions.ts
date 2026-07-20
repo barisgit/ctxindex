@@ -1,4 +1,5 @@
 import * as CTXINDEX_BUILTIN_MODULE from '@ctxindex/adapters'
+import { DirectExtensionStore } from '@ctxindex/core'
 import { CatalogStore } from '@ctxindex/core/catalog'
 import { type CtxindexConfig, readConfig } from '@ctxindex/core/config'
 import {
@@ -26,15 +27,28 @@ export async function loadCliDefinitions(
 ): Promise<CliDefinitions> {
   const config = options.config ?? (await readConfig())
   const installed = await new CatalogStore().readInstalled()
+  const direct = await new DirectExtensionStore().readRecordsForLoading()
   const loaded = await loadExtensions({
     config,
     builtins: CTXINDEX_BUILTIN_MODULE,
     installed,
+    directInstalled: direct.records,
     ...(options.localOAuthAppIdentities === undefined
       ? {}
       : { localOAuthAppIdentities: options.localOAuthAppIdentities }),
   })
-  return { ...loaded, config, description: describeRegistry(loaded.registry) }
+  return {
+    ...loaded,
+    diagnostics: [
+      ...direct.diagnostics.map((message) => ({
+        path: 'direct-records',
+        message,
+      })),
+      ...loaded.diagnostics,
+    ],
+    config,
+    description: describeRegistry(loaded.registry),
+  }
 }
 
 export function printExtensionDiagnostics(

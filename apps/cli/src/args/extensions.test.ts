@@ -64,7 +64,7 @@ describe('parseExtensionsArgs Catalog surface', () => {
         '--json',
       ]),
     ).toEqual({
-      kind: 'install',
+      kind: 'catalog-install',
       catalog: 'team',
       extension: { id: 'fixture.extension', version: 1 },
       trust: true,
@@ -74,7 +74,7 @@ describe('parseExtensionsArgs Catalog surface', () => {
     expect(
       parseExtensionsArgs(['uninstall', 'fixture.extension@1', '--json']),
     ).toEqual({
-      kind: 'uninstall',
+      kind: 'catalog-uninstall',
       extension: { id: 'fixture.extension', version: 1 },
       json: true,
     })
@@ -101,13 +101,60 @@ describe('parseExtensionsArgs Catalog surface', () => {
         '--no-refresh',
       ]),
     ).toEqual({
-      kind: 'install',
+      kind: 'catalog-install',
       catalog: 'team',
       extension: { id: 'fixture.extension', version: 1 },
       trust: true,
       noRefresh: true,
       json: false,
     })
+  })
+
+  test('parses direct lifecycle commands without guessing target kinds', () => {
+    expect(
+      parseExtensionsArgs([
+        'install',
+        'npm',
+        '@example/mail@^2',
+        '--extension',
+        'example.mail',
+        '--json',
+      ]),
+    ).toEqual({
+      kind: 'direct-install',
+      sourceKind: 'npm',
+      target: '@example/mail@^2',
+      extensionId: 'example.mail',
+      json: true,
+    })
+    expect(parseExtensionsArgs(['update', 'example.mail', '--json'])).toEqual({
+      kind: 'direct-update',
+      extensionId: 'example.mail',
+      json: true,
+    })
+    expect(
+      parseExtensionsArgs(['uninstall', 'example.mail', '--force', '--json']),
+    ).toEqual({
+      kind: 'direct-uninstall',
+      extensionId: 'example.mail',
+      force: true,
+      json: true,
+    })
+  })
+
+  test.each([
+    'npm',
+    'git',
+    'local',
+  ])('keeps %s available as a Catalog name', (catalog) => {
+    expect(
+      parseExtensionsArgs([
+        'install',
+        catalog,
+        'fixture.extension@1',
+        '--trust',
+      ]),
+    ).toMatchObject({ kind: 'catalog-install', catalog })
   })
 
   test.each([
@@ -117,6 +164,9 @@ describe('parseExtensionsArgs Catalog surface', () => {
     ['uninstall', 'fixture.extension@0'],
     ['catalog', 'show', 'team', 'fixture.extension@x'],
     ['catalog', 'list', '--unknown'],
+    ['install', 'npm', '@example/mail'],
+    ['install', '@example/mail'],
+    ['uninstall', 'fixture.extension@1', '--force'],
   ])('rejects malformed or untrusted arguments: %j', (...args) => {
     expect(
       parseExtensionsArgs(

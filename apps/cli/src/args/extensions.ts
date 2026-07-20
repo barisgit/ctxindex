@@ -38,7 +38,7 @@ export type ExtensionsArgs =
       readonly json: boolean
     }
   | {
-      readonly kind: 'install'
+      readonly kind: 'catalog-install'
       readonly catalog: string
       readonly extension: ExtensionSelector
       readonly trust: true
@@ -46,8 +46,26 @@ export type ExtensionsArgs =
       readonly json: boolean
     }
   | {
-      readonly kind: 'uninstall'
+      readonly kind: 'catalog-uninstall'
       readonly extension: ExtensionSelector
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'direct-install'
+      readonly sourceKind: 'npm' | 'git' | 'local'
+      readonly target: string
+      readonly extensionId: string
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'direct-update'
+      readonly extensionId: string
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'direct-uninstall'
+      readonly extensionId: string
+      readonly force: boolean
       readonly json: boolean
     }
   | { readonly kind: 'help' }
@@ -207,6 +225,40 @@ export function parseExtensionsArgs(args: string[]): ExtensionsArgs {
   }
   if (subcommand === 'catalog') return parseCatalogArgs(rest)
   if (subcommand === 'install') {
+    const directKind = rest[0]
+    if (
+      (directKind === 'npm' ||
+        directKind === 'git' ||
+        directKind === 'local') &&
+      rest.includes('--extension')
+    ) {
+      const parsed = parseFlags(rest, {
+        booleanFlags: ['json'],
+        valueFlags: ['extension'],
+        strict: true,
+      })
+      if (parsed.error !== undefined) {
+        return unknown(
+          `extensions install: ${parsed.error.kind} option ${parsed.error.flag}`,
+        )
+      }
+      if (
+        parsed.positional.length !== 2 ||
+        typeof parsed.flags.extension !== 'string' ||
+        parsed.flags.extension.length === 0
+      ) {
+        return unknown(
+          'extensions install: expected <npm|git|local> <target> --extension <id>',
+        )
+      }
+      return {
+        kind: 'direct-install',
+        sourceKind: directKind,
+        target: parsed.positional[1] ?? '',
+        extensionId: parsed.flags.extension,
+        json: parsed.flags.json === true,
+      }
+    }
     const parsed = parseFlags(rest, {
       booleanFlags: ['trust', 'no-refresh', 'json'],
       strict: true,
@@ -229,7 +281,7 @@ export function parseExtensionsArgs(args: string[]): ExtensionsArgs {
       return unknown('extensions install: --trust is required')
     }
     return {
-      kind: 'install',
+      kind: 'catalog-install',
       catalog: parsed.positional[0] ?? '',
       extension: selector,
       trust: true,
@@ -237,14 +289,51 @@ export function parseExtensionsArgs(args: string[]): ExtensionsArgs {
       json: parsed.flags.json === true,
     }
   }
-  if (subcommand === 'uninstall') {
-    const parsed = parseSimple('extensions uninstall', rest, 1)
+  if (subcommand === 'update') {
+    const parsed = parseSimple('extensions update', rest, 1)
     if ('kind' in parsed) return parsed
-    const selector = parseSelector(parsed.positional[0] ?? '')
-    if (selector === undefined) {
+    return {
+      kind: 'direct-update',
+      extensionId: parsed.positional[0] ?? '',
+      json: parsed.json,
+    }
+  }
+  if (subcommand === 'uninstall') {
+    const parsed = parseFlags(rest, {
+      booleanFlags: ['force', 'json'],
+      strict: true,
+    })
+    if (parsed.error !== undefined) {
+      return unknown(
+        `extensions uninstall: ${parsed.error.kind} option ${parsed.error.flag}`,
+      )
+    }
+    if (parsed.positional.length !== 1) {
+      return unknown('extensions uninstall: invalid arguments')
+    }
+    const value = parsed.positional[0] ?? ''
+    const selector = parseSelector(value)
+    if (selector !== undefined) {
+      if (parsed.flags.force === true) {
+        return unknown(
+          'extensions uninstall: --force applies only to direct Extensions',
+        )
+      }
+      return {
+        kind: 'catalog-uninstall',
+        extension: selector,
+        json: parsed.flags.json === true,
+      }
+    }
+    if (value.length === 0 || value.includes('@')) {
       return unknown('extensions uninstall: invalid Extension selector')
     }
-    return { kind: 'uninstall', extension: selector, json: parsed.json }
+    return {
+      kind: 'direct-uninstall',
+      extensionId: value,
+      force: parsed.flags.force === true,
+      json: parsed.flags.json === true,
+    }
   }
   return unknown(
     `extensions: unknown subcommand ${JSON.stringify(subcommand ?? '')}`,

@@ -66,6 +66,14 @@ bun cli extensions install team example.extension@1 --trust
 bun cli extensions list --json
 ```
 
+Packages can also be installed directly from npm, Git, or a local directory. The selector chooses exactly one Extension root; update reuses the stored target, while startup uses only the immutable local pin:
+
+```sh
+bun cli extensions install npm @example/ctxindex-extension --extension example.extension
+bun cli extensions update example.extension
+bun cli extensions uninstall example.extension
+```
+
 ## 2. Overview and value proposition
 
 ctxindex is a **local personal-context gateway** with four operations over the same configured Sources:
@@ -119,7 +127,7 @@ A backend move copies and verifies target entries before switching durable refer
 
 Provider requests pass through central authorized fetch with declared host restrictions. Logs redact known sensitive fields, and the reference system emits no telemetry or update pings.
 
-External Extensions are explicitly configured TypeScript/JavaScript loaded in-process with full trust. Runtime validation protects registry consistency, not the host from malicious code. Catalog add, explicit refresh, and default list/show/install refresh are the only repository acquisition operations; they accept credential-free public HTTPS or absolute local Git repositories, pin a commit, and use hardened system Git without prompts, credentials, hooks, submodules, filters, or external protocol helpers. Remote URLs reject userinfo, query, fragment, localhost, and literal loopback, IPv4-mapped, private, unique-local, link-local, site-local, unspecified, or multicast destinations. `--no-refresh`, startup, loaded-Extension listing, uninstall, and removal never acquire. Installing an exact Catalog Extension requires a separate execution-trust acknowledgement. A Realm scopes reasoning and search, not credentials or filesystem access; auth isolation comes from Account, Grant, Source binding, and host restrictions.
+External Extensions are explicitly configured TypeScript/JavaScript loaded in-process with full trust. Runtime validation protects registry consistency, not the host from malicious code. Catalog commands acquire credential-free Git snapshots; direct install/update explicitly acquire npm, Git, or local packages. Both paths pin immutable local snapshots, reject credential-bearing targets, disable lifecycle scripts, and surface execution trust before code import. Startup, loaded-Extension listing, uninstall, and removal never acquire or revisit the original target. Catalog Git acquisition additionally rejects userinfo, query, fragment, localhost, and literal loopback, IPv4-mapped, private, unique-local, link-local, site-local, unspecified, or multicast destinations. A Realm scopes reasoning and search, not credentials or filesystem access; auth isolation comes from Account, Grant, Source binding, and host restrictions.
 
 ## 5. Extension architecture
 
@@ -135,7 +143,7 @@ Adapters may be provider-bound or providerless. Providerless operation is a real
 
 Adapters receive host-provided operation contexts: Source identity/config, cancellation, scoped logging, allowlisted authorized fetch, declared secret access, Artifact sink, and operation-specific emission. They neither import core runtime internals nor write tables.
 
-V1 loads trusted `.ts`/`.js` Extensions from bundled packages, explicit local package roots, and exact installed Catalog provenance through the same manifest-entry, collector, documentation-resolver, and registry seams. Built-in source documentation is staged into validated embedded virtual trees so relocated compiled binaries need no checkout files. Built-ins currently publish no official OAuth App metadata; BYOA remains available. Import, manifest, documentation, schema, duplicate-id, or capability failure becomes a diagnostic and rejects that package atomically. Persistent direct local/Git/npm installation, built-in selection/override UX, sandboxing, and out-of-process/non-TypeScript Adapters are deferred. Bun is pinned to 1.3.14 for compiled distribution and external TypeScript Extension compatibility.
+V1 loads trusted `.ts`/`.js` Extensions from bundled packages, explicit local package roots, exact installed Catalog provenance, and immutable direct npm/Git/local package pins through the same manifest-entry, collector, documentation-resolver, and registry seams. Built-in source documentation is staged into validated embedded virtual trees so relocated compiled binaries need no checkout files. Built-ins currently publish no official OAuth App metadata; BYOA remains available. Import, manifest, documentation, schema, duplicate-id, or capability failure becomes a diagnostic and rejects that package atomically. Direct-install failures degrade per Extension without fetching or invalidating unrelated candidates. Built-in selection/override UX, sandboxing, and out-of-process/non-TypeScript Adapters are deferred. Bun is pinned to 1.3.14 for compiled distribution and external TypeScript Extension compatibility.
 
 If an Extension disappears, Sources become `extension_unavailable`. Existing local Resources remain searchable, degrading to their envelope when vocabulary is missing; provider operations stop. Restoring the Extension restores availability without deleting data.
 
@@ -241,7 +249,7 @@ Artifact descriptors remain with Resources while provider bytes are fetched on d
 
 Core bookkeeping timestamps use UTC Unix-epoch milliseconds; Profile payloads may preserve RFC 3339 instants or local dates. Opaque ctxindex-owned primary keys are client-generated ULIDs; a Realm uses its human slug as primary key, or a ULID without one. Provider IDs are never core primary keys. Exports resolve formats from Profiles, not a core conversion pipeline. A basic backup stops Sync, then copies SQLite and the encrypted secret file when used. External systems remain canonical. Prototype databases have no compatibility obligation; cross-Source Resource collapse, canonical identity, merge policy, Extension-private tables, and payload-version migration are deferred.
 
-Catalog and installed-Extension records are strict TOML with portable repository, ref, commit, snapshot acquisition time, and relative source/setup fields. Output derives stored snapshot age from that timestamp. Absolute snapshot paths are never persisted: locations derive under `data/catalogs/<catalog-name>/<commit>` and remain retained immutable data rather than SQLite domain records.
+Catalog and installed-Extension records are strict TOML with portable repository, ref, commit, snapshot acquisition time, and relative source/setup fields. Direct-install records are strict versioned JSON with sanitized requested provenance, exact npm version/integrity, Git commit, or normalized local origin, plus a content digest and relative package root. Managed absolute paths are never persisted: locations derive beneath the data directory and remain retained immutable data rather than SQLite domain records.
 
 ## 11. CLI surface and stable exit codes
 
@@ -251,7 +259,7 @@ Readable output is compact; JSON goes to stdout and diagnostics to stderr. Regis
 
 Generic verbs cover initialization, OAuth App/Account/Realm/Source management, sync, search, get, threads, Artifacts, exports, Actions, status, purge, Extensions, secrets, and bundled skills. `oauth-app add <provider> <label> --from-env`, `oauth-app list [--json]`, and `oauth-app remove <provider> <label>` are the complete local App grammar; there is no `client` alias or literal-config argument. Exact labels/ids resolve without auto-creation. Bundled skills provide concise orientation to what ctxindex is, when to use it, and the live discovery surfaces; generated help and loaded-definition output remain authoritative for interface facts.
 
-Catalog distribution adds deterministic `extensions catalog add|list|show|refresh|remove`, `extensions install`, and `extensions uninstall` commands. Add requires repository trust; install independently requires execution trust. List/show/install refresh involved Catalogs by default; `--no-refresh` explicitly uses stored state and every stored-snapshot output includes age. Refresh failure fails the command without stale success output. Missing trust or an invalid exact `<id>@<version>` selector exits `2` before repository access, dynamic import, or state mutation. Loaded-Extension listing reports exact persisted provenance and age without refreshing.
+Catalog distribution adds deterministic `extensions catalog add|list|show|refresh|remove`, `extensions install`, and `extensions uninstall` commands. Add requires repository trust; install independently requires execution trust. List/show/install refresh involved Catalogs by default; `--no-refresh` explicitly uses stored state and every stored-snapshot output includes age. Direct distribution uses `extensions install <npm|git|local> <target> --extension <id>`, `extensions update <id>`, and `extensions uninstall <id> [--force]`. Invalid selectors exit `2` before acquisition, import, or state mutation. Normal direct uninstall is blocked when it would strand Source Adapter bindings; forced uninstall preserves Source-owned state. Loaded-Extension listing reports exact persisted provenance without refreshing.
 
 | Exit | Stable meaning | Caller response |
 | ---: | --- | --- |
@@ -276,7 +284,7 @@ Sync Run history records `completed`, `cancelled` for cancellation, and `failed`
 - Remote filter-only enumeration, remote pagination, and mixed-search offset pagination are unsupported.
 - `resync` and `diff` depend on Adapter support; `sync` is baseline.
 - Cached Artifact bytes have one retention class and no automatic eviction. Raw provider payloads are optional and off by default.
-- External Extensions are trusted in-process bundled, explicit-path, or installed Catalog package code. Sandboxing, ambient discovery or startup refresh, arbitrary commands, private/credentialed or SSH Catalogs, nested or cross-repository entries, submodules, Git LFS, persistent direct local/Git/npm install/update/uninstall, build hooks, polling, and non-TypeScript/out-of-process Adapters are unsupported. Package-manager dependencies used by an already acquired package remain ordinary imports; ctxindex has no Extension dependency graph.
+- External Extensions are trusted in-process bundled, explicit-path, installed Catalog, or directly installed npm/Git/local package code. Sandboxing, ambient discovery or startup refresh, arbitrary commands, private/credentialed or SSH Catalogs, nested or cross-repository Catalog entries, submodules, Git LFS, build hooks, polling, and non-TypeScript/out-of-process Adapters are unsupported. Package dependencies used by an acquired package remain ordinary imports; ctxindex has no Extension dependency graph.
 - Built-in selection/override UX and documentation consumers, including CLI, agent, and browser rendering of Extension trees, remain deferred. Bundled Google and Microsoft definitions currently publish no official OAuth Apps; users configure BYOA Apps until approved public metadata is supplied.
 - Per-Extension storage, multiple primary Profiles, cross-source identity collapse, and payload migration await demonstrated need.
 - There is no SaaS canonical store, MCP server, workflow-policy engine, or universal sync protocol.
