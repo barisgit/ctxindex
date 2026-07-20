@@ -46,10 +46,8 @@ function registryWith(
 ): ExtensionRegistry {
   const common = {
     id: 'fake.retrieve',
-    version: 1,
     configSchema: z.object({}).strict(),
-    auth: { kind: 'none' as const },
-    profiles: [{ id: 'fake.item', version: 1 }] as const,
+    profiles: [profile] as const,
     routing: 'indexed' as const,
     actions: {},
   }
@@ -63,8 +61,6 @@ function registryWith(
   return createExtensionRegistry([
     defineExtension({
       id: 'fake.retrieve-extension',
-      version: 1,
-      profiles: [profile],
       adapters: [adapter],
     }),
   ])
@@ -80,8 +76,8 @@ async function freshDb(): Promise<Database> {
   ).run()
   db.prepare(
     `INSERT INTO sources
-       (id, realm_id, adapter_id, adapter_version, label, config_json, sync_enabled, created_at, updated_at)
-     VALUES (?, 'realm-1', 'fake.retrieve', 1, ?, '{}', 1, 1, 1)`,
+       (id, realm_id, adapter_id, label, config_json, sync_enabled, created_at, updated_at)
+     VALUES (?, 'realm-1', 'fake.retrieve', ?, '{}', 1, 1, 1)`,
   ).run(sourceId, sourceId)
   return db
 }

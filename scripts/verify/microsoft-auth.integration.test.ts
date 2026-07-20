@@ -3,12 +3,16 @@ import { afterEach, expect, test } from 'bun:test'
 import { authorizeProvider, createAuthService } from '@ctxindex/core/auth'
 import type { Logger } from '@ctxindex/core/logger'
 import {
-  createAdapterRegistry,
-  createProfileRegistry,
+  buildCompleteCandidateRegistry,
+  type CompleteRegistry,
 } from '@ctxindex/core/registry'
 import { keychainRef, type SecretsStore } from '@ctxindex/core/secrets'
 import { applyPragmas, runMigrations } from '@ctxindex/core/storage'
-import { defineAdapter } from '@ctxindex/extension-sdk'
+import {
+  defineAdapter,
+  defineExtension,
+  defineOAuthApp,
+} from '@ctxindex/extension-sdk'
 import { z } from 'zod'
 import {
   type MockGraphServer,
@@ -35,7 +39,7 @@ class MemorySecretsStore implements SecretsStore {
     this.values.delete(ref)
   }
 
-  async listKeys(): Promise<readonly string[]> {
+  async listKeys() {
     return []
   }
 }
@@ -80,22 +84,16 @@ function startIdentity(
 test('one core OAuth flow supports Microsoft personal and work identities safely', async () => {
   const database = await createDatabase()
   const store = new MemorySecretsStore()
-  const provider = {
-    ...microsoftOAuthProvider,
-    environment: {
-      ...microsoftOAuthProvider.environment,
-      refreshToken: 'CTXINDEX_MICROSOFT_REFRESH_TOKEN',
-    },
-  }
+  const app = defineOAuthApp(microsoftOAuthProvider, {
+    label: 'fixture',
+    config: { clientId: 'fixture-client' },
+  })
   const adapter = defineAdapter({
     id: 'microsoft.fixture-mailbox',
-    version: 1,
     configSchema: z.object({}).strict(),
-    auth: {
-      kind: 'oauth2',
-      provider,
-      scopes: ['Mail.ReadWrite'],
-    },
+    provider: microsoftOAuthProvider,
+    access: { scopes: ['Mail.ReadWrite'] },
+    providerApiHosts: ['graph.microsoft.com'],
     profiles: [],
     routing: 'federated',
     capabilities: ['search-remote'],
@@ -104,12 +102,28 @@ test('one core OAuth flow supports Microsoft personal and work identities safely
     },
     actions: {},
   })
-  const registry = createAdapterRegistry(createProfileRegistry([]), [adapter])
+  const extension = defineExtension({
+    id: 'microsoft.fixture',
+    oauthApps: [app],
+    adapters: [adapter],
+  })
+  const registry: CompleteRegistry = buildCompleteCandidateRegistry({
+    roots: [
+      {
+        definition: extension,
+        provenance: {
+          origin: 'builtin',
+          entry: 'scripts/verify/microsoft-auth.integration.test.ts',
+          exportName: 'extension',
+        },
+      },
+    ],
+    localOAuthAppIdentities: [],
+  })
   let current = startIdentity('work')
   const readEnvironment = (name: string): string | undefined => {
     if (name === 'CTXINDEX_OAUTH_MOCK_BASE_URL') return current.baseUrl
-    if (name === 'CTXINDEX_MICROSOFT_CLIENT_ID') return 'fixture-client'
-    if (name === 'CTXINDEX_MICROSOFT_REFRESH_TOKEN') {
+    if (name === 'CTXINDEX_OAUTH_REFRESH_TOKEN') {
       return 'microsoft-initial-refresh-token'
     }
     return undefined
@@ -126,16 +140,20 @@ test('one core OAuth flow supports Microsoft personal and work identities safely
     authorizeProvider(
       {
         provider: 'microsoft',
+        app: 'fixture',
         mode: 'from-env',
       },
       {
         registry,
         authService,
-        resolveClient: async () => ({
-          provider: 'microsoft',
-          label: 'microsoft',
-          clientId: 'fixture-client',
-        }),
+        resolveApp: async (providerId, label) => {
+          expect([providerId, label]).toEqual(['microsoft', 'fixture'])
+          return {
+            provider: microsoftOAuthProvider,
+            label: app.label,
+            config: app.config,
+          }
+        },
         readEnvironment,
         now: () => 1_000,
       },
@@ -149,6 +167,10 @@ test('one core OAuth flow supports Microsoft personal and work identities safely
   expect(await authService.refreshAccessToken(work.grantId)).toBe(
     'microsoft-access-3',
   )
+  const workGrant = await authService.getGrantById(work.grantId)
+  expect(
+    JSON.parse(await store.getSecret(workGrant?.appConfigRef ?? '')),
+  ).toEqual({ clientId: 'fixture-client' })
 
   current = startIdentity('personal')
   const personal = await authorize()

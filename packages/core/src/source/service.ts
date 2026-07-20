@@ -1,3 +1,4 @@
+import type { AnyAdapterDefinition } from '@ctxindex/extension-sdk'
 import { ulid } from 'ulid'
 import { isGrantCompatible, providerIdForAuth } from '../auth'
 import {
@@ -36,22 +37,11 @@ function defaultSourceLabel(
 }
 
 function resolveAdapter(deps: SourceServiceDeps, input: AddSourceInput) {
-  const adapter =
-    input.adapterVersion !== undefined
-      ? deps.registry.adapters.get({
-          id: input.adapterId,
-          version: input.adapterVersion,
-        })
-      : deps.registry.adapters
-          .list()
-          .filter((candidate) => candidate.id === input.adapterId)
-          .sort((left, right) => right.version - left.version)[0]
+  const adapter = deps.registry.adapters.get({ id: input.adapterId })
   if (!adapter) {
-    const version =
-      input.adapterVersion !== undefined ? `@${input.adapterVersion}` : ''
     throw new CtxindexValidationError(
       'invalid_filter',
-      `Unknown Adapter: ${input.adapterId}${version}`,
+      `Unknown Adapter: ${input.adapterId}`,
     )
   }
   return adapter
@@ -81,9 +71,11 @@ function validateSearchRouting(
 function resolveGrantId(
   deps: SourceServiceDeps,
   input: AddSourceInput,
-  auth: ReturnType<typeof resolveAdapter>['auth'],
+  adapter: AnyAdapterDefinition,
 ): string | null {
-  if (auth.kind === 'none') {
+  const providerDefinition = adapter.provider
+  const auth = providerDefinition?.auth
+  if (auth === undefined || auth.kind === 'none') {
     if (input.grantId) {
       throw new CtxindexValidationError(
         'invalid_filter',
@@ -98,17 +90,27 @@ function resolveGrantId(
       `Adapter "${input.adapterId}" uses unsupported auth kind "${(auth as { kind: string }).kind}"`,
     )
   }
+  if (providerDefinition === undefined) {
+    throw new CtxindexValidationError(
+      'invalid_filter',
+      `Adapter "${input.adapterId}" has no Provider`,
+    )
+  }
 
   const grants = deps.db
     .prepare('SELECT id, provider, scopes_json FROM grants ORDER BY id')
     .all() as GrantRow[]
+  const authorization = {
+    provider: providerDefinition,
+    access: adapter.access ?? { scopes: [] },
+  }
   const compatible = grants.filter((grant) =>
-    isGrantCompatible(auth, {
+    isGrantCompatible(authorization, {
       provider: grant.provider,
       scopes: grant.scopes_json,
     }),
   )
-  const provider = providerIdForAuth(auth) ?? 'unknown'
+  const provider = providerIdForAuth(authorization) ?? 'unknown'
   if (input.grantId) {
     const selected = grants.find((grant) => grant.id === input.grantId)
     if (!selected || !compatible.includes(selected)) {
@@ -143,7 +145,6 @@ interface GrantRow {
 interface StatusDbRow {
   readonly sourceId: string
   readonly adapterId: string
-  readonly adapterVersion: number
   readonly realmSlug: string
   readonly lastStatus: string
   readonly lastRunAt: number | null
@@ -156,12 +157,9 @@ interface StatusDbRow {
 
 function sourceAvailability(
   deps: SourceServiceDeps,
-  source: Pick<SourceRow, 'adapter_id' | 'adapter_version'>,
+  source: Pick<SourceRow, 'adapter_id'>,
 ): SourceRow['availability'] {
-  return deps.registry.adapters.get({
-    id: source.adapter_id,
-    version: source.adapter_version,
-  })
+  return deps.registry.adapters.get({ id: source.adapter_id })
     ? 'available'
     : 'extension_unavailable'
 }
@@ -222,7 +220,7 @@ function parseLastWarning(warningJson: string | null): SyncWarning | null {
 }
 
 function selectSourceColumns(): string {
-  return 'id, realm_id, adapter_id, adapter_version, label, config_json, sync_enabled, grant_id, search_routing, created_at'
+  return 'id, realm_id, adapter_id, label, config_json, sync_enabled, grant_id, search_routing, created_at'
 }
 
 function sourceListSelect(): string {
@@ -230,7 +228,6 @@ function sourceListSelect(): string {
                  s.realm_id,
                  r.slug AS realm_slug,
                  s.adapter_id,
-                 s.adapter_version,
                  s.label,
                  s.config_json,
                  s.sync_enabled,
@@ -285,7 +282,7 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
       const realm = resolveRealm(deps, input.realmSlug)
       const adapter = resolveAdapter(deps, input)
       validateSearchRouting(input.searchRouting, adapter.capabilities)
-      const grantId = resolveGrantId(deps, input, adapter.auth)
+      const grantId = resolveGrantId(deps, input, adapter)
       const label =
         input.label ?? defaultSourceLabel(deps, input.adapterId, grantId)
       if (label.trim().length === 0) {
@@ -326,15 +323,14 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
       deps.db
         .prepare(
           `INSERT INTO sources (
-             id, realm_id, adapter_id, adapter_version, label, config_json,
+             id, realm_id, adapter_id, label, config_json,
              grant_id, search_routing, sync_enabled, created_at, updated_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           sourceId,
           realm.id,
           input.adapterId,
-          adapter.version,
           label,
           JSON.stringify(parsedConfig.data),
           grantId,
@@ -442,7 +438,6 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
       const base = `
         SELECT s.id AS sourceId,
                s.adapter_id AS adapterId,
-               s.adapter_version AS adapterVersion,
                r.slug AS realmSlug,
                COALESCE(sss.last_status, 'pending') AS lastStatus,
                sr.completed_at AS lastRunAt,
@@ -472,7 +467,6 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
         realmSlug: row.realmSlug,
         availability: sourceAvailability(deps, {
           adapter_id: row.adapterId,
-          adapter_version: row.adapterVersion,
         }),
         lastStatus: row.lastStatus,
         lastRunAt: row.lastRunAt,

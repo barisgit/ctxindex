@@ -12,6 +12,7 @@ import { createSandbox, type Sandbox } from '@ctxindex/core/testing'
 
 const accessValue = 'ACCESS-VALUE-CANARY'
 const refreshValue = 'REFRESH-VALUE-CANARY'
+const appConfigValue = '{"clientId":"APP-CONFIG-CANARY"}'
 
 function dbPath(sandbox: Sandbox): string {
   return join(sandbox.env.CTXINDEX_DATA_HOME, 'ctxindex.sqlite')
@@ -85,6 +86,7 @@ function keychainStore(path: string): KeychainBackend {
 
 function seedGrant(
   sandbox: Sandbox,
+  appConfigRef: string,
   accessRef: string,
   refreshRef: string,
 ): void {
@@ -98,16 +100,17 @@ function seedGrant(
     ).run(now, now)
     db.prepare(
       `INSERT INTO grants
-         (id, account_id, provider, scopes_json, access_token_ref,
-          refresh_token_ref, created_at, updated_at)
-       VALUES ('grant-1', 'account-1', 'google', '[]', ?, ?, ?, ?)`,
-    ).run(accessRef, refreshRef, now, now)
+         (id, account_id, provider, scopes_json, app_config_ref,
+          access_token_ref, refresh_token_ref, created_at, updated_at)
+       VALUES ('grant-1', 'account-1', 'google', '[]', ?, ?, ?, ?, ?)`,
+    ).run(appConfigRef, accessRef, refreshRef, now, now)
   } finally {
     db.close()
   }
 }
 
 function grantRefs(sandbox: Sandbox): {
+  appConfigRef: string
   accessTokenRef: string
   refreshTokenRef: string
 } {
@@ -115,11 +118,16 @@ function grantRefs(sandbox: Sandbox): {
   try {
     const row = db
       .prepare(
-        `SELECT access_token_ref AS accessTokenRef,
+        `SELECT app_config_ref AS appConfigRef,
+                access_token_ref AS accessTokenRef,
                 refresh_token_ref AS refreshTokenRef
          FROM grants WHERE id = 'grant-1'`,
       )
-      .get() as { accessTokenRef: string; refreshTokenRef: string }
+      .get() as {
+      appConfigRef: string
+      accessTokenRef: string
+      refreshTokenRef: string
+    }
     return row
   } finally {
     db.close()
@@ -129,6 +137,7 @@ function grantRefs(sandbox: Sandbox): {
 function expectNoValues(output: string): void {
   expect(output).not.toContain(accessValue)
   expect(output).not.toContain(refreshValue)
+  expect(output).not.toContain(appConfigValue)
 }
 
 test('secret backend status and switching preserve typed refs without exposing values', async () => {
@@ -159,7 +168,12 @@ test('secret backend status and switching preserve typed refs without exposing v
       'refresh-token',
       refreshValue,
     )
-    seedGrant(sandbox, accessRef, refreshRef)
+    const appConfigRef = await files.setSecret(
+      'google',
+      'app-config',
+      appConfigValue,
+    )
+    seedGrant(sandbox, appConfigRef, accessRef, refreshRef)
 
     const status = await sandbox.run(['secrets', 'status', '--json'])
     expect(status.exitCode).toBe(0)
@@ -167,7 +181,7 @@ test('secret backend status and switching preserve typed refs without exposing v
     expect(JSON.parse(status.stdout)).toEqual({
       backend: 'file',
       backends: {
-        file: { available: true, referenceCount: 2 },
+        file: { available: true, referenceCount: 3 },
         keychain: { available: true, referenceCount: 0 },
       },
     })
@@ -182,13 +196,14 @@ test('secret backend status and switching preserve typed refs without exposing v
     expect(toKeychain.exitCode).toBe(0)
     expect(toKeychain.stderr).toBe('')
     expect(toKeychain.stdout.trim()).toBe(
-      'secrets backend set to keychain; copied 2; cleaned 2',
+      'secrets backend set to keychain; copied 3; cleaned 3',
     )
     expectNoValues(toKeychain.stdout + toKeychain.stderr)
     expect((await readConfig(configPath(sandbox))).secrets.backend).toBe(
       'keychain',
     )
     expect(grantRefs(sandbox)).toEqual({
+      appConfigRef: 'keychain:ctxindex/google/app-config',
       accessTokenRef: 'keychain:ctxindex/google/access-token',
       refreshTokenRef: 'keychain:ctxindex/google/refresh-token',
     })
@@ -200,16 +215,20 @@ test('secret backend status and switching preserve typed refs without exposing v
     expect(
       await keychain.getSecret('keychain:ctxindex/google/refresh-token'),
     ).toBe(refreshValue)
+    expect(
+      await keychain.getSecret('keychain:ctxindex/google/app-config'),
+    ).toBe(appConfigValue)
 
     const toFile = await sandbox.run(['secrets', 'backend', 'set', 'file'])
     expect(toFile.exitCode).toBe(0)
     expect(toFile.stderr).toBe('')
     expect(toFile.stdout.trim()).toBe(
-      'secrets backend set to file; copied 2; cleaned 2',
+      'secrets backend set to file; copied 3; cleaned 3',
     )
     expectNoValues(toFile.stdout + toFile.stderr)
     expect((await readConfig(configPath(sandbox))).secrets.backend).toBe('file')
     expect(grantRefs(sandbox)).toEqual({
+      appConfigRef: 'file:secrets.box#google/app-config',
       accessTokenRef: 'file:secrets.box#google/access-token',
       refreshTokenRef: 'file:secrets.box#google/refresh-token',
     })
@@ -218,6 +237,9 @@ test('secret backend status and switching preserve typed refs without exposing v
     )
     expect(await files.getSecret(grantRefs(sandbox).refreshTokenRef)).toBe(
       refreshValue,
+    )
+    expect(await files.getSecret(grantRefs(sandbox).appConfigRef)).toBe(
+      appConfigValue,
     )
     expect(await keychain.listKeys()).toEqual([])
 

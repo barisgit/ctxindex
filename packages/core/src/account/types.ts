@@ -21,12 +21,11 @@ export type AccountExpiryState = 'active' | 'expired' | 'unknown'
 export interface AccountInventoryRealm {
   readonly id: string
   readonly slug: string
-  readonly label: string
+  readonly label: string | null
 }
 
 export interface AccountInventoryAdapter {
   readonly id: string
-  readonly version: number
 }
 
 export interface AccountInventorySource {
@@ -36,19 +35,13 @@ export interface AccountInventorySource {
   readonly realm: AccountInventoryRealm
 }
 
-export interface AccountInventoryGrant {
-  readonly id: string
-  readonly scopes: readonly string[]
-  readonly expiresAt: number | null
-  readonly expiryState: AccountExpiryState
-  readonly sources: readonly AccountInventorySource[]
-}
-
 export interface AccountInventoryItem {
   readonly id: string
   readonly provider: string
   readonly label: string | null
-  readonly grants: readonly AccountInventoryGrant[]
+  readonly expiresAt: number | null
+  readonly expiryState: AccountExpiryState
+  readonly sources: readonly AccountInventorySource[]
 }
 
 export interface AccountServiceDeps {

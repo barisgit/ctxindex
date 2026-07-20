@@ -254,13 +254,13 @@ describe('listAccountInventory', () => {
       INSERT INTO realms (id, slug, label, created_at) VALUES
         ('realm-z', '𐀀-realm', 'Realm later', 1),
         ('realm-a', '\uE000-realm', 'Realm earlier', 1);
-      INSERT INTO grants (id, account_id, provider, scopes_json, access_token_ref, expires_at, created_at, updated_at) VALUES
-        ('grant-empty', '${earlier}', '\uE000-provider', '["scope-z","scope-a","scope-a"]', 'keychain:secret-empty', NULL, 1, 1),
-        ('grant-active', '${later}', '𐀀-provider', '["𐀀","\uE000"]', 'keychain:secret-active', 2001, 1, 1);
-      INSERT INTO sources (id, realm_id, adapter_id, adapter_version, grant_id, label, config_json, created_at, updated_at) VALUES
-        ('𐀀-source', 'realm-z', '𐀀-adapter', 2, 'grant-active', 'Later source', '{}', 1, 1),
-        ('\uE000-source', 'realm-a', '\uE000-adapter', 1, 'grant-active', 'Earlier source', '{}', 1, 1),
-        ('local-source', 'realm-a', 'local-directory', 1, NULL, 'Local', '{"path":"/sensitive"}', 1, 1);
+      INSERT INTO grants (id, account_id, provider, scopes_json, app_config_ref, access_token_ref, expires_at, created_at, updated_at) VALUES
+        ('grant-empty', '${earlier}', '\uE000-provider', '["scope-z","scope-a","scope-a"]', 'keychain:app-empty', 'keychain:secret-empty', NULL, 1, 1),
+        ('grant-active', '${later}', '𐀀-provider', '["𐀀","\uE000"]', 'keychain:app-active', 'keychain:secret-active', 2001, 1, 1);
+      INSERT INTO sources (id, realm_id, adapter_id, grant_id, label, config_json, created_at, updated_at) VALUES
+        ('𐀀-source', 'realm-z', '𐀀-adapter', 'grant-active', 'Later source', '{}', 1, 1),
+        ('\uE000-source', 'realm-a', '\uE000-adapter', 'grant-active', 'Earlier source', '{}', 1, 1),
+        ('local-source', 'realm-a', 'local-directory', NULL, 'Local', '{"path":"/sensitive"}', 1, 1);
     `)
 
     expect(accounts.listAccountInventory()).toEqual([
@@ -268,44 +268,36 @@ describe('listAccountInventory', () => {
         id: earlier,
         provider: '\uE000-provider',
         label: 'Earlier',
-        grants: [
-          {
-            id: 'grant-empty',
-            scopes: ['scope-a', 'scope-z'],
-            expiresAt: null,
-            expiryState: 'unknown',
-            sources: [],
-          },
-        ],
+        expiresAt: null,
+        expiryState: 'unknown',
+        sources: [],
       },
       {
         id: later,
         provider: '𐀀-provider',
         label: 'Later',
-        grants: [
+        expiresAt: 2001,
+        expiryState: 'active',
+        sources: [
           {
-            id: 'grant-active',
-            scopes: ['\uE000', '𐀀'],
-            expiresAt: 2001,
-            expiryState: 'active',
-            sources: [
-              {
-                id: '\uE000-source',
-                label: 'Earlier source',
-                adapter: { id: '\uE000-adapter', version: 1 },
-                realm: {
-                  id: 'realm-a',
-                  slug: '\uE000-realm',
-                  label: 'Realm earlier',
-                },
-              },
-              {
-                id: '𐀀-source',
-                label: 'Later source',
-                adapter: { id: '𐀀-adapter', version: 2 },
-                realm: { id: 'realm-z', slug: '𐀀-realm', label: 'Realm later' },
-              },
-            ],
+            id: '\uE000-source',
+            label: 'Earlier source',
+            adapter: { id: '\uE000-adapter' },
+            realm: {
+              id: 'realm-a',
+              slug: '\uE000-realm',
+              label: 'Realm earlier',
+            },
+          },
+          {
+            id: '𐀀-source',
+            label: 'Later source',
+            adapter: { id: '𐀀-adapter' },
+            realm: {
+              id: 'realm-z',
+              slug: '𐀀-realm',
+              label: 'Realm later',
+            },
           },
         ],
       },

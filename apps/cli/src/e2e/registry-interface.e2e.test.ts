@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path'
 
 const repoRoot = resolve(import.meta.dir, '../../../..')
 const entrypoint = join(repoRoot, 'apps/cli/bin/ctxindex.mjs')
-const extensionPath = join(repoRoot, 'examples/tenders-extension/extension.ts')
+const extensionPath = join(repoRoot, 'examples/tenders-extension')
 
 test('interpreted registry interface follows an explicit external Extension', async () => {
   const root = await mkdtemp(join(tmpdir(), 'ctxindex-registry-interface-'))
@@ -47,7 +47,6 @@ test('interpreted registry interface follows an explicit external Extension', as
     expect(registry.kinds).toContainEqual(
       expect.objectContaining({
         id: 'enarocanje.tender',
-        aliases: ['tenders'],
       }),
     )
     expect(registry.sources).toContainEqual(
@@ -106,8 +105,6 @@ test('interpreted registry interface follows an explicit external Extension', as
     expect(actionDetail.stdout).toContain(
       '      additional properties: not allowed',
     )
-    expect(actionDetail.stdout).toContain('"to": [')
-    expect(actionDetail.stdout).toContain('"replyToRef":')
     expect(actionDetail.stdout).not.toContain('input: {"$schema"')
 
     const actionJson = await run([
@@ -164,7 +161,7 @@ test('interpreted registry interface follows an explicit external Extension', as
     expect(googleAuth.exitCode, googleAuth.stderr).toBe(0)
     expect(googleAuth.stdout).toContain('provider: google')
     expect(googleAuth.stdout).toContain(
-      'environment: client-id=CTXINDEX_GOOGLE_CLIENT_ID, client-secret=CTXINDEX_GOOGLE_CLIENT_SECRET',
+      'environment: clientId=CTXINDEX_GOOGLE_CLIENT_ID, clientSecret=CTXINDEX_GOOGLE_CLIENT_SECRET',
     )
     expect(googleAuth.stdout).toContain(
       'Adapter scopes: https://www.googleapis.com/auth/gmail.readonly',
@@ -182,10 +179,12 @@ test('interpreted registry interface follows an explicit external Extension', as
       id: 'google.mailbox',
       providerApiHosts: ['gmail.googleapis.com'],
       configOptions: [],
-      auth: {
-        provider: {
-          environment: {
-            clientId: 'CTXINDEX_GOOGLE_CLIENT_ID',
+      provider: {
+        auth: {
+          registration: {
+            environment: {
+              clientId: 'CTXINDEX_GOOGLE_CLIENT_ID',
+            },
           },
         },
       },
@@ -202,18 +201,20 @@ test('interpreted registry interface follows an explicit external Extension', as
     expect(JSON.parse(microsoftMailbox.stdout)).toMatchObject({
       id: 'microsoft.mailbox',
       routing: 'federated',
-      auth: {
-        kind: 'oauth2',
-        scopes: ['Mail.ReadWrite'],
-        provider: {
-          id: 'microsoft',
+      access: { scopes: ['Mail.ReadWrite'] },
+      provider: {
+        id: 'microsoft',
+        auth: {
+          kind: 'oauth2',
           authorizationUrl:
             'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
           tokenUrl:
             'https://login.microsoftonline.com/common/oauth2/v2.0/token',
           baseScopes: ['openid', 'offline_access', 'User.Read'],
-          environment: {
-            clientId: 'CTXINDEX_MICROSOFT_CLIENT_ID',
+          registration: {
+            environment: {
+              clientId: 'CTXINDEX_MICROSOFT_CLIENT_ID',
+            },
           },
         },
       },
@@ -233,7 +234,8 @@ test('interpreted registry interface follows an explicit external Extension', as
       id: 'microsoft.calendar',
       routing: 'indexed',
       profiles: [{ id: 'calendar.event', version: 1 }],
-      auth: { kind: 'oauth2', scopes: ['Calendars.Read'] },
+      access: { scopes: ['Calendars.Read'] },
+      provider: { auth: { kind: 'oauth2' } },
       providerApiHosts: ['graph.microsoft.com'],
       capabilities: ['retrieve', 'sync'],
       configOptions: [
@@ -262,7 +264,8 @@ test('interpreted registry interface follows an explicit external Extension', as
     expect(help.stdout).toContain('INTERFACE')
     expect(help.stdout).toContain('ctxindex describe <type> <id> --json')
     expect(help.stdout).not.toContain('enarocanje.tender@1')
-    expect(help.stdout).toContain('client')
+    expect(help.stdout).toContain('oauth-app')
+    expect(help.stdout).not.toMatch(/\bclient\b/i)
     expect(help.stdout).not.toMatch(/\bauth\b/)
 
     for (const args of [
@@ -271,8 +274,9 @@ test('interpreted registry interface follows an explicit external Extension', as
       ['action', '--help'],
       ['describe', '--help'],
       ['extensions', '--help'],
-      ['client', '--help'],
+      ['oauth-app', '--help'],
       ['account', '--help'],
+      ['source', '--help'],
     ]) {
       const commandHelp = await run(args)
       expect(commandHelp.exitCode, commandHelp.stderr).toBe(0)
@@ -282,19 +286,21 @@ test('interpreted registry interface follows an explicit external Extension', as
       )
       expect(commandHelp.stdout).not.toContain('Loaded interface:')
       expect(commandHelp.stdout).not.toContain('enarocanje.tender@1')
+      expect(commandHelp.stdout).not.toMatch(/\bGrant\b/)
     }
+
+    const removedClientAlias = await run(['client'])
+    expect(removedClientAlias.exitCode).toBe(2)
+    expect(removedClientAlias.stderr).toContain('Unknown command')
 
     const extensions = await run(['extensions', 'list', '--json'])
     expect(extensions.exitCode, extensions.stderr).toBe(0)
     expect(JSON.parse(extensions.stdout)).toContainEqual({
       id: 'enarocanje.proof',
-      version: 1,
-      profiles: [{ id: 'enarocanje.tender', version: 1 }],
-      adapters: [{ id: 'enarocanje.fixture', version: 1 }],
-      summary: 'External tenders Extension proof.',
+      profiles: [],
+      adapters: [{ id: 'enarocanje.fixture' }],
       provenance: {
         id: 'enarocanje.proof',
-        version: 1,
         kind: 'path',
         path: extensionPath,
       },

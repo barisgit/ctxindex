@@ -1,10 +1,15 @@
 import { join } from 'node:path'
-import { importExtensionDefinition } from '../extension/import'
+import {
+  createExtensionHostDiagnostic,
+  safeExtensionDiagnostic,
+} from '../extension/diagnostics'
+import { importExtensionPackageRoots } from '../extension/import'
+import { selectExactExtension } from '../extension/package-entry'
 import { dataDir } from '../paths'
 import {
-  createExtensionRegistry,
-  DefinitionRegistryError,
+  buildCompleteCandidateRegistry,
   type ExtensionRegistry,
+  type OAuthAppIdentity,
 } from '../registry'
 import { acquireCatalogSnapshot } from './git'
 import { catalogSnapshotPath, validateCatalogSnapshot } from './paths'
@@ -18,11 +23,11 @@ import { validateCatalogName } from './schema'
 import { CatalogStore } from './store'
 
 function invalid(message: string): never {
-  throw Object.assign(new TypeError(message), { code: 'invalid_args' })
+  throw createExtensionHostDiagnostic(message, { code: 'invalid_args' })
 }
 
 function conflict(message: string): never {
-  throw Object.assign(new Error(message), { code: 'invalid_args' })
+  throw createExtensionHostDiagnostic(message, { code: 'invalid_args' })
 }
 
 function recordFromManifest(input: {
@@ -218,6 +223,7 @@ export class CatalogService {
     readonly version: number
     readonly trust: boolean
     readonly registry: ExtensionRegistry
+    readonly localOAuthAppIdentities: readonly OAuthAppIdentity[]
     readonly refresh?: boolean
     readonly replaceableCatalog?: {
       readonly catalog: string
@@ -243,7 +249,7 @@ export class CatalogService {
     )
     const manifest = await validateCatalogSnapshot(snapshot)
     if (manifest.catalog.id !== catalog.catalog_id) {
-      throw new TypeError(
+      throw createExtensionHostDiagnostic(
         'Catalog snapshot identity does not match persisted record',
       )
     }
@@ -256,16 +262,25 @@ export class CatalogService {
       entry.source.path !== recordedEntry.source_path ||
       entry.setup?.path !== recordedEntry.setup_path
     ) {
-      throw new TypeError(
+      throw createExtensionHostDiagnostic(
         'Catalog snapshot entry does not match persisted record',
       )
     }
-    const definition = await importExtensionDefinition(
-      join(snapshot, entry.source.path),
-    )
-    if (definition.id !== entry.id || definition.version !== entry.version) {
-      throw new TypeError(
-        `Catalog Extension identity mismatch: expected ${entry.id}@${entry.version}, loaded ${definition.id}@${definition.version}`,
+    let selected: ReturnType<typeof selectExactExtension>
+    try {
+      selected = selectExactExtension(
+        await importExtensionPackageRoots(join(snapshot, entry.source.path), {
+          origin: 'catalog',
+          commit: catalog.commit,
+        }),
+        entry.id,
+      )
+    } catch (cause) {
+      throw createExtensionHostDiagnostic(
+        `Catalog Extension ${entry.id}: ${safeExtensionDiagnostic(
+          cause,
+          'package could not be loaded',
+        )}`,
       )
     }
     const current = await this.store.readInstalled()
@@ -280,23 +295,36 @@ export class CatalogService {
     const runtimeDefinitions = input.registry
       .list()
       .filter(
-        (candidate) =>
-          !replacesLoadedCatalog ||
-          candidate.id !== entry.id ||
-          candidate.version !== entry.version,
+        (candidate) => !replacesLoadedCatalog || candidate.id !== entry.id,
       )
-    if (
-      runtimeDefinitions.some(
-        (candidate) =>
-          candidate.id === entry.id && candidate.version === entry.version,
-      )
-    ) {
-      throw new DefinitionRegistryError(
-        `Duplicate Extension ${entry.id}@${entry.version}`,
-        'duplicate_definition',
+    if (runtimeDefinitions.some((candidate) => candidate.id === entry.id)) {
+      throw createExtensionHostDiagnostic(
+        `Catalog Extension ${entry.id}: Extension definition conflict`,
       )
     }
-    createExtensionRegistry([...runtimeDefinitions, definition])
+    try {
+      buildCompleteCandidateRegistry({
+        roots: [
+          ...runtimeDefinitions.map((runtimeDefinition, index) => ({
+            definition: runtimeDefinition,
+            provenance: {
+              origin: 'builtin' as const,
+              entry: `runtime:${index}`,
+              exportName: 'default',
+            },
+          })),
+          selected,
+        ],
+        localOAuthAppIdentities: input.localOAuthAppIdentities,
+      })
+    } catch (cause) {
+      throw createExtensionHostDiagnostic(
+        `Catalog Extension ${entry.id}: ${safeExtensionDiagnostic(
+          cause,
+          'definition validation failed',
+        )}`,
+      )
+    }
     const installed: InstalledExtensionRecord = {
       id: entry.id,
       version: entry.version,

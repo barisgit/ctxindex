@@ -18,7 +18,7 @@ export function generatedSourceConfigArgs(
     compareStrings(left.id, right.id),
   )) {
     for (const option of source.configOptions) {
-      const description = `${source.id}: ${option.docs ?? option.property} (${option.type}${option.required ? ', required' : ''}${option.default !== undefined ? `, default ${JSON.stringify(option.default)}` : ''})`
+      const description = `${source.id}: ${option.property} (${option.type}${option.required ? ', required' : ''}${option.default !== undefined ? `, default ${JSON.stringify(option.default)}` : ''})`
       const flag = option.flag.slice(2)
       byFlag.set(flag, [...(byFlag.get(flag) ?? []), description])
     }
@@ -43,7 +43,7 @@ export const sourceCommand = defineCommand({
         label: { type: 'string', description: 'Global Source label' },
         account: {
           type: 'string',
-          description: 'Account label, Account ID, or Grant ID',
+          description: 'Account label or Account ID',
         },
         'config-json': { type: 'string', description: 'Adapter config JSON' },
         'search-routing': {

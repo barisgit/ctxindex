@@ -3,29 +3,23 @@ import type { SourceDescription } from '@ctxindex/core/registry'
 import { generatedSourceConfigArgs, sourceCommand } from './source'
 
 test('aggregates same-named generated options without losing Adapter ownership', () => {
-  const source = (
-    id: string,
-    type: string,
-    docs: string,
-  ): SourceDescription => ({
+  const source = (id: string, type: string): SourceDescription => ({
     id,
-    version: 1,
     profiles: [],
     routing: 'indexed',
-    auth: { kind: 'none' },
     providerApiHosts: [],
     capabilities: [],
     config: {},
     configOptions: [
-      { property: 'value', flag: '--config-value', type, required: true, docs },
+      { property: 'value', flag: '--config-value', type, required: true },
     ],
   })
   const args = generatedSourceConfigArgs([
-    source('z.adapter', 'integer', 'Count'),
-    source('A.adapter', 'string', 'Name'),
+    source('z.adapter', 'integer'),
+    source('A.adapter', 'string'),
   ])
   expect(args['config-value']?.description).toBe(
-    'A.adapter: Name (string, required); z.adapter: Count (integer, required)',
+    'A.adapter: value (string, required); z.adapter: value (integer, required)',
   )
 })
 

@@ -28,18 +28,16 @@ const described: DescribeActionResult = {
   effect: 'reversible',
   input: { type: 'object' },
   output: { id: 'fake.note', version: 1 },
-  docs: 'Create note.',
-  examples: [{ body: 'hi' }],
-  adapters: [{ id: 'fake.adapter', version: 2 }],
+  adapters: [{ id: 'fake.adapter' }],
   sources: [
     {
       id: sourceId,
-      adapter: { id: 'fake.adapter', version: 2 },
+      adapter: { id: 'fake.adapter' },
       available: true,
     },
     {
       id: 'source-b',
-      adapter: { id: 'missing.adapter', version: 3 },
+      adapter: { id: 'missing.adapter' },
       available: false,
       reason: 'adapter_unavailable',
     },
@@ -106,10 +104,9 @@ describe('Action output', () => {
         'effect\treversible',
         'Profile\tfake.note@1',
         'output\tfake.note@1',
-        'docs\tCreate note.',
         'input\t{"type":"object"}',
-        'Source\tsource-a\tavailable\tfake.adapter@2',
-        'Source\tsource-b\tunavailable\tmissing.adapter@3\tadapter_unavailable',
+        'Source\tsource-a\tavailable\tfake.adapter',
+        'Source\tsource-b\tunavailable\tmissing.adapter\tadapter_unavailable',
       ].join('\n'),
     )
   })

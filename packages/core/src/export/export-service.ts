@@ -1,4 +1,3 @@
-import type { ProfileReference } from '@ctxindex/extension-sdk'
 import { CtxindexError, CtxindexValidationError } from '../errors'
 import type {
   RetrieveSourceResourceInput,
@@ -18,12 +17,17 @@ export interface ExportResourceResult {
   readonly warnings: readonly SourceResourceWarning[]
 }
 
+interface ProfileIdentity {
+  readonly id: string
+  readonly version: number
+}
+
 export class UnsupportedExportFormatError extends CtxindexValidationError {
   readonly validFormats: readonly string[]
-  readonly profile: ProfileReference
+  readonly profile: ProfileIdentity
 
   constructor(
-    profile: ProfileReference,
+    profile: ProfileIdentity,
     format: string,
     validFormats: readonly string[],
   ) {

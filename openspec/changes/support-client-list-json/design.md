@@ -1,3 +1,5 @@
+> **SUPERSEDED — DO NOT SYNC.** This completed Client-era change is retained only as historical evidence. `redesign-extension-sdk` removes the Client surface and replaces it with `oauth-app list --json`. Its delta spec MUST NOT be synced into canonical specs. Archive only with explicit user approval.
+
 ## Context
 
 The core Client service already returns deterministic, non-sensitive `OAuthClientRecord` values containing only provider, label, and timestamps. The CLI currently renders those values only as compact text, while other primary inventory commands expose opt-in JSON. The CLI is the agent integration surface, so presentation-text parsing is an unnecessary source of fragility.

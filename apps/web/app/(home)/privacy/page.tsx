@@ -138,10 +138,9 @@ export default function PrivacyPage() {
         </p>
         <p>
           Loaded Extensions may contribute additional Google scopes through an
-          available OAuth Client. Google may require separate verification,
-          display warnings, limit access, or reject an authorization for such
-          scopes. The exact scopes are displayed in Google&apos;s consent
-          screen.
+          available OAuth App. Google may require separate verification, display
+          warnings, limit access, or reject an authorization for such scopes.
+          The exact scopes are displayed in Google&apos;s consent screen.
         </p>
         <p>
           The use of information received from Google Workspace scopes will
@@ -174,8 +173,8 @@ export default function PrivacyPage() {
           and <code>Calendars.Read</code> to read calendar events. OpenID
           Connect scopes support sign-in and durable authorization. Loaded
           Extensions may contribute additional delegated permissions through the
-          same available OAuth Client, including permissions requested
-          dynamically at authorization time. The Microsoft consent screen is the
+          same selected OAuth App, including permissions requested dynamically
+          at authorization time. The Microsoft consent screen is the
           authoritative description of each request. The ctxindex-managed
           Microsoft application uses delegated permissions, not application
           permissions that run without a signed-in user.
@@ -213,11 +212,10 @@ export default function PrivacyPage() {
           Extensions are trusted executable code loaded in the ctxindex process.
           They can use the local process&apos;s permissions to access files,
           environment values, network services, and data returned through
-          ctxindex, and may transmit that data. A managed OAuth Client
-          identifies the OAuth application used for authorization; it does not
-          certify or endorse an Extension that uses it. Review an
-          Extension&apos;s source, documentation, permissions, and operator
-          before loading it.
+          ctxindex, and may transmit that data. An OAuth App identifies the
+          OAuth application used for authorization; it does not certify or
+          endorse an Extension that uses it. Review an Extension&apos;s source,
+          documentation, permissions, and operator before loading it.
         </p>
         <p>
           If you permit a coding agent, personal agent, script, Extension, or
@@ -270,11 +268,11 @@ export default function PrivacyPage() {
           one Source and its locally stored Resources,{' '}
           <code>ctxindex account remove &lt;label&gt;</code> to remove an
           Account and request deletion of its stored Grant secrets,{' '}
-          <code>ctxindex client remove &lt;provider&gt; &lt;label&gt;</code> to
-          remove Client metadata and request deletion of its stored credentials,
-          and <code>ctxindex purge artifacts</code> to remove managed
-          Artifact-cache bytes. You can also revoke ctxindex in your Google
-          Account or Microsoft account security settings.
+          <code>ctxindex oauth-app remove &lt;provider&gt; &lt;label&gt;</code>{' '}
+          to remove local OAuth App metadata and request deletion of its stored
+          configuration, and <code>ctxindex purge artifacts</code> to remove
+          managed Artifact-cache bytes. You can also revoke ctxindex in your
+          Google Account or Microsoft account security settings.
         </p>
         <p>
           To delete remaining directory-backed ctxindex state, remove the

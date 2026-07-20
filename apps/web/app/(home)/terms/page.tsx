@@ -73,7 +73,7 @@ export default function TermsPage() {
         </p>
         <p>
           Loaded Extensions may contribute additional permissions to an OAuth
-          request through an available managed Client. A managed Client does not
+          request through a selected available OAuth App. An OAuth App does not
           certify or endorse an Extension. The provider consent screen is the
           authoritative description of the permissions requested for a specific
           authorization, and you should review both the Extension and that

@@ -8,12 +8,12 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 
 - Bun/Turborepo monorepo split into user-facing application workspaces (`apps/`), reusable runtime and contract packages (`packages/`), external authoring examples (`examples/`), and repository tooling (`scripts/`).
 - Layered boundaries keep CLI presentation separate from provider-neutral core services and Profiles: calendar and communication Profiles own shared vocabulary and Draft Action contracts, while Adapters own provider-specific Google, Microsoft Graph, and filesystem I/O.
-- Extensions bundle declarative Profiles and Source Adapters; core registries validate definitions and OAuth provider declarations before workflows dispatch operations and persist local state. Explicitly trusted Git Catalogs add commit-pinned inline Extension provenance with default command-time discovery refresh, explicit offline stored-snapshot reads, and offline startup, without a background marketplace or daemon.
-- OAuth client records persist credential values through typed secret references, Accounts own one stable updatable Grant, and central typed environment capture keeps OAuth client credentials limited to explicit client-import and test-routing boundaries.
+- Extensions are versionless plain roots composing exact imported Providers, Profiles, Adapters, and OAuth Apps without a runtime dependency graph. Core resolves manifest-owned entries, collects exported roots/reachable leaves, and validates one complete registry atomically for built-in, explicit, and Catalog origins.
+- Extension or secret-backed local OAuth Apps provide validated configuration. Authorization snapshots the exact selected App config into one private stable Grant per Account so refresh is independent of current App inventory.
 
 ## Entry points
 
-- `package.json` — workspace manifest and root command surface; Turbo dispatches package-owned dev, start, build, lint, format, typecheck, test, clean, and fullclean tasks, while `cli` routes through `scripts/cli.sh` so helper-created worktrees isolate state.
+- `package.json` — workspace manifest for `apps/*`, `packages/*`, and package-managed `examples/*`, plus the root command surface.
 - `.github/workflows/ci.yml` — least-privilege pull-request CI that runs the repository gate with the pinned Bun version.
 - `.agents/skills/repo-development/SKILL.md` — triggered contributor doctrine, CLI workflow, and verification guidance.
 - `DESIGN.md` — project-wide visual doctrine for the adaptive ctxindex mark, semantic color roles, typography, component treatment, motion, and accessibility; the web app supplies its executable specimen.
@@ -25,14 +25,14 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 
 ## Data & control flow
 
-CLI input is parsed and dispatched by `apps/cli/` into core services. The access lifecycle is explicit: `client` persists provider-scoped OAuth client configuration, `account` performs consent and owns one stable Grant, and `source` binds a labeled stream to that Grant and a Realm. Core loads Profile, Adapter, and OAuth declarations, constrains provider contexts, validates outputs, and coordinates search, retrieval, Artifacts, Actions, sync, persistence, and typed secrets. Concurrent remote-search cache writers are serialized by atomic SQLite Resource batches; optional cache exhaustion becomes a safe warning without discarding provider hits. Gmail and Microsoft Graph Outlook Adapters implement the shared reversible Draft create/update Actions with standalone and provider-native threaded-reply branches. Reply mutations resolve complete same-Source parent and Draft state locally, preserve immutable reply context, perform one no-retry provider mutation, and return a canonical materialized Draft Resource; sending remains outside the Action surface. Indexed Google and Microsoft Calendar Adapters synchronize provider events into the shared calendar Profile, while provider-root Graph transport serves both Microsoft calendar and mailbox modules. Google APIs, Microsoft Graph, or the local filesystem remain behind Adapter operation contracts; results return through CLI formatters with stable process statuses. Independently, `apps/web/` compiles MDX documentation into a Fumadocs source consumed by Next.js pages, search, Markdown/LLM representations, and generated social images.
+CLI input is parsed and dispatched by `apps/cli/` into core services. The access lifecycle is explicit: `oauth-app` imports safe Provider-declared App config, `account --app` performs consent and owns one stable private Grant snapshot, and `source` binds a labeled stream to that Grant and a Realm by Adapter id. Providerless Sources bypass Account, Grant, token, and Provider egress resolution. Core constrains provider contexts, validates outputs, and coordinates search, retrieval, Artifacts, Actions, sync, persistence, and typed secrets. Gmail and Microsoft Outlook Adapters implement reversible Draft create/update without send; Google and Microsoft Calendar Adapters share the ordinary calendar Profile; local-directory remains providerless. Independently, `apps/web/` serves the documentation site.
 
 ## Integration points
 
 - Root orchestration: Bun workspaces and Turbo tasks in `package.json`; repository gates enforce dependency and architecture boundaries.
 - Runtime: core storage, schema, configuration, secrets, logging, networking, auth, and operation services under `packages/core/src/`.
 - External systems: Google OAuth/Gmail/Calendar, Microsoft OAuth/Graph Calendar and Outlook mailbox, and filesystem access under `packages/adapters/src/`.
-- Public extension boundary: `packages/extension-sdk/src/index.ts`, demonstrated by `examples/`.
+- Public extension boundary: `packages/extension-sdk/src/index.ts`, demonstrated by manifest-discoverable package `examples/tenders-extension/`.
 
 ## Directory map
 

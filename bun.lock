@@ -51,6 +51,13 @@
         "typescript": "^6.0.3",
       },
     },
+    "examples/tenders-extension": {
+      "name": "@ctxindex/example-tenders-extension",
+      "version": "0.0.0",
+      "dependencies": {
+        "@ctxindex/extension-sdk": "workspace:*",
+      },
+    },
     "packages/adapters": {
       "name": "@ctxindex/adapters",
       "version": "0.0.0",
@@ -133,6 +140,8 @@
     "@ctxindex/cli": ["@ctxindex/cli@workspace:apps/cli"],
 
     "@ctxindex/core": ["@ctxindex/core@workspace:packages/core"],
+
+    "@ctxindex/example-tenders-extension": ["@ctxindex/example-tenders-extension@workspace:examples/tenders-extension"],
 
     "@ctxindex/extension-sdk": ["@ctxindex/extension-sdk@workspace:packages/extension-sdk"],
 

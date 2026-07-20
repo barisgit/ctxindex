@@ -29,7 +29,7 @@ export type SourceArgs =
   | { readonly kind: 'unknown'; readonly message: string }
 
 export const sourceUsage =
-  'source add <adapter-id> [--realm <slug>] [--label <label>] [--account <label|account-id|grant-id>] [--config-json <json>|--config-* <value>] [--search-routing indexed|federated|hybrid] [--no-sync] | source list [--realm <slug>] [--format table|compact] [--json] | source remove <label|source-id>'
+  'source add <adapter-id> [--realm <slug>] [--label <label>] [--account <label|account-id>] [--config-json <json>|--config-* <value>] [--search-routing indexed|federated|hybrid] [--no-sync] | source list [--realm <slug>] [--format table|compact] [--json] | source remove <label|source-id>'
 
 function parsePrimitive(value: string, type: string): unknown {
   if (type === 'json') {
@@ -158,9 +158,7 @@ export function parseSourceArgs(
     if (!rawAdapterId)
       return { kind: 'unknown', message: 'source add: missing <adapter-id>' }
     const adapterId = rawAdapterId
-    const source = sources
-      .filter((candidate) => candidate.id === adapterId)
-      .sort((left, right) => right.version - left.version)[0]
+    const source = sources.find((candidate) => candidate.id === adapterId)
     const allowed = new Set([
       'adapter',
       'realm',

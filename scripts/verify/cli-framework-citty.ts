@@ -9,7 +9,7 @@ process.chdir(repoRoot)
 const mainFile = 'apps/cli/src/main.ts'
 const commandFiles = [
   'apps/cli/src/commands/account.ts',
-  'apps/cli/src/commands/client.ts',
+  'apps/cli/src/commands/oauth-app.ts',
   'apps/cli/src/commands/describe.ts',
   'apps/cli/src/commands/extensions.ts',
   'apps/cli/src/commands/init.ts',

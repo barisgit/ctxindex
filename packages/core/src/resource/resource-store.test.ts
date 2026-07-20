@@ -141,8 +141,8 @@ async function freshDb(): Promise<Database> {
   await runMigrations(db)
   db.exec("INSERT INTO realms VALUES ('personal', 'personal', NULL, 1)")
   db.prepare(
-    'INSERT INTO sources (id, realm_id, adapter_id, adapter_version, label, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-  ).run(sourceId, 'personal', 'fake', 1, sourceId, '{}', 1, 1)
+    'INSERT INTO sources (id, realm_id, adapter_id, label, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  ).run(sourceId, 'personal', 'fake', sourceId, '{}', 1, 1)
   dbs.push(db)
   return db
 }
@@ -368,9 +368,9 @@ describe('ResourceStore', () => {
     holder.exec("INSERT INTO realms VALUES ('personal', 'personal', NULL, 1)")
     holder
       .prepare(
-        'INSERT INTO sources (id, realm_id, adapter_id, adapter_version, label, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO sources (id, realm_id, adapter_id, label, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       )
-      .run(sourceId, 'personal', 'fake', 1, sourceId, '{}', 1, 1)
+      .run(sourceId, 'personal', 'fake', sourceId, '{}', 1, 1)
     applyPragmas(contender)
     contender.exec('PRAGMA busy_timeout = 10')
     holder.exec('BEGIN IMMEDIATE')
@@ -428,9 +428,9 @@ describe('ResourceStore', () => {
     )
     staleReader
       .prepare(
-        'INSERT INTO sources (id, realm_id, adapter_id, adapter_version, label, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO sources (id, realm_id, adapter_id, label, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       )
-      .run(sourceId, 'personal', 'fake', 1, sourceId, '{}', 1, 1)
+      .run(sourceId, 'personal', 'fake', sourceId, '{}', 1, 1)
     applyPragmas(writer)
     staleReader.exec('BEGIN')
     staleReader.query('SELECT COUNT(*) FROM resources').get()

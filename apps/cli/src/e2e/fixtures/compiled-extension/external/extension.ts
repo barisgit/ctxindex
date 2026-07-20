@@ -1,24 +1,18 @@
-import type { HostApi } from './authoring-types'
+import { defineAdapter, defineExtension, z } from '@ctxindex/extension-sdk'
+import { suffix } from 'extension-fixture-dep'
 import { typedHelper } from './helper'
 
-const dependencyName = 'extension-fixture-dep'
+const adapter = defineAdapter({
+  id: `fixture.adapter.${typedHelper('typescript')}${suffix}`,
+  configSchema: z.object({}),
+  profiles: [],
+  routing: 'indexed',
+  capabilities: [],
+  operations: {},
+  actions: {},
+})
 
-type ExtensionResult = {
-  id: string
-  adapter: { id: string; hostVersion: string }
-  probe: string
-}
-
-export default async function defineExtension(
-  api: HostApi,
-): Promise<ExtensionResult> {
-  const { suffix } = (await import(dependencyName)) as { suffix: string }
-  return {
-    id: 'fixture.extension',
-    adapter: api.defineAdapter({
-      id: 'fixture.adapter',
-      hostVersion: api.version,
-    }),
-    probe: typedHelper('typescript') + suffix,
-  }
-}
+export default defineExtension({
+  id: 'fixture.extension',
+  adapters: [adapter],
+})

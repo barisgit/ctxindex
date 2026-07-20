@@ -1,3 +1,4 @@
+import type { OAuthProviderDefinition } from '@ctxindex/extension-sdk'
 import { ulid } from 'ulid'
 import { createAccountService, normalizeGrantScopes } from '../account'
 import { readEnvironmentVariable } from '../config'
@@ -5,6 +6,7 @@ import { CtxindexAuthError, CtxindexNotFoundError } from '../errors'
 import {
   normalizeOAuthScopes,
   postOAuthToken,
+  resolveOAuthAppCredentials,
   resolveOAuthEndpoint,
   resolveRefreshGrantedScopes,
 } from './oauth'
@@ -24,8 +26,7 @@ type GrantSqlRow = {
   scopes_json: string
   access_token_ref: string | null
   refresh_token_ref: string | null
-  client_id_ref: string | null
-  client_secret_ref: string | null
+  app_config_ref: string
   expires_at: number | null
   created_at: number
   updated_at: number
@@ -33,8 +34,7 @@ type GrantSqlRow = {
 
 type ExistingGrantRefs = {
   readonly id: string
-  readonly client_id_ref: string | null
-  readonly client_secret_ref: string | null
+  readonly app_config_ref: string
   readonly access_token_ref: string | null
   readonly refresh_token_ref: string | null
 }
@@ -48,8 +48,7 @@ function toGrantRow(row: GrantSqlRow): GrantRow {
     scopes: normalizeGrantScopes(row.scopes_json),
     accessTokenRef: row.access_token_ref,
     refreshTokenRef: row.refresh_token_ref,
-    clientIdRef: row.client_id_ref,
-    clientSecretRef: row.client_secret_ref,
+    appConfigRef: row.app_config_ref,
     expiresAt: row.expires_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -74,7 +73,7 @@ export function createAuthService(deps: AuthDependencies): AuthService {
   const getGrantById = async (grantId: string): Promise<GrantRow | null> => {
     const row = deps.db
       .prepare(
-        'SELECT g.id, g.account_id, g.provider, a.label AS account_label, g.scopes_json, g.access_token_ref, g.refresh_token_ref, g.client_id_ref, g.client_secret_ref, g.expires_at, g.created_at, g.updated_at FROM grants AS g JOIN accounts AS a ON a.id = g.account_id WHERE g.id = ? LIMIT 1',
+        'SELECT g.id, g.account_id, g.provider, a.label AS account_label, g.scopes_json, g.access_token_ref, g.refresh_token_ref, g.app_config_ref, g.expires_at, g.created_at, g.updated_at FROM grants AS g JOIN accounts AS a ON a.id = g.account_id WHERE g.id = ? LIMIT 1',
       )
       .get(grantId) as GrantSqlRow | null
     return row ? toGrantRow(row) : null
@@ -89,26 +88,31 @@ export function createAuthService(deps: AuthDependencies): AuthService {
 
   const service: AuthService = {
     async addGrant(input: AddGrantInput): Promise<AddGrantResult> {
-      const provider = deps.registry.getOAuthProvider(input.provider)
-      if (!provider)
+      const provider = deps.registry.providers.get(input.provider)
+      if (!provider || provider.auth.kind !== 'oauth2')
         throw new CtxindexAuthError(
           'needs_auth',
           'OAuth provider is not loaded',
         )
+      const oauthProvider = provider as OAuthProviderDefinition
       if (!input.refreshToken)
         throw new CtxindexAuthError(
           'invalid_grant',
           'A durable refresh token is required',
         )
-      if (provider.client.secret === 'required' && !input.clientSecret)
+      const appConfig = oauthProvider.auth.registration.configSchema.safeParse(
+        input.appConfig,
+      )
+      if (!appConfig.success)
         throw new CtxindexAuthError(
-          'missing_oauth_client_creds',
-          'OAuth provider requires a client secret',
+          'missing_oauth_app_config',
+          'OAuth App configuration is invalid',
         )
+      resolveOAuthAppCredentials(input.appConfig)
       const timestamp = now()
       const existing = deps.db
         .prepare(
-          `SELECT g.id, g.client_id_ref, g.client_secret_ref,
+          `SELECT g.id, g.app_config_ref,
                   g.access_token_ref, g.refresh_token_ref
              FROM grants AS g
              JOIN accounts AS a ON a.id = g.account_id
@@ -123,23 +127,13 @@ export function createAuthService(deps: AuthDependencies): AuthService {
       const refs: string[] = []
       let result: AddGrantResult
       try {
-        const clientIdRef = await write(
+        const appConfigRef = await write(
           input.provider,
           grantId,
-          'client-id',
-          input.clientId,
+          'app-config',
+          JSON.stringify(appConfig.data),
         )
-        refs.push(clientIdRef)
-        let clientSecretRef: string | null = null
-        if (input.clientSecret !== undefined) {
-          clientSecretRef = await write(
-            input.provider,
-            grantId,
-            'client-secret',
-            input.clientSecret,
-          )
-          refs.push(clientSecretRef)
-        }
+        refs.push(appConfigRef)
         const refreshTokenRef = await write(
           input.provider,
           grantId,
@@ -167,15 +161,14 @@ export function createAuthService(deps: AuthDependencies): AuthService {
             const updated = deps.db
               .prepare(
                 `UPDATE grants
-                    SET scopes_json = ?, client_id_ref = ?, client_secret_ref = ?,
+                    SET scopes_json = ?, app_config_ref = ?,
                         access_token_ref = ?, refresh_token_ref = ?, expires_at = ?,
                         updated_at = ?
                   WHERE id = ? AND account_id = ?`,
               )
               .run(
                 JSON.stringify(scopes),
-                clientIdRef,
-                clientSecretRef,
+                appConfigRef,
                 accessTokenRef,
                 refreshTokenRef,
                 input.expiresAt ?? null,
@@ -187,15 +180,14 @@ export function createAuthService(deps: AuthDependencies): AuthService {
           } else {
             deps.db
               .prepare(
-                'INSERT INTO grants (id, account_id, provider, scopes_json, client_id_ref, client_secret_ref, access_token_ref, refresh_token_ref, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                'INSERT INTO grants (id, account_id, provider, scopes_json, app_config_ref, access_token_ref, refresh_token_ref, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
               )
               .run(
                 grantId,
                 accountId,
                 input.provider,
                 JSON.stringify(scopes),
-                clientIdRef,
-                clientSecretRef,
+                appConfigRef,
                 accessTokenRef,
                 refreshTokenRef,
                 input.expiresAt ?? null,
@@ -213,8 +205,7 @@ export function createAuthService(deps: AuthDependencies): AuthService {
         await cleanup(
           deps.store,
           [
-            existing.client_id_ref,
-            existing.client_secret_ref,
+            existing.app_config_ref,
             existing.access_token_ref,
             existing.refresh_token_ref,
           ].filter((ref): ref is string => ref !== null),
@@ -239,7 +230,7 @@ export function createAuthService(deps: AuthDependencies): AuthService {
       }
       const grants = deps.db
         .prepare(
-          'SELECT client_id_ref, client_secret_ref, access_token_ref, refresh_token_ref FROM grants WHERE account_id = ?',
+          'SELECT app_config_ref, access_token_ref, refresh_token_ref FROM grants WHERE account_id = ?',
         )
         .all(account.id) as Omit<ExistingGrantRefs, 'id'>[]
       const timestamp = now()
@@ -267,8 +258,7 @@ export function createAuthService(deps: AuthDependencies): AuthService {
         deps.store,
         grants.flatMap((grant) =>
           [
-            grant.client_id_ref,
-            grant.client_secret_ref,
+            grant.app_config_ref,
             grant.access_token_ref,
             grant.refresh_token_ref,
           ].filter((ref): ref is string => ref !== null),
@@ -278,7 +268,7 @@ export function createAuthService(deps: AuthDependencies): AuthService {
     getGrantById,
     async listGrants(provider?: string): Promise<readonly GrantRow[]> {
       const sql =
-        'SELECT g.id, g.account_id, g.provider, a.label AS account_label, g.scopes_json, g.access_token_ref, g.refresh_token_ref, g.client_id_ref, g.client_secret_ref, g.expires_at, g.created_at, g.updated_at FROM grants AS g JOIN accounts AS a ON a.id = g.account_id'
+        'SELECT g.id, g.account_id, g.provider, a.label AS account_label, g.scopes_json, g.access_token_ref, g.refresh_token_ref, g.app_config_ref, g.expires_at, g.created_at, g.updated_at FROM grants AS g JOIN accounts AS a ON a.id = g.account_id'
       const rows = (
         provider === undefined
           ? deps.db.prepare(`${sql} ORDER BY g.provider, g.id`).all()
@@ -311,8 +301,8 @@ export function createAuthService(deps: AuthDependencies): AuthService {
           'invalid_grant',
           'Grant cannot be refreshed',
         )
-      const provider = deps.registry.getOAuthProvider(grant.provider)
-      if (!provider) {
+      const provider = deps.registry.providers.get(grant.provider)
+      if (!provider || provider.auth.kind !== 'oauth2') {
         deps.db
           .prepare(
             "UPDATE source_sync_state SET last_status = 'needs_auth', updated_at = ? WHERE source_id IN (SELECT id FROM sources WHERE grant_id = ?)",
@@ -323,24 +313,31 @@ export function createAuthService(deps: AuthDependencies): AuthService {
           'Grant provider is not loaded',
         )
       }
-      if (!grant.clientIdRef)
+      const oauthProvider = provider as OAuthProviderDefinition
+      let appConfig: unknown
+      try {
+        appConfig = JSON.parse(await deps.store.getSecret(grant.appConfigRef))
+      } catch (cause) {
         throw new CtxindexAuthError(
-          'missing_oauth_client_creds',
-          'OAuth client id is unavailable',
+          'missing_oauth_app_config',
+          'Grant OAuth App snapshot is unavailable',
+          { cause },
         )
-      const clientId = await deps.store.getSecret(grant.clientIdRef)
-      const clientSecret = grant.clientSecretRef
-        ? await deps.store.getSecret(grant.clientSecretRef)
-        : undefined
-      if (provider.client.secret === 'required' && !clientSecret)
+      }
+      const parsedConfig =
+        oauthProvider.auth.registration.configSchema.safeParse(appConfig)
+      if (!parsedConfig.success)
         throw new CtxindexAuthError(
-          'missing_oauth_client_creds',
-          'OAuth client secret is unavailable',
+          'missing_oauth_app_config',
+          'Grant OAuth App snapshot is invalid',
         )
+      const { clientId, clientSecret } = resolveOAuthAppCredentials(
+        parsedConfig.data as Readonly<Record<string, unknown>>,
+      )
       const refreshToken = await deps.store.getSecret(grant.refreshTokenRef)
       const token = await postOAuthToken({
-        provider,
-        endpoint: resolveOAuthEndpoint(provider, 'token', readEnvironment),
+        provider: oauthProvider,
+        endpoint: resolveOAuthEndpoint(oauthProvider, 'token', readEnvironment),
         clientId,
         ...(clientSecret ? { clientSecret } : {}),
         grant: { kind: 'refresh_token', refreshToken },
@@ -348,7 +345,7 @@ export function createAuthService(deps: AuthDependencies): AuthService {
       const scopes = resolveRefreshGrantedScopes(
         token.scope,
         grant.scopes,
-        provider,
+        oauthProvider,
       )
       const freshRefs: string[] = []
       try {

@@ -3,7 +3,6 @@ import { CtxindexValidationError } from '../errors'
 import { compareUnicodeCodePoints } from '../internal/code-point-order'
 import type {
   AccountExpiryState,
-  AccountInventoryGrant,
   AccountInventoryItem,
   AccountInventorySource,
   AccountService,
@@ -23,23 +22,17 @@ interface InventoryRow {
   readonly provider: string
   readonly label: string
   readonly grantId: string | null
-  readonly scopesJson: string | null
   readonly expiresAt: number | null
   readonly sourceId: string | null
   readonly sourceLabel: string | null
   readonly adapterId: string | null
-  readonly adapterVersion: number | null
   readonly realmId: string | null
   readonly realmSlug: string | null
   readonly realmLabel: string | null
 }
 
-interface MutableInventoryGrant extends Omit<AccountInventoryGrant, 'sources'> {
+interface MutableInventoryItem extends Omit<AccountInventoryItem, 'sources'> {
   readonly sources: AccountInventorySource[]
-}
-
-interface MutableInventoryItem extends Omit<AccountInventoryItem, 'grants'> {
-  readonly grants: MutableInventoryGrant[]
 }
 
 function isNonemptyString(value: unknown): value is string {
@@ -217,12 +210,10 @@ export function createAccountService(deps: AccountServiceDeps): AccountService {
              a.provider,
              a.label,
              g.id AS grantId,
-             g.scopes_json AS scopesJson,
              g.expires_at AS expiresAt,
              s.id AS sourceId,
              s.label AS sourceLabel,
              s.adapter_id AS adapterId,
-             s.adapter_version AS adapterVersion,
              r.id AS realmId,
              r.slug AS realmSlug,
              r.label AS realmLabel
@@ -233,7 +224,6 @@ export function createAccountService(deps: AccountServiceDeps): AccountService {
         )
         .all() as InventoryRow[]
       const inventory = new Map<string, MutableInventoryItem>()
-      const grants = new Map<string, MutableInventoryGrant>()
       const currentTime = now()
 
       for (const row of rows) {
@@ -243,54 +233,38 @@ export function createAccountService(deps: AccountServiceDeps): AccountService {
             id: row.accountId,
             provider: row.provider,
             label: row.label,
-            grants: [],
-          }
-          inventory.set(row.accountId, account)
-        }
-        if (row.grantId === null || row.scopesJson === null) continue
-
-        let grant = grants.get(row.grantId)
-        if (!grant) {
-          grant = {
-            id: row.grantId,
-            scopes: normalizeGrantScopes(row.scopesJson),
             expiresAt: row.expiresAt,
             expiryState: expiryState(row.expiresAt, currentTime),
             sources: [],
           }
-          account.grants.push(grant)
-          grants.set(row.grantId, grant)
+          inventory.set(row.accountId, account)
         }
+        if (row.grantId === null) continue
         if (
           row.sourceId === null ||
           row.sourceLabel === null ||
           row.adapterId === null ||
-          row.adapterVersion === null ||
           row.realmId === null ||
-          row.realmSlug === null ||
-          row.realmLabel === null
+          row.realmSlug === null
         ) {
           continue
         }
         const source: AccountInventorySource = {
           id: row.sourceId,
           label: row.sourceLabel,
-          adapter: { id: row.adapterId, version: row.adapterVersion },
+          adapter: { id: row.adapterId },
           realm: {
             id: row.realmId,
             slug: row.realmSlug,
             label: row.realmLabel,
           },
         }
-        grant.sources.push(source)
+        account.sources.push(source)
       }
 
       const result = [...inventory.values()]
       for (const account of result) {
-        account.grants.sort(compareById)
-        for (const grant of account.grants) {
-          grant.sources.sort(compareById)
-        }
+        account.sources.sort(compareById)
       }
       return result.sort((left, right) => {
         const providerOrder = compareUnicodeCodePoints(
