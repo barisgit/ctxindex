@@ -91,9 +91,9 @@ export default function TermsPage() {
         <p>
           ctxindex stores configuration, indexes, caches, logs, and credentials
           on the device where you run it. You are responsible for securing that
-          device, its operating-system account, backups, OAuth client
-          credentials, secret-store keys, exported data, and any software that
-          can execute ctxindex commands.
+          device, its operating-system account, backups, OAuth App credentials,
+          secret-store keys, exported data, and any software that can execute
+          ctxindex commands.
         </p>
         <p>
           You are also responsible for choosing appropriate Realm and Source

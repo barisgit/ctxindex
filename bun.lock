@@ -60,6 +60,10 @@
       "dependencies": {
         "@ctxindex/extension-sdk": "workspace:*",
       },
+      "devDependencies": {
+        "@ctxindex/adapters": "workspace:*",
+        "@ctxindex/core": "workspace:*",
+      },
     },
     "packages/adapters": {
       "name": "@ctxindex/adapters",

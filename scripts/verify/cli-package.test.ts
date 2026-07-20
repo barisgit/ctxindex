@@ -24,6 +24,7 @@ test('the private monorepo builds one public installable ctxindex package', asyn
 
   expect(root.private).toBe(true)
   expect(root.name).not.toBe('ctxindex')
+  expect(root.scripts?.['build:cli']).toBe('turbo run build --filter ctxindex')
 
   expect(cli).toMatchObject({
     name: 'ctxindex',

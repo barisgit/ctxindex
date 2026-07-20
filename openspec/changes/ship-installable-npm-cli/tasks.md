@@ -13,7 +13,7 @@
 ## 3. Exact-tarball relocated installation
 
 - [x] 3.1 Add a failing integration test that globally installs the exact tarball under a temporary Bun home and invokes it outside the checkout with isolated ctxindex state.
-- [x] 3.2 Extend the isolated smoke through help, bundled skills, fresh init/SQLite migration, native Bun behavior, and an explicit-path external TypeScript Extension.
+- [x] 3.2 Extend the isolated smoke through help, bundled skills, fresh init/SQLite migration, native Bun behavior, and an explicit-path manifest-declared package-root TypeScript Extension.
 - [x] 3.3 Pass the exact-tarball smoke plus existing compiled Extension, catalog, skills, native/concurrent SQLite, and relocated runtime workflow tests required by this slice.
 
 ## 4. Trusted release automation

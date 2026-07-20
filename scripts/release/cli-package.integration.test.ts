@@ -15,6 +15,9 @@ test('the exact packed CLI installs globally and runs outside the checkout', asy
         archive,
         packageName: 'ctxindex',
         nativeKeytarLoaded: true,
+        oauthAppHelpLoaded: true,
+        preInitStatePreserved: true,
+        packageExtensionLoaded: true,
       }),
     )
   } finally {

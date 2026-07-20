@@ -42,9 +42,10 @@ Package tests use temporary `BUN_INSTALL_GLOBAL_DIR`, `BUN_INSTALL_BIN`,
 `BUN_INSTALL_CACHE_DIR`, and `CTXINDEX_*_HOME` paths. They do not access the
 user's package installation, configuration, database, provider state, or
 credentials. The exact-tarball smoke runs outside the checkout and proves the
-installed bin, native `keytar` load, bundled skills, embedded SQLite migrations,
-and explicit-path TypeScript Extension loading. Existing compiled and relocated
-runtime tests remain complementary repository gates.
+installed bin, native `keytar` load, OAuth App help plus pre-init no-side-effect
+rejection, bundled skills, embedded SQLite migrations, and explicit-path
+manifest-declared package-root TypeScript Extension loading. Existing compiled
+and relocated runtime tests remain complementary repository gates.
 
 Archive inspection rejects every non-allowlisted path, unsafe traversal,
 credential-like content, workspace metadata/imports, source maps, source,

@@ -45,7 +45,7 @@ The push gate compares `apps/cli/package.json` at `github.event.before` and `git
 ## Verification
 
 - Unit tests cover manifest policy, allowlisted archive members, sensitive path/content rejection, workspace runtime dependency rejection, normalized member digests, strict version-increase/idempotent-existing-version gating, and release workflow structure.
-- The package integration gate builds and packs twice, compares normalized member/content digests, installs the first exact archive under a temporary Bun home, and runs help, skills, init/SQLite, and external TypeScript Extension probes from outside the checkout.
+- The package integration gate builds and packs twice, compares normalized member/content digests, installs the first exact archive under a temporary Bun home, and runs root/OAuth App help, pre-init no-side-effect, skills, init/SQLite, and manifest-declared package-root TypeScript Extension probes from outside the checkout.
 - Existing compiled Extension, catalog, skills, concurrent/native SQLite, and relocated provider workflow tests remain part of `bun run ci`.
 - Final validation includes `bun run ci`, `bunx openspec validate --all --strict`, OpenSpec change verification, and cartography refresh.
 

@@ -75,8 +75,8 @@ export default function PrivacyPage() {
           </li>
           <li>
             OAuth authorization data, including granted scopes, access and
-            refresh tokens, token expiry information, and OAuth client
-            credentials; and
+            refresh tokens, token expiry information, and OAuth App credentials;
+            and
           </li>
           <li>
             local configuration and operational data, including Realms, Sources,

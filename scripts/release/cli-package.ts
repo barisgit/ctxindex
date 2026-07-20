@@ -2,6 +2,7 @@ import { Database } from 'bun:sqlite'
 import {
   chmod,
   copyFile,
+  cp,
   mkdir,
   mkdtemp,
   readFile,
@@ -72,6 +73,9 @@ export interface CliPackageSmokeResult {
   readonly archive: string
   readonly packageName: 'ctxindex'
   readonly nativeKeytarLoaded: true
+  readonly oauthAppHelpLoaded: true
+  readonly preInitStatePreserved: true
+  readonly packageExtensionLoaded: true
 }
 
 const allowedPackagePaths = [
@@ -225,6 +229,26 @@ async function run(
     readonly env?: Readonly<Record<string, string>>
   } = {},
 ): Promise<{ readonly stdout: string; readonly stderr: string }> {
+  const result = await runWithExit(command, options)
+  if (result.exitCode !== 0) {
+    throw new Error(
+      `${command.join(' ')} failed with exit ${result.exitCode}: ${result.stderr || result.stdout}`,
+    )
+  }
+  return result
+}
+
+async function runWithExit(
+  command: readonly string[],
+  options: {
+    readonly cwd?: string
+    readonly env?: Readonly<Record<string, string>>
+  } = {},
+): Promise<{
+  readonly exitCode: number
+  readonly stdout: string
+  readonly stderr: string
+}> {
   const child = Bun.spawn(command, {
     ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
     ...(options.env === undefined ? {} : { env: options.env }),
@@ -237,12 +261,7 @@ async function run(
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
   ])
-  if (exitCode !== 0) {
-    throw new Error(
-      `${command.join(' ')} failed with exit ${exitCode}: ${stderr || stdout}`,
-    )
-  }
-  return { stdout, stderr }
+  return { exitCode, stdout, stderr }
 }
 
 async function prepareCliPackage(): Promise<CliPublishManifest> {
@@ -417,14 +436,58 @@ export async function smokeCliPackage(
   if (!help.stdout.includes('ctxindex')) {
     throw new Error('Installed CLI help did not identify ctxindex')
   }
+  const oauthAppHelp = await cli(['oauth-app', '--help'])
+  if (!oauthAppHelp.stdout.includes('ctxindex oauth-app add|list|remove')) {
+    throw new Error('Installed CLI help did not expose OAuth App commands')
+  }
   const skills = await cli(['skills', 'get', 'getting-started'])
   if (!skills.stdout.startsWith('# Getting started with ctxindex')) {
     throw new Error('Installed CLI could not read its bundled skill')
   }
 
-  await cli(['init'], {
-    CTXINDEX_KEYTAR_MOCK_FILE: join(smokeRoot, 'keytar.json'),
-  })
+  const keytarMockFile = join(smokeRoot, 'keytar.json')
+  const preInit = await runWithExit(
+    [
+      executable,
+      'oauth-app',
+      'add',
+      'microsoft',
+      'package-smoke',
+      '--from-env',
+    ],
+    {
+      cwd: outsideDirectory,
+      env: {
+        ...env,
+        CTXINDEX_KEYTAR_MOCK_FILE: keytarMockFile,
+        CTXINDEX_MICROSOFT_CLIENT_ID: 'package-smoke-client-id-canary',
+      },
+    },
+  )
+  if (
+    preInit.exitCode !== 2 ||
+    !preInit.stderr.includes('ctxindex is not initialized; run bun cli init')
+  ) {
+    throw new Error(
+      `Installed CLI did not reject pre-init OAuth App add safely: ${preInit.stderr || preInit.stdout}`,
+    )
+  }
+  if (`${preInit.stdout}${preInit.stderr}`.includes('client-id-canary')) {
+    throw new Error('Installed CLI exposed pre-init OAuth App configuration')
+  }
+  for (const path of [
+    join(configDirectory, 'config.toml'),
+    join(dataDirectory, 'ctxindex.sqlite'),
+    join(dataDirectory, 'secrets.box'),
+    join(configDirectory, 'secret.key'),
+    keytarMockFile,
+  ]) {
+    if (await Bun.file(path).exists()) {
+      throw new Error(`Installed CLI created pre-init state: ${path}`)
+    }
+  }
+
+  await cli(['init'], { CTXINDEX_KEYTAR_MOCK_FILE: keytarMockFile })
   const database = new Database(join(dataDirectory, 'ctxindex.sqlite'), {
     readonly: true,
   })
@@ -439,10 +502,42 @@ export async function smokeCliPackage(
     database.close()
   }
 
-  const extensionPath = join(smokeRoot, 'installed-extension.ts')
+  const extensionPath = join(smokeRoot, 'installed-extension')
+  await mkdir(extensionPath, { recursive: true, mode: 0o700 })
+  await mkdir(join(extensionPath, 'node_modules/@ctxindex'), {
+    recursive: true,
+    mode: 0o700,
+  })
+  await cp(
+    join(repoRoot, 'packages/extension-sdk'),
+    join(extensionPath, 'node_modules/@ctxindex/extension-sdk'),
+    { recursive: true },
+  )
+  await cp(
+    join(repoRoot, 'node_modules/zod'),
+    join(extensionPath, 'node_modules/zod'),
+    {
+      recursive: true,
+    },
+  )
   await writeFile(
-    extensionPath,
-    "export default ({ defineExtension }) => defineExtension({ id: 'fixture.installed-package', version: 1, profiles: [], adapters: [] })\n",
+    join(extensionPath, 'package.json'),
+    `${JSON.stringify(
+      {
+        name: '@ctxindex/package-smoke-extension',
+        version: '1.0.0',
+        private: true,
+        type: 'module',
+        ctxindex: { extensions: ['./extension.ts'] },
+        dependencies: { '@ctxindex/extension-sdk': '0.0.0' },
+      },
+      null,
+      2,
+    )}\n`,
+  )
+  await writeFile(
+    join(extensionPath, 'extension.ts'),
+    "import { defineExtension } from '@ctxindex/extension-sdk'\nexport default defineExtension({ id: 'fixture.installed-package' })\n",
   )
   await writeFile(
     join(configDirectory, 'config.toml'),
@@ -452,7 +547,9 @@ export async function smokeCliPackage(
     (await cli(['extensions', 'list', '--json'])).stdout,
   ) as readonly { readonly id?: string }[]
   if (!extensions.some(({ id }) => id === 'fixture.installed-package')) {
-    throw new Error('Installed CLI could not load a TypeScript Extension')
+    throw new Error(
+      'Installed CLI could not load a package-root TypeScript Extension',
+    )
   }
 
   const installedManifest = JSON.parse(
@@ -468,6 +565,9 @@ export async function smokeCliPackage(
     archive: resolvedArchive,
     packageName: 'ctxindex',
     nativeKeytarLoaded: true,
+    oauthAppHelpLoaded: true,
+    preInitStatePreserved: true,
+    packageExtensionLoaded: true,
   }
 }
 

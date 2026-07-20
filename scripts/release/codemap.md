@@ -17,8 +17,8 @@ artifact without publishing from local development or touching user state.
   or credential-like content.
 - Its exact-tarball smoke creates temporary state outside the checkout, installs
   globally under isolated Bun directories, and proves the installed bin, native
-  `keytar`, bundled skills, embedded SQLite migrations, and explicit TypeScript
-  Extension loading.
+  `keytar`, OAuth App help and pre-init isolation, bundled skills, embedded SQLite
+  migrations, and manifest-declared package-root TypeScript Extension loading.
 - `release-gate.ts` separates a pure strict-semver/registry decision from Git and
   npm-registry I/O. Exact existing versions skip idempotently; only a forward,
   unpublished version proceeds, and every indeterminate response fails closed.

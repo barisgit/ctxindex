@@ -2,7 +2,7 @@
 
 The root package and every workspace are private. `apps/cli` executes TypeScript directly from the checkout and declares `workspace:*` runtime dependencies, while release-oriented tests compile a standalone Bun executable. Users therefore cannot install the CLI through npm, and contributors cannot validate the package-manager path that users will receive.
 
-The distribution must preserve Bun 1.3.14 behavior, embedded migration SQL and skills, external TypeScript Extension loading, and native Keychain support. Release automation must use npm trusted publishing on a GitHub-hosted runner without a long-lived npm token. The first publication cannot be automated safely until maintainers have reviewed the packed artifact and configured npm/GitHub trust.
+The distribution must preserve Bun 1.3.14 behavior, embedded migration SQL and skills, manifest-declared package-root TypeScript Extension loading, and native Keychain support. Release automation must use npm trusted publishing on a GitHub-hosted runner without a long-lived npm token. The first publication cannot be automated safely until maintainers have reviewed the packed artifact and configured npm/GitHub trust.
 
 ## Goals / Non-Goals
 

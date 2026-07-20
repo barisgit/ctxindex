@@ -359,13 +359,6 @@ export async function verifyWorkspaceDependencies(
       ...Object.keys(workspacePackage.manifest.devDependencies ?? {}),
     ])
     addDeclaredFrameworkPeers(imports, declared)
-    if (workspacePackage.name === 'ctxindex') {
-      for (const dependency of Object.keys(
-        workspacePackage.manifest.devDependencies ?? {},
-      )) {
-        declared.add(dependency)
-      }
-    }
     imports.delete(workspacePackage.name)
 
     for (const dependency of imports) {
