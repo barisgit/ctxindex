@@ -1,10 +1,43 @@
 import { describe, expect, test } from 'bun:test'
 import { calendarEventSchema } from '@ctxindex/profiles'
-import { normalizeMicrosoftCalendarEvent } from './event'
+import {
+  microsoftCalendarEventSchema,
+  normalizeMicrosoftCalendarEvent,
+} from './event'
 
 const sourceId = '01J00000000000000000000000'
 
 describe('Microsoft Calendar event normalization', () => {
+  test('treats an unknown future Graph event type as absent', () => {
+    expect(
+      microsoftCalendarEventSchema.parse({
+        id: 'future-type',
+        type: 'futureSeriesVariant',
+      }).type,
+    ).toBeUndefined()
+
+    const result = normalizeMicrosoftCalendarEvent(
+      {
+        id: 'future-type',
+        type: 'futureSeriesVariant',
+        start: { dateTime: '2026-07-16T09:00:00Z', timeZone: 'UTC' },
+        end: { dateTime: '2026-07-16T10:00:00Z', timeZone: 'UTC' },
+      },
+      sourceId,
+      'default',
+    )
+
+    expect(result.warnings).toEqual([])
+    expect(result.resource?.payload).toMatchObject({
+      providerEventId: 'future-type',
+      timing: {
+        kind: 'timed',
+        start: '2026-07-16T09:00:00.000Z',
+        end: '2026-07-16T10:00:00.000Z',
+      },
+    })
+  })
+
   test('normalizes timed participants, status, recurrence, and series identity', () => {
     const result = normalizeMicrosoftCalendarEvent(
       {

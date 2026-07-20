@@ -28,13 +28,24 @@ const attendeeSchema = participantSchema
     status: absentable(z.object({ response: z.string().min(1) }).passthrough()),
   })
   .passthrough()
+const microsoftCalendarKnownEventTypeSchema = z.enum([
+  'singleInstance',
+  'occurrence',
+  'exception',
+  'seriesMaster',
+])
+const microsoftCalendarEventTypeSchema =
+  microsoftCalendarKnownEventTypeSchema.or(
+    z
+      .string()
+      .min(1)
+      .transform(() => undefined),
+  )
 
 export const microsoftCalendarEventSchema = z
   .object({
     id: z.string().min(1),
-    type: absentable(
-      z.enum(['singleInstance', 'occurrence', 'exception', 'seriesMaster']),
-    ),
+    type: absentable(microsoftCalendarEventTypeSchema),
     '@removed': z
       .object({ reason: z.string().optional() })
       .passthrough()

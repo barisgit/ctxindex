@@ -69,7 +69,7 @@ export function normalizeMicrosoftCalendarEvent(
 
 ## Implementation doctrine
 
-`@ctxindex/profiles` owns provider-neutral event validation, canonical IANA zone vocabulary, and pure projections. Timed Calendar Events retain optional canonical IANA zones in the schema-derived timing union and project them through the optional string fields `startTimeZone` and `endTimeZone`; all-day events project neither field. The Profile-owned canonicalizer maps recognized IANA links to current names and rejects unknown labels. Google and Microsoft modules in `@ctxindex/adapters` normalize provider responses through that seam and construct Source-scoped Refs; core storage, search, retrieval, and CLI code stay provider-neutral.
+`@ctxindex/profiles` owns provider-neutral event validation, canonical IANA zone vocabulary, and pure projections. Timed Calendar Events retain optional canonical IANA zones in the schema-derived timing union and project them through the optional string fields `startTimeZone` and `endTimeZone`; all-day events project neither field. The Profile-owned canonicalizer applies pinned replacements first, then the runtime canonical inventory, and finally `Intl.DateTimeFormat(...).resolvedOptions().timeZone` for valid unlisted links before rejecting unknown labels. Google and Microsoft modules in `@ctxindex/adapters` normalize provider responses through that seam and construct Source-scoped Refs; core storage, search, retrieval, and CLI code stay provider-neutral.
 
 Calendar sync uses generic operation contexts. Adapter cursors retain an anchored window, provider cursor, and Source-local manifest; changing the window requires complete reconciliation before cursor replacement or removal emission. Calendar definitions bind no Actions.
 

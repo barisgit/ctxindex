@@ -54,6 +54,7 @@ describe('calendarEventProfile', () => {
     expect(canonicalizeIanaTimeZone('Europe/Ljubljana')).toBe(
       'Europe/Ljubljana',
     )
+    expect(canonicalizeIanaTimeZone('America/Shiprock')).toBe('America/Denver')
     expect(canonicalizeIanaTimeZone('Synthetic/Unknown')).toBeUndefined()
 
     expect(() =>

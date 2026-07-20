@@ -19,6 +19,8 @@ const canonicalTimeZoneAliases = new Map<string, string>([
   ['America/Knox_IN', 'America/Indiana/Knox'],
   ['America/Louisville', 'America/Kentucky/Louisville'],
   ['America/Mendoza', 'America/Argentina/Mendoza'],
+  // Bun preserves this link in resolvedOptions while Node canonicalizes it.
+  ['America/Shiprock', 'America/Denver'],
   ['Etc/UTC', 'UTC'],
   ['Etc/UCT', 'UTC'],
   ['Etc/Universal', 'UTC'],
@@ -66,10 +68,20 @@ export function canonicalizeIanaTimeZone(value: string): string | undefined {
     canonicalTimeZones.has(value)
   )
     return value
-  if (!/^Etc\/GMT(?:[+-](?:[1-9]|1[0-4]))?$/.test(value)) return undefined
+  if (/^Etc\/GMT(?:[+-](?:[1-9]|1[0-4]))?$/.test(value)) {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: value })
+      return value
+    } catch {
+      return undefined
+    }
+  }
   try {
-    new Intl.DateTimeFormat('en-US', { timeZone: value })
-    return value
+    const resolved = new Intl.DateTimeFormat('en-US', {
+      timeZone: value,
+    }).resolvedOptions().timeZone
+    if (resolved === value) return undefined
+    return canonicalTimeZoneAliases.get(resolved) ?? resolved
   } catch {
     return undefined
   }
