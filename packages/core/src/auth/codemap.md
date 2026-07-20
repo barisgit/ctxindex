@@ -15,7 +15,7 @@ Owns provider-neutral Account authorization, private one-stable-Grant lifecycle,
 
 1. Authorization resolves an exact Provider/App pair and all-loaded scope union, completes loopback token/identity flow, then writes the App snapshot and token refs.
 2. Account upsert and Grant insert/update commit together; same-Account authorization, refresh, and removal re-read current state in one process-wide keyed order. Failures attempt cleanup without replacing the original failure, while successful reauthorization preserves Source bindings and its committed replacement even when old-ref cleanup warns.
-3. Account removal revalidates its exact label after entering the Account mutation queue, then marks bound Sources `needs_auth`, upserts sync state, clears `grant_id`, deletes Grant/Account transactionally, and cleans refs.
+3. Account removal revalidates its exact label after entering the Account mutation queue, then marks bound Sources `needs_auth`, upserts sync state, clears `grant_id`, and deletes Grant/Account transactionally before cleaning refs. The commit remains authoritative when cleanup warns, and physical deletion is idempotently retryable.
 4. Provider operations reuse unexpired access or refresh through the declared endpoint with one safe ref rotation.
 
 ## Integration points

@@ -12,7 +12,6 @@ class MemoryStore implements SecretsStore {
   readonly failDeleteRefs = new Set<string>()
   failAllDeletes = false
   failWriteAt = 0
-  writeDelayMs = 0
   writeBarrier: Promise<void> | null = null
   onWrite: (() => void) | null = null
   writes = 0
@@ -26,7 +25,6 @@ class MemoryStore implements SecretsStore {
     if (this.failWriteAt === this.writes) throw new Error('write failed')
     this.onWrite?.()
     if (this.writeBarrier) await this.writeBarrier
-    if (this.writeDelayMs > 0) await Bun.sleep(this.writeDelayMs)
     const ref = keychainRef(scope, key)
     this.values.set(ref, value)
     return ref
@@ -279,24 +277,33 @@ test('concurrent reauthorization leaves only the winning Grant refs', async () =
     appConfig: { clientId: 'initial' },
     refreshToken: 'initial-refresh',
   })
-  store.writeDelayMs = 10
+  let signalWrite = () => {}
+  const writeStarted = new Promise<void>((resolve) => {
+    signalWrite = resolve
+  })
+  let releaseWrite = () => {}
+  store.writeBarrier = new Promise<void>((resolve) => {
+    releaseWrite = resolve
+  })
+  store.onWrite = signalWrite
+  const concurrentA = service.addGrant({
+    provider: 'example',
+    account,
+    scopes: ['openid'],
+    appConfig: { clientId: 'concurrent-a' },
+    refreshToken: 'refresh-a',
+  })
+  await writeStarted
+  const concurrentB = service.addGrant({
+    provider: 'example',
+    account,
+    scopes: ['openid'],
+    appConfig: { clientId: 'concurrent-b' },
+    refreshToken: 'refresh-b',
+  })
+  releaseWrite()
 
-  const results = await Promise.all([
-    service.addGrant({
-      provider: 'example',
-      account,
-      scopes: ['openid'],
-      appConfig: { clientId: 'concurrent-a' },
-      refreshToken: 'refresh-a',
-    }),
-    service.addGrant({
-      provider: 'example',
-      account,
-      scopes: ['openid'],
-      appConfig: { clientId: 'concurrent-b' },
-      refreshToken: 'refresh-b',
-    }),
-  ])
+  const results = await Promise.all([concurrentA, concurrentB])
 
   expect(results).toEqual([first, first])
   const current = await service.getGrantById(first.grantId)
@@ -309,10 +316,7 @@ test('concurrent reauthorization leaves only the winning Grant refs', async () =
     JSON.parse(await store.getSecret(current.appConfigRef)).clientId,
     await store.getSecret(current.refreshTokenRef),
   ]
-  expect([
-    ['concurrent-a', 'refresh-a'],
-    ['concurrent-b', 'refresh-b'],
-  ]).toContainEqual(pair)
+  expect(pair).toEqual(['concurrent-b', 'refresh-b'])
 })
 
 test('old-label removal cannot delete an Account renamed while queued', async () => {
@@ -398,7 +402,15 @@ test('concurrent refresh leaves only current token refs', async () => {
     accessToken: 'initial-access',
     expiresAt: 0,
   })
-  store.writeDelayMs = 10
+  let signalWrite = () => {}
+  const writeStarted = new Promise<void>((resolve) => {
+    signalWrite = resolve
+  })
+  let releaseWrite = () => {}
+  store.writeBarrier = new Promise<void>((resolve) => {
+    releaseWrite = resolve
+  })
+  store.onWrite = signalWrite
   let request = 0
   globalThis.fetch = (async () => {
     request += 1
@@ -410,12 +422,14 @@ test('concurrent refresh leaves only current token refs', async () => {
     })
   }) as unknown as typeof fetch
 
-  await expect(
-    Promise.all([
-      service.refreshAccessToken(grantId),
-      service.refreshAccessToken(grantId),
-    ]),
-  ).resolves.toEqual(['access-1', 'access-2'])
+  const firstRefresh = service.refreshAccessToken(grantId)
+  await writeStarted
+  const secondRefresh = service.refreshAccessToken(grantId)
+  releaseWrite()
+  await expect(Promise.all([firstRefresh, secondRefresh])).resolves.toEqual([
+    'access-1',
+    'access-2',
+  ])
 
   const current = await service.getGrantById(grantId)
   expect(current).not.toBeNull()
@@ -644,6 +658,10 @@ test('Account removal cleanup warning contains only the enumerated safe fields',
     refreshToken: 'removal-refresh-canary',
     accessToken: 'removal-access-canary',
   })
+  const grant = await service.getGrantById(grantId)
+  if (!grant?.accessTokenRef || !grant.refreshTokenRef)
+    throw new Error('missing Account removal refs')
+  const refs = [grant.appConfigRef, grant.accessTokenRef, grant.refreshTokenRef]
   store.failAllDeletes = true
 
   await expect(service.removeAccount('Person')).resolves.toBeUndefined()
@@ -662,4 +680,18 @@ test('Account removal cleanup warning contains only the enumerated safe fields',
   expect(JSON.stringify(warnings)).not.toMatch(
     /removal-config-canary|removal-refresh-canary|removal-access-canary|DELETE-FAILURE-SECRET-CANARY|keychain:|accountId/,
   )
+  expect(db.prepare('SELECT COUNT(*) AS count FROM accounts').get()).toEqual({
+    count: 0,
+  })
+  expect(db.prepare('SELECT COUNT(*) AS count FROM grants').get()).toEqual({
+    count: 0,
+  })
+  expect(store.values.size).toBe(3)
+
+  store.failAllDeletes = false
+  for (const ref of refs) {
+    await expect(store.deleteSecret(ref)).resolves.toBeUndefined()
+    await expect(store.deleteSecret(ref)).resolves.toBeUndefined()
+  }
+  expect(store.values.size).toBe(0)
 })

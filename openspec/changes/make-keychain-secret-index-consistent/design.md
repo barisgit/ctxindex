@@ -44,13 +44,15 @@ The Keychain availability probe writes one reserved credential identity in a ser
 
 ### Serialize mutations per Account identity
 
-Grant authorization, refresh, and Account removal join a module-owned asynchronous queue keyed by exact Provider and external user id. A waiter re-reads current Grant state inside the critical section before writing or refreshing. Removal also revalidates the exact requested label after waiting, so a queued authorization rename invalidates an old-label removal instead of deleting the renamed Account. Unrelated Accounts remain concurrent, while same-Account operations clean the references they actually supersede and leave only the final committed App/token references live.
+Grant authorization, refresh, and Account removal join a module-owned asynchronous queue keyed by exact Provider and external user id. A waiter re-reads current Grant state inside the critical section before writing or refreshing. Removal also revalidates the exact requested label after waiting, so a queued authorization rename invalidates an old-label removal instead of deleting the renamed Account. Unrelated Accounts remain concurrent, while same-Account operations leave only the final committed App/token references authoritative. Superseded physical rows may remain when cleanup warns, but no committed Grant selects them and they are not live authorization state.
+
+Account removal commits Account/Grant deletion and cleared Source bindings before cleanup. Cleanup failure preserves that authoritative commit, emits the same bounded redacted warning, and leaves typed refs or backend inventory eligible for idempotent deletion retry. Retrying physical deletion cannot restore Account/Grant rows and tolerates an already-absent physical credential.
 
 ## Risks / Trade-offs
 
 - **A second ctxindex process can still race the reserved inventory.** → Document the process-local boundary explicitly; solving cross-process serialization requires a separately designed lock or storage format.
 - **A process crash or native-call ambiguity can interrupt inventory/credential coordination.** → Never return success or a reference after a reported failure; retain the original credential-write error if compensation also fails, and do not claim more about native state than completed operations establish.
-- **Post-commit cleanup warnings do not automatically retry deletion.** → The consistent inventory retains failed entries for existing traversal/backend-switch cleanup; a dedicated repair command remains separate future scope.
+- **Post-commit cleanup warnings do not automatically retry deletion.** → The consistent inventory retains failed entries for existing traversal/backend-switch cleanup, where typed-ref deletion is safe to repeat; a dedicated repair command remains separate future scope.
 - **A locked Keychain can prevent both the primary mutation and compensation.** → Return the existing bounded backend error and never expose the affected reference or value.
 - **Same-Account auth operations wait across provider network latency.** → The queue is scoped to one exact Account identity; serializing token rotation is necessary to keep the durable Grant and secret store consistent.
 

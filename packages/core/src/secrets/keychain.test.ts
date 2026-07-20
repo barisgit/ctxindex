@@ -151,11 +151,24 @@ describe('KeychainBackend', () => {
 
   test('concurrent writes across backend instances preserve every index entry', async () => {
     const values = new Map<string, string>()
+    let signalFirstRead = () => {}
+    const firstReadStarted = new Promise<void>((resolve) => {
+      signalFirstRead = resolve
+    })
+    let releaseFirstRead = () => {}
+    const firstReadGate = new Promise<void>((resolve) => {
+      releaseFirstRead = resolve
+    })
+    let indexReads = 0
     const keytar = {
       async getPassword(service: string, account: string) {
         const snapshot = values.get(`${service}\u0000${account}`) ?? null
         if (service === 'ctxindex' && account === '__ctxindex_keys__') {
-          await Bun.sleep(10)
+          indexReads += 1
+          if (indexReads === 1) {
+            signalFirstRead()
+            await firstReadGate
+          }
         }
         return snapshot
       },
@@ -166,14 +179,23 @@ describe('KeychainBackend', () => {
         return values.delete(`${service}\u0000${account}`)
       },
     } as unknown as KeytarShim
-    const options = { importKeytar: async () => keytar }
-    const first = new KeychainBackend(options)
-    const second = new KeychainBackend(options)
+    const first = new KeychainBackend({ importKeytar: async () => keytar })
+    let signalSecondQueued = () => {}
+    const secondQueued = new Promise<void>((resolve) => {
+      signalSecondQueued = resolve
+    })
+    const second = new KeychainBackend({
+      importKeytar: async () => keytar,
+      onIndexOperationQueuedForTesting: signalSecondQueued,
+    })
 
-    await Promise.all([
-      first.setSecret('google', 'first', 'FIRST-CANARY'),
-      second.setSecret('microsoft', 'second', 'SECOND-CANARY'),
-    ])
+    const firstWrite = first.setSecret('google', 'first', 'FIRST-CANARY')
+    await firstReadStarted
+    const secondWrite = second.setSecret('microsoft', 'second', 'SECOND-CANARY')
+    await secondQueued
+    releaseFirstRead()
+
+    await Promise.all([firstWrite, secondWrite])
 
     expect(await first.listKeys()).toEqual([
       {
@@ -358,6 +380,7 @@ describe('KeychainBackend', () => {
     expect(values.has('ctxindex/google\u0000old-secret')).toBe(false)
 
     failIndexWrite = false
+    await expect(backend.deleteSecret(entry.ref)).resolves.toBeUndefined()
     await expect(backend.deleteSecret(entry.ref)).resolves.toBeUndefined()
     expect(await backend.listKeys()).toEqual([])
   })

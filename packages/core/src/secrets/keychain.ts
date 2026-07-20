@@ -24,12 +24,16 @@ interface KeychainIndexEntry {
   readonly key: string
 }
 
-async function withIndexOperation<T>(operation: () => Promise<T>): Promise<T> {
+async function withIndexOperation<T>(
+  operation: () => Promise<T>,
+  onQueuedForTesting?: () => void,
+): Promise<T> {
   const prior = indexOperationTail
   let release = () => {}
   indexOperationTail = new Promise<void>((resolve) => {
     release = resolve
   })
+  onQueuedForTesting?.()
   await prior
   try {
     return await operation()
@@ -40,6 +44,8 @@ async function withIndexOperation<T>(operation: () => Promise<T>): Promise<T> {
 
 export interface KeychainBackendOptions {
   readonly importKeytar?: KeytarImporter
+  /** @internal */
+  readonly onIndexOperationQueuedForTesting?: () => void
 }
 
 function serviceName(scope: string): string {
@@ -119,9 +125,12 @@ function fileBackedKeytarMock(path: string) {
 
 export class KeychainBackend implements SecretsStore {
   private readonly importKeytar: KeytarImporter
+  private readonly onIndexOperationQueuedForTesting: (() => void) | undefined
 
   constructor(options: KeychainBackendOptions = {}) {
     this.importKeytar = options.importKeytar ?? defaultImportKeytar
+    this.onIndexOperationQueuedForTesting =
+      options.onIndexOperationQueuedForTesting
   }
 
   async assertAvailable(): Promise<void> {
@@ -152,7 +161,7 @@ export class KeychainBackend implements SecretsStore {
           failure ??= cause
         }
       }
-    })
+    }, this.onIndexOperationQueuedForTesting)
     if (failure !== undefined) {
       throw new CtxindexSecretsError(
         'keychain backend unavailable',
@@ -206,7 +215,7 @@ export class KeychainBackend implements SecretsStore {
           throw cause
         }
         return ref
-      })
+      }, this.onIndexOperationQueuedForTesting)
     } catch (err) {
       throw wrapKeytarRuntimeError(err, 'failed to write keychain secret')
     }
@@ -226,7 +235,7 @@ export class KeychainBackend implements SecretsStore {
       await withIndexOperation(async () => {
         await keytar.deletePassword(serviceName(parsed.scope), parsed.key)
         await this.removeIndexEntry(ref, keytar)
-      })
+      }, this.onIndexOperationQueuedForTesting)
     } catch (err) {
       throw wrapKeytarRuntimeError(err, 'failed to delete keychain secret')
     }
@@ -235,10 +244,12 @@ export class KeychainBackend implements SecretsStore {
   async listKeys(): Promise<{ ref: string; scope: string; key: string }[]> {
     const keytar = await this.keytar()
     try {
-      return await withIndexOperation(async () =>
-        (await this.readIndex(keytar)).sort((a, b) =>
-          a.ref < b.ref ? -1 : a.ref > b.ref ? 1 : 0,
-        ),
+      return await withIndexOperation(
+        async () =>
+          (await this.readIndex(keytar)).sort((a, b) =>
+            a.ref < b.ref ? -1 : a.ref > b.ref ? 1 : 0,
+          ),
+        this.onIndexOperationQueuedForTesting,
       )
     } catch (err) {
       throw wrapKeytarRuntimeError(err, 'failed to list keychain secrets')

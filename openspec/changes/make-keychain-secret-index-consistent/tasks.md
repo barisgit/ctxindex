@@ -6,6 +6,7 @@
 - [x] 1.4 Add failing probe read/delete cleanup coverage and use one stable probe identity whose cleanup is always attempted and retryable.
 - [x] 1.5 Keep the probe service structurally outside normal scoped-secret services and add a collision regression.
 - [x] 1.6 Specify and cover the double-failure path where credential write and inventory compensation both report failure.
+- [x] 1.7 Replace timing-based concurrency sleeps with explicit deferred gates.
 
 ## 2. Authentication cleanup visibility
 
@@ -16,6 +17,8 @@
 - [x] 2.5 Serialize authorization, refresh, and removal per exact Account identity and re-read Grant state inside the critical section.
 - [x] 2.6 Revalidate the requested Account label after queued work and cover a deterministic rename/removal race.
 - [x] 2.7 Restrict cleanup warning bindings to Provider id, Grant id, lifecycle phase, and failed-entry count, with Account id and sensitive fields excluded.
+- [x] 2.8 Specify authoritative Account-removal commit state, bounded cleanup warning behavior, and idempotent physical deletion retry.
+- [x] 2.9 Clarify that authoritative/live Grant refs are committed references, not superseded physical rows pending cleanup.
 
 ## 3. Doctrine and final verification
 
