@@ -8,13 +8,17 @@ test('the exact packed CLI installs globally and runs outside the checkout', asy
   const sandbox = await mkdtemp(join(tmpdir(), 'ctxindex-package-smoke-test-'))
   try {
     const archive = await packCliPackage(join(sandbox, 'artifacts'))
-    await expect(
-      smokeCliPackage(archive, join(sandbox, 'smoke')),
-    ).resolves.toEqual(
+    const result = await smokeCliPackage(archive, join(sandbox, 'smoke'))
+    expect(['loaded', 'host-libsecret-unavailable']).toContain(
+      result.nativeKeytar,
+    )
+    if (process.platform !== 'linux') {
+      expect(result.nativeKeytar).toBe('loaded')
+    }
+    expect(result).toEqual(
       expect.objectContaining({
         archive,
         packageName: 'ctxindex',
-        nativeKeytarLoaded: true,
         oauthAppHelpLoaded: true,
         preInitStatePreserved: true,
         packageExtensionLoaded: true,

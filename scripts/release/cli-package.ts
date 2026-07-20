@@ -72,10 +72,20 @@ export interface PackageContentEntry {
 export interface CliPackageSmokeResult {
   readonly archive: string
   readonly packageName: 'ctxindex'
-  readonly nativeKeytarLoaded: true
+  readonly nativeKeytar: NativeKeytarProbeStatus
   readonly oauthAppHelpLoaded: true
   readonly preInitStatePreserved: true
   readonly packageExtensionLoaded: true
+}
+
+export type NativeKeytarProbeStatus = 'loaded' | 'host-libsecret-unavailable'
+
+type NativeKeytarProbeClassification = NativeKeytarProbeStatus | 'failed'
+
+interface CommandResult {
+  readonly exitCode: number
+  readonly stdout: string
+  readonly stderr: string
 }
 
 const allowedPackagePaths = [
@@ -244,11 +254,7 @@ async function runWithExit(
     readonly cwd?: string
     readonly env?: Readonly<Record<string, string>>
   } = {},
-): Promise<{
-  readonly exitCode: number
-  readonly stdout: string
-  readonly stderr: string
-}> {
+): Promise<CommandResult> {
   const child = Bun.spawn(command, {
     ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
     ...(options.env === undefined ? {} : { env: options.env }),
@@ -262,6 +268,24 @@ async function runWithExit(
     new Response(child.stderr).text(),
   ])
   return { exitCode, stdout, stderr }
+}
+
+export function classifyNativeKeytarProbe(
+  platform: NodeJS.Platform,
+  result: CommandResult,
+): NativeKeytarProbeClassification {
+  if (result.exitCode === 0) return 'loaded'
+
+  const diagnostic = `${result.stderr}\n${result.stdout}`
+  if (
+    platform === 'linux' &&
+    diagnostic.includes('libsecret-1.so.0') &&
+    (diagnostic.includes('cannot open shared object file') ||
+      diagnostic.includes('No such file or directory'))
+  ) {
+    return 'host-libsecret-unavailable'
+  }
+  return 'failed'
 }
 
 async function prepareCliPackage(): Promise<CliPublishManifest> {
@@ -414,7 +438,7 @@ export async function smokeCliPackage(
   })
 
   const keytarEntry = join(globalDirectory, 'node_modules/keytar/lib/keytar.js')
-  await run(
+  const keytarProbe = await runWithExit(
     [
       process.execPath,
       '-e',
@@ -425,6 +449,12 @@ export async function smokeCliPackage(
       env: { ...env, KEYTAR_ENTRY: keytarEntry },
     },
   )
+  const nativeKeytar = classifyNativeKeytarProbe(process.platform, keytarProbe)
+  if (nativeKeytar === 'failed') {
+    throw new Error(
+      `Installed native keytar probe failed with exit ${keytarProbe.exitCode}: ${keytarProbe.stderr || keytarProbe.stdout}`,
+    )
+  }
 
   const executable = join(binDirectory, 'ctxindex')
   const cli = (args: readonly string[], overrides = {}) =>
@@ -564,7 +594,7 @@ export async function smokeCliPackage(
   return {
     archive: resolvedArchive,
     packageName: 'ctxindex',
-    nativeKeytarLoaded: true,
+    nativeKeytar,
     oauthAppHelpLoaded: true,
     preInitStatePreserved: true,
     packageExtensionLoaded: true,

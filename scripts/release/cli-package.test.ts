@@ -4,11 +4,45 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   assertSafePackageFiles,
+  classifyNativeKeytarProbe,
   createPublishManifest,
   packageContentManifest,
   packCliPackage,
   readPackageFiles,
 } from './cli-package'
+
+test('native keytar probe distinguishes a missing Linux host library', () => {
+  expect(
+    classifyNativeKeytarProbe('linux', {
+      exitCode: 1,
+      stdout: '',
+      stderr:
+        'error: libsecret-1.so.0: cannot open shared object file: No such file or directory',
+    }),
+  ).toBe('host-libsecret-unavailable')
+  expect(
+    classifyNativeKeytarProbe('darwin', {
+      exitCode: 1,
+      stdout: '',
+      stderr:
+        'error: libsecret-1.so.0: cannot open shared object file: No such file or directory',
+    }),
+  ).toBe('failed')
+  expect(
+    classifyNativeKeytarProbe('linux', {
+      exitCode: 1,
+      stdout: '',
+      stderr: 'error: native keytar API unavailable',
+    }),
+  ).toBe('failed')
+  expect(
+    classifyNativeKeytarProbe('linux', {
+      exitCode: 0,
+      stdout: '',
+      stderr: '',
+    }),
+  ).toBe('loaded')
+})
 
 test('publish metadata contains only the installable runtime contract', () => {
   const manifest = createPublishManifest({

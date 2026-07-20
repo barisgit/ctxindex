@@ -1,7 +1,7 @@
 {
   "metadata": {
     "version": "1.0.0",
-    "last_run": "2026-07-20T01:24:24.805889Z",
+    "last_run": "2026-07-20T01:50:17.321602Z",
     "root": ".",
     "include_patterns": [
       "apps/*/src/**/*.ts",
@@ -334,7 +334,7 @@
     "packages/profiles/src/file.ts": "8eb8c009e0e5e5de060417b733ea7cda",
     "packages/profiles/src/index.ts": "5fb72514056c7705c1eb0137d7fc81df",
     "scripts/release/build-cli-package.ts": "daebe3edbd232a9af0ab3ef605251807",
-    "scripts/release/cli-package.ts": "04012d3729d4b2d03939bcc46e1e07e1",
+    "scripts/release/cli-package.ts": "3581eec20e3a5342b2ad0d016375d270",
     "scripts/release/release-gate.ts": "40bcb2d3534dd14337aa6420fb7eff58",
     "scripts/verify/architecture-lint.ts": "5bfed1f3d98bfcd199cf3d22b3fea7d2",
     "scripts/verify/cli-framework-citty.ts": "f314c77084a8b484536607206459a67a",
@@ -415,7 +415,7 @@
     "packages/core/src/internal": "0372a93ccf9ae0dc2e57b441f51f4953",
     "apps": "ab777c4e5ec8ac2d4a1adaaf0a4a5f73",
     "apps/web/app/(home)/brand": "54c50f08ef94b81ace49cc0ba52ddb90",
-    "scripts/release": "e19e3d7e88ef196b470dfceb85e77827",
+    "scripts/release": "fb6d8818b2f1688b29a733b057de70a7",
     "apps/cli/src/source": "8e8c3fc5728d7326294ffa63a9296ed3",
     "packages/core/src/sync": "669d43e8078f7a532d08ccce622c1d34",
     "packages/extension-sdk/src": "4ddc2012ba2141a368dd3146af439756",
@@ -423,7 +423,7 @@
     "packages/adapters/src/local-directory": "75de065b0d49b8a82a93c95e0a40cc8f",
     "apps/web/lib": "5d69cfd9f59cd5c6ac914415aaa3d121",
     ".": "452b7417a51391020496a282744bc35b",
-    "scripts": "102df4da5a6dd84da44216db8ac972d4",
+    "scripts": "f2e5b6712671f8e9523aabe6a93037c7",
     "apps/cli/src/account": "8ced771f506a36e0d9f1644abcf91900",
     "apps/cli/src/extensions": "ec599f6c8d64d6041b12347c6c8ba577",
     "apps/web/app/api/search": "f6e2484001029fae6a3a9ba8150d0738",
