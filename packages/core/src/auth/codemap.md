@@ -8,13 +8,13 @@ Owns provider-neutral Account authorization, private one-stable-Grant lifecycle,
 
 - `authorize-provider.ts` resolves one exact OAuth App label, derives Provider base scopes plus every loaded same-provider Adapter access scope, and completes loopback consent through the imported Provider definition.
 - `selection.ts` owns deterministic scope union; OAuth modules isolate endpoints, token/identity validation, and host policy.
-- `createAuthService()` writes typed Grant refs plus a private snapshot of the selected App config, composes Account upsert transactionally, updates reauthorization in place under the same Grant ID, and cleans replaced refs best-effort.
+- `createAuthService()` writes typed Grant refs plus a private snapshot of the selected App config, composes Account upsert transactionally, serializes mutations per exact Account identity, updates reauthorization in place under the same Grant ID, and reports bounded redacted warnings when replaced-ref cleanup remains pending.
 - Refresh always uses the Grant-owned App snapshot and token refs, never the current App inventory or environment.
 
 ## Data & control flow
 
 1. Authorization resolves an exact Provider/App pair and all-loaded scope union, completes loopback token/identity flow, then writes the App snapshot and token refs.
-2. Account upsert and Grant insert/update commit together; failures clean new refs, successful reauthorization cleans old refs while preserving Source bindings.
+2. Account upsert and Grant insert/update commit together; same-Account authorization, refresh, and removal re-read current state in one process-wide keyed order. Failures attempt cleanup without replacing the original failure, while successful reauthorization preserves Source bindings and its committed replacement even when old-ref cleanup warns.
 3. Account removal marks bound Sources `needs_auth`, upserts sync state, clears `grant_id`, deletes Grant/Account transactionally, and cleans refs.
 4. Provider operations reuse unexpired access or refresh through the declared endpoint with one safe ref rotation.
 

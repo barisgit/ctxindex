@@ -14,11 +14,28 @@ type KeytarImporter = () => Promise<KeytarModule>
 
 const indexService = 'ctxindex'
 const indexAccount = '__ctxindex_keys__'
+const probeService = 'ctxindex/probe'
+const probeAccount = '__ctxindex_probe__'
+let indexOperationTail: Promise<void> = Promise.resolve()
 
 interface KeychainIndexEntry {
   readonly ref: string
   readonly scope: string
   readonly key: string
+}
+
+async function withIndexOperation<T>(operation: () => Promise<T>): Promise<T> {
+  const prior = indexOperationTail
+  let release = () => {}
+  indexOperationTail = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await prior
+  try {
+    return await operation()
+  } finally {
+    release()
+  }
 }
 
 export interface KeychainBackendOptions {
@@ -112,18 +129,35 @@ export class KeychainBackend implements SecretsStore {
   }
 
   async probeAvailable(): Promise<void> {
-    const account = `probe-${process.pid}-${Date.now()}`
     const keytar = await this.keytar()
-    try {
-      await keytar.setPassword('ctxindex/probe', account, 'ok')
-      const value = await keytar.getPassword('ctxindex/probe', account)
-      if (value !== 'ok') throw new Error('keychain probe read mismatch')
-      await keytar.deletePassword('ctxindex/probe', account)
-    } catch (cause) {
+    let failure: unknown
+    await withIndexOperation(async () => {
+      let persisted = false
+      try {
+        await keytar.setPassword(probeService, probeAccount, 'ok')
+        persisted = true
+        const value = await keytar.getPassword(probeService, probeAccount)
+        if (value !== 'ok') throw new Error('keychain probe read mismatch')
+      } catch (cause) {
+        failure = cause
+      }
+      if (persisted) {
+        try {
+          const deleted = await keytar.deletePassword(
+            probeService,
+            probeAccount,
+          )
+          if (!deleted) throw new Error('keychain probe cleanup mismatch')
+        } catch (cause) {
+          failure ??= cause
+        }
+      }
+    })
+    if (failure !== undefined) {
       throw new CtxindexSecretsError(
         'keychain backend unavailable',
         'backend_unavailable',
-        { cause },
+        { cause: failure },
       )
     }
   }
@@ -156,9 +190,23 @@ export class KeychainBackend implements SecretsStore {
     const ref = keychainRef(scope, key)
     const keytar = await this.keytar()
     try {
-      await keytar.setPassword(serviceName(scope), key, value)
-      await this.addIndexEntry({ ref, scope, key }, keytar)
-      return ref
+      return await withIndexOperation(async () => {
+        const previousEntries = await this.readIndex(keytar)
+        const entries = previousEntries.filter(
+          (existing) => existing.ref !== ref,
+        )
+        entries.push({ ref, scope, key })
+        await this.writeIndex(entries, keytar)
+        try {
+          await keytar.setPassword(serviceName(scope), key, value)
+        } catch (cause) {
+          try {
+            await this.writeIndex(previousEntries, keytar)
+          } catch {}
+          throw cause
+        }
+        return ref
+      })
     } catch (err) {
       throw wrapKeytarRuntimeError(err, 'failed to write keychain secret')
     }
@@ -175,8 +223,10 @@ export class KeychainBackend implements SecretsStore {
 
     const keytar = await this.keytar()
     try {
-      await keytar.deletePassword(serviceName(parsed.scope), parsed.key)
-      await this.removeIndexEntry(ref, keytar)
+      await withIndexOperation(async () => {
+        await keytar.deletePassword(serviceName(parsed.scope), parsed.key)
+        await this.removeIndexEntry(ref, keytar)
+      })
     } catch (err) {
       throw wrapKeytarRuntimeError(err, 'failed to delete keychain secret')
     }
@@ -185,8 +235,10 @@ export class KeychainBackend implements SecretsStore {
   async listKeys(): Promise<{ ref: string; scope: string; key: string }[]> {
     const keytar = await this.keytar()
     try {
-      return (await this.readIndex(keytar)).sort((a, b) =>
-        a.ref < b.ref ? -1 : a.ref > b.ref ? 1 : 0,
+      return await withIndexOperation(async () =>
+        (await this.readIndex(keytar)).sort((a, b) =>
+          a.ref < b.ref ? -1 : a.ref > b.ref ? 1 : 0,
+        ),
       )
     } catch (err) {
       throw wrapKeytarRuntimeError(err, 'failed to list keychain secrets')
@@ -221,17 +273,6 @@ export class KeychainBackend implements SecretsStore {
       indexAccount,
       JSON.stringify(entries),
     )
-  }
-
-  private async addIndexEntry(
-    entry: KeychainIndexEntry,
-    keytar: KeytarModule,
-  ): Promise<void> {
-    const entries = (await this.readIndex(keytar)).filter(
-      (existing) => existing.ref !== entry.ref,
-    )
-    entries.push(entry)
-    await this.writeIndex(entries, keytar)
   }
 
   private async removeIndexEntry(

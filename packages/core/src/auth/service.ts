@@ -39,6 +39,31 @@ type ExistingGrantRefs = {
   readonly refresh_token_ref: string | null
 }
 
+const accountMutationTails = new Map<string, Promise<void>>()
+
+function accountMutationKey(provider: string, externalUserId: string): string {
+  return JSON.stringify([provider, externalUserId])
+}
+
+async function withAccountMutation<T>(
+  key: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const prior = accountMutationTails.get(key) ?? Promise.resolve()
+  let release = () => {}
+  const tail = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  accountMutationTails.set(key, tail)
+  await prior
+  try {
+    return await operation()
+  } finally {
+    release()
+    if (accountMutationTails.get(key) === tail) accountMutationTails.delete(key)
+  }
+}
+
 function toGrantRow(row: GrantSqlRow): GrantRow {
   return {
     id: row.id,
@@ -55,15 +80,43 @@ function toGrantRow(row: GrantSqlRow): GrantRow {
   }
 }
 
+type CleanupLifecycle =
+  | 'authorization-rollback'
+  | 'reauthorization'
+  | 'account-removal'
+  | 'refresh'
+  | 'refresh-rollback'
+
 async function cleanup(
   store: AuthDependencies['store'],
   refs: readonly string[],
-): Promise<void> {
+): Promise<number> {
+  let failures = 0
   for (const ref of refs) {
     try {
       await store.deleteSecret(ref)
-    } catch {}
+    } catch {
+      failures += 1
+    }
   }
+  return failures
+}
+
+function warnCleanupPending(
+  logger: AuthDependencies['logger'],
+  context: {
+    readonly lifecycle: CleanupLifecycle
+    readonly provider?: string
+    readonly grantId?: string
+    readonly accountId?: string
+  },
+  cleanupFailures: number,
+): void {
+  if (cleanupFailures === 0) return
+  logger.warn(
+    { ...context, cleanupFailures },
+    'OAuth secret cleanup remains pending',
+  )
 }
 
 export function createAuthService(deps: AuthDependencies): AuthService {
@@ -109,160 +162,211 @@ export function createAuthService(deps: AuthDependencies): AuthService {
           'OAuth App configuration is invalid',
         )
       resolveOAuthAppCredentials(input.appConfig)
-      const timestamp = now()
-      const existing = deps.db
-        .prepare(
-          `SELECT g.id, g.app_config_ref,
+      return withAccountMutation(
+        accountMutationKey(input.provider, input.account.externalUserId),
+        async () => {
+          const timestamp = now()
+          const existing = deps.db
+            .prepare(
+              `SELECT g.id, g.app_config_ref,
                   g.access_token_ref, g.refresh_token_ref
              FROM grants AS g
              JOIN accounts AS a ON a.id = g.account_id
             WHERE a.provider = ? AND a.external_user_id = ?
             LIMIT 1`,
-        )
-        .get(
-          input.provider,
-          input.account.externalUserId,
-        ) as ExistingGrantRefs | null
-      const grantId = existing?.id ?? ulid(timestamp)
-      const refs: string[] = []
-      let result: AddGrantResult
-      try {
-        const appConfigRef = await write(
-          input.provider,
-          grantId,
-          'app-config',
-          JSON.stringify(appConfig.data),
-        )
-        refs.push(appConfigRef)
-        const refreshTokenRef = await write(
-          input.provider,
-          grantId,
-          'refresh-token',
-          input.refreshToken,
-        )
-        refs.push(refreshTokenRef)
-        let accessTokenRef: string | null = null
-        if (input.accessToken !== undefined) {
-          accessTokenRef = await write(
-            input.provider,
-            grantId,
-            'access-token',
-            input.accessToken,
-          )
-          refs.push(accessTokenRef)
-        }
-        const scopes = normalizeOAuthScopes(input.scopes)
-        result = deps.db.transaction(() => {
-          const { accountId } = accountService.upsertAccount({
-            provider: input.provider,
-            ...input.account,
-          })
-          if (existing) {
-            const updated = deps.db
-              .prepare(
-                `UPDATE grants
+            )
+            .get(
+              input.provider,
+              input.account.externalUserId,
+            ) as ExistingGrantRefs | null
+          const grantId = existing?.id ?? ulid(timestamp)
+          const refs: string[] = []
+          let result: AddGrantResult
+          try {
+            const appConfigRef = await write(
+              input.provider,
+              grantId,
+              'app-config',
+              JSON.stringify(appConfig.data),
+            )
+            refs.push(appConfigRef)
+            const refreshTokenRef = await write(
+              input.provider,
+              grantId,
+              'refresh-token',
+              input.refreshToken,
+            )
+            refs.push(refreshTokenRef)
+            let accessTokenRef: string | null = null
+            if (input.accessToken !== undefined) {
+              accessTokenRef = await write(
+                input.provider,
+                grantId,
+                'access-token',
+                input.accessToken,
+              )
+              refs.push(accessTokenRef)
+            }
+            const scopes = normalizeOAuthScopes(input.scopes)
+            result = deps.db.transaction(() => {
+              const { accountId } = accountService.upsertAccount({
+                provider: input.provider,
+                ...input.account,
+              })
+              if (existing) {
+                const updated = deps.db
+                  .prepare(
+                    `UPDATE grants
                     SET scopes_json = ?, app_config_ref = ?,
                         access_token_ref = ?, refresh_token_ref = ?, expires_at = ?,
                         updated_at = ?
                   WHERE id = ? AND account_id = ?`,
-              )
-              .run(
-                JSON.stringify(scopes),
-                appConfigRef,
-                accessTokenRef,
-                refreshTokenRef,
-                input.expiresAt ?? null,
-                timestamp,
+                  )
+                  .run(
+                    JSON.stringify(scopes),
+                    appConfigRef,
+                    accessTokenRef,
+                    refreshTokenRef,
+                    input.expiresAt ?? null,
+                    timestamp,
+                    grantId,
+                    accountId,
+                  )
+                if (updated.changes !== 1)
+                  throw new Error('Grant upsert failed')
+              } else {
+                deps.db
+                  .prepare(
+                    'INSERT INTO grants (id, account_id, provider, scopes_json, app_config_ref, access_token_ref, refresh_token_ref, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                  )
+                  .run(
+                    grantId,
+                    accountId,
+                    input.provider,
+                    JSON.stringify(scopes),
+                    appConfigRef,
+                    accessTokenRef,
+                    refreshTokenRef,
+                    input.expiresAt ?? null,
+                    timestamp,
+                    timestamp,
+                  )
+              }
+              return { grantId, accountId }
+            })()
+          } catch (cause) {
+            warnCleanupPending(
+              deps.logger,
+              {
+                lifecycle: 'authorization-rollback',
+                provider: input.provider,
                 grantId,
-                accountId,
-              )
-            if (updated.changes !== 1) throw new Error('Grant upsert failed')
-          } else {
-            deps.db
-              .prepare(
-                'INSERT INTO grants (id, account_id, provider, scopes_json, app_config_ref, access_token_ref, refresh_token_ref, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-              )
-              .run(
-                grantId,
-                accountId,
-                input.provider,
-                JSON.stringify(scopes),
-                appConfigRef,
-                accessTokenRef,
-                refreshTokenRef,
-                input.expiresAt ?? null,
-                timestamp,
-                timestamp,
-              )
+              },
+              await cleanup(deps.store, refs),
+            )
+            throw cause
           }
-          return { grantId, accountId }
-        })()
-      } catch (cause) {
-        await cleanup(deps.store, refs)
-        throw cause
-      }
-      if (existing) {
-        await cleanup(
-          deps.store,
-          [
-            existing.app_config_ref,
-            existing.access_token_ref,
-            existing.refresh_token_ref,
-          ].filter((ref): ref is string => ref !== null),
-        )
-      }
-      deps.logger.debug(
-        {
-          grantId: result.grantId,
-          accountId: result.accountId,
-          provider: input.provider,
+          if (existing) {
+            warnCleanupPending(
+              deps.logger,
+              {
+                lifecycle: 'reauthorization',
+                provider: input.provider,
+                grantId,
+              },
+              await cleanup(
+                deps.store,
+                [
+                  existing.app_config_ref,
+                  existing.access_token_ref,
+                  existing.refresh_token_ref,
+                ].filter((ref): ref is string => ref !== null),
+              ),
+            )
+          }
+          deps.logger.debug(
+            {
+              grantId: result.grantId,
+              accountId: result.accountId,
+              provider: input.provider,
+            },
+            existing ? 'OAuth Grant updated' : 'OAuth Grant added',
+          )
+          return result
         },
-        existing ? 'OAuth Grant updated' : 'OAuth Grant added',
       )
-      return result
     },
     async removeAccount(label: string): Promise<void> {
       const account = deps.db
-        .prepare('SELECT id FROM accounts WHERE label = ?')
-        .get(label) as { readonly id: string } | null
+        .prepare(
+          'SELECT id, provider, external_user_id FROM accounts WHERE label = ?',
+        )
+        .get(label) as {
+        readonly id: string
+        readonly provider: string
+        readonly external_user_id: string
+      } | null
       if (!account) {
         throw new CtxindexNotFoundError(`account not found: "${label}"`)
       }
-      const grants = deps.db
-        .prepare(
-          'SELECT app_config_ref, access_token_ref, refresh_token_ref FROM grants WHERE account_id = ?',
-        )
-        .all(account.id) as Omit<ExistingGrantRefs, 'id'>[]
-      const timestamp = now()
-      deps.db.transaction(() => {
-        deps.db
-          .prepare(
-            `INSERT INTO source_sync_state (source_id, last_status, updated_at)
+      return withAccountMutation(
+        accountMutationKey(account.provider, account.external_user_id),
+        async () => {
+          const currentAccount = deps.db
+            .prepare('SELECT id FROM accounts WHERE id = ?')
+            .get(account.id) as { readonly id: string } | null
+          if (!currentAccount) {
+            throw new CtxindexNotFoundError(`account not found: "${label}"`)
+          }
+          const grants = deps.db
+            .prepare(
+              'SELECT id, provider, app_config_ref, access_token_ref, refresh_token_ref FROM grants WHERE account_id = ?',
+            )
+            .all(account.id) as (ExistingGrantRefs & {
+            readonly provider: string
+          })[]
+          const timestamp = now()
+          deps.db.transaction(() => {
+            deps.db
+              .prepare(
+                `INSERT INTO source_sync_state (source_id, last_status, updated_at)
              SELECT id, 'needs_auth', ? FROM sources
               WHERE grant_id IN (SELECT id FROM grants WHERE account_id = ?)
              ON CONFLICT(source_id) DO UPDATE
                SET last_status = 'needs_auth', updated_at = excluded.updated_at`,
+              )
+              .run(timestamp, account.id)
+            deps.db
+              .prepare(
+                'UPDATE sources SET grant_id = NULL, updated_at = ? WHERE grant_id IN (SELECT id FROM grants WHERE account_id = ?)',
+              )
+              .run(timestamp, account.id)
+            deps.db
+              .prepare('DELETE FROM grants WHERE account_id = ?')
+              .run(account.id)
+            deps.db.prepare('DELETE FROM accounts WHERE id = ?').run(account.id)
+          })()
+          warnCleanupPending(
+            deps.logger,
+            {
+              lifecycle: 'account-removal',
+              ...(grants[0]
+                ? { provider: grants[0].provider, grantId: grants[0].id }
+                : {}),
+              accountId: account.id,
+            },
+            await cleanup(
+              deps.store,
+              grants.flatMap((grant) =>
+                [
+                  grant.app_config_ref,
+                  grant.access_token_ref,
+                  grant.refresh_token_ref,
+                ].filter((ref): ref is string => ref !== null),
+              ),
+            ),
           )
-          .run(timestamp, account.id)
-        deps.db
-          .prepare(
-            'UPDATE sources SET grant_id = NULL, updated_at = ? WHERE grant_id IN (SELECT id FROM grants WHERE account_id = ?)',
-          )
-          .run(timestamp, account.id)
-        deps.db
-          .prepare('DELETE FROM grants WHERE account_id = ?')
-          .run(account.id)
-        deps.db.prepare('DELETE FROM accounts WHERE id = ?').run(account.id)
-      })()
-      await cleanup(
-        deps.store,
-        grants.flatMap((grant) =>
-          [
-            grant.app_config_ref,
-            grant.access_token_ref,
-            grant.refresh_token_ref,
-          ].filter((ref): ref is string => ref !== null),
-        ),
+        },
       )
     },
     getGrantById,
@@ -295,108 +399,151 @@ export function createAuthService(deps: AuthDependencies): AuthService {
       return service.refreshAccessToken(grantId)
     },
     async refreshAccessToken(grantId: string): Promise<string> {
-      const grant = await getGrantById(grantId)
-      if (!grant?.refreshTokenRef)
+      const selectedGrant = await getGrantById(grantId)
+      if (!selectedGrant?.refreshTokenRef)
         throw new CtxindexAuthError(
           'invalid_grant',
           'Grant cannot be refreshed',
         )
-      const provider = deps.registry.providers.get(grant.provider)
-      if (!provider || provider.auth.kind !== 'oauth2') {
-        deps.db
-          .prepare(
-            "UPDATE source_sync_state SET last_status = 'needs_auth', updated_at = ? WHERE source_id IN (SELECT id FROM sources WHERE grant_id = ?)",
+      const account = deps.db
+        .prepare('SELECT external_user_id FROM accounts WHERE id = ?')
+        .get(selectedGrant.accountId) as {
+        readonly external_user_id: string
+      } | null
+      if (!account)
+        throw new CtxindexAuthError(
+          'invalid_grant',
+          'Grant cannot be refreshed',
+        )
+      return withAccountMutation(
+        accountMutationKey(selectedGrant.provider, account.external_user_id),
+        async () => {
+          const grant = await getGrantById(grantId)
+          if (!grant?.refreshTokenRef)
+            throw new CtxindexAuthError(
+              'invalid_grant',
+              'Grant cannot be refreshed',
+            )
+          const provider = deps.registry.providers.get(grant.provider)
+          if (!provider || provider.auth.kind !== 'oauth2') {
+            deps.db
+              .prepare(
+                "UPDATE source_sync_state SET last_status = 'needs_auth', updated_at = ? WHERE source_id IN (SELECT id FROM sources WHERE grant_id = ?)",
+              )
+              .run(now(), grantId)
+            throw new CtxindexAuthError(
+              'needs_auth',
+              'Grant provider is not loaded',
+            )
+          }
+          const oauthProvider = provider as OAuthProviderDefinition
+          let appConfig: unknown
+          try {
+            appConfig = JSON.parse(
+              await deps.store.getSecret(grant.appConfigRef),
+            )
+          } catch (cause) {
+            throw new CtxindexAuthError(
+              'missing_oauth_app_config',
+              'Grant OAuth App snapshot is unavailable',
+              { cause },
+            )
+          }
+          const parsedConfig =
+            oauthProvider.auth.registration.configSchema.safeParse(appConfig)
+          if (!parsedConfig.success)
+            throw new CtxindexAuthError(
+              'missing_oauth_app_config',
+              'Grant OAuth App snapshot is invalid',
+            )
+          const { clientId, clientSecret } = resolveOAuthAppCredentials(
+            parsedConfig.data as Readonly<Record<string, unknown>>,
           )
-          .run(now(), grantId)
-        throw new CtxindexAuthError(
-          'needs_auth',
-          'Grant provider is not loaded',
-        )
-      }
-      const oauthProvider = provider as OAuthProviderDefinition
-      let appConfig: unknown
-      try {
-        appConfig = JSON.parse(await deps.store.getSecret(grant.appConfigRef))
-      } catch (cause) {
-        throw new CtxindexAuthError(
-          'missing_oauth_app_config',
-          'Grant OAuth App snapshot is unavailable',
-          { cause },
-        )
-      }
-      const parsedConfig =
-        oauthProvider.auth.registration.configSchema.safeParse(appConfig)
-      if (!parsedConfig.success)
-        throw new CtxindexAuthError(
-          'missing_oauth_app_config',
-          'Grant OAuth App snapshot is invalid',
-        )
-      const { clientId, clientSecret } = resolveOAuthAppCredentials(
-        parsedConfig.data as Readonly<Record<string, unknown>>,
+          const refreshToken = await deps.store.getSecret(grant.refreshTokenRef)
+          const token = await postOAuthToken({
+            provider: oauthProvider,
+            endpoint: resolveOAuthEndpoint(
+              oauthProvider,
+              'token',
+              readEnvironment,
+            ),
+            clientId,
+            ...(clientSecret ? { clientSecret } : {}),
+            grant: { kind: 'refresh_token', refreshToken },
+          })
+          const scopes = resolveRefreshGrantedScopes(
+            token.scope,
+            grant.scopes,
+            oauthProvider,
+          )
+          const freshRefs: string[] = []
+          try {
+            const accessTokenRef = await write(
+              grant.provider,
+              grantId,
+              'access-token',
+              token.accessToken,
+            )
+            freshRefs.push(accessTokenRef)
+            let refreshTokenRef = grant.refreshTokenRef
+            if (token.refreshToken !== undefined) {
+              refreshTokenRef = await write(
+                grant.provider,
+                grantId,
+                'refresh-token',
+                token.refreshToken,
+              )
+              freshRefs.push(refreshTokenRef)
+            }
+            const updated = deps.db
+              .prepare(
+                'UPDATE grants SET access_token_ref = ?, refresh_token_ref = ?, scopes_json = ?, expires_at = ?, updated_at = ? WHERE id = ?',
+              )
+              .run(
+                accessTokenRef,
+                refreshTokenRef,
+                JSON.stringify(scopes),
+                now() + token.expiresIn * 1000,
+                now(),
+                grantId,
+              )
+            if (updated.changes !== 1)
+              throw new CtxindexAuthError(
+                'invalid_grant',
+                'Grant disappeared during refresh',
+              )
+            const oldRefs = [
+              grant.accessTokenRef,
+              token.refreshToken !== undefined ? grant.refreshTokenRef : null,
+            ].filter((ref): ref is string => ref !== null)
+            warnCleanupPending(
+              deps.logger,
+              {
+                lifecycle: 'refresh',
+                provider: grant.provider,
+                grantId,
+              },
+              await cleanup(deps.store, oldRefs),
+            )
+            deps.logger.debug(
+              { grantId, provider: grant.provider },
+              'OAuth access token refreshed',
+            )
+            return token.accessToken
+          } catch (cause) {
+            warnCleanupPending(
+              deps.logger,
+              {
+                lifecycle: 'refresh-rollback',
+                provider: grant.provider,
+                grantId,
+              },
+              await cleanup(deps.store, freshRefs),
+            )
+            throw cause
+          }
+        },
       )
-      const refreshToken = await deps.store.getSecret(grant.refreshTokenRef)
-      const token = await postOAuthToken({
-        provider: oauthProvider,
-        endpoint: resolveOAuthEndpoint(oauthProvider, 'token', readEnvironment),
-        clientId,
-        ...(clientSecret ? { clientSecret } : {}),
-        grant: { kind: 'refresh_token', refreshToken },
-      })
-      const scopes = resolveRefreshGrantedScopes(
-        token.scope,
-        grant.scopes,
-        oauthProvider,
-      )
-      const freshRefs: string[] = []
-      try {
-        const accessTokenRef = await write(
-          grant.provider,
-          grantId,
-          'access-token',
-          token.accessToken,
-        )
-        freshRefs.push(accessTokenRef)
-        let refreshTokenRef = grant.refreshTokenRef
-        if (token.refreshToken !== undefined) {
-          refreshTokenRef = await write(
-            grant.provider,
-            grantId,
-            'refresh-token',
-            token.refreshToken,
-          )
-          freshRefs.push(refreshTokenRef)
-        }
-        const updated = deps.db
-          .prepare(
-            'UPDATE grants SET access_token_ref = ?, refresh_token_ref = ?, scopes_json = ?, expires_at = ?, updated_at = ? WHERE id = ?',
-          )
-          .run(
-            accessTokenRef,
-            refreshTokenRef,
-            JSON.stringify(scopes),
-            now() + token.expiresIn * 1000,
-            now(),
-            grantId,
-          )
-        if (updated.changes !== 1)
-          throw new CtxindexAuthError(
-            'invalid_grant',
-            'Grant disappeared during refresh',
-          )
-        const oldRefs = [
-          grant.accessTokenRef,
-          token.refreshToken !== undefined ? grant.refreshTokenRef : null,
-        ].filter((ref): ref is string => ref !== null)
-        await cleanup(deps.store, oldRefs)
-        deps.logger.debug(
-          { grantId, provider: grant.provider },
-          'OAuth access token refreshed',
-        )
-        return token.accessToken
-      } catch (cause) {
-        await cleanup(deps.store, freshRefs)
-        throw cause
-      }
     },
   }
   return service
