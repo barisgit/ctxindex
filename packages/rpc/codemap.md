@@ -7,7 +7,7 @@ Defines the private composition-only `@ctxindex/rpc` package: bounded local-daem
 ## Design / patterns
 
 - `package.json` exposes a single ESM facade and depends only on Zod plus transport-neutral `@orpc/contract` and `@orpc/server`.
-- `src/schemas.ts` is the closed bounded DTO boundary. Its keyed failure registry is the single source for strict failure schemas, `RpcFailure`, oRPC codes, and declared error data. `RpcResult<T>` is internal to the injected application boundary and is never serialized; `RpcRequestContext` augments validated transport metadata with the native request signal.
+- `src/schemas.ts` is the closed bounded DTO boundary. Its keyed failure registry is the single source for strict failure schemas, `RpcFailure`, oRPC codes, and declared error data. Search DTOs preserve constrained query-less remote execution, exact-Source opaque continuation, and an explicit local-offset versus remote-continuation pagination union. `RpcResult<T>` is internal to the injected application boundary and is never serialized; `RpcRequestContext` augments validated transport metadata with the native request signal.
 - `src/contract.ts` owns the handler-free `@orpc/contract` procedure tree: exact inputs, plain success outputs, and registry-declared typed errors. `src/router.ts` recursively derives the nested `DaemonRpcApplication` from the contract input/output trees, then implements that contract with injected behavior, compatibility middleware, exactly-once delegation, and error adaptation.
 - The package contains no Bun listener/client transport, daemon lifecycle, filesystem discovery or leases, database composition, provider calls, or CLI presentation.
 

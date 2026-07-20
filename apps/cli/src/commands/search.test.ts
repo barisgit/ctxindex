@@ -108,4 +108,20 @@ describe('search JSON output', () => {
       error.mockRestore()
     }
   })
+
+  test('reports opaque continuation deterministically for one remote Source', () => {
+    expect(
+      formatSearchJson({
+        results: [],
+        pagination: {
+          limit: 50,
+          hasMore: true,
+          continuation: 'opaque-next-page',
+        },
+        warnings: [],
+      }),
+    ).toBe(
+      '{"results":[],"pagination":{"limit":50,"hasMore":true,"continuation":"opaque-next-page"},"warnings":[]}',
+    )
+  })
 })

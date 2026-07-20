@@ -13,6 +13,7 @@ Pure argv parsing into typed discriminated command unions.
 - `source.ts` derives `--config-*` values from a minimal active-registry projection, accepts `--label` and Account label/Account ID references, rejects removed forms, and keeps list/remove grammar independent of registry loading.
 - Ref-bearing parsers validate stable `ctx://` / Artifact Refs; search/sync/status/Action source flags remain strings for later label-or-ID resolution.
 - Source add preflights common grammar and potentially generated `--config-*` value shape before active-definition retrieval, then performs Adapter-specific option/type validation against that immutable projection.
+- `search.ts` permits query-less filtered remote execution and accepts a non-blank opaque `--continuation` only with `--remote`, exactly one `--source`, and no `--offset`; offsets remain local-only pagination.
 - `extensions.ts` owns the closed Catalog lifecycle grammar, exact `<id>@<version>` selectors, separate repository/install trust acknowledgements, and `--no-refresh` on Catalog list/show and install; absence of that flag leaves command-time refresh enabled.
 
 ## Data & control flow

@@ -572,6 +572,10 @@ const payloadKeySchema = boundedString(256)
 const payloadStringSchema = boundedString(65_536, 0)
 const payloadNumberSchema = z.number().finite()
 const resultLimitSchema = z.number().int().min(1).max(1_024)
+const continuationSchema = boundedString(65_536).refine(
+  (value) => value.trim().length > 0,
+  { message: 'Continuation must not be blank' },
+)
 
 export type RpcSafeJson =
   | null
@@ -715,6 +719,7 @@ export const rpcSearchInputSchema = z
     until: signedTimestampMsSchema.optional(),
     limit: resultLimitSchema.optional(),
     offset: countSchema.optional(),
+    continuation: continuationSchema.optional(),
     includeDeleted: z.boolean().optional(),
     explain: z.boolean().optional(),
     localOnly: z.boolean().optional(),
@@ -742,21 +747,51 @@ export const rpcSearchInputSchema = z
         message: 'localOnly and remote are mutually exclusive',
       })
     }
-    if (input.text === undefined && input.remote === true) {
+    if (
+      input.text === undefined &&
+      input.remote === true &&
+      (input.realms?.length ?? 0) === 0 &&
+      (input.sourceIds?.length ?? 0) === 0 &&
+      input.adapterId === undefined &&
+      input.kind === undefined &&
+      (input.fields?.length ?? 0) === 0 &&
+      input.since === undefined &&
+      input.until === undefined
+    ) {
       issue.addIssue({
         code: 'custom',
-        message: 'Remote search requires query text',
+        message:
+          'Query-less remote search requires a narrowing Realm, Adapter, Source, kind, field, or time filter',
       })
     }
-    if (
-      input.offset !== undefined &&
-      input.text !== undefined &&
-      input.localOnly !== true
-    ) {
+    const localExecution =
+      (input.text === undefined && input.remote !== true) ||
+      input.localOnly === true
+    if (input.offset !== undefined && !localExecution) {
       issue.addIssue({
         code: 'custom',
         message: 'Offset requires local search execution',
       })
+    }
+    if (input.continuation !== undefined) {
+      if (input.remote !== true) {
+        issue.addIssue({
+          code: 'custom',
+          message: 'Continuation requires remote search execution',
+        })
+      }
+      if (input.sourceIds?.length !== 1) {
+        issue.addIssue({
+          code: 'custom',
+          message: 'Continuation requires exactly one Source',
+        })
+      }
+      if (input.offset !== undefined) {
+        issue.addIssue({
+          code: 'custom',
+          message: 'Continuation cannot be combined with offset',
+        })
+      }
     }
     if ((input.fields?.length ?? 0) > 0 && input.kind === undefined) {
       issue.addIssue({
@@ -834,12 +869,22 @@ export const rpcSearchResultSchema = z
     results: z.array(rpcSearchRowSchema).max(1_024).readonly(),
     warnings: z.array(rpcSearchWarningSchema).max(256).readonly(),
     pagination: z
-      .strictObject({
-        offset: countSchema,
-        limit: resultLimitSchema,
-        hasMore: z.boolean(),
-      })
-      .readonly()
+      .union([
+        z
+          .strictObject({
+            offset: countSchema,
+            limit: resultLimitSchema,
+            hasMore: z.boolean(),
+          })
+          .readonly(),
+        z
+          .strictObject({
+            limit: resultLimitSchema,
+            hasMore: z.boolean(),
+            continuation: continuationSchema.nullable(),
+          })
+          .readonly(),
+      ])
       .optional(),
     explain: z
       .strictObject({

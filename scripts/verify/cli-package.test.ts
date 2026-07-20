@@ -35,9 +35,13 @@ test('the private monorepo builds one public installable ctxindex package', asyn
     homepage: 'https://ctxindex.com',
     bugs: { url: 'https://github.com/barisgit/ctxindex/issues' },
     bin: { ctxindex: 'dist/ctxindex.mjs' },
-    files: ['dist/ctxindex.mjs', 'README.md'],
     engines: { bun: '1.3.14' },
   })
+  expect(cli.files).toEqual([
+    'dist/ctxindex.mjs',
+    'dist/ctxindex-daemon',
+    'README.md',
+  ])
   expect(cli.private).not.toBe(true)
   expect(cli.scripts?.build).toBe('bun run build:package')
   expect(cli.scripts?.['build:package']).toBe(

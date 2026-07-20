@@ -142,6 +142,31 @@ test('tracks a business request and propagates request cancellation', async () =
   expect(app.activeRequestCount).toBe(0)
 })
 
+test('unavailable business requests describe starting and stopping lifecycle', async () => {
+  const app = application()
+
+  const starting = await app.status.get({}, context('starting'))
+  expect(starting).toEqual({
+    ok: false,
+    error: {
+      kind: 'daemon_unavailable',
+      code: 'daemon_unavailable',
+      message: 'The daemon is starting and is not yet accepting work.',
+    },
+  })
+
+  app.beginStopping()
+  const stopping = await app.status.get({}, context('stopping'))
+  expect(stopping).toEqual({
+    ok: false,
+    error: {
+      kind: 'daemon_unavailable',
+      code: 'daemon_unavailable',
+      message: 'The daemon is stopping and is not accepting new work.',
+    },
+  })
+})
+
 test('shutdown stops admission, cancels active work, and is idempotent', async () => {
   let settle!: () => void
   let operationSignal: AbortSignal | undefined
@@ -736,6 +761,85 @@ test('search receives request cancellation and redacts raw provider warning text
         },
       ],
     },
+  })
+})
+
+test('search forwards query-less and resumed exact-Source remote pagination', async () => {
+  const inputs: unknown[] = []
+  const app = application({
+    sourceService: {
+      resolveSourceId: (value: string) =>
+        value === 'work-outlook' ? '01ARZ3NDEKTSV4RRFFQ69G5FAV' : value,
+      getStatus: () => [],
+    },
+    searchService: {
+      search: async (input: unknown) => {
+        inputs.push(input)
+        return {
+          results: [],
+          warnings: [],
+          pagination:
+            inputs.length === 1
+              ? {
+                  limit: 50,
+                  hasMore: true,
+                  continuation: 'opaque-next-page',
+                }
+              : { limit: 50, hasMore: false, continuation: null },
+        }
+      },
+    },
+  })
+  app.markReady()
+
+  const first = await app.search.query(
+    {
+      sourceIds: ['work-outlook'],
+      kind: 'communication.message',
+      limit: 50,
+      remote: true,
+    },
+    context('search-remote-first'),
+  )
+  expect(first).toMatchObject({
+    ok: true,
+    value: {
+      pagination: {
+        limit: 50,
+        hasMore: true,
+        continuation: 'opaque-next-page',
+      },
+    },
+  })
+  expect(inputs[0]).toMatchObject({
+    sourceIds: ['01ARZ3NDEKTSV4RRFFQ69G5FAV'],
+    kind: 'communication.message',
+    limit: 50,
+    remote: true,
+  })
+
+  const resumed = await app.search.query(
+    {
+      sourceIds: ['work-outlook'],
+      kind: 'communication.message',
+      limit: 50,
+      remote: true,
+      continuation: 'opaque-next-page',
+    },
+    context('search-remote-resumed'),
+  )
+  expect(resumed).toMatchObject({
+    ok: true,
+    value: {
+      pagination: { limit: 50, hasMore: false, continuation: null },
+    },
+  })
+  expect(inputs[1]).toMatchObject({
+    sourceIds: ['01ARZ3NDEKTSV4RRFFQ69G5FAV'],
+    kind: 'communication.message',
+    limit: 50,
+    remote: true,
+    continuation: 'opaque-next-page',
   })
 })
 

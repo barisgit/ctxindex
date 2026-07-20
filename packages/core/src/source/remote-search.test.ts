@@ -65,6 +65,7 @@ const adapter = defineAdapter({
             message: 'provider result was partial',
           },
         ],
+        continuation: 'adapter-next-page',
       }
     },
   },
@@ -345,7 +346,9 @@ describe('searchSourceRemote', () => {
     expect(first.warnings).toEqual([
       { code: 'provider_warning', message: 'provider result was partial' },
     ])
+    expect(first.continuation).toBe('adapter-next-page')
     expect(second.warnings).toEqual(first.warnings)
+    expect(second.continuation).toBe(first.continuation)
     expect(authorizations).toEqual([
       'Bearer linked-token',
       'Bearer linked-token',

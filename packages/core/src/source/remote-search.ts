@@ -184,5 +184,11 @@ export async function searchSourceRemote(
           : STORAGE_BUSY_MESSAGE,
     })
   }
-  return { resources: verified, warnings }
+  return {
+    resources: verified,
+    warnings,
+    ...(result.continuation === undefined
+      ? {}
+      : { continuation: result.continuation }),
+  }
 }

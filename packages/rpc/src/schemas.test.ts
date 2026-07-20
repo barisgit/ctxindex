@@ -520,11 +520,55 @@ describe('search, Resource, and thread contracts', () => {
       localOnly: true,
       offset: 0,
     })
+    expect(
+      rpcSearchInputSchema.parse({
+        sourceIds: ['work-outlook'],
+        kind: 'communication.message',
+        limit: 50,
+        remote: true,
+      }),
+    ).toEqual({
+      sourceIds: ['work-outlook'],
+      kind: 'communication.message',
+      limit: 50,
+      remote: true,
+    })
+    expect(
+      rpcSearchInputSchema.parse({
+        sourceIds: ['work-outlook'],
+        kind: 'communication.message',
+        limit: 50,
+        remote: true,
+        continuation: 'opaque-next-page',
+      }),
+    ).toEqual({
+      sourceIds: ['work-outlook'],
+      kind: 'communication.message',
+      limit: 50,
+      remote: true,
+      continuation: 'opaque-next-page',
+    })
     for (const input of [
       {},
       { text: 'query', localOnly: true, remote: true },
-      { realms: ['work'], remote: true },
+      { includeDeleted: true, remote: true },
       { text: 'query', offset: 1 },
+      { text: 'query', remote: true, offset: 1 },
+      { text: 'query', continuation: 'next' },
+      { text: 'query', remote: true, continuation: 'next' },
+      {
+        text: 'query',
+        remote: true,
+        sourceIds: ['one', 'two'],
+        continuation: 'next',
+      },
+      {
+        text: 'query',
+        remote: true,
+        sourceIds: ['one'],
+        offset: 0,
+        continuation: 'next',
+      },
       { text: 'query', fields: [{ name: 'status', value: 'open' }] },
       { text: 'query', since: 2, until: 1 },
       { text: 'query', extra: true },
@@ -552,6 +596,26 @@ describe('search, Resource, and thread contracts', () => {
       pagination: { offset: 0, limit: 20, hasMore: false },
     } as const
     expect(rpcSearchResultSchema.parse(result)).toEqual(result)
+    const remoteResult = {
+      ...result,
+      pagination: {
+        limit: 50,
+        hasMore: true,
+        continuation: 'opaque-next-page',
+      },
+    } as const
+    expect(rpcSearchResultSchema.parse(remoteResult)).toEqual(remoteResult)
+    expect(() =>
+      rpcSearchResultSchema.parse({
+        ...result,
+        pagination: {
+          offset: 0,
+          limit: 20,
+          hasMore: true,
+          continuation: 'not-local-pagination',
+        },
+      }),
+    ).toThrow()
     expect(() =>
       rpcSearchResultSchema.parse({
         ...result,

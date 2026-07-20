@@ -212,13 +212,18 @@ async function resolveSourceGrant(
   return matches[0]?.id
 }
 
-function unavailable(): RpcResult<never> {
+function unavailable(
+  lifecycle: Exclude<RpcHealthResult['lifecycle'], 'ready'>,
+): RpcResult<never> {
   return {
     ok: false,
     error: {
       kind: 'daemon_unavailable',
       code: 'daemon_unavailable',
-      message: 'The daemon is stopping and is not accepting new work.',
+      message:
+        lifecycle === 'starting'
+          ? 'The daemon is starting and is not yet accepting work.'
+          : 'The daemon is stopping and is not accepting new work.',
     },
   }
 }
@@ -657,6 +662,9 @@ export class DaemonApplication implements DaemonRpcApplication {
         ...(input.until !== undefined ? { until: input.until } : {}),
         ...(input.limit !== undefined ? { limit: input.limit } : {}),
         ...(input.offset !== undefined ? { offset: input.offset } : {}),
+        ...(input.continuation !== undefined
+          ? { continuation: input.continuation }
+          : {}),
         ...(input.includeDeleted !== undefined
           ? { includeDeleted: input.includeDeleted }
           : {}),
@@ -760,7 +768,8 @@ export class DaemonApplication implements DaemonRpcApplication {
     context: RpcRequestContext,
     invoke: (signal: AbortSignal) => Promise<T>,
   ): Promise<RpcResult<T>> {
-    if (this.#lifecycle !== 'ready') return Promise.resolve(unavailable())
+    if (this.#lifecycle !== 'ready')
+      return Promise.resolve(unavailable(this.#lifecycle))
     const controller = new AbortController()
     const cancel = () => controller.abort(context.signal.reason)
     if (context.signal.aborted) cancel()
