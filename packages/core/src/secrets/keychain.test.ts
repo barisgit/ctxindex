@@ -258,6 +258,66 @@ describe('KeychainBackend', () => {
     await expect(write).rejects.not.toThrow('FAILED-WRITE-CANARY')
   })
 
+  test('credential and compensation failure keeps the intended entry discoverable and the primary error authoritative', async () => {
+    const existing = {
+      ref: 'keychain:ctxindex/existing/secret',
+      scope: 'existing',
+      key: 'secret',
+    }
+    const values = new Map<string, string>([
+      ['ctxindex\u0000__ctxindex_keys__', JSON.stringify([existing])],
+      ['ctxindex/existing\u0000secret', 'EXISTING-CANARY'],
+    ])
+    let indexWrites = 0
+    const backend = new KeychainBackend({
+      importKeytar: async () =>
+        ({
+          async getPassword(service: string, account: string) {
+            return values.get(`${service}\u0000${account}`) ?? null
+          },
+          async setPassword(service: string, account: string, value: string) {
+            if (service === 'ctxindex/google') {
+              throw new Error('PRIMARY-CREDENTIAL-FAILURE')
+            }
+            if (service === 'ctxindex' && account === '__ctxindex_keys__') {
+              indexWrites += 1
+              if (indexWrites === 2)
+                throw new Error('COMPENSATION-FAILURE-CANARY')
+            }
+            values.set(`${service}\u0000${account}`, value)
+          },
+          async deletePassword(service: string, account: string) {
+            return values.delete(`${service}\u0000${account}`)
+          },
+        }) as unknown as KeytarShim,
+    })
+
+    const failure = await backend
+      .setSecret('google', 'new-secret', 'FAILED-WRITE-CANARY')
+      .then(
+        () => null,
+        (error: unknown) => error,
+      )
+
+    expect(failure).toMatchObject({
+      code: 'backend_unavailable',
+      message: 'failed to write keychain secret',
+      cause: { message: 'PRIMARY-CREDENTIAL-FAILURE' },
+    })
+    expect(await backend.listKeys()).toEqual([
+      existing,
+      {
+        ref: 'keychain:ctxindex/google/new-secret',
+        scope: 'google',
+        key: 'new-secret',
+      },
+    ])
+    expect(values.has('ctxindex/google\u0000new-secret')).toBe(false)
+    expect(JSON.stringify(failure)).not.toMatch(
+      /FAILED-WRITE-CANARY|COMPENSATION-FAILURE-CANARY|keychain:/,
+    )
+  })
+
   test('failed delete index mutation remains discoverable and retryable', async () => {
     const entry = {
       ref: 'keychain:ctxindex/google/old-secret',

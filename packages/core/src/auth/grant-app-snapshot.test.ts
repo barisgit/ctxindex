@@ -614,3 +614,52 @@ test('Account removal cleans private App and token refs and preserves bound Sour
     { last_status: 'needs_auth' },
   )
 })
+
+test('Account removal cleanup warning contains only the enumerated safe fields', async () => {
+  const db = await database()
+  const store = new MemoryStore()
+  const warnings: unknown[][] = []
+  const warningLogger = {
+    debug() {},
+    warn(...args: unknown[]) {
+      warnings.push(args)
+    },
+  } as unknown as Logger
+  const service = createAuthService({
+    db,
+    store,
+    logger: warningLogger,
+    registry: registry(),
+    now: () => 1_000,
+  })
+  const { grantId } = await service.addGrant({
+    provider: 'example',
+    account: {
+      externalUserId: 'subject',
+      label: 'Person',
+      verifiedIdentities: [],
+    },
+    scopes: ['openid'],
+    appConfig: { clientId: 'removal-config-canary' },
+    refreshToken: 'removal-refresh-canary',
+    accessToken: 'removal-access-canary',
+  })
+  store.failAllDeletes = true
+
+  await expect(service.removeAccount('Person')).resolves.toBeUndefined()
+
+  expect(warnings).toEqual([
+    [
+      {
+        lifecycle: 'account-removal',
+        provider: 'example',
+        grantId,
+        cleanupFailures: 3,
+      },
+      'OAuth secret cleanup remains pending',
+    ],
+  ])
+  expect(JSON.stringify(warnings)).not.toMatch(
+    /removal-config-canary|removal-refresh-canary|removal-access-canary|DELETE-FAILURE-SECRET-CANARY|keychain:|accountId/,
+  )
+})

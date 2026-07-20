@@ -30,13 +30,13 @@ Alternatives considered were optimistic compare-and-swap, which keytar does not 
 
 ### Publish inventory before a new credential value
 
-A set operation first writes the intended inventory state while holding the queue, then writes the credential value. If the credential write fails, it attempts to restore the prior inventory and returns the existing backend failure. This ordering ensures a crash or failed compensation can leave at worst a discoverable inventory entry rather than an untracked secret. Rewriting an existing ref restores the prior entry on failure.
+A set operation first writes the intended inventory state while holding the queue, then writes the credential value. If the credential write reports failure, it attempts to restore the prior inventory and returns the existing bounded backend failure. If restoration also reports failure, the original credential-write failure remains authoritative, no reference or success is returned, and the intended inventory entry may remain. The adapter does not infer whether a native operation that reported failure took effect. Rewriting an existing ref follows the same best-effort restoration rule.
 
 A delete operation removes the credential and then removes its inventory entry in the same critical section. If the latter fails, the operation fails and leaves a retryable stale inventory entry rather than falsely reporting success.
 
 ### Warn after durable Grant swaps instead of rolling them back
 
-Once reauthorization or refresh has durably replaced database references, failure to delete superseded secrets does not invalidate the usable new Grant. Cleanup returns a failure count and authentication emits one structured warning containing only the Provider, Grant id, lifecycle phase, and count. The public operation keeps its existing result and exit behavior. Rollback and Account-removal cleanup use the same explicit warning discipline.
+Once reauthorization or refresh has durably replaced database references, failure to delete superseded secrets does not invalidate the usable new Grant. Cleanup returns a failure count and authentication emits one structured warning whose bindings are exactly Provider id, Grant id, lifecycle phase, and failed-entry count. Account id, refs, values, backend errors, and other sensitive fields are excluded. The public operation keeps its existing result and exit behavior. Rollback and Account-removal cleanup use the same explicit warning discipline.
 
 ### Use one retryable probe identity
 
@@ -49,7 +49,7 @@ Grant authorization, refresh, and Account removal join a module-owned asynchrono
 ## Risks / Trade-offs
 
 - **A second ctxindex process can still race the reserved inventory.** → Document the process-local boundary explicitly; solving cross-process serialization requires a separately designed lock or storage format.
-- **A process crash between inventory and credential writes can leave a stale index entry.** → The entry remains discoverable and retryable; no secret becomes untracked through the chosen order.
+- **A process crash or native-call ambiguity can interrupt inventory/credential coordination.** → Never return success or a reference after a reported failure; retain the original credential-write error if compensation also fails, and do not claim more about native state than completed operations establish.
 - **Post-commit cleanup warnings do not automatically retry deletion.** → The consistent inventory retains failed entries for existing traversal/backend-switch cleanup; a dedicated repair command remains separate future scope.
 - **A locked Keychain can prevent both the primary mutation and compensation.** → Return the existing bounded backend error and never expose the affected reference or value.
 - **Same-Account auth operations wait across provider network latency.** → The queue is scoped to one exact Account identity; serializing token rotation is necessary to keep the durable Grant and secret store consistent.

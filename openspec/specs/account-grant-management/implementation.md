@@ -82,7 +82,7 @@ Authorization copies the exact selected App configuration into new Grant-owned s
 
 Authorization, refresh, and removal use one process-wide asynchronous queue keyed by exact Provider and external user id. Each operation re-reads current Grant state after entering the Account critical section, and removal additionally revalidates its exact label selector before deletion. Same-Account replacements therefore clean the state they actually supersede, a stale old-label removal cannot delete a renamed Account, and unrelated Accounts remain concurrent.
 
-Authentication cleanup returns a failed-entry count instead of discarding deletion failures. Pre-commit callers retain their original failure; post-commit reauthorization, refresh, and Account removal retain their usable committed result. Each nonzero count produces one warning through the injected logger with only Provider, Grant/Account id, lifecycle phase, and count. Failed refs, credential keys, caught backend errors, App config, and token material never enter the warning.
+Authentication cleanup returns a failed-entry count instead of discarding deletion failures. Pre-commit callers retain their original failure; post-commit reauthorization, refresh, and Account removal retain their usable committed result. Each nonzero count produces one warning through the injected logger whose bindings are exactly Provider id, Grant id, lifecycle phase, and failed-entry count. Account id, failed refs, credential keys, caught backend errors, App config, token material, and other sensitive fields never enter the warning.
 
 ## Verification
 

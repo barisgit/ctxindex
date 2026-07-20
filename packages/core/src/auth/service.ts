@@ -106,9 +106,8 @@ function warnCleanupPending(
   logger: AuthDependencies['logger'],
   context: {
     readonly lifecycle: CleanupLifecycle
-    readonly provider?: string
-    readonly grantId?: string
-    readonly accountId?: string
+    readonly provider: string
+    readonly grantId: string
   },
   cleanupFailures: number,
 ): void {
@@ -346,26 +345,27 @@ export function createAuthService(deps: AuthDependencies): AuthService {
               .run(account.id)
             deps.db.prepare('DELETE FROM accounts WHERE id = ?').run(account.id)
           })()
-          warnCleanupPending(
-            deps.logger,
-            {
-              lifecycle: 'account-removal',
-              ...(grants[0]
-                ? { provider: grants[0].provider, grantId: grants[0].id }
-                : {}),
-              accountId: account.id,
-            },
-            await cleanup(
-              deps.store,
-              grants.flatMap((grant) =>
-                [
-                  grant.app_config_ref,
-                  grant.access_token_ref,
-                  grant.refresh_token_ref,
-                ].filter((ref): ref is string => ref !== null),
-              ),
+          const cleanupFailures = await cleanup(
+            deps.store,
+            grants.flatMap((grant) =>
+              [
+                grant.app_config_ref,
+                grant.access_token_ref,
+                grant.refresh_token_ref,
+              ].filter((ref): ref is string => ref !== null),
             ),
           )
+          const firstGrant = grants[0]
+          if (firstGrant)
+            warnCleanupPending(
+              deps.logger,
+              {
+                lifecycle: 'account-removal',
+                provider: firstGrant.provider,
+                grantId: firstGrant.id,
+              },
+              cleanupFailures,
+            )
         },
       )
     },
