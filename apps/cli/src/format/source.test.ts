@@ -7,10 +7,10 @@ const source: SourceRow = {
   realm_id: 'realm-1',
   realm_slug: 'work',
   adapter_id: 'fixture.adapter',
-  adapter_version: 1,
   label: 'fixture',
   config_json: '{}',
   sync_enabled: true,
+  grant_id: 'private-grant-1',
   created_at: 1,
   availability: 'extension_unavailable',
   last_status: 'failed',
@@ -24,7 +24,8 @@ const source: SourceRow = {
 }
 
 test('source output exposes availability without replacing lastStatus', () => {
-  expect(JSON.parse(formatSources([source], { json: true }))).toMatchObject([
+  const json = formatSources([source], { json: true })
+  expect(JSON.parse(json)).toMatchObject([
     {
       availability: 'extension_unavailable',
       lastStatus: 'failed',
@@ -38,6 +39,7 @@ test('source output exposes availability without replacing lastStatus', () => {
       lastError: 'provider request failed',
     },
   ])
+  expect(json).not.toMatch(/grant/i)
   expect(formatSources([source], { json: false, format: 'compact' })).toContain(
     'status=extension_unavailable',
   )

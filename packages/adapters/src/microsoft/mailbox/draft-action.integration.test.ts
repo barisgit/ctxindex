@@ -37,13 +37,13 @@ async function freshDb(): Promise<Database> {
     "INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES ('account-1', 'microsoft', 'Work', 'subject-1', 1, 1)",
   ).run()
   db.prepare(
-    `INSERT INTO grants (id, account_id, provider, scopes_json, created_at, updated_at)
-     VALUES ('grant-1', 'account-1', 'microsoft', ?, 1, 1)`,
+    `INSERT INTO grants (id, account_id, provider, scopes_json, app_config_ref, created_at, updated_at)
+     VALUES ('grant-1', 'account-1', 'microsoft', ?, 'keychain:test/app-config', 1, 1)`,
   ).run(JSON.stringify(['Mail.ReadWrite', 'User.Read']))
   db.prepare(
     `INSERT INTO sources
-       (id, realm_id, label, adapter_id, adapter_version, grant_id, config_json, sync_enabled, created_at, updated_at)
-     VALUES (?, 'realm-1', 'Microsoft Mailbox Fixture', 'microsoft.mailbox', 1, 'grant-1', '{}', 1, 1, 1)`,
+       (id, realm_id, label, adapter_id, grant_id, config_json, sync_enabled, created_at, updated_at)
+     VALUES (?, 'realm-1', 'Microsoft Mailbox Fixture', 'microsoft.mailbox', 'grant-1', '{}', 1, 1, 1)`,
   ).run(sourceId)
   return db
 }

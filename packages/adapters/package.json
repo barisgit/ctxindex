@@ -7,6 +7,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "generate:documentation": "bun scripts/generate-documentation.ts",
     "build": "tsgo --noEmit -p tsconfig.json",
     "lint": "biome check .",
     "typecheck": "tsgo --noEmit -p tsconfig.json",

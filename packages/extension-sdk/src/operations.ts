@@ -3,7 +3,11 @@ import type {
   FieldType,
   ResolvedArtifactDescriptor,
 } from './profile'
-import type { ProfileReference } from './reference'
+
+interface ResourceProfileIdentity {
+  readonly id: string
+  readonly version: number
+}
 
 export interface AdapterSourceContext {
   readonly id: string
@@ -28,7 +32,7 @@ export type SyncMode = 'sync' | 'resync' | 'diff'
 
 export interface RetrievedResource<TPayload = unknown> {
   readonly ref: string
-  readonly profile: ProfileReference
+  readonly profile: ResourceProfileIdentity
   readonly title?: string | null
   readonly summary?: string | null
   readonly occurredAt?: number | null
@@ -76,7 +80,7 @@ export interface SearchFieldFilter {
 
 export interface SearchRemoteResource<TPayload = unknown> {
   readonly ref: string
-  readonly profile: ProfileReference
+  readonly profile: ResourceProfileIdentity
   readonly title?: string | null
   readonly summary?: string | null
   readonly occurredAt?: number | null
@@ -117,7 +121,7 @@ export interface DownloadContext extends ProviderContext {
 export interface ActionResource {
   readonly ref: string
   readonly sourceId: string
-  readonly profile: ProfileReference
+  readonly profile: ResourceProfileIdentity
   readonly completeness: 'partial' | 'complete'
   readonly deletedAt: number | null
   readonly payload: unknown | null

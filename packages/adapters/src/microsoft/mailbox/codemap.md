@@ -2,11 +2,11 @@
 
 ## Responsibility
 
-Implements the federated `microsoft.mailbox@1` Adapter for Outlook message search/retrieval, file attachment download, and reversible Draft create/update through Microsoft Graph.
+Implements the federated `microsoft.mailbox` Adapter for Outlook message search/retrieval, file attachment download, and reversible Draft create/update through Microsoft Graph.
 
 ## Design/patterns
 
-- `definition.ts` binds strict empty Source configuration, shared Microsoft OAuth with `Mail.ReadWrite`, `communication.message@1`, Graph host authority, `search-remote`/`retrieve`/`download` operations, and the Profile-owned `communication.message.draft.create` and `.update` schemas to provider handlers.
+- `definition.ts` binds strict empty Source configuration, directly links the shared Microsoft Provider and `communicationMessageProfile`, separately declares `Mail.ReadWrite` and Graph host authority, exposes `search-remote`/`retrieve`/`download`, and uses that concrete Profile for the Profile-owned `communication.message.draft.create` and `.update` contracts.
 - `transport.ts` is a compatibility re-export of the provider-root `../transport.ts`, which now owns canonical v1.0/mock URL construction, immutable-ID and text-body `Prefer` headers, typed HTTP/JSON error translation with retry metadata and bounded redacted Graph diagnostics, and same-origin/path validation for provider continuation links shared with Microsoft Calendar.
 - `message.ts` validates Graph DTOs and normalizes addresses, Reply-To, RFC References, timestamps, conversation identity, labels, read state, body text, and Artifact descriptors into `communication.message@1` resources.
 - `draft.ts` validates strict standalone/reply Action inputs, Graph recipient syntax, and every locally derived MIME header against CR/LF injection. Standalone create/update uses one generic message POST/PATCH; reply create uses one MIME `createReply`, while reply update proves the local Draft provider identity and immutable parent before one PATCH. Stored reply Drafts cannot use the standalone update shape; reply responses must match the derived recipient, subject, line-ending-normalized body, and conversation. Every path has no send handler, provider read, retry, or follow-up mutation.

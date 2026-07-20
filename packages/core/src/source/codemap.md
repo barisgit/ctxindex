@@ -6,14 +6,14 @@ Owns Source lifecycle and Adapter execution boundaries for sync, remote search, 
 
 ## Design / patterns
 
-- `createSourceService()` validates Adapter config/routing/auth, derives verbatim labels, enforces global label uniqueness, and resolves Source label-or-ID references.
+- `createSourceService()` resolves Adapters by stable id, validates config/routing and optional Provider access, derives verbatim labels, enforces global label uniqueness, and resolves Source label-or-ID references.
 - Defaults are `<account-label>-<adapter-tail>` for authenticated Sources or `<adapter-tail>` without an Account; no normalization or suffixing occurs.
-- Provider contexts strip sensitive config, enforce Grant compatibility and Adapter host allowlists, and perform bounded token refresh/retry behavior.
+- Provider-backed contexts strip sensitive config, enforce Grant compatibility from the exact imported Provider plus Adapter access scopes, enforce Adapter host allowlists, and perform bounded token refresh/retry behavior. Providerless contexts bypass Account, Grant, token, and Provider egress resolution.
 - Remote search post-filters and Ref-deduplicates one provider origin, materializes it through one atomic Resource batch, passes through the Adapter's opaque continuation, yields after synchronous storage waits so scheduled cancellation wins, and degrades only exhausted optional-cache contention to a safe `storage_busy` warning.
 
 ## Data & control flow
 
-Add resolves Realm, Adapter, Grant, routing, config, and label before inserting. List/status join Realm/sync state and annotate Adapter availability. Label-based commands resolve to stable IDs before remove/sync/search/status/Action operations. Provider operations invoke Adapter methods with controlled fetch and persist validated results; remote search returns verified Resources, warnings, and any continuation without interpreting the token. Cache contention preserves provider results, while cancellation and non-contention failures retain their terminal paths. Source deletion cascades Source-owned generic rows.
+Add resolves Realm, Adapter id, optional Grant, routing, config, and label before inserting. List/status join Realm/sync state and annotate Adapter availability by id. Label-based commands resolve to stable IDs before remove/sync/search/status/Action operations. Provider operations invoke Adapter methods with controlled fetch and persist validated results; providerless operations run without auth resolution. Remote search returns verified Resources, warnings, and any continuation without interpreting the token. Cache contention preserves provider results, while cancellation and non-contention failures retain their terminal paths. Source deletion cascades Source-owned generic rows.
 
 ## Integration points
 

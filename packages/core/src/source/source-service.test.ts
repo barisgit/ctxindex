@@ -1,6 +1,10 @@
 import { Database } from 'bun:sqlite'
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { defineAdapter, defineExtension } from '@ctxindex/extension-sdk'
+import {
+  defineAdapter,
+  defineExtension,
+  defineProfile,
+} from '@ctxindex/extension-sdk'
 import { z } from 'zod'
 import type { Logger } from '../logger'
 import { createRealmService } from '../realm'
@@ -15,25 +19,26 @@ import { testOAuthProvider } from '../testing/oauth-provider'
 
 const logger = { debug() {} } as unknown as Logger
 const gmailScope = 'https://www.googleapis.com/auth/gmail.readonly'
+const googleProvider = testOAuthProvider({
+  id: 'google',
+  authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+  tokenUrl: 'https://oauth2.googleapis.com/token',
+})
+const localProfile = defineProfile({
+  id: 'test.local',
+  version: 1,
+  schema: z.object({ path: z.string() }),
+})
+const localConfigSchema = z.object({ root_path: z.string().min(1) }).strict()
 const registry = createExtensionRegistry([
   defineExtension({
     id: 'test.sources',
-    version: 1,
-    profiles: [],
     adapters: [
       defineAdapter({
         id: 'google.mailbox',
-        version: 2,
         configSchema: z.object({}).strict(),
-        auth: {
-          kind: 'oauth2',
-          provider: testOAuthProvider({
-            id: 'google',
-            authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
-            tokenUrl: 'https://oauth2.googleapis.com/token',
-          }),
-          scopes: [gmailScope],
-        },
+        provider: googleProvider,
+        access: { scopes: [gmailScope] },
         profiles: [],
         routing: 'federated',
         capabilities: ['search-remote'],
@@ -44,41 +49,16 @@ const registry = createExtensionRegistry([
       }),
       defineAdapter({
         id: 'local.directory',
-        version: 1,
-        configSchema: z.object({ root_path: z.string().min(1) }).strict(),
-        auth: { kind: 'none' },
-        profiles: [],
+        configSchema: localConfigSchema,
+        profiles: [localProfile],
         routing: 'indexed',
-        capabilities: [],
-        operations: {},
+        capabilities: ['sync'],
+        operations: { sync() {} },
         actions: {},
       }),
     ],
   }),
 ])
-
-function registryWithLocalDirectoryVersion(version: number) {
-  return createExtensionRegistry([
-    defineExtension({
-      id: `test.local-directory-v${version}`,
-      version: 1,
-      profiles: [],
-      adapters: [
-        defineAdapter({
-          id: 'local.directory',
-          version,
-          configSchema: z.object({ root_path: z.string().min(1) }).strict(),
-          auth: { kind: 'none' },
-          profiles: [],
-          routing: 'indexed',
-          capabilities: [],
-          operations: {},
-          actions: {},
-        }),
-      ],
-    }),
-  ])
-}
 
 beforeEach(async () => {
   db = new Database(':memory:', { create: true })
@@ -86,18 +66,17 @@ beforeEach(async () => {
   await runMigrations(db)
 })
 
-test('derives Source availability from the exact Adapter id and version', () => {
+test('derives Source availability from the exact Adapter id', () => {
   const realmService = createRealmService({ db, logger })
   realmService.createRealm({ slug: 'work' })
   const service = createSourceService({
     db,
     logger,
     realmService,
-    registry: registryWithLocalDirectoryVersion(1),
+    registry,
   })
   const added = service.addSource({
     adapterId: 'local.directory',
-    adapterVersion: 1,
     realmSlug: 'work',
     configJson: '{"root_path":"/tmp"}',
   })
@@ -105,18 +84,18 @@ test('derives Source availability from the exact Adapter id and version', () => 
   expect(service.listSources()[0]?.availability).toBe('available')
   expect(service.findSourceById(added.sourceId)?.availability).toBe('available')
 
-  const wrongVersionService = createSourceService({
+  const missingAdapterService = createSourceService({
     db,
     logger,
     realmService,
-    registry: registryWithLocalDirectoryVersion(2),
+    registry: createExtensionRegistry(),
   })
-  expect(wrongVersionService.listSources()[0]?.availability).toBe(
+  expect(missingAdapterService.listSources()[0]?.availability).toBe(
     'extension_unavailable',
   )
-  expect(wrongVersionService.findSourceById(added.sourceId)?.availability).toBe(
-    'extension_unavailable',
-  )
+  expect(
+    missingAdapterService.findSourceById(added.sourceId)?.availability,
+  ).toBe('extension_unavailable')
 })
 
 test('status includes never-synced Sources with pending sync status', () => {
@@ -202,7 +181,7 @@ test('missing and restored Adapters preserve historical sync status', () => {
     db,
     logger,
     realmService,
-    registry: registryWithLocalDirectoryVersion(1),
+    registry,
   })
   const added = availableService.addSource({
     adapterId: 'local.directory',
@@ -366,7 +345,7 @@ describe('source service', () => {
       "INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES ('account-google', 'google', 'work@example.com', 'subject-google', 1, 1)",
     ).run()
     db.prepare(
-      'INSERT INTO grants (id, account_id, provider, scopes_json, created_at, updated_at) VALUES (?, ?, ?, ?, 1, 1)',
+      "INSERT INTO grants (id, account_id, provider, scopes_json, app_config_ref, created_at, updated_at) VALUES (?, ?, ?, ?, 'secret://test/app', 1, 1)",
     ).run(
       'grant-google',
       'account-google',
@@ -440,7 +419,7 @@ describe('source service', () => {
       'INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES (?, ?, ?, ?, 1, 1)',
     )
     const insertGrant = db.prepare(
-      'INSERT INTO grants (id, account_id, provider, scopes_json, created_at, updated_at) VALUES (?, ?, ?, ?, 1, 1)',
+      "INSERT INTO grants (id, account_id, provider, scopes_json, app_config_ref, created_at, updated_at) VALUES (?, ?, ?, ?, 'secret://test/app', 1, 1)",
     )
     insertAccount.run('account-google', 'google', 'google', 'subject-google')
     insertGrant.run('grant-google', 'account-google', 'google', '[]')
@@ -453,7 +432,7 @@ describe('source service', () => {
     ).toThrow('not compatible')
   })
 
-  test('binds an explicit compatible Grant and persists the selected Adapter version', () => {
+  test('binds an explicit compatible Grant to the selected Adapter id', () => {
     const realmService = createRealmService({ db, logger })
     realmService.createRealm({ slug: 'work' })
     const service = createSourceService({ db, logger, realmService, registry })
@@ -461,7 +440,7 @@ describe('source service', () => {
       "INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES ('account-google', 'google', 'google', 'subject-google', 1, 1)",
     ).run()
     db.prepare(
-      'INSERT INTO grants (id, account_id, provider, scopes_json, created_at, updated_at) VALUES (?, ?, ?, ?, 1, 1)',
+      "INSERT INTO grants (id, account_id, provider, scopes_json, app_config_ref, created_at, updated_at) VALUES (?, ?, ?, ?, 'secret://test/app', 1, 1)",
     ).run(
       'grant-google',
       'account-google',
@@ -475,10 +454,10 @@ describe('source service', () => {
     })
     expect(
       db
-        .prepare('SELECT adapter_version, grant_id FROM sources WHERE id = ?')
+        .prepare('SELECT adapter_id, grant_id FROM sources WHERE id = ?')
         .get(added.sourceId),
     ).toEqual({
-      adapter_version: 2,
+      adapter_id: 'google.mailbox',
       grant_id: 'grant-google',
     })
   })
@@ -491,7 +470,7 @@ describe('source service', () => {
       "INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES ('account-google', 'google', 'google', 'subject-google', 1, 1)",
     ).run()
     const insertGrant = db.prepare(
-      'INSERT INTO grants (id, account_id, provider, scopes_json, created_at, updated_at) VALUES (?, ?, ?, ?, 1, 1)',
+      "INSERT INTO grants (id, account_id, provider, scopes_json, app_config_ref, created_at, updated_at) VALUES (?, ?, ?, ?, 'secret://test/app', 1, 1)",
     )
     insertGrant.run(
       'grant-one',
@@ -524,7 +503,7 @@ describe('source service', () => {
     ).toThrow('multiple compatible Grants')
   })
 
-  test('auth:none Adapter needs no Grant and rejects a supplied Grant', () => {
+  test('providerless Adapter needs no Grant and rejects a supplied Grant', () => {
     const realmService = createRealmService({ db, logger })
     realmService.createRealm({ slug: 'work' })
     const service = createSourceService({ db, logger, realmService, registry })

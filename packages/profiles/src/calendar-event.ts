@@ -197,32 +197,26 @@ export const calendarEventProfile = defineProfile({
       provider: {
         type: 'string',
         extract: (event) => event.provider,
-        docs: 'Stable provider id for the Calendar Event.',
       },
       calendarId: {
         type: 'string',
         extract: (event) => event.providerCalendarId,
-        docs: 'Provider calendar identity within the Source.',
       },
       eventId: {
         type: 'string',
         extract: (event) => event.providerEventId,
-        docs: 'Provider event identity within the selected calendar.',
       },
       title: {
         type: 'string',
         extract: (event) => event.title,
-        docs: 'Calendar Event title.',
       },
       status: {
         type: 'string',
         extract: (event) => event.status,
-        docs: 'Normalized Calendar Event status.',
       },
       allDay: {
         type: 'boolean',
         extract: (event) => event.timing.kind === 'all-day',
-        docs: 'Whether timing is an all-day half-open date range.',
       },
       startsAt: {
         type: 'datetime',
@@ -230,7 +224,6 @@ export const calendarEventProfile = defineProfile({
           event.timing.kind === 'timed'
             ? new Date(event.timing.start)
             : undefined,
-        docs: 'Timed start instant; absent for all-day Calendar Events.',
       },
       endsAt: {
         type: 'datetime',
@@ -238,19 +231,16 @@ export const calendarEventProfile = defineProfile({
           event.timing.kind === 'timed'
             ? new Date(event.timing.end)
             : undefined,
-        docs: 'Timed end instant; absent for all-day Calendar Events.',
       },
       startDate: {
         type: 'string',
         extract: (event) =>
           event.timing.kind === 'all-day' ? event.timing.startDate : undefined,
-        docs: 'All-day start date; absent for timed Calendar Events.',
       },
       endDate: {
         type: 'string',
         extract: (event) =>
           event.timing.kind === 'all-day' ? event.timing.endDate : undefined,
-        docs: 'Exclusive all-day end date; absent for timed Calendar Events.',
       },
       organizer: {
         type: 'string',
@@ -258,32 +248,24 @@ export const calendarEventProfile = defineProfile({
           event.organizer === undefined
             ? undefined
             : participantIdentity(event.organizer),
-        docs: 'Organizer email when available, otherwise display name.',
       },
       attendees: {
         type: 'string[]',
         extract: (event) => (event.attendees ?? []).map(participantIdentity),
-        docs: 'Attendee emails when available, otherwise display names.',
       },
       seriesEventId: {
         type: 'string',
         extract: (event) => event.series?.providerEventId,
-        docs: 'Provider event identity for the recurring series.',
       },
       updatedAt: {
         type: 'datetime',
         extract: (event) =>
           event.updatedAt === undefined ? undefined : new Date(event.updatedAt),
-        docs: 'Provider update instant.',
       },
     },
   },
   relations: {
     series: (event) =>
       event.series === undefined ? undefined : { ref: event.series.ref },
-  },
-  docs: {
-    summary: 'A provider-neutral calendar event or occurrence.',
-    aliases: ['events'],
   },
 })

@@ -2,12 +2,12 @@
 
 ## Responsibility
 
-Implements the indexed, read-only `microsoft.calendar@1` Adapter for synchronizing and retrieving events from one selected Microsoft Graph calendar as `calendar.event@1` resources.
+Implements the indexed, read-only `microsoft.calendar` Adapter for synchronizing and retrieving events from one selected Microsoft Graph calendar as `calendar.event@1` resources.
 
 ## Design/patterns
 
 - `config.ts` defines strict Source configuration: `calendar_id` defaults to `default`, while positive `past_days` and `future_days` bound the rolling sync window.
-- `definition.ts` binds shared Microsoft OAuth with `Calendars.Read`, Graph host authority, the calendar-event Profile, indexed routing, and `sync`/`retrieve` operations; it exposes no Actions.
+- `definition.ts` directly binds the shared Microsoft Provider and `calendarEventProfile`, separately declares `Calendars.Read` access and Graph host authority, then exposes indexed routing with `sync`/`retrieve` operations and no Actions.
 - `event.ts` validates permissive Graph event DTOs and normalizes timing, all-day dates, participants, response/status, recurrence, links, locations, HTML/plain-text descriptions, timestamps, immutable event Refs, removals, and warning-bearing malformed records into the provider-neutral calendar schema.
 - `response.ts` validates Graph pages and progression invariants, constrains opaque next/delta links through the provider-root transport, translates expired delta state, and rejects malformed responses.
 - `sync.ts` uses a fingerprinted rolling-window cursor and sorted event manifest. The default calendar follows `calendarView/delta`; selected calendars use bounded `calendarView` scans. Reconciliation emits upserts/removals/warnings and checkpoints, while expired delta links trigger one warned full reconciliation.

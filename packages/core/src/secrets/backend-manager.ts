@@ -9,8 +9,7 @@ import {
 } from './types'
 
 const secretColumns = [
-  'client_id_ref',
-  'client_secret_ref',
+  'app_config_ref',
   'access_token_ref',
   'refresh_token_ref',
 ] as const
@@ -23,10 +22,15 @@ type SecretEntry = {
 
 type GrantSecretRow = {
   readonly id: string
-  readonly client_id_ref: string | null
-  readonly client_secret_ref: string | null
+  readonly app_config_ref: string
   readonly access_token_ref: string | null
   readonly refresh_token_ref: string | null
+}
+
+type OAuthAppSecretRow = {
+  readonly provider_id: string
+  readonly label: string
+  readonly config_ref: string
 }
 
 export interface SecretBackendManagerDeps {
@@ -75,36 +79,45 @@ function otherBackend(backend: SecretBackend): SecretBackend {
 function grantRows(deps: SecretBackendManagerDeps): GrantSecretRow[] {
   return deps.db
     .prepare(
-      `SELECT id, client_id_ref, client_secret_ref, access_token_ref, refresh_token_ref
+      `SELECT id, app_config_ref, access_token_ref, refresh_token_ref
        FROM grants
        ORDER BY id`,
     )
     .all() as GrantSecretRow[]
 }
 
-function referencedRefs(rows: readonly GrantSecretRow[]): string[] {
+function oauthAppRows(deps: SecretBackendManagerDeps): OAuthAppSecretRow[] {
+  return deps.db
+    .prepare(
+      `SELECT provider_id, label, config_ref
+       FROM oauth_apps
+       ORDER BY provider_id, label`,
+    )
+    .all() as OAuthAppSecretRow[]
+}
+
+function referencedRefs(
+  grants: readonly GrantSecretRow[],
+  apps: readonly OAuthAppSecretRow[],
+): string[] {
   const refs = new Set<string>()
-  for (const row of rows) {
+  for (const row of grants) {
     for (const column of secretColumns) {
       const ref = row[column]
       if (ref) refs.add(ref)
     }
   }
+  for (const row of apps) refs.add(row.config_ref)
   return [...refs].sort((left, right) =>
     left < right ? -1 : left > right ? 1 : 0,
   )
 }
 
 function referenceCounts(
-  rows: readonly GrantSecretRow[],
+  refs: readonly string[],
 ): Record<SecretBackend, number> {
   const counts: Record<SecretBackend, number> = { file: 0, keychain: 0 }
-  for (const row of rows) {
-    for (const column of secretColumns) {
-      const ref = row[column]
-      if (ref) counts[parseSecretRef(ref).backend] += 1
-    }
-  }
+  for (const ref of refs) counts[parseSecretRef(ref).backend] += 1
   return counts
 }
 
@@ -142,6 +155,16 @@ function updateReferences(
         }
       }
     }
+    for (const row of oauthAppRows(deps)) {
+      const next = refs.get(row.config_ref)
+      if (next && next !== row.config_ref) {
+        deps.db
+          .prepare(
+            'UPDATE oauth_apps SET config_ref = ? WHERE provider_id = ? AND label = ?',
+          )
+          .run(next, row.provider_id, row.label)
+      }
+    }
   })
   update()
 }
@@ -162,8 +185,8 @@ export function createSecretBackendManager(
 
   return {
     async getStatus(): Promise<SecretBackendStatus> {
-      const rows = grantRows(deps)
-      const counts = referenceCounts(rows)
+      const refs = referencedRefs(grantRows(deps), oauthAppRows(deps))
+      const counts = referenceCounts(refs)
       const [fileAvailable, keychainAvailable] = await Promise.all([
         storeAvailable(deps.fileStore),
         storeAvailable(deps.keychainStore),
@@ -190,10 +213,10 @@ export function createSecretBackendManager(
       const source = otherBackend(target)
       const sourceStore = storeForBackend(deps, source)
       const targetStore = storeForBackend(deps, target)
-      const rows = grantRows(deps)
-      const sourceRefs = referencedRefs(rows).filter(
-        (ref) => parseSecretRef(ref).backend === source,
-      )
+      const sourceRefs = referencedRefs(
+        grantRows(deps),
+        oauthAppRows(deps),
+      ).filter((ref) => parseSecretRef(ref).backend === source)
 
       if (backend === source) await sourceStore.listKeys()
       await prepareStore(targetStore)

@@ -7,9 +7,9 @@ Pure argv parsing into typed discriminated command unions.
 ## Design / patterns
 
 - `flags.ts` centralizes help, scalar/list extraction, duplicate detection, and strict closed-grammar failures.
-- `client.ts` accepts only add-from-environment, safe list, and provider-scoped remove; no client credential value is accepted on argv.
-- `account.ts` accepts provider authorization with optional Account/client labels, deterministic inventory, and label removal.
-- `source.ts` derives `--config-*` values from registry descriptions, accepts `--label` and Account label/Account ID/Grant ID references, and rejects removed `--name` / `--display-name` forms.
+- `oauth-app.ts` accepts add-from-environment, safe list, and exact provider/label removal; no configuration value is accepted on argv.
+- `account.ts` requires an exact OAuth App label for provider authorization and accepts optional Account labels, deterministic inventory, and label removal.
+- `source.ts` derives `--config-*` values from registry descriptions, accepts `--label` and Account label/Account ID references, and rejects removed `--name`, `--display-name`, and direct Grant-ID selection forms.
 - Ref-bearing parsers validate stable `ctx://` / Artifact Refs; search/sync/status/Action source flags remain strings for later label-or-ID resolution.
 - `search.ts` permits query-less filtered remote execution and accepts an opaque `--continuation` only with `--remote`, exactly one `--source`, and no `--offset`; offsets remain local-only pagination.
 - `extensions.ts` owns the closed Catalog lifecycle grammar, exact `<id>@<version>` selectors, separate repository/install trust acknowledgements, and `--no-refresh` on Catalog list/show and install; absence of that flag leaves command-time refresh enabled.

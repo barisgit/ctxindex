@@ -2,6 +2,7 @@ import { defineAdapter } from '@ctxindex/extension-sdk'
 import {
   communicationMessageDraftCreateInputSchema,
   communicationMessageDraftUpdateInputSchema,
+  communicationMessageProfile,
 } from '@ctxindex/profiles'
 import { microsoftOAuthProvider } from '../provider'
 import { microsoftMailboxSourceConfigSchema } from './config'
@@ -12,15 +13,11 @@ import { microsoftMailboxSearchRemote } from './search-remote'
 
 export const microsoftMailboxAdapterDefinition = defineAdapter({
   id: 'microsoft.mailbox',
-  version: 1,
   configSchema: microsoftMailboxSourceConfigSchema,
-  auth: {
-    kind: 'oauth2',
-    provider: microsoftOAuthProvider,
-    scopes: ['Mail.ReadWrite'],
-  },
+  provider: microsoftOAuthProvider,
+  access: { scopes: ['Mail.ReadWrite'] },
   providerApiHosts: ['graph.microsoft.com'],
-  profiles: [{ id: 'communication.message', version: 1 }],
+  profiles: [communicationMessageProfile],
   routing: 'federated',
   capabilities: ['search-remote', 'retrieve', 'download'],
   operations: {
@@ -30,17 +27,16 @@ export const microsoftMailboxAdapterDefinition = defineAdapter({
   },
   actions: {
     'communication.message.draft.create': {
-      profile: { id: 'communication.message', version: 1 },
+      profile: communicationMessageProfile,
       input: communicationMessageDraftCreateInputSchema,
-      output: { id: 'communication.message', version: 1 },
+      output: communicationMessageProfile,
       run: microsoftDraftCreate,
     },
     'communication.message.draft.update': {
-      profile: { id: 'communication.message', version: 1 },
+      profile: communicationMessageProfile,
       input: communicationMessageDraftUpdateInputSchema,
-      output: { id: 'communication.message', version: 1 },
+      output: communicationMessageProfile,
       run: microsoftDraftUpdate,
     },
   },
-  docs: { summary: 'Microsoft Outlook mailbox' },
 })

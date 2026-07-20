@@ -89,7 +89,7 @@ describe('no-prompts contract', () => {
     }
   })
 
-  test('account add: missing client exits non-zero without prompting', async () => {
+  test('account add: missing OAuth App exits non-zero without prompting', async () => {
     const { env, cleanup } = await mkSandbox()
     try {
       const { exitCode, stderr } = await spawnCli(
@@ -98,7 +98,7 @@ describe('no-prompts contract', () => {
         'null',
       )
       expect(exitCode).not.toBe(0)
-      expect(stderr).toContain('client add google')
+      expect(stderr).toContain('--app is required')
     } finally {
       await cleanup()
     }
@@ -307,11 +307,11 @@ describe('no-prompts contract', () => {
     }
   })
 
-  test('client add: missing credentials exits non-zero without prompting', async () => {
+  test('OAuth App add: missing configuration exits non-zero without prompting', async () => {
     const { env, cleanup } = await mkSandbox()
     try {
       const { exitCode, stderr } = await spawnCli(
-        ['client', 'add', 'google', '--from-env'],
+        ['oauth-app', 'add', 'google', 'desktop', '--from-env'],
         env,
         'null',
       )

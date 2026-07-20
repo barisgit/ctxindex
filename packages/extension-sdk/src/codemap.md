@@ -2,29 +2,28 @@
 
 ## Responsibility
 
-Defines the public TypeScript authoring and runtime contract for ctxindex Profiles, Adapters, and Extensions. `index.ts` is the stable package Interface over private contract Modules.
+Defines the stateless public TypeScript contract used to author ctxindex Providers, OAuth Apps, Profiles, Adapters, and Extension roots. `index.ts` is the package's only public entry point and re-exports these cohesive contract modules.
 
 ## Design / patterns
 
-- `reference.ts`: shared definition versions and Profile references.
-- `profile.ts`: Profile schemas, title/summary/time/chunk/field search projections, relation/artifact/export/Action contracts, and the `defineProfile` identity factory.
-- `operations.ts`: provider operation contexts, generic Resource values, sync emissions, remote-search values with opaque continuation input/output, logging, host callbacks, and the local Source-scoped `ActionResource` resolver seam; resolved Action Resources expose canonical identity, Profile, completeness/deletion state, and payload without storage details.
-- `adapter.ts`: Adapter capabilities, provider-neutral `OAuthProviderSpec` declarations (including client policy and environment-key metadata), auth/routing, per-Adapter `providerApiHosts`, capability-gated operations, Action bindings, definitions, and the `defineAdapter` identity factory. Built-in declarations use client ID and optional client-secret keys; refresh tokens live in runtime Grants.
-- `extension.ts`: Extension composition, the host authoring contract, and the `defineExtension` identity factory.
-- `index.ts`: explicit public barrel; it owns no contract implementation.
-- Identity factories return definitions unchanged while preserving literal IDs, versions, capabilities, schemas, and Action maps through generic inference.
-- `AdapterOperationsFor` uses the private `CapabilityOperation` conditional type to require exactly the operations declared in `AdapterDefinition.capabilities`.
+- `provider.ts`: declares Provider identity and authentication. `auth.oauth2` builds PKCE OAuth2 policy (endpoints, identity extraction paths, a complete registration-schema key mapping to safe uppercase environment names, base scopes, allowed hosts, and fixed authorization parameters); `auth.none` supports unauthenticated Providers. `defineProvider` tags a definition as `provider`.
+- `oauth-app.ts`: binds one OAuth2 Provider to a labelled registration config validated by that Provider's registration schema. `defineOAuthApp` tags the resulting app as `oauth-app` and preserves its literal Provider, label, and config types.
+- `profile.ts`: defines schema-backed Profile identity, search projections, relation/artifact/export hooks, and reversible or irreversible Action declarations. `defineProfile` adds the `profile` discriminator while retaining literal IDs, versions, and Zod inference.
+- `adapter.ts`: declares source config, targeted Profiles, routing, capability-gated operations, and Profile Action bindings. An Adapter may bind a Provider; OAuth2 Providers require Adapter access scopes, while `none` Providers prohibit them. `providerApiHosts` further scopes permitted provider egress. `AdapterOperationsFor` uses a private conditional type to require exactly the operations selected by `capabilities`.
+- `operations.ts`: provides the provider-operation contexts and value contracts for sync emissions, remote search with opaque continuation input/output, retrieval, artifact download, and Actions. `ActionContext.resolveResource` offers a read-only selected-Source Resource lookup without exposing persistence.
+- `extension.ts`: composes an Extension root from Providers, OAuth Apps, Profiles, and Adapters; `defineExtension` supplies omitted collections as empty arrays and adds the `extension` discriminator.
+- `documentation.ts`: defines the closed directory-or-virtual documentation declaration and the pure overloaded `docs()` helper; it performs no I/O and captures no module location.
 
 ## Data & control flow
 
-1. Authors compose Zod schemas and hooks into Profile definitions, declare reusable OAuth provider policy plus Adapter-specific scopes/API hosts and operations, then bundle Profiles and Adapters with `defineExtension`.
-2. Core passes provider inputs through `SyncContext`, `SearchContext`, `RetrieveContext`, `DownloadContext`, or `ActionContext`; remote search Adapters may consume and return opaque continuation tokens, while `ActionContext.resolveResource(ref)` returns the matching selected-Source `ActionResource` or `null`.
-3. Adapter Action handlers can inspect resolved local payloads to derive provider mutations, while all Adapter operations return search/action Resources or emit sync Resources, removals, checkpoints, warnings, artifacts, and byte chunks through SDK-defined contracts.
-4. Core validates and materializes those values; the SDK itself holds no state and performs no I/O.
+1. An extension author defines Provider policy, optional OAuth App registrations, schema-backed Profiles, and capability-constrained Adapters, then groups any root definitions and optional passive documentation declaration with `defineExtension`.
+2. Core follows the declared definitions to validate and register the reachable graph. For Adapter operations it supplies `SyncContext`, `SearchContext`, `RetrieveContext`, `DownloadContext`, or typed `ActionContext`; remote search Adapters may consume and return opaque continuation tokens.
+3. Operations return Resources/results or use callbacks to emit sync resources, removals, checkpoints, warnings, artifacts, and byte chunks. Action handlers can resolve local Resources before deriving a provider mutation.
+4. Core validates and materializes the values; the SDK owns no storage, network calls, or runtime state.
 
 ## Integration points
 
-- Exported as `@ctxindex/extension-sdk` by `packages/extension-sdk/package.json`; depends only on Zod.
-- Authored against by bundled definitions in `packages/profiles/src/`, Adapters in `packages/adapters/src/`, and external examples such as `examples/tenders-extension/extension.ts`.
-- Loaded by `packages/core/src/extension/loader.ts`, whose `authoringHost` exposes `z`, `defineProfile`, `defineAdapter`, and `defineExtension`.
-- Validated and registered by `packages/core/src/registry/definition-registries.ts`; consumed by core Action, search, source, sync, Resource, relation, Artifact, and export services.
+- Exposed inside the monorepo by the private `@ctxindex/extension-sdk` workspace package; its only runtime dependency is Zod.
+- Authored against by `packages/profiles/src/`, `packages/adapters/src/`, and external extension packages such as `examples/tenders-extension/extension.ts`.
+- Imported by `packages/core/src/extension/loader.ts` and validated/assembled through `packages/core/src/registry/complete-registry.ts` and `definition-registries.ts`.
+- Its contracts are consumed by core source, sync, search, action, resource, relation, artifact, export, and OAuth-app workflows.

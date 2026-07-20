@@ -20,6 +20,19 @@ test('registers export as a root command', () => {
   expect(rootCommand.subCommands).toMatchObject({ export: expect.any(Object) })
 })
 
+test('registers OAuth App commands without a Client alias', () => {
+  expect(rootCommand.subCommands).toMatchObject({
+    'oauth-app': {
+      subCommands: {
+        add: expect.any(Object),
+        list: expect.any(Object),
+        remove: expect.any(Object),
+      },
+    },
+  })
+  expect(rootCommand.subCommands).not.toHaveProperty('client')
+})
+
 test('registers purge as a root command with artifacts nested beneath it', () => {
   expect(rootCommand.subCommands).toMatchObject({
     purge: { subCommands: { artifacts: expect.any(Object) } },

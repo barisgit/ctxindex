@@ -1,4 +1,4 @@
-import type { OAuthProviderSpec } from '@ctxindex/extension-sdk'
+import type { OAuthProviderDefinition } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
 import { CtxindexAuthError } from '../errors'
 import { egressFetch } from '../net'
@@ -21,6 +21,34 @@ export interface OAuthTokenResponse {
   readonly scope?: string
 }
 
+export interface OAuthAppCredentials {
+  readonly clientId: string
+  readonly clientSecret?: string
+}
+
+export function resolveOAuthAppCredentials(
+  config: Readonly<Record<string, unknown>>,
+): OAuthAppCredentials {
+  const clientId = config.clientId
+  const clientSecret = config.clientSecret
+  if (typeof clientId !== 'string' || clientId.length === 0) {
+    throw new CtxindexAuthError(
+      'missing_oauth_app_config',
+      'OAuth App client id is unavailable',
+    )
+  }
+  if (clientSecret !== undefined && typeof clientSecret !== 'string') {
+    throw new CtxindexAuthError(
+      'missing_oauth_app_config',
+      'OAuth App client secret is invalid',
+    )
+  }
+  return {
+    clientId,
+    ...(clientSecret === undefined ? {} : { clientSecret }),
+  }
+}
+
 type OAuthGrant =
   | {
       readonly kind: 'authorization_code'
@@ -31,25 +59,24 @@ type OAuthGrant =
   | { readonly kind: 'refresh_token'; readonly refreshToken: string }
 
 export async function postOAuthToken(input: {
-  readonly provider: OAuthProviderSpec
+  readonly provider: OAuthProviderDefinition
   readonly endpoint: string
   readonly clientId: string
   readonly clientSecret?: string
   readonly grant: OAuthGrant
 }): Promise<OAuthTokenResponse> {
   assertOAuthProviderHost(input.provider, input.endpoint)
-  if (input.provider.client.secret === 'required' && !input.clientSecret) {
+  if (
+    input.provider.auth.registration.type === 'confidential' &&
+    !input.clientSecret
+  ) {
     throw new CtxindexAuthError(
-      'missing_oauth_client_creds',
+      'missing_oauth_app_config',
       'OAuth provider requires a client secret',
     )
   }
   const body = new URLSearchParams({ client_id: input.clientId })
-  if (
-    input.provider.client.tokenAuthMethod === 'client_secret_post' &&
-    input.clientSecret
-  )
-    body.set('client_secret', input.clientSecret)
+  if (input.clientSecret) body.set('client_secret', input.clientSecret)
   if (input.grant.kind === 'authorization_code') {
     body.set('grant_type', 'authorization_code')
     body.set('code', input.grant.code)
@@ -69,7 +96,7 @@ export async function postOAuthToken(input: {
         body,
         redirect: 'manual',
       },
-      input.provider.allowedHosts,
+      input.provider.auth.allowedHosts,
     )
   } catch (cause) {
     if (cause instanceof CtxindexAuthError) throw cause

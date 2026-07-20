@@ -129,13 +129,21 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
       expect(result.exitCode, result.stderr).toBe(0)
     }
 
-    const client = await sandbox.run(
-      ['client', 'add', 'microsoft', '--from-env'],
+    const app = await sandbox.run(
+      ['oauth-app', 'add', 'microsoft', 'microsoft', '--from-env'],
       { env },
     )
-    expect(client.exitCode, client.stderr).toBe(0)
+    expect(app.exitCode, app.stderr).toBe(0)
     const authenticated = await sandbox.run(
-      ['account', 'add', 'microsoft', '--label', 'outlook'],
+      [
+        'account',
+        'add',
+        'microsoft',
+        '--app',
+        'microsoft',
+        '--label',
+        'outlook',
+      ],
       { env },
     )
     expect(authenticated.exitCode, authenticated.stderr).toBe(0)
@@ -173,19 +181,18 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
     })
     expect(inventoryResult.exitCode, inventoryResult.stderr).toBe(0)
     expect(inventoryResult.stdout).not.toContain('microsoft-work-subject')
+    expect(inventoryResult.stdout).not.toMatch(/grant|scope/i)
     const inventory = JSON.parse(inventoryResult.stdout) as {
       provider: string
       label: string
-      grants: { scopes: string[] }[]
+      sources: { label: string }[]
     }[]
     expect(inventory).toHaveLength(1)
     expect(inventory[0]?.provider).toBe('microsoft')
     expect(inventory[0]?.label).toBe('outlook')
-    expect(inventory[0]?.grants).toHaveLength(1)
-    expect(inventory[0]?.grants[0]?.scopes).toEqual([
-      'Calendars.Read',
-      'Mail.ReadWrite',
-      'User.Read',
+    expect(inventory[0]?.sources.map(({ label }) => label).sort()).toEqual([
+      'personal-outlook',
+      workSourceLabel,
     ])
     const sources = JSON.parse(
       (await sandbox.run(['source', 'list', '--json'], { env })).stdout,

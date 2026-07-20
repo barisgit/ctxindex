@@ -73,7 +73,7 @@ export default function TermsPage() {
         </p>
         <p>
           Loaded Extensions may contribute additional permissions to an OAuth
-          request through an available managed Client. A managed Client does not
+          request through a selected available OAuth App. An OAuth App does not
           certify or endorse an Extension. The provider consent screen is the
           authoritative description of the permissions requested for a specific
           authorization, and you should review both the Extension and that
@@ -91,9 +91,9 @@ export default function TermsPage() {
         <p>
           ctxindex stores configuration, indexes, caches, logs, and credentials
           on the device where you run it. You are responsible for securing that
-          device, its operating-system account, backups, OAuth client
-          credentials, secret-store keys, exported data, and any software that
-          can execute ctxindex commands.
+          device, its operating-system account, backups, OAuth App credentials,
+          secret-store keys, exported data, and any software that can execute
+          ctxindex commands.
         </p>
         <p>
           You are also responsible for choosing appropriate Realm and Source

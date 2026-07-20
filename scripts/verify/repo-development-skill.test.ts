@@ -135,7 +135,7 @@ function implementedCommands(mainSource: string): Set<string> {
   expect(match, 'main.ts should define root citty subCommands').not.toBeNull()
   const subCommands = match?.[1] ?? ''
   return new Set(
-    [...subCommands.matchAll(/^ {4}([a-z][a-z0-9-]*):/gm)].map(
+    [...subCommands.matchAll(/^ {4}'?([a-z][a-z0-9-]*)'?:/gm)].map(
       (commandMatch) => commandMatch[1] as string,
     ),
   )
@@ -168,7 +168,7 @@ test('repo-development skill keeps the supported CLI walkthrough', async () => {
     'bun cli action run',
     'bun cli skills list',
     'bun cli secrets status',
-    'bun cli client add',
+    'bun cli oauth-app add',
     'bun cli account add',
   ]) {
     expect(skill).toContain(command)
@@ -221,7 +221,7 @@ test('bundled skill is concise orientation to live discovery', async () => {
   }
 
   expect(orientation).not.toMatch(
-    /--from-env|client add|account add|source add|provider console|credential/i,
+    /--from-env|oauth-app add|account add|source add|provider console|credential/i,
   )
   expect(await Bun.file(cliOverviewPath).exists()).toBe(false)
 })
@@ -234,8 +234,8 @@ test('bundled orientation guard rejects static inventories and schemas', async (
     staticCommandInventory('init  initialize local state', commands),
   ).toEqual(['init  initialize local state'])
   expect(
-    staticCommandInventory('realm / client / account / source', commands),
-  ).toEqual(['realm / client / account / source'])
+    staticCommandInventory('realm / oauth-app / account / source', commands),
+  ).toEqual(['realm / oauth-app / account / source'])
   expect(
     staticCommandInventory('- search helps an agent find context.', commands),
   ).toEqual([])
@@ -258,11 +258,13 @@ test('bundled orientation guard rejects static inventories and schemas', async (
 test('OAuth guidance derives provider vocabulary from describe output', async () => {
   const skill = await readSkill()
   expect(skill).toContain('bun cli describe adapter <adapter-id>')
-  expect(skill).toContain('bun cli client add <provider> --from-env')
-  expect(skill).toContain('bun cli account add <provider>')
+  expect(skill).toContain(
+    'bun cli oauth-app add <provider> <app-label> --from-env',
+  )
+  expect(skill).toContain('bun cli account add <provider> --app <app-label>')
   expect(skill).toContain('bun cli account list --json')
   expect(skill).not.toMatch(
-    /\bauth add\b|--client-secret|--auth-code|--refresh-token/,
+    /\bauth add\b|--client(?:-id|-secret)?\b|--auth-code|--refresh-token/,
   )
   expect(skill).not.toMatch(/CTXINDEX_(?:GOOGLE|MICROSOFT|GMAIL)_/)
 })

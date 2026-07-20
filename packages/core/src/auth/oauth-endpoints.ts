@@ -1,11 +1,11 @@
-import type { OAuthProviderSpec } from '@ctxindex/extension-sdk'
+import type { OAuthProviderDefinition } from '@ctxindex/extension-sdk'
 import { CtxindexAuthError } from '../errors'
 import { isLoopbackHost } from '../net'
 
 export type OAuthEndpointKind = 'authorize' | 'token' | 'identity'
 
 export function assertOAuthProviderHost(
-  provider: OAuthProviderSpec,
+  provider: OAuthProviderDefinition,
   url: string,
 ): void {
   let parsed: URL
@@ -19,7 +19,7 @@ export function assertOAuthProviderHost(
     )
   }
   if (
-    !provider.allowedHosts.includes(parsed.hostname) &&
+    !provider.auth.allowedHosts.includes(parsed.hostname) &&
     !isLoopbackHost(parsed.hostname)
   ) {
     throw new CtxindexAuthError(
@@ -30,16 +30,16 @@ export function assertOAuthProviderHost(
 }
 
 export function resolveOAuthEndpoint(
-  provider: OAuthProviderSpec,
+  provider: OAuthProviderDefinition,
   kind: OAuthEndpointKind,
   readEnvironment: (name: string) => string | undefined,
 ): string {
   const declared =
     kind === 'authorize'
-      ? provider.authorizationUrl
+      ? provider.auth.authorizationUrl
       : kind === 'token'
-        ? provider.tokenUrl
-        : provider.identity.url
+        ? provider.auth.tokenUrl
+        : provider.auth.identity.url
   const mockBase = readEnvironment('CTXINDEX_OAUTH_MOCK_BASE_URL')
   if (process.env.NODE_ENV === 'production' || !mockBase) return declared
   let base: URL

@@ -1,0 +1,15 @@
+{
+  "name": "@ctxindex/compiled-extension-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "ctxindex": {
+    "extensions": [
+      "./dist/extension.js"
+    ]
+  },
+  "dependencies": {
+    "@ctxindex/extension-sdk": "workspace:*",
+    "extension-fixture-dep": "file:../dependency"
+  }
+}

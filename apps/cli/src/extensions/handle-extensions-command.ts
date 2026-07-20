@@ -1,4 +1,6 @@
 import { CatalogService } from '@ctxindex/core/catalog'
+import { safeExtensionDiagnostic } from '@ctxindex/core/extension'
+import { readLocalOAuthAppIdentities } from '@ctxindex/core/oauth-app'
 import { parseExtensionsArgs } from '../args/extensions'
 import { loadCliDefinitions, printExtensionDiagnostics } from '../definitions'
 import {
@@ -87,13 +89,13 @@ export async function handleExtensionsCommand(
       return 0
     }
     if (parsed.kind === 'install') {
-      const loaded = await loadCliDefinitions()
+      const localOAuthAppIdentities = readLocalOAuthAppIdentities()
+      const loaded = await loadCliDefinitions({ localOAuthAppIdentities })
       printExtensionDiagnostics(loaded.diagnostics)
       const replaceableCatalog = loaded.provenance.find(
         (provenance) =>
           provenance.kind === 'catalog' &&
-          provenance.id === parsed.extension.id &&
-          provenance.version === parsed.extension.version,
+          provenance.id === parsed.extension.id,
       )
       console.log(
         formatInstalledExtension(
@@ -104,6 +106,7 @@ export async function handleExtensionsCommand(
             version: parsed.extension.version,
             trust: parsed.trust,
             registry: loaded.registry,
+            localOAuthAppIdentities,
             refresh: !parsed.noRefresh,
             ...(replaceableCatalog?.kind === 'catalog'
               ? {
@@ -128,7 +131,7 @@ export async function handleExtensionsCommand(
     )
     return 0
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error))
+    console.error(safeExtensionDiagnostic(error, 'Extension command failed'))
     return mapErrorToExit(error)
   }
 }

@@ -21,8 +21,8 @@ const unknownSendActionIds = [
   'communication.message.send',
 ]
 const scopes = [
-  'https://www.googleapis.com/auth/gmail.compose',
   'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/gmail.compose',
 ]
 const registry = createExtensionRegistry(CTXINDEX_BUILTIN_EXTENSIONS)
 const logger = {
@@ -62,13 +62,13 @@ async function freshDb(): Promise<Database> {
     "INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES ('account-1', 'google', 'Test', 'subject-1', 1, 1)",
   ).run()
   db.prepare(
-    `INSERT INTO grants (id, account_id, provider, scopes_json, created_at, updated_at)
-     VALUES ('grant-1', 'account-1', 'google', ?, 1, 1)`,
+    `INSERT INTO grants (id, account_id, provider, scopes_json, app_config_ref, created_at, updated_at)
+     VALUES ('grant-1', 'account-1', 'google', ?, 'secret://google/app', 1, 1)`,
   ).run(JSON.stringify(scopes))
   db.prepare(
     `INSERT INTO sources
-       (id, realm_id, label, adapter_id, adapter_version, grant_id, config_json, sync_enabled, created_at, updated_at)
-     VALUES (?, 'realm-1', ?, 'google.mailbox', 1, 'grant-1', '{}', 1, 1, 1)`,
+       (id, realm_id, label, adapter_id, grant_id, config_json, sync_enabled, created_at, updated_at)
+     VALUES (?, 'realm-1', ?, 'google.mailbox', 'grant-1', '{}', 1, 1, 1)`,
   ).run(sourceId, sourceId)
   return db
 }
@@ -118,11 +118,10 @@ describe('V1 Draft Action negative contract', () => {
     ])
     const microsoftMailbox = registry.adapters.get({
       id: 'microsoft.mailbox',
-      version: 1,
     })
-    expect(microsoftMailbox?.auth).toMatchObject({
-      kind: 'oauth2',
-      scopes: ['Mail.ReadWrite'],
+    expect(microsoftMailbox).toMatchObject({
+      provider: { id: 'microsoft', auth: { kind: 'oauth2' } },
+      access: { scopes: ['Mail.ReadWrite'] },
     })
     expect(JSON.stringify(microsoftMailbox)).not.toContain('Mail.Send')
     expect(description.actions.map((action) => action.effect)).toEqual([
@@ -137,7 +136,11 @@ describe('V1 Draft Action negative contract', () => {
       selectedDescriptions.map(({ id, effect, sources }) => ({
         id,
         effect,
-        sources,
+        sources: sources.map((source) => ({
+          id: source.id,
+          adapterId: source.adapter.id,
+          available: source.available,
+        })),
       })),
     ).toEqual(
       actionIds.map((id) => ({
@@ -146,7 +149,7 @@ describe('V1 Draft Action negative contract', () => {
         sources: [
           {
             id: sourceId,
-            adapter: { id: 'google.mailbox', version: 1 },
+            adapterId: 'google.mailbox',
             available: true,
           },
         ],
@@ -154,7 +157,7 @@ describe('V1 Draft Action negative contract', () => {
     )
 
     const affordanceSurface = [
-      ...description.actions.flatMap(({ id, docs }) => [id, docs]),
+      ...description.actions.map(({ id }) => id),
       ...adapterBindings.map(({ adapter, id }) => `${adapter}:${id}`),
     ].join('\n')
     expect(affordanceSurface).not.toMatch(/send|irrevers/i)
