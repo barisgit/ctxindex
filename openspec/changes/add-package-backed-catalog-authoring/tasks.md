@@ -1,6 +1,6 @@
 ## 1. Land the generic installation prerequisite
 
-- [ ] 1.1 Archive and sync `add-git-extension-catalogs`, then merge, archive, and
+- [x] 1.1 Archive and sync `add-git-extension-catalogs`, then merge, archive, and
   sync `add-direct-extension-installation` with canonical npm/Git/local target
   parsing, replayable exact dependency-resolution artifacts, Bun dependency materialization, immutable
   resolved provenance, lifecycle locking, generic execution records, exact root
