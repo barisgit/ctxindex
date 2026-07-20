@@ -37,7 +37,7 @@ Supplying `--app <label>` MUST bypass managed-default choice and use the existin
 ### Requirement: Managed designation does not alter requested access
 Managed and explicit OAuth Apps MUST use the same Provider-owned authorization contract and exact requested scope algorithm: the selected App's Provider base scopes plus the strict sorted deduplicated union of operation scopes from every active Adapter importing that semantic Provider id. Managed designation MUST NOT contribute a scope allowlist, remove a community Adapter's scope, add a scope, change allowed hosts, or grant a new mutation or runtime capability.
 
-If the provider has not approved any requested scope for the managed App, ctxindex MUST preserve the provider's safe typed failure without attaching selection fallback. The documented explicit App/BYOA path MUST remain available for a later invocation. It MUST NOT silently narrow the request or start a second authorization.
+If the provider rejects any scope in the exact requested union for the managed App, ctxindex MUST preserve the provider's safe typed failure without attaching selection fallback. The documented explicit App/BYOA path MUST remain available for a later invocation. It MUST NOT silently narrow the request or start a second authorization.
 
 #### Scenario: Community Adapter enlarges managed consent
 - **WHEN** an active community Adapter imports the selected Provider and contributes one additional operation scope
