@@ -37,7 +37,7 @@ Supplying `--app <label>` MUST bypass managed-default choice and use the existin
 ### Requirement: Managed designation does not alter requested access
 Managed and explicit OAuth Apps MUST use the same Provider-owned authorization contract and exact requested scope algorithm: the selected App's Provider base scopes plus the strict sorted deduplicated union of operation scopes from every active Adapter importing that semantic Provider id. Managed designation MUST NOT contribute a scope allowlist, remove a community Adapter's scope, add a scope, change allowed hosts, or grant a new mutation or runtime capability.
 
-If the provider has not approved any requested scope for the managed App, ctxindex MUST preserve the provider's safe typed failure and direct the operator to an explicit App/BYOA path. It MUST NOT silently narrow the request or start a second authorization.
+If the provider has not approved any requested scope for the managed App, ctxindex MUST preserve the provider's safe typed failure without attaching selection fallback. The documented explicit App/BYOA path MUST remain available for a later invocation. It MUST NOT silently narrow the request or start a second authorization.
 
 #### Scenario: Community Adapter enlarges managed consent
 - **WHEN** an active community Adapter imports the selected Provider and contributes one additional operation scope
@@ -45,7 +45,7 @@ If the provider has not approved any requested scope for the managed App, ctxind
 
 #### Scenario: Provider rejects an unapproved scope
 - **WHEN** Google or Microsoft rejects the managed App's exact requested union under provider policy
-- **THEN** ctxindex reports the safe existing failure category and BYOA guidance without dropping the scope or retrying
+- **THEN** ctxindex reports the safe existing failure category without selection fallback, scope dropping, or retrying; the documented explicit BYOA path remains available
 
 ### Requirement: Managed authorization remains provider-direct and local
 A managed App MUST use the existing provider-neutral authorization lifecycle: Provider-owned endpoints and allowed hosts, an IPv4 loopback callback, state validation, required S256 PKCE, direct token and identity requests, and local transactional Grant/Secret Vault persistence. Public App registration metadata MAY be distributed in source, Extension packages, or compiled binaries and MUST NOT be represented as a confidential secret merely to obscure it.

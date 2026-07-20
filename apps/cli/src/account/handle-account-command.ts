@@ -18,6 +18,22 @@ import {
 } from '../format/account'
 import { mapErrorToExit } from '../format/exit'
 
+export interface AccountCommandRuntime {
+  readonly assertInitialized: typeof assertInitialized
+  readonly loadAuthDefinitionDeps: typeof loadAuthDefinitionDeps
+  readonly openAccountDeps: typeof openAccountDeps
+  readonly openDeps: typeof openDeps
+  readonly authorizeProvider: typeof authorizeProvider
+}
+
+const accountCommandRuntime: AccountCommandRuntime = {
+  assertInitialized,
+  loadAuthDefinitionDeps,
+  openAccountDeps,
+  openDeps,
+  authorizeProvider,
+}
+
 function availableOAuthAppLabels(
   inventory: readonly OAuthAppInventoryItem[],
   providerId: string,
@@ -72,7 +88,10 @@ export function resolveAccountOAuthAppLabel(
   )
 }
 
-export async function handleAccountCommand(args: string[]): Promise<number> {
+export async function handleAccountCommand(
+  args: string[],
+  runtime: AccountCommandRuntime = accountCommandRuntime,
+): Promise<number> {
   const parsed = parseAccountArgs(args)
   if (parsed.kind === 'help') return 0
   if (parsed.kind === 'unknown') {
@@ -87,7 +106,7 @@ export async function handleAccountCommand(args: string[]): Promise<number> {
   let managedProviderId: string | undefined
   try {
     if (parsed.kind === 'list') {
-      deps = await openAccountDeps()
+      deps = await runtime.openAccountDeps()
       console.log(
         formatAccountInventory(
           deps.accountService.listAccountInventory(),
@@ -95,18 +114,18 @@ export async function handleAccountCommand(args: string[]): Promise<number> {
         ),
       )
     } else if (parsed.kind === 'remove') {
-      deps = await openDeps()
+      deps = await runtime.openDeps()
       await deps.authService.removeAccount(parsed.label)
       console.log(formatAccountRemoved(parsed.label))
     } else {
       try {
-        await assertInitialized()
+        await runtime.assertInitialized()
       } catch (initializationError) {
-        const definitions = await loadAuthDefinitionDeps()
+        const definitions = await runtime.loadAuthDefinitionDeps()
         resolveOAuthSelection(definitions.completeRegistry, parsed.provider)
         throw initializationError
       }
-      const opened = await openDeps()
+      const opened = await runtime.openDeps()
       deps = opened
       resolveOAuthSelection(opened.completeRegistry, parsed.provider)
       const appLabel = resolveAccountOAuthAppLabel(
@@ -131,6 +150,7 @@ export async function handleAccountCommand(args: string[]): Promise<number> {
             availableApps.length === 0
               ? localOAuthAppGuidance(parsed.provider, appLabel)
               : `Available labels: ${availableApps.join(', ')}`
+          managedProviderId = undefined
           throw new CtxindexValidationError(
             'invalid_oauth_selection',
             `OAuth App "${appLabel}" is not available for Provider "${parsed.provider}". ${guidance}`,
@@ -139,7 +159,9 @@ export async function handleAccountCommand(args: string[]): Promise<number> {
         }
         throw error
       }
-      const result = await authorizeProvider(
+      // BYOA guidance is selection fallback, not a suffix for Provider errors.
+      managedProviderId = undefined
+      const result = await runtime.authorizeProvider(
         {
           provider: parsed.provider,
           app: appLabel,

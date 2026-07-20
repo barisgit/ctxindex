@@ -84,7 +84,7 @@ The public App config remains subject to the exact Provider registration schema 
 
 An Extension cannot self-assert omission-default status. Conversely, an unreviewed Extension App is not rejected for defining public registration metadata: it remains selectable explicitly. Duplicate `(providerId,label)` identities still reject atomically under the existing registry contract, so a copied App cannot shadow the policy target.
 
-Missing managed policy or provenance mismatch exits before secret/database/browser/network effects and guides the operator to create/select a local App. Provider failures after selection preserve the existing stable typed exit category and append only static commands plus safe Provider/App labels. Raw OAuth responses, authorization URLs, state outside the dedicated URL output, codes, verifiers, tokens, config, secret refs, and identities remain redacted.
+Missing managed policy, provenance mismatch, or managed App resolution failure exits before secret/database/browser/network effects and guides the operator to create/select a local App. After exact App resolution succeeds, Provider failures preserve the existing stable typed exit category without appending selection fallback. Raw OAuth responses, authorization URLs, state outside the dedicated URL output, codes, verifiers, tokens, config, secret refs, and identities remain redacted.
 
 ## Verification
 
@@ -107,4 +107,4 @@ Final verification is all focused Slice gates, `bun run ci`, `bunx openspec vali
 - Extend `oauth-client-management/implementation.md` with optional managed-default resolution before the existing exact App resolver.
 - Extend `extension-loading/implementation.md` only with the retained provenance required for host policy matching; do not add authored trust fields.
 - Extend `cli-surface/implementation.md` with optional `--app` parsing and structured fallback formatting.
-- Extend `error-taxonomy/implementation.md` with missing-default invalid usage and safe post-selection guidance using existing exit categories.
+- Extend `error-taxonomy/implementation.md` with missing-default invalid usage and safe pre-authorization selection guidance while preserving post-selection errors unchanged.

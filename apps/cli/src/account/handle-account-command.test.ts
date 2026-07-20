@@ -1,16 +1,62 @@
-import { expect, test } from 'bun:test'
+import { afterEach, expect, spyOn, test } from 'bun:test'
+import * as builtinModule from '@ctxindex/adapters'
+import { defaultConfig } from '@ctxindex/core/config'
+import {
+  CtxindexAuthError,
+  CtxindexValidationError,
+} from '@ctxindex/core/errors'
+import { loadExtensions } from '@ctxindex/core/extension'
 import type {
   ManagedOAuthAppPolicy,
   ManagedOAuthAppResolution,
 } from '@ctxindex/core/oauth-app'
 import type { CompleteRegistry } from '@ctxindex/core/registry'
 import {
+  type AccountCommandRuntime,
   formatAccountCommandError,
+  handleAccountCommand,
   resolveAccountOAuthAppLabel,
 } from './handle-account-command'
 
 const registry = {} as CompleteRegistry
 const policies = [] as readonly ManagedOAuthAppPolicy[]
+const completeRegistry = (
+  await loadExtensions({ config: defaultConfig(), builtins: builtinModule })
+).completeRegistry
+
+afterEach(() => {
+  spyOn(console, 'error').mockRestore()
+})
+
+function commandRuntime(
+  overrides: Partial<AccountCommandRuntime>,
+): AccountCommandRuntime {
+  const unused = async () => {
+    throw new Error('unexpected dependency call')
+  }
+  return {
+    assertInitialized: async () => {},
+    loadAuthDefinitionDeps: unused,
+    openAccountDeps: unused,
+    openDeps: unused,
+    authorizeProvider: unused,
+    ...overrides,
+  } as AccountCommandRuntime
+}
+
+function openedDeps(
+  resolveApp: (providerId: string, label: string) => Promise<unknown>,
+) {
+  return {
+    completeRegistry,
+    oauthAppService: {
+      resolveApp,
+      listApps: () => [],
+    },
+    authService: {},
+    close: async () => {},
+  } as unknown as Awaited<ReturnType<AccountCommandRuntime['openDeps']>>
+}
 
 function managedResolution(
   resolution: ManagedOAuthAppResolution,
@@ -103,7 +149,7 @@ test.each([
   }
 })
 
-test('managed authorization failure appends static BYOA commands without changing the error', () => {
+test('implicit App resolution failure appends static BYOA commands without changing the error', () => {
   const error = Object.assign(
     new Error('Provider denied the requested scopes'),
     {
@@ -120,8 +166,72 @@ test('managed authorization failure appends static BYOA commands without changin
   expect(error.code).toBe('insufficient_scope')
 })
 
-test('explicit App failure does not add managed fallback guidance', () => {
-  expect(formatAccountCommandError(new Error('explicit failure'))).toBe(
-    'explicit failure',
+test('authorization failure after implicit App resolution does not add BYOA guidance', () => {
+  expect(
+    formatAccountCommandError(
+      new Error('Provider denied the requested scopes'),
+    ),
+  ).toBe('Provider denied the requested scopes')
+})
+
+test('implicit command keeps one fallback for exact App resolution failure', async () => {
+  const error = spyOn(console, 'error').mockImplementation(() => {})
+  let authorizations = 0
+  const exit = await handleAccountCommand(
+    ['add', 'google'],
+    commandRuntime({
+      openDeps: async () =>
+        openedDeps(async () => {
+          throw new CtxindexValidationError(
+            'invalid_oauth_selection',
+            'fixture App resolution failed',
+          )
+        }),
+      authorizeProvider: async () => {
+        authorizations += 1
+        throw new Error('must not authorize')
+      },
+    }),
   )
+
+  expect(exit).toBe(2)
+  expect(authorizations).toBe(0)
+  const output = String(error.mock.calls[0]?.[0])
+  expect(output.match(/oauth-app add google/g)).toHaveLength(1)
+  expect(output.match(/account add google --app/g)).toHaveLength(1)
+})
+
+test('implicit command does not attach selection fallback after exact App resolution', async () => {
+  const error = spyOn(console, 'error').mockImplementation(() => {})
+  const definition = completeRegistry.oauthApps.get('["google","ctxindex"]')
+  if (definition === undefined) throw new Error('Google fixture App missing')
+  const exit = await handleAccountCommand(
+    ['add', 'google'],
+    commandRuntime({
+      openDeps: async () =>
+        openedDeps(async () => ({
+          provider: definition.provider,
+          label: definition.label,
+          config: definition.config,
+          definition,
+        })),
+      authorizeProvider: async () => {
+        throw new CtxindexAuthError(
+          'insufficient_scope',
+          'Provider denied the requested scopes',
+        )
+      },
+    }),
+  )
+
+  expect(exit).toBe(50)
+  const output = String(error.mock.calls[0]?.[0])
+  expect(output).toBe('Provider denied the requested scopes')
+  expect(output).not.toMatch(/oauth-app add|account add .*--app/)
+})
+
+test('explicit App resolution failure does not add managed fallback guidance', () => {
+  expect(
+    formatAccountCommandError(new Error('explicit resolution failure')),
+  ).toBe('explicit resolution failure')
 })

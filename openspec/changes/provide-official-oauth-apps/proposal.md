@@ -8,8 +8,8 @@ A fresh ctxindex installation still requires each user to create an OAuth applic
 - Allow `account add <provider>` to omit `--app` only when the host release has exactly one available managed App for that Provider. An explicit `--app <label>` always selects that exact Extension or local BYOA App.
 - Preserve the current Provider-owned registration contract and exact dynamic scope union. Managed Apps do not add, remove, allowlist, or otherwise reinterpret Adapter scopes; provider approval can still reject scopes that were not approved for that App.
 - Keep authorization provider-direct and local through the existing state-checked S256 PKCE loopback flow. Public App registration metadata may ship in source or the compiled CLI, while tokens, Grant snapshots, local BYOA secrets, and personal data remain local.
-- Return deterministic `oauth-app add ... --from-env` and `account add ... --app ...` guidance when no managed App is available or a provider blocks it. Never retry automatically through another App after authorization starts.
-- Keep automated runtime/CLI authorization evidence synthetic while allowing explicitly authorized public Google and Microsoft native-App registration metadata to ship before provider verification completes; documentation and status MUST NOT claim approval that has not happened.
+- Return deterministic `oauth-app add ... --from-env` and `account add ... --app ...` guidance when no managed App can be resolved. After authorization starts, preserve Provider failures without attaching selection fallback or retrying through another App.
+- Keep automated runtime/CLI authorization evidence synthetic while allowing explicitly authorized public Google and Microsoft native-App registration metadata to ship and participate in exact managed release-policy matching before provider verification completes; documentation and status MUST NOT claim approval that has not happened.
 
 ## Capabilities
 
@@ -23,7 +23,7 @@ A fresh ctxindex installation still requires each user to create an OAuth applic
 - `oauth-client-management`: Permit one host-designated Extension App to be selected when `--app` is omitted while preserving exact `(providerId,label)` identity and local BYOA.
 - `extension-loading`: Retain enough immutable Extension provenance for host release policy to recognize a managed App without a built-in-only SDK shape or an author-controlled trust flag.
 - `cli-surface`: Add the managed default form of `account add <provider>` and deterministic fallback guidance while keeping explicit App selection agent-safe.
-- `error-taxonomy`: Treat missing managed defaults as invalid usage and normalize managed-provider failures through existing stable exit categories with redacted BYOA guidance.
+- `error-taxonomy`: Treat missing managed defaults as invalid usage with redacted BYOA guidance, while preserving post-selection Provider failures through existing stable exit categories without selection fallback.
 
 ## Impact
 

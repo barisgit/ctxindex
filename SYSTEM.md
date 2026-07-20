@@ -213,7 +213,7 @@ The prototype extracts one/all-Source sync selection into a daemon-agnostic core
 
 Both calendar Adapters emit `calendar.event@1`, sync one calendar in an anchored rolling window, retrieve through `get`, and expose no write Action. Timed events keep instants/zones; all-day events keep half-open dates. Incomplete scans preserve prior state.
 
-The bundled Google and Microsoft Extensions embed public native-App registration definitions and matching managed-default policy, but embedding is not provider approval. Their publisher/domain verification, consent, tenant, and requested-scope checkpoints remain pending under issue #60; either provider may reject authorization. Exact explicit Extension Apps and local BYOA remain available without changing the requested scope algorithm.
+The bundled Google and Microsoft Extensions embed public native-App registration definitions and matching managed-default policy. Those omission defaults are active, but embedding and selection are not provider approval. Their publisher/domain verification, consent, tenant, and requested-scope checkpoints remain pending under issue #60; either provider may reject authorization. Exact explicit Extension Apps and local BYOA remain available without changing the requested scope algorithm.
 
 `google.calendar` defaults to the primary calendar or selects one explicit id. Initial sync commits only the final token after all pages. Token invalidation warns and triggers bounded full reconciliation. Missing events cause removals only after a complete scan. Unsupported variants such as `fromGmail` and `workingLocation` are skipped with `google_calendar_unsupported_event`; `birthday` becomes an ordinary all-day event. Retrieval rejects foreign-Source Refs before auth/network access.
 
