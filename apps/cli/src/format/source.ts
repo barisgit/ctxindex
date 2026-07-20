@@ -1,12 +1,15 @@
 import { dirname } from 'node:path'
 import type { SourceRow } from '@ctxindex/core/source'
+import type { RpcSourceRow } from '@ctxindex/rpc'
 import Table from 'cli-table3'
 
 export function formatSourceAdded(sourceId: string): string {
   return `source added: ${sourceId}`
 }
 
-function displayStatus(source: SourceRow): string {
+type FormattableSource = SourceRow | RpcSourceRow
+
+function displayStatus(source: FormattableSource): string {
   return source.availability === 'extension_unavailable'
     ? source.availability
     : (source.last_status ?? '-')
@@ -18,7 +21,7 @@ function compactValue(value: string | number | null | undefined): string {
   return text.replace(/\s+/g, '_')
 }
 
-function compactSource(source: SourceRow): string {
+function compactSource(source: FormattableSource): string {
   const warning = source.last_warning
     ? `${source.last_warning.code}:${source.last_warning.message.replace(/\s+/g, '_')}${source.last_warning.ref ? `:ref=${compactValue(source.last_warning.ref)}` : ''}`
     : null
@@ -58,7 +61,7 @@ function parseConfig(configJson: string | null): Record<string, unknown> {
   }
 }
 
-function sourceRef(source: SourceRow): string {
+function sourceRef(source: FormattableSource): string {
   const config = parseConfig(source.config_json)
   const rootPath = config.root_path ?? config.root ?? config.path
   if (typeof rootPath === 'string') return rootPath
@@ -79,19 +82,19 @@ function sourceRef(source: SourceRow): string {
   return '-'
 }
 
-function lastRun(source: SourceRow): string {
+function lastRun(source: FormattableSource): string {
   return source.last_run_at
     ? new Date(source.last_run_at).toISOString().replace('T', ' ').slice(0, 16)
     : '-'
 }
 
-function rootPath(source: SourceRow): string | null {
+function rootPath(source: FormattableSource): string | null {
   const value = parseConfig(source.config_json).root_path
   return typeof value === 'string' ? value : null
 }
 
 export function formatSources(
-  sources: SourceRow[],
+  sources: readonly FormattableSource[],
   opts: { readonly json: boolean; readonly format?: 'table' | 'compact' },
 ): string {
   if (opts.json) {

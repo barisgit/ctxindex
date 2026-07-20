@@ -39,6 +39,18 @@ test('registers purge as a root command with artifacts nested beneath it', () =>
   })
 })
 
+test('registers explicit foreground daemon lifecycle commands', () => {
+  expect(rootCommand.subCommands).toMatchObject({
+    daemon: {
+      subCommands: {
+        serve: expect.any(Object),
+        health: expect.any(Object),
+        shutdown: expect.any(Object),
+      },
+    },
+  })
+})
+
 test('prints help successfully', async () => {
   const log = spyOn(console, 'log').mockImplementation(() => {})
 

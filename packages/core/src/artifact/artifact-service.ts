@@ -179,7 +179,7 @@ export class ArtifactService {
     const row = (
       this.input.db
         .prepare(
-          'SELECT ref FROM resources WHERE deleted_at IS NULL AND source_id = ? ORDER BY length(ref) DESC',
+          'SELECT ref FROM resources WHERE deleted_at IS NULL AND hydrated_at IS NOT NULL AND source_id = ? ORDER BY length(ref) DESC',
         )
         .all(sourceId) as { ref: string }[]
     ).find((candidate) => ref.startsWith(`${candidate.ref}/`))

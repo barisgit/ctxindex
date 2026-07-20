@@ -50,7 +50,12 @@ export interface CliPublishManifest {
   }
   readonly type: 'module'
   readonly bin: { readonly ctxindex: 'dist/ctxindex.mjs' }
-  readonly files: readonly ['dist/ctxindex.mjs', 'README.md', 'LICENSE']
+  readonly files: readonly [
+    'dist/ctxindex.mjs',
+    'dist/ctxindex-daemon',
+    'README.md',
+    'LICENSE',
+  ]
   readonly engines: { readonly bun: '1.3.14' }
   readonly repository: {
     readonly type: 'git'
@@ -82,6 +87,7 @@ export interface CliPackageSmokeResult {
   readonly oauthAppHelpLoaded: true
   readonly preInitStatePreserved: true
   readonly packageExtensionLoaded: true
+  readonly daemonServeAvailable: true
 }
 
 export type NativeKeytarProbeStatus = 'loaded' | 'host-libsecret-unavailable'
@@ -97,6 +103,7 @@ interface CommandResult {
 const allowedPackagePaths = [
   'package/LICENSE',
   'package/README.md',
+  'package/dist/ctxindex-daemon',
   'package/dist/ctxindex.mjs',
   'package/package.json',
 ] as const
@@ -174,7 +181,12 @@ export function assertSafePackageFiles(files: readonly PackageFile[]): void {
     manifest.bin?.ctxindex !== 'dist/ctxindex.mjs' ||
     manifest.engines?.bun !== '1.3.14' ||
     JSON.stringify(manifest.files) !==
-      JSON.stringify(['dist/ctxindex.mjs', 'README.md', 'LICENSE']) ||
+      JSON.stringify([
+        'dist/ctxindex.mjs',
+        'dist/ctxindex-daemon',
+        'README.md',
+        'LICENSE',
+      ]) ||
     JSON.stringify(manifest.dependencies) !==
       JSON.stringify({ keytar: '7.9.0' }) ||
     JSON.stringify(manifest.trustedDependencies) !== JSON.stringify(['keytar'])
@@ -187,8 +199,16 @@ export function assertSafePackageFiles(files: readonly PackageFile[]): void {
   const executable = text(
     byPath.get('package/dist/ctxindex.mjs')?.content ?? '',
   )
+  const daemonExecutable = text(
+    byPath.get('package/dist/ctxindex-daemon')?.content ?? '',
+  )
   if (!executable.startsWith('#!/usr/bin/env bun\n')) {
     throw new TypeError('Published executable is missing the Bun shebang')
+  }
+  if (!daemonExecutable.startsWith('#!/usr/bin/env bun\n')) {
+    throw new TypeError(
+      'Published daemon executable is missing the Bun shebang',
+    )
   }
   if (
     /(?:from\s+|import\s+(?:[^'"]+\s+from\s+)?|import\s*\()\s*['"]@ctxindex\//.test(
@@ -226,7 +246,12 @@ export function createPublishManifest(
     bugs: { url: 'https://github.com/barisgit/ctxindex/issues' },
     type: 'module',
     bin: { ctxindex: 'dist/ctxindex.mjs' },
-    files: ['dist/ctxindex.mjs', 'README.md', 'LICENSE'],
+    files: [
+      'dist/ctxindex.mjs',
+      'dist/ctxindex-daemon',
+      'README.md',
+      'LICENSE',
+    ],
     engines: { bun: '1.3.14' },
     repository: {
       type: 'git',
@@ -312,6 +337,11 @@ async function prepareCliPackage(): Promise<CliPublishManifest> {
     join(stagingRoot, 'dist/ctxindex.mjs'),
   )
   await chmod(join(stagingRoot, 'dist/ctxindex.mjs'), 0o755)
+  await copyFile(
+    join(cliRoot, 'dist/ctxindex-daemon'),
+    join(stagingRoot, 'dist/ctxindex-daemon'),
+  )
+  await chmod(join(stagingRoot, 'dist/ctxindex-daemon'), 0o755)
   await copyFile(join(cliRoot, 'README.md'), join(stagingRoot, 'README.md'))
   await copyFile(join(repoRoot, 'LICENSE'), join(stagingRoot, 'LICENSE'))
   await writeFile(
@@ -545,6 +575,54 @@ export async function smokeCliPackage(
     database.close()
   }
 
+  if (process.platform === 'darwin') {
+    const daemon = Bun.spawn([executable, 'daemon', 'serve'], {
+      cwd: outsideDirectory,
+      env,
+      stdin: 'ignore',
+      stdout: 'pipe',
+      stderr: 'pipe',
+    })
+    try {
+      let ready = false
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        const probe = await runWithExit(
+          [executable, 'daemon', 'health', '--json'],
+          { cwd: outsideDirectory, env },
+        )
+        if (probe.exitCode === 0) {
+          ready = true
+          break
+        }
+        if (daemon.exitCode !== null) break
+        await Bun.sleep(20)
+      }
+      if (!ready) {
+        throw new Error('Installed CLI daemon serve did not become ready')
+      }
+      await cli(['daemon', 'shutdown', '--json'])
+      if ((await daemon.exited) !== 0) {
+        throw new Error('Installed CLI daemon serve did not exit cleanly')
+      }
+    } finally {
+      if (daemon.exitCode === null) daemon.kill('SIGKILL')
+    }
+  } else {
+    const unsupported = await runWithExit([executable, 'daemon', 'serve'], {
+      cwd: outsideDirectory,
+      env,
+    })
+    if (
+      unsupported.exitCode !== 50 ||
+      unsupported.stderr.trim() !==
+        'The local daemon is unsupported on this platform or filesystem.'
+    ) {
+      throw new Error(
+        `Installed CLI daemon did not fail closed on an unsupported host: ${unsupported.stderr || unsupported.stdout}`,
+      )
+    }
+  }
+
   const extensionPath = join(smokeRoot, 'installed-extension')
   await mkdir(extensionPath, { recursive: true, mode: 0o700 })
   await mkdir(join(extensionPath, 'node_modules/@ctxindex'), {
@@ -611,6 +689,7 @@ export async function smokeCliPackage(
     oauthAppHelpLoaded: true,
     preInitStatePreserved: true,
     packageExtensionLoaded: true,
+    daemonServeAvailable: true,
   }
 }
 

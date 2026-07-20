@@ -2,20 +2,39 @@ import {
   getSourceResource,
   type SourceResourceResult,
 } from '@ctxindex/core/source'
+import type { RpcResourceGetResult } from '@ctxindex/rpc'
 import { defineCommand } from 'citty'
 import { getUsage, parseGetArgs } from '../args/get'
+import { daemonResourceGet, selectDaemon } from '../daemon/client'
 import { openDeps } from '../deps'
 import { mapErrorToExit, runWithExit } from '../format/exit'
 
-export function formatGetJson(result: SourceResourceResult): string {
+type GetResult = SourceResourceResult | RpcResourceGetResult
+
+export function formatGetJson(result: GetResult): string {
   return JSON.stringify(result)
 }
 
-export function formatGetText(result: SourceResourceResult): string {
+export function formatGetText(result: GetResult): string {
   return `${result.resource.ref}${result.resource.title ? `\t${result.resource.title}` : ''}`
 }
 
-export async function handleGetCommand(args: string[]): Promise<number> {
+export interface GetCommandDeps {
+  readonly selectDaemon: typeof selectDaemon
+  readonly get: typeof daemonResourceGet
+  readonly open: typeof openDeps
+}
+
+const defaultDeps: GetCommandDeps = {
+  selectDaemon,
+  get: daemonResourceGet,
+  open: openDeps,
+}
+
+export async function handleGetCommand(
+  args: string[],
+  services: GetCommandDeps = defaultDeps,
+): Promise<number> {
   const parsed = parseGetArgs(args)
   if (parsed.kind === 'help') return 0
   if (parsed.kind === 'unknown') {
@@ -23,16 +42,28 @@ export async function handleGetCommand(args: string[]): Promise<number> {
     return 2
   }
 
-  const deps = await openDeps()
+  const controller = new AbortController()
+  const cancel = () => controller.abort()
+  process.once('SIGINT', cancel)
+  let deps: Awaited<ReturnType<typeof openDeps>> | undefined
   try {
-    const result = await getSourceResource({
-      db: deps.db,
-      ref: parsed.ref,
-      registry: deps.registry,
-      authService: deps.authService,
-      logger: deps.logger,
-      signal: new AbortController().signal,
-    })
+    const daemon = services.selectDaemon()
+    const result = daemon
+      ? await services.get(daemon, parsed.ref, controller.signal)
+      : await (async () => {
+          deps = await services.open()
+          controller.signal.throwIfAborted()
+          const directResult = await getSourceResource({
+            db: deps.db,
+            ref: parsed.ref,
+            registry: deps.registry,
+            authService: deps.authService,
+            logger: deps.logger,
+            signal: controller.signal,
+          })
+          controller.signal.throwIfAborted()
+          return directResult
+        })()
     console.log(parsed.json ? formatGetJson(result) : formatGetText(result))
     for (const warning of result.warnings) {
       console.error(`${warning.code}\t${warning.message}`)
@@ -42,7 +73,8 @@ export async function handleGetCommand(args: string[]): Promise<number> {
     console.error(error instanceof Error ? error.message : String(error))
     return mapErrorToExit(error)
   } finally {
-    await deps.close()
+    process.removeListener('SIGINT', cancel)
+    await deps?.close()
   }
 }
 

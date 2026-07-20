@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -147,6 +147,374 @@ test('example packages may use public packages as runtime or test dependencies',
   await writeFixture(
     join(fixtureRoot, 'examples/demo/index.test.ts'),
     "import '@ctxindex/core'",
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([])
+})
+
+test('rpc package rejects transport, lifecycle, storage, provider, formatting, and business imports', async () => {
+  fixtureRoot = await createFixtureRoot()
+  for (const [directory, name] of [
+    ['packages/core', '@ctxindex/core'],
+    ['packages/adapters', '@ctxindex/adapters'],
+    ['packages/local-daemon', '@ctxindex/local-daemon'],
+    ['apps/cli', '@ctxindex/cli'],
+    ['apps/daemon', '@ctxindex/daemon'],
+  ] as const) {
+    await writeFixture(
+      join(fixtureRoot, directory, 'package.json'),
+      JSON.stringify({ name, dependencies: {} }),
+    )
+    await writeFixture(
+      join(fixtureRoot, directory, 'src/index.ts'),
+      'export {}',
+    )
+  }
+  await writeFixture(
+    join(fixtureRoot, 'packages/rpc/package.json'),
+    JSON.stringify({ name: '@ctxindex/rpc', dependencies: {} }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'packages/rpc/src/router.ts'),
+    `
+import '@ctxindex/core'
+import '@ctxindex/adapters'
+import '@ctxindex/local-daemon'
+import '@ctxindex/cli/src/formatters'
+import '@ctxindex/daemon'
+import 'bun'
+import 'bun:sqlite'
+import 'node:fs/promises'
+import 'node:process'
+import 'drizzle-orm/sqlite-core'
+
+Bun.serve({ fetch: () => new Response() })
+fetch('https://graph.microsoft.com/v1.0/me')
+process.on('SIGTERM', () => {})
+const query = 'SELECT * FROM sources'
+void query
+`,
+  )
+
+  expect(
+    (await verifyWorkspaceDependencies(fixtureRoot)).filter(
+      (violation) => violation.type === 'rpc-boundary',
+    ),
+  ).toEqual(
+    [
+      '@ctxindex/adapters',
+      '@ctxindex/cli',
+      '@ctxindex/cli/src/formatters',
+      '@ctxindex/core',
+      '@ctxindex/daemon',
+      '@ctxindex/local-daemon',
+      'Bun.serve',
+      'bun',
+      'bun:sqlite',
+      'drizzle-orm/sqlite-core',
+      'fetch',
+      'node:fs/promises',
+      'node:process',
+      'package-private',
+      'process',
+      'provider-url:graph.microsoft.com',
+      'raw-sql',
+    ].map((dependency) => ({
+      type: 'rpc-boundary' as const,
+      packageName: '@ctxindex/rpc',
+      dependency,
+    })),
+  )
+})
+
+test('rpc package accepts direct contract, schema, and procedure composition dependencies', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'packages/rpc/package.json'),
+    JSON.stringify({
+      name: '@ctxindex/rpc',
+      private: true,
+      dependencies: {
+        '@orpc/contract': 'latest',
+        '@orpc/server': 'latest',
+        zod: 'latest',
+      },
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'packages/rpc/src/router.ts'),
+    `
+import { oc } from '@orpc/contract'
+import { implement } from '@orpc/server'
+import { z } from 'zod'
+
+export const contract = oc.input(z.object({ value: z.string() }))
+export const router = implement(contract).handler(({ input }) => input)
+`,
+  )
+  await writeFixture(
+    join(fixtureRoot, 'packages/rpc/src/router.test.ts'),
+    `
+import { test } from 'bun:test'
+test('router', () => {})
+`,
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([])
+})
+
+test('rpc package rejects relative package escapes and non-base oRPC entrypoints', async () => {
+  fixtureRoot = await createFixtureRoot()
+  const coreSourcePath = join(fixtureRoot, 'packages/core/src/index.ts')
+  await writeFixture(
+    join(fixtureRoot, 'packages/core/package.json'),
+    JSON.stringify({ name: '@ctxindex/core', dependencies: {} }),
+  )
+  await writeFixture(coreSourcePath, 'export {}')
+  await writeFixture(
+    join(fixtureRoot, 'packages/rpc/package.json'),
+    JSON.stringify({
+      name: '@ctxindex/rpc',
+      private: true,
+      dependencies: { '@orpc/server': 'latest', zod: 'latest' },
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'packages/rpc/src/core-link.ts'),
+    'export {}',
+  )
+  await rm(join(fixtureRoot, 'packages/rpc/src/core-link.ts'))
+  await symlink(
+    coreSourcePath,
+    join(fixtureRoot, 'packages/rpc/src/core-link.ts'),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'packages/rpc/src/router.ts'),
+    `
+import '../../core/src/index'
+import './core-link'
+import ${JSON.stringify(coreSourcePath)}
+import { RPCHandler } from '@orpc/server/fetch'
+import { z } from 'zod'
+
+void RPCHandler
+void z
+`,
+  )
+
+  expect(
+    (await verifyWorkspaceDependencies(fixtureRoot)).filter(
+      (violation) => violation.type === 'rpc-boundary',
+    ),
+  ).toEqual(
+    [
+      '../../core/src/index',
+      './core-link',
+      coreSourcePath,
+      '@orpc/server/fetch',
+      'source-escape:src/core-link.ts',
+    ].map((dependency) => ({
+      type: 'rpc-boundary' as const,
+      packageName: '@ctxindex/rpc',
+      dependency,
+    })),
+  )
+})
+
+test('local daemon package rejects RPC, business, transport, formatting, provider, process, and storage imports', async () => {
+  fixtureRoot = await createFixtureRoot()
+  for (const [directory, name] of [
+    ['packages/rpc', '@ctxindex/rpc'],
+    ['packages/core', '@ctxindex/core'],
+    ['packages/adapters', '@ctxindex/adapters'],
+    ['apps/cli', '@ctxindex/cli'],
+    ['apps/daemon', '@ctxindex/daemon'],
+  ] as const) {
+    await writeFixture(
+      join(fixtureRoot, directory, 'package.json'),
+      JSON.stringify({
+        name,
+        private: name === '@ctxindex/rpc' ? true : undefined,
+        dependencies: {},
+      }),
+    )
+    await writeFixture(
+      join(fixtureRoot, directory, 'src/index.ts'),
+      'export {}',
+    )
+  }
+  await writeFixture(
+    join(fixtureRoot, 'packages/local-daemon/package.json'),
+    JSON.stringify({ name: '@ctxindex/local-daemon', dependencies: {} }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'packages/local-daemon/src/index.ts'),
+    `
+import '@ctxindex/rpc'
+import '@ctxindex/core/src/sync/application-service'
+import '@ctxindex/adapters'
+import '@ctxindex/cli/src/formatters'
+import '@ctxindex/daemon'
+import '@orpc/server'
+import 'bun'
+import 'bun:ffi'
+import 'bun:sqlite'
+import 'node:process'
+import 'drizzle-orm/sqlite-core'
+
+Bun.serve({ fetch: () => new Response() })
+fetch('https://oauth2.googleapis.com/token')
+process.on('SIGTERM', () => {})
+const query = 'DELETE FROM sources'
+void query
+`,
+  )
+
+  expect(
+    (await verifyWorkspaceDependencies(fixtureRoot)).filter(
+      (violation) => violation.type === 'local-daemon-boundary',
+    ),
+  ).toEqual(
+    [
+      '@ctxindex/adapters',
+      '@ctxindex/cli',
+      '@ctxindex/cli/src/formatters',
+      '@ctxindex/core',
+      '@ctxindex/daemon',
+      '@ctxindex/rpc',
+      '@orpc/server',
+      'Bun.serve',
+      'bun',
+      'bun:ffi',
+      'bun:sqlite',
+      'drizzle-orm/sqlite-core',
+      'fetch',
+      'node:process',
+      'package-private',
+      'process',
+      'provider-url:oauth2.googleapis.com',
+      'raw-sql',
+    ].map((dependency) => ({
+      type: 'local-daemon-boundary' as const,
+      packageName: '@ctxindex/local-daemon',
+      dependency,
+    })),
+  )
+})
+
+test('local daemon package accepts process-independent identity and lease primitives', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'packages/local-daemon/package.json'),
+    JSON.stringify({
+      name: '@ctxindex/local-daemon',
+      private: true,
+      dependencies: {},
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'packages/local-daemon/src/index.ts'),
+    `
+import { createHash } from 'node:crypto'
+import { open } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { resolve } from 'node:path'
+
+export const digest = createHash('sha256').update(resolve(tmpdir())).digest('hex')
+export const acquire = open
+`,
+  )
+  await writeFixture(
+    join(fixtureRoot, 'packages/local-daemon/src/index.test.ts'),
+    `
+import { test } from 'bun:test'
+test('identity', () => {})
+`,
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([])
+})
+
+test('local daemon package rejects relative imports that escape its package', async () => {
+  fixtureRoot = await createFixtureRoot()
+  const coreSourcePath = join(fixtureRoot, 'packages/core/src/index.ts')
+  await writeFixture(
+    join(fixtureRoot, 'packages/core/package.json'),
+    JSON.stringify({ name: '@ctxindex/core', dependencies: {} }),
+  )
+  await writeFixture(coreSourcePath, 'export {}')
+  await writeFixture(
+    join(fixtureRoot, 'packages/local-daemon/package.json'),
+    JSON.stringify({
+      name: '@ctxindex/local-daemon',
+      private: true,
+      dependencies: {},
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'packages/local-daemon/src/core-link.ts'),
+    'export {}',
+  )
+  await rm(join(fixtureRoot, 'packages/local-daemon/src/core-link.ts'))
+  await symlink(
+    coreSourcePath,
+    join(fixtureRoot, 'packages/local-daemon/src/core-link.ts'),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'packages/local-daemon/src/identity.ts'),
+    "import '../../core/src/index'; import './core-link'",
+  )
+
+  expect(
+    (await verifyWorkspaceDependencies(fixtureRoot)).filter(
+      (violation) => violation.type === 'local-daemon-boundary',
+    ),
+  ).toEqual(
+    [
+      '../../core/src/index',
+      './core-link',
+      'source-escape:src/core-link.ts',
+    ].map((dependency) => ({
+      type: 'local-daemon-boundary',
+      packageName: '@ctxindex/local-daemon',
+      dependency,
+    })),
+  )
+})
+
+test('local daemon tests and testing helpers may spawn and terminate subprocesses', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'packages/local-daemon/package.json'),
+    JSON.stringify({
+      name: '@ctxindex/local-daemon',
+      private: true,
+      dependencies: {},
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'packages/local-daemon/src/lease.test.ts'),
+    `
+import { test } from 'bun:test'
+import process from 'node:process'
+
+test('kernel lease', () => {
+  const child = Bun.spawn(['lease-contender'])
+  process.kill(child.pid, 'SIGKILL')
+})
+`,
+  )
+  await writeFixture(
+    join(fixtureRoot, 'packages/local-daemon/src/testing/subprocess.ts'),
+    `
+import { kill } from 'node:process'
+
+export function spawnContender(): number {
+  const child = Bun.spawn(['lease-contender'])
+  kill(child.pid, 'SIGKILL')
+  return child.pid
+}
+`,
   )
 
   expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([])

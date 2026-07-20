@@ -162,6 +162,13 @@ describe('ArtifactService', () => {
       ),
     ).rejects.toMatchObject({ code: 'ref_source_mismatch' })
     f.db
+      .prepare('UPDATE resources SET hydrated_at = NULL WHERE ref = ?')
+      .run(originRef)
+    expect(await f.service.resolveCached(artifactRef, sourceId)).toBeNull()
+    f.db
+      .prepare('UPDATE resources SET hydrated_at = 1 WHERE ref = ?')
+      .run(originRef)
+    f.db
       .prepare('UPDATE resources SET payload_json = ? WHERE ref = ?')
       .run(JSON.stringify({ attachments: [] }), originRef)
     expect(await f.service.resolveCached(artifactRef, sourceId)).toBeNull()
