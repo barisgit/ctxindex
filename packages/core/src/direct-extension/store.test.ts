@@ -48,6 +48,38 @@ describe('direct Extension records', () => {
         extensions: [{ ...record(), managed_path: '/private/state' }],
       }),
     ).toThrow()
+    expect(
+      directExtensionDocumentSchema.parse({
+        schema_version: 1,
+        extensions: [
+          {
+            ...record(),
+            id: 'example.git',
+            source: {
+              kind: 'git',
+              requested_target: 'git+https://example.com/repository.git#main',
+              commit: 'b'.repeat(40),
+            },
+          },
+          {
+            ...record(),
+            id: 'example.local',
+            source: {
+              kind: 'local',
+              requested_target: '/original/package',
+              origin_path: '/original/package',
+              content_digest: 'c'.repeat(64),
+            },
+          },
+        ],
+      }).extensions,
+    ).toHaveLength(2)
+    expect(() =>
+      directExtensionDocumentSchema.parse({
+        schema_version: 1,
+        extensions: [{ ...record(), package_root: '/managed/package' }],
+      }),
+    ).toThrow()
     expect(() =>
       directExtensionDocumentSchema.parse({
         schema_version: 1,
@@ -115,5 +147,57 @@ describe('direct Extension records', () => {
         join(directExtensionMaterializationPath(dataRoot, digest), 'index.ts'),
       ).exists(),
     ).toBe(true)
+  })
+
+  test('serializes writers and removes only unreferenced materializations', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ctxindex-direct-lock-'))
+    roots.push(root)
+    const options = {
+      configRoot: join(root, 'config'),
+      dataRoot: join(root, 'data'),
+    }
+    const first = new DirectExtensionStore(options)
+    const second = new DirectExtensionStore(options)
+    await Promise.all(
+      [
+        [first, { ...record('d'.repeat(64)), id: 'example.first' }],
+        [second, { ...record('e'.repeat(64)), id: 'example.second' }],
+      ].map(async ([store, value]) =>
+        (store as DirectExtensionStore).withLifecycleLock(async () => {
+          const current = await (store as DirectExtensionStore).readRecords()
+          await (store as DirectExtensionStore).writeRecords([
+            ...current,
+            value as DirectExtensionInstallationRecord,
+          ])
+        }),
+      ),
+    )
+    expect((await first.readRecords()).map(({ id }) => id)).toEqual([
+      'example.first',
+      'example.second',
+    ])
+
+    const referencedStage = join(root, 'referenced')
+    const orphanStage = join(root, 'orphan')
+    await mkdir(referencedStage)
+    await mkdir(orphanStage)
+    await writeFile(join(referencedStage, 'index.js'), 'referenced')
+    await writeFile(join(orphanStage, 'index.js'), 'orphan')
+    const referencedDigest = await hashDirectory(referencedStage)
+    const orphanDigest = await hashDirectory(orphanStage)
+    await first.publishMaterialization(referencedStage, referencedDigest)
+    await first.publishMaterialization(orphanStage, orphanDigest)
+    await first.writeRecords([record(referencedDigest)])
+    await first.collectUnreferencedMaterializations()
+    expect(
+      await Bun.file(
+        join(first.materializationsRoot, referencedDigest, 'index.js'),
+      ).exists(),
+    ).toBe(true)
+    expect(
+      await Bun.file(
+        join(first.materializationsRoot, orphanDigest, 'index.js'),
+      ).exists(),
+    ).toBe(false)
   })
 })

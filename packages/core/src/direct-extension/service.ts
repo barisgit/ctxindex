@@ -309,7 +309,7 @@ export class DirectExtensionService {
       if (blockingSources.length > 0 && !input.force) {
         throw lifecycleError(
           'extension_removal_blocked',
-          `Direct Extension ${input.extensionId} is required by configured Sources`,
+          `Direct Extension ${input.extensionId} is required by configured Sources: ${blockingSources.map(({ label }) => label).join(', ')}`,
           { blockingSources },
         )
       }

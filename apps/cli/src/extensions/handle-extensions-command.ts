@@ -227,7 +227,24 @@ export async function handleExtensionsCommand(
     )
     return 0
   } catch (error) {
-    console.error(safeExtensionDiagnostic(error, 'Extension command failed'))
+    const code = (error as { code?: unknown }).code
+    if (
+      error instanceof Error &&
+      typeof code === 'string' &&
+      code.startsWith('extension_')
+    ) {
+      console.error(`${code}: ${error.message}`)
+    } else {
+      const diagnostic = safeExtensionDiagnostic(
+        error,
+        'Extension command failed',
+      )
+      console.error(
+        typeof code === 'string' && /^[a-z0-9_]+$/.test(code)
+          ? `${diagnostic} (${code})`
+          : diagnostic,
+      )
+    }
     return mapErrorToExit(error)
   }
 }

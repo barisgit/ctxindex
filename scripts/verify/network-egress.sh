@@ -129,6 +129,7 @@ NODE_ENV=test bun test --path-ignore-patterns '__none__' \
   ./packages/core/src/source/provider-context.test.ts \
   ./packages/core/src/logger/redaction.integration.test.ts \
   ./packages/adapters/src/google-mailbox/no-send.integration.test.ts \
+  ./apps/cli/src/e2e/compiled-direct-extension.e2e.test.ts \
   ./apps/cli/src/e2e/network-egress.e2e.test.ts \
   ./apps/cli/src/e2e/malformed-zero-side-effects.e2e.test.ts
 

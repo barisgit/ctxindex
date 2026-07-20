@@ -2,7 +2,7 @@ import { afterEach, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { BunPackageMaterializer } from './materializer'
+import { BunPackageMaterializer, runPackageProcess } from './materializer'
 
 const roots: string[] = []
 afterEach(async () => {
@@ -104,12 +104,12 @@ test('runner receives executable and argv without shell interpolation', async ()
       )
       await writeFile(
         join(input.cwd, 'bun.lock'),
-        JSON.stringify({
-          lockfileVersion: 1,
-          packages: {
-            '@example/mail': ['@example/mail@2.3.4', '', {}, 'sha512-safe'],
+        `{
+          "lockfileVersion": 1,
+          "packages": {
+            "@example/mail": ["@example/mail@2.3.4", "", {}, "sha512-safe"],
           },
-        }),
+        }`,
       )
     },
   })
@@ -176,4 +176,40 @@ test('Git materialization records the exact package-manager commit', async () =>
   } finally {
     await result.cleanup()
   }
+})
+
+test('package process bounds output, timeout, cancellation, and temporary state', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'ctxindex-package-process-'))
+  roots.push(root)
+  await expect(
+    runPackageProcess({
+      executable: process.execPath,
+      args: ['-e', "console.log('x'.repeat(70_000))"],
+      cwd: root,
+      timeoutMs: 5_000,
+    }),
+  ).rejects.toMatchObject({ code: 'extension_acquisition_failed' })
+  await expect(
+    runPackageProcess({
+      executable: process.execPath,
+      args: ['-e', 'await new Promise(() => {})'],
+      cwd: root,
+      timeoutMs: 20,
+    }),
+  ).rejects.toMatchObject({ code: 'extension_acquisition_failed' })
+
+  const controller = new AbortController()
+  setTimeout(() => controller.abort(), 20)
+  await expect(
+    runPackageProcess({
+      executable: process.execPath,
+      args: ['-e', 'await new Promise(() => {})'],
+      cwd: root,
+      timeoutMs: 5_000,
+      signal: controller.signal,
+    }),
+  ).rejects.toMatchObject({ code: 'cancelled' })
+  expect(await Bun.file(join(root, '.ctxindex-package-tmp')).exists()).toBe(
+    false,
+  )
 })

@@ -2,7 +2,13 @@ import { afterEach, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { defineAdapter, defineExtension, z } from '@ctxindex/extension-sdk'
+import {
+  auth,
+  defineAdapter,
+  defineExtension,
+  defineProvider,
+  z,
+} from '@ctxindex/extension-sdk'
 import { createExtensionRegistry } from '../registry'
 import type {
   MaterializedDirectExtension,
@@ -23,6 +29,7 @@ class FixtureMaterializer implements PackageMaterializer {
   calls = 0
   fail = false
   cleanupFails = false
+  entry = `export default { kind: 'extension', id: 'example.direct', providers: [], oauthApps: [], profiles: [], adapters: [] }\n`
 
   async materialize(
     target: DirectExtensionTarget,
@@ -42,10 +49,7 @@ class FixtureMaterializer implements PackageMaterializer {
       join(stagingRoot, 'package', 'package.json'),
       JSON.stringify({ ctxindex: { extensions: ['./entry.ts'] } }),
     )
-    await writeFile(
-      join(stagingRoot, 'package', 'entry.ts'),
-      `export default { kind: 'extension', id: 'example.direct', providers: [], oauthApps: [], profiles: [], adapters: [] }\n`,
-    )
+    await writeFile(join(stagingRoot, 'package', 'entry.ts'), this.entry)
     const materializationDigest = await hashDirectory(stagingRoot)
     return {
       stagingRoot,
@@ -121,6 +125,64 @@ test('install selects one exact root, publishes, and rejects a repeated direct i
     }),
   ).rejects.toMatchObject({ code: 'extension_target_invalid' })
   expect(materializer.calls).toBe(1)
+})
+
+test('install requires the exact exported root and validates the complete registry before publication', async () => {
+  const { materializer, service, store } = await fixtureService()
+  await expect(
+    service.install({
+      target: { kind: 'npm', requestedTarget: 'example-package@1' },
+      extensionId: 'example.missing',
+      registry: createExtensionRegistry([]),
+      localOAuthAppIdentities: [],
+    }),
+  ).rejects.toMatchObject({ code: 'extension_validation_failed' })
+  expect(await store.readRecords()).toEqual([])
+
+  await expect(
+    service.install({
+      target: { kind: 'npm', requestedTarget: 'example-package@1' },
+      extensionId: 'example.direct',
+      registry: createExtensionRegistry([
+        defineExtension({
+          id: 'example.direct',
+          providers: [
+            defineProvider({ id: 'example.provider', auth: auth.none() }),
+          ],
+        }),
+      ]),
+      localOAuthAppIdentities: [],
+    }),
+  ).rejects.toMatchObject({ code: 'extension_conflict' })
+  expect(materializer.calls).toBe(2)
+  expect(await store.readRecords()).toEqual([])
+})
+
+test('sibling roots from one package remain independent direct records', async () => {
+  const { materializer, service, store } = await fixtureService()
+  materializer.entry = `
+    export const sibling = { kind: 'extension', id: 'example.sibling', providers: [], oauthApps: [], profiles: [], adapters: [] }
+    export default { kind: 'extension', id: 'example.direct', providers: [], oauthApps: [], profiles: [], adapters: [] }
+  `
+  const registry = createExtensionRegistry([])
+  await service.install({
+    target: { kind: 'npm', requestedTarget: 'example-package@1' },
+    extensionId: 'example.direct',
+    registry,
+    localOAuthAppIdentities: [],
+  })
+  await service.install({
+    target: { kind: 'npm', requestedTarget: 'example-package@1' },
+    extensionId: 'example.sibling',
+    registry: createExtensionRegistry([
+      defineExtension({ id: 'example.direct' }),
+    ]),
+    localOAuthAppIdentities: [],
+  })
+  expect((await store.readRecords()).map(({ id }) => id)).toEqual([
+    'example.direct',
+    'example.sibling',
+  ])
 })
 
 test('failed update preserves the prior exact record', async () => {
@@ -201,27 +263,32 @@ test('uninstall blocks dependent Sources and force removes only activation state
   })
   const registry = createExtensionRegistry([loadedDirect])
   const source = { id: 'source-1', label: 'mail', adapterId: 'missing.adapter' }
+  const earlierSource = {
+    id: 'source-2',
+    label: 'alpha',
+    adapterId: 'missing.adapter',
+  }
   await expect(
     service.uninstall({
       extensionId: 'example.direct',
       registry,
-      sources: [source],
+      sources: [source, earlierSource],
       alternateOriginAvailable: false,
       force: false,
     }),
   ).rejects.toMatchObject({
     code: 'extension_removal_blocked',
-    blockingSources: [source],
+    blockingSources: [earlierSource, source],
   })
   expect(await store.readRecords()).toHaveLength(1)
   const result = await service.uninstall({
     extensionId: 'example.direct',
     registry,
-    sources: [source],
+    sources: [source, earlierSource],
     alternateOriginAvailable: false,
     force: true,
   })
-  expect(result.blockingSources).toEqual([source])
+  expect(result.blockingSources).toEqual([earlierSource, source])
   expect(await store.readRecords()).toEqual([])
 })
 

@@ -83,6 +83,13 @@ export function validateDirectPackageTarget(
     return
   }
   const normalized = target.replace(/^git\+/, '')
+  if (/^file:\/\//i.test(normalized)) {
+    const parsed = new URL(normalized)
+    if (parsed.hostname.length > 0 || !parsed.pathname.startsWith('/')) {
+      throw new TypeError('Invalid Git package target')
+    }
+    return
+  }
   if (/^(?:https?|ssh|git):\/\//i.test(normalized)) {
     const parsed = new URL(normalized)
     if (parsed.hostname.length === 0 || parsed.pathname === '/') {

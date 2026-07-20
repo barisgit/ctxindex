@@ -52,11 +52,32 @@ test('loads a valid direct pin offline and degrades a missing pin per Extension'
     id: 'example.missing',
     materialization_digest: 'f'.repeat(64),
   }
+  const corruptStaging = join(root, 'corrupt-staging')
+  await mkdir(join(corruptStaging, 'package'), { recursive: true })
+  await writeFile(
+    join(corruptStaging, 'package', 'package.json'),
+    JSON.stringify({ ctxindex: { extensions: ['./entry.ts'] } }),
+  )
+  await writeFile(
+    join(corruptStaging, 'package', 'entry.ts'),
+    `export default { kind: 'extension', id: 'example.corrupt', providers: [], oauthApps: [], profiles: [], adapters: [] }\n`,
+  )
+  const corruptDigest = await hashDirectory(corruptStaging)
+  await store.publishMaterialization(corruptStaging, corruptDigest)
+  await writeFile(
+    join(store.materializationsRoot, corruptDigest, 'package', 'entry.ts'),
+    'corrupted after publication',
+  )
+  const corrupt: DirectExtensionInstallationRecord = {
+    ...valid,
+    id: 'example.corrupt',
+    materialization_digest: corruptDigest,
+  }
 
   const loaded = await loadExtensions({
     config: defaultConfig(),
     builtins: {},
-    directInstalled: [valid, missing],
+    directInstalled: [valid, missing, corrupt],
     dataRoot,
   })
   expect(loaded.registry.list().map(({ id }) => id)).toEqual(['example.direct'])
@@ -68,7 +89,10 @@ test('loads a valid direct pin offline and degrades a missing pin per Extension'
       materializationDigest: digest,
     }),
   ])
-  expect(loaded.diagnostics).toEqual([
-    expect.objectContaining({ path: 'direct:example.missing' }),
-  ])
+  expect(loaded.diagnostics).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ path: 'direct:example.missing' }),
+      expect.objectContaining({ path: 'direct:example.corrupt' }),
+    ]),
+  )
 })

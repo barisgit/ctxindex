@@ -191,7 +191,31 @@ function packageIntegrity(
 ): string | undefined {
   let lock: unknown
   try {
-    lock = JSON.parse(lockText)
+    let normalized = ''
+    let inString = false
+    let escaped = false
+    for (let index = 0; index < lockText.length; index++) {
+      const character = lockText[index] ?? ''
+      if (inString) {
+        normalized += character
+        if (escaped) escaped = false
+        else if (character === '\\') escaped = true
+        else if (character === '"') inString = false
+        continue
+      }
+      if (character === '"') {
+        inString = true
+        normalized += character
+        continue
+      }
+      if (character === ',') {
+        let next = index + 1
+        while (/\s/.test(lockText[next] ?? '')) next++
+        if (lockText[next] === '}' || lockText[next] === ']') continue
+      }
+      normalized += character
+    }
+    lock = JSON.parse(normalized)
   } catch {
     return undefined
   }

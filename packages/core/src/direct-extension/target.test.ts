@@ -100,5 +100,8 @@ describe('direct Extension target parsing', () => {
         'git+ssh://git@github.com/example/repository.git',
       ),
     ).not.toThrow()
+    expect(() =>
+      validateDirectPackageTarget('git', 'git+file:///tmp/repository#main'),
+    ).not.toThrow()
   })
 })
