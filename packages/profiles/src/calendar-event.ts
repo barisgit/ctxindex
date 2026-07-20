@@ -1,61 +1,13 @@
 import { defineProfile } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
+import { ianaTimeZoneAliases } from './iana-time-zone-links'
 
 const sourceIdPattern = /^[0-9A-HJKMNP-TV-Z]{26}$/
 const providerIdPattern = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/
 const instantSchema = z.iso.datetime({ offset: true })
 const dateSchema = z.iso.date()
 
-const canonicalTimeZoneAliases = new Map<string, string>([
-  // Selected IANA tzdb 2026b backward spellings that replace obsolete names
-  // exposed by Bun 1.3.14's Intl inventory, plus legacy UTC/US identifiers.
-  ['Africa/Asmera', 'Africa/Asmara'],
-  ['America/Buenos_Aires', 'America/Argentina/Buenos_Aires'],
-  ['America/Catamarca', 'America/Argentina/Catamarca'],
-  ['America/Cordoba', 'America/Argentina/Cordoba'],
-  ['America/Godthab', 'America/Nuuk'],
-  ['America/Indianapolis', 'America/Indiana/Indianapolis'],
-  ['America/Jujuy', 'America/Argentina/Jujuy'],
-  ['America/Knox_IN', 'America/Indiana/Knox'],
-  ['America/Louisville', 'America/Kentucky/Louisville'],
-  ['America/Mendoza', 'America/Argentina/Mendoza'],
-  // Bun preserves this link in resolvedOptions while Node canonicalizes it.
-  ['America/Shiprock', 'America/Denver'],
-  ['Etc/UTC', 'UTC'],
-  ['Etc/UCT', 'UTC'],
-  ['Etc/Universal', 'UTC'],
-  ['Etc/Zulu', 'UTC'],
-  ['GMT', 'UTC'],
-  ['UCT', 'UTC'],
-  ['Universal', 'UTC'],
-  ['Zulu', 'UTC'],
-  ['US/Alaska', 'America/Anchorage'],
-  ['US/Arizona', 'America/Phoenix'],
-  ['US/Central', 'America/Chicago'],
-  ['US/Eastern', 'America/New_York'],
-  ['US/Hawaii', 'Pacific/Honolulu'],
-  ['US/Mountain', 'America/Denver'],
-  ['US/Pacific', 'America/Los_Angeles'],
-  ['Asia/Ashkhabad', 'Asia/Ashgabat'],
-  ['Asia/Calcutta', 'Asia/Kolkata'],
-  ['Asia/Chungking', 'Asia/Chongqing'],
-  ['Asia/Dacca', 'Asia/Dhaka'],
-  ['Asia/Istanbul', 'Europe/Istanbul'],
-  ['Asia/Katmandu', 'Asia/Kathmandu'],
-  ['Asia/Macao', 'Asia/Macau'],
-  ['Asia/Rangoon', 'Asia/Yangon'],
-  ['Asia/Saigon', 'Asia/Ho_Chi_Minh'],
-  ['Asia/Thimbu', 'Asia/Thimphu'],
-  ['Asia/Ujung_Pandang', 'Asia/Makassar'],
-  ['Asia/Ulan_Bator', 'Asia/Ulaanbaatar'],
-  ['Atlantic/Faeroe', 'Atlantic/Faroe'],
-  ['Europe/Kiev', 'Europe/Kyiv'],
-  ['Europe/Nicosia', 'Asia/Nicosia'],
-  ['Pacific/Enderbury', 'Pacific/Kanton'],
-  ['Pacific/Ponape', 'Pacific/Pohnpei'],
-  ['Pacific/Samoa', 'Pacific/Pago_Pago'],
-  ['Pacific/Truk', 'Pacific/Chuuk'],
-])
+const canonicalTimeZoneAliases = new Map<string, string>(ianaTimeZoneAliases)
 const canonicalTimeZones = new Set(Intl.supportedValuesOf('timeZone'))
 const modernCanonicalTimeZones = new Set(canonicalTimeZoneAliases.values())
 

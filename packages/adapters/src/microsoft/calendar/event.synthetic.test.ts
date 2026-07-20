@@ -28,6 +28,50 @@ function timedEvent(overrides: Record<string, unknown> = {}) {
 describe('Microsoft Calendar synthetic time-zone and series normalization', () => {
   test.each([
     {
+      label: 'UTC',
+      zone: 'UTC',
+      expectedStart: '2026-07-15T09:00:00.123Z',
+    },
+    {
+      label: 'IANA',
+      zone: 'Europe/Belgrade',
+      expectedStart: '2026-07-15T07:00:00.123Z',
+    },
+    {
+      label: 'Windows',
+      zone: 'GMT Standard Time',
+      expectedStart: '2026-07-15T08:00:00.123Z',
+    },
+  ])('$label offset-less Graph datetimes preserve fractional milliseconds', (value) => {
+    const normalized = normalizeMicrosoftCalendarEvent(
+      timedEvent({
+        start: {
+          dateTime: '2026-07-15T09:00:00.1234567',
+          timeZone: value.zone,
+        },
+        end: {
+          dateTime: '2026-07-15T10:00:00.1234567',
+          timeZone: value.zone,
+        },
+        originalStart: '2026-07-15T09:00:00.1234567',
+        originalStartTimeZone: value.zone,
+        originalEndTimeZone: value.zone,
+      }),
+      sourceId,
+      calendarId,
+    )
+
+    expect(normalized.warnings).toEqual([])
+    expect(normalized.resource?.payload).toMatchObject({
+      timing: { kind: 'timed', start: value.expectedStart },
+      series: {
+        originalStart: { kind: 'timed', at: value.expectedStart },
+      },
+    })
+  })
+
+  test.each([
+    {
       label: 'Windows',
       event: timedEvent(),
       zone: 'Europe/London',

@@ -5,6 +5,7 @@ import {
   calendarEventSchema,
   canonicalizeIanaTimeZone,
 } from './calendar-event'
+import { ianaTimeZoneAliases } from './iana-time-zone-links'
 
 const sourceId = '01KXHBNECDAH1T4MJ38X88EPFJ'
 
@@ -43,6 +44,9 @@ const timedPayload = {
 
 describe('calendarEventProfile', () => {
   test('canonicalizes known IANA links and rejects aliases in Profile payloads', () => {
+    for (const [alias, canonical] of new Map(ianaTimeZoneAliases))
+      expect(canonicalizeIanaTimeZone(alias)).toBe(canonical)
+
     expect(canonicalizeIanaTimeZone('US/Pacific')).toBe('America/Los_Angeles')
     expect(canonicalizeIanaTimeZone('Europe/Kiev')).toBe('Europe/Kyiv')
     expect(canonicalizeIanaTimeZone('Etc/UTC')).toBe('UTC')
@@ -55,6 +59,11 @@ describe('calendarEventProfile', () => {
       'Europe/Ljubljana',
     )
     expect(canonicalizeIanaTimeZone('America/Shiprock')).toBe('America/Denver')
+    expect(canonicalizeIanaTimeZone('Canada/Eastern')).toBe('America/Toronto')
+    expect(canonicalizeIanaTimeZone('Brazil/East')).toBe('America/Sao_Paulo')
+    expect(canonicalizeIanaTimeZone('US/East-Indiana')).toBe(
+      'America/Indiana/Indianapolis',
+    )
     expect(canonicalizeIanaTimeZone('Synthetic/Unknown')).toBeUndefined()
 
     expect(() =>

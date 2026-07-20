@@ -141,7 +141,7 @@ function zoneOffsetMs(date: Date, timeZone: string): number {
     part('minute'),
     part('second'),
   )
-  return asUtc - date.getTime()
+  return asUtc - date.getTime() + date.getUTCMilliseconds()
 }
 // Convert a Graph datetime to a UTC instant using a resolved IANA zone for
 // offset-less local wall times. Returns undefined when neither an explicit
