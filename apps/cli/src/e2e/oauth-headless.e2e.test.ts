@@ -50,8 +50,8 @@ test('provider-neutral account authorization deduplicates Accounts and safely re
       CTXINDEX_LOOPBACK_TIMEOUT_SECS: '5',
       CTXINDEX_KEYTAR_MOCK_FILE: join(sandbox.dir, 'keytar.json'),
     }
-    const client = await sandbox.run(
-      ['client', 'add', 'google', '--from-env'],
+    const app = await sandbox.run(
+      ['oauth-app', 'add', 'google', 'google', '--from-env'],
       {
         env: {
           ...accountEnv,
@@ -60,19 +60,19 @@ test('provider-neutral account authorization deduplicates Accounts and safely re
         },
       },
     )
-    expect(client.exitCode, client.stderr).toBe(0)
-    expect(client.stdout).not.toContain('canary')
-    expect(client.stdout).toContain('client added: google "google"')
+    expect(app.exitCode, app.stderr).toBe(0)
+    expect(app.stdout).not.toContain('canary')
+    expect(app.stdout).toContain('OAuth App added: google "google"')
 
     const result = await sandbox.run(
-      ['account', 'add', 'google', '--label', 'work'],
+      ['account', 'add', 'google', '--app', 'google', '--label', 'work'],
       { env: accountEnv },
     )
     expect(result.exitCode, result.stderr).toBe(0)
     expect(result.stdout).not.toContain('canary')
     expect(result.stdout).toContain('account added:')
     const second = await sandbox.run(
-      ['account', 'add', 'google', '--label', 'work'],
+      ['account', 'add', 'google', '--app', 'google', '--label', 'work'],
       { env: accountEnv },
     )
     expect(second.exitCode, second.stderr).toBe(0)
@@ -144,17 +144,17 @@ test('provider-neutral account authorization deduplicates Accounts and safely re
     expect(listed.exitCode, listed.stderr).toBe(0)
     expect(listed.stdout).not.toContain('canary')
     expect(listed.stdout).not.toContain('subject-1')
+    expect(listed.stdout).not.toMatch(/grant|scope/i)
     const inventory = JSON.parse(listed.stdout) as {
       id: string
       provider: string
       label: string
-      grants: { id: string }[]
+      sources: { id: string }[]
     }[]
     expect(inventory).toHaveLength(1)
     expect(inventory[0]?.provider).toBe('google')
     expect(inventory[0]?.label).toBe('work')
-    expect(inventory[0]?.grants).toHaveLength(1)
-    expect(inventory[0]?.grants[0]?.id).toBe(sharedGrantId)
+    expect(inventory[0]?.sources).toHaveLength(2)
   } finally {
     await sandbox.cleanup()
     server.closeAllConnections()

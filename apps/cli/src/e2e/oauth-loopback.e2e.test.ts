@@ -8,8 +8,8 @@ test('CLI no-browser loopback emits a safe authorization URL and never accepts O
     const initialized = await sandbox.run(['init'])
     expect(initialized.exitCode, initialized.stderr).toBe(0)
 
-    const client = await sandbox.run(
-      ['client', 'add', 'google', '--from-env'],
+    const app = await sandbox.run(
+      ['oauth-app', 'add', 'google', 'google', '--from-env'],
       {
         env: {
           CTXINDEX_GOOGLE_CLIENT_ID: 'public-id',
@@ -18,18 +18,21 @@ test('CLI no-browser loopback emits a safe authorization URL and never accepts O
         },
       },
     )
-    expect(client.exitCode, client.stderr).toBe(0)
-    expect(client.stdout).not.toContain('client-secret-canary')
+    expect(app.exitCode, app.stderr).toBe(0)
+    expect(app.stdout).not.toContain('client-secret-canary')
 
-    const result = await sandbox.run(['account', 'add', 'google'], {
-      env: {
-        NODE_ENV: 'test',
-        CTXINDEX_OAUTH_MOCK_BASE_URL: 'http://127.0.0.1:43123',
-        CTXINDEX_NO_BROWSER: '1',
-        CTXINDEX_LOOPBACK_TIMEOUT_SECS: '0.01',
-        CTXINDEX_KEYTAR_MOCK_FILE: join(sandbox.dir, 'keytar.json'),
+    const result = await sandbox.run(
+      ['account', 'add', 'google', '--app', 'google'],
+      {
+        env: {
+          NODE_ENV: 'test',
+          CTXINDEX_OAUTH_MOCK_BASE_URL: 'http://127.0.0.1:43123',
+          CTXINDEX_NO_BROWSER: '1',
+          CTXINDEX_LOOPBACK_TIMEOUT_SECS: '0.01',
+          CTXINDEX_KEYTAR_MOCK_FILE: join(sandbox.dir, 'keytar.json'),
+        },
       },
-    })
+    )
     expect(result.exitCode).toBe(50)
     expect(result.stdout).toContain(
       'Open this URL: http://127.0.0.1:43123/oauth/google/authorize?',

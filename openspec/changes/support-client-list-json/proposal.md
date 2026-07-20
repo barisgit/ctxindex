@@ -1,3 +1,5 @@
+> **SUPERSEDED — DO NOT SYNC.** This completed Client-era change is retained only as historical evidence. `redesign-extension-sdk` removes the Client surface and replaces it with `oauth-app list --json`. Its delta spec MUST NOT be synced into canonical specs. Archive only with explicit user approval.
+
 ## Why
 
 `client list` is the only primary identity inventory command that cannot emit machine-readable JSON. Agents currently have to parse its presentation-oriented text even though Client inventory is already deterministic and secret-safe and comparable Account and Source inventory commands support `--json`.

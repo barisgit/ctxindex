@@ -8,7 +8,6 @@ import { communicationMessageProfile } from '@ctxindex/profiles/communication-me
 
 const communicationMessageExtension = defineExtension({
   id: 'ctxindex.communication-message.test',
-  version: 1,
   profiles: [communicationMessageProfile],
   adapters: [],
 })
@@ -23,28 +22,22 @@ test('bundled communication.message enters the public registry path', () => {
       {
         id: 'communication.message',
         version: 1,
-        summary: 'An email or provider message.',
-        aliases: ['email', 'mail', 'message'],
         fields: [
           {
             name: 'conversationKey',
             type: 'string',
-            docs: 'Source-scoped provider conversation identity.',
           },
           {
             name: 'rfcMessageId',
             type: 'string',
-            docs: 'Normalized RFC Message-ID header value.',
           },
           {
             name: 'sender',
             type: 'string[]',
-            docs: 'Sender addresses associated with the message.',
           },
           {
             name: 'unread',
             type: 'boolean',
-            docs: 'Whether the message is unread.',
           },
         ],
         formats: [{ name: 'eml', mediaType: 'message/rfc822' }],
@@ -69,19 +62,6 @@ test('bundled communication.message enters the public registry path', () => {
           ],
         }),
         output: { id: 'communication.message', version: 1 },
-        docs: 'Create a Draft in the selected mailbox Source.',
-        examples: [
-          {
-            to: ['recipient@example.com'],
-            subject: 'Project update',
-            bodyText: 'The project is on track.',
-          },
-          {
-            replyToRef:
-              'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/stable-message-id',
-            bodyText: 'Thanks for the update.',
-          },
-        ],
         adapters: [],
       },
       {
@@ -101,21 +81,6 @@ test('bundled communication.message enters the public registry path', () => {
           ],
         }),
         output: { id: 'communication.message', version: 1 },
-        docs: 'Replace the complete content of the addressed Draft in the selected mailbox Source.',
-        examples: [
-          {
-            ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/stable-draft-id',
-            to: ['recipient@example.com'],
-            subject: 'Updated project status',
-            bodyText: 'The project is ready for review.',
-          },
-          {
-            ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/stable-draft-id',
-            replyToRef:
-              'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/stable-message-id',
-            bodyText: 'Updated reply text.',
-          },
-        ],
         adapters: [],
       },
     ],

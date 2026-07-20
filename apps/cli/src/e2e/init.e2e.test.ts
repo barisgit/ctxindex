@@ -64,7 +64,7 @@ test('database-backed commands require init while help and init remain available
     )
     expect(await Bun.file(dbPath(sandbox)).exists()).toBe(false)
 
-    const help = await sandbox.run(['client', '--help'])
+    const help = await sandbox.run(['oauth-app', '--help'])
     expect(help.exitCode, help.stderr).toBe(0)
     expect(await Bun.file(dbPath(sandbox)).exists()).toBe(false)
 

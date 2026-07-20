@@ -6,8 +6,6 @@ Define typed Adapter failures, persisted sync status mappings, and the stable us
 ## Requirements
 
 ### Requirement: Typed sync errors and stable CLI exits
-The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.
-
 Adapters MUST surface failure as a typed `CtxindexSyncError` (or subclass) carrying one of the following codes. The sync runner is the only component that translates these into persisted `sync_runs.status` and `source_sync_state.last_status`.
 
 ```text
@@ -18,7 +16,7 @@ CtxindexSyncError codes
   network                  DNS/TCP/TLS failure or timeout
   provider_unavailable     5xx from provider
   provider_bad_response    response parse / Zod-validation failure
-  provider_quota           account quota exhausted (e.g. mailbox over storage)
+  provider_quota           account quota exhausted
   not_found                resource referenced by cursor no longer exists
   permission_denied        403 / scope mismatch from provider
   cancelled                aborted by SIGINT, SIGTERM, or explicit cancel
@@ -27,7 +25,7 @@ CtxindexSyncError codes
 
 Adapters MAY also yield non-fatal warning ops that increment `sync_runs.errors_count` and append to `error_summary` without aborting the run.
 
-Mapping rules (normative):
+Mapping rules remain normative:
 
 - `sync_runs.status` = `completed` only when the iterator completes without throwing.
 - `sync_runs.status` = `cancelled` when the cause was `cancelled`.
@@ -37,8 +35,24 @@ Mapping rules (normative):
 - `source_sync_state.last_status` = `failed` for every other terminal error.
 - `source_sync_state.last_status` = `disabled` is set only by the CLI, never by the runner.
 
-User-visible CLI exit codes MUST be stable: `0` success, `2` invalid usage, `10` `needs_auth`, `20` rate-limited, `30` network/provider, `40` permission denied, `50` other sync failure, `130` cancelled (SIGINT). Client, Account, and Source label collisions MUST exit `2`, name the taken label, and make no change; they MUST NOT prompt, normalize, or automatically suffix the label.
+User-visible stable exits remain: `0` success, `2` invalid usage, `10` `needs_auth`, `20` rate-limited, `30` network/provider, `40` permission denied, `50` other sync or internal auth failure, and `130` cancelled by SIGINT. OAuth App, Account, and Source label collisions MUST exit `2`, name the taken label, make no change, and MUST NOT prompt, normalize, automatically suffix, or choose a winner.
 
-#### Scenario: Typed failures map to stable persisted statuses and exit codes
-- **WHEN** a conforming implementation exercises this contract
-- **THEN** it satisfies every applicable MUST and MUST NOT clause and treats SHOULD, SHOULD NOT, and MAY clauses according to their normative meanings
+The public/internal authentication error code `missing_oauth_client_creds` MUST be removed and replaced by `missing_oauth_app_config`. No alias SHALL remain. `missing_oauth_app_config` MUST retain the removed code's stable `50` exit mapping when authorization or refresh discovers absent or corrupt persisted App or Grant-snapshot configuration.
+
+Unknown Provider or App selection, omitted required `account add --app`, and invalid or missing `oauth-app add --from-env` config are invalid usage and MUST exit `2` with actionable OAuth App guidance. Unknown selection MUST fail before environment/secret reads, database mutation, browser launch, or Provider egress. Missing or invalid assembled config MUST fail before secret-store writes, database mutation, browser launch, or Provider egress. These add-time validation failures MUST NOT use `missing_oauth_app_config` because no persisted authorization state was expected yet.
+
+#### Scenario: Missing persisted App snapshot uses renamed error
+- **WHEN** authorization or refresh requires persisted App config that is absent or corrupt
+- **THEN** core reports `missing_oauth_app_config`, CLI exits `50`, and no `missing_oauth_client_creds` alias is emitted
+
+#### Scenario: Unknown App selection is invalid usage
+- **WHEN** `account add google --app absent` selects no available App
+- **THEN** CLI exits `2` before secret/database/browser/network effects with exact App guidance
+
+#### Scenario: Missing environment config is invalid usage
+- **WHEN** `oauth-app add google work --from-env` cannot assemble a valid Provider config
+- **THEN** CLI exits `2` before secret-store writes, database mutation, browser launch, or Provider egress
+
+#### Scenario: Typed sync mapping remains stable
+- **WHEN** a typed sync failure reaches the runner and CLI
+- **THEN** persisted status and exit mapping remain unchanged by the OAuth App vocabulary migration

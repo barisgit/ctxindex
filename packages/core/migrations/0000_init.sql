@@ -24,14 +24,13 @@ CREATE TABLE account_identities (
   UNIQUE(account_id, kind, value)
 );
 
-CREATE TABLE oauth_clients (
-  provider TEXT NOT NULL,
+CREATE TABLE oauth_apps (
+  provider_id TEXT NOT NULL,
   label TEXT NOT NULL,
-  client_id_ref TEXT NOT NULL,
-  client_secret_ref TEXT,
+  config_ref TEXT NOT NULL,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
-  UNIQUE(provider, label)
+  UNIQUE(provider_id, label)
 );
 
 CREATE TABLE grants (
@@ -39,8 +38,7 @@ CREATE TABLE grants (
   account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
   provider TEXT NOT NULL,
   scopes_json TEXT NOT NULL,
-  client_id_ref TEXT,
-  client_secret_ref TEXT,
+  app_config_ref TEXT NOT NULL,
   access_token_ref TEXT,
   refresh_token_ref TEXT,
   expires_at INTEGER,
@@ -53,7 +51,6 @@ CREATE TABLE sources (
   id TEXT NOT NULL PRIMARY KEY,
   realm_id TEXT NOT NULL REFERENCES realms(id),
   adapter_id TEXT NOT NULL,
-  adapter_version INTEGER NOT NULL,
   grant_id TEXT REFERENCES grants(id),
   label TEXT NOT NULL UNIQUE,
   config_json TEXT NOT NULL,

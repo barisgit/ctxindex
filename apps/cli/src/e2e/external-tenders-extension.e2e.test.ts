@@ -5,12 +5,13 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 const repoRoot = resolve(import.meta.dir, '../../../..')
-const extensionPath = join(repoRoot, 'examples/tenders-extension/extension.ts')
+const extensionSourceRoot = join(repoRoot, 'examples/tenders-extension')
 
 test('relocated compiled CLI syncs external tenders through generic verbs', async () => {
   const root = await mkdtemp(join(tmpdir(), 'ctxindex-tenders-e2e-'))
   const buildOutput = join(root, 'build', 'ctxindex')
   const relocatedBinary = join(root, 'relocated', 'ctxindex')
+  const extensionPath = join(root, 'extension-package')
   const xdgConfig = join(root, 'xdg', 'config')
   const xdgData = join(root, 'xdg', 'data')
   const xdgState = join(root, 'xdg', 'state')
@@ -65,11 +66,47 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
     ])
     expect(buildExitCode, `${buildStdout}\n${buildStderr}`).toBe(0)
 
+    await mkdir(join(extensionPath, 'dist'), { recursive: true })
+    const extensionBuild = Bun.spawn(
+      [
+        'bun',
+        'build',
+        join(extensionSourceRoot, 'extension.ts'),
+        '--outfile',
+        join(extensionPath, 'dist', 'extension.js'),
+        '--target=bun',
+      ],
+      { cwd: repoRoot, stdout: 'pipe', stderr: 'pipe' },
+    )
+    const [extensionBuildExitCode, extensionBuildStdout, extensionBuildStderr] =
+      await Promise.all([
+        extensionBuild.exited,
+        new Response(extensionBuild.stdout).text(),
+        new Response(extensionBuild.stderr).text(),
+      ])
+    expect(
+      extensionBuildExitCode,
+      `${extensionBuildStdout}\n${extensionBuildStderr}`,
+    ).toBe(0)
+    await writeFile(
+      join(extensionPath, 'package.json'),
+      JSON.stringify({
+        name: '@ctxindex/tenders-e2e-package',
+        version: '1.0.0',
+        type: 'module',
+        ctxindex: { extensions: ['./dist/extension.js'] },
+      }),
+    )
+
     await mkdir(join(root, 'relocated'), { recursive: true })
     await copyFile(buildOutput, relocatedBinary)
     expect(relocatedBinary).not.toBe(buildOutput)
-    expect(extensionPath.startsWith(join(repoRoot, 'examples'))).toBe(true)
-    expect(extensionPath.startsWith(join(repoRoot, 'packages'))).toBe(false)
+    expect(extensionSourceRoot.startsWith(join(repoRoot, 'examples'))).toBe(
+      true,
+    )
+    expect(extensionSourceRoot.startsWith(join(repoRoot, 'packages'))).toBe(
+      false,
+    )
     expect(extensionPath.startsWith(join(root, 'relocated'))).toBe(false)
 
     const initialized = await run(['init'])
@@ -134,7 +171,7 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
       'search',
       'equipment',
       '--kind',
-      'tenders',
+      'enarocanje.tender',
       '--source',
       sourceId,
       '--field',
@@ -152,7 +189,7 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
       'search',
       'equipment',
       '--kind',
-      'tenders',
+      'enarocanje.tender',
       '--source',
       sourceId,
       '--field',
@@ -321,7 +358,7 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
       'search',
       '--json',
       '--kind',
-      'tenders',
+      'enarocanje.tender',
       'equipment',
     ])
     expect(restoredSearch.exitCode, restoredSearch.stderr).toBe(0)

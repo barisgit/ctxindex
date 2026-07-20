@@ -5,52 +5,48 @@ Define provider-neutral OAuth authorization, stable labeled Account identity, on
 
 ## Requirements
 
-### Requirement: OAuth authorization derives from selected Adapters
-Account authorization SHALL derive its scope request from the loaded Adapter registry as defined by `account add`: provider base scopes plus the strict sorted union of all loaded Adapters declaring that provider. Authorization MUST NOT derive scopes from Adapters declaring other providers, and no command SHALL accept per-authorization Adapter selection.
+### Requirement: OAuth authorization derives from active Provider-backed Adapters
+Account authorization SHALL derive its scope request from the selected OAuth App's exact active Provider: that Provider's base scopes plus the strict sorted union of operation scopes from all active Provider-backed Adapters importing the same semantic Provider id. It MUST NOT include scopes from other Providers or providerless Adapters, and no command SHALL accept per-authorization Adapter selection.
 
-When a successful initial token response includes `scope`, every requested Adapter operation scope MUST be present using case-sensitive comparison; declared provider identity/refresh scopes MAY be absent from that response where the provider does not echo them. If `scope` is absent, the requested set is the granted set under the OAuth response contract. A refresh response without `scope` preserves the Grant's prior normalized scopes.
+If an initial token response includes `scope`, every requested Adapter operation scope MUST be present using case-sensitive comparison. If absent, the requested set is the granted set. A refresh response without `scope` preserves prior normalized private authorization state.
 
-#### Scenario: Gmail and Calendar are authorized together
-- **WHEN** `account add google` runs with `google.mailbox` and `google.calendar` loaded
-- **THEN** consent requests exactly the deduplicated scopes required by those Adapters plus provider identity, and the resulting Grant can bind Sources for both
+#### Scenario: Mailbox and Calendar authorize together
+- **WHEN** authorization selects a Google App while Google mailbox and calendar Adapters are active
+- **THEN** consent requests their deduplicated operation scopes plus Google base scopes
 
-#### Scenario: Other-provider Adapter contributes no scope
-- **WHEN** a loaded Adapter declares a different provider than the one being authorized
-- **THEN** none of that Adapter's scopes appear in the authorization request or stored Grant
+#### Scenario: Providerless Adapter contributes no scope
+- **WHEN** providerless local Adapters are active during Google authorization
+- **THEN** none contributes scopes, Provider access, or Provider egress requirements
 
-#### Scenario: Token scope validation is preserved
-- **WHEN** an initial token response echoes a `scope` value missing a requested Adapter operation scope
-- **THEN** authorization fails and no Grant is persisted
+### Requirement: Account authorization covers all active matching Adapters
+Account authorization SHALL resolve one active Provider by semantic id and one available Extension or local OAuth App by exact label, then request base scopes plus all active matching Adapter scopes. Package selection determines which Adapters are active; ctxindex MUST NOT narrow consent through an Extension dependency graph.
 
-### Requirement: Account authorization covers all loaded provider Adapters
-`account add <provider>` SHALL request provider base scopes plus the strict sorted deduplicated union of the operation scopes of every loaded Adapter declaring that provider. There SHALL be no per-command Adapter selection; loading fewer Extensions is the mechanism for narrower consent. Re-running `account add` for the same provider identity after additional Adapters are loaded SHALL re-consent with the enlarged union and update the existing Account and Grant state rather than duplicating the Account. Each Account SHALL own exactly one Grant maintained by `account add`: re-authorization MUST update that Grant's scopes and secret references in place under its existing grant id so Source bindings remain valid.
+On success, private Grant state MUST snapshot the exact selected App config into Grant-owned secret storage. Reauthorization of the same verified Provider identity SHALL update the existing Account, tokens, scopes, and App snapshot rather than duplicate it. Public workflows MUST use OAuth App and Account vocabulary and MUST NOT require or render Grant ids, token references, or permission records.
 
-#### Scenario: Consent unions mailbox and calendar
-- **WHEN** `account add google` runs while `google.mailbox` and `google.calendar` are loaded
-- **THEN** one consent request contains exactly the provider base scopes plus both Adapters' deduplicated scopes
+#### Scenario: Exact App label selects configuration
+- **WHEN** authorization runs for Provider `google` with App label `work`
+- **THEN** it uses exactly `(google,work)` and does not infer an App from load order or config
 
-#### Scenario: New Extension enlarges consent on re-add
-- **WHEN** the same identity re-runs `account add` after a new Adapter for that provider is loaded
-- **THEN** consent requests the enlarged union and the existing Account is updated without duplication
+#### Scenario: Reauthorization preserves Account identity
+- **WHEN** the same verified identity reauthorizes through an available App
+- **THEN** Account identity remains stable while private scopes, tokens, and App snapshot update transactionally
 
-#### Scenario: Re-authorization keeps one stable Grant
-- **WHEN** the same identity completes `account add` a second time
-- **THEN** the Account still owns exactly one Grant whose id is unchanged, with scopes and tokens updated in place, and existing Source bindings remain valid
+#### Scenario: Replacement snapshot is durable first
+- **WHEN** reauthorization succeeds through another App
+- **THEN** replacement config is durably snapshotted before superseded references are cleaned
 
-#### Scenario: Other providers' Adapters contribute nothing
-- **WHEN** Microsoft Adapters are loaded during `account add google`
-- **THEN** no Microsoft scope appears in the request or stored Grant
+### Requirement: OAuth Providers are declarative and provider-neutral
+An active OAuth2 Provider MUST own sufficient authorization, token, identity, App config, PKCE, base-scope, and allowlisted-host metadata for one uniform authorization-code/refresh lifecycle. A Provider declares exactly one direct `oauth2` or `none` auth kind. Named methods, multiple methods, selectors, and placeholder auth kinds MUST NOT be exposed without a separate accepted contract.
 
-### Requirement: OAuth providers are declarative and provider-neutral
-The public Adapter auth contract SHALL identify a stable provider id and sufficient authorization, token, identity, client-input, PKCE, and scope metadata for core to execute one uniform authorization-code/refresh lifecycle. Core MUST NOT select provider behavior from token-host heuristics or mailbox-specific functions, and provider identity/network behavior MUST remain declared and allowlisted.
+Provider-backed Adapters MUST import exact Provider definitions and MUST NOT duplicate Provider metadata. Core MUST NOT select behavior from token-host heuristics, Adapter-owned endpoint copies, object identity, load order, private method names, or domain-specific functions.
 
 #### Scenario: Google and Microsoft use one host flow
-- **WHEN** equivalent Google and Microsoft Adapter selections are authorized
-- **THEN** core performs state-checked loopback authorization, token validation, identity resolution, and secret persistence through the same provider-neutral module
+- **WHEN** Accounts authorize through active Google and Microsoft Apps
+- **THEN** core performs state-checked loopback authorization, token validation, identity resolution, and private persistence through one provider-neutral module
 
-#### Scenario: Undeclared identity host is blocked
-- **WHEN** an OAuth identity request targets a host not allowed for the declared provider
-- **THEN** authorization fails before network egress to that host
+#### Scenario: Named multi-method auth is absent
+- **WHEN** Provider authoring/runtime schemas are inspected
+- **THEN** they expose one direct `oauth2` or `none` declaration and no selector
 
 ### Requirement: Accounts use stable deduplicated provider identity
 A successful authorization SHALL require a stable non-empty external identity from the provider and atomically upsert exactly one Account for `(provider, external_user_id)`. Reauthorization MUST reuse the Account and update its one stable Grant in place, MAY update its local label without changing identity, and MUST NOT fall back to an email label as identity when the provider does not prove a stable subject.
@@ -72,7 +68,7 @@ A successful authorization SHALL require a stable non-empty external identity fr
 - **THEN** they are deduplicated as Account Identity rows for that Account without replacing its stable external subject
 
 ### Requirement: Account labels are verbatim unique handles
-An Account SHALL carry a local label defaulting verbatim to its verified provider identity when `--label` is omitted, with no normalization. Account labels MUST be unique across all providers; a collision with a different Account's label MUST fail as invalid usage naming the taken label and suggesting `--label`, never auto-suffixing or prompting. Re-authorization of the same `(provider, external identity)` with a new label SHALL rename the existing Account. `--account` references SHALL resolve an exact account label, then an exact account id, then an exact grant id.
+An Account SHALL carry a local label defaulting verbatim to its verified provider identity when `--label` is omitted, with no normalization. Account labels MUST be unique across all providers; a collision with a different Account's label MUST fail as invalid usage naming the taken label and suggesting `--label`, never auto-suffixing or prompting. Re-authorization of the same `(provider, external identity)` with a new label SHALL rename the existing Account. `--account` references SHALL resolve an exact Account label, then an exact Account id. Grant ids MUST remain private and MUST NOT be accepted as selectors.
 
 #### Scenario: Omitted label defaults to verified identity
 - **WHEN** `account add google` completes for `blaz@paxia.co` without `--label`
@@ -90,23 +86,29 @@ An Account SHALL carry a local label defaulting verbatim to its verified provide
 - **WHEN** a Source command passes `--account work`
 - **THEN** resolution matches the Account labeled `work` before any id comparison and only among Accounts matching the Adapter's declared provider
 
-### Requirement: Grants preserve exact permissions and explicit Source binding
-Every Account SHALL own exactly one stable Grant storing normalized granted scopes and secret references for that Account/provider. Authenticated Source creation MUST resolve `--account` by exact Account label, then exact Account id, then exact Grant id, only among Accounts matching the Adapter's declared provider, and bind that Account's compatible Grant. The Grant's provider MUST match and its scopes MUST contain every selected Adapter requirement; no global or latest fallback is allowed. Multiple Sources MAY reuse the Grant.
+### Requirement: Grants preserve exact permissions and Source binding
+Private authorization state for an Account SHALL retain normalized scopes, token references, and a Grant-owned snapshot of the exact selected App config. Authenticated Source creation for a Provider-backed Adapter MUST use that Adapter's exact imported active Provider, resolve the selected Account by exact label or id, and verify matching Provider identity and all Adapter scopes. No load-order, alternate-Provider, App-shadow, object-identity, or auth-method fallback is allowed. Multiple Sources MAY reuse one Account's private authorization.
 
-#### Scenario: Mailbox and calendar share a Grant
-- **WHEN** one Account's Grant contains all Gmail and Google Calendar scopes
-- **THEN** explicitly created mailbox and calendar Sources for that Account may both bind that Grant
+A Provider-backed Adapter whose exact Provider uses `none` MUST require no Account or Grant but MAY retain its declared Provider egress contract. A providerless Adapter MUST require no Account, create no Grant or OAuth App state, and perform no Provider authorization or Provider egress validation. Public Source config and inventory MUST NOT expose a Grant selector.
 
-#### Scenario: Read-only Grant cannot bind Draft mailbox
-- **WHEN** a Microsoft Account's Grant lacks `Mail.ReadWrite`
-- **THEN** creation of a Draft-capable Microsoft mailbox Source fails before Source persistence
+#### Scenario: Mailbox and calendar share private authorization
+- **WHEN** one Google Account has all mailbox and calendar scopes
+- **THEN** Sources for both Provider-backed Adapters may use that Account without exposing a Grant
+
+#### Scenario: Providerless Source creates no authorization
+- **WHEN** a Source is created for a providerless Adapter
+- **THEN** no Account, App, Grant, Provider access, or Provider egress state is read or created
+
+#### Scenario: None-auth Provider remains distinct from providerless
+- **WHEN** an Adapter imports a Provider whose direct auth is `none`
+- **THEN** Source creation requires no Account or Grant while the Adapter still uses that Provider's declared identity and egress contract
 
 ### Requirement: Account inventory is deterministic and non-sensitive
-`account list` SHALL return Accounts in deterministic order with provider, stable local Account id, local label, Grant ids/scopes/expiry state, and bound Source ids/labels/Adapters/Realms. JSON SHALL preserve nested cardinality; readable output SHALL remain compact. Neither form may expose external stable identity by default when a safer label exists, or any secret reference/value.
+`account list` SHALL return Accounts in deterministic order with provider, stable local Account id, local label, authorization expiry state, and bound Source ids/labels/Adapters/Realms. JSON SHALL preserve nested cardinality; readable output SHALL remain compact. Neither form may expose Grant ids/scopes, permission records, external stable identity by default when a safer label exists, or any secret reference/value.
 
 #### Scenario: Personal and work inventory is listed
 - **WHEN** personal Google and work Microsoft Accounts have multiple bound Sources
-- **THEN** one command clearly associates each Grant and labeled Source with the correct Account and Realm
+- **THEN** one command clearly associates each Account's authorization health and labeled Sources with the correct Provider and Realm without exposing its Grant
 
 #### Scenario: Labels identify Accounts in inventory
 - **WHEN** Accounts labeled `work` and `uni` exist for one provider
@@ -128,15 +130,25 @@ Every Account SHALL own exactly one stable Grant storing normalized granted scop
 - **THEN** it receives a fresh Grant id and previously bound Sources remain `needs_auth` until recreated
 
 ### Requirement: Token refresh is provider-neutral and safe
-Authorized provider reads SHALL use the linked Grant, reuse an unexpired access token, and refresh through its declared token endpoint when required. Rotated refresh tokens MUST replace prior references safely; a 401 read MAY trigger the existing single refresh retry, while Actions MUST NOT be retried automatically.
+Authorized Provider reads SHALL use the Adapter's exact imported active Provider, the Account's matching private authorization, an unexpired access token when available, and the Grant-owned App snapshot for refresh. Removing the source App MUST affect only future authorization. Rotated refresh tokens MUST replace prior references safely. A 401 read MAY trigger the existing single refresh retry; Actions MUST NOT be retried automatically.
+
+Refresh MUST NOT depend on current App inventory, a public Client, Grant selector, Provider version, reference fallback, object identity, load order, or auth-method selector. Providerless Adapter operations MUST NOT enter token refresh.
 
 #### Scenario: Microsoft refresh token rotates
-- **WHEN** Microsoft returns a new refresh token while refreshing access
-- **THEN** the Grant safely stores the replacement before deleting the old value and subsequent requests use it
+- **WHEN** Microsoft returns a new refresh token
+- **THEN** private state stores the replacement before deleting the old value
+
+#### Scenario: Removed App does not break refresh
+- **WHEN** an App is removed after Account authorization
+- **THEN** future authorization cannot select it while the Account refreshes from its Grant snapshot
 
 #### Scenario: Action receives unauthorized response
 - **WHEN** a Draft mutation returns 401
 - **THEN** ctxindex reports authentication failure and performs no automatic second mutation
+
+#### Scenario: Providerless operation bypasses refresh
+- **WHEN** a providerless Adapter operation runs
+- **THEN** no token lookup, refresh, or OAuth retry path executes
 
 ### Requirement: Mailbox Account identities
 The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.

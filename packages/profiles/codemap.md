@@ -2,23 +2,25 @@
 
 ## Responsibility
 
-Publishes ctxindex's bundled provider-neutral vocabularies: the `calendar.event@1`, `communication.message@1`, and `file@1` Profile definitions, schemas, standalone/reply Draft input unions, Ref/text/reply helpers, and public types.
+Publishes ctxindex's bundled provider-neutral Profile vocabularies: `calendar.event@1`, `communication.message@1`, and `file@1`, with their schemas, draft input unions, Ref/text/reply helpers, and public types.
 
-## Design/patterns
+## Design / patterns
 
-- Schema-first declarative Profiles are implemented in `packages/profiles/src/calendar-event.ts`, `communication-message.ts`, and `file.ts` using Zod and `defineProfile`.
-- `packages/profiles/src/index.ts` is the facade; `packages/profiles/package.json` also exposes `./calendar-event`, `./communication-message`, and `./file` subpaths.
-- Profile hooks project payloads into search fields/chunks, relations, artifacts, exports, and typed Actions while remaining provider-neutral and side-effect free; communication messages carry portable reply metadata (`references`, `replyTo`, and `replyToRef`).
+- `src/calendar-event.ts`, `communication-message.ts`, and `file.ts` implement schema-first declarative Profiles with Zod and `defineProfile`.
+- `src/index.ts` is the facade; `package.json` also exposes `./calendar-event`, `./communication-message`, and `./file` subpaths.
+- Profile hooks project payloads into search fields/chunks, relations, artifacts, exports, and typed Actions without provider-side effects. Communication messages carry portable reply and threading metadata.
 - Full symbol-level map: `packages/profiles/src/codemap.md`.
 
 ## Data & control flow
 
-1. Adapters produce payloads validated by `calendarEventSchema`, `communicationMessageSchema`, or `fileSchema`.
-2. Core invokes Profile search, relation, artifact, and export hooks while materializing or presenting resources.
-3. `communicationMessageDraftCreateInputSchema` and `communicationMessageDraftUpdateInputSchema` accept either strict standalone content or a strict `replyToRef` plus body, and exported helpers derive the reply recipient, normalized subject, and deduplicated RFC References before a supporting Adapter executes the Action; `chunkText` creates overlapping searchable file chunks.
+1. Adapters validate produced payloads with `calendarEventSchema`, `communicationMessageSchema`, or `fileSchema`.
+2. Core invokes Profile search, relation, artifact, export, and Action declarations while it materializes, indexes, presents, or acts on Resources.
+3. Communication-message draft schemas accept strict standalone content or strict reply content. Supporting Adapters use the exported helpers to derive reply recipient, normalized subject, and deduplicated RFC References; `chunkText` produces searchable file chunks.
 
 ## Integration points
 
-- Depends on `@ctxindex/extension-sdk` definition helpers and Zod; its package manifest owns build, quality, test, and clean/fullclean tasks dispatched by root Turbo commands.
-- `packages/adapters/src/builtins.ts` bundles all three Profiles: Google and Microsoft mailbox Adapters target `communication.message@1` and bind the same `communication.message.draft.create` and `communication.message.draft.update` Actions; Google and Microsoft calendar Adapters target `calendar.event@1`; the local-directory Adapter targets `file@1`.
-- Core registry, resource, search, relation, artifact, export, and Action services consume the Profile hooks through SDK contracts.
+- Depends on `@ctxindex/extension-sdk` definition helpers and Zod; its manifest owns build, quality, test, and clean/fullclean tasks dispatched by root Turbo commands.
+- `packages/adapters/src/builtins.ts` exposes built-in Extension roots whose Adapters target all three Profiles: Google and Microsoft mailbox Adapters target `communication.message@1`; Google and Microsoft calendar Adapters target `calendar.event@1`; local-directory targets `file@1`.
+- Google and Microsoft mailbox Adapters bind the same `communication.message.draft.create` and `communication.message.draft.update` Actions.
+- The local-directory Adapter targets `file@1`.
+- Core registry, resource, search, relation, artifact, export, and Action services consume Profile hooks through SDK contracts.

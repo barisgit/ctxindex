@@ -1,10 +1,12 @@
-import type { ExtensionAuthoringHost } from '@ctxindex/extension-sdk'
+import { defineExtension, defineProfile, z } from '@ctxindex/extension-sdk'
 
-export default function extension(host: ExtensionAuthoringHost) {
-  return host.defineExtension({
-    id: 'fixture.builtin',
-    version: 1,
-    profiles: [],
-    adapters: [],
-  })
-}
+const conflictProfile = defineProfile({
+  id: 'fixture.conflict',
+  version: 1,
+  schema: z.object({ value: z.string() }),
+})
+
+export default defineExtension({
+  id: 'fixture.builtin',
+  profiles: [conflictProfile],
+})

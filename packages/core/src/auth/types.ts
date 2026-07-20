@@ -1,6 +1,6 @@
 import type { UpsertAccountInput } from '../account'
 import type { Logger } from '../logger'
-import type { AdapterRegistry } from '../registry'
+import type { CompleteRegistry } from '../registry'
 import type { SecretsStore } from '../secrets'
 import type { CtxindexDatabase } from '../storage'
 
@@ -12,8 +12,7 @@ export interface GrantRow {
   readonly scopes: readonly string[]
   readonly accessTokenRef: string | null
   readonly refreshTokenRef: string | null
-  readonly clientIdRef: string | null
-  readonly clientSecretRef: string | null
+  readonly appConfigRef: string
   readonly expiresAt: number | null
   readonly createdAt: number
   readonly updatedAt: number
@@ -23,8 +22,7 @@ export interface AddGrantInput {
   readonly provider: string
   readonly account: Omit<UpsertAccountInput, 'provider'>
   readonly scopes: readonly string[]
-  readonly clientId: string
-  readonly clientSecret?: string
+  readonly appConfig: Readonly<Record<string, unknown>>
   readonly accessToken?: string
   readonly refreshToken: string
   readonly expiresAt?: number
@@ -39,7 +37,7 @@ export interface AuthDependencies {
   readonly db: CtxindexDatabase
   readonly store: SecretsStore
   readonly logger: Logger
-  readonly registry: AdapterRegistry
+  readonly registry: CompleteRegistry
   readonly readEnvironment?: (name: string) => string | undefined
   readonly now?: () => number
 }

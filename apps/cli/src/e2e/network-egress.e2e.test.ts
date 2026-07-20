@@ -5,7 +5,7 @@ import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { createSandbox } from '@ctxindex/core/testing'
 
-test('unknown client provider fails before network, secrets, or database creation', async () => {
+test('unknown OAuth App provider fails before network, secrets, or database creation', async () => {
   let calls = 0
   const server = createServer((_request, response) => {
     calls++
@@ -17,7 +17,7 @@ test('unknown client provider fails before network, secrets, or database creatio
   const sandbox = await createSandbox()
   try {
     const result = await sandbox.run(
-      ['client', 'add', 'unknown-provider', '--from-env'],
+      ['oauth-app', 'add', 'unknown-provider', 'work', '--from-env'],
       {
         env: {
           NODE_ENV: 'test',

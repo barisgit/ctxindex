@@ -20,7 +20,7 @@ function manifest(overrides: Record<string, unknown> = {}): unknown {
       {
         id: 'fixture.extension',
         version: 1,
-        source: { kind: 'inline', path: 'extension.ts' },
+        source: { kind: 'inline', path: 'extension-package' },
         setup: { path: 'SETUP.md' },
       },
     ],
@@ -49,7 +49,7 @@ describe('Catalog manifest schema', () => {
             id: 'fixture.extension',
             version: 1,
             scopes: ['mail.read'],
-            source: { kind: 'inline', path: 'extension.ts' },
+            source: { kind: 'inline', path: 'extension-package' },
           },
         ],
       },
@@ -63,7 +63,7 @@ describe('Catalog manifest schema', () => {
             version: 1,
             source: {
               kind: 'inline',
-              path: 'extension.ts',
+              path: 'extension-package',
               config: {},
             },
           },
@@ -80,7 +80,7 @@ describe('Catalog manifest schema', () => {
     const entry = {
       id: 'fixture.extension',
       version: 1,
-      source: { kind: 'inline', path: 'extension.ts' },
+      source: { kind: 'inline', path: 'extension-package' },
     }
     expect(() =>
       parseCatalogManifest(
@@ -96,7 +96,7 @@ describe('Catalog manifest schema', () => {
     const entry = {
       id: 'fixture.extension',
       version: 1,
-      source: { kind: 'inline', path: 'extension.ts' },
+      source: { kind: 'inline', path: 'extension-package' },
     }
     expect(() =>
       parseCatalogManifest(
@@ -109,12 +109,17 @@ describe('Catalog manifest schema', () => {
 })
 
 describe('Catalog snapshot validation', () => {
-  test('accepts normalized contained source and setup files', async () => {
+  test('accepts a normalized contained package root and setup file', async () => {
     const sandbox = await createSandbox()
     try {
       const root = join(sandbox.dir, 'snapshot')
       await mkdir(root, { recursive: true })
-      await writeFile(join(root, 'extension.ts'), 'export default () => ({})')
+      await mkdir(join(root, 'extension-package'))
+      await writeFile(
+        join(root, 'extension-package', 'package.json'),
+        '{"ctxindex":{"extensions":["./entry.ts"]}}',
+      )
+      await writeFile(join(root, 'extension-package', 'entry.ts'), 'export {}')
       await writeFile(join(root, 'SETUP.md'), 'Follow these steps.')
       await writeFile(
         join(root, 'ctxindex-catalog.json'),
@@ -132,10 +137,10 @@ describe('Catalog snapshot validation', () => {
     '/absolute.ts',
     '../escape.ts',
     'nested/../escape.ts',
-    './extension.ts',
-    'nested//extension.ts',
-    'nested\\extension.ts',
-    'extension.ts\0ignored',
+    './extension-package',
+    'nested//extension-package',
+    'nested\\extension-package',
+    'extension-package\0ignored',
     `${'a'.repeat(CATALOG_PATH_MAX_BYTES)}x`,
   ])('rejects unsafe source path %j', async (path) => {
     const sandbox = await createSandbox()
@@ -168,7 +173,11 @@ describe('Catalog snapshot validation', () => {
       const root = join(sandbox.dir, 'snapshot')
       await mkdir(root, { recursive: true })
       await writeFile(join(sandbox.dir, 'outside.ts'), 'outside')
-      await symlink(join(sandbox.dir, 'outside.ts'), join(root, 'extension.ts'))
+      await mkdir(join(sandbox.dir, 'outside-package'))
+      await symlink(
+        join(sandbox.dir, 'outside-package'),
+        join(root, 'extension-package'),
+      )
       await writeFile(
         join(root, 'ctxindex-catalog.json'),
         JSON.stringify(manifest()),
@@ -200,7 +209,7 @@ describe('Catalog snapshot validation', () => {
     try {
       const root = join(sandbox.dir, 'snapshot')
       await mkdir(root, { recursive: true })
-      await writeFile(join(root, 'extension.ts'), 'source')
+      await mkdir(join(root, 'extension-package'))
       await writeFile(
         join(root, 'SETUP.md'),
         'x'.repeat(CATALOG_SETUP_MAX_BYTES + 1),

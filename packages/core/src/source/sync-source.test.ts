@@ -31,11 +31,8 @@ async function setup(sync?: (context: SyncContext) => void | Promise<void>) {
   const adapter = sync
     ? defineAdapter({
         id: 'fake.sync',
-        version: 1,
         configSchema: z.object({ folder: z.string() }).strict(),
-        auth: { kind: 'none' },
-        providerApiHosts: ['provider.test'],
-        profiles: [{ id: 'fake.item', version: 1 }],
+        profiles: [profile],
         routing: 'indexed',
         capabilities: ['sync'],
         operations: { sync },
@@ -43,11 +40,8 @@ async function setup(sync?: (context: SyncContext) => void | Promise<void>) {
       })
     : defineAdapter({
         id: 'fake.sync',
-        version: 1,
         configSchema: z.object({ folder: z.string() }).strict(),
-        auth: { kind: 'none' },
-        providerApiHosts: ['provider.test'],
-        profiles: [{ id: 'fake.item', version: 1 }],
+        profiles: [profile],
         routing: 'indexed',
         capabilities: [],
         operations: {},
@@ -56,8 +50,6 @@ async function setup(sync?: (context: SyncContext) => void | Promise<void>) {
   const registry = createExtensionRegistry([
     defineExtension({
       id: 'fake.extension',
-      version: 1,
-      profiles: [profile],
       adapters: [adapter],
     }),
   ])
@@ -67,7 +59,7 @@ async function setup(sync?: (context: SyncContext) => void | Promise<void>) {
   await runMigrations(db)
   db.exec("INSERT INTO realms VALUES ('realm-1', 'work', 'Work', 1)")
   db.prepare(
-    "INSERT INTO sources (id, realm_id, adapter_id, adapter_version, label, config_json, created_at, updated_at) VALUES (?, 'realm-1', 'fake.sync', 1, ?, ?, 1, 1)",
+    "INSERT INTO sources (id, realm_id, adapter_id, label, config_json, created_at, updated_at) VALUES (?, 'realm-1', 'fake.sync', ?, ?, 1, 1)",
   ).run(sourceId, sourceId, JSON.stringify({ folder: '/tmp/root' }))
   return { db, registry }
 }
@@ -88,7 +80,6 @@ test('invokes the loaded public Adapter inside the lock with Source-bound contex
     })
     expect(context.mode).toBe('resync')
     expect(context.cursor).toBeNull()
-    await context.fetch('https://provider.test/resource')
     await context.emit({
       type: 'upsertResource',
       resource: {
@@ -113,7 +104,7 @@ test('invokes the loaded public Adapter inside the lock with Source-bound contex
     signal: new AbortController().signal,
     fetch,
   })
-  expect(fetchCalled).toBe(true)
+  expect(fetchCalled).toBe(false)
   expect(result.added).toBe(1)
 })
 

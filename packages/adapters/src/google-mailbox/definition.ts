@@ -2,6 +2,7 @@ import { defineAdapter } from '@ctxindex/extension-sdk'
 import {
   communicationMessageDraftCreateInputSchema,
   communicationMessageDraftUpdateInputSchema,
+  communicationMessageProfile,
 } from '@ctxindex/profiles'
 import { googleOAuthProvider } from '../google-oauth-provider'
 import { gmailSourceConfigSchema } from './config'
@@ -12,18 +13,16 @@ import { gmailSearchRemote } from './search-remote'
 
 export const gmailAdapterDefinition = defineAdapter({
   id: 'google.mailbox',
-  version: 1,
   configSchema: gmailSourceConfigSchema,
-  auth: {
-    kind: 'oauth2',
-    provider: googleOAuthProvider,
+  provider: googleOAuthProvider,
+  access: {
     scopes: [
       'https://www.googleapis.com/auth/gmail.readonly',
       'https://www.googleapis.com/auth/gmail.compose',
     ],
   },
   providerApiHosts: ['gmail.googleapis.com'],
-  profiles: [{ id: 'communication.message', version: 1 }],
+  profiles: [communicationMessageProfile],
   routing: 'federated',
   capabilities: ['search-remote', 'retrieve', 'download'],
   operations: {
@@ -33,17 +32,16 @@ export const gmailAdapterDefinition = defineAdapter({
   },
   actions: {
     'communication.message.draft.create': {
-      profile: { id: 'communication.message', version: 1 },
+      profile: communicationMessageProfile,
       input: communicationMessageDraftCreateInputSchema,
-      output: { id: 'communication.message', version: 1 },
+      output: communicationMessageProfile,
       run: gmailDraftCreate,
     },
     'communication.message.draft.update': {
-      profile: { id: 'communication.message', version: 1 },
+      profile: communicationMessageProfile,
       input: communicationMessageDraftUpdateInputSchema,
-      output: { id: 'communication.message', version: 1 },
+      output: communicationMessageProfile,
       run: gmailDraftUpdate,
     },
   },
-  docs: { summary: 'Google Mail (Gmail)' },
 })

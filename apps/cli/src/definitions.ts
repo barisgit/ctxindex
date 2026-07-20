@@ -1,10 +1,11 @@
-import { CTXINDEX_BUILTIN_EXTENSIONS } from '@ctxindex/adapters'
+import * as CTXINDEX_BUILTIN_MODULE from '@ctxindex/adapters'
 import { CatalogStore } from '@ctxindex/core/catalog'
-import { type CtxindexConfig, getEnv, readConfig } from '@ctxindex/core/config'
+import { type CtxindexConfig, readConfig } from '@ctxindex/core/config'
 import {
   type LoadExtensionsResult,
   loadExtensions,
 } from '@ctxindex/core/extension'
+import type { OAuthAppIdentity } from '@ctxindex/core/registry'
 import {
   describeRegistry,
   type RegistryDescription,
@@ -15,13 +16,23 @@ export interface CliDefinitions extends LoadExtensionsResult {
   readonly description: RegistryDescription
 }
 
-export async function loadCliDefinitions(): Promise<CliDefinitions> {
-  const config = await readConfig()
+export interface LoadCliDefinitionsOptions {
+  readonly config?: CtxindexConfig
+  readonly localOAuthAppIdentities?: readonly OAuthAppIdentity[]
+}
+
+export async function loadCliDefinitions(
+  options: LoadCliDefinitionsOptions = {},
+): Promise<CliDefinitions> {
+  const config = options.config ?? (await readConfig())
   const installed = await new CatalogStore().readInstalled()
   const loaded = await loadExtensions({
     config,
-    builtins: CTXINDEX_BUILTIN_EXTENSIONS,
+    builtins: CTXINDEX_BUILTIN_MODULE,
     installed,
+    ...(options.localOAuthAppIdentities === undefined
+      ? {}
+      : { localOAuthAppIdentities: options.localOAuthAppIdentities }),
   })
   return { ...loaded, config, description: describeRegistry(loaded.registry) }
 }
@@ -30,25 +41,6 @@ export function printExtensionDiagnostics(
   diagnostics: CliDefinitions['diagnostics'],
 ): void {
   for (const diagnostic of diagnostics) {
-    const message = redactExtensionDiagnostic(diagnostic.message)
-    console.error(`Extension ${diagnostic.path}: ${message}`)
+    console.error(`Extension ${diagnostic.path}: ${diagnostic.message}`)
   }
-}
-
-export function redactExtensionDiagnostic(
-  message: string,
-  canary = getEnv().CTXINDEX_LOG_CANARY_TOKEN,
-): string {
-  let redacted = message
-    .replace(
-      /(\bAuthorization["']?\s*[:=]\s*)(?:"Bearer\s+[^"]*"|'Bearer\s+[^']*'|Bearer\s+\S+|\S+)/gi,
-      '$1[Redacted]',
-    )
-    .replace(
-      /(\b(?:access[-_]?token|refresh[-_]?token|client[-_]?secret|password|api[-_]?key)\b["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,}]+)/gi,
-      '$1[Redacted]',
-    )
-    .replace(/(\bBearer\s+)\S+/gi, '$1[Redacted]')
-  if (canary) redacted = redacted.replaceAll(canary, '[Redacted]')
-  return redacted
 }

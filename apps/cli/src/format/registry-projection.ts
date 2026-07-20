@@ -4,21 +4,15 @@ export type RegistryView = 'compact' | 'detail' | 'full'
 
 function compactRegistryDescription(description: RegistryDescription) {
   return {
-    kinds: description.kinds.map(({ id, version, summary, aliases }) => ({
+    kinds: description.kinds.map(({ id, version }) => ({
       id,
       version,
-      ...(summary === undefined ? {} : { summary }),
-      aliases,
     })),
-    sources: description.sources.map(
-      ({ id, version, summary, routing, capabilities }) => ({
-        id,
-        version,
-        ...(summary === undefined ? {} : { summary }),
-        routing,
-        capabilities,
-      }),
-    ),
+    sources: description.sources.map(({ id, routing, capabilities }) => ({
+      id,
+      routing,
+      capabilities,
+    })),
     actions: description.actions.map(
       ({ id, profile, effect, output, adapters }) => ({
         id,

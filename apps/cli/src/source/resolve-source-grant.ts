@@ -4,21 +4,34 @@ import {
   providerIdForAuth,
 } from '@ctxindex/core/auth'
 import { CtxindexValidationError } from '@ctxindex/core/errors'
+import type { AnyAdapterDefinition } from '@ctxindex/extension-sdk'
 
-type AdapterAuth = Parameters<typeof isGrantCompatible>[0]
 export async function resolveSourceGrant(
   authService: AuthService,
-  auth: AdapterAuth,
+  adapter: AnyAdapterDefinition,
   account?: string,
 ): Promise<string | undefined> {
-  if (auth.kind === 'none') return undefined
+  const provider = adapter.provider
+  if (provider === undefined || provider.auth.kind === 'none') {
+    if (account !== undefined)
+      throw new CtxindexValidationError(
+        'invalid_filter',
+        `Adapter "${adapter.id}" does not accept an Account`,
+      )
+    return undefined
+  }
+  const auth = provider.auth
   if (auth.kind !== 'oauth2')
     throw new CtxindexValidationError(
       'invalid_filter',
       'Adapter authentication is not supported by this command',
     )
-  const provider = providerIdForAuth(auth)
-  const providerGrants = await authService.listGrants(provider ?? undefined)
+  const authorization = {
+    provider,
+    access: adapter.access ?? { scopes: [] },
+  }
+  const providerId = providerIdForAuth(authorization)
+  const providerGrants = await authService.listGrants(providerId)
   let grants = providerGrants
   if (account) {
     const byLabel = providerGrants.filter(
@@ -27,26 +40,23 @@ export async function resolveSourceGrant(
     const byAccountId = providerGrants.filter(
       (grant) => grant.accountId === account,
     )
-    const byGrantId = providerGrants.filter((grant) => grant.id === account)
     grants =
-      byLabel.length > 0
-        ? byLabel
-        : byAccountId.length > 0
-          ? byAccountId
-          : byGrantId
+      byLabel.length > 0 ? byLabel : byAccountId.length > 0 ? byAccountId : []
   }
-  const matches = grants.filter((grant) => isGrantCompatible(auth, grant))
+  const matches = grants.filter((grant) =>
+    isGrantCompatible(authorization, grant),
+  )
   if (matches.length === 0)
     throw new CtxindexValidationError(
       'invalid_filter',
       account
-        ? `no compatible Grant matches account "${account}"`
-        : `no compatible Grant available; run bun cli account add ${provider ?? '<provider>'}`,
+        ? `no compatible Account authorization matches "${account}"`
+        : `no compatible Account authorization available; run bun cli account add ${providerId ?? '<provider>'} --app <label>`,
     )
   if (matches.length > 1)
     throw new CtxindexValidationError(
       'invalid_filter',
-      `multiple compatible Grants available; choose one with --account <label|account-id|grant-id>: ${matches.map((grant) => grant.accountLabel ?? grant.accountId).join(', ')}`,
+      `multiple compatible Accounts available; choose one with --account <label|account-id>: ${matches.map((grant) => grant.accountLabel ?? grant.accountId).join(', ')}`,
     )
   return matches[0]?.id
 }

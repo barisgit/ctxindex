@@ -4,7 +4,7 @@
 Define Google Calendar Source selection, authorization, synchronization, normalization, and retrieval through generic calendar contracts.
 ## Requirements
 ### Requirement: Google Calendar Source selects one collection explicitly
-`google.calendar@1` SHALL be a bundled indexed Source Adapter for `calendar.event@1`. Its registry-derived configuration SHALL identify exactly one Google calendar, defaulting only to the provider's documented primary calendar identifier, and explicit positive past/future coverage days. One Source SHALL maintain one independent anchored window, cursor, manifest, and Resource namespace for that calendar.
+`google.calendar` SHALL be a bundled indexed Source Adapter for `calendar.event@1`. Its registry-derived configuration SHALL identify exactly one Google calendar, defaulting only to the provider's documented primary calendar identifier, and explicit positive past/future coverage days. One Source SHALL maintain one independent anchored window, cursor, manifest, and Resource namespace for that calendar.
 
 #### Scenario: Primary calendar Source is created
 - **WHEN** a compatible Google Grant and no explicit calendar id are supplied
@@ -69,4 +69,3 @@ Automated loopback tests SHALL cover paging, incremental updates/deletions, inva
 #### Scenario: Human live checkpoint is approved
 - **WHEN** the user explicitly completes Google consent and approves the bounded read check
 - **THEN** evidence records exact scopes and successful event discovery/retrieval with identifiers and secrets redacted and no provider mutation
-

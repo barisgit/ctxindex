@@ -6,9 +6,9 @@ Pure presentation and process-exit adapters for stable text, compact, Markdown, 
 
 ## Design / patterns
 
-- `client.ts` renders only provider, label, and timestamps plus lifecycle confirmations; secret refs/values never appear.
-- `account.ts` renders Accounts, stable Grants, and required Source labels; `source.ts` projects the single Source label field that replaced display name.
-- Registry renderers derive provider endpoints, declared client environment names, scopes, config flags, and Actions from loaded definitions. Text and Markdown Action renderers expand top-level `oneOf`/`anyOf` inputs into numbered branches, reusing object-field rendering so strict standalone and threaded-reply Draft alternatives expose their required fields, constraints, and additional-property policy.
+- `oauth-app.ts` renders only provider, label, origin, safe provenance, and lifecycle confirmations; config and secret refs/values never appear.
+- `account.ts` renders Accounts, authorization expiry state, and required Source labels without Grant identifiers or scopes; `source.ts` projects the single Source label field that replaced display name and omits internal Grant IDs from JSON.
+- Registry renderers derive Provider auth/registration metadata, Adapter access scopes, config flags, and Actions from loaded definitions. Text and Markdown Action renderers expand top-level `oneOf`/`anyOf` inputs into numbered branches.
 - Catalog formatters render deterministic persisted pins, entries, install/uninstall provenance, and loaded registry origins in text or JSON; acquisition timestamps remain intact and derived non-negative snapshot age is surfaced at formatting time.
 - `exit.ts` maps typed core errors to SPEC-stable numeric outcomes and `runWithExit` assigns `process.exitCode`.
 
@@ -18,4 +18,4 @@ Handlers supply domain values, formatters return strings, and handlers own stdou
 
 ## Integration points
 
-Used by commands and workflows under `client/`, `source/`, `sync/`, `action/`, and `artifact/`; inputs come from public core capabilities.
+Used by commands and workflows under `oauth-app/`, `source/`, `sync/`, `action/`, and `artifact/`; inputs come from public core capabilities.

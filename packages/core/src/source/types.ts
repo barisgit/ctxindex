@@ -12,7 +12,6 @@ export interface SourceRow {
   readonly realm_id: string
   readonly realm_slug?: string
   readonly adapter_id: string
-  readonly adapter_version: number
   readonly label: string
   readonly config_json: string | null
   readonly sync_enabled: boolean
@@ -35,7 +34,6 @@ export interface SourceRow {
 export interface AddSourceInput {
   readonly adapterId: string
   readonly realmSlug?: string
-  readonly adapterVersion?: number
   readonly label?: string
   readonly configJson?: string
   readonly grantId?: string

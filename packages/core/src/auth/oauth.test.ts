@@ -1,12 +1,13 @@
 import { afterEach, expect, test } from 'bun:test'
-import type { OAuthProviderSpec } from '@ctxindex/extension-sdk'
-import { testOAuthProvider } from '../testing/oauth-provider'
+import type { OAuthProviderDefinition } from '@ctxindex/extension-sdk'
 import {
   fetchOAuthIdentity,
   postOAuthToken,
   resolveInitialGrantedScopes,
+  resolveOAuthAppCredentials,
   resolveRefreshGrantedScopes,
 } from './oauth'
+import { testOAuthProvider } from './test-provider'
 
 const provider = testOAuthProvider({
   authorizationUrl: 'https://accounts.example.test/authorize',
@@ -56,6 +57,15 @@ test('provider host mismatch rejects before fetch', async () => {
   expect(calls).toBe(0)
 })
 
+test('missing persisted OAuth App config uses App vocabulary', () => {
+  expect(() => resolveOAuthAppCredentials({})).toThrow()
+  try {
+    resolveOAuthAppCredentials({})
+  } catch (error) {
+    expect(error).toMatchObject({ code: 'missing_oauth_app_config' })
+  }
+})
+
 test('declared identity paths use own properties and verified semantics', async () => {
   globalThis.fetch = (async () =>
     Response.json({
@@ -77,7 +87,13 @@ test('declared identity paths use own properties and verified semantics', async 
 
 test('scope response rules distinguish provider base scopes from operation scopes', () => {
   const selection = {
-    provider: { ...provider, baseScopes: ['offline_access', 'openid'] },
+    provider: {
+      ...provider,
+      auth: {
+        ...provider.auth,
+        baseScopes: ['offline_access', 'openid'],
+      },
+    },
     operationScopes: ['Mail.Read'],
     requestedScopes: ['Mail.Read', 'offline_access', 'openid'],
   }
@@ -114,17 +130,20 @@ test('scope response rules distinguish provider base scopes from operation scope
 test('verified identity false or missing skips while wrong type rejects', async () => {
   const declared = {
     ...provider,
-    identity: {
-      ...provider.identity,
-      identities: [
-        {
-          kind: 'email',
-          path: ['email'] as ['email'],
-          verifiedPath: ['verified'] as ['verified'],
-        },
-      ],
+    auth: {
+      ...provider.auth,
+      identity: {
+        ...provider.auth.identity,
+        identities: [
+          {
+            kind: 'email',
+            path: ['email'] as ['email'],
+            verifiedPath: ['verified'] as ['verified'],
+          },
+        ],
+      },
     },
-  } as OAuthProviderSpec
+  } as OAuthProviderDefinition
   for (const body of [
     { sub: 's', email: 'e', verified: false },
     { sub: 's', email: 'e' },
