@@ -234,6 +234,15 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
       }
     }
     expect(firstEnumerationJson.results).toHaveLength(50)
+    const firstEnumerationRequest = graph
+      .readRequests()
+      .find(({ pathname }) => pathname === '/v1.0/me/messages')
+    expect(
+      new URLSearchParams(firstEnumerationRequest?.search).get('$search'),
+    ).toBeNull()
+    expect(
+      new URLSearchParams(firstEnumerationRequest?.search).get('$filter'),
+    ).toBeNull()
     const enumerationContinuation =
       firstEnumerationJson.pagination.continuation ?? ''
     expect(firstEnumerationJson.pagination).toEqual({
@@ -308,11 +317,13 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
     expect(
       (JSON.parse(unreadEnumeration.stdout) as { results: unknown[] }).results,
     ).toHaveLength(28)
-    expect(
-      graph
-        .readRequests()
-        .find(({ pathname }) => pathname === '/v1.0/me/messages')?.search,
-    ).toContain('IsRead%3Afalse')
+    const unreadRequest = graph
+      .readRequests()
+      .find(({ pathname }) => pathname === '/v1.0/me/messages')
+    expect(new URLSearchParams(unreadRequest?.search).get('$search')).toBeNull()
+    expect(new URLSearchParams(unreadRequest?.search).get('$filter')).toBe(
+      'isRead eq false',
+    )
 
     graph.resetRequests()
     const invalidContinuation = await sandbox.run(

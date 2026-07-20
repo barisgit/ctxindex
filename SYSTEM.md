@@ -2,7 +2,7 @@
 
 > **NON-NORMATIVE — readable projection, not the contract.** If this document conflicts with a capability specification, `openspec/specs/<capability>/spec.md` wins.
 >
-> **Last refreshed:** 2026-07-19
+> **Last refreshed:** 2026-07-20
 >
 > **Sources consulted:** `README.md`; `CONTEXT.md`; all 18 canonical capability specs and all 19 sidecars present on 2026-07-19 (`core-model` has none); the `complete-microsoft-remote-mailbox-pagination`, `agent-orientation-guidance`, `add-git-extension-catalogs`, `add-threaded-reply-drafts`, and `add-docs-web-surface` delta specs; all four delta specs in `separate-sync-warning-error-accounting`; the `complete-microsoft-remote-mailbox-pagination`, `add-threaded-reply-drafts`, and `add-docs-web-surface` implementation artifacts; decisions D1–D22 in `docs/design/2026-07-13-context-access-layer.md`; `.agents/skills/repo-development/SKILL.md`; and current CLI help/registry output. Section 13 is the full index.
 
@@ -199,7 +199,7 @@ Both calendar Adapters emit `calendar.event@1`, sync one calendar in an anchored
 
 The calendar specs conflict on recurring Google identity: `calendar-context` describes one series Resource plus changed/cancelled exceptions, while `google-calendar-adapter` describes each expanded occurrence as a distinct stable Resource. This reference cannot choose; recurrence storage needs canonical clarification.
 
-`microsoft.mailbox@1` covers remote search and constrained enumeration, retrieval, conversation Relations, file attachments, exports, and Drafts. Exact `unread` booleans translate to the inverse Graph `IsRead` value and are verified again through the shared Profile. One invocation returns at most 50 messages and exposes an opaque continuation when Graph has another page; immutable Graph IDs and a bounded seen-id set preserve stable, non-duplicated Refs across moves and resumed pages. Shared contracts cover Gmail search/Actions, but no dedicated Gmail mailbox spec establishes provider transport details.
+`microsoft.mailbox@1` covers remote search and constrained enumeration, retrieval, conversation Relations, file attachments, exports, and Drafts. Match-all enumeration omits Graph `$search`; unread-only enumeration uses exact `isRead eq <bool>` filtering, while combined text/KQL plus unread uses documented message `$search` and exact local verification. Shared Profile extraction verifies the result again. One invocation returns at most 50 messages and exposes an exact-Source-and-query-bound opaque continuation when Graph has another page; immutable Graph IDs and a bounded seen-id set preserve stable, non-duplicated Refs across moves and resumed pages. Shared contracts cover Gmail search/Actions, but no dedicated Gmail mailbox spec establishes provider transport details.
 
 `local.directory` is unauthenticated and indexed, with one root and file Resources. Fine-grained scanner behavior should be discovered from the loaded registry: there is no dedicated local-directory ingestion specification. Likewise, Profile expressibility for tasks, files, communication, calendars, and external domains does not imply complete bundled Adapter coverage.
 

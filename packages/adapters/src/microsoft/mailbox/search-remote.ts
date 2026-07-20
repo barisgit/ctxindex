@@ -24,6 +24,7 @@ const pageSchema = z
   .passthrough()
 const continuationSchema = z.object({
   version: z.literal(1),
+  sourceId: z.string().min(1),
   nextLink: z.string().min(1),
   query: z.string().min(1),
   limit: z.number().int().min(1),
@@ -41,7 +42,7 @@ function escaped(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
 
-function kql(context: SearchContext): string {
+function kql(context: SearchContext): string | undefined {
   const parts: string[] = []
   if (context.query.text.trim()) parts.push(escaped(context.query.text.trim()))
   for (const field of context.query.fields ?? []) {
@@ -53,12 +54,10 @@ function kql(context: SearchContext): string {
     ) {
       parts.push(`from:${escaped(field.value.trim())}`)
     } else if (
-      field.name === 'unread' &&
-      field.type === 'boolean' &&
-      typeof field.value === 'boolean'
+      field.name !== 'unread' ||
+      field.type !== 'boolean' ||
+      typeof field.value !== 'boolean'
     ) {
-      parts.push(`IsRead:${field.value ? 'false' : 'true'}`)
-    } else {
       throw new CtxindexValidationError(
         'invalid_filter',
         `Microsoft mailbox remote search does not support field "${field.name}" with type "${field.type}"`,
@@ -69,15 +68,34 @@ function kql(context: SearchContext): string {
     parts.push(`received>=${graphDate(context.query.since)}`)
   if (context.query.until !== undefined)
     parts.push(`received<${graphDate(context.query.until, true)}`)
-  return `"${parts.length > 0 ? parts.join(' AND ') : '*'}"`
+  return parts.length > 0 ? `"${parts.join(' AND ')}"` : undefined
+}
+
+function unreadValue(context: SearchContext): boolean | undefined {
+  const value = context.query.fields?.find(
+    (field) => field.name === 'unread',
+  )?.value
+  return typeof value === 'boolean' ? value : undefined
+}
+
+function graphFilter(
+  context: SearchContext,
+  search: string | undefined,
+): string | undefined {
+  const unread = unreadValue(context)
+  return search === undefined && unread !== undefined
+    ? `isRead eq ${unread ? 'false' : 'true'}`
+    : undefined
 }
 
 function continuationQueryIdentity(
   context: SearchContext,
-  query: string,
+  search: string | undefined,
+  filter: string | undefined,
 ): string {
   return JSON.stringify({
-    query,
+    search: search ?? null,
+    filter: filter ?? null,
     text: context.query.text,
     fields: context.query.fields ?? [],
     since: context.query.since ?? null,
@@ -94,6 +112,7 @@ function invalidContinuation(reason = 'is malformed'): never {
 
 function decodeContinuation(
   value: string,
+  sourceId: string,
   query: string,
   limit: number,
 ): MicrosoftMailboxContinuation {
@@ -105,6 +124,7 @@ function decodeContinuation(
     )
     if (!parsed.success) invalidContinuation()
     if (
+      parsed.data.sourceId !== sourceId ||
       parsed.data.query !== query ||
       parsed.data.limit !== limit ||
       new Set(parsed.data.seenIds).size !== parsed.data.seenIds.length
@@ -129,6 +149,7 @@ function decodeContinuation(
 
 function encodeContinuation(
   nextLink: string,
+  sourceId: string,
   query: string,
   limit: number,
   seenIds: ReadonlySet<string>,
@@ -142,6 +163,7 @@ function encodeContinuation(
   return Buffer.from(
     JSON.stringify({
       version: 1,
+      sourceId,
       nextLink,
       query,
       limit,
@@ -182,6 +204,14 @@ function insideExactTimeBounds(
   )
 }
 
+function hasExactUnread(
+  message: ReturnType<typeof parseGraphMessage>,
+  context: SearchContext,
+): boolean {
+  const unread = unreadValue(context)
+  return unread === undefined || !message.isRead === unread
+}
+
 export async function microsoftMailboxSearchRemote(
   context: SearchContext,
 ): Promise<SearchRemoteResult> {
@@ -198,12 +228,14 @@ export async function microsoftMailboxSearchRemote(
       'invalid_filter',
       'Microsoft mailbox search bounds must be finite integers',
     )
-  const query = kql(context)
-  const queryIdentity = continuationQueryIdentity(context, query)
+  const search = kql(context)
+  const filter = graphFilter(context, search)
+  const queryIdentity = continuationQueryIdentity(context, search, filter)
   if (limit === 0) return { resources: [], warnings: [] }
   const continuation = context.query.continuation
     ? decodeContinuation(
         context.query.continuation,
+        context.source.id,
         queryIdentity,
         context.query.limit,
       )
@@ -213,7 +245,8 @@ export async function microsoftMailboxSearchRemote(
     next = continuation.nextLink
   } else {
     const initial = new URL(graphUrl('/me/messages'))
-    initial.searchParams.set('$search', query)
+    if (search !== undefined) initial.searchParams.set('$search', search)
+    if (filter !== undefined) initial.searchParams.set('$filter', filter)
     initial.searchParams.set('$top', String(limit))
     initial.searchParams.set(
       '$select',
@@ -254,6 +287,7 @@ export async function microsoftMailboxSearchRemote(
       if (
         seen.has(message.id) ||
         message.isDraft ||
+        !hasExactUnread(message, context) ||
         !insideExactTimeBounds(message, context)
       )
         continue
@@ -273,7 +307,13 @@ export async function microsoftMailboxSearchRemote(
     next = hasUnemittedEligibleMessage ? pageUrl : providerNext
   }
   const nextContinuation = next
-    ? encodeContinuation(next, queryIdentity, context.query.limit, seen)
+    ? encodeContinuation(
+        next,
+        context.source.id,
+        queryIdentity,
+        context.query.limit,
+        seen,
+      )
     : undefined
   const warnings = nextContinuation
     ? [

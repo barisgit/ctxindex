@@ -29,7 +29,7 @@ Search SHALL accept `--offset <n>` (a non-negative integer, default 0) for local
 ## ADDED Requirements
 
 ### Requirement: Exact-Source remote continuation
-Remote search SHALL accept an opaque `--continuation <token>` only with `--remote` and exactly one `--source`, and SHALL pass that token only to the selected Source's generic remote-search operation. Continuation MUST be rejected as invalid usage before provider I/O when it is empty or malformed for the selected Adapter, combined with `--offset` or `--local-only`, used without `--remote`, used without exactly one Source, or reused with a changed normalized query or limit. A single-Source remote result SHALL report deterministic JSON `pagination` containing `limit`, `hasMore`, and `continuation`, where `hasMore` is true exactly when continuation is non-null.
+Remote search SHALL accept an opaque `--continuation <token>` only with `--remote` and exactly one `--source`, and SHALL pass that token only to the selected Source's generic remote-search operation. Continuation MUST be rejected as invalid usage before provider I/O when it is empty or malformed for the selected Adapter, combined with `--offset` or `--local-only`, used without `--remote`, used without exactly one Source, or reused with a different exact Source, changed normalized query, or changed limit. A single-Source remote result SHALL report deterministic JSON `pagination` containing `limit`, `hasMore`, and `continuation`, where `hasMore` is true exactly when continuation is non-null.
 
 #### Scenario: Agent resumes one remote Source
 - **WHEN** an exact-Source remote result reports a non-null continuation and the caller repeats the same query, filters, and limit with that token

@@ -108,14 +108,14 @@ describe('Microsoft mailbox search', () => {
     expect(result.warnings).toEqual([])
   })
 
-  test('translates and returns exact unread booleans for query-less enumeration', async () => {
-    const searches: string[] = []
+  test('uses exact isRead filters without inventing match-all search syntax', async () => {
+    const requests: URL[] = []
     const providerFetch = (async (input: Parameters<typeof fetch>[0]) => {
-      const search = new URL(String(input)).searchParams.get('$search') ?? ''
-      searches.push(search)
+      const url = new URL(String(input))
+      requests.push(url)
       return Response.json({
         value: [
-          search.includes('IsRead:false')
+          url.searchParams.get('$filter') === 'isRead eq false'
             ? message('unread')
             : message('read', false, true),
         ],
@@ -143,9 +143,57 @@ describe('Microsoft mailbox search', () => {
       ),
     )
 
-    expect(searches).toEqual(['"IsRead:false"', '"IsRead:true"'])
+    expect(
+      requests.map((url) => ({
+        search: url.searchParams.get('$search'),
+        filter: url.searchParams.get('$filter'),
+      })),
+    ).toEqual([
+      { search: null, filter: 'isRead eq false' },
+      { search: null, filter: 'isRead eq true' },
+    ])
     expect(unread.resources[0]?.payload).toMatchObject({ unread: true })
     expect(read.resources[0]?.payload).toMatchObject({ unread: false })
+  })
+
+  test('uses supported text search and verifies unread locally when combined', async () => {
+    let requested: URL | undefined
+    const result = await operation()(
+      context(
+        {
+          text: 'quarterly',
+          limit: 5,
+          fields: [{ name: 'unread', type: 'boolean', value: true }],
+        },
+        (async (input: Parameters<typeof fetch>[0]) => {
+          requested = new URL(String(input))
+          return Response.json({
+            value: [message('read', false, true), message('unread')],
+          })
+        }) as unknown as typeof fetch,
+      ),
+    )
+
+    expect(requested?.searchParams.get('$search')).toBe('"quarterly"')
+    expect(requested?.searchParams.get('$filter')).toBeNull()
+    expect(result.resources.map(({ ref }) => ref)).toEqual([
+      `ctx://${sourceId.toUpperCase()}/message/unread`,
+    ])
+  })
+
+  test('omits search and filter for match-all enumeration', async () => {
+    let requested: URL | undefined
+    await operation()(
+      context({ text: '', limit: 5 }, (async (
+        input: Parameters<typeof fetch>[0],
+      ) => {
+        requested = new URL(String(input))
+        return Response.json({ value: [] })
+      }) as unknown as typeof fetch),
+    )
+
+    expect(requested?.searchParams.get('$search')).toBeNull()
+    expect(requested?.searchParams.get('$filter')).toBeNull()
   })
 
   test('rejects unsupported or malformed filters before I/O', async () => {
@@ -176,7 +224,7 @@ describe('Microsoft mailbox search', () => {
       message(`message-${index}`),
     )
     const first = await operation()(
-      context({ text: '*', limit: 100 }, (async (
+      context({ text: '', limit: 100 }, (async (
         input: Parameters<typeof fetch>[0],
         init?: RequestInit,
       ) => {
@@ -204,7 +252,7 @@ describe('Microsoft mailbox search', () => {
     const second = await operation()(
       context(
         {
-          text: '*',
+          text: '',
           limit: 100,
           continuation,
         },
@@ -265,7 +313,7 @@ describe('Microsoft mailbox search', () => {
     }) as unknown as typeof fetch
 
     const first = await operation()(
-      context({ text: '*', limit: 50 }, providerFetch),
+      context({ text: '', limit: 50 }, providerFetch),
     )
     expect(first.resources).toHaveLength(50)
     expect(first.continuation).toBeString()
@@ -275,7 +323,7 @@ describe('Microsoft mailbox search', () => {
     const second = await operation()(
       context(
         {
-          text: '*',
+          text: '',
           limit: 50,
           continuation,
         },
@@ -373,6 +421,34 @@ describe('Microsoft mailbox search', () => {
       ),
     ).catch((caught) => caught)
     expect(changedRequestedLimit).toMatchObject({ code: 'invalid_filter' })
+    expect(calls).toBe(0)
+  })
+
+  test('rejects continuation from another exact Source before I/O', async () => {
+    const first = await operation()(
+      context({ text: 'original', limit: 5 }, (async () =>
+        Response.json({
+          value: [],
+          '@odata.nextLink':
+            'https://graph.microsoft.com/v1.0/me/messages?$skiptoken=next',
+        })) as unknown as typeof fetch),
+    )
+    if (!first.continuation) throw new Error('missing continuation')
+
+    let calls = 0
+    const otherSource = {
+      ...context(
+        { text: 'original', limit: 5, continuation: first.continuation },
+        (async () => {
+          calls += 1
+          return Response.json({})
+        }) as unknown as typeof fetch,
+      ),
+      source: { id: '01kxhbnecdah1t4mj38x88epfk', config: {} },
+    }
+
+    const error = await operation()(otherSource).catch((caught) => caught)
+    expect(error).toMatchObject({ code: 'invalid_filter' })
     expect(calls).toBe(0)
   })
 

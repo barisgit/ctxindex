@@ -201,10 +201,7 @@ function messageMatchesSearch(
   const searchable = `${message.subject} ${message.bodyPreview}`.toLowerCase()
   return expression.split(' AND ').every((rawClause) => {
     const clause = rawClause.trim()
-    if (!clause || clause === '*') return true
-    const isRead = /^IsRead:(true|false)$/i.exec(clause)
-    if (isRead?.[1])
-      return (message.isRead ?? false) === (isRead[1].toLowerCase() === 'true')
+    if (!clause) return true
     const sender = /^from:(.+)$/i.exec(clause)
     if (sender?.[1]) {
       return message.from.address.toLowerCase() === sender[1].toLowerCase()
@@ -219,6 +216,16 @@ function messageMatchesSearch(
     }
     return searchable.includes(clause.replace(/\\([\\"])/g, '$1').toLowerCase())
   })
+}
+
+function messageMatchesFilter(
+  message: MockGraphMessage,
+  rawFilter: string | null,
+): boolean {
+  if (!rawFilter) return true
+  const isRead = /^isRead eq (true|false)$/.exec(rawFilter)
+  if (!isRead?.[1]) return false
+  return (message.isRead ?? false) === (isRead[1] === 'true')
 }
 
 function attachmentMetadata(attachment: MockGraphAttachment) {
@@ -713,6 +720,19 @@ export function startMockGraph(
       }
 
       if (url.pathname === '/v1.0/me/messages' && request.method === 'GET') {
+        const rawSearch = url.searchParams.get('$search')
+        const rawFilter = url.searchParams.get('$filter')
+        if (
+          (rawSearch !== null && rawFilter !== null) ||
+          rawSearch === '"*"' ||
+          /IsRead:/i.test(rawSearch ?? '') ||
+          (rawFilter !== null && !/^isRead eq (?:true|false)$/.test(rawFilter))
+        ) {
+          return Response.json(
+            { error: 'unsupported_message_query' },
+            { status: 400 },
+          )
+        }
         if (
           options.searchBarrierCount &&
           searchArrivals < options.searchBarrierCount
@@ -730,8 +750,10 @@ export function startMockGraph(
         const rawOffset = Number(url.searchParams.get('$skiptoken') ?? '0')
         if (!Number.isInteger(rawOffset) || rawOffset < 0)
           return Response.json({ error: 'invalid_skiptoken' }, { status: 400 })
-        const matching = messages.filter((message) =>
-          messageMatchesSearch(message, url.searchParams.get('$search')),
+        const matching = messages.filter(
+          (message) =>
+            messageMatchesSearch(message, rawSearch) &&
+            messageMatchesFilter(message, rawFilter),
         )
         const nextOffset = rawOffset + pageSize
         const nextLink = new URL(url)
