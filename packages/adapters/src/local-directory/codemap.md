@@ -6,7 +6,7 @@ Implements the `local.directory` indexed adapter: validates source configuration
 
 ## Design/patterns
 
-- `config.ts` defines the strict `localDirectorySourceConfigSchema` and `DEFAULT_SIZE_CAP_BYTES`; `definition.ts` owns `localDirectoryAdapterDefinition`.
+- `config.ts` defines the strict `localDirectorySourceConfigSchema` and `DEFAULT_SIZE_CAP_BYTES`; `definition.ts` owns `localDirectoryAdapterDefinition`, directly binds `fileProfile`, and deliberately declares no Provider because filesystem access needs no Grant.
 - `walker.ts` is a deterministic, non-following filesystem walker. `walkDirectory()` composes built-in ignores, root `.gitignore`, configured excludes, and `.ctxindexignore`, applies optional includes, rejects symlinks/path escapes, and records uncertain prefixes instead of treating inaccessible paths as deleted.
 - `reader.ts` uses a snapshot/check pattern: `readLocalFile()` opens with `O_NOFOLLOW`, compares pre/post metadata, enforces the size cap, rejects binary or invalid UTF-8 content, and computes a SHA-256 content hash.
 - `ref.ts` reuses the file Profile's normalized relative-path predicate, preserves its thrown Error interface, and creates canonical `ctx://<SOURCE>/file/<encoded-path>` references. `order.ts` supplies code-point ordering for reproducible traversal, emissions, and cursors.

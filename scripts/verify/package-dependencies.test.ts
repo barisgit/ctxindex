@@ -89,6 +89,69 @@ test('applications may depend on public packages but not on sibling applications
   ])
 })
 
+test('applications may declare bundled source imports as development dependencies', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'packages/core/package.json'),
+    JSON.stringify({ name: '@ctxindex/core', dependencies: {} }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'packages/core/src/index.ts'),
+    'export {}',
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/cli/package.json'),
+    JSON.stringify({
+      name: 'ctxindex',
+      dependencies: { keytar: '7.9.0' },
+      devDependencies: {
+        '@ctxindex/core': 'workspace:*',
+        citty: 'latest',
+      },
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/cli/src/index.ts'),
+    "import '@ctxindex/core'; import 'citty'; import 'keytar'",
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([])
+})
+
+test('example packages may use public packages as runtime or test dependencies', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'package.json'),
+    JSON.stringify({ workspaces: ['packages/*', 'examples/*'] }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'packages/extension-sdk/package.json'),
+    JSON.stringify({ name: '@ctxindex/extension-sdk', dependencies: {} }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'packages/core/package.json'),
+    JSON.stringify({ name: '@ctxindex/core', dependencies: {} }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'examples/demo/package.json'),
+    JSON.stringify({
+      name: '@ctxindex/example-demo',
+      dependencies: { '@ctxindex/extension-sdk': 'workspace:*' },
+      devDependencies: { '@ctxindex/core': 'workspace:*' },
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'examples/demo/index.ts'),
+    "import '@ctxindex/extension-sdk'",
+  )
+  await writeFixture(
+    join(fixtureRoot, 'examples/demo/index.test.ts'),
+    "import '@ctxindex/core'",
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([])
+})
+
 async function writeFixture(path: string, content: string): Promise<void> {
   await mkdir(join(path, '..'), { recursive: true })
   await writeFile(path, content)
@@ -150,6 +213,28 @@ test('discovers package files under apps/* and packages/* without a source allow
     'apps/cli/tests/colocated.test.ts',
     'packages/core/extra/nested.mts',
   ])
+})
+
+test('does not attribute a nested fixture package to its containing workspace', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'apps/cli/package.json'),
+    JSON.stringify({ name: '@fixture/cli', dependencies: {} }),
+  )
+  await writeFixture(join(fixtureRoot, 'apps/cli/src/main.ts'), 'export {}')
+  await writeFixture(
+    join(fixtureRoot, 'apps/cli/fixtures/external/package.json'),
+    JSON.stringify({
+      name: '@fixture/external',
+      dependencies: { 'external-only': 'latest' },
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/cli/fixtures/external/index.ts'),
+    "import 'external-only'",
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([])
 })
 
 test('extracts static, re-export, dynamic import, and require specifiers only from syntax', () => {
@@ -235,6 +320,209 @@ test('rejects undeclared and unused runtime dependencies', async () => {
       type: 'unused-dependency',
       packageName: '@ctxindex/extension-sdk',
       dependency: 'unused',
+    },
+  ])
+})
+
+test('checks web workspaces and reports ordinary undeclared imports', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/package.json'),
+    JSON.stringify({ name: 'web', dependencies: { next: 'latest' } }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/app/page.tsx'),
+    "import Link from 'next/link'; import 'undeclared-web-package'; export default Link",
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([
+    {
+      type: 'undeclared-dependency',
+      packageName: 'web',
+      dependency: 'undeclared-web-package',
+    },
+  ])
+})
+
+test('accepts web aliases, generated directories, framework imports, and declared peers', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/package.json'),
+    JSON.stringify({
+      name: 'web',
+      dependencies: {
+        'fumadocs-core': 'latest',
+        'lucide-react': 'latest',
+        next: 'latest',
+        react: 'latest',
+        'react-dom': 'latest',
+      },
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/tsconfig.json'),
+    JSON.stringify({
+      compilerOptions: {
+        paths: { '@/*': ['./*'], 'collections/*': ['./.source/*'] },
+      },
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/app/page.tsx'),
+    [
+      "import Link from 'next/link'",
+      "import { lucideIconsPlugin } from 'fumadocs-core/source/lucide-icons'",
+      "import local from '@/lib/local'",
+      "import generated from 'collections/server'",
+      "import type { MDXComponents } from 'mdx/types'",
+      'lucideIconsPlugin()',
+      'export default <Link href={local}>{generated as unknown as MDXComponents}</Link>',
+    ].join('\n'),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/.next/types/generated.ts'),
+    "import 'generated-only-package'",
+  )
+  await writeFixture(
+    join(fixtureRoot, 'node_modules/next/package.json'),
+    JSON.stringify({
+      name: 'next',
+      peerDependencies: { react: '*', 'react-dom': '*' },
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'node_modules/fumadocs-core/package.json'),
+    JSON.stringify({
+      name: 'fumadocs-core',
+      peerDependencies: { 'lucide-react': '*' },
+      peerDependenciesMeta: { 'lucide-react': { optional: true } },
+    }),
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([])
+})
+
+test('matches exact aliases without suppressing package-name prefixes', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/package.json'),
+    JSON.stringify({ name: 'web', dependencies: {} }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/tsconfig.json'),
+    JSON.stringify({ compilerOptions: { paths: { react: ['./shim.ts'] } } }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/app/page.ts'),
+    "import local from 'react'; import external from 'react-dom'; export { local, external }",
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([
+    {
+      type: 'undeclared-dependency',
+      packageName: 'web',
+      dependency: 'react-dom',
+    },
+  ])
+})
+
+test('reads local aliases from valid commented and trailing-comma tsconfig JSONC', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/package.json'),
+    JSON.stringify({ name: 'web', dependencies: {} }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/tsconfig.json'),
+    `{
+      // TypeScript configuration files use JSONC.
+      "compilerOptions": {
+        "paths": { "@/*": ["./*"] },
+      },
+    }`,
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/app/page.ts'),
+    "import local from '@/lib/local'; export default local",
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([])
+})
+
+test('does not exempt aliases targeting node_modules or sibling applications', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'apps/worker/package.json'),
+    JSON.stringify({ name: '@fixture/worker', dependencies: {} }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/worker/src/index.ts'),
+    'export const worker = true',
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/package.json'),
+    JSON.stringify({ name: 'web', dependencies: {} }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/tsconfig.json'),
+    JSON.stringify({
+      compilerOptions: {
+        baseUrl: '..',
+        paths: {
+          'external/*': ['web/node_modules/external/*'],
+          '@fixture/worker/*': ['worker/*'],
+        },
+      },
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/app/page.ts'),
+    "import 'external/value'; import '@fixture/worker/runtime'",
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([
+    {
+      type: 'undeclared-dependency',
+      packageName: 'web',
+      dependency: '@fixture/worker',
+    },
+    {
+      type: 'undeclared-dependency',
+      packageName: 'web',
+      dependency: 'external',
+    },
+    {
+      type: 'workspace-direction',
+      packageName: 'web',
+      dependency: '@fixture/worker',
+    },
+  ])
+})
+
+test('does not treat unrelated optional framework peers as used', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/package.json'),
+    JSON.stringify({
+      name: 'web',
+      dependencies: {
+        next: 'latest',
+        react: 'latest',
+        'react-dom': 'latest',
+        sass: 'latest',
+      },
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'apps/web/app/page.ts'),
+    "import Link from 'next/link'; export default Link",
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([
+    {
+      type: 'unused-dependency',
+      packageName: 'web',
+      dependency: 'sass',
     },
   ])
 })

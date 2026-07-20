@@ -106,7 +106,6 @@ export function formatSources(
       rootPath: rootPath(source),
       configJson: source.config_json,
       syncEnabled: source.sync_enabled,
-      ...(source.grant_id !== undefined ? { grantId: source.grant_id } : {}),
       createdAt: source.created_at,
       availability: source.availability,
       lastStatus: source.last_status ?? null,

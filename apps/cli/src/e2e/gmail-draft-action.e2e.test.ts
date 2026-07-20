@@ -64,12 +64,13 @@ async function initialize(
   expect(init.exitCode, init.stderr).toBe(0)
   const realm = await sandbox.run(['realm', 'add', 'mail'])
   expect(realm.exitCode, realm.stderr).toBe(0)
-  const client = await sandbox.run(['client', 'add', 'google', '--from-env'], {
-    env,
-  })
-  expect(client.exitCode, client.stderr).toBe(0)
+  const app = await sandbox.run(
+    ['oauth-app', 'add', 'google', 'google', '--from-env'],
+    { env },
+  )
+  expect(app.exitCode, app.stderr).toBe(0)
   const account = await sandbox.run(
-    ['account', 'add', 'google', '--label', 'gmail'],
+    ['account', 'add', 'google', '--app', 'google', '--label', 'gmail'],
     { env },
   )
   expect(account.exitCode, account.stderr).toBe(0)
@@ -152,7 +153,7 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
         sources: [
           {
             id: sourceId,
-            adapter: { id: 'google.mailbox', version: 1 },
+            adapter: { id: 'google.mailbox' },
             available: true,
           },
         ],

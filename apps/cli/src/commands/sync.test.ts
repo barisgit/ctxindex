@@ -27,7 +27,6 @@ function source(id: string, adapterId = 'sync.adapter', syncEnabled = true) {
     id,
     realm_id: 'realm-1',
     adapter_id: adapterId,
-    adapter_version: 1,
     label: id,
     config_json: '{}',
     sync_enabled: syncEnabled,
@@ -61,12 +60,11 @@ function harness(input: {
     registry: {
       profiles: {},
       adapters: {
-        get: ({ id }: { id: string; version: number }) => {
+        get: ({ id }: { id: string }) => {
           const entry = input.adapters?.[id] ?? { sync: true }
           if (!entry) return undefined
           return {
             id,
-            version: 1,
             capabilities: entry.sync ? ['sync'] : ['retrieve'],
             operations: entry.sync ? { sync() {} } : {},
           }

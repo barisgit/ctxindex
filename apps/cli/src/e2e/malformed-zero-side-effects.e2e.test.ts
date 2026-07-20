@@ -4,7 +4,7 @@ import { createSandbox } from '@ctxindex/core/testing'
 
 const malformedCommands = [
   ['account', 'list', '--client-secret', 'malformed-secret-canary'],
-  ['client', 'add', 'google', '--from-env', '--unknown-client-flag'],
+  ['oauth-app', 'add', 'google', 'google', '--from-env', '--unknown-app-flag'],
   ['account', 'add', 'google', '--unknown-account-flag'],
   ['auth'],
   [
@@ -56,7 +56,7 @@ test('malformed commands perform zero auth, network, or storage work', async () 
       expect(result.exitCode, `${args.join(' ')}\n${result.stderr}`).toBe(2)
       if (args[0] === 'auth') {
         expect(result.stderr).toContain('Unknown command')
-        expect(result.stdout).toContain('ctxindex init|account|client')
+        expect(result.stdout).toContain('ctxindex init|account|oauth-app')
         expect(result.stdout).not.toContain('init|auth|')
       } else {
         expect(result.stdout).toBe('')

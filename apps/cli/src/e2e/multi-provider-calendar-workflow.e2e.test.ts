@@ -190,23 +190,39 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
       expect(result.exitCode, result.stderr).toBe(0)
     }
 
-    const googleClient = await sandbox.run(
-      ['client', 'add', 'google', '--from-env'],
+    const googleApp = await sandbox.run(
+      ['oauth-app', 'add', 'google', 'google', '--from-env'],
       { env: googleAuthEnv },
     )
-    expect(googleClient.exitCode, googleClient.stderr).toBe(0)
+    expect(googleApp.exitCode, googleApp.stderr).toBe(0)
     const googleAuth = await sandbox.run(
-      ['account', 'add', 'google', '--label', 'personal-google'],
+      [
+        'account',
+        'add',
+        'google',
+        '--app',
+        'google',
+        '--label',
+        'personal-google',
+      ],
       { env: googleAuthEnv },
     )
     expect(googleAuth.exitCode, googleAuth.stderr).toBe(0)
-    const microsoftClient = await sandbox.run(
-      ['client', 'add', 'microsoft', '--from-env'],
+    const microsoftApp = await sandbox.run(
+      ['oauth-app', 'add', 'microsoft', 'microsoft', '--from-env'],
       { env: microsoftAuthEnv },
     )
-    expect(microsoftClient.exitCode, microsoftClient.stderr).toBe(0)
+    expect(microsoftApp.exitCode, microsoftApp.stderr).toBe(0)
     const microsoftAuth = await sandbox.run(
-      ['account', 'add', 'microsoft', '--label', 'work-microsoft'],
+      [
+        'account',
+        'add',
+        'microsoft',
+        '--app',
+        'microsoft',
+        '--label',
+        'work-microsoft',
+      ],
       { env: microsoftAuthEnv },
     )
     expect(microsoftAuth.exitCode, microsoftAuth.stderr).toBe(0)
@@ -347,7 +363,13 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
     }
 
     const allSearch = await sandbox.run(
-      ['search', 'Cross-provider planning', '--kind', 'events', '--json'],
+      [
+        'search',
+        'Cross-provider planning',
+        '--kind',
+        'calendar.event',
+        '--json',
+      ],
       { env: baseEnv },
     )
     expect(allSearch.exitCode, allSearch.stderr).toBe(0)
@@ -376,7 +398,7 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
           '--realm',
           realm,
           '--kind',
-          'events',
+          'calendar.event',
           '--json',
         ],
         { env: baseEnv },
@@ -416,7 +438,7 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
         'search',
         'Cross-provider planning',
         '--kind',
-        'events',
+        'calendar.event',
         '--field',
         'startTimeZone=Europe/London',
         '--json',

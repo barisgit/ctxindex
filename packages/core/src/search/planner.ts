@@ -80,7 +80,6 @@ interface SourcePlanRow {
   readonly id: string
   readonly realm_slug: string
   readonly adapter_id: string
-  readonly adapter_version: number
   readonly config_json: string
   readonly sync_enabled: number
   readonly search_routing: SearchRouting | null
@@ -345,7 +344,7 @@ export class SearchPlanner {
   ): SourcePlanRow[] {
     const rows = this.deps.db
       .prepare<SourcePlanRow, []>(`
-      SELECT s.id, r.slug AS realm_slug, s.adapter_id, s.adapter_version,
+      SELECT s.id, r.slug AS realm_slug, s.adapter_id,
              s.config_json, s.sync_enabled, s.search_routing, sss.last_status,
              sr.status AS last_run_status
       FROM sources s
@@ -372,10 +371,7 @@ export class SearchPlanner {
       if (sourceIds.length > 0 && !sourceIds.includes(row.id)) return false
       if (input.adapterId !== undefined && row.adapter_id !== input.adapterId)
         return false
-      const adapter = this.deps.registry.adapters.get({
-        id: row.adapter_id,
-        version: row.adapter_version,
-      })
+      const adapter = this.deps.registry.adapters.get({ id: row.adapter_id })
       return (
         adapter === undefined ||
         kind === undefined ||
@@ -389,15 +385,12 @@ export class SearchPlanner {
     input: SearchPlannerInput,
     warnings: SearchPlannerWarning[],
   ): PlannedSource {
-    const adapter = this.deps.registry.adapters.get({
-      id: row.adapter_id,
-      version: row.adapter_version,
-    })
+    const adapter = this.deps.registry.adapters.get({ id: row.adapter_id })
     if (!adapter) {
       warnings.push({
         sourceId: row.id,
         code: 'extension_unavailable',
-        message: `Source "${row.id}" uses unavailable Adapter ${row.adapter_id}@${row.adapter_version}`,
+        message: `Source "${row.id}" uses unavailable Adapter ${row.adapter_id}`,
       })
       const remoteOnly = input.remote === true
       return {
@@ -425,7 +418,7 @@ export class SearchPlanner {
         warnings.push({
           sourceId: row.id,
           code: 'stale_search_routing',
-          message: `Stored search routing ${row.search_routing} is incompatible with Adapter ${adapter.id}@${adapter.version}; using ${adapter.routing}`,
+          message: `Stored search routing ${row.search_routing} is incompatible with Adapter ${adapter.id}; using ${adapter.routing}`,
         })
       }
     }

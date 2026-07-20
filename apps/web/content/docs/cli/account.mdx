@@ -1,0 +1,34 @@
+---
+title: ctxindex account
+description: Authorize, list, and remove provider Accounts.
+---
+
+An Account is one stable authenticated provider identity. Its private authorization may back multiple Sources.
+
+## Usage
+
+```sh
+ctxindex account add <provider> --app <label> [--label <label>]
+ctxindex account list [--json]
+ctxindex account remove <label>
+```
+
+## Commands and flags
+
+| Command or flag | Purpose |
+| --- | --- |
+| `add <provider>` | Start explicit OAuth authorization for one provider Account. This may open a browser. |
+| `--app <label>` | Select exactly one available OAuth App for that Provider. This is required. |
+| `--label <label>` | Set the globally unique Account label. The verified provider identity is the default. |
+| `list` | List Accounts with authorization health and bound Sources. |
+| `remove <label>` | Remove the Account and its private authorization. Bound Sources remain configured and become `needs_auth`. |
+
+Use `ctxindex oauth-app list` to discover exact labels. Reauthorizing the same provider identity updates its stable Account and private authorization snapshot in place. Labels remain verbatim; collisions fail without prompting or automatic suffixes.
+
+## JSON output
+
+Only `account list` accepts `--json`. Its deterministic inventory includes Account identity, label, Provider, authorization expiry, and bound Sources while excluding private Grant ids/scopes and secret values.
+
+<Callout title="Stable exit codes">
+Exit codes are API: `0` success; `2` invalid usage or a label collision; `10` `needs_auth`; `20` rate limited; `30` network/provider; `40` permission denied; `50` other sync failure; `130` cancelled by SIGINT.
+</Callout>

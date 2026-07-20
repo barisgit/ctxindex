@@ -1,0 +1,77 @@
+---
+title: CLI reference
+description: Complete command index for the deterministic ctxindex CLI.
+---
+
+The CLI is the integration surface for ctxindex. Installed builds use `ctxindex`; from the repository root, use `bun cli` instead.
+
+```sh
+ctxindex --help
+# Development checkout
+bun cli --help
+```
+
+<Callout title="Discover registry-defined options">
+Profiles, kinds, fields, export formats, Actions, and Adapter configuration come from the loaded registry. Use `ctxindex describe` for the current vocabulary instead of assuming provider-specific values.
+</Callout>
+
+## Commands
+
+| Command | Purpose | `--json` |
+| --- | --- | --- |
+| `ctxindex init` | Initialize config, data, state, cache, logs, and SQLite. | No |
+| `ctxindex account add` | Authorize a provider Account. | No |
+| `ctxindex account list` | List Accounts with authorization health and bound Sources. | Yes |
+| `ctxindex account remove` | Remove an Account and its Grant. | No |
+| `ctxindex oauth-app add` | Persist a local OAuth App from Provider-declared environment variables. | No |
+| `ctxindex oauth-app list` | List available Extension and local OAuth Apps safely. | Yes |
+| `ctxindex oauth-app remove` | Remove a local OAuth App. | No |
+| `ctxindex describe` | Inspect loaded Profiles, Adapters, and Actions. | Yes |
+| `ctxindex extensions list` | List loaded Extensions. | Yes |
+| `ctxindex extensions catalog add` | Trust and add a pinned Git Catalog. | Yes |
+| `ctxindex extensions catalog list` | Refresh and list merged local Catalog entries. | Yes |
+| `ctxindex extensions catalog show` | Refresh and inspect a Catalog or exact Extension entry. | Yes |
+| `ctxindex extensions catalog refresh` | Refresh one Catalog snapshot. | Yes |
+| `ctxindex extensions catalog remove` | Remove an unused Catalog. | Yes |
+| `ctxindex extensions install` | Trust and install an exact Catalog Extension. | Yes |
+| `ctxindex extensions uninstall` | Uninstall an exact Catalog Extension. | Yes |
+| `ctxindex action describe` | Inspect a typed Action and Source availability. | Yes |
+| `ctxindex action run` | Validate and run a typed Action through one Source. | Yes |
+| `ctxindex artifact list` | List Artifact descriptors for a Resource. | Yes |
+| `ctxindex artifact download` | Download Artifact bytes into the managed cache. | Yes |
+| `ctxindex purge artifacts` | Remove managed Artifact cache state. | Yes |
+| `ctxindex realm add` | Create a Realm. | No |
+| `ctxindex realm list` | List Realms. | Yes |
+| `ctxindex source add` | Configure a Source in a Realm. | No |
+| `ctxindex source list` | List Sources. | Yes |
+| `ctxindex source remove` | Remove a Source. | No |
+| `ctxindex sync` | Synchronize one or all Sources. | Yes |
+| `ctxindex get` | Retrieve a Resource by exact Ref. | Yes |
+| `ctxindex export` | Stream a Profile export. | Use `--format json` |
+| `ctxindex thread get` | Traverse a local Resource thread. | Yes |
+| `ctxindex search` | Search Resources across selected Sources. | Yes |
+| `ctxindex status` | Show last sync status. | Yes |
+| `ctxindex secrets status` | Inspect safe secret-backend status. | Yes |
+| `ctxindex secrets backend set` | Move secrets to the selected backend. | No |
+| `ctxindex skills list` | List bundled skills. | Yes |
+| `ctxindex skills get` | Print one bundled skill. | Yes |
+| `ctxindex skills path` | Print the bundled-skills location. | No |
+
+## Machine-readable output
+
+Commands that expose `--json` write JSON to stdout and diagnostics to stderr. Prefer it in scripts and agent calls. `export` is a byte-stream command: select its always-available JSON representation with `--format json` rather than `--json`.
+
+## Exit codes
+
+Exit codes are a stable API. Callers should branch on the code instead of parsing diagnostic text.
+
+| Exit | Meaning |
+| ---: | --- |
+| `0` | Success |
+| `2` | Invalid usage |
+| `10` | `needs_auth` |
+| `20` | Rate limited |
+| `30` | Network or provider failure |
+| `40` | Permission denied |
+| `50` | Other sync failure |
+| `130` | Cancelled by SIGINT |

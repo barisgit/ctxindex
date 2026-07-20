@@ -1,0 +1,52 @@
+---
+title: ctxindex search
+description: Search Resources across local projections and remote-capable Sources.
+---
+
+Search accepts query text, filters, or both. With no query, at least one filter is required and the search remains local.
+
+## Usage
+
+```sh
+ctxindex search [options] [query]
+```
+
+## Selection and filtering
+
+| Flag | Purpose |
+| --- | --- |
+| `--realm <realm>` | Select one exact Realm slug. Omit it to search all Realms. |
+| `--adapter <adapter>` | Restrict by Adapter ID. |
+| `--source <source>` | Select an exact Source label or ID. |
+| `--kind <kind>` | Filter by a Profile ID or declared alias. |
+| `--field <name=value>` | Apply a typed equality filter declared by the Profile. |
+| `--since <date>` | Set the start ISO date. |
+| `--until <date>` | Set the end ISO date. |
+| `--include-deleted` | Include deleted local Resources. |
+
+## Routing and pagination
+
+| Flag | Purpose |
+| --- | --- |
+| `--local-only` | Search local projections only. |
+| `--remote` | Search remote-capable Sources only. A query is required. |
+| `--explain` | Report each Source's route, search legs, coverage, and degradation. |
+| `--limit <number>` | Limit result count. |
+| `--offset <number>` | Set local pagination offset. Remote and mixed query searches reject it. |
+
+Routing precedence is CLI override, then per-Source configuration, then the Adapter decision. Mixed local and remote results are interleaved and deduplicated by Ref; a remote failure can become a warning while local results survive.
+
+## Output flags
+
+| Flag | Purpose |
+| --- | --- |
+| `--refs` | Print Resource Refs only. |
+| `--json` | Print deterministic JSON. |
+
+## JSON output
+
+`search --json` returns `results`, `warnings`, pagination data when applicable, and routing explanation when requested. Diagnostics remain on stderr.
+
+<Callout title="Stable exit codes">
+Exit codes are API: `0` success; `2` invalid usage or invalid filters; `10` `needs_auth`; `20` rate limited; `30` network/provider; `40` permission denied; `50` other sync failure; `130` cancelled by SIGINT.
+</Callout>

@@ -1,0 +1,18 @@
+{
+  "name": "@ctxindex/example-tenders-extension",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "ctxindex": {
+    "extensions": [
+      "./extension.ts"
+    ]
+  },
+  "dependencies": {
+    "@ctxindex/extension-sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@ctxindex/adapters": "workspace:*",
+    "@ctxindex/core": "workspace:*"
+  }
+}

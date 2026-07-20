@@ -1,0 +1,175 @@
+---
+title: Mail workflows
+description: Search multiple mail accounts, retrieve threads, and create reversible provider Drafts.
+---
+
+ctxindex presents Gmail and Outlook messages through the provider-neutral `communication.message` Profile. Each mailbox is a Source attached to one Account and one Realm, while search can span Sources and providers.
+
+## Search across accounts
+
+First inspect the configured Sources and their Account bindings:
+
+```sh
+ctxindex account list --json
+ctxindex source list --json
+```
+
+Search every configured mailbox by omitting `--realm` and `--source`:
+
+```sh
+ctxindex search "renewal notice" --kind mail --json
+```
+
+Restrict a search to one operating context or mailbox when the task requires it:
+
+```sh
+ctxindex search "renewal notice" \
+  --kind mail \
+  --realm company \
+  --json
+
+ctxindex search "flight receipt" \
+  --kind mail \
+  --source personal-gmail \
+  --json
+```
+
+An omitted Realm spans all Realms. `--realm company` is exact and never includes personal Sources implicitly. Gmail and Outlook mailbox Sources use provider search when routing requires it, but return the same result envelope and stable Ref shape.
+
+## Retrieve a message and its thread
+
+<Steps>
+
+### Search for the message
+
+```sh
+ctxindex search "deployment approval" --kind mail --json
+```
+
+### Retrieve the complete message
+
+```sh
+ctxindex get 'ctx://01J00000000000000000000000/message/stable-message-id' --json
+```
+
+### Load the related conversation
+
+```sh
+ctxindex thread get 'ctx://01J00000000000000000000000/message/stable-message-id' --json
+```
+
+`thread get` follows stored conversation membership and parent Relations. It returns a reply tree when parent edges are available and otherwise a date-ordered list.
+
+</Steps>
+
+## Create a provider Draft
+
+A Draft is reversible provider state, not text that exists only in an agent conversation. Inspect the live Action schema before constructing input:
+
+```sh
+ctxindex action describe communication.message.draft.create \
+  --source company-mail \
+  --json
+```
+
+Create the Draft through the mailbox Source that should own it:
+
+```sh
+cat > /tmp/new-draft.json <<'JSON'
+{
+  "to": ["recipient@example.com"],
+  "cc": ["reviewer@example.com"],
+  "subject": "Deployment follow-up",
+  "bodyText": "The deployment completed successfully."
+}
+JSON
+
+ctxindex action run communication.message.draft.create \
+  --source company-mail \
+  --input /tmp/new-draft.json \
+  --json
+```
+
+Both Gmail and Outlook mailbox Adapters implement this Action. The result returns a normalized `communication.message` Resource Ref for the provider-persisted Draft.
+
+## Create a threaded reply Draft
+
+A reply Action does not fetch missing parent data. First use `get` on the exact parent Ref so a complete, non-deleted message from the selected Source is available locally:
+
+```sh
+ctxindex get 'ctx://01J00000000000000000000000/message/stable-message-id' --json
+```
+
+Then create the reply with the strict reply branch. It accepts only the local parent Ref and body text; ctxindex derives the single recipient, reply subject, and provider-native thread state from the parent:
+
+```sh
+cat > /tmp/reply-draft.json <<'JSON'
+{
+  "replyToRef": "ctx://01J00000000000000000000000/message/stable-message-id",
+  "bodyText": "Thanks, I will review the deployment report today."
+}
+JSON
+
+ctxindex action run communication.message.draft.create \
+  --source company-mail \
+  --input /tmp/reply-draft.json \
+  --json
+```
+
+The parent must belong to `company-mail`, be locally complete, and contain the provider threading fields. Reply-all and caller-supplied recipients or subject are intentionally unavailable.
+
+## Update an existing Draft
+
+Inspect the current update union before constructing input:
+
+```sh
+ctxindex action describe communication.message.draft.update \
+  --source company-mail \
+  --json
+```
+
+A standalone Draft update replaces the complete addressed content. Supply the Draft Ref returned by create or retrieval and the full desired recipient arrays, subject, and body. Empty `cc` and `bcc` arrays explicitly clear those recipients:
+
+```sh
+cat > /tmp/updated-draft.json <<'JSON'
+{
+  "ref": "ctx://01J00000000000000000000000/draft/stable-draft-id",
+  "to": ["recipient@example.com"],
+  "cc": [],
+  "bcc": [],
+  "subject": "Updated deployment follow-up",
+  "bodyText": "The deployment and verification completed successfully."
+}
+JSON
+
+ctxindex action run communication.message.draft.update \
+  --source company-mail \
+  --input /tmp/updated-draft.json \
+  --json
+```
+
+Reply context is immutable. Before updating a reply Draft, ensure both its Draft Ref and its parent message are complete local Resources in the same selected Source (Action results are already materialized; otherwise use `get`). The update must repeat the exact stored `replyToRef` and may replace only `bodyText`:
+
+```sh
+ctxindex get 'ctx://01J00000000000000000000000/draft/stable-draft-id' --json
+ctxindex get 'ctx://01J00000000000000000000000/message/stable-message-id' --json
+
+cat > /tmp/updated-reply-draft.json <<'JSON'
+{
+  "ref": "ctx://01J00000000000000000000000/draft/stable-draft-id",
+  "replyToRef": "ctx://01J00000000000000000000000/message/stable-message-id",
+  "bodyText": "Thanks, I reviewed the deployment report."
+}
+JSON
+
+ctxindex action run communication.message.draft.update \
+  --source company-mail \
+  --input /tmp/updated-reply-draft.json \
+  --json
+```
+
+Changing `replyToRef`, using the standalone branch for a stored reply Draft, or supplying recipients or subject in the reply branch fails before provider I/O.
+
+<Callout>
+Provider mutations stop at reversible email Draft creation and update. ctxindex never sends email and exposes no send, reply-send, forward-send, calendar mutation, or other provider mutation.
+</Callout>

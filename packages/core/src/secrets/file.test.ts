@@ -140,6 +140,7 @@ test('file backend round-trips, lists, deletes, encrypts, and forces private mod
     }
 
     await store.deleteSecret(ref)
+    await expect(store.deleteSecret(ref)).resolves.toBeUndefined()
     await expect(store.getSecret(ref)).rejects.toMatchObject({
       code: 'not_found',
     })

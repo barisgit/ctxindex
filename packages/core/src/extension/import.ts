@@ -1,36 +1,91 @@
-import { pathToFileURL } from 'node:url'
-import type {
-  AnyExtensionDefinition,
-  ExtensionAuthoringHost,
-} from '@ctxindex/extension-sdk'
+import { readFile, realpath } from 'node:fs/promises'
+import { join } from 'node:path'
+import type { AnyExtensionDefinition } from '@ctxindex/extension-sdk'
+import type { CollectedExtension } from '../registry/complete-registry'
+import type { ExtensionOriginProvenance } from './collector'
+import { createExtensionHostDiagnostic } from './diagnostics'
 import {
-  defineAdapter,
-  defineExtension,
-  defineProfile,
-} from '@ctxindex/extension-sdk'
-import { z } from 'zod'
+  importPackageEntries,
+  importSelectedPackageEntry,
+  resolvePackageEntries,
+} from './package-entry'
 
-const authoringHost: ExtensionAuthoringHost = {
-  z,
-  defineProfile,
-  defineAdapter,
-  defineExtension,
+function packageIdentity(manifest: unknown): {
+  readonly packageName?: string
+  readonly packageVersion?: string
+} {
+  if (manifest === null || typeof manifest !== 'object') return {}
+  const record = manifest as Record<string, unknown>
+  return {
+    ...(typeof record.name === 'string' ? { packageName: record.name } : {}),
+    ...(typeof record.version === 'string'
+      ? { packageVersion: record.version }
+      : {}),
+  }
 }
 
-type ExtensionModule = {
-  readonly default?: (
-    host: ExtensionAuthoringHost,
-  ) => AnyExtensionDefinition | Promise<AnyExtensionDefinition>
+async function resolveExtensionPackageEntries(
+  packageRoot: string,
+  provenance: ExtensionOriginProvenance = { origin: 'explicit-path' },
+): Promise<Awaited<ReturnType<typeof resolvePackageEntries>>> {
+  let root: string
+  let manifest: unknown
+  try {
+    root = await realpath(packageRoot)
+    manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'))
+  } catch {
+    throw createExtensionHostDiagnostic(
+      'Extension package manifest could not be read',
+    )
+  }
+  return resolvePackageEntries(root, manifest, {
+    ...packageIdentity(manifest),
+    ...provenance,
+  })
+}
+
+export async function importExtensionPackageRoots(
+  packageRoot: string,
+  provenance: ExtensionOriginProvenance = { origin: 'explicit-path' },
+): Promise<CollectedExtension[]> {
+  return importPackageEntries(
+    await resolveExtensionPackageEntries(packageRoot, provenance),
+  )
+}
+
+export async function importExtensionPackageRoot(
+  packageRoot: string,
+  extensionId: string,
+  provenance: ExtensionOriginProvenance = { origin: 'explicit-path' },
+): Promise<CollectedExtension> {
+  return importSelectedPackageEntry(
+    await resolveExtensionPackageEntries(packageRoot, provenance),
+    extensionId,
+  )
+}
+
+export async function importExtensionRoots(
+  packageRoot: string,
+  provenance: ExtensionOriginProvenance = { origin: 'explicit-path' },
+): Promise<CollectedExtension[]> {
+  return importExtensionPackageRoots(packageRoot, provenance)
 }
 
 export async function importExtensionDefinition(
-  extensionPath: string,
+  packageRoot: string,
+  extensionId?: string,
 ): Promise<AnyExtensionDefinition> {
-  const loaded = (await import(
-    pathToFileURL(extensionPath).href
-  )) as ExtensionModule
-  if (typeof loaded.default !== 'function') {
-    throw new TypeError('Extension must default-export a factory')
-  }
-  return loaded.default(authoringHost)
+  if (extensionId !== undefined)
+    return (await importExtensionPackageRoot(packageRoot, extensionId))
+      .definition
+  const collected = await importExtensionRoots(packageRoot)
+  if (collected.length === 0)
+    throw createExtensionHostDiagnostic(
+      'Entry exports no supported Extension root',
+    )
+  if (collected.length > 1)
+    throw createExtensionHostDiagnostic(
+      'Entry exports multiple Extensions; select one exact Extension id',
+    )
+  return (collected[0] as CollectedExtension).definition
 }

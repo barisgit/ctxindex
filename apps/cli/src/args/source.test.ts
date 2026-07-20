@@ -6,14 +6,12 @@ import {
 } from '@ctxindex/core/registry'
 import { defineAdapter, defineExtension } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
-import { parseSourceArgs } from './source'
+import { parseSourceArgs, sourceUsage } from './source'
 
 const externalSource: SourceDescription = {
   id: 'external.adapter',
-  version: 1,
   profiles: [],
   routing: 'indexed',
-  auth: { kind: 'none' },
   providerApiHosts: [],
   capabilities: [],
   config: {},
@@ -23,7 +21,6 @@ const externalSource: SourceDescription = {
       flag: '--config-root-path',
       type: 'string',
       required: true,
-      docs: 'Root path',
     },
     {
       property: 'ratio',
@@ -71,6 +68,11 @@ function add(...args: string[]) {
   )
 }
 
+test('usage exposes only public Account selectors', () => {
+  expect(sourceUsage).toContain('--account <label|account-id>')
+  expect(sourceUsage).not.toMatch(/grant/i)
+})
+
 describe('source add generated Adapter config options', () => {
   test('parses external primitive and repeated array options without Adapter literals', () => {
     expect(
@@ -112,13 +114,11 @@ describe('source add generated Adapter config options', () => {
   test('addresses colliding and nested config properties from a real registry', () => {
     const adapter = defineAdapter({
       id: 'collision.adapter',
-      version: 1,
       configSchema: z.object({
         foo_bar: z.string(),
         'foo-bar': z.string(),
         nested: z.object({ enabled: z.boolean() }),
       }),
-      auth: { kind: 'none' },
       profiles: [],
       routing: 'indexed',
       capabilities: [],
@@ -128,7 +128,6 @@ describe('source add generated Adapter config options', () => {
     const registry = createExtensionRegistry([
       defineExtension({
         id: 'collision',
-        version: 1,
         profiles: [],
         adapters: [adapter],
       }),

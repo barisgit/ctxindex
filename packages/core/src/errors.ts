@@ -35,7 +35,7 @@ export class CtxindexError extends Error {
 
 export type CtxindexAuthErrorCode =
   | 'needs_auth'
-  | 'missing_oauth_client_creds'
+  | 'missing_oauth_app_config'
   | 'invalid_grant'
   | 'invalid_client'
   | 'oauth_failed'

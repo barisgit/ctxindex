@@ -1,0 +1,24 @@
+{
+  "title": "CLI Reference",
+  "pages": [
+    "index",
+    "init",
+    "describe",
+    "extensions",
+    "realm",
+    "source",
+    "oauth-app",
+    "account",
+    "sync",
+    "search",
+    "get",
+    "thread",
+    "artifact",
+    "export",
+    "action",
+    "status",
+    "purge",
+    "secrets",
+    "skills"
+  ]
+}

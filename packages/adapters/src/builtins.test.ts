@@ -1,12 +1,45 @@
 import { describe, expect, test } from 'bun:test'
-import { isGrantCompatible } from '@ctxindex/core/auth'
+import type { AnyAdapterDefinition } from '@ctxindex/extension-sdk'
 import {
-  createExtensionRegistry,
-  describeRegistry,
-} from '@ctxindex/core/registry'
+  calendarEventProfile,
+  communicationMessageProfile,
+  fileProfile,
+} from '@ctxindex/profiles'
 import { CTXINDEX_BUILTIN_EXTENSIONS } from './index'
 
 describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
+  test('publishes three ordinary provider integration roots with no foundational Profiles Extension or bundled OAuth App', () => {
+    expect(CTXINDEX_BUILTIN_EXTENSIONS.map(({ id }) => id)).toEqual([
+      'ctxindex.google',
+      'ctxindex.microsoft',
+      'ctxindex.local',
+    ])
+    expect(
+      CTXINDEX_BUILTIN_EXTENSIONS.map((extension) =>
+        extension.adapters.map(({ id }) => id),
+      ),
+    ).toEqual([
+      ['google.calendar', 'google.mailbox'],
+      ['microsoft.calendar', 'microsoft.mailbox'],
+      ['local.directory'],
+    ])
+    expect(
+      CTXINDEX_BUILTIN_EXTENSIONS.every(
+        (extension) => extension.oauthApps.length === 0,
+      ),
+    ).toBe(true)
+    expect(
+      CTXINDEX_BUILTIN_EXTENSIONS.every(
+        (extension) => !Object.hasOwn(extension, 'dependencies'),
+      ),
+    ).toBe(true)
+    expect(
+      CTXINDEX_BUILTIN_EXTENSIONS.every(
+        (extension) => !Object.hasOwn(extension, 'version'),
+      ),
+    ).toBe(true)
+  })
+
   test('keeps the canonical docs aligned with the bundled Profile inventory', async () => {
     const [specification, design] = await Promise.all([
       Bun.file(
@@ -45,200 +78,74 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
     )
   })
 
-  test('describes declarative Google, Microsoft, and local Source definitions', () => {
-    const registry = createExtensionRegistry(CTXINDEX_BUILTIN_EXTENSIONS)
-    const description = describeRegistry(registry)
-
-    expect(
-      description.sources.map(({ id, version, capabilities }) => ({
-        id,
-        version,
-        capabilities,
-      })),
-    ).toEqual([
-      {
-        id: 'google.calendar',
-        version: 1,
-        capabilities: ['retrieve', 'sync'],
+  test('composes exact shared Profiles without embedding definition docs', () => {
+    const adapters = CTXINDEX_BUILTIN_EXTENSIONS.reduce<AnyAdapterDefinition[]>(
+      (all, extension) => {
+        all.push(...extension.adapters)
+        return all
       },
-      {
-        id: 'google.mailbox',
-        version: 1,
-        capabilities: ['download', 'retrieve', 'search-remote'],
-      },
-      { id: 'local.directory', version: 1, capabilities: ['sync'] },
-      {
-        id: 'microsoft.calendar',
-        version: 1,
-        capabilities: ['retrieve', 'sync'],
-      },
-      {
-        id: 'microsoft.mailbox',
-        version: 1,
-        capabilities: ['download', 'retrieve', 'search-remote'],
-      },
-    ])
-    expect(
-      registry.profiles.list().map(({ id, version }) => ({ id, version })),
-    ).toEqual([
-      { id: 'calendar.event', version: 1 },
-      { id: 'communication.message', version: 1 },
-      { id: 'file', version: 1 },
-    ])
-    const calendarKind = description.kinds.find(
-      ({ id }) => id === 'calendar.event',
+      [],
     )
-    expect(calendarKind).toMatchObject({
-      id: 'calendar.event',
-      version: 1,
-      summary: 'A provider-neutral calendar event or occurrence.',
-      aliases: ['events'],
-      formats: [],
-    })
-    expect(calendarKind?.fields.map(({ name }) => name)).toEqual([
-      'allDay',
-      'attendees',
-      'calendarId',
-      'endDate',
-      'endTimeZone',
-      'endsAt',
-      'eventId',
-      'organizer',
-      'provider',
-      'seriesEventId',
-      'startDate',
-      'startTimeZone',
-      'startsAt',
-      'status',
-      'title',
-      'updatedAt',
+    expect(adapters.map(({ id }) => id)).toEqual([
+      'google.calendar',
+      'google.mailbox',
+      'microsoft.calendar',
+      'microsoft.mailbox',
+      'local.directory',
     ])
-    const fileKind = description.kinds.find(({ id }) => id === 'file')
-    expect(
-      fileKind && {
-        id: fileKind.id,
-        version: fileKind.version,
-        summary: fileKind.summary,
-        aliases: fileKind.aliases,
-        fields: fileKind.fields.map(({ name, type }) => ({ name, type })),
-        formats: fileKind.formats,
-      },
-    ).toEqual({
-      id: 'file',
-      version: 1,
-      summary: 'An extracted local file.',
-      aliases: ['files'],
-      fields: [
-        { name: 'contentHash', type: 'string' },
-        { name: 'extension', type: 'string' },
-        { name: 'mediaType', type: 'string' },
-        { name: 'modifiedAt', type: 'datetime' },
-        { name: 'name', type: 'string' },
-        { name: 'path', type: 'string' },
-        { name: 'size', type: 'number' },
-      ],
-      formats: [],
+    expect(adapters[0]?.profiles[0]).toBe(calendarEventProfile)
+    expect(adapters[1]?.profiles[0]).toBe(communicationMessageProfile)
+    expect(adapters[2]?.profiles[0]).toBe(calendarEventProfile)
+    expect(adapters[3]?.profiles[0]).toBe(communicationMessageProfile)
+    expect(adapters[4]?.profiles[0]).toBe(fileProfile)
+    expect(calendarEventProfile.search?.fields).toMatchObject({
+      startTimeZone: { type: 'string' },
+      endTimeZone: { type: 'string' },
     })
     expect(
-      description.sources.find(({ id }) => id === 'google.calendar')?.profiles,
-    ).toEqual([{ id: 'calendar.event', version: 1 }])
-    expect(
-      description.sources.find(({ id }) => id === 'microsoft.calendar')
-        ?.profiles,
-    ).toEqual([{ id: 'calendar.event', version: 1 }])
-    expect(
-      description.sources.find(({ id }) => id === 'local.directory')?.profiles,
-    ).toEqual([{ id: 'file', version: 1 }])
-    expect(
-      description.actions.map(({ id, effect, adapters }) => ({
-        id,
-        effect,
-        adapters,
-      })),
-    ).toEqual([
-      {
-        id: 'communication.message.draft.create',
-        effect: 'reversible',
-        adapters: [
-          { id: 'google.mailbox', version: 1 },
-          { id: 'microsoft.mailbox', version: 1 },
-        ],
-      },
-      {
-        id: 'communication.message.draft.update',
-        effect: 'reversible',
-        adapters: [
-          { id: 'google.mailbox', version: 1 },
-          { id: 'microsoft.mailbox', version: 1 },
-        ],
-      },
-    ])
+      [...CTXINDEX_BUILTIN_EXTENSIONS, ...adapters].every(
+        (definition) => !Object.hasOwn(definition, 'docs'),
+      ),
+    ).toBe(true)
   })
 
   test('declares canonical Google OAuth and strict token-free configs', () => {
-    const registry = createExtensionRegistry(CTXINDEX_BUILTIN_EXTENSIONS)
-    const description = describeRegistry(registry)
-    const calendar = registry.adapters.get({
-      id: 'google.calendar',
-      version: 1,
-    })
-    const gmail = registry.adapters.get({ id: 'google.mailbox', version: 1 })
-    const local = registry.adapters.get({ id: 'local.directory', version: 1 })
-    const microsoft = registry.adapters.get({
-      id: 'microsoft.mailbox',
-      version: 1,
-    })
+    const adapters = CTXINDEX_BUILTIN_EXTENSIONS.reduce<AnyAdapterDefinition[]>(
+      (all, extension) => {
+        all.push(...extension.adapters)
+        return all
+      },
+      [],
+    )
+    const calendar = adapters.find(({ id }) => id === 'google.calendar')
+    const gmail = adapters.find(({ id }) => id === 'google.mailbox')
+    const local = adapters.find(({ id }) => id === 'local.directory')
+    const microsoft = adapters.find(({ id }) => id === 'microsoft.mailbox')
 
-    expect(gmail?.auth).toEqual({
-      kind: 'oauth2',
+    expect(gmail).toMatchObject({
       provider: {
+        kind: 'provider',
         id: 'google',
-        authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
-        tokenUrl: 'https://oauth2.googleapis.com/token',
-        identity: {
-          url: 'https://openidconnect.googleapis.com/v1/userinfo',
-          subjectPath: ['sub'],
-          labelPaths: [['email']],
-          identities: [
-            {
-              kind: 'email',
-              path: ['email'],
-              verifiedPath: ['email_verified'],
-            },
-          ],
-        },
-        pkce: { method: 'S256', required: true },
-        client: {
-          type: 'public',
-          secret: 'optional',
-          tokenAuthMethod: 'client_secret_post',
-        },
-        baseScopes: ['openid', 'email'],
-        environment: {
-          clientId: 'CTXINDEX_GOOGLE_CLIENT_ID',
-          clientSecret: 'CTXINDEX_GOOGLE_CLIENT_SECRET',
-        },
-        allowedHosts: [
-          'accounts.google.com',
-          'oauth2.googleapis.com',
-          'openidconnect.googleapis.com',
-        ],
-        fixedAuthorizationParams: {
-          access_type: 'offline',
-          include_granted_scopes: 'false',
-          prompt: 'consent',
+        auth: {
+          kind: 'oauth2',
+          authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+          tokenUrl: 'https://oauth2.googleapis.com/token',
+          baseScopes: ['openid', 'email'],
         },
       },
-      scopes: [
-        'https://www.googleapis.com/auth/gmail.readonly',
-        'https://www.googleapis.com/auth/gmail.compose',
-      ],
+      access: {
+        scopes: [
+          'https://www.googleapis.com/auth/gmail.readonly',
+          'https://www.googleapis.com/auth/gmail.compose',
+        ],
+      },
     })
     expect(gmail?.providerApiHosts).toEqual(['gmail.googleapis.com'])
-    expect(calendar?.auth).toMatchObject({
-      kind: 'oauth2',
+    expect(calendar).toMatchObject({
       provider: { id: 'google' },
-      scopes: ['https://www.googleapis.com/auth/calendar.events.readonly'],
+      access: {
+        scopes: ['https://www.googleapis.com/auth/calendar.events.readonly'],
+      },
     })
     expect(calendar?.providerApiHosts).toEqual(['www.googleapis.com'])
     expect(calendar?.capabilities).toEqual(['sync', 'retrieve'])
@@ -249,34 +156,12 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
       future_days: 730,
     })
     expect(
-      gmail &&
-        isGrantCompatible(gmail.auth, {
-          provider: 'google',
-          scopes: 'https://www.googleapis.com/auth/gmail.readonly',
-        }),
-    ).toBe(false)
-    expect(
-      gmail &&
-        isGrantCompatible(gmail.auth, {
-          provider: 'google',
-          scopes: JSON.stringify([
-            'https://www.googleapis.com/auth/gmail.compose',
-            'https://www.googleapis.com/auth/gmail.readonly',
-          ]),
-        }),
-    ).toBe(true)
-    expect(
       gmail?.configSchema.safeParse({ access_token: 'malicious' }).success,
     ).toBe(false)
     expect(gmail?.configSchema.parse({})).toEqual({})
-    expect(
-      description.sources.find(({ id }) => id === 'google.mailbox')
-        ?.configOptions,
-    ).toEqual([])
-    expect(microsoft?.auth).toMatchObject({
-      kind: 'oauth2',
+    expect(microsoft).toMatchObject({
       provider: { id: 'microsoft' },
-      scopes: ['Mail.ReadWrite'],
+      access: { scopes: ['Mail.ReadWrite'] },
     })
     expect(microsoft?.providerApiHosts).toEqual(['graph.microsoft.com'])
     expect(microsoft?.capabilities).toEqual([
@@ -292,7 +177,8 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
     expect(
       microsoft?.configSchema.safeParse({ access_token: 'malicious' }).success,
     ).toBe(false)
-    expect(local?.auth).toEqual({ kind: 'none' })
+    expect(local).not.toHaveProperty('provider')
+    expect(local).not.toHaveProperty('access')
     expect(local?.routing).toBe('indexed')
     expect(local?.capabilities).toEqual(['sync'])
     expect(Object.keys(local?.operations ?? {})).toEqual(['sync'])

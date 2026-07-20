@@ -1,17 +1,13 @@
-import type { ExtensionAuthoringHost } from '@ctxindex/extension-sdk'
+import { defineExtension, defineProfile, z } from '@ctxindex/extension-sdk'
 
-export default function extension(host: ExtensionAuthoringHost) {
-  const profile = host.defineProfile({
-    id: 'fixture.note',
-    version: 1,
-    schema: host.z.object({ title: host.z.string() }),
-    search: { title: (payload) => payload.title },
-  })
+export const fixtureNoteProfile = defineProfile({
+  id: 'fixture.note',
+  version: 1,
+  schema: z.object({ title: z.string() }),
+  search: { title: (payload) => payload.title },
+})
 
-  return host.defineExtension({
-    id: 'fixture.external',
-    version: 1,
-    profiles: [profile],
-    adapters: [],
-  })
-}
+export default defineExtension({
+  id: 'fixture.external',
+  profiles: [fixtureNoteProfile],
+})

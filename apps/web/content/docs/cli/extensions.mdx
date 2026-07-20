@@ -1,0 +1,46 @@
+---
+title: ctxindex extensions
+description: Inspect loaded Extensions and manage trusted local Git Catalogs.
+---
+
+Extensions bundle Profiles and Source Adapters. External Extensions are trusted code loaded from explicit paths or installed from explicitly added Git Catalogs. Catalogs are merged into one local discovery surface; ctxindex does not operate a hosted marketplace.
+
+## Usage
+
+```sh
+ctxindex extensions list [--json]
+ctxindex extensions catalog add <name> <repository> --ref <full-ref-or-oid> --trust [--json]
+ctxindex extensions catalog list [--no-refresh] [--json]
+ctxindex extensions catalog show <name> [<id>@<version>] [--no-refresh] [--json]
+ctxindex extensions catalog refresh <name> [--json]
+ctxindex extensions catalog remove <name> [--json]
+ctxindex extensions install <catalog> <id>@<version> --trust [--no-refresh] [--json]
+ctxindex extensions uninstall <id>@<version> [--json]
+```
+
+## Commands and flags
+
+| Command or flag | Purpose |
+| --- | --- |
+| `list` | List loaded Extensions. |
+| `catalog add` | Trust and add a credential-free public HTTPS or absolute local Git repository pinned by a full ref or object ID. |
+| `catalog list` | Refresh configured Catalogs and list their merged local entries. |
+| `catalog show` | Refresh, then inspect one Catalog or exact Extension entry. |
+| `catalog refresh` | Explicitly acquire and persist a Catalog's latest immutable snapshot for its configured ref. |
+| `catalog remove` | Remove a Catalog registration when none of its Extensions remain installed. |
+| `install` | Install one exact `<id>@<version>` from a named Catalog after a separate code-execution trust acknowledgement. |
+| `uninstall` | Remove one installed Catalog Extension by exact `<id>@<version>`. |
+| `--no-refresh` | Use the stored Catalog snapshot for `catalog list`, `catalog show`, or `install` instead of refreshing first. |
+| `--json` | Print deterministic JSON for any listed operation. |
+
+`catalog add --trust` acknowledges trust in acquiring and reading that repository. `extensions install --trust` is a second, independent acknowledgement that the selected Extension executes in-process with the same privileges as ctxindex. Catalog listing, showing, and installation refresh by default; refresh failure is reported instead of silently falling back to stale data. Use `--no-refresh` deliberately for the stored snapshot. Startup, loaded-Extension listing, and uninstall remain offline.
+
+If an Extension is unavailable or uninstalled, its Sources remain listed and their synced Resources remain locally searchable, but provider operations stop.
+
+## JSON output
+
+All Extension lifecycle commands accept `--json`. Extension loading and acquisition diagnostics are written separately from stdout.
+
+<Callout title="Stable exit codes">
+Exit codes are API: `0` success; `2` invalid usage; `10` `needs_auth`; `20` rate limited; `30` network/provider; `40` permission denied; `50` other sync failure; `130` cancelled by SIGINT.
+</Callout>

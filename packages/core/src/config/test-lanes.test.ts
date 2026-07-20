@@ -21,8 +21,8 @@ type Bunfig = {
   }
 }
 
-async function readPackageJson(): Promise<PackageJson> {
-  return JSON.parse(await Bun.file(join(repoRoot, 'package.json')).text())
+async function readPackageJson(directory = repoRoot): Promise<PackageJson> {
+  return JSON.parse(await Bun.file(join(directory, 'package.json')).text())
 }
 
 async function readBunfig(): Promise<Bunfig> {
@@ -71,21 +71,27 @@ async function runBunTest(cwd: string): Promise<{
 }
 
 test('unit lane excludes integration', async () => {
-  const [packageJson, bunfig] = await Promise.all([
+  const [rootPackageJson, corePackageJson, bunfig] = await Promise.all([
     readPackageJson(),
+    readPackageJson(join(repoRoot, 'packages/core')),
     readBunfig(),
   ])
 
-  expect(script(packageJson, 'test')).toBe('bun test')
+  expect(script(rootPackageJson, 'test')).toBe('turbo run test')
+  expect(script(corePackageJson, 'test')).toBe('bun test')
   expect(
     asStringArray(bunfig.test?.pathIgnorePatterns, 'pathIgnorePatterns'),
   ).toEqual(expect.arrayContaining([...unitIgnoreGlobs]))
 })
 
 test('e2e lane isolated', async () => {
-  const packageJson = await readPackageJson()
-  const command = script(packageJson, 'test:e2e')
+  const [rootPackageJson, corePackageJson] = await Promise.all([
+    readPackageJson(),
+    readPackageJson(join(repoRoot, 'packages/core')),
+  ])
+  const command = script(corePackageJson, 'test:e2e')
 
+  expect(script(rootPackageJson, 'test:e2e')).toBe('turbo run test:e2e')
   expect(command).toContain('bun test')
   expect(command).toContain('--path-ignore-patterns')
   expect(command).toContain('__none__')

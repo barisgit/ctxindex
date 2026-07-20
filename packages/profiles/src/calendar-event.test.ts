@@ -174,11 +174,8 @@ describe('calendarEventProfile', () => {
     expect(() => calendarEventRef(sourceId, '')).toThrow()
   })
 
-  test('exposes documented common vocabulary with no Actions or special export', () => {
-    expect(calendarEventProfile.docs).toEqual({
-      summary: 'A provider-neutral calendar event or occurrence.',
-      aliases: ['events'],
-    })
+  test('exposes common vocabulary with no embedded docs, Actions, or special export', () => {
+    expect(calendarEventProfile).not.toHaveProperty('docs')
     expect(calendarEventProfile.actions).toBeUndefined()
     expect(calendarEventProfile.exports).toBeUndefined()
     expect(

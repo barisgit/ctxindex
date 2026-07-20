@@ -1,0 +1,66 @@
+---
+title: Realms and Sources
+description: How ctxindex groups context and binds provider authentication to configured collections.
+---
+
+A **Realm** groups the **Sources** that should be searched and reasoned about together. A **Source** connects one collection of context to ctxindex through one **Source Adapter**.
+
+```text
+Realm
+└── Source ──> Source Adapter ──> provider collection or local directory
+```
+
+## Realms are operating contexts
+
+A **Realm** is user-defined. Typical slugs are `personal`, `company`, and `university`, but ctxindex assigns no special meaning to any slug.
+
+- Every Source belongs to exactly one Realm.
+- A Realm can contain Sources from different providers and Accounts.
+- A query without a Realm filter considers all Realms.
+- An explicit Realm filter is exact. It never includes another Realm implicitly.
+- There is no `global` Realm.
+
+<Callout>
+  A Realm is a reasoning and search scope, not a security boundary. Account, Grant, Source binding, and provider host restrictions enforce access boundaries.
+</Callout>
+
+For example, `bun cli search planning --realm company` plans only Sources in the `company` Realm. Omitting `--realm` allows every eligible Source across all Realms to participate.
+
+## Sources identify one collection
+
+A **Source** is one configured connection to one collection through exactly one Source Adapter. Its local label is globally unique.
+
+Collection boundaries stay explicit:
+
+| Source kind | One Source represents |
+| --- | --- |
+| Mailbox | One mailbox |
+| Calendar | One specific calendar, not every calendar visible to an Account |
+| Local directory | One configured root directory |
+
+A Source can participate in sync, remote search, retrieval, Artifact download, and supported Actions according to its Adapter's declared capabilities. Sync is optional; disabling it does not redefine the Source.
+
+## Authentication records have separate jobs
+
+```text
+OAuth App ──authorizes──> Account ──owns──> Grant
+                                             │
+                                             └──explicitly bound by──> Source
+```
+
+| Term | Responsibility |
+| --- | --- |
+| **OAuth App** | One labeled application definition for a Provider, contributed by an Extension or configured locally. Its identity is `(provider id, label)`. |
+| **Account** | One stable authenticated external identity within a provider. Its local label is globally unique. |
+| **Grant** | The Account's private normalized permissions, token references, and OAuth App snapshot. Reauthorization updates it in place. |
+
+Verified provider addresses are **Account Identities**; they are not the Account's stable identity key.
+
+An authenticated Source binds explicitly to one compatible Grant. One Account and its Grant may back multiple Sources, including Sources in different Realms. ctxindex never chooses a global, active, or most-recent Grant at operation time.
+
+This separation supports common configurations without collapsing concepts:
+
+- one OAuth App can authorize multiple Accounts for its Provider;
+- one Account can expose separate mailbox and calendar Sources;
+- one calendar Account can expose multiple Sources, one per selected calendar;
+- compatible Sources can share a Grant while remaining in different Realms.

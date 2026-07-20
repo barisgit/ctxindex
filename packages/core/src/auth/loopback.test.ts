@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { get } from 'node:http'
-import { testOAuthProvider } from '../testing/oauth-provider'
 import { openOAuthLoopback } from './loopback'
+import { testOAuthProvider } from './test-provider'
 
 function request(url: string | URL): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -17,7 +17,13 @@ const provider = {
     authorizationUrl: 'https://auth.test/authorize',
     tokenUrl: 'https://auth.test/token',
   }),
-  fixedAuthorizationParams: { access_type: 'offline', prompt: 'consent' },
+  auth: {
+    ...testOAuthProvider({
+      authorizationUrl: 'https://auth.test/authorize',
+      tokenUrl: 'https://auth.test/token',
+    }).auth,
+    fixedAuthorizationParams: { access_type: 'offline', prompt: 'consent' },
+  },
 }
 
 test('loopback uses PKCE, state, exact callback path, and fixed params', async () => {

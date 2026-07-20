@@ -70,7 +70,7 @@ function markAdapterUnavailable(sandbox: Sandbox, sourceId: string): void {
   const db = new Database(dbPath(sandbox))
   try {
     db.prepare(
-      "UPDATE sources SET adapter_id = 'missing.adapter', adapter_version = 1 WHERE id = ?",
+      "UPDATE sources SET adapter_id = 'missing.adapter' WHERE id = ?",
     ).run(sourceId)
   } finally {
     db.close()

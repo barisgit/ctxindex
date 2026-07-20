@@ -16,7 +16,6 @@ import type { CtxindexDatabase } from '../storage'
 interface SourceSqlRow {
   readonly id: string
   readonly adapter_id: string
-  readonly adapter_version: number
   readonly config_json: string
   readonly grant_id: string | null
 }
@@ -31,7 +30,7 @@ function sanitizeTokenResolutionError(error: unknown): CtxindexAuthError {
   if (
     error.code === 'needs_auth' ||
     error.code === 'invalid_grant' ||
-    error.code === 'missing_oauth_client_creds'
+    error.code === 'missing_oauth_app_config'
   ) {
     return needsAuth()
   }
@@ -119,16 +118,13 @@ export async function createSourceProviderContext(
 ): Promise<SourceProviderContext> {
   const source = input.db
     .prepare(
-      `SELECT id, adapter_id, adapter_version, config_json, grant_id
+      `SELECT id, adapter_id, config_json, grant_id
        FROM sources WHERE id = ?`,
     )
     .get(input.sourceId) as SourceSqlRow | null
   if (!source) throw new CtxindexNotFoundError('Source not found')
 
-  const adapter = input.registry.adapters.get({
-    id: source.adapter_id,
-    version: source.adapter_version,
-  })
+  const adapter = input.registry.adapters.get({ id: source.adapter_id })
   if (!adapter) {
     throw new CtxindexError(
       'Source Adapter definition is unavailable',
@@ -156,7 +152,9 @@ export async function createSourceProviderContext(
     return providerFetch(url, { ...requestInit, redirect: 'manual' })
   }) as typeof fetch
 
-  if (adapter.auth.kind === 'none') {
+  const providerDefinition = adapter.provider
+  const auth = providerDefinition?.auth
+  if (auth === undefined || auth.kind === 'none') {
     return {
       adapter,
       source: sourceContext,
@@ -164,15 +162,20 @@ export async function createSourceProviderContext(
       logger: input.logger,
     }
   }
-  if (adapter.auth.kind !== 'oauth2' || !source.grant_id) throw needsAuth()
+  if (auth.kind !== 'oauth2' || !source.grant_id) throw needsAuth()
+  if (providerDefinition === undefined) throw needsAuth()
 
   const grantId = source.grant_id
   const grant = input.db
     .prepare('SELECT provider, scopes_json FROM grants WHERE id = ?')
     .get(grantId) as GrantSqlRow | null
+  const authorization = {
+    provider: providerDefinition,
+    access: adapter.access ?? { scopes: [] },
+  }
   if (
     !grant ||
-    !isGrantCompatible(adapter.auth, {
+    !isGrantCompatible(authorization, {
       provider: grant.provider,
       scopes: grant.scopes_json,
     })

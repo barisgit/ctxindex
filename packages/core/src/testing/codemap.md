@@ -10,7 +10,7 @@ Provides reusable test infrastructure: a black-box CLI sandbox plus a provider-n
 - Environment isolation redirects config, data, cache, and state through `CTXINDEX_*_HOME` variables under one temporary directory and always points `CTXINDEX_KEYTAR_MOCK_FILE` at a sandbox-local file.
 - `run()` wraps `Bun.spawn` for the repository CLI entrypoint and captures exit code, stdout, stderr, and elapsed time as `SandboxRunResult`.
 - `cleanup()` is idempotent through a closure-scoped `cleaned` flag.
-- `oauth-provider.ts` exports `testOAuthProvider()` with deterministic endpoints, hosts, PKCE/client/environment policy, scopes, and identity mappings for core tests.
+- `oauth-provider.ts` exports `testOAuthProvider()` as an ordinary `defineProvider()` OAuth2 value with deterministic endpoints, hosts, PKCE, public registration schema, scopes, and identity mappings for core tests.
 
 ## Data & control flow
 

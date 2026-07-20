@@ -49,10 +49,7 @@ describe('fileProfile', () => {
       name: 'LICENSE',
     })
 
-    expect(fileProfile.docs).toEqual({
-      summary: 'An extracted local file.',
-      aliases: ['files'],
-    })
+    expect(fileProfile).not.toHaveProperty('docs')
     expect(fileProfile.actions).toBeUndefined()
     expect(fileProfile.exports).toBeUndefined()
     expect(fields?.extension?.extract(noExtension)).toBeUndefined()

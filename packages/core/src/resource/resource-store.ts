@@ -1,7 +1,6 @@
 import type {
   AnyProfileDefinition,
   FieldType,
-  ProfileReference,
   ProfileRelationTarget,
 } from '@ctxindex/extension-sdk'
 import { CtxindexValidationError } from '../errors'
@@ -34,10 +33,15 @@ function traceStorageAcquireForE2e(): void {
 
 export type ResourceOrigin = 'synced' | 'adhoc'
 
+export interface ResourceProfileIdentity {
+  readonly id: string
+  readonly version: number
+}
+
 export interface ResourceUpsert {
   readonly ref: string
   readonly sourceId: string
-  readonly profile: ProfileReference
+  readonly profile: ResourceProfileIdentity
   readonly origin: ResourceOrigin
   readonly completeness: 'partial' | 'complete'
   readonly title?: string | null
@@ -104,7 +108,7 @@ export interface StoredResource {
   readonly ref: string
   readonly sourceId: string
   readonly realmId: string
-  readonly profile: ProfileReference
+  readonly profile: ResourceProfileIdentity
   readonly origin: ResourceOrigin
   readonly title: string | null
   readonly summary: string | null
