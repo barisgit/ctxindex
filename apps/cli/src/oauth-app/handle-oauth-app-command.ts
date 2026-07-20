@@ -1,6 +1,7 @@
 import { readEnvironmentVariable } from '@ctxindex/core/config'
 import { CtxindexValidationError } from '@ctxindex/core/errors'
 import { oauthAppUsage, parseOAuthAppArgs } from '../args/oauth-app'
+import { assertInitialized } from '../commands/db'
 import { loadCliDefinitions } from '../definitions'
 import { openDeps } from '../deps'
 import { mapErrorToExit } from '../format/exit'
@@ -31,6 +32,7 @@ export async function handleOAuthAppCommand(args: string[]): Promise<number> {
           `Unknown OAuth provider: ${parsed.provider}`,
         )
       }
+      await assertInitialized()
       const config: Record<string, string> = {}
       for (const [field, name] of Object.entries(
         provider.auth.registration.environment,
@@ -73,6 +75,7 @@ export async function handleOAuthAppCommand(args: string[]): Promise<number> {
       })
       console.log(formatOAuthAppAdded(parsed.provider, parsed.label))
     } else {
+      await assertInitialized()
       deps = await openDeps()
       if (parsed.kind === 'list') {
         console.log(

@@ -54,6 +54,28 @@ function expectSqlitePragmas(sandbox: Sandbox): void {
   }
 }
 
+test('database-backed commands require init while help and init remain available', async () => {
+  const sandbox = await createSandbox()
+  try {
+    const realms = await sandbox.run(['realm', 'list', '--json'])
+    expect(realms.exitCode).toBe(2)
+    expect(realms.stderr).toContain(
+      'ctxindex is not initialized; run bun cli init',
+    )
+    expect(await Bun.file(dbPath(sandbox)).exists()).toBe(false)
+
+    const help = await sandbox.run(['oauth-app', '--help'])
+    expect(help.exitCode, help.stderr).toBe(0)
+    expect(await Bun.file(dbPath(sandbox)).exists()).toBe(false)
+
+    const initialized = await sandbox.run(['init'])
+    expect(initialized.exitCode, initialized.stderr).toBe(0)
+    expect(await Bun.file(dbPath(sandbox)).exists()).toBe(true)
+  } finally {
+    await sandbox.cleanup()
+  }
+})
+
 test('init creates layout', async () => {
   const sandbox = await createSandbox()
   try {

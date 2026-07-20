@@ -103,7 +103,7 @@ describe('exit codes e2e', () => {
   test('exit 40 config_error: malformed TOML config is rejected', async () => {
     const sandbox = await createSandbox()
     try {
-      await mkdir(sandbox.env.CTXINDEX_CONFIG_HOME, { recursive: true })
+      await initSandbox(sandbox)
       await writeFile(
         join(sandbox.env.CTXINDEX_CONFIG_HOME, 'config.toml'),
         '[secrets\nbackend = "file"\n',

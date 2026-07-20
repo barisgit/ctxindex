@@ -14,7 +14,7 @@ Packages the Bun-executed `ctxindex` command-line application, from its executab
 
 1. Bun starts `apps/cli/bin/ctxindex.mjs` with process argv.
 2. The shim calls `apps/cli/src/main.ts#runCli(process.argv.slice(2))`.
-3. `runCli` dispatches through the command tree; handlers parse arguments, load dependencies and definitions, invoke core behavior, and format output. `extensions catalog` delegates Git acquisition and persisted provenance to core while startup remains offline. `oauth-app add --from-env` imports only Provider-declared config fields into a secret-backed local App, `account add --app` performs consent with that exact App and snapshots its config into the stable private Grant, and labeled Sources bind the Grant by Adapter id. `init` asks core to select a backend only for a fresh config.
+3. `runCli` dispatches through the command tree; database-backed handlers require both config and database evidence from explicit `init` before opening SQLite. `oauth-app add --from-env` validates the Provider, checks initialization before reading Provider-declared config environments, and imports the config into a secret-backed local App. `account add --app` performs consent with that exact App and snapshots its config into the stable private Grant, and labeled Sources bind the Grant by Adapter id. Action descriptions preserve registry-derived strict unions as numbered alternatives. `extensions catalog` delegates Git acquisition and persisted provenance to core while startup remains offline. `init` selects a backend only for a fresh config.
 4. The returned numeric status is assigned to `process.exitCode` by the shim.
 
 ## Integration points

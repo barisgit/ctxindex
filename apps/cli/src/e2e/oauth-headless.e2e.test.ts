@@ -39,6 +39,9 @@ test('provider-neutral account authorization deduplicates Accounts and safely re
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   const sandbox = await createSandbox()
   try {
+    const initialized = await sandbox.run(['init'])
+    expect(initialized.exitCode, initialized.stderr).toBe(0)
+
     const bin = await installLoopbackBrowser(sandbox.dir)
     const accountEnv = {
       NODE_ENV: 'test',

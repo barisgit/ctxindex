@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
 import { join } from 'node:path'
+import { defaultConfig, writeConfig } from '@ctxindex/core/config'
 import { createSandbox } from '@ctxindex/core/testing'
 
 async function expectDatabaseAbsent(dataHome: string): Promise<void> {
@@ -12,31 +13,99 @@ async function expectDatabaseAbsent(dataHome: string): Promise<void> {
   }
 }
 
-test('oauth-app rejects unknown Providers and invalid config without creating SQLite files', async () => {
+test('oauth-app add requires explicit initialization before reading config or creating state', async () => {
   const sandbox = await createSandbox()
   try {
-    const unknown = await sandbox.run([
-      'oauth-app',
-      'add',
-      'fastmail',
-      'work',
-      '--from-env',
-    ])
+    const added = await sandbox.run(
+      ['oauth-app', 'add', 'microsoft', 'work', '--from-env'],
+      {
+        env: {
+          CTXINDEX_MICROSOFT_CLIENT_ID: 'microsoft-client-id-canary',
+        },
+      },
+    )
+    expect(added.exitCode).toBe(2)
+    expect(added.stderr).toContain(
+      'ctxindex is not initialized; run bun cli init',
+    )
+    expect(`${added.stdout}${added.stderr}`).not.toContain(
+      'microsoft-client-id-canary',
+    )
+    const keytarMockFile = sandbox.env.CTXINDEX_KEYTAR_MOCK_FILE
+    expect(keytarMockFile).toBeDefined()
+    if (keytarMockFile === undefined) {
+      throw new Error('sandbox Keychain mock path is required')
+    }
+    for (const path of [
+      join(sandbox.env.CTXINDEX_CONFIG_HOME, 'config.toml'),
+      join(sandbox.env.CTXINDEX_DATA_HOME, 'secrets.box'),
+      join(sandbox.env.CTXINDEX_CONFIG_HOME, 'secret.key'),
+      keytarMockFile,
+    ]) {
+      expect(await Bun.file(path).exists()).toBe(false)
+    }
+    await expectDatabaseAbsent(sandbox.env.CTXINDEX_DATA_HOME)
+  } finally {
+    await sandbox.cleanup()
+  }
+})
+
+test('oauth-app add rejects config-only partial initialization without opening state', async () => {
+  const sandbox = await createSandbox()
+  try {
+    await writeConfig(
+      defaultConfig(),
+      join(sandbox.env.CTXINDEX_CONFIG_HOME, 'config.toml'),
+    )
+    const keytarMockFile = sandbox.env.CTXINDEX_KEYTAR_MOCK_FILE
+    expect(keytarMockFile).toBeDefined()
+    if (keytarMockFile === undefined) {
+      throw new Error('sandbox Keychain mock path is required')
+    }
+
+    const added = await sandbox.run(
+      ['oauth-app', 'add', 'microsoft', 'work', '--from-env'],
+      {
+        env: { CTXINDEX_MICROSOFT_CLIENT_ID: 'partial-client-id-canary' },
+      },
+    )
+
+    expect(added.exitCode).toBe(2)
+    expect(added.stderr).toContain(
+      'ctxindex is not initialized; run bun cli init',
+    )
+    expect(`${added.stdout}${added.stderr}`).not.toContain(
+      'partial-client-id-canary',
+    )
+    for (const path of [
+      join(sandbox.env.CTXINDEX_DATA_HOME, 'secrets.box'),
+      join(sandbox.env.CTXINDEX_CONFIG_HOME, 'secret.key'),
+      keytarMockFile,
+    ]) {
+      expect(await Bun.file(path).exists()).toBe(false)
+    }
+    await expectDatabaseAbsent(sandbox.env.CTXINDEX_DATA_HOME)
+  } finally {
+    await sandbox.cleanup()
+  }
+})
+
+test('oauth-app add preserves Provider validation before initialization', async () => {
+  const sandbox = await createSandbox()
+  try {
+    const unknown = await sandbox.run(
+      ['oauth-app', 'add', 'fastmail', 'work', '--from-env'],
+      { env: { FASTMAIL_SECRET: 'unknown-canary' } },
+    )
+
     expect(unknown.exitCode).toBe(2)
     expect(unknown.stderr).toContain('Unknown OAuth provider: fastmail')
-    await expectDatabaseAbsent(sandbox.env.CTXINDEX_DATA_HOME)
-
-    const invalidConfig = await sandbox.run([
-      'oauth-app',
-      'add',
-      'microsoft',
-      'work',
-      '--from-env',
-    ])
-    expect(invalidConfig.exitCode).toBe(2)
-    expect(invalidConfig.stderr).toContain(
-      'OAuth App configuration is invalid for the selected Provider',
-    )
+    expect(`${unknown.stdout}${unknown.stderr}`).not.toContain('unknown-canary')
+    expect(
+      await Bun.file(
+        join(sandbox.env.CTXINDEX_CONFIG_HOME, 'config.toml'),
+      ).exists(),
+    ).toBe(false)
     await expectDatabaseAbsent(sandbox.env.CTXINDEX_DATA_HOME)
   } finally {
     await sandbox.cleanup()
@@ -46,6 +115,9 @@ test('oauth-app rejects unknown Providers and invalid config without creating SQ
 test('oauth-app validates providers and manages safe labeled inventory', async () => {
   const sandbox = await createSandbox()
   try {
+    const initialized = await sandbox.run(['init'])
+    expect(initialized.exitCode, initialized.stderr).toBe(0)
+
     const empty = await sandbox.run(['oauth-app', 'list', '--json'])
     expect(empty.exitCode, empty.stderr).toBe(0)
     expect(empty.stdout).toBe('[]\n')
