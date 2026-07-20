@@ -14,7 +14,7 @@ artifact without publishing from local development or touching user state.
 - `cli-package.ts` is the package-policy owner. It creates a minimal staging manifest, packs an allowlisted archive, computes
   normalized content digests, and rejects unsafe paths, unexpected files,
   workspace imports/specifiers, development manifests, absolute checkout paths,
-  or credential-like content.
+  credential-like content, or non-canonical project and issue-tracker links.
 - Its exact-tarball smoke creates temporary state outside the checkout, installs
   globally under isolated Bun directories, and proves the installed bin, native
   `keytar` when the host supplies its platform library, OAuth App help and pre-init

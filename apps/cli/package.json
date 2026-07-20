@@ -3,6 +3,10 @@
   "version": "0.0.0",
   "description": "Local personal-context gateway CLI for agents",
   "license": "MIT",
+  "homepage": "https://ctxindex.com",
+  "bugs": {
+    "url": "https://github.com/barisgit/ctxindex/issues"
+  },
   "type": "module",
   "bin": {
     "ctxindex": "dist/ctxindex.mjs"

@@ -21,6 +21,8 @@ export interface CliSourceManifest {
   readonly version: string
   readonly description: string
   readonly license: 'MIT'
+  readonly homepage: string
+  readonly bugs: { readonly url: string }
   readonly type: 'module'
   readonly bin: { readonly ctxindex: string }
   readonly files: readonly string[]
@@ -42,6 +44,10 @@ export interface CliPublishManifest {
   readonly version: string
   readonly description: string
   readonly license: 'MIT'
+  readonly homepage: 'https://ctxindex.com'
+  readonly bugs: {
+    readonly url: 'https://github.com/barisgit/ctxindex/issues'
+  }
   readonly type: 'module'
   readonly bin: { readonly ctxindex: 'dist/ctxindex.mjs' }
   readonly files: readonly ['dist/ctxindex.mjs', 'README.md', 'LICENSE']
@@ -163,6 +169,8 @@ export function assertSafePackageFiles(files: readonly PackageFile[]): void {
   if (
     manifest.name !== 'ctxindex' ||
     manifest.license !== 'MIT' ||
+    manifest.homepage !== 'https://ctxindex.com' ||
+    manifest.bugs?.url !== 'https://github.com/barisgit/ctxindex/issues' ||
     manifest.bin?.ctxindex !== 'dist/ctxindex.mjs' ||
     manifest.engines?.bun !== '1.3.14' ||
     JSON.stringify(manifest.files) !==
@@ -214,6 +222,8 @@ export function createPublishManifest(
     version: source.version,
     description: source.description,
     license: 'MIT',
+    homepage: 'https://ctxindex.com',
+    bugs: { url: 'https://github.com/barisgit/ctxindex/issues' },
     type: 'module',
     bin: { ctxindex: 'dist/ctxindex.mjs' },
     files: ['dist/ctxindex.mjs', 'README.md', 'LICENSE'],

@@ -5,6 +5,8 @@ interface PackageManifest {
   readonly version?: string
   readonly private?: boolean
   readonly license?: string
+  readonly homepage?: string
+  readonly bugs?: { readonly url?: string }
   readonly bin?: Record<string, string>
   readonly files?: readonly string[]
   readonly engines?: Record<string, string>
@@ -30,6 +32,8 @@ test('the private monorepo builds one public installable ctxindex package', asyn
     name: 'ctxindex',
     version: '0.0.0',
     license: 'MIT',
+    homepage: 'https://ctxindex.com',
+    bugs: { url: 'https://github.com/barisgit/ctxindex/issues' },
     bin: { ctxindex: 'dist/ctxindex.mjs' },
     files: ['dist/ctxindex.mjs', 'README.md'],
     engines: { bun: '1.3.14' },

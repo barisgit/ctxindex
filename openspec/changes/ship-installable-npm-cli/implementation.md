@@ -16,6 +16,8 @@ The published package contract is:
 {
   "name": "ctxindex",
   "license": "MIT",
+  "homepage": "https://ctxindex.com",
+  "bugs": { "url": "https://github.com/barisgit/ctxindex/issues" },
   "bin": { "ctxindex": "dist/ctxindex.mjs" },
   "files": ["dist/ctxindex.mjs", "README.md", "LICENSE"],
   "dependencies": { "keytar": "7.9.0" }

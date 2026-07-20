@@ -18,13 +18,16 @@ policy in workflow shell.
 
 The staged package contains exactly `package.json`, `README.md`, `LICENSE`, and
 `dist/ctxindex.mjs`. Its manifest exposes `ctxindex` through the bundled
-executable, requires Bun 1.3.14, declares the MIT license, and retains only
-`keytar@7.9.0` as an external runtime dependency. `trustedDependencies` permits
-Bun to install the native `keytar` module. No runtime dependency or bundled
-import may use the workspace protocol or an internal `@ctxindex/*` package.
-Only the CLI version is injected from the source manifest. The build rewrites
-dependency `__dirname` references to the bundle directory so the executable has
-no development manifest or absolute source-checkout path after relocation.
+executable, requires Bun 1.3.14, declares the MIT license, identifies
+`https://ctxindex.com` as its homepage and
+`https://github.com/barisgit/ctxindex/issues` as its issue tracker, and retains
+only `keytar@7.9.0` as an external runtime dependency. `trustedDependencies`
+permits Bun to install the native `keytar` module. No runtime dependency or
+bundled import may use the workspace protocol or an internal `@ctxindex/*`
+package. Only the CLI version is injected from the source manifest. The build
+rewrites dependency `__dirname` references to the bundle directory so the
+executable has no development manifest or absolute source-checkout path after
+relocation.
 
 The flow is source entrypoint → Bun-target bundle → minimal staging directory →
 allowlisted `.tgz` → isolated global installation → protected publication.

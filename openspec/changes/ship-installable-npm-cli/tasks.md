@@ -1,6 +1,6 @@
 ## 1. Public package and contributor build
 
-- [x] 1.1 Add failing package-contract tests for the private root, public unscoped CLI manifest, built bin, Bun pin, native dependency boundary, and absence of runtime `workspace:*` dependencies.
+- [x] 1.1 Add failing package-contract tests for the private root, public unscoped CLI manifest with canonical homepage and issue-tracker links, built bin, Bun pin, native dependency boundary, and absence of runtime `workspace:*` dependencies.
 - [x] 1.2 Implement the Bun-target CLI bundle, public package metadata, root/package scripts, lockfile updates, and documented build plus `bun link` contributor flow.
 - [x] 1.3 Pass the package-contract tests, CLI typecheck/build, dependency architecture gate, and linked-bin help smoke in isolated state.
 

@@ -2,7 +2,7 @@
 
 ### Requirement: Installable public CLI package
 
-The repository SHALL keep its monorepo root private and SHALL produce an unscoped public npm package named `ctxindex` from the CLI workspace. The package MUST expose a `ctxindex` executable that runs with Bun 1.3.14 after a global installation and MUST NOT require any unpublished `workspace:*` runtime dependency. Contributors MUST be able to build the package and link that executable locally through Bun.
+The repository SHALL keep its monorepo root private and SHALL produce an unscoped public npm package named `ctxindex` from the CLI workspace. The package MUST expose a `ctxindex` executable that runs with Bun 1.3.14 after a global installation, MUST identify `https://ctxindex.com` as its homepage and `https://github.com/barisgit/ctxindex/issues` as its issue tracker, and MUST NOT require any unpublished `workspace:*` runtime dependency. Contributors MUST be able to build the package and link that executable locally through Bun.
 
 #### Scenario: Contributor links the built CLI
 
@@ -12,7 +12,7 @@ The repository SHALL keep its monorepo root private and SHALL produce an unscope
 #### Scenario: Installed package has a closed runtime graph
 
 - **WHEN** the packed package metadata and executable are inspected
-- **THEN** the package is public and unscoped, exposes the `ctxindex` bin, and contains no unpublished workspace dependency or workspace import
+- **THEN** the package is public and unscoped, exposes the `ctxindex` bin and canonical project and issue-tracker links, and contains no unpublished workspace dependency or workspace import
 
 ### Requirement: Deterministic and safe publish artifact
 
