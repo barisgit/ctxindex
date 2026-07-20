@@ -6,8 +6,8 @@ import type { ExtensionOriginProvenance } from './collector'
 import { createExtensionHostDiagnostic } from './diagnostics'
 import {
   importPackageEntries,
+  importSelectedPackageEntry,
   resolvePackageEntries,
-  selectExactExtension,
 } from './package-entry'
 
 function packageIdentity(manifest: unknown): {
@@ -24,10 +24,10 @@ function packageIdentity(manifest: unknown): {
   }
 }
 
-export async function importExtensionPackageRoots(
+async function resolveExtensionPackageEntries(
   packageRoot: string,
   provenance: ExtensionOriginProvenance = { origin: 'explicit-path' },
-): Promise<CollectedExtension[]> {
+): Promise<Awaited<ReturnType<typeof resolvePackageEntries>>> {
   let root: string
   let manifest: unknown
   try {
@@ -38,11 +38,30 @@ export async function importExtensionPackageRoots(
       'Extension package manifest could not be read',
     )
   }
-  const resolved = await resolvePackageEntries(root, manifest, {
+  return resolvePackageEntries(root, manifest, {
     ...packageIdentity(manifest),
     ...provenance,
   })
-  return importPackageEntries(resolved)
+}
+
+export async function importExtensionPackageRoots(
+  packageRoot: string,
+  provenance: ExtensionOriginProvenance = { origin: 'explicit-path' },
+): Promise<CollectedExtension[]> {
+  return importPackageEntries(
+    await resolveExtensionPackageEntries(packageRoot, provenance),
+  )
+}
+
+export async function importExtensionPackageRoot(
+  packageRoot: string,
+  extensionId: string,
+  provenance: ExtensionOriginProvenance = { origin: 'explicit-path' },
+): Promise<CollectedExtension> {
+  return importSelectedPackageEntry(
+    await resolveExtensionPackageEntries(packageRoot, provenance),
+    extensionId,
+  )
 }
 
 export async function importExtensionRoots(
@@ -56,9 +75,10 @@ export async function importExtensionDefinition(
   packageRoot: string,
   extensionId?: string,
 ): Promise<AnyExtensionDefinition> {
-  const collected = await importExtensionRoots(packageRoot)
   if (extensionId !== undefined)
-    return selectExactExtension(collected, extensionId).definition
+    return (await importExtensionPackageRoot(packageRoot, extensionId))
+      .definition
+  const collected = await importExtensionRoots(packageRoot)
   if (collected.length === 0)
     throw createExtensionHostDiagnostic(
       'Entry exports no supported Extension root',

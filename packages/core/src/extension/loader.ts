@@ -21,8 +21,10 @@ import {
   type DocumentationProjection,
   resolveCollectedExtensionDocumentation,
 } from './documentation'
-import { importExtensionPackageRoots } from './import'
-import { selectExactExtension } from './package-entry'
+import {
+  importExtensionPackageRoot,
+  importExtensionPackageRoots,
+} from './import'
 
 export interface ExtensionLoadDiagnostic {
   readonly path: string
@@ -158,11 +160,14 @@ export async function loadExtensions(
           'Installed Extension provenance does not match snapshot manifest',
         )
       }
-      const roots = await importExtensionPackageRoots(extensionPath, {
-        origin: 'catalog',
-        commit: installed.commit,
-      })
-      const selected = selectExactExtension(roots, installed.id)
+      const selected = await importExtensionPackageRoot(
+        extensionPath,
+        installed.id,
+        {
+          origin: 'catalog',
+          commit: installed.commit,
+        },
+      )
       const nextRoots = [...activeRoots, selected]
       assertCompatibleExtensionDocumentation(nextRoots)
       const candidate = buildCompleteCandidateRegistry({

@@ -2,7 +2,6 @@ import { expect, test } from 'bun:test'
 import { defaultConfig } from '@ctxindex/core/config'
 import {
   loadExtensions,
-  type ResolvedDocumentationTree,
   resolveExtensionDocumentation,
 } from '@ctxindex/core/extension'
 import { googleDocumentation } from './builtin-documentation/google/descriptor'
@@ -52,9 +51,9 @@ test('embedded built-in trees match directory sources through the shared resolve
       fixture.moduleUrl,
     )
     const embedded = await resolveExtensionDocumentation(fixture.extension)
-    expect(embedded.documentation as ResolvedDocumentationTree).toEqual(
-      directory.documentation as ResolvedDocumentationTree,
-    )
+    expect(directory.documentation).toBeDefined()
+    expect(embedded.documentation).toBeDefined()
+    expect(embedded.documentation).toEqual(directory.documentation)
   }
 })
 

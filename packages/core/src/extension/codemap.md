@@ -6,7 +6,7 @@ Discovers exported Extension values from built-in namespaces and materialized pa
 
 ## Design
 
-- `package-entry.ts` resolves the ordered, unique, contained module paths declared by `package.json` `ctxindex.extensions`, imports each entry once, and provides exact-id selection. This manifest list is the package boundary, not a dependency graph.
+- `package-entry.ts` resolves the ordered, unique, contained module paths declared by `package.json` `ctxindex.extensions`, imports each entry once, and provides exact-id selection before sidecar resolution. Whole-package imports resolve every collected root, while exact imports resolve documentation only for the selected root. This manifest list is the package boundary, not a dependency graph.
 - `collector.ts` filters module namespaces for structurally valid named/default Extension values, ignores unrelated exports and functions, and attaches entry/export provenance.
 - `import.ts` reads package manifests, derives package provenance, and composes entry resolution, namespace import, collection, and optional exact selection.
 - `diagnostics.ts` owns branded host-generated Extension diagnostics. Import/evaluation boundaries discard arbitrary thrown causes; callers render only branded safe messages plus separately validated path, Catalog, or Extension identity.
@@ -18,7 +18,7 @@ Discovers exported Extension values from built-in namespaces and materialized pa
 
 1. The already acquired `@ctxindex/adapters` module namespace enters the same namespace collector used for package entries and forms the initial complete candidate; the host does not preselect its Extension exports.
 2. Each configured path identifies a package root. The loader reads its manifest, resolves and imports declared entries once, collects every exported Extension root, resolves any directory sidecar relative to its entry, and atomically validates the combined candidate.
-3. Each installed Catalog record resolves its immutable snapshot package root offline, validates persisted manifest identity, collects all roots, and exact-selects the recorded Extension id before candidate validation.
+3. Each installed Catalog record resolves its immutable snapshot package root offline, validates persisted manifest identity, collects all roots, exact-selects the recorded Extension id, and resolves only that root's documentation before candidate validation.
 4. A package becomes active only after documentation and complete-registry validation succeed; failures produce diagnostics while the previous active roots, registry, and documentation projection remain unchanged.
 
 ## Integration points

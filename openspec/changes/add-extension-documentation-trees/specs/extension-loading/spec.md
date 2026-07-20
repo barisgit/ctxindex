@@ -14,6 +14,10 @@ Trusted built-in, explicit-path TypeScript/JavaScript, existing installed inline
 - **WHEN** an external loader has already acquired an npm package and supplies its definition-module URL
 - **THEN** ctxindex resolves that Extension's relative docs without downloading, installing, or executing package-manager behavior
 
+#### Scenario: Exact selection isolates unselected sibling documentation
+- **WHEN** an exact-id loader selects one root from a multi-root package whose unselected sibling has invalid or missing documentation
+- **THEN** the loader resolves and validates only the selected root's documentation, while a whole-package multi-root load still validates every collected root
+
 ### Requirement: Compiled built-ins embed resolved documentation
 The compiled built-in packaging path SHALL resolve directory descriptors while their definition-module URLs and source files are available, validate them through the shared documentation rules, and embed generated virtual trees in the compiled artifact. A relocated compiled CLI MUST NOT need the source checkout or captured module paths to expose the same logical projection.
 

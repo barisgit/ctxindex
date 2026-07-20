@@ -17,6 +17,11 @@ export interface ResolvedPackageEntries {
   readonly provenance: ExtensionOriginProvenance
 }
 
+interface CollectedPackageRoot {
+  readonly root: CollectedExtension
+  readonly definitionModuleUrl: URL
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -93,10 +98,10 @@ export async function resolvePackageEntries(
   return { entries: resolved, provenance }
 }
 
-export async function importPackageEntries(
+async function collectPackageEntries(
   resolved: ResolvedPackageEntries,
-): Promise<CollectedExtension[]> {
-  const collected: CollectedExtension[] = []
+): Promise<CollectedPackageRoot[]> {
+  const collected: CollectedPackageRoot[] = []
   for (const entry of resolved.entries) {
     let module: Readonly<Record<string, unknown>>
     try {
@@ -110,14 +115,8 @@ export async function importPackageEntries(
     }
     try {
       const roots = collectExtensionExports(module, entry, resolved.provenance)
-      for (const root of roots) {
-        collected.push(
-          await resolveCollectedExtensionDocumentation(
-            root,
-            pathToFileURL(entry),
-          ),
-        )
-      }
+      const definitionModuleUrl = pathToFileURL(entry)
+      collected.push(...roots.map((root) => ({ root, definitionModuleUrl })))
     } catch (cause) {
       if (isExtensionHostDiagnostic(cause)) throw cause
       throw createExtensionHostDiagnostic(
@@ -126,6 +125,47 @@ export async function importPackageEntries(
     }
   }
   return collected
+}
+
+async function resolvePackageRoot(
+  candidate: CollectedPackageRoot,
+): Promise<CollectedExtension> {
+  try {
+    return await resolveCollectedExtensionDocumentation(
+      candidate.root,
+      candidate.definitionModuleUrl,
+    )
+  } catch (cause) {
+    if (isExtensionHostDiagnostic(cause)) throw cause
+    throw createExtensionHostDiagnostic(
+      'Extension exports could not be inspected',
+    )
+  }
+}
+
+export async function importPackageEntries(
+  resolved: ResolvedPackageEntries,
+): Promise<CollectedExtension[]> {
+  const candidates = await collectPackageEntries(resolved)
+  const collected: CollectedExtension[] = []
+  for (const candidate of candidates)
+    collected.push(await resolvePackageRoot(candidate))
+  return collected
+}
+
+export async function importSelectedPackageEntry(
+  resolved: ResolvedPackageEntries,
+  id: string,
+): Promise<CollectedExtension> {
+  const candidates = await collectPackageEntries(resolved)
+  const selected = selectExactExtension(
+    candidates.map(({ root }) => root),
+    id,
+  )
+  const candidate = candidates.find(({ root }) => root === selected)
+  if (candidate === undefined)
+    throw createExtensionHostDiagnostic('Requested Extension was not exported')
+  return resolvePackageRoot(candidate)
 }
 
 export function selectExactExtension(

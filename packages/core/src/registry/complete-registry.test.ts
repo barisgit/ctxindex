@@ -129,31 +129,38 @@ function build(roots: readonly CollectedExtension[]) {
   })
 }
 
+const boundaryDefinitionId = 'a'.repeat(128)
+const invalidDefinitionIds = [
+  'a'.repeat(129),
+  '../escape',
+  '\uD800',
+  'Uppercase',
+  'repeated..separator',
+] as const
+
 describe('buildCompleteCandidateRegistry', () => {
-  test('requires bounded route-safe ids for every definition kind', () => {
-    const boundary = 'a'.repeat(128)
+  test('accepts the route-safe Extension id boundary and rejects invalid ids', () => {
+    expect(() =>
+      build([collected(extension(boundaryDefinitionId))]),
+    ).not.toThrow()
+    for (const invalidId of invalidDefinitionIds) {
+      expect(() => build([collected(extension(invalidId))])).toThrow(
+        'Invalid Extension definition',
+      )
+    }
+  })
+
+  test('accepts the route-safe Provider id boundary and rejects invalid ids', () => {
     expect(() =>
       build([
         collected(
-          extension(boundary, {
-            providers: [provider(boundary)],
-            profiles: [profile(boundary)],
-            adapters: [adapter({ id: boundary })],
+          extension('fixture.valid-provider-id', {
+            providers: [provider(boundaryDefinitionId)],
           }),
         ),
       ]),
     ).not.toThrow()
-
-    for (const invalidId of [
-      'a'.repeat(129),
-      '../escape',
-      '\uD800',
-      'Uppercase',
-      'repeated..separator',
-    ]) {
-      expect(() => build([collected(extension(invalidId))])).toThrow(
-        'Invalid Extension definition',
-      )
+    for (const invalidId of invalidDefinitionIds) {
       expect(() =>
         build([
           collected(
@@ -163,15 +170,20 @@ describe('buildCompleteCandidateRegistry', () => {
           ),
         ]),
       ).toThrow('Invalid Provider definition')
-      expect(() =>
-        build([
-          collected(
-            extension('fixture.invalid-profile-id', {
-              profiles: [profile(invalidId)],
-            }),
-          ),
-        ]),
-      ).toThrow('Invalid Profile definition')
+    }
+  })
+
+  test('accepts the route-safe Adapter id boundary and rejects invalid ids', () => {
+    expect(() =>
+      build([
+        collected(
+          extension('fixture.valid-adapter-id', {
+            adapters: [adapter({ id: boundaryDefinitionId })],
+          }),
+        ),
+      ]),
+    ).not.toThrow()
+    for (const invalidId of invalidDefinitionIds) {
       expect(() =>
         build([
           collected(

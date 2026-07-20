@@ -34,7 +34,7 @@ export function selectExactExtension(
 
 `resolvePackageEntries` validates the ordered unique `package.json` `ctxindex.extensions` module paths, including containment after symlink resolution. Namespace collection inspects top-level values, structurally validates values claiming the Extension discriminator, ignores unrelated exports, and never invokes functions.
 
-`importPackageEntries` also supplies each acquired entry's file URL to the shared documentation resolver. The resolver binds an Extension-root `docs('./docs')` descriptor beside that entry, produces portable logical content, and removes the descriptor before complete-registry validation. Virtual built-in trees enter the same resolver. `LoadExtensionsResult.documentation` is built only from roots that survive atomic candidate validation.
+`importPackageEntries` also supplies each acquired entry's file URL to the shared documentation resolver. Whole-package import resolves every collected root. The exact-id seam collects all roots to prove unique selection, then resolves only the selected root's sidecar; invalid documentation on an unselected sibling cannot block an exact installed or direct import. The resolver binds an Extension-root `docs('./docs')` descriptor beside that entry, produces portable logical content, and removes the descriptor before complete-registry validation. Virtual built-in trees enter the same resolver. `LoadExtensionsResult.documentation` is built only from roots that survive atomic candidate validation.
 
 ### @ctxindex/core — reachable graph and complete registry
 

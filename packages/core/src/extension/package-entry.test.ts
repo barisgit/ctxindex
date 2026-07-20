@@ -9,6 +9,7 @@ import {
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { importExtensionDefinition } from './import'
 import {
   importPackageEntries,
   resolvePackageEntries,
@@ -90,6 +91,34 @@ export function legacyCallback() { globalThis[${JSON.stringify(counter)}] += 100
     ])
     expect((globalThis as Record<string, unknown>)[counter]).toBe(1)
     delete (globalThis as Record<string, unknown>)[counter]
+  })
+
+  test('exact selection ignores invalid documentation on an unselected sibling', async () => {
+    const root = await sandbox()
+    await writeFile(
+      join(root, 'package.json'),
+      JSON.stringify({ ctxindex: { extensions: ['./entry.mjs'] } }),
+    )
+    await writeFile(
+      join(root, 'entry.mjs'),
+      `const extension = (id, docs) => ({ kind: 'extension', id, providers: [], oauthApps: [], profiles: [], adapters: [], ...(docs === undefined ? {} : { docs }) })
+export const selected = extension('fixture.selected')
+export const sibling = extension('fixture.sibling', { kind: 'directory', path: './docs' })
+`,
+    )
+
+    await expect(
+      importExtensionDefinition(root, 'fixture.selected'),
+    ).resolves.toMatchObject({ id: 'fixture.selected' })
+
+    const resolved = await resolvePackageEntries(
+      root,
+      { ctxindex: { extensions: ['./entry.mjs'] } },
+      provenance,
+    )
+    await expect(importPackageEntries(resolved)).rejects.toThrow(
+      'Invalid Extension documentation',
+    )
   })
 
   test('selects one exact Extension id with absence and ambiguity diagnostics', () => {

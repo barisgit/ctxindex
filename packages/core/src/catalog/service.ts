@@ -3,8 +3,7 @@ import {
   createExtensionHostDiagnostic,
   safeExtensionDiagnostic,
 } from '../extension/diagnostics'
-import { importExtensionPackageRoots } from '../extension/import'
-import { selectExactExtension } from '../extension/package-entry'
+import { importExtensionPackageRoot } from '../extension/import'
 import { dataDir } from '../paths'
 import {
   buildCompleteCandidateRegistry,
@@ -266,14 +265,15 @@ export class CatalogService {
         'Catalog snapshot entry does not match persisted record',
       )
     }
-    let selected: ReturnType<typeof selectExactExtension>
+    let selected: Awaited<ReturnType<typeof importExtensionPackageRoot>>
     try {
-      selected = selectExactExtension(
-        await importExtensionPackageRoots(join(snapshot, entry.source.path), {
+      selected = await importExtensionPackageRoot(
+        join(snapshot, entry.source.path),
+        entry.id,
+        {
           origin: 'catalog',
           commit: catalog.commit,
-        }),
-        entry.id,
+        },
       )
     } catch (cause) {
       throw createExtensionHostDiagnostic(

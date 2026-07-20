@@ -58,6 +58,23 @@ describe('ProfileRegistry', () => {
     ).toThrow(DefinitionRegistryError)
   })
 
+  test('rejects an Action output with an invalid Profile reference id', () => {
+    expect(() =>
+      createProfileRegistry([
+        {
+          ...profile,
+          actions: {
+            'fake.note.read': {
+              effect: 'reversible',
+              input: z.object({}),
+              output: { id: '../escape', version: 1 },
+            },
+          },
+        } as never,
+      ]),
+    ).toThrow(DefinitionRegistryError)
+  })
+
   test('rejects an empty Profile Action id', () => {
     expect(() =>
       createProfileRegistry([
