@@ -1,0 +1,10 @@
+{
+  "name": "fixture-direct-local",
+  "version": "1.0.0",
+  "type": "module",
+  "ctxindex": {
+    "extensions": [
+      "./dist/extension.js"
+    ]
+  }
+}

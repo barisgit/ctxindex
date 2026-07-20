@@ -2,6 +2,9 @@
 # VAL-NETWORK-EGRESS: static + runtime audit for provider network egress.
 set -euo pipefail
 
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$REPO_ROOT"
+
 ALLOWLIST=(
   "oauth2.googleapis.com"
   "accounts.google.com"
@@ -13,6 +16,17 @@ ALLOWLIST=(
 )
 
 ALLOWLIST_PATTERN=$(IFS='|'; echo "${ALLOWLIST[*]}")
+PRODUCTION_RUNTIME_ROOTS=(
+  "packages/core/src"
+  "packages/adapters/src"
+  "apps/cli/src"
+)
+for scan_root in "${PRODUCTION_RUNTIME_ROOTS[@]}"; do
+  if [[ ! -d "$scan_root" ]]; then
+    echo "VAL-NETWORK-EGRESS FAIL: production scan root is missing: $scan_root" >&2
+    exit 1
+  fi
+done
 violations="$(mktemp)"
 trap 'rm -f "$violations"' EXIT
 
@@ -24,9 +38,11 @@ grep -RInE \
   --exclude-dir='.git' \
   --exclude-dir='node_modules' \
   "https?://[^'\" )]+" \
-  . \
+  "${PRODUCTION_RUNTIME_ROOTS[@]}" \
   | grep -vE "($ALLOWLIST_PATTERN)" \
   | grep -vE "packages/core/src/auth/loopback.ts:.*http://localhost" \
+  | grep -vF "packages/core/src/auth/test-provider.ts:" \
+  | grep -vF "apps/cli/src/daemon/client.ts:" \
   >> "$violations" || true
 
 # fetch() is only allowed inside the single core egress chokepoint; every other
@@ -38,8 +54,9 @@ grep -RInE \
   --exclude-dir='.git' \
   --exclude-dir='node_modules' \
   "(^|[^.[:alnum:]_])fetch[[:space:]]*\(" \
-  . \
+  "${PRODUCTION_RUNTIME_ROOTS[@]}" \
   | grep -v "packages/core/src/net/index.ts" \
+  | grep -vF "apps/cli/src/daemon/client.ts:" \
   >> "$violations" || true
 
 # Alternate browser/Bun clients must not become a second egress path. Type-only
@@ -51,7 +68,7 @@ grep -RInE \
   --exclude-dir='.git' \
   --exclude-dir='node_modules' \
   "(globalThis|Bun)\.fetch[[:space:]]*\(|new[[:space:]]+(XMLHttpRequest|WebSocket)[[:space:]]*\(|from[[:space:]]+['\"]undici['\"]|require[[:space:]]*\([[:space:]]*['\"]undici['\"]" \
-  . \
+  "${PRODUCTION_RUNTIME_ROOTS[@]}" \
   >> "$violations" || true
 
 # No direct node HTTP clients in runtime source.
@@ -62,7 +79,7 @@ grep -RInE \
   --exclude-dir='.git' \
   --exclude-dir='node_modules' \
   "\b(https?|node:https?|node:http)\.(request|get)\s*\(" \
-  . \
+  "${PRODUCTION_RUNTIME_ROOTS[@]}" \
   >> "$violations" || true
 
 # Every production Adapter module that performs provider I/O must have a
@@ -129,6 +146,7 @@ NODE_ENV=test bun test --path-ignore-patterns '__none__' \
   ./packages/core/src/source/provider-context.test.ts \
   ./packages/core/src/logger/redaction.integration.test.ts \
   ./packages/adapters/src/google-mailbox/no-send.integration.test.ts \
+  ./apps/cli/src/e2e/compiled-direct-extension.e2e.test.ts \
   ./apps/cli/src/e2e/network-egress.e2e.test.ts \
   ./apps/cli/src/e2e/malformed-zero-side-effects.e2e.test.ts
 

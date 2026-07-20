@@ -13,6 +13,9 @@ function fakeOwnership(events: string[]): DirectDatabaseOwnership {
       events.push('read-identities')
       return []
     },
+    async readDirectExtensionSourceBindings() {
+      throw new Error('Source bindings read outside dependency composition')
+    },
     async open() {
       throw new Error('ownership opened outside dependency composition')
     },

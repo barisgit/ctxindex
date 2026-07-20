@@ -1,0 +1,16 @@
+{
+  "name": "fixture-direct-npm",
+  "version": "1.0.0",
+  "type": "module",
+  "ctxindex": {
+    "extensions": [
+      "./extension.js"
+    ]
+  },
+  "dependencies": {
+    "fixture-direct-dependency": "1.0.0"
+  },
+  "scripts": {
+    "postinstall": "node -e \"require('node:fs').writeFileSync('lifecycle-ran', 'unsafe')\""
+  }
+}

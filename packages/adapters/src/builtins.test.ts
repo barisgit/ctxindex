@@ -1,14 +1,25 @@
 import { describe, expect, test } from 'bun:test'
+import { defaultConfig } from '@ctxindex/core/config'
+import { loadExtensions } from '@ctxindex/core/extension'
+import { resolveManagedOAuthApp } from '@ctxindex/core/oauth-app'
 import type { AnyAdapterDefinition } from '@ctxindex/extension-sdk'
 import {
   calendarEventProfile,
   communicationMessageProfile,
   fileProfile,
 } from '@ctxindex/profiles'
-import { CTXINDEX_BUILTIN_EXTENSIONS } from './index'
+import * as builtinModule from './index'
+import {
+  CTXINDEX_BUILTIN_EXTENSIONS,
+  CTXINDEX_MANAGED_OAUTH_APP_POLICIES,
+  ctxindexGoogleOAuthApp,
+  ctxindexMicrosoftOAuthApp,
+  googleOAuthProvider,
+  microsoftOAuthProvider,
+} from './index'
 
 describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
-  test('publishes three ordinary provider integration roots with no foundational Profiles Extension or bundled OAuth App', () => {
+  test('publishes three ordinary provider integration roots with managed Apps on the same SDK graph', () => {
     expect(CTXINDEX_BUILTIN_EXTENSIONS.map(({ id }) => id)).toEqual([
       'ctxindex.google',
       'ctxindex.microsoft',
@@ -24,10 +35,10 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
       ['local.directory'],
     ])
     expect(
-      CTXINDEX_BUILTIN_EXTENSIONS.every(
-        (extension) => extension.oauthApps.length === 0,
+      CTXINDEX_BUILTIN_EXTENSIONS.map((extension) =>
+        extension.oauthApps.map(({ provider, label }) => [provider.id, label]),
       ),
-    ).toBe(true)
+    ).toEqual([[['google', 'ctxindex']], [['microsoft', 'ctxindex']], []])
     expect(
       CTXINDEX_BUILTIN_EXTENSIONS.every(
         (extension) => !Object.hasOwn(extension, 'dependencies'),
@@ -38,6 +49,61 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
         (extension) => !Object.hasOwn(extension, 'version'),
       ),
     ).toBe(true)
+  })
+
+  test('binds managed Apps to exact Providers and host-owned bundled policy', () => {
+    expect(ctxindexGoogleOAuthApp.provider).toBe(googleOAuthProvider)
+    expect(ctxindexMicrosoftOAuthApp.provider).toBe(microsoftOAuthProvider)
+    expect(CTXINDEX_MANAGED_OAUTH_APP_POLICIES).toEqual([
+      {
+        providerId: 'google',
+        label: 'ctxindex',
+        extensionId: 'ctxindex.google',
+        distributions: [{ kind: 'bundled', packageName: '@ctxindex/adapters' }],
+      },
+      {
+        providerId: 'microsoft',
+        label: 'ctxindex',
+        extensionId: 'ctxindex.microsoft',
+        distributions: [{ kind: 'bundled', packageName: '@ctxindex/adapters' }],
+      },
+    ])
+    expect(
+      googleOAuthProvider.auth.registration.configSchema.safeParse(
+        ctxindexGoogleOAuthApp.config,
+      ).success,
+    ).toBe(true)
+    expect(
+      microsoftOAuthProvider.auth.registration.configSchema.safeParse(
+        ctxindexMicrosoftOAuthApp.config,
+      ).success,
+    ).toBe(true)
+  })
+
+  test('resolves both host policies against the actual bundled module provenance', async () => {
+    const loaded = await loadExtensions({
+      config: defaultConfig(),
+      builtins: builtinModule,
+    })
+
+    expect(
+      resolveManagedOAuthApp(
+        loaded.completeRegistry,
+        CTXINDEX_MANAGED_OAUTH_APP_POLICIES,
+        'google',
+      ),
+    ).toEqual({ status: 'selected', providerId: 'google', label: 'ctxindex' })
+    expect(
+      resolveManagedOAuthApp(
+        loaded.completeRegistry,
+        CTXINDEX_MANAGED_OAUTH_APP_POLICIES,
+        'microsoft',
+      ),
+    ).toEqual({
+      status: 'selected',
+      providerId: 'microsoft',
+      label: 'ctxindex',
+    })
   })
 
   test('keeps the canonical docs aligned with the bundled Profile inventory', async () => {

@@ -329,9 +329,71 @@ describe('extensions list interface', () => {
               sourcePath: 'extension.ts',
             },
           ],
+          [],
           4_000,
         ),
       )[0].provenance,
     ).toMatchObject({ snapshotAcquiredAt: 1_000, snapshotAgeMs: 3_000 })
+
+    const unavailable = JSON.parse(
+      formatExtensions(
+        { list: () => [] },
+        true,
+        [],
+        [
+          {
+            id: 'example.direct',
+            sourceKind: 'git',
+            requestedTarget: 'github:example/direct#main',
+            resolvedIdentity: 'a'.repeat(40),
+            materializationDigest: 'b'.repeat(64),
+            installedAt: 100,
+            updatedAt: 200,
+          },
+        ],
+        4_000,
+      ),
+    )
+    expect(unavailable).toEqual([
+      expect.objectContaining({
+        id: 'example.direct',
+        available: false,
+        provenance: expect.objectContaining({
+          installedAt: 100,
+          updatedAt: 200,
+        }),
+      }),
+    ])
+  })
+
+  test('keeps a failed direct pin unavailable when another origin shares its id', () => {
+    const result = JSON.parse(
+      formatExtensions(
+        {
+          list: () => [{ id: 'example.direct', profiles: [], adapters: [] }],
+        },
+        true,
+        [{ id: 'example.direct', kind: 'builtin' }],
+        [
+          {
+            id: 'example.direct',
+            sourceKind: 'npm',
+            requestedTarget: '@example/direct@^1',
+            resolvedIdentity: '1.2.3',
+            materializationDigest: 'b'.repeat(64),
+            installedAt: 100,
+            updatedAt: 200,
+          },
+        ],
+      ),
+    )
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: 'example.direct',
+        available: false,
+        provenance: expect.objectContaining({ kind: 'direct' }),
+      }),
+    ])
   })
 })
