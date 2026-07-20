@@ -271,6 +271,26 @@ describe('getSourceResource', () => {
     expect(new ResourceStore(db, registry.profiles).get(ref)).toBeNull()
   })
 
+  test('checks cancellation again after Adapter retrieval before persistence', async () => {
+    const db = await freshDb()
+    const controller = new AbortController()
+    const registry = registryWith((context) => {
+      context.emitResource({
+        ref: context.ref,
+        profile: { id: 'fake.item', version: 1 },
+        payload: { body: 'must not persist' },
+      })
+      controller.abort(new DOMException('cancelled', 'AbortError'))
+    })
+
+    const error = await getSourceResource(
+      input(db, registry, controller.signal),
+    ).catch((caught: unknown) => caught)
+
+    expect(error).toMatchObject({ name: 'AbortError' })
+    expect(new ResourceStore(db, registry.profiles).get(ref)).toBeNull()
+  })
+
   test('degrades an unknown retrieved Profile to envelope-only with a warning', async () => {
     const db = await freshDb()
     const registry = registryWith((context) => {

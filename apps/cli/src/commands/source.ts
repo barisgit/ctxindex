@@ -1,8 +1,13 @@
-import { compareStrings, type SourceDescription } from '@ctxindex/core/registry'
 import { defineCommand } from 'citty'
-import { loadCliDefinitions } from '../definitions'
+import { generatedSourceConfigArgs, preflightSourceArgs } from '../args/source'
 import { runWithExit } from '../format/exit'
-import { handleSourceCommand } from '../source/handle-source-command'
+import {
+  defaultSourceCommandDeps,
+  handleSourceCommand,
+  retainSourceCommandRoute,
+  type SourceCommandDeps,
+  sourceRouteDescriptions,
+} from '../source/handle-source-command'
 
 const sourceOptionArgs = {
   realm: { type: 'string', description: 'Realm slug' },
@@ -10,70 +15,81 @@ const sourceOptionArgs = {
   json: { type: 'boolean', description: 'Print JSON' },
 } as const
 
-export function generatedSourceConfigArgs(
-  sources: readonly SourceDescription[],
-): Record<string, { type: 'string'; description: string }> {
-  const byFlag = new Map<string, string[]>()
-  for (const source of [...sources].sort((left, right) =>
-    compareStrings(left.id, right.id),
-  )) {
-    for (const option of source.configOptions) {
-      const description = `${source.id}: ${option.property} (${option.type}${option.required ? ', required' : ''}${option.default !== undefined ? `, default ${JSON.stringify(option.default)}` : ''})`
-      const flag = option.flag.slice(2)
-      byFlag.set(flag, [...(byFlag.get(flag) ?? []), description])
-    }
-  }
-  return Object.fromEntries(
-    [...byFlag.entries()]
-      .sort(([left], [right]) => compareStrings(left, right))
-      .map(([flag, descriptions]) => [
-        flag,
-        { type: 'string' as const, description: descriptions.join('; ') },
-      ]),
-  )
+export interface SourceCommandRuntime {
+  readonly command: ReturnType<typeof defineCommand>
+  close(): Promise<void>
+  error(): unknown
 }
 
-export const sourceCommand = defineCommand({
-  meta: { name: 'source', description: 'Manage indexed sources.' },
-  subCommands: {
-    add: defineCommand({
-      meta: { name: 'add', description: 'Add a source.' },
-      args: async () => ({
-        adapter: { type: 'string', description: 'Adapter ID' },
-        label: { type: 'string', description: 'Global Source label' },
-        account: {
-          type: 'string',
-          description: 'Account label or Account ID',
-        },
-        'config-json': { type: 'string', description: 'Adapter config JSON' },
-        'search-routing': {
-          type: 'string',
-          description: 'indexed, federated, or hybrid routing override',
-        },
-        'no-sync': {
-          type: 'boolean',
-          description: 'Disable synchronization for this Source',
-        },
-        'adapter-id': { type: 'positional', required: false },
-        realm: sourceOptionArgs.realm,
-        ...generatedSourceConfigArgs(
-          (await loadCliDefinitions()).description.sources,
-        ),
+export function createSourceCommandRuntime(
+  invocationArgs: string[] = [],
+  services: SourceCommandDeps = defaultSourceCommandDeps,
+): SourceCommandRuntime {
+  const retained = retainSourceCommandRoute(invocationArgs, services)
+  const route = retained.resolve
+  const activeSourceDescriptions = async () => {
+    const preliminary = preflightSourceArgs(invocationArgs)
+    const needsDefinitions =
+      preliminary.kind === 'needs-definitions' ||
+      (preliminary.kind === 'help' && invocationArgs[0] === 'add')
+    if (!needsDefinitions) {
+      return []
+    }
+    const activeRoute = await route()
+    const descriptions = sourceRouteDescriptions(activeRoute)
+    if (preliminary.kind === 'help') await retained.close()
+    return descriptions
+  }
+  const run = (args: string[]) =>
+    runWithExit(async () => handleSourceCommand(args, services, await route()))
+
+  const command = defineCommand({
+    meta: { name: 'source', description: 'Manage indexed sources.' },
+    subCommands: {
+      add: defineCommand({
+        meta: { name: 'add', description: 'Add a source.' },
+        args: async () => ({
+          adapter: { type: 'string', description: 'Adapter ID' },
+          label: { type: 'string', description: 'Global Source label' },
+          account: {
+            type: 'string',
+            description: 'Account label or Account ID',
+          },
+          'config-json': { type: 'string', description: 'Adapter config JSON' },
+          'search-routing': {
+            type: 'string',
+            description: 'indexed, federated, or hybrid routing override',
+          },
+          'no-sync': {
+            type: 'boolean',
+            description: 'Disable synchronization for this Source',
+          },
+          'adapter-id': { type: 'positional', required: false },
+          realm: sourceOptionArgs.realm,
+          ...generatedSourceConfigArgs(await activeSourceDescriptions()),
+        }),
+        run: ({ rawArgs }) => run(['add', ...rawArgs]),
       }),
-      run: ({ rawArgs }) =>
-        runWithExit(() => handleSourceCommand(['add', ...rawArgs])),
-    }),
-    list: defineCommand({
-      meta: { name: 'list', description: 'List sources.' },
-      args: sourceOptionArgs,
-      run: ({ rawArgs }) =>
-        runWithExit(() => handleSourceCommand(['list', ...rawArgs])),
-    }),
-    remove: defineCommand({
-      meta: { name: 'remove', description: 'Remove a source.' },
-      args: { source: { type: 'positional', required: false } },
-      run: ({ rawArgs }) =>
-        runWithExit(() => handleSourceCommand(['remove', ...rawArgs])),
-    }),
-  },
-})
+      list: defineCommand({
+        meta: { name: 'list', description: 'List sources.' },
+        args: sourceOptionArgs,
+        run: ({ rawArgs }) => run(['list', ...rawArgs]),
+      }),
+      remove: defineCommand({
+        meta: { name: 'remove', description: 'Remove a source.' },
+        args: { source: { type: 'positional', required: false } },
+        run: ({ rawArgs }) => run(['remove', ...rawArgs]),
+      }),
+    },
+  })
+  return { command, close: retained.close, error: retained.error }
+}
+
+export function createSourceCommand(
+  invocationArgs: string[] = [],
+  services: SourceCommandDeps = defaultSourceCommandDeps,
+) {
+  return createSourceCommandRuntime(invocationArgs, services).command
+}
+
+export const sourceCommand = createSourceCommand()

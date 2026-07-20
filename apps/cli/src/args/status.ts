@@ -15,7 +15,29 @@ export const statusUsage =
 
 export function parseStatusArgs(args: string[]): StatusArgs {
   if (hasHelpFlag(args)) return { kind: 'help' }
-  const { flags } = parseFlags(args)
+  const { flags, positional, error } = parseFlags(args, {
+    booleanFlags: ['json'],
+    valueFlags: ['source', 'format'],
+    strict: true,
+  })
+  if (error) {
+    const detail =
+      error.kind === 'unknown'
+        ? `unknown flag ${error.flag}`
+        : error.kind === 'duplicate'
+          ? `duplicate ${error.flag}`
+          : `${error.flag} requires a non-empty value`
+    return { kind: 'unknown', message: `status: ${detail}` }
+  }
+  if (args.filter((arg) => arg === '--json').length > 1) {
+    return { kind: 'unknown', message: 'status: duplicate --json' }
+  }
+  if (positional.length > 0) {
+    return {
+      kind: 'unknown',
+      message: `status: unexpected argument: ${positional[0]}`,
+    }
+  }
   const sourceId = stringFlag(flags, 'source')
   const rawFormat = stringFlag(flags, 'format') ?? 'summary'
   if (rawFormat !== 'summary' && rawFormat !== 'compact') {

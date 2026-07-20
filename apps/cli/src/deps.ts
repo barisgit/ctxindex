@@ -33,8 +33,9 @@ import {
 import { createSourceService, type SourceService } from '@ctxindex/core/source'
 import type { CtxindexDatabase } from '@ctxindex/core/storage'
 import { createThreadService, type ThreadService } from '@ctxindex/core/thread'
-import { getDb } from './commands/db'
-import { loadCliDefinitions } from './definitions'
+import { assertInitialized } from './commands/db'
+import { type CliDefinitions, loadCliDefinitions } from './definitions'
+import { closeDb, type DirectDatabaseOwnership, getDb } from './direct-database'
 
 export interface CliDeps {
   readonly db: CtxindexDatabase
@@ -54,10 +55,16 @@ export interface CliDeps {
 }
 
 export async function openAccountDeps(): Promise<AccountCliDeps> {
+  await assertInitialized()
   const db = await getDb()
-  return {
-    accountService: createAccountService({ db }),
-    async close() {},
+  try {
+    return {
+      accountService: createAccountService({ db }),
+      close: closeDb,
+    }
+  } catch (error) {
+    await closeDb()
+    throw error
   }
 }
 
@@ -110,11 +117,17 @@ function createSecretRuntime(
 }
 
 export async function openSecretDeps(): Promise<SecretCliDeps> {
+  await assertInitialized()
   const db = await getDb()
-  const log = await createLogger(cliLogLevel ? { level: cliLogLevel } : {})
-  const config = await readConfig()
-  const { secretBackendManager } = createSecretRuntime(db, log, config)
-  return { secretBackendManager, async close() {} }
+  try {
+    const log = await createLogger(cliLogLevel ? { level: cliLogLevel } : {})
+    const config = await readConfig()
+    const { secretBackendManager } = createSecretRuntime(db, log, config)
+    return { secretBackendManager, close: closeDb }
+  } catch (error) {
+    await closeDb()
+    throw error
+  }
 }
 
 export async function loadAuthDefinitionDeps(): Promise<{
@@ -132,63 +145,83 @@ export async function loadAuthDefinitionDeps(): Promise<{
 }
 
 export async function openDeps(
-  opts: { readonly config?: CtxindexConfig } = {},
+  opts: {
+    readonly config?: CtxindexConfig
+    readonly definitions?: CliDefinitions
+    readonly databaseOwnership?: DirectDatabaseOwnership
+  } = {},
 ): Promise<CliDeps> {
-  const db = await getDb()
-  const log = await createLogger(cliLogLevel ? { level: cliLogLevel } : {})
-  const config = opts.config ?? (await readConfig())
-  const localOAuthAppIdentities = listLocalOAuthAppIdentities(db)
-  const loaded = await loadCliDefinitions({
-    config,
-    localOAuthAppIdentities,
-  })
-  const realmService = createRealmService({ db, logger: log })
-  const registry = loaded.registry
-  const completeRegistry = loaded.completeRegistry
-  const threadService = createThreadService({ db, profiles: registry.profiles })
-  const sourceService = createSourceService({
-    db,
-    logger: log,
-    realmService,
-    registry,
-  })
-  const { secretBackendManager, secretVault } = createSecretRuntime(
-    db,
-    log,
-    config,
-  )
-  const env = getEnv()
-  const oauthAppService = createOAuthAppService({
-    db,
-    store: secretVault,
-    registry: completeRegistry,
-  })
-  const authService = createAuthService({
-    db,
-    store: secretVault,
-    logger: log,
-    registry: completeRegistry,
-  })
-  const artifactService = new ArtifactService({
-    db,
-    registry,
-    authService,
-    logger: log,
-  })
-  return {
-    db,
-    logger: log,
-    env,
-    realmService,
-    sourceService,
-    secretBackendManager,
-    secretVault,
-    authService,
-    oauthAppService,
-    registry,
-    completeRegistry,
-    threadService,
-    artifactService,
-    async close() {},
+  const close = opts.databaseOwnership
+    ? async () => opts.databaseOwnership?.close()
+    : closeDb
+  try {
+    await assertInitialized()
+    const db = opts.databaseOwnership
+      ? await opts.databaseOwnership.open()
+      : await getDb()
+    const log = await createLogger(cliLogLevel ? { level: cliLogLevel } : {})
+    const config =
+      opts.definitions?.config ?? opts.config ?? (await readConfig())
+    const loaded =
+      opts.definitions ??
+      (await loadCliDefinitions({
+        config,
+        localOAuthAppIdentities: listLocalOAuthAppIdentities(db),
+      }))
+    const realmService = createRealmService({ db, logger: log })
+    const registry = loaded.registry
+    const completeRegistry = loaded.completeRegistry
+    const threadService = createThreadService({
+      db,
+      profiles: registry.profiles,
+    })
+    const sourceService = createSourceService({
+      db,
+      logger: log,
+      realmService,
+      registry,
+    })
+    const { secretBackendManager, secretVault } = createSecretRuntime(
+      db,
+      log,
+      config,
+    )
+    const env = getEnv()
+    const oauthAppService = createOAuthAppService({
+      db,
+      store: secretVault,
+      registry: completeRegistry,
+    })
+    const authService = createAuthService({
+      db,
+      store: secretVault,
+      logger: log,
+      registry: completeRegistry,
+    })
+    const artifactService = new ArtifactService({
+      db,
+      registry,
+      authService,
+      logger: log,
+    })
+    return {
+      db,
+      logger: log,
+      env,
+      realmService,
+      sourceService,
+      secretBackendManager,
+      secretVault,
+      authService,
+      oauthAppService,
+      registry,
+      completeRegistry,
+      threadService,
+      artifactService,
+      close,
+    }
+  } catch (error) {
+    await close()
+    throw error
   }
 }

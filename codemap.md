@@ -8,7 +8,7 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 
 - Bun/Turborepo monorepo split into user-facing application workspaces (`apps/`), reusable runtime and contract packages (`packages/`), external authoring examples (`examples/`), and repository tooling (`scripts/`).
 - Layered boundaries keep CLI presentation separate from provider-neutral core services and Profiles: calendar and communication Profiles own shared vocabulary and Draft Action contracts, while Adapters own provider-specific Google, Microsoft Graph, and filesystem I/O.
-- Extensions are versionless plain roots composing exact imported Providers, Profiles, Adapters, and OAuth Apps without a runtime dependency graph. Core resolves manifest-owned entries, collects exported roots/reachable leaves, and validates one complete registry atomically for built-in, explicit, and Catalog origins.
+- Extensions are versionless plain roots composing exact imported Providers, Profiles, Adapters, and OAuth Apps without a runtime dependency graph. Core resolves manifest-owned entries, collects exported roots/reachable leaves, and validates one complete registry atomically for built-in, explicit, and Catalog origins. A foreground local daemon prototype composes those same core services behind a bounded Unix-socket RPC boundary without moving provider logic into transport.
 - Extension or secret-backed local OAuth Apps provide validated configuration. Authorization snapshots the exact selected App config into one private stable Grant per Account so refresh is independent of current App inventory.
 
 ## Entry points
@@ -19,13 +19,16 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 - `DESIGN.md` — project-wide visual doctrine for the adaptive ctxindex mark, semantic color roles, typography, component treatment, motion, and accessibility; the web app supplies its executable specimen.
 - `apps/cli/bin/ctxindex.mjs` — executable shim forwarding argv to `runCli` and assigning its exit code.
 - `apps/web/app/(home)/page.tsx`, `apps/web/app/(home)/design/page.tsx`, and `apps/web/app/docs/[[...slug]]/page.tsx` — Next.js landing page, live visual-system specimen, and Fumadocs-backed documentation routes.
+- `apps/daemon/src/main.ts` — foreground daemon process entry that composes retained ownership, core services, RPC transport, and graceful shutdown.
 - `packages/core/src/index.ts` — core domain services and runtime infrastructure export surface.
+- `packages/rpc/src/index.ts` — composition-only local wire schemas, router contract, and generated client type.
+- `packages/local-daemon/src/index.ts` — process-independent runtime identity, discovery, endpoint, and retained lease primitives.
 - `packages/extension-sdk/src/index.ts` — public Profile, Adapter, Extension, OAuth, and operation contracts.
 - `packages/profiles/src/index.ts` and `packages/adapters/src/index.ts` — built-in semantic definitions and Google/Microsoft/filesystem integrations.
 
 ## Data & control flow
 
-CLI input is parsed and dispatched by `apps/cli/` into core services. The access lifecycle is explicit: `oauth-app` imports safe Provider-declared App config, `account --app` performs consent and owns one stable private Grant snapshot, and `source` binds a labeled stream to that Grant and a Realm by Adapter id. Providerless Sources bypass Account, Grant, token, and Provider egress resolution. Core constrains provider contexts, validates outputs, and coordinates search, retrieval, Artifacts, Actions, sync, persistence, and typed secrets. Gmail and Microsoft Outlook Adapters implement reversible Draft create/update without send; Google and Microsoft Calendar Adapters share the ordinary calendar Profile; local-directory remains providerless. Independently, `apps/web/` serves the documentation site.
+CLI input is parsed and dispatched by `apps/cli/` into core services. Realm, Source, sync, status, search, get, and thread commands select an exact-runtime daemon when matching discovery exists and do not fall back after selection; direct SQLite composition retains a shared database lease around open/use/close, while the daemon retains exclusive lifecycle and database leases. The access lifecycle remains `oauth-app` -> `account --app` -> `source`: authorization snapshots one selected App into a stable private Grant, and providerless Sources bypass Account, Grant, token, and Provider egress resolution. Core coordinates search, retrieval, Artifacts, Actions, sync, persistence, and typed secrets. Gmail and Microsoft Outlook Adapters implement reversible Draft create/update without send; Google and Microsoft Calendar Adapters share the ordinary calendar Profile; local-directory remains providerless. Independently, `apps/web/` serves the documentation site.
 
 ## Integration points
 
@@ -39,7 +42,7 @@ CLI input is parsed and dispatched by `apps/cli/` into core services. The access
 | Directory | Responsibility | Detailed map |
 | --- | --- | --- |
 | `.github/` | GitHub pull-request gates and protected npm trusted-publishing automation. | Workflow-local configuration. |
-| `apps/` | Deployable application workspaces: the Bun-based `ctxindex` CLI and the Next.js/Fumadocs documentation site. | [`apps/codemap.md`](apps/codemap.md) |
-| `packages/` | Core runtime, extension contract, provider-neutral Profiles, and built-in Google/Microsoft/filesystem Adapters. | [`packages/codemap.md`](packages/codemap.md) |
+| `apps/` | Deployable application workspaces: the public CLI, documentation site, and foreground local-daemon prototype. | [`apps/codemap.md`](apps/codemap.md) |
+| `packages/` | Core/runtime libraries, local RPC and daemon infrastructure, extension contracts, Profiles, and built-in Adapters. | [`packages/codemap.md`](packages/codemap.md) |
 | `examples/` | External Extension examples using only the public authoring boundary. | [`examples/codemap.md`](examples/codemap.md) |
 | `scripts/` | Repository policy gates, helper-created worktree isolation, and bounded command tooling. | [`scripts/codemap.md`](scripts/codemap.md) |
