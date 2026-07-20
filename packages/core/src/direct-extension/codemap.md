@@ -10,7 +10,7 @@ Installs, updates, inventories, loads, and uninstalls one exact Extension root f
 - `materializer.ts` acquires packages through argv-only Bun execution with lifecycle scripts disabled, snapshots local packages, and returns immutable exact source metadata.
 - `schema.ts` owns strict versioned activation records and safe inventory output.
 - `store.ts` hashes package trees, serializes lifecycle mutations, atomically publishes content-addressed materializations and records, and collects only unreferenced pins.
-- `service.ts` exact-selects one declared Extension export, validates it against the runtime-complete registry and local OAuth Apps, and guards uninstall when Sources require its Adapters.
+- `service.ts` exact-selects one declared Extension export, validates definitions and passive documentation against the active collected roots plus local OAuth Apps, attaches sanitized target provenance to lifecycle failures, and guards uninstall when Sources require its Adapters.
 - `source-bindings.ts` reads only the Source identity and Adapter binding needed by the removal guard.
 
 ## Data and control flow

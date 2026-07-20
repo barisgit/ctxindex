@@ -6,6 +6,7 @@ import {
   cp,
   mkdir,
   mkdtemp,
+  readdir,
   readFile,
   rm,
   writeFile,
@@ -464,13 +465,41 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
            VALUES (?, ?, ?, ?, ?, 1, 'indexed', ?, ?)`,
         )
         .run(
-          'fixture-source-id',
+          '01ARZ3NDEKTSV4RRFFQ69G5FAV',
           'work',
           'fixture.direct.local-adapter',
           'fixture-source',
           '{}',
           Date.now(),
           Date.now(),
+        )
+      const resourceRef = 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/file/offline-note'
+      const timestamp = Date.now()
+      database
+        .prepare(
+          `INSERT INTO resources
+             (id, ref, source_id, realm_id, profile_id, profile_version,
+              title, origin, payload_json, hydrated_at, created_at, updated_at)
+           VALUES (?, ?, ?, ?, 'file', 1, ?, 'synced', ?, ?, ?, ?)`,
+        )
+        .run(
+          'fixture-resource-id',
+          resourceRef,
+          '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+          'work',
+          'offline-note.txt',
+          JSON.stringify({
+            path: 'offline-note.txt',
+            name: 'offline-note.txt',
+            mediaType: 'text/plain',
+            byteSize: 12,
+            modifiedAt: '2026-07-20T00:00:00.000Z',
+            contentHash: `sha256:${'a'.repeat(64)}`,
+            text: 'offline note',
+          }),
+          timestamp,
+          timestamp,
+          timestamp,
         )
     } finally {
       database.close()
@@ -485,16 +514,60 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       PATH: join(sandbox, 'missing-tools'),
       BUN_CONFIG_REGISTRY: 'http://127.0.0.1:1',
     }
+    const recordsPath = join(
+      baseEnv.CTXINDEX_CONFIG_HOME,
+      'direct-extensions.json',
+    )
+    const materializationsPath = join(
+      baseEnv.CTXINDEX_DATA_HOME,
+      'direct-extensions',
+      'materializations',
+    )
+    const recordsBeforeReads = await readFile(recordsPath, 'utf8')
+    const materializationsBeforeReads = (
+      await readdir(materializationsPath)
+    ).sort()
+    const resourceRef = 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/file/offline-note'
     for (const args of [
       ['extensions', 'list', '--json'],
+      ['describe', 'adapter', 'fixture.direct.local-adapter', '--json'],
+      ['oauth-app', 'list', '--json'],
+      ['account', 'list', '--json'],
+      ['realm', 'list', '--json'],
       ['source', 'list', '--json'],
-      ['status', '--json'],
-      ['search', 'offline', '--json'],
+      ['status', '--source', 'fixture-source', '--json'],
+      [
+        'search',
+        'offline',
+        '--source',
+        'fixture-source',
+        '--local-only',
+        '--json',
+      ],
+      [
+        'action',
+        'describe',
+        'communication.message.draft.create',
+        '--source',
+        'fixture-source',
+        '--json',
+      ],
+      ['sync', '--json'],
+      ['get', '--json', resourceRef],
+      ['export', '--format', 'json', resourceRef],
+      ['thread', 'get', '--json', resourceRef],
+      ['artifact', 'list', '--json', resourceRef],
+      ['extensions', 'catalog', 'list', '--no-refresh', '--json'],
+      ['skills', 'list', '--json'],
     ]) {
       const result = await run(args, offlineEnv)
       expect(result.exitCode, `${args.join(' ')}\n${result.stderr}`).toBe(0)
       expect(() => JSON.parse(result.stdout)).not.toThrow()
     }
+    expect(await readFile(recordsPath, 'utf8')).toBe(recordsBeforeReads)
+    expect((await readdir(materializationsPath)).sort()).toEqual(
+      materializationsBeforeReads,
+    )
     expect(registryRequests).toBe(requestsBeforeOffline)
 
     const blocked = await run(

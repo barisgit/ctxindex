@@ -1,11 +1,13 @@
 import { join } from 'node:path'
 import type { AnyExtensionDefinition } from '@ctxindex/extension-sdk'
 import {
+  assertCompatibleExtensionDocumentation,
   importExtensionPackageRoot,
   safeExtensionDiagnostic,
 } from '../extension'
 import {
   buildCompleteCandidateRegistry,
+  type CollectedExtension,
   type ExtensionRegistry,
   type OAuthAppIdentity,
 } from '../registry'
@@ -16,7 +18,11 @@ import {
   projectDirectExtensionRecord,
 } from './schema'
 import type { DirectExtensionStore } from './store'
-import { type DirectExtensionTarget, validateDirectExtensionId } from './target'
+import {
+  type DirectExtensionTarget,
+  sanitizeDirectExtensionTarget,
+  validateDirectExtensionId,
+} from './target'
 
 export interface DirectExtensionSourceBinding {
   readonly id: string
@@ -27,11 +33,14 @@ export interface DirectExtensionSourceBinding {
 export interface DirectExtensionUninstallResult {
   readonly extension: DirectExtensionInventoryEntry
   readonly blockingSources: readonly DirectExtensionSourceBinding[]
+  readonly forced: boolean
+  readonly dataPreserved: true
 }
 
 function lifecycleError(
   code:
     | 'extension_target_invalid'
+    | 'extension_acquisition_failed'
     | 'extension_validation_failed'
     | 'extension_conflict'
     | 'extension_removal_blocked',
@@ -39,9 +48,12 @@ function lifecycleError(
   extra: object = {},
 ): Error {
   const exitCode =
-    code === 'extension_target_invalid' || code === 'extension_removal_blocked'
-      ? 2
-      : 50
+    code === 'extension_acquisition_failed'
+      ? 30
+      : code === 'extension_target_invalid' ||
+          code === 'extension_removal_blocked'
+        ? 2
+        : 50
   return Object.assign(new Error(message), { code, exitCode, ...extra })
 }
 
@@ -67,6 +79,45 @@ function runtimeRoots(
         exportName: 'default' as const,
       },
     }))
+}
+
+function activeRoots(
+  registry: ExtensionRegistry,
+  roots: readonly CollectedExtension[] | undefined,
+): readonly CollectedExtension[] {
+  return roots ?? runtimeRoots(registry)
+}
+
+function withoutDirectRoot(
+  roots: readonly CollectedExtension[],
+  extensionId: string,
+): readonly CollectedExtension[] {
+  return roots.filter(
+    (root) =>
+      root.definition.id !== extensionId || root.provenance.origin !== 'direct',
+  )
+}
+
+function rootsWithoutPriorDirect(input: {
+  readonly registry: ExtensionRegistry
+  readonly roots?: readonly CollectedExtension[]
+  readonly extensionId: string
+  readonly alternateOriginAvailable: boolean
+}): readonly CollectedExtension[] {
+  return input.roots === undefined
+    ? runtimeRoots(
+        input.registry,
+        input.alternateOriginAvailable ? undefined : input.extensionId,
+      )
+    : withoutDirectRoot(input.roots, input.extensionId)
+}
+
+function directTargetContext(
+  extensionId: string,
+  target: DirectExtensionTarget,
+): string {
+  const safe = sanitizeDirectExtensionTarget(target)
+  return `Direct Extension ${extensionId} from ${safe.kind} ${safe.requestedTarget}`
 }
 
 function targetFromRecord(
@@ -110,6 +161,7 @@ export class DirectExtensionService {
     readonly target: DirectExtensionTarget
     readonly extensionId: string
     readonly registry: ExtensionRegistry
+    readonly roots?: readonly CollectedExtension[]
     readonly localOAuthAppIdentities: readonly OAuthAppIdentity[]
     readonly signal?: AbortSignal
   }): Promise<DirectExtensionInstallationRecord> {
@@ -129,6 +181,7 @@ export class DirectExtensionService {
   async update(input: {
     readonly extensionId: string
     readonly registry: ExtensionRegistry
+    readonly roots?: readonly CollectedExtension[]
     readonly localOAuthAppIdentities: readonly OAuthAppIdentity[]
     readonly alternateOriginAvailable: boolean
     readonly signal?: AbortSignal
@@ -160,15 +213,26 @@ export class DirectExtensionService {
     readonly target: DirectExtensionTarget
     readonly extensionId: string
     readonly registry: ExtensionRegistry
+    readonly roots?: readonly CollectedExtension[]
     readonly localOAuthAppIdentities: readonly OAuthAppIdentity[]
     readonly current: readonly DirectExtensionInstallationRecord[]
     readonly previous?: DirectExtensionInstallationRecord
     readonly alternateOriginAvailable?: boolean
     readonly signal?: AbortSignal
   }): Promise<DirectExtensionInstallationRecord> {
-    const materialized = await this.materializer.materialize(input.target, {
-      ...(input.signal === undefined ? {} : { signal: input.signal }),
-    })
+    const targetContext = directTargetContext(input.extensionId, input.target)
+    let materialized: Awaited<ReturnType<PackageMaterializer['materialize']>>
+    try {
+      materialized = await this.materializer.materialize(input.target, {
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+      })
+    } catch (cause) {
+      if ((cause as { code?: unknown }).code === 'cancelled') throw cause
+      throw lifecycleError(
+        'extension_acquisition_failed',
+        `${targetContext}: ${safeExtensionDiagnostic(cause, 'package acquisition failed')}`,
+      )
+    }
     let committed = false
     try {
       let selected: Awaited<ReturnType<typeof importExtensionPackageRoot>>
@@ -193,27 +257,31 @@ export class DirectExtensionService {
       } catch (cause) {
         throw lifecycleError(
           'extension_validation_failed',
-          `Direct Extension ${input.extensionId}: ${safeExtensionDiagnostic(cause, 'package validation failed')}`,
+          `${targetContext}: ${safeExtensionDiagnostic(cause, 'package validation failed')}`,
         )
       }
       try {
+        const nextRoots = [
+          ...(input.previous === undefined
+            ? activeRoots(input.registry, input.roots)
+            : rootsWithoutPriorDirect({
+                registry: input.registry,
+                ...(input.roots === undefined ? {} : { roots: input.roots }),
+                extensionId: input.previous.id,
+                alternateOriginAvailable:
+                  input.alternateOriginAvailable === true,
+              })),
+          selected,
+        ]
+        assertCompatibleExtensionDocumentation(nextRoots)
         buildCompleteCandidateRegistry({
-          roots: [
-            ...runtimeRoots(
-              input.registry,
-              input.previous !== undefined &&
-                input.alternateOriginAvailable !== true
-                ? input.previous.id
-                : undefined,
-            ),
-            selected,
-          ],
+          roots: nextRoots,
           localOAuthAppIdentities: input.localOAuthAppIdentities,
         })
       } catch (cause) {
         throw lifecycleError(
           'extension_conflict',
-          `Direct Extension ${input.extensionId}: ${safeExtensionDiagnostic(cause, 'complete registry conflict')}`,
+          `${targetContext}: ${safeExtensionDiagnostic(cause, 'complete registry conflict')}`,
         )
       }
       const now = this.now()
@@ -273,6 +341,7 @@ export class DirectExtensionService {
   async uninstall(input: {
     readonly extensionId: string
     readonly registry: ExtensionRegistry
+    readonly roots?: readonly CollectedExtension[]
     readonly sources: readonly DirectExtensionSourceBinding[]
     readonly alternateOriginAvailable: boolean
     readonly force: boolean
@@ -293,10 +362,12 @@ export class DirectExtensionService {
         input.registry.adapters.list().map((adapter) => adapter.id),
       )
       const postRemoval = buildCompleteCandidateRegistry({
-        roots: runtimeRoots(
-          input.registry,
-          input.alternateOriginAvailable ? undefined : input.extensionId,
-        ),
+        roots: rootsWithoutPriorDirect({
+          registry: input.registry,
+          ...(input.roots === undefined ? {} : { roots: input.roots }),
+          extensionId: input.extensionId,
+          alternateOriginAvailable: input.alternateOriginAvailable,
+        }),
         localOAuthAppIdentities: [],
       })
       const blockingSources = input.sources
@@ -322,6 +393,8 @@ export class DirectExtensionService {
       return {
         extension: projectDirectExtensionRecord(installed),
         blockingSources,
+        forced: input.force,
+        dataPreserved: true,
       }
     })
   }

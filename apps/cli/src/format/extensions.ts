@@ -1,3 +1,4 @@
+import type { DirectExtensionInventoryEntry } from '@ctxindex/core'
 import type { ExtensionLoadProvenance } from '@ctxindex/core/extension'
 import { compareReferences, compareStrings } from '@ctxindex/core/registry'
 
@@ -9,7 +10,7 @@ function provenanceText(provenance: ProvenanceWithAge): string {
   if (provenance.kind === 'builtin') return 'builtin'
   if (provenance.kind === 'path') return `path ${provenance.path}`
   if (provenance.kind === 'direct') {
-    return `direct ${provenance.sourceKind} ${provenance.requestedTarget} ${provenance.resolvedIdentity} ${provenance.materializationDigest}`
+    return `direct ${provenance.sourceKind} ${provenance.requestedTarget} ${provenance.resolvedIdentity} ${provenance.materializationDigest} installed ${provenance.installedAt} updated ${provenance.updatedAt}`
   }
   return `catalog ${provenance.catalog} ${provenance.commit} ${provenance.repository} ${provenance.sourcePath}${provenance.snapshotAgeMs === undefined ? '' : ` age ${provenance.snapshotAgeMs}ms`}`
 }
@@ -24,6 +25,7 @@ export function formatExtensions(
   },
   jsonOutput: boolean,
   provenance: readonly ExtensionLoadProvenance[] = [],
+  directInventory: readonly DirectExtensionInventoryEntry[] = [],
   now = Date.now(),
 ): string {
   const provenanceByIdentity = new Map(
@@ -37,12 +39,36 @@ export function formatExtensions(
         : item,
     ]),
   )
-  const extensions = [...registry.list()]
+  const loadedIds = new Set(registry.list().map(({ id }) => id))
+  const directById = new Map(directInventory.map((item) => [item.id, item]))
+  const extensions = [
+    ...registry.list(),
+    ...directInventory
+      .filter(({ id }) => !loadedIds.has(id))
+      .map(({ id }) => ({ id, profiles: [], adapters: [] })),
+  ]
     .sort((left, right) => compareStrings(left.id, right.id))
     .map((extension) => {
-      const source = provenanceByIdentity.get(extension.id)
+      const storedDirect = directById.get(extension.id)
+      const loadedSource = provenanceByIdentity.get(extension.id)
+      const source =
+        storedDirect === undefined
+          ? loadedSource
+          : {
+              id: storedDirect.id,
+              kind: 'direct' as const,
+              sourceKind: storedDirect.sourceKind,
+              requestedTarget: storedDirect.requestedTarget,
+              resolvedIdentity: storedDirect.resolvedIdentity,
+              materializationDigest: storedDirect.materializationDigest,
+              installedAt: storedDirect.installedAt,
+              updatedAt: storedDirect.updatedAt,
+            }
       return {
         id: extension.id,
+        ...(storedDirect !== undefined && !loadedIds.has(extension.id)
+          ? { available: false as const }
+          : {}),
         profiles: [...extension.profiles]
           .sort(compareReferences)
           .map(({ id, version }) => ({ id, version })),
@@ -56,7 +82,7 @@ export function formatExtensions(
   return extensions
     .map(
       (extension) =>
-        `${extension.id}\tProfiles: ${extension.profiles.map((item) => `${item.id}@${item.version}`).join(', ') || 'none'}\tAdapters: ${extension.adapters.map((item) => item.id).join(', ') || 'none'}${extension.provenance === undefined ? '' : `\tProvenance: ${provenanceText(extension.provenance)}`}`,
+        `${extension.id}${extension.available === false ? '\tUnavailable' : ''}\tProfiles: ${extension.profiles.map((item) => `${item.id}@${item.version}`).join(', ') || 'none'}\tAdapters: ${extension.adapters.map((item) => item.id).join(', ') || 'none'}${extension.provenance === undefined ? '' : `\tProvenance: ${provenanceText(extension.provenance)}`}`,
     )
     .join('\n')
 }

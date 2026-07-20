@@ -9,7 +9,7 @@ import {
   defineProvider,
   z,
 } from '@ctxindex/extension-sdk'
-import { createExtensionRegistry } from '../registry'
+import { type CollectedExtension, createExtensionRegistry } from '../registry'
 import type {
   MaterializedDirectExtension,
   PackageMaterializer,
@@ -158,6 +158,41 @@ test('install requires the exact exported root and validates the complete regist
   expect(await store.readRecords()).toEqual([])
 })
 
+test('install validates documentation compatibility before publication', async () => {
+  const { service, store } = await fixtureService()
+  const definition = defineExtension({ id: 'example.direct' })
+  const activeRoot: CollectedExtension = {
+    definition,
+    provenance: {
+      origin: 'explicit-path',
+      entry: '/fixture/entry.ts',
+      exportName: 'default',
+    },
+    documentation: {
+      index: 'README.md',
+      files: [
+        {
+          path: 'README.md',
+          kind: 'markdown',
+          mediaType: 'text/markdown',
+          content: '# Existing documentation',
+        },
+      ],
+    },
+  }
+
+  await expect(
+    service.install({
+      target: { kind: 'npm', requestedTarget: 'example-package@1' },
+      extensionId: 'example.direct',
+      registry: createExtensionRegistry([definition]),
+      roots: [activeRoot],
+      localOAuthAppIdentities: [],
+    }),
+  ).rejects.toMatchObject({ code: 'extension_conflict' })
+  expect(await store.readRecords()).toEqual([])
+})
+
 test('sibling roots from one package remain independent direct records', async () => {
   const { materializer, service, store } = await fixtureService()
   materializer.entry = `
@@ -210,7 +245,12 @@ test('failed update preserves the prior exact record', async () => {
       localOAuthAppIdentities: [],
       alternateOriginAvailable: false,
     }),
-  ).rejects.toMatchObject({ code: 'extension_acquisition_failed' })
+  ).rejects.toMatchObject({
+    code: 'extension_acquisition_failed',
+    message: expect.stringContaining(
+      'Direct Extension example.direct from npm example-package@^1',
+    ),
+  })
   expect(await store.readRecords()).toEqual([installed])
 })
 

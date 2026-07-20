@@ -72,9 +72,12 @@ export type ExtensionLoadProvenance =
       readonly requestedTarget: string
       readonly resolvedIdentity: string
       readonly materializationDigest: string
+      readonly installedAt: number
+      readonly updatedAt: number
     }
 
 export interface LoadExtensionsResult {
+  readonly roots: readonly CollectedExtension[]
   readonly registry: ExtensionRegistry
   readonly completeRegistry: CompleteRegistry
   readonly diagnostics: readonly ExtensionLoadDiagnostic[]
@@ -269,6 +272,8 @@ export async function loadExtensions(
               ? installed.source.commit
               : installed.source.content_digest,
         materializationDigest: installed.materialization_digest,
+        installedAt: installed.installed_at,
+        updatedAt: installed.updated_at,
       })
     } catch (cause) {
       diagnostics.push({
@@ -282,6 +287,7 @@ export async function loadExtensions(
   }
 
   return {
+    roots: activeRoots,
     registry,
     completeRegistry,
     diagnostics,

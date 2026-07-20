@@ -12,7 +12,7 @@ Discovers exported Extension values from built-in namespaces and materialized pa
 - `diagnostics.ts` owns branded host-generated Extension diagnostics. Import/evaluation boundaries discard arbitrary thrown causes; callers render only branded safe messages plus separately validated path, Catalog, or Extension identity.
 - `documentation.ts` binds `docs('./docs')` to an acquired entry URL, validates directory and eager virtual trees through one bounded passive-content policy, strips declarations from definition identity, and exposes an authored/generated transport-neutral projection with exact Extension and definition routes.
 - `loader.ts` sequences built-ins, explicit package roots, exact installed Catalog roots, and verified immutable direct-install pins. Each package is added only after `buildCompleteCandidateRegistry()` validates the whole next candidate set against any supplied local BYOA OAuth App identities.
-- `LoadExtensionsResult` retains the legacy `ExtensionRegistry` projection, exposes the provenance-preserving `CompleteRegistry`, and carries the portable `DocumentationProjection` for future consumers.
+- `LoadExtensionsResult` retains the active collected roots and legacy `ExtensionRegistry` projection, exposes the provenance-preserving `CompleteRegistry`, and carries the portable `DocumentationProjection` for lifecycle validation and future consumers.
 
 ## Data & control flow
 

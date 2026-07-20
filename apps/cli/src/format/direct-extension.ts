@@ -9,7 +9,7 @@ export function formatDirectExtension(
   json: boolean,
 ): string {
   if (json) return JSON.stringify(extension, null, 2)
-  return `${verb} ${extension.id}\tSource: ${extension.sourceKind} ${extension.requestedTarget}\tResolved: ${extension.resolvedIdentity}\tMaterialization: ${extension.materializationDigest}`
+  return `${verb} ${extension.id}\tSource: ${extension.sourceKind} ${extension.requestedTarget}\tResolved: ${extension.resolvedIdentity}\tMaterialization: ${extension.materializationDigest}\tInstalled: ${extension.installedAt}\tUpdated: ${extension.updatedAt}`
 }
 
 export function formatDirectExtensionUninstall(
@@ -17,9 +17,12 @@ export function formatDirectExtensionUninstall(
   json: boolean,
 ): string {
   if (json) return JSON.stringify(result, null, 2)
-  const preserved =
+  const affected =
     result.blockingSources.length === 0
       ? ''
-      : `\tPreserved unavailable Sources: ${result.blockingSources.map(({ label }) => label).join(', ')}`
-  return `Uninstalled ${result.extension.id}${preserved}`
+      : `\tAffected Sources unavailable: ${result.blockingSources.map(({ label }) => label).join(', ')}`
+  const preserved = result.forced
+    ? '\tSources and materialized data preserved'
+    : ''
+  return `Uninstalled ${result.extension.id}${preserved}${affected}`
 }

@@ -37,10 +37,26 @@ function createDirectExtensionService(): DirectExtensionService {
   })
 }
 
+export async function runWithSigintCancellation<T>(
+  operation: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController()
+  const cancel = () => controller.abort()
+  process.once('SIGINT', cancel)
+  try {
+    return await operation(controller.signal)
+  } finally {
+    process.removeListener('SIGINT', cancel)
+  }
+}
+
 export async function handleExtensionsCommand(
   args: string[],
   catalogs: CatalogService = new CatalogService(),
   direct: DirectExtensionService = createDirectExtensionService(),
+  loadDefinitions: typeof loadCliDefinitions = loadCliDefinitions,
+  readOAuthAppIdentities: typeof readLocalOAuthAppIdentities = readLocalOAuthAppIdentities,
+  readSourceBindings: typeof readDirectExtensionSourceBindings = readDirectExtensionSourceBindings,
 ): Promise<number> {
   const parsed = parseExtensionsArgs(args)
   if (parsed.kind === 'help') return 0
@@ -50,10 +66,15 @@ export async function handleExtensionsCommand(
   }
   try {
     if (parsed.kind === 'list') {
-      const loaded = await loadCliDefinitions()
+      const loaded = await loadDefinitions()
       printExtensionDiagnostics(loaded.diagnostics)
       console.log(
-        formatExtensions(loaded.registry, parsed.json, loaded.provenance),
+        formatExtensions(
+          loaded.registry,
+          parsed.json,
+          loaded.provenance,
+          await direct.list(),
+        ),
       )
       return 0
     }
@@ -115,8 +136,8 @@ export async function handleExtensionsCommand(
       return 0
     }
     if (parsed.kind === 'catalog-install') {
-      const localOAuthAppIdentities = readLocalOAuthAppIdentities()
-      const loaded = await loadCliDefinitions({ localOAuthAppIdentities })
+      const localOAuthAppIdentities = readOAuthAppIdentities()
+      const loaded = await loadDefinitions({ localOAuthAppIdentities })
       printExtensionDiagnostics(loaded.diagnostics)
       const replaceableCatalog = loaded.provenance.find(
         (provenance) =>
@@ -170,19 +191,23 @@ export async function handleExtensionsCommand(
         'Trust notice: this command acquires and executes third-party Extension code in-process; validation is not a sandbox.',
       )
     }
-    const localOAuthAppIdentities = readLocalOAuthAppIdentities()
-    const loaded = await loadCliDefinitions({ localOAuthAppIdentities })
+    const localOAuthAppIdentities = readOAuthAppIdentities()
+    const loaded = await loadDefinitions({ localOAuthAppIdentities })
     printExtensionDiagnostics(loaded.diagnostics)
     if (parsed.kind === 'direct-install') {
       if (directTarget === undefined) {
         throw new TypeError('Direct Extension target was not parsed')
       }
-      const result = await direct.install({
-        target: directTarget,
-        extensionId: parsed.extensionId,
-        registry: loaded.registry,
-        localOAuthAppIdentities,
-      })
+      const result = await runWithSigintCancellation((signal) =>
+        direct.install({
+          target: directTarget,
+          extensionId: parsed.extensionId,
+          registry: loaded.registry,
+          roots: loaded.roots,
+          localOAuthAppIdentities,
+          signal,
+        }),
+      )
       console.log(
         formatDirectExtension(
           'Installed',
@@ -193,14 +218,19 @@ export async function handleExtensionsCommand(
       return 0
     }
     if (parsed.kind === 'direct-update') {
-      const result = await direct.update({
-        extensionId: parsed.extensionId,
-        registry: loaded.registry,
-        localOAuthAppIdentities,
-        alternateOriginAvailable: loaded.provenance.some(
-          (entry) => entry.id === parsed.extensionId && entry.kind !== 'direct',
-        ),
-      })
+      const result = await runWithSigintCancellation((signal) =>
+        direct.update({
+          extensionId: parsed.extensionId,
+          registry: loaded.registry,
+          roots: loaded.roots,
+          localOAuthAppIdentities,
+          alternateOriginAvailable: loaded.provenance.some(
+            (entry) =>
+              entry.id === parsed.extensionId && entry.kind !== 'direct',
+          ),
+          signal,
+        }),
+      )
       console.log(
         formatDirectExtension(
           'Updated',
@@ -215,7 +245,8 @@ export async function handleExtensionsCommand(
         await direct.uninstall({
           extensionId: parsed.extensionId,
           registry: loaded.registry,
-          sources: readDirectExtensionSourceBindings(),
+          roots: loaded.roots,
+          sources: readSourceBindings(),
           alternateOriginAvailable: loaded.provenance.some(
             (entry) =>
               entry.id === parsed.extensionId && entry.kind !== 'direct',

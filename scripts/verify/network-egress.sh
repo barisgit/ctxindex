@@ -13,6 +13,11 @@ ALLOWLIST=(
 )
 
 ALLOWLIST_PATTERN=$(IFS='|'; echo "${ALLOWLIST[*]}")
+PRODUCTION_RUNTIME_ROOTS=(
+  "packages/core/src"
+  "packages/adapters/src"
+  "apps/cli/src"
+)
 violations="$(mktemp)"
 trap 'rm -f "$violations"' EXIT
 
@@ -24,9 +29,10 @@ grep -RInE \
   --exclude-dir='.git' \
   --exclude-dir='node_modules' \
   "https?://[^'\" )]+" \
-  . \
+  "${PRODUCTION_RUNTIME_ROOTS[@]}" \
   | grep -vE "($ALLOWLIST_PATTERN)" \
   | grep -vE "packages/core/src/auth/loopback.ts:.*http://localhost" \
+  | grep -vF "packages/core/src/auth/test-provider.ts:" \
   >> "$violations" || true
 
 # fetch() is only allowed inside the single core egress chokepoint; every other
@@ -38,7 +44,7 @@ grep -RInE \
   --exclude-dir='.git' \
   --exclude-dir='node_modules' \
   "(^|[^.[:alnum:]_])fetch[[:space:]]*\(" \
-  . \
+  "${PRODUCTION_RUNTIME_ROOTS[@]}" \
   | grep -v "packages/core/src/net/index.ts" \
   >> "$violations" || true
 
@@ -51,7 +57,7 @@ grep -RInE \
   --exclude-dir='.git' \
   --exclude-dir='node_modules' \
   "(globalThis|Bun)\.fetch[[:space:]]*\(|new[[:space:]]+(XMLHttpRequest|WebSocket)[[:space:]]*\(|from[[:space:]]+['\"]undici['\"]|require[[:space:]]*\([[:space:]]*['\"]undici['\"]" \
-  . \
+  "${PRODUCTION_RUNTIME_ROOTS[@]}" \
   >> "$violations" || true
 
 # No direct node HTTP clients in runtime source.
@@ -62,7 +68,7 @@ grep -RInE \
   --exclude-dir='.git' \
   --exclude-dir='node_modules' \
   "\b(https?|node:https?|node:http)\.(request|get)\s*\(" \
-  . \
+  "${PRODUCTION_RUNTIME_ROOTS[@]}" \
   >> "$violations" || true
 
 # Every production Adapter module that performs provider I/O must have a

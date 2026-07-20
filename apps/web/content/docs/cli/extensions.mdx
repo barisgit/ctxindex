@@ -32,7 +32,7 @@ ctxindex extensions uninstall <id> [--force] [--json]
 | `catalog refresh` | Explicitly acquire and persist a Catalog's latest immutable snapshot for its configured ref. |
 | `catalog remove` | Remove a Catalog registration when none of its Extensions remain installed. |
 | `install <catalog> <id>@<version> --trust` | Install one exact version from a named Catalog after a separate code-execution trust acknowledgement. |
-| `install <npm|git|local> <target> --extension <id>` | Acquire one package and activate exactly the selected Extension root. |
+| `install` from npm, Git, or local | Acquire one package and activate exactly the selected Extension root with `--extension <id>`. |
 | `update <id>` | Re-acquire a directly installed Extension from its stored target and atomically replace its immutable pin. |
 | `uninstall <id> [--force]` | Remove a direct installation; normal removal is blocked while configured Sources need its Adapter. Force preserves Sources and indexed data in an unavailable state. |
 | `uninstall <id>@<version>` | Remove one installed Catalog Extension by exact version. |
