@@ -23,16 +23,17 @@ describe('release gate', () => {
     ).toEqual({ publish: false, version: '1.2.3' })
   })
 
-  test.each([
-    {
-      name: 'unchanged unpublished version',
-      input: {
+  test('skips an unchanged unpublished version', () => {
+    expect(
+      evaluateReleaseGate({
         previousVersion: '1.2.3',
         currentVersion: '1.2.3',
         registryStatus: 404,
-      },
-      error: 'bump apps/cli/package.json',
-    },
+      }),
+    ).toEqual({ publish: false, version: '1.2.3' })
+  })
+
+  test.each([
     {
       name: 'reversed version',
       input: {

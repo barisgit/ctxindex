@@ -76,9 +76,7 @@ export function evaluateReleaseGate(
   }
   const comparison = compareSemver(current, previous)
   if (comparison === 0) {
-    throw new Error(
-      'Unpublished CLI version is unchanged; bump apps/cli/package.json before merging to main',
-    )
+    return { publish: false, version: input.currentVersion }
   }
   if (comparison < 0) {
     throw new Error(
@@ -162,7 +160,7 @@ async function main(args: readonly string[]): Promise<number> {
     console.log(
       result.publish
         ? `ctxindex@${result.version} is eligible for publication`
-        : `ctxindex@${result.version} already exists; skipping publication`,
+        : `ctxindex@${result.version} is unchanged or already exists; skipping publication`,
     )
     return 0
   }
