@@ -1,20 +1,20 @@
 import { chmod, link, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
-import {
-  createDocumentationService,
-  createExtensionDocumentationSource,
-  type DocumentationItem,
-  type DocumentationOrigin,
-  type DocumentationSearchResult,
-  type DocumentationService,
+import type {
+  DocumentationItem,
+  DocumentationOrigin,
+  DocumentationSearchResult,
 } from '@ctxindex/core/documentation'
 import { CtxindexError } from '@ctxindex/core/errors'
 import { defineCtxCommand } from '../command-model'
-import { loadCliDefinitions, printExtensionDiagnostics } from '../definitions'
 import { mapErrorToExit, runWithExit } from '../format/exit'
-import { resolveBundledDocumentation } from './resolve'
+import {
+  type DocsServiceLoader,
+  type DocumentationListItem,
+  loadDocsCommandService,
+} from './service'
 
-export type DocsServiceLoader = () => Promise<DocumentationService>
+export { loadDocsCommandService } from './service'
 
 interface DocsListInput {
   readonly extensionId?: string
@@ -39,7 +39,10 @@ function safeOrigin(origin: DocumentationOrigin): {
     : { origin: 'extension', extensionId: origin.extensionId }
 }
 
-function safeItem(item: DocumentationItem, includeContent = false) {
+function safeItem(
+  item: DocumentationListItem | DocumentationItem,
+  includeContent = false,
+) {
   return {
     ...safeOrigin(item.origin),
     path: item.path,
@@ -48,7 +51,7 @@ function safeItem(item: DocumentationItem, includeContent = false) {
     byteSize: item.byteSize,
     ...(item.title === undefined ? {} : { title: item.title }),
     ...(item.summary === undefined ? {} : { summary: item.summary }),
-    ...(includeContent && typeof item.content === 'string'
+    ...(includeContent && 'content' in item && typeof item.content === 'string'
       ? { content: item.content }
       : {}),
   }
@@ -98,21 +101,14 @@ async function copyExactOutput(
   }
 }
 
-const loadDefaultService: DocsServiceLoader = async () => {
-  const loaded = await loadCliDefinitions()
-  printExtensionDiagnostics(loaded.diagnostics)
-  return createDocumentationService([
-    resolveBundledDocumentation(),
-    createExtensionDocumentationSource(loaded.documentation),
-  ])
-}
+const loadDefaultService: DocsServiceLoader = loadDocsCommandService
 
 export async function handleDocsList(
   input: DocsListInput,
   loadService: DocsServiceLoader = loadDefaultService,
 ): Promise<number> {
   try {
-    const items = (await loadService()).list({
+    const items = await (await loadService()).list({
       ...(input.extensionId === undefined
         ? {}
         : { extensionId: input.extensionId }),
@@ -146,7 +142,7 @@ export async function handleDocsGet(
   loadService: DocsServiceLoader = loadDefaultService,
 ): Promise<number> {
   try {
-    const item = (await loadService()).get({
+    const item = await (await loadService()).get({
       path: input.path,
       ...(input.extensionId === undefined
         ? {}
@@ -181,7 +177,7 @@ export async function handleDocsSearch(
   loadService: DocsServiceLoader = loadDefaultService,
 ): Promise<number> {
   try {
-    const results = (await loadService()).search({
+    const results = await (await loadService()).search({
       query: input.query,
       ...(input.extensionId === undefined
         ? {}

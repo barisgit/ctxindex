@@ -1,5 +1,9 @@
 import { expect, test } from 'bun:test'
 import {
+  createDocumentationService,
+  type DocumentationService,
+} from '@ctxindex/core/documentation'
+import {
   CtxindexAuthError,
   type CtxindexAuthErrorCode,
   CtxindexNotFoundError,
@@ -101,6 +105,7 @@ function application(overrides: Record<string, unknown> = {}) {
     startedAt: '2026-07-18T00:00:00.000Z',
     pid: 123,
     extensionDiagnosticsCount: 0,
+    documentationService: createDocumentationService([]),
     observationTimeoutMs: 25,
     syncService: {
       run: async () => ({ mode: 'sync', results: [], warnings: [] }),
@@ -163,6 +168,172 @@ test('unavailable business requests describe starting and stopping lifecycle', a
       kind: 'daemon_unavailable',
       code: 'daemon_unavailable',
       message: 'The daemon is stopping and is not accepting new work.',
+    },
+  })
+})
+
+test('projects loaded Extension documentation as bounded content-safe RPC values', async () => {
+  const markdown = {
+    origin: { kind: 'extension' as const, extensionId: 'fixture.docs' },
+    path: 'README.md',
+    kind: 'markdown' as const,
+    mediaType: 'text/markdown',
+    byteSize: 9,
+    title: 'Fixture',
+    content: '# Fixture',
+  }
+  const asset = {
+    origin: { kind: 'extension' as const, extensionId: 'fixture.docs' },
+    path: 'assets/pixel.png',
+    kind: 'asset' as const,
+    mediaType: 'image/png',
+    byteSize: 8,
+    content: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10]),
+  }
+  const documentationService: DocumentationService = {
+    list: () => [markdown, asset],
+    get: ({ path }) => (path === asset.path ? asset : markdown),
+    search: () => [
+      {
+        origin: markdown.origin,
+        path: markdown.path,
+        title: markdown.title,
+        snippet: '# Fixture',
+      },
+    ],
+  }
+  const app = application({ documentationService })
+  expect(
+    await app.documentation.list({}, context('docs-starting')),
+  ).toMatchObject({ ok: false, error: { kind: 'daemon_unavailable' } })
+  app.markReady()
+
+  expect(await app.documentation.list({}, context('docs-list'))).toEqual({
+    ok: true,
+    value: {
+      rows: [
+        {
+          extensionId: 'fixture.docs',
+          path: 'README.md',
+          kind: 'markdown',
+          mediaType: 'text/markdown',
+          byteSize: 9,
+          title: 'Fixture',
+        },
+        {
+          extensionId: 'fixture.docs',
+          path: 'assets/pixel.png',
+          kind: 'asset',
+          mediaType: 'image/png',
+          byteSize: 8,
+        },
+      ],
+    },
+  })
+  expect(
+    await app.documentation.get(
+      { extensionId: 'fixture.docs', path: 'assets/pixel.png' },
+      context('docs-get'),
+    ),
+  ).toEqual({
+    ok: true,
+    value: {
+      item: {
+        extensionId: 'fixture.docs',
+        path: 'assets/pixel.png',
+        kind: 'asset',
+        mediaType: 'image/png',
+        byteSize: 8,
+        contentBase64: 'iVBORw0KGgo=',
+      },
+    },
+  })
+  expect(
+    await app.documentation.search(
+      { query: 'fixture' },
+      context('docs-search'),
+    ),
+  ).toEqual({
+    ok: true,
+    value: {
+      rows: [
+        {
+          extensionId: 'fixture.docs',
+          path: 'README.md',
+          title: 'Fixture',
+          snippet: '# Fixture',
+        },
+      ],
+    },
+  })
+  expect(
+    await clientFor(app).documentation.get({
+      extensionId: 'fixture.docs',
+      path: 'README.md',
+    }),
+  ).toMatchObject({ item: { content: '# Fixture' } })
+})
+
+test('rejects oversized documentation output without truncation', async () => {
+  const content = 'x'.repeat(256 * 1_024 + 1)
+  const app = application({
+    documentationService: {
+      list: () => [],
+      get: () => ({
+        origin: { kind: 'extension', extensionId: 'fixture.docs' },
+        path: 'README.md',
+        kind: 'markdown',
+        mediaType: 'text/markdown',
+        byteSize: content.length,
+        content,
+      }),
+      search: () => [],
+    },
+  })
+  app.markReady()
+  expect(
+    await app.documentation.get(
+      { extensionId: 'fixture.docs', path: 'README.md' },
+      context('docs-too-large'),
+    ),
+  ).toEqual({
+    ok: false,
+    error: {
+      kind: 'result_too_large',
+      code: 'result_too_large',
+      message: 'The daemon result exceeds the local protocol bounds.',
+    },
+  })
+})
+
+test('rejects terminal-active documentation output at the RPC boundary', async () => {
+  const content = '# Fixture\u001b]0;unsafe\u0007'
+  const app = application({
+    documentationService: {
+      list: () => [],
+      get: () => ({
+        origin: { kind: 'extension', extensionId: 'fixture.docs' },
+        path: 'README.md',
+        kind: 'markdown',
+        mediaType: 'text/markdown',
+        byteSize: new TextEncoder().encode(content).byteLength,
+        content,
+      }),
+      search: () => [],
+    },
+  })
+  app.markReady()
+  expect(
+    await app.documentation.get(
+      { extensionId: 'fixture.docs', path: 'README.md' },
+      context('docs-terminal-control'),
+    ),
+  ).toEqual({
+    ok: false,
+    error: {
+      kind: 'result_too_large',
+      code: 'result_too_large',
+      message: 'The daemon result exceeds the local protocol bounds.',
     },
   })
 })

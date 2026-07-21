@@ -2,6 +2,12 @@ import { describe, expect, test } from 'bun:test'
 import { z } from 'zod'
 import {
   defineRpcFailureRegistry,
+  rpcDocumentationGetInputSchema,
+  rpcDocumentationGetResultSchema,
+  rpcDocumentationListInputSchema,
+  rpcDocumentationListResultSchema,
+  rpcDocumentationSearchInputSchema,
+  rpcDocumentationSearchResultSchema,
   rpcFailureSchema,
   rpcHealthResultSchema,
   rpcJsonCursorSchema,
@@ -201,6 +207,121 @@ describe('wire identity and common bounds', () => {
     expect(rpcFailureSchema.parse(failure)).toEqual(failure)
     expect(() =>
       rpcFailureSchema.parse({ ...failure, ownerTupleDigest: digest }),
+    ).toThrow()
+  })
+})
+
+describe('documentation wire values', () => {
+  const row = {
+    extensionId: 'fixture.docs',
+    path: 'README.md',
+    kind: 'markdown',
+    mediaType: 'text/markdown',
+    byteSize: 9,
+    title: 'Fixture',
+  } as const
+
+  test('keeps list and search content-free with strict bounded inputs', () => {
+    expect(rpcDocumentationListInputSchema.parse({})).toEqual({})
+    expect(
+      rpcDocumentationListInputSchema.parse({ extensionId: 'fixture.docs' }),
+    ).toEqual({ extensionId: 'fixture.docs' })
+    expect(rpcDocumentationListResultSchema.parse({ rows: [row] })).toEqual({
+      rows: [row],
+    })
+    expect(() =>
+      rpcDocumentationListResultSchema.parse({
+        rows: [{ ...row, content: '# private' }],
+      }),
+    ).toThrow()
+
+    expect(
+      rpcDocumentationSearchInputSchema.parse({ query: 'fixture' }),
+    ).toEqual({ query: 'fixture' })
+    const result = {
+      rows: [
+        {
+          extensionId: 'fixture.docs',
+          path: 'README.md',
+          title: 'Fixture',
+          snippet: '# Fixture',
+        },
+      ],
+    }
+    expect(rpcDocumentationSearchResultSchema.parse(result)).toEqual(result)
+    expect(() =>
+      rpcDocumentationSearchResultSchema.parse({
+        rows: [{ ...result.rows[0], content: '# private' }],
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcDocumentationListInputSchema.parse({ extensionId: 'x'.repeat(129) }),
+    ).toThrow()
+    expect(() =>
+      rpcDocumentationSearchInputSchema.parse({ query: 'fixture\u001b' }),
+    ).toThrow()
+    expect(() =>
+      rpcDocumentationSearchResultSchema.parse({
+        rows: [{ ...result.rows[0], title: 'Fixture\u001b]0;unsafe\u0007' }],
+      }),
+    ).toThrow()
+  })
+
+  test('accepts exact text and canonical asset content while rejecting mismatches', () => {
+    expect(
+      rpcDocumentationGetInputSchema.parse({
+        extensionId: 'fixture.docs',
+        path: 'README.md',
+      }),
+    ).toEqual({ extensionId: 'fixture.docs', path: 'README.md' })
+    expect(() =>
+      rpcDocumentationGetInputSchema.parse({
+        extensionId: 'fixture.docs',
+        path: 'README\u001b.md',
+      }),
+    ).toThrow()
+    expect(
+      rpcDocumentationGetResultSchema.parse({
+        item: { ...row, content: '# Fixture' },
+      }),
+    ).toEqual({ item: { ...row, content: '# Fixture' } })
+    expect(
+      rpcDocumentationGetResultSchema.parse({
+        item: { ...row, byteSize: 10, content: '# Fixture\n' },
+      }),
+    ).toEqual({ item: { ...row, byteSize: 10, content: '# Fixture\n' } })
+    expect(() =>
+      rpcDocumentationGetResultSchema.parse({
+        item: { ...row, byteSize: 10, content: '# Fixture\u001b' },
+      }),
+    ).toThrow()
+
+    const png = 'iVBORw0KGgo='
+    const asset = {
+      extensionId: 'fixture.docs',
+      path: 'assets/pixel.png',
+      kind: 'asset',
+      mediaType: 'image/png',
+      byteSize: 8,
+      contentBase64: png,
+    } as const
+    expect(rpcDocumentationGetResultSchema.parse({ item: asset })).toEqual({
+      item: asset,
+    })
+    expect(() =>
+      rpcDocumentationGetResultSchema.parse({
+        item: { ...asset, byteSize: 7 },
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcDocumentationGetResultSchema.parse({
+        item: { ...asset, contentBase64: 'iVBORw0KGgp=' },
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcDocumentationGetResultSchema.parse({
+        item: { ...row, mediaType: 'image/png', content: '# Fixture' },
+      }),
     ).toThrow()
   })
 })

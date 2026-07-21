@@ -10,6 +10,12 @@ import {
 } from '@ctxindex/local-daemon'
 import {
   type DaemonClient,
+  type RpcDocumentationGetInput,
+  type RpcDocumentationGetResult,
+  type RpcDocumentationListInput,
+  type RpcDocumentationListResult,
+  type RpcDocumentationSearchInput,
+  type RpcDocumentationSearchResult,
   type RpcFailure,
   type RpcHealthResult,
   type RpcRealmAddInput,
@@ -252,6 +258,42 @@ export async function daemonHealth(
   return invoke(
     signal,
     (client) => client.system.health({}, requestOptions(signal)),
+    selection,
+  )
+}
+
+export async function daemonDocumentationList(
+  selection: DaemonSelection,
+  input: RpcDocumentationListInput,
+  signal?: AbortSignal,
+): Promise<RpcDocumentationListResult> {
+  return invoke(
+    signal,
+    (client) => client.documentation.list(input, requestOptions(signal)),
+    selection,
+  )
+}
+
+export async function daemonDocumentationGet(
+  selection: DaemonSelection,
+  input: RpcDocumentationGetInput,
+  signal?: AbortSignal,
+): Promise<RpcDocumentationGetResult> {
+  return invoke(
+    signal,
+    (client) => client.documentation.get(input, requestOptions(signal)),
+    selection,
+  )
+}
+
+export async function daemonDocumentationSearch(
+  selection: DaemonSelection,
+  input: RpcDocumentationSearchInput,
+  signal?: AbortSignal,
+): Promise<RpcDocumentationSearchResult> {
+  return invoke(
+    signal,
+    (client) => client.documentation.search(input, requestOptions(signal)),
     selection,
   )
 }

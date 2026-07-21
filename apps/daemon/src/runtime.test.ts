@@ -14,6 +14,11 @@ import {
   startDaemon,
 } from './runtime'
 
+const emptyDocumentation = {
+  list: () => [],
+  get: () => undefined,
+} as const
+
 function lease(name: string, events: string[]): FileLease {
   return {
     mode: 'exclusive',
@@ -115,6 +120,26 @@ test('startup owns leases before one load/open and publishes ready last', async 
           registry: {} as never,
           completeRegistry: {} as never,
           diagnostics: [],
+          documentation: {
+            list: () => [
+              {
+                extensionId: 'fixture.docs',
+                path: 'README.md',
+                origin: 'authored' as const,
+                kind: 'markdown' as const,
+                mediaType: 'text/markdown' as const,
+                content: '# Fixture',
+              },
+            ],
+            get: () => ({
+              extensionId: 'fixture.docs',
+              path: 'README.md',
+              origin: 'authored' as const,
+              kind: 'markdown' as const,
+              mediaType: 'text/markdown' as const,
+              content: '# Fixture',
+            }),
+          },
         }
       },
       openDatabase: async () => {
@@ -178,6 +203,15 @@ test('startup owns leases before one load/open and publishes ready last', async 
   expect(
     (await daemon.application.system.health({}, daemon.testContext())).ok,
   ).toBe(true)
+  expect(
+    await daemon.application.documentation.get(
+      { extensionId: 'fixture.docs', path: 'README.md' },
+      daemon.testContext(),
+    ),
+  ).toMatchObject({
+    ok: true,
+    value: { item: { content: '# Fixture' } },
+  })
   expect(await daemon.close(100)).toEqual({ status: 'complete' })
   expect(events.slice(-7)).toEqual([
     'metadata:stopping',
@@ -284,6 +318,7 @@ test('a lifecycle-lease loser cannot remove the live daemon endpoint or discover
       registry: {} as never,
       completeRegistry: {} as never,
       diagnostics: [],
+      documentation: emptyDocumentation,
     }),
     openDatabase: async () => ({ close: () => {} }) as never,
     runMigrations: async () => {},
@@ -362,6 +397,7 @@ test('non-cooperative request times out while ownership remains, then cleans up 
         registry: {} as never,
         completeRegistry: {} as never,
         diagnostics: [],
+        documentation: emptyDocumentation,
       }),
       openDatabase: async () =>
         ({ close: () => events.push('close:db') }) as never,
@@ -429,6 +465,7 @@ test('startup rollback closes opened resources and releases both leases', async 
           registry: {} as never,
           completeRegistry: {} as never,
           diagnostics: [],
+          documentation: emptyDocumentation,
         }),
         openDatabase: async () =>
           ({ close: () => events.push('close:db') }) as never,
@@ -487,6 +524,7 @@ test('post-open database target assertion closes SQLite before rollback', async 
           registry: {} as never,
           completeRegistry: {} as never,
           diagnostics: [],
+          documentation: emptyDocumentation,
         }),
         openDatabase: async () => {
           events.push('open')

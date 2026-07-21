@@ -12,7 +12,7 @@ Implements the CLI-owned Bun Unix-socket RPC adapter, exact runtime discovery se
 
 ## Data & control flow
 
-Command descriptors and the shared command model validate locally before Realm/Source management, sync/status, search, exact get, and thread call `selectDaemon()` and invoke semantic typed procedures only when selected; none opens SQLite or falls back after selection. Source add requests the daemon's active definition projection before resolving generated flags. Health/shutdown require a selector.
+Command descriptors and the shared command model validate locally before Realm/Source management, sync/status, search, exact get, thread, and Extension-documentation operations call `selectDaemon()` and invoke semantic typed procedures only when selected; none opens SQLite or falls back after selection. Source add requests the daemon's active definition projection before resolving generated flags. Documentation requests receive only bounded portable rows, text, snippets, or Base64 assets. Health/shutdown require a selector.
 
 ## Integration points
 
