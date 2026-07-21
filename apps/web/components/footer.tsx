@@ -4,19 +4,19 @@ import { gitConfig } from '@/lib/shared'
 
 const groups = [
   {
-    title: 'Docs',
+    title: 'Start',
     links: [
-      { href: '/docs', label: 'Overview' },
-      { href: '/docs/getting-started', label: 'Getting started' },
-      { href: '/docs/cli', label: 'CLI reference' },
+      { href: '/docs/start', label: 'First result' },
+      { href: '/docs/start/connect-provider', label: 'Connect a provider' },
+      { href: '/docs/start/agent-usage', label: 'Agent usage' },
     ],
   },
   {
-    title: 'Learn',
+    title: 'Build',
     links: [
-      { href: '/docs/concepts/realms-and-sources', label: 'Concepts' },
-      { href: '/docs/guides/agent-integration', label: 'Agent integration' },
-      { href: '/docs/examples', label: 'Examples' },
+      { href: '/docs/use', label: 'Use ctxindex' },
+      { href: '/docs/extend', label: 'Extension SDK' },
+      { href: '/docs/reference', label: 'Reference' },
     ],
   },
   {
@@ -26,7 +26,7 @@ const groups = [
         href: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,
         label: 'GitHub',
       },
-      { href: '/docs/examples/marketplace', label: 'Marketplace' },
+      { href: '/docs/contribute', label: 'Contribute' },
       { href: '/brand', label: 'Brand assets' },
       { href: '/privacy', label: 'Privacy' },
       { href: '/terms', label: 'Terms' },
@@ -54,7 +54,7 @@ export function Footer() {
                   <li key={l.href}>
                     <Link
                       href={l.href}
-                      className="text-sm text-text-secondary transition-colors hover:text-text-primary"
+                      className="inline-flex min-h-11 items-center text-sm text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-fd-ring)]"
                     >
                       {l.label}
                     </Link>

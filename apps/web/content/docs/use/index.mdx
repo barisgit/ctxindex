@@ -1,0 +1,53 @@
+---
+title: The core ctxindex workflow
+description: Organize Sources, materialize context, discover Resources, and follow stable Refs.
+---
+
+Every ctxindex workflow uses the same small model:
+
+1. A **Realm** groups Sources that should be searched and reasoned about together.
+2. A **Source** connects one provider collection or local directory through one Source Adapter.
+3. A **Profile** gives Resources portable shape, search vocabulary, Relations, Artifacts, exports, and Actions.
+4. A **Ref** addresses one Resource independently of local materialization.
+
+## Inspect loaded vocabulary
+
+```sh
+ctxindex describe --json
+ctxindex describe profile communication.message --json
+ctxindex describe adapter microsoft.mailbox --json
+```
+
+Use the compact default for orientation and request `describe --full --json` only when you need the complete registry snapshot.
+
+## Materialize deliberately
+
+```sh
+ctxindex sync --realm company --json
+ctxindex status --realm company --json
+```
+
+Sync is a strategy for fast local discovery. Providers and files remain canonical. Purging local materializations does not delete provider records.
+
+## Search, then follow the Ref
+
+```sh
+ctxindex search "quarterly planning" --realm company --json
+ctxindex get 'ctx://…' --json
+ctxindex thread 'ctx://…' --json
+ctxindex export 'ctx://…' --format json
+```
+
+An omitted Realm considers every eligible Realm. An explicit Realm filter is exact; there is no implicit global Realm and no Realm includes another.
+
+## Act through a Source
+
+```sh
+ctxindex describe action communication.message.draft.create \
+  --source work-mail \
+  --json
+```
+
+Actions are typed Profile mutations implemented by a Source Adapter. Current provider mutation stops at reversible email Draft creation and update. ctxindex never sends email.
+
+Read the focused [mail](/docs/guides/mail-workflows), [calendar](/docs/guides/calendar-workflows), and [agent](/docs/guides/agent-integration) guides next.

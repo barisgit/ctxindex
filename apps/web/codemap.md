@@ -6,11 +6,12 @@ Implements the public ctxindex landing page and documentation site as a private 
 
 ## Design / patterns
 
-- `content/docs/` is the authored documentation tree; `source.config.ts` declares its Fumadocs MDX schemas and enables processed Markdown for machine-readable representations.
+- `content/docs/` is the authored documentation tree. Its primary navigation follows reader intent through `start/`, `use/`, `extend/`, `reference/`, and `contribute/`; the generated CLI subtree remains a secondary reference surface. `source.config.ts` declares the Fumadocs MDX schemas and enables processed Markdown for machine-readable representations.
 - `lib/source.ts` is the Source Gateway over generated `collections/server` data. It centralizes page lookup, navigation-tree creation, static route parameters, Markdown rendering, and social-image paths.
 - Route components under `app/` separate the marketing shell, documentation layout/page rendering, search endpoint, text representations, and generated image representations.
 - `lib/shared.ts` owns stable route constants, canonical URL helpers, repository source links, and representation-slug parsing. `proxy.ts` applies content negotiation for Markdown-preferring documentation requests.
 - Reusable presentation components live in `components/`; `app/global.css` owns the semantic OKLCH light/dark tokens, maps app-facing color aliases onto Fumadocs' dynamic `fd-*` integration variables, and Fumadocs' root provider applies theme state. The unlisted `/design` route renders an executable specimen from those same tokens and components so visual drift remains observable.
+- The landing page pairs its product claim with one compact real command/result artifact and direct Start/Extend routes. It uses flat divider-led structures instead of repeated marketing-card grids or decorative imagery.
 - `components/logo.tsx` renders the adaptive inline mark. `components/brand-lockup.tsx` renders the official outlined Geist wordmark lockups (horizontal and stacked, adaptive or monochrome) via `<use>` references into the canonical sprite that `components/brand-lockup-defs.tsx` inlines once per document from `public/brand/ctxindex-lockup-sprite.svg`. `public/brand/` contains distributable mark and lockup SVGs plus raster exports, presented on the public `/brand` page; root `DESIGN.md` owns project-wide visual doctrine.
 
 ## Data & control flow
@@ -21,6 +22,7 @@ Implements the public ctxindex landing page and documentation site as a private 
 4. `/api/search`, `/llms.txt`, `/llms-full.txt`, `/llms.mdx/docs/**`, and `/og/docs/**` read the same source to expose search data, aggregate or page-level text, and social images.
 5. `proxy.ts` rewrites explicit `.md` paths and Markdown-negotiated `/docs` requests to the canonical per-page Markdown representation.
 6. `/design` applies forced light and dark token scopes to representative typography, controls, code, and logo sizes without introducing a parallel theme implementation.
+7. Focused homepage and content-contract tests enforce first-viewport claims, task-oriented navigation, checked Extension-example links, and authored internal-route resolution before MDX type generation and production build.
 
 ## Integration points
 

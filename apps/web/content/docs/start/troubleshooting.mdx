@@ -1,0 +1,51 @@
+---
+title: Troubleshooting
+description: Recover from initialization, authentication, Source, Extension, sync, and search failures without deleting local state.
+---
+
+## Start with local status
+
+```sh
+ctxindex status --json
+ctxindex source list --json
+ctxindex oauth-app list --json
+```
+
+Read the command's stable exit code and structured warning/error fields before retrying.
+
+## “Run init first”
+
+Stateful commands require initialized local state. Run:
+
+```sh
+ctxindex init
+```
+
+`init` probes the secret backend and creates local config/data directories. It does not create an implicit Realm.
+
+## Provider authorization fails
+
+- Confirm the OAuth App is listed and choose its exact Provider-scoped label when using BYOA.
+- Check provider tenant and administrator policy. A work or university tenant can block an app even when another desktop mail app is allowed.
+- Confirm the Provider's current requested scopes are permitted for that App and tenant.
+- Do not remove local Grant or secret state blindly. Reauthorization updates the existing Grant in place.
+
+## Source is unavailable
+
+The Source Adapter's Extension may be absent or invalid. Locally materialized Resource envelopes are preserved; provider operations remain unavailable until the Extension loads again.
+
+```sh
+ctxindex extension list --json
+ctxindex describe adapter <adapter-id> --json
+```
+
+## Search returns nothing
+
+- Confirm the Source belongs to the Realm you filtered.
+- Run `sync --source <label> --json` for indexed Sources.
+- Use `--remote` only when exactly one eligible remote-search Source is selected.
+- Remove `--local-only` only when provider traffic is intentional.
+
+<Callout type="warn">
+  Do not delete `~/.local/share/ctxindex`, secret-backend entries, or installed Extension materializations as a first troubleshooting step. Preserve state until the failing boundary is identified.
+</Callout>

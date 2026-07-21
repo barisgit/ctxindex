@@ -1,0 +1,14 @@
+{
+  "title": "Extend",
+  "pages": [
+    "index",
+    "providerless",
+    "provider-backed",
+    "profiles",
+    "providers-oauth-apps",
+    "adapters-actions",
+    "documentation",
+    "package-test-publish",
+    "catalogs"
+  ]
+}
