@@ -2,9 +2,9 @@
 
 ## Responsibility
 
-Builds, validates, smoke-tests, and release-gates the public `ctxindex` npm
-CLI and `@ctxindex/extension-sdk` npm artifacts without publishing from local
-development or touching user state.
+Builds, validates, smoke-tests, and release-gates the public `ctxindex` CLI,
+`@ctxindex/extension-sdk`, and `@ctxindex/profiles` npm artifacts without
+publishing from ordinary local development or touching user state.
 
 ## Design / patterns
 
@@ -33,6 +33,14 @@ development or touching user state.
   metadata, checkout paths, private workspace imports, and unresolved or
   extensionless declaration imports, then proves the exact archive through a
   clean external NodeNext TypeScript/Bun consumer.
+- `profiles-package.ts` builds all Profile entrypoints with shared chunks, emits
+  declarations, generates a public multi-subpath manifest from the private
+  workspace manifest, and verifies archive allowlists, exact SDK dependency,
+  root/subpath identity, and clean external consumption.
+- `library-release-gate.ts` derives an ordered SDK-then-Profiles candidate list
+  only from changed semantic versions and exact npm registry state. It validates
+  the bounded matrix, prepares artifacts without OIDC, checksum-verifies them,
+  and supports fail-closed first attempts plus idempotent partial reruns.
 
 ## Data & control flow
 
@@ -49,6 +57,10 @@ development or touching user state.
    `verify:extension-sdk-package`, `smoke:extension-sdk-package`, and
    `prepare:extension-sdk-release` commands dispatch the SDK artifact lifecycle;
    the final command packs, validates, smoke-tests, and writes its checksum.
+7. The parallel Profiles commands provide the same lifecycle for its root and
+   four subpath exports. `.github/workflows/publish-packages.yml` builds ordered
+   library artifacts in an unprivileged job, then a minimal OIDC job downloads,
+   verifies, preflights, and publishes the exact archives.
 
 ## Integration points
 
@@ -56,7 +68,8 @@ development or touching user state.
   `apps/cli/README.md`, and the root `LICENSE`.
 - Exposed through root `build:cli`, `pack:cli-package`, and
   `smoke:cli-package` scripts and composed by the release workflow.
-- Exposed through the root Extension SDK package lifecycle scripts; its unit and
-  exact-archive integration tests live under `tests/tooling/release/`.
+- Exposed through root Extension SDK and Profiles package lifecycle scripts;
+  their unit, identity, and exact-archive integration tests live under
+  `tests/tooling/release/`.
 - Tests live under `tests/tooling/release/`; installed CLI state is confined to temporary
   `BUN_INSTALL_*` and `CTXINDEX_*_HOME` directories.
