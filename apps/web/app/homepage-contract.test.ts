@@ -10,15 +10,15 @@ import {
 
 test('homepage demo keeps commands and result in one replaceable component', () => {
   expect(DEMO_EXTENSION_TARGET).toBe('./examples/tenders-extension')
-  expect(DEMO_EXTENSION_ID).toBe('enarocanje.proof')
+  expect(DEMO_EXTENSION_ID).toBe('ctxindex.demo')
   expect(DEMO_COMMANDS).toContain('git clone')
   expect(DEMO_COMMANDS).toContain('bun cli extension install local')
   expect(DEMO_COMMANDS).toContain('bun cli sync --source demo-tenders')
-  expect(DEMO_COMMANDS).toContain(
-    '"bridge inspection" --realm demo --format json',
+  expect(DEMO_COMMANDS).toContain('"bridge inspection" --realm demo')
+  expect(DEMO_RESULT).toContain('ctx://<source-id>/tender/DEMO-2026-006')
+  expect(DEMO_RESULT).toContain(
+    'Wireless structural monitoring for river bridges',
   )
-  expect(DEMO_RESULT).toContain('ctx://<source-id>/tender/JN-002%2F2026')
-  expect(DEMO_RESULT).toContain('Municipal bridge inspection')
 })
 
 test('homepage proves the local agent workflow before secondary paths', async () => {
@@ -36,10 +36,9 @@ test('homepage proves the local agent workflow before secondary paths', async ()
   )
   const css = await readFile(resolve(import.meta.dir, 'global.css'), 'utf8')
 
-  expect(page).toContain('shell-capable agent can use them')
-  expect(page).toContain('mail, calendars, files, and')
+  expect(page).toContain('All your context. One command')
+  expect(page).toContain('grouped into Realms, indexed on your machine')
   expect(page).toContain('Try the no-auth demo')
-  expect(page).toContain('ctx://…/file/aurora.txt')
   expect(page).toContain('Providers stay canonical')
   expect(page).toContain('trusted in-process code')
   expect(page).toContain('href="/docs/start/agent-usage"')
