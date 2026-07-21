@@ -2,9 +2,9 @@ import { describe, expect, test } from 'bun:test'
 import { resetEnvForTests } from '@ctxindex/core/config'
 import type { ActionArtifact, ActionContext } from '@ctxindex/extension-sdk'
 import {
-  communicationMessageDraftCreateInputSchema,
-  communicationMessageDraftUpdateInputSchema,
-  communicationMessageProfile,
+  mailMessageDraftCreateInputSchema,
+  mailMessageDraftUpdateInputSchema,
+  mailMessageProfile,
 } from '@ctxindex/profiles'
 import { gmailAdapterDefinition } from './definition'
 import { buildGmailDraftRaw, gmailDraftCreate, gmailDraftUpdate } from './draft'
@@ -46,7 +46,7 @@ function context(
     return {
       ref,
       sourceId,
-      profile: { id: 'communication.message', version: 1 },
+      profile: { id: 'mail.message', version: 1 },
       completeness: 'complete',
       deletedAt: null,
       payload: {
@@ -208,7 +208,7 @@ describe('gmailDraftCreate', () => {
             ? {
                 ref,
                 sourceId,
-                profile: { id: 'communication.message', version: 1 },
+                profile: { id: 'mail.message', version: 1 },
                 completeness: 'complete',
                 deletedAt: null,
                 payload: {
@@ -285,7 +285,7 @@ describe('gmailDraftCreate', () => {
         () => ({
           ref: parentRef,
           sourceId,
-          profile: { id: 'communication.message', version: 1 },
+          profile: { id: 'mail.message', version: 1 },
           completeness: 'complete',
           deletedAt: null,
           payload: {
@@ -341,7 +341,7 @@ describe('gmailDraftCreate', () => {
         () => ({
           ref: parentRef,
           sourceId,
-          profile: { id: 'communication.message', version: 1 },
+          profile: { id: 'mail.message', version: 1 },
           completeness: state.completeness,
           deletedAt: state.deletedAt,
           payload: {
@@ -386,11 +386,10 @@ describe('gmailDraftCreate', () => {
       bodyText: 'Body',
     }
 
-    const binding =
-      gmailAdapterDefinition.actions['communication.message.draft.create']
-    expect(binding?.profile).toBe(communicationMessageProfile)
-    expect(binding?.output).toBe(communicationMessageProfile)
-    expect(binding?.input).toBe(communicationMessageDraftCreateInputSchema)
+    const binding = gmailAdapterDefinition.actions['mail.message.draft.create']
+    expect(binding?.profile).toBe(mailMessageProfile)
+    expect(binding?.output).toBe(mailMessageProfile)
+    expect(binding?.input).toBe(mailMessageDraftCreateInputSchema)
     const resource = await binding?.run(context(input, mockedFetch))
 
     expect(calls).toHaveLength(1)
@@ -406,7 +405,7 @@ describe('gmailDraftCreate', () => {
     expect(body).toEqual({ message: { raw: buildGmailDraftRaw(input) } })
     expect(resource).toEqual({
       ref: `ctx://${sourceId}/draft/draft%2Fid%201`,
-      profile: { id: 'communication.message', version: 1 },
+      profile: { id: 'mail.message', version: 1 },
       title: 'Subject',
       payload: {
         providerDraftId: 'draft/id 1',
@@ -545,7 +544,7 @@ describe('gmailDraftUpdate', () => {
             ? {
                 ref,
                 sourceId,
-                profile: { id: 'communication.message', version: 1 },
+                profile: { id: 'mail.message', version: 1 },
                 completeness: 'complete',
                 deletedAt: null,
                 payload: {
@@ -585,7 +584,7 @@ describe('gmailDraftUpdate', () => {
           () => ({
             ref: draftRef,
             sourceId,
-            profile: { id: 'communication.message', version: 1 },
+            profile: { id: 'mail.message', version: 1 },
             completeness: 'complete',
             deletedAt: null,
             payload: {
@@ -624,7 +623,7 @@ describe('gmailDraftUpdate', () => {
             ? {
                 ref,
                 sourceId,
-                profile: { id: 'communication.message', version: 1 },
+                profile: { id: 'mail.message', version: 1 },
                 completeness: 'complete',
                 deletedAt: null,
                 payload: {
@@ -651,7 +650,7 @@ describe('gmailDraftUpdate', () => {
         {
           ref: parentRef,
           sourceId,
-          profile: { id: 'communication.message', version: 1 } as const,
+          profile: { id: 'mail.message', version: 1 } as const,
           completeness: 'complete' as const,
           deletedAt: null,
           payload: {
@@ -668,7 +667,7 @@ describe('gmailDraftUpdate', () => {
         {
           ref: draftRef,
           sourceId,
-          profile: { id: 'communication.message', version: 1 } as const,
+          profile: { id: 'mail.message', version: 1 } as const,
           completeness: 'complete' as const,
           deletedAt: null,
           payload: {
@@ -724,7 +723,7 @@ describe('gmailDraftUpdate', () => {
         {
           ref: parentRef,
           sourceId,
-          profile: { id: 'communication.message', version: 1 } as const,
+          profile: { id: 'mail.message', version: 1 } as const,
           completeness: 'complete' as const,
           deletedAt: null,
           payload: {
@@ -742,7 +741,7 @@ describe('gmailDraftUpdate', () => {
         {
           ref: draftRef,
           sourceId,
-          profile: { id: 'communication.message', version: 1 } as const,
+          profile: { id: 'mail.message', version: 1 } as const,
           completeness: 'complete' as const,
           deletedAt: null,
           payload: {
@@ -818,7 +817,7 @@ describe('gmailDraftUpdate', () => {
             ? {
                 ref,
                 sourceId,
-                profile: { id: 'communication.message', version: 1 },
+                profile: { id: 'mail.message', version: 1 },
                 completeness: 'complete',
                 deletedAt: null,
                 payload: {
@@ -836,7 +835,7 @@ describe('gmailDraftUpdate', () => {
             : {
                 ref,
                 sourceId,
-                profile: { id: 'communication.message', version: 1 },
+                profile: { id: 'mail.message', version: 1 },
                 completeness: 'complete',
                 deletedAt: null,
                 payload: {
@@ -876,11 +875,10 @@ describe('gmailDraftUpdate', () => {
       bodyText: 'Replacement body',
     }
 
-    const binding =
-      gmailAdapterDefinition.actions['communication.message.draft.update']
-    expect(binding?.profile).toBe(communicationMessageProfile)
-    expect(binding?.output).toBe(communicationMessageProfile)
-    expect(binding?.input).toBe(communicationMessageDraftUpdateInputSchema)
+    const binding = gmailAdapterDefinition.actions['mail.message.draft.update']
+    expect(binding?.profile).toBe(mailMessageProfile)
+    expect(binding?.output).toBe(mailMessageProfile)
+    expect(binding?.input).toBe(mailMessageDraftUpdateInputSchema)
     const resource = await binding?.run(context(input, mockedFetch))
 
     expect(calls).toHaveLength(1)
@@ -917,7 +915,7 @@ describe('gmailDraftUpdate', () => {
     )
     expect(resource).toEqual({
       ref: input.ref,
-      profile: { id: 'communication.message', version: 1 },
+      profile: { id: 'mail.message', version: 1 },
       title: 'Replacement',
       payload: {
         providerDraftId: 'draft/id 1',

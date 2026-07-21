@@ -28,7 +28,7 @@ describe('search CLI arguments', () => {
         'mail',
         '--source=calendar',
         '--kind',
-        'communication.message',
+        'mail.message',
         '--field',
         'sender=alice@example.com',
         '--field=unread=true',
@@ -43,7 +43,7 @@ describe('search CLI arguments', () => {
         text: 'project',
         realms: ['work', 'personal'],
         sourceIds: ['mail', 'calendar'],
-        kind: 'communication.message',
+        kind: 'mail.message',
         fields: [
           { name: 'sender', value: 'alice@example.com' },
           { name: 'unread', value: 'true' },

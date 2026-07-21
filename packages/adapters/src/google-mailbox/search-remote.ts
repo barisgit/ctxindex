@@ -7,7 +7,7 @@ import type {
   SearchRemoteResource,
   SearchRemoteResult,
 } from '@ctxindex/extension-sdk'
-import { communicationMessageSchema } from '@ctxindex/profiles'
+import { mailMessageSchema } from '@ctxindex/profiles'
 import {
   type GmailMessage,
   gmailHeader,
@@ -105,7 +105,7 @@ function resource(
   )
   const replyTo = gmailHeaderAddresses(gmailHeader(message, 'Reply-To'))
   const timestamp = gmailOccurredAt(message)
-  const payload = communicationMessageSchema.parse({
+  const payload = mailMessageSchema.parse({
     providerMessageId: message.id,
     ...(message.threadId ? { threadId: message.threadId } : {}),
     ...(message.threadId
@@ -129,7 +129,7 @@ function resource(
   })
   return {
     ref: `ctx://${sourceId.toUpperCase()}/message/${message.id}`,
-    profile: { id: 'communication.message', version: 1 },
+    profile: { id: 'mail.message', version: 1 },
     title: subject ?? null,
     occurredAt: timestamp ?? null,
     payload,

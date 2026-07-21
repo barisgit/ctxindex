@@ -10,7 +10,7 @@ Contains reusable workspace libraries defining ctxindex's provider-neutral domai
 - `rpc` is a composition-only wire boundary: it owns bounded schemas, compatibility middleware, router shape, and the generated client type, but no transport, application behavior, filesystem coordination, or provider logic.
 - `local-daemon` is infrastructure-only: it owns canonical runtime identity, Unix-socket discovery/endpoint metadata, and retained lifecycle/database leases without depending on RPC, core storage, or applications.
 - Explicit TypeScript export maps and repository verification enforce package dependency direction and truthful direct manifests.
-- Provider composition remains outside core: adapters bundle Google Calendar, Gmail, Microsoft Calendar, Microsoft Outlook mailbox, and local-directory definitions against provider-neutral SDK/Profile contracts; both calendar Adapters implement the shared calendar-event Profile, while Gmail and Outlook implement the communication Profile's reversible standalone/reply Draft create/update Actions.
+- Provider composition remains outside core: adapters bundle Google Calendar, Gmail, Microsoft Calendar, Microsoft Outlook mailbox, and local-directory definitions against provider-neutral SDK/Profile contracts; both calendar Adapters implement the shared calendar-event Profile, while Gmail and Outlook implement the mail Profile's reversible standalone/reply Draft create/update Actions.
 
 ## Data & control flow
 
@@ -25,7 +25,7 @@ Contains reusable workspace libraries defining ctxindex's provider-neutral domai
 | Package | Integration role | Detailed map |
 | --- | --- | --- |
 | `packages/extension-sdk/` | Shared contracts for definitions, Catalog curation, contexts, emissions, and operations. | `packages/extension-sdk/codemap.md` |
-| `packages/profiles/` | Provider-neutral calendar-event, communication-message, and file vocabularies. | `packages/profiles/codemap.md` |
+| `packages/profiles/` | Provider-neutral calendar-event, mail-message, and file vocabularies. | `packages/profiles/codemap.md` |
 | `packages/adapters/` | Built-in Google, Microsoft, and local-directory provider integrations. | `packages/adapters/codemap.md` |
 | `packages/core/` | Provider-neutral services, registries, SQLite storage/schema, operation pipelines, and runtime infrastructure. | `packages/core/codemap.md` |
 | `packages/rpc/` | Bounded local-daemon DTO schemas, compatibility middleware, router contract, and typed client surface. | `packages/rpc/codemap.md` |

@@ -12,7 +12,7 @@ Core SHALL provide Action adapters a generic local Resource resolver scoped to t
 - **THEN** resolution fails with actionable retrieval guidance and performs no provider I/O
 
 ### Requirement: Portable threaded reply Draft Actions
-The existing Draft create and update Actions SHALL support provider-native reply branches. Before authentication or provider I/O, reply create MUST resolve `replyToRef` to a complete, non-deleted, non-Draft `communication.message@1` Resource in the exact selected Source. Reply update MUST additionally resolve the addressed complete Draft in that Source and prove its stored `replyToRef` exactly matches the requested parent.
+The existing Draft create and update Actions SHALL support provider-native reply branches. Before authentication or provider I/O, reply create MUST resolve `replyToRef` to a complete, non-deleted, non-Draft `mail.message@1` Resource in the exact selected Source. Reply update MUST additionally resolve the addressed complete Draft in that Source and prove its stored `replyToRef` exactly matches the requested parent.
 
 The reply recipient MUST be the first Reply-To address when present and otherwise the first From address. Reply-all MUST NOT be performed. The subject MUST be derived deterministically from the parent and MUST NOT be caller-overridable. Missing locally required recipient, identity, reference-chain, conversation, or provider-thread data MUST fail with guidance to retrieve the message first.
 

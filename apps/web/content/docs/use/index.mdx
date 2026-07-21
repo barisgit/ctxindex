@@ -14,7 +14,7 @@ Every ctxindex workflow uses the same small model:
 
 ```sh
 ctxindex describe --format json
-ctxindex describe profile communication.message --format json
+ctxindex describe profile mail.message --format json
 ctxindex describe adapter microsoft.mailbox --format json
 ```
 
@@ -43,7 +43,7 @@ An omitted Realm considers every eligible Realm. An explicit Realm filter is exa
 ## Act through a Source
 
 ```sh
-ctxindex describe action communication.message.draft.create \
+ctxindex describe action mail.message.draft.create \
   --source work-mail \
   --format json
 ```

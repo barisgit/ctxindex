@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Portable threaded reply Draft vocabulary
-`communication.message@1` SHALL expose optional ordered Reply-To addresses and RFC References needed to construct portable replies, and reply Draft Resources SHALL expose the immutable same-Source parent Ref as `replyToRef`. Existing message payloads and standalone Draft payloads without these optional fields MUST remain valid.
+`mail.message@1` SHALL expose optional ordered Reply-To addresses and RFC References needed to construct portable replies, and reply Draft Resources SHALL expose the immutable same-Source parent Ref as `replyToRef`. Existing message payloads and standalone Draft payloads without these optional fields MUST remain valid.
 
 Draft create and update Action inputs MUST be strict unions. The existing standalone create and update branches MUST remain unchanged. Reply create MUST accept exactly `replyToRef` and `bodyText`; reply update MUST accept exactly `ref`, `replyToRef`, and `bodyText`. A reply branch MUST reject recipient, subject, cc, bcc, attachment, provider-id, or other override fields.
 

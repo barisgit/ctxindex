@@ -1,13 +1,11 @@
 import { describe, expect, test } from 'bun:test'
-import { communicationMessageProfile } from './communication-message'
+import { mailMessageProfile } from './mail-message'
 
-const renderEml = communicationMessageProfile.exports?.eml?.render
+const renderEml = mailMessageProfile.exports?.eml?.render
 
-describe('communication.message EML export', () => {
+describe('mail.message EML export', () => {
   test('declares the RFC 822 media type', () => {
-    expect(communicationMessageProfile.exports?.eml?.mediaType).toBe(
-      'message/rfc822',
-    )
+    expect(mailMessageProfile.exports?.eml?.mediaType).toBe('message/rfc822')
   })
 
   test('renders full messages with fixed headers, UTC dates, and CRLF bytes', () => {

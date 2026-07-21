@@ -151,8 +151,8 @@ test('production Adapter surface has no send permission, Action, or route', asyn
     ...adapters.flatMap((adapter) => Object.keys(adapter.actions)),
   ]
   expect([...new Set(actionIds)].sort()).toEqual([
-    'communication.message.draft.create',
-    'communication.message.draft.update',
+    'mail.message.draft.create',
+    'mail.message.draft.update',
   ])
   expect(actionIds.filter((id) => /send/i.test(id))).toEqual([])
 })

@@ -19,7 +19,7 @@ const malformedCommands = [
   [
     'action',
     'run',
-    'communication.message.draft.create',
+    'mail.message.draft.create',
     '--source',
     'SOURCE',
     '--input',

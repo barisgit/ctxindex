@@ -8,8 +8,8 @@ import { applyPragmas, runMigrations } from '@ctxindex/core/storage'
 import { CTXINDEX_BUILTIN_EXTENSIONS } from '../builtins'
 
 const sourceId = '01KXHBNECDAH1T4MJ38X88EPFJ'
-const createActionId = 'communication.message.draft.create'
-const updateActionId = 'communication.message.draft.update'
+const createActionId = 'mail.message.draft.create'
+const updateActionId = 'mail.message.draft.update'
 const scopes = [
   'https://www.googleapis.com/auth/gmail.compose',
   'https://www.googleapis.com/auth/gmail.readonly',
@@ -180,7 +180,7 @@ describe('Gmail Draft Action integration', () => {
     expect(result.resource).toMatchObject({
       ref,
       sourceId,
-      profile: { id: 'communication.message', version: 1 },
+      profile: { id: 'mail.message', version: 1 },
       origin: 'adhoc',
       title: 'Draft subject',
       payload: {

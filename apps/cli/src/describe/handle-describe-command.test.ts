@@ -43,7 +43,7 @@ describe('describe command validation', () => {
       await handleDescribeCommand(
         {
           selector: 'action',
-          id: 'communication.message.draft.create',
+          id: 'mail.message.draft.create',
           format: 'json',
           full: false,
         },
@@ -53,8 +53,8 @@ describe('describe command validation', () => {
       ),
     ).toBe(0)
     expect(JSON.parse(output)).toMatchObject({
-      id: 'communication.message.draft.create',
-      profile: { id: 'communication.message', version: 1 },
+      id: 'mail.message.draft.create',
+      profile: { id: 'mail.message', version: 1 },
       effect: 'reversible',
       adapters: [{ id: 'google.mailbox' }, { id: 'microsoft.mailbox' }],
     })

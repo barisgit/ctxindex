@@ -65,7 +65,7 @@ For V1, `microsoft.mailbox` Resources SHALL use the existing complete Resource r
 
 #### Scenario: Missing Outlook message is hydrated
 - **WHEN** `get` receives a valid Microsoft message Ref absent from local storage
-- **THEN** the owning Adapter retrieves and caches a complete `communication.message` Resource through the generic path
+- **THEN** the owning Adapter retrieves and caches a complete `mail.message` Resource through the generic path
 
 #### Scenario: Outlook thread uses Relations
 - **WHEN** a caller runs `thread` for related Microsoft messages
@@ -77,7 +77,7 @@ For V1, `microsoft.mailbox` Resources SHALL use the existing complete Resource r
 
 #### Scenario: Outlook message exports through its Profile
 - **WHEN** a caller exports a normalized Outlook message as EML or JSON
-- **THEN** the existing communication Profile renderer/fallback streams the representation without Microsoft conversion code in core
+- **THEN** the existing mail Profile renderer/fallback streams the representation without Microsoft conversion code in core
 
 ### Requirement: Attachment materialization
 The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.

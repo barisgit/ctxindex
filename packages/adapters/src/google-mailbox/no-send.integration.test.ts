@@ -12,14 +12,8 @@ import { CTXINDEX_BUILTIN_EXTENSIONS } from '../builtins'
 import { buildGmailDraftRaw } from './draft'
 
 const sourceId = '01KXHBNECDAH1T4MJ38X88EPFJ'
-const actionIds = [
-  'communication.message.draft.create',
-  'communication.message.draft.update',
-]
-const unknownSendActionIds = [
-  'communication.message.draft.send',
-  'communication.message.send',
-]
+const actionIds = ['mail.message.draft.create', 'mail.message.draft.update']
+const unknownSendActionIds = ['mail.message.draft.send', 'mail.message.send']
 const scopes = [
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/gmail.compose',

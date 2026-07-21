@@ -15,7 +15,7 @@ const headerValueSchema = z
   .min(1)
   .regex(/^[^\r\n]*$/)
 
-const communicationMessageDraftStandaloneContentShape = {
+const mailMessageDraftStandaloneContentShape = {
   to: z.array(headerValueSchema).min(1),
   cc: z.array(headerValueSchema).optional(),
   bcc: z.array(headerValueSchema).optional(),
@@ -23,7 +23,7 @@ const communicationMessageDraftStandaloneContentShape = {
   bodyText: z.string(),
 }
 
-export const communicationMessageDraftAttachmentSchema = z
+export const mailMessageDraftAttachmentSchema = z
   .object({ ref: z.string().min(1) })
   .strict()
 
@@ -31,7 +31,7 @@ export const MAX_DRAFT_ATTACHMENT_COUNT = 10
 export const MAX_DRAFT_ATTACHMENT_BYTES = 2 * 1024 * 1024
 
 const draftAttachmentsSchema = z
-  .array(communicationMessageDraftAttachmentSchema)
+  .array(mailMessageDraftAttachmentSchema)
   .min(1)
   .max(MAX_DRAFT_ATTACHMENT_COUNT)
   .superRefine((attachments, context) => {
@@ -47,54 +47,52 @@ const draftAttachmentsSchema = z
     }
   })
 
-const communicationMessageDraftReplyContentShape = {
+const mailMessageDraftReplyContentShape = {
   replyToRef: z.string().min(1),
   bodyText: z.string(),
 }
 
-const communicationMessageDraftStandaloneCreateInputSchema = z
+const mailMessageDraftStandaloneCreateInputSchema = z
   .object({
-    ...communicationMessageDraftStandaloneContentShape,
+    ...mailMessageDraftStandaloneContentShape,
     attachments: draftAttachmentsSchema.optional(),
   })
   .strict()
-const communicationMessageDraftReplyCreateInputSchema = z
+const mailMessageDraftReplyCreateInputSchema = z
   .object({
-    ...communicationMessageDraftReplyContentShape,
+    ...mailMessageDraftReplyContentShape,
     attachments: draftAttachmentsSchema.optional(),
   })
   .strict()
 
-export const communicationMessageDraftCreateInputSchema = z.union([
-  communicationMessageDraftStandaloneCreateInputSchema,
-  communicationMessageDraftReplyCreateInputSchema,
+export const mailMessageDraftCreateInputSchema = z.union([
+  mailMessageDraftStandaloneCreateInputSchema,
+  mailMessageDraftReplyCreateInputSchema,
 ])
 
-const communicationMessageDraftStandaloneUpdateInputSchema = z
+const mailMessageDraftStandaloneUpdateInputSchema = z
   .object({
     ref: z.string().min(1),
-    ...communicationMessageDraftStandaloneContentShape,
+    ...mailMessageDraftStandaloneContentShape,
   })
   .strict()
-const communicationMessageDraftReplyUpdateInputSchema = z
+const mailMessageDraftReplyUpdateInputSchema = z
   .object({
     ref: z.string().min(1),
-    ...communicationMessageDraftReplyContentShape,
+    ...mailMessageDraftReplyContentShape,
   })
   .strict()
 
-export const communicationMessageDraftUpdateInputSchema = z.union([
-  communicationMessageDraftStandaloneUpdateInputSchema,
-  communicationMessageDraftReplyUpdateInputSchema,
+export const mailMessageDraftUpdateInputSchema = z.union([
+  mailMessageDraftStandaloneUpdateInputSchema,
+  mailMessageDraftReplyUpdateInputSchema,
 ])
 
 function sanitizeHeader(value: string): string {
   return value.replace(/[\r\n]+/g, ' ')
 }
 
-function renderEml(
-  payload: z.infer<typeof communicationMessageSchema>,
-): string {
+function renderEml(payload: z.infer<typeof mailMessageSchema>): string {
   const headers: string[] = []
   const addHeader = (name: string, value: string | undefined): void => {
     if (value !== undefined) headers.push(`${name}: ${sanitizeHeader(value)}`)
@@ -121,7 +119,7 @@ function renderEml(
   return `${headers.join('\r\n')}\r\n\r\n${body}`
 }
 
-export const communicationMessageSchema = z
+export const mailMessageSchema = z
   .object({
     providerMessageId: z.string().min(1),
     providerDraftId: z.string().min(1).optional(),
@@ -147,42 +145,42 @@ export const communicationMessageSchema = z
   })
   .strict()
 
-export type CommunicationMessage = z.infer<typeof communicationMessageSchema>
+export type MailMessage = z.infer<typeof mailMessageSchema>
 
-export function deriveCommunicationMessageReplyRecipient(
-  payload: CommunicationMessage,
+export function deriveMailMessageReplyRecipient(
+  payload: MailMessage,
 ): string | undefined {
   return payload.replyTo?.[0] ?? payload.from?.[0]
 }
 
-export function deriveCommunicationMessageReplySubject(
+export function deriveMailMessageReplySubject(
   subject: string | undefined,
 ): string {
   const base = (subject ?? '').replace(/^(?:\s*re\s*:\s*)+/i, '').trim()
   return base ? `Re: ${base}` : 'Re:'
 }
 
-export function deriveCommunicationMessageReplyReferences(
+export function deriveMailMessageReplyReferences(
   references: readonly string[] | undefined,
   rfcMessageId: string,
 ): string[] {
   return [...new Set([...(references ?? []), rfcMessageId])]
 }
 
-export const communicationMessageProfile = defineProfile({
-  id: 'communication.message',
+export const mailMessageProfile = defineProfile({
+  id: 'mail.message',
   version: 1,
-  schema: communicationMessageSchema,
+  schema: mailMessageSchema,
   actions: {
-    'communication.message.draft.create': {
+    'mail.message.draft.create': {
       effect: 'reversible',
-      input: communicationMessageDraftCreateInputSchema,
-      output: { id: 'communication.message', version: 1 },
+      input: mailMessageDraftCreateInputSchema,
+      output: { id: 'mail.message', version: 1 },
     },
-    'communication.message.draft.update': {
+    'mail.message.draft.update': {
       effect: 'reversible',
-      input: communicationMessageDraftUpdateInputSchema,
-      output: { id: 'communication.message', version: 1 },
+      input: mailMessageDraftUpdateInputSchema,
+      output: { id: 'mail.message', version: 1 },
     },
   },
   search: {

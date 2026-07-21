@@ -30,7 +30,7 @@ function parent(): ActionResource {
   return {
     ref: parentRef,
     sourceId,
-    profile: { id: 'communication.message', version: 1 },
+    profile: { id: 'mail.message', version: 1 },
     completeness: 'complete',
     deletedAt: null,
     payload: {
@@ -49,7 +49,7 @@ function draft(): ActionResource {
   return {
     ref: draftRef,
     sourceId,
-    profile: { id: 'communication.message', version: 1 },
+    profile: { id: 'mail.message', version: 1 },
     completeness: 'complete',
     deletedAt: null,
     payload: {

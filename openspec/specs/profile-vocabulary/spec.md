@@ -15,7 +15,7 @@ For V1, the system SHALL expose `defineProfile`, `defineAdapter`, and `defineExt
 - **THEN** the system rejects it before the definition becomes available to operations
 
 ### Requirement: Profiles own pure domain vocabulary
-For V1, Profile definitions SHALL provide schema-backed domain vocabulary, including the slots needed for search extraction, typed fields, Relations, Artifact descriptors, exports, Actions, aliases, and documentation. The bundled vocabulary SHALL include strict provider-neutral `communication.message@1`, `calendar.event@1`, and `file@1` Profiles. Core MUST NOT add provider- or domain-specific vocabulary paths, and ordinary vocabulary functions MUST remain pure over validated payloads.
+For V1, Profile definitions SHALL provide schema-backed domain vocabulary, including the slots needed for search extraction, typed fields, Relations, Artifact descriptors, exports, Actions, aliases, and documentation. The bundled vocabulary SHALL include strict provider-neutral `mail.message@1`, `calendar.event@1`, and `file@1` Profiles. Core MUST NOT add provider- or domain-specific vocabulary paths, and ordinary vocabulary functions MUST remain pure over validated payloads.
 
 #### Scenario: Fake Profile drives generic behavior
 - **WHEN** a Resource using a valid fake Profile is stored and queried
@@ -74,7 +74,7 @@ Vocabulary rules (normative):
 1. Vocabulary functions MUST be pure over the validated payload; no I/O. The one exception is export render functions, which MAY receive core-resolved declared dependencies (e.g. related resources by relation type). Action declarations are pure contracts; their provider I/O is never a profile vocabulary function.
 2. Vocabulary slots are versioned. An implementation encountering an unknown slot MUST ignore it with a diagnostic and continue.
 3. When an adapter emits a payload for an unknown profile id or version, core MUST accept the resource at envelope level, index what the envelope carries, and surface a warning (degraded acceptance). Sync MUST NOT fail on unknown profiles.
-4. The V1 bundled canonical Profiles MUST be `communication.message@1`, `calendar.event@1`, and `file@1`. Bundled and extension-defined Profiles MUST be expressible through the same public Profile API; V1 MUST NOT require an `artifact` Profile because Artifacts are represented by Profile-extracted descriptors.
+4. The V1 bundled canonical Profiles MUST be `mail.message@1`, `calendar.event@1`, and `file@1`. Bundled and extension-defined Profiles MUST be expressible through the same public Profile API; V1 MUST NOT require an `artifact` Profile because Artifacts are represented by Profile-extracted descriptors.
 
 #### Scenario: A Profile supplies domain semantics through pure versioned vocabulary
 - **WHEN** a conforming implementation exercises this contract

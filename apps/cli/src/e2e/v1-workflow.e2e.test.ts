@@ -5,8 +5,8 @@ import { createSandbox, type Sandbox } from '@ctxindex/core/testing'
 import { type MockGmailRecordedRequest, startMockGmail } from './_mock-gmail'
 import { installLoopbackBrowser } from './_oauth-account'
 
-const createDraftAction = 'communication.message.draft.create'
-const updateDraftAction = 'communication.message.draft.update'
+const createDraftAction = 'mail.message.draft.create'
+const updateDraftAction = 'mail.message.draft.update'
 
 function parseSourceId(stdout: string): string {
   const match = /^source added: (.+)$/m.exec(stdout)
@@ -275,7 +275,7 @@ test('real binary proves the isolated complete V1 workflow', async () => {
       resource: {
         ref: messageRef,
         sourceId: gmailSource,
-        profile: { id: 'communication.message', version: 1 },
+        profile: { id: 'mail.message', version: 1 },
         payload: {
           providerMessageId: 'workflow-root',
           bodyText: 'Gmail workflow body\nsecond line',
@@ -438,7 +438,7 @@ test('real binary proves the isolated complete V1 workflow', async () => {
     expect(unsupported.exitCode).toBe(2)
     expect(unsupported.stdout).toBe('')
     expect(unsupported.stderr).toBe(
-      'Unsupported export format "mbox" for communication.message@1; valid formats: eml, json\n',
+      'Unsupported export format "mbox" for mail.message@1; valid formats: eml, json\n',
     )
 
     mock.resetRequests()

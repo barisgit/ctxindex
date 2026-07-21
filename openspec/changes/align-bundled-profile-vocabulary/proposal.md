@@ -4,7 +4,7 @@ The canonical Profile vocabulary specification and accepted V1 design contradict
 
 ## What Changes
 
-- Define the V1 bundled vocabulary consistently as `communication.message@1`, `calendar.event@1`, and `file@1`.
+- Define the V1 bundled vocabulary consistently as `mail.message@1`, `calendar.event@1`, and `file@1`.
 - Remove current-bundle claims for conversation, task, and artifact Profiles and for MBOX and ICS exports.
 - Clarify that V1 Resource composition uses one primary Profile plus Artifact descriptors, not an `artifact` Profile.
 - Preserve the public Profile API for extension-defined Profiles and future domains.

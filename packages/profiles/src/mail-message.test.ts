@@ -2,12 +2,12 @@ import { describe, expect, test } from 'bun:test'
 import { readFile } from 'node:fs/promises'
 import type { InferProfilePayload } from '@ctxindex/extension-sdk'
 import {
-  communicationMessageDraftCreateInputSchema,
-  communicationMessageDraftUpdateInputSchema,
-  communicationMessageProfile,
-  deriveCommunicationMessageReplyRecipient,
-  deriveCommunicationMessageReplyReferences,
-  deriveCommunicationMessageReplySubject,
+  deriveMailMessageReplyRecipient,
+  deriveMailMessageReplyReferences,
+  deriveMailMessageReplySubject,
+  mailMessageDraftCreateInputSchema,
+  mailMessageDraftUpdateInputSchema,
+  mailMessageProfile,
 } from './index'
 
 type Equal<TLeft, TRight> =
@@ -15,12 +15,10 @@ type Equal<TLeft, TRight> =
     ? true
     : false
 type Assert<T extends true> = T
-type CommunicationMessagePayload = InferProfilePayload<
-  typeof communicationMessageProfile
->
+type MailMessagePayload = InferProfilePayload<typeof mailMessageProfile>
 type _PayloadIsInferred = Assert<
   Equal<
-    CommunicationMessagePayload,
+    MailMessagePayload,
     {
       providerMessageId: string
       providerDraftId?: string | undefined
@@ -54,12 +52,12 @@ type _PayloadIsInferred = Assert<
   >
 >
 
-describe('communication.message Profile v1', () => {
+describe('mail.message Profile v1', () => {
   test('accepts unique managed attachments only on create', () => {
     const artifactRef =
       'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/1/attachment/1'
     expect(
-      communicationMessageDraftCreateInputSchema.parse({
+      mailMessageDraftCreateInputSchema.parse({
         to: ['recipient@example.test'],
         subject: 'Subject',
         bodyText: 'Body',
@@ -67,14 +65,14 @@ describe('communication.message Profile v1', () => {
       }).attachments,
     ).toEqual([{ ref: artifactRef }])
     expect(() =>
-      communicationMessageDraftCreateInputSchema.parse({
+      mailMessageDraftCreateInputSchema.parse({
         replyToRef: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/1',
         bodyText: 'Body',
         attachments: [{ ref: artifactRef }, { ref: artifactRef }],
       }),
     ).toThrow()
     expect(() =>
-      communicationMessageDraftUpdateInputSchema.parse({
+      mailMessageDraftUpdateInputSchema.parse({
         ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/1',
         replyToRef: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/1',
         bodyText: 'Body',
@@ -83,7 +81,7 @@ describe('communication.message Profile v1', () => {
     ).toThrow()
   })
   test('strictly validates the minimal Gmail search/get payload', () => {
-    const payload: CommunicationMessagePayload = {
+    const payload: MailMessagePayload = {
       providerMessageId: 'gmail-message-1',
       threadId: 'gmail-thread-1',
       conversationKey: 'SOURCE-1:gmail-thread-1',
@@ -103,10 +101,10 @@ describe('communication.message Profile v1', () => {
       unread: true,
     }
 
-    expect(communicationMessageProfile.schema.parse(payload)).toEqual(payload)
-    expect(() => communicationMessageProfile.schema.parse({})).toThrow()
+    expect(mailMessageProfile.schema.parse(payload)).toEqual(payload)
+    expect(() => mailMessageProfile.schema.parse({})).toThrow()
     expect(() =>
-      communicationMessageProfile.schema.parse({
+      mailMessageProfile.schema.parse({
         providerMessageId: 'gmail-message-1',
         providerOnly: true,
       }),
@@ -114,18 +112,15 @@ describe('communication.message Profile v1', () => {
   })
 
   test('declares the strict reversible Draft create Action and rejects header injection', () => {
-    const action =
-      communicationMessageProfile.actions?.[
-        'communication.message.draft.create'
-      ]
+    const action = mailMessageProfile.actions?.['mail.message.draft.create']
 
     expect(action).toEqual({
       effect: 'reversible',
-      input: communicationMessageDraftCreateInputSchema,
-      output: { id: 'communication.message', version: 1 },
+      input: mailMessageDraftCreateInputSchema,
+      output: { id: 'mail.message', version: 1 },
     })
     expect(
-      communicationMessageDraftCreateInputSchema.parse({
+      mailMessageDraftCreateInputSchema.parse({
         to: ['recipient@example.com'],
         cc: [],
         bcc: ['blind@example.com'],
@@ -161,29 +156,26 @@ describe('communication.message Profile v1', () => {
         from: 'forbidden@example.com',
       },
     ]) {
-      expect(
-        communicationMessageDraftCreateInputSchema.safeParse(input).success,
-      ).toBe(false)
+      expect(mailMessageDraftCreateInputSchema.safeParse(input).success).toBe(
+        false,
+      )
     }
-    expect(Object.keys(communicationMessageProfile.actions ?? {})).toEqual([
-      'communication.message.draft.create',
-      'communication.message.draft.update',
+    expect(Object.keys(mailMessageProfile.actions ?? {})).toEqual([
+      'mail.message.draft.create',
+      'mail.message.draft.update',
     ])
   })
 
   test('declares strict complete-replacement Draft update', () => {
-    const action =
-      communicationMessageProfile.actions?.[
-        'communication.message.draft.update'
-      ]
+    const action = mailMessageProfile.actions?.['mail.message.draft.update']
 
     expect(action).toEqual({
       effect: 'reversible',
-      input: communicationMessageDraftUpdateInputSchema,
-      output: { id: 'communication.message', version: 1 },
+      input: mailMessageDraftUpdateInputSchema,
+      output: { id: 'mail.message', version: 1 },
     })
     expect(
-      communicationMessageDraftUpdateInputSchema.parse({
+      mailMessageDraftUpdateInputSchema.parse({
         ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/draft/stable-draft-id',
         to: ['recipient@example.com'],
         subject: '',
@@ -228,15 +220,15 @@ describe('communication.message Profile v1', () => {
         draftId: 'forbidden',
       },
     ]) {
-      expect(
-        communicationMessageDraftUpdateInputSchema.safeParse(input).success,
-      ).toBe(false)
+      expect(mailMessageDraftUpdateInputSchema.safeParse(input).success).toBe(
+        false,
+      )
     }
   })
 
   test('accepts only strict reply Draft branches and preserves standalone branches', () => {
     expect(
-      communicationMessageDraftCreateInputSchema.parse({
+      mailMessageDraftCreateInputSchema.parse({
         replyToRef: 'ctx://SOURCE/message/parent',
         bodyText: 'Reply body',
       }),
@@ -245,7 +237,7 @@ describe('communication.message Profile v1', () => {
       bodyText: 'Reply body',
     })
     expect(
-      communicationMessageDraftUpdateInputSchema.parse({
+      mailMessageDraftUpdateInputSchema.parse({
         ref: 'ctx://SOURCE/draft/one',
         replyToRef: 'ctx://SOURCE/message/parent',
         bodyText: 'Replacement reply body',
@@ -282,9 +274,9 @@ describe('communication.message Profile v1', () => {
         providerMessageId: 'forbidden',
       },
     ]) {
-      expect(
-        communicationMessageDraftCreateInputSchema.safeParse(input).success,
-      ).toBe(false)
+      expect(mailMessageDraftCreateInputSchema.safeParse(input).success).toBe(
+        false,
+      )
     }
     for (const input of [
       {
@@ -318,36 +310,36 @@ describe('communication.message Profile v1', () => {
         providerMessageId: 'forbidden',
       },
     ]) {
-      expect(
-        communicationMessageDraftUpdateInputSchema.safeParse(input).success,
-      ).toBe(false)
+      expect(mailMessageDraftUpdateInputSchema.safeParse(input).success).toBe(
+        false,
+      )
     }
   })
 
   test('derives portable reply recipient, subject, and references deterministically', () => {
     expect(
-      deriveCommunicationMessageReplyRecipient({
+      deriveMailMessageReplyRecipient({
         providerMessageId: 'parent',
         replyTo: ['reply@example.com', 'second@example.com'],
         from: ['from@example.com'],
       }),
     ).toBe('reply@example.com')
     expect(
-      deriveCommunicationMessageReplyRecipient({
+      deriveMailMessageReplyRecipient({
         providerMessageId: 'parent',
         from: ['from@example.com'],
       }),
     ).toBe('from@example.com')
     expect(
-      deriveCommunicationMessageReplyRecipient({ providerMessageId: 'parent' }),
+      deriveMailMessageReplyRecipient({ providerMessageId: 'parent' }),
     ).toBeUndefined()
-    expect(deriveCommunicationMessageReplySubject('Re: RE:  Project')).toBe(
+    expect(deriveMailMessageReplySubject('Re: RE:  Project')).toBe(
       'Re: Project',
     )
-    expect(deriveCommunicationMessageReplySubject('')).toBe('Re:')
-    expect(deriveCommunicationMessageReplySubject(undefined)).toBe('Re:')
+    expect(deriveMailMessageReplySubject('')).toBe('Re:')
+    expect(deriveMailMessageReplySubject(undefined)).toBe('Re:')
     expect(
-      deriveCommunicationMessageReplyReferences(
+      deriveMailMessageReplyReferences(
         ['<root@example.com>', '<parent@example.com>'],
         '<parent@example.com>',
       ),
@@ -355,7 +347,7 @@ describe('communication.message Profile v1', () => {
   })
 
   test('extracts title, occurrence date, chunks, and typed fields purely', () => {
-    const payload: CommunicationMessagePayload = {
+    const payload: MailMessagePayload = {
       providerMessageId: 'gmail-message-1',
       subject: 'Project update',
       from: ['sender@example.com'],
@@ -365,7 +357,7 @@ describe('communication.message Profile v1', () => {
       bodyText: 'Full project update.',
       unread: true,
     }
-    const search = communicationMessageProfile.search
+    const search = mailMessageProfile.search
 
     expect(search?.title?.(payload)).toBe('Project update')
     expect(search?.occurredAt?.(payload)).toEqual(
@@ -401,26 +393,22 @@ describe('communication.message Profile v1', () => {
       },
       { ref: 'ctx://SOURCE/message/gmail-message-1/attachment/inline' },
     ]
-    const payload: CommunicationMessagePayload = {
+    const payload: MailMessagePayload = {
       providerMessageId: 'gmail-message-1',
       attachments,
     }
 
-    expect(communicationMessageProfile.schema.parse(payload)).toEqual(payload)
-    expect(communicationMessageProfile.artifacts?.(payload)).toEqual(
-      attachments,
-    )
-    expect(communicationMessageProfile.artifacts?.(payload)).not.toBe(
-      attachments,
-    )
+    expect(mailMessageProfile.schema.parse(payload)).toEqual(payload)
+    expect(mailMessageProfile.artifacts?.(payload)).toEqual(attachments)
+    expect(mailMessageProfile.artifacts?.(payload)).not.toBe(attachments)
     expect(() =>
-      communicationMessageProfile.schema.parse({
+      mailMessageProfile.schema.parse({
         providerMessageId: 'gmail-message-1',
         attachments: [{ ref: 'valid', providerAttachmentId: 'forbidden' }],
       }),
     ).toThrow()
     expect(() =>
-      communicationMessageProfile.schema.parse({
+      mailMessageProfile.schema.parse({
         providerMessageId: 'gmail-message-1',
         attachments: [{ ref: 'valid', byteSize: -1 }],
       }),
@@ -428,14 +416,14 @@ describe('communication.message Profile v1', () => {
   })
 
   test('extracts exact identity fields and natural-key Relations', () => {
-    const payload: CommunicationMessagePayload = {
+    const payload: MailMessagePayload = {
       providerMessageId: 'gmail-message-1',
       conversationKey: 'SOURCE-1:gmail-thread-1',
       rfcMessageId: '<child@example.com>',
       inReplyTo: '<parent@example.com>',
     }
-    const search = communicationMessageProfile.search
-    const relations = communicationMessageProfile.relations
+    const search = mailMessageProfile.search
+    const relations = mailMessageProfile.relations
 
     expect(search?.fields?.rfcMessageId?.extract(payload)).toBe(
       '<child@example.com>',
@@ -454,33 +442,24 @@ describe('communication.message Profile v1', () => {
   })
 
   test('omits identity fields and Relations when values are absent', () => {
-    const payload: CommunicationMessagePayload = {
+    const payload: MailMessagePayload = {
       providerMessageId: 'gmail-message-2',
     }
 
     expect(
-      communicationMessageProfile.search?.fields?.rfcMessageId?.extract(
-        payload,
-      ),
+      mailMessageProfile.search?.fields?.rfcMessageId?.extract(payload),
     ).toBeUndefined()
     expect(
-      communicationMessageProfile.search?.fields?.conversationKey?.extract(
-        payload,
-      ),
+      mailMessageProfile.search?.fields?.conversationKey?.extract(payload),
     ).toBeUndefined()
     expect(
-      communicationMessageProfile.relations?.conversation?.(payload),
+      mailMessageProfile.relations?.conversation?.(payload),
     ).toBeUndefined()
-    expect(
-      communicationMessageProfile.relations?.parent?.(payload),
-    ).toBeUndefined()
+    expect(mailMessageProfile.relations?.parent?.(payload)).toBeUndefined()
   })
 
   test('has no runtime import from core', async () => {
-    const source = await readFile(
-      `${import.meta.dir}/communication-message.ts`,
-      'utf8',
-    )
+    const source = await readFile(`${import.meta.dir}/mail-message.ts`, 'utf8')
     expect(source).not.toContain("from '@ctxindex/core")
     expect(source).not.toContain('from "@ctxindex/core')
   })

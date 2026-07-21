@@ -7,7 +7,7 @@ import type {
   RetrieveContext,
   RetrievedResource,
 } from '@ctxindex/extension-sdk'
-import { communicationMessageSchema } from '@ctxindex/profiles'
+import { mailMessageSchema } from '@ctxindex/profiles'
 import { parseHTML } from 'linkedom'
 import { z } from 'zod'
 import {
@@ -169,7 +169,7 @@ function retrievedResource(
   const attachments = providerDraftId
     ? []
     : attachmentDescriptors(ref, message.payload)
-  const payload = communicationMessageSchema.parse({
+  const payload = mailMessageSchema.parse({
     providerMessageId,
     ...(providerDraftId ? { providerDraftId } : {}),
     ...(message.threadId ? { threadId: message.threadId } : {}),
@@ -196,7 +196,7 @@ function retrievedResource(
   })
   return {
     ref,
-    profile: { id: 'communication.message', version: 1 },
+    profile: { id: 'mail.message', version: 1 },
     title: subject ?? null,
     occurredAt: timestamp ?? null,
     providerUpdatedAt: timestamp ?? null,

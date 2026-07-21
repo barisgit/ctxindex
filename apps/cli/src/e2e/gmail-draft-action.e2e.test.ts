@@ -5,8 +5,8 @@ import { createSandbox, type Sandbox } from '@ctxindex/core/testing'
 import { type MockGmailServer, startMockGmail } from './_mock-gmail'
 import { installLoopbackBrowser } from './_oauth-account'
 
-const createActionId = 'communication.message.draft.create'
-const updateActionId = 'communication.message.draft.update'
+const createActionId = 'mail.message.draft.create'
+const updateActionId = 'mail.message.draft.update'
 const sourceLabel = 'gmail-mailbox'
 
 function parseSourceId(stdout: string): string {
@@ -154,9 +154,9 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
         sources: description.sources,
       }).toEqual({
         id: actionId,
-        profile: { id: 'communication.message', version: 1 },
+        profile: { id: 'mail.message', version: 1 },
         effect: 'reversible',
-        output: { id: 'communication.message', version: 1 },
+        output: { id: 'mail.message', version: 1 },
         requiredBranches,
         sources: [
           {
@@ -239,7 +239,7 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
       resource: {
         ref,
         sourceId,
-        profile: { id: 'communication.message', version: 1 },
+        profile: { id: 'mail.message', version: 1 },
         origin: 'adhoc',
         title: 'Original subject',
         payload: {
@@ -303,7 +303,7 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
       resource: {
         ref,
         sourceId,
-        profile: { id: 'communication.message', version: 1 },
+        profile: { id: 'mail.message', version: 1 },
         origin: 'adhoc',
         title: 'Replacement subject',
         payload: {
@@ -420,7 +420,7 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
       [
         'describe',
         'action',
-        'communication.message.draft.send',
+        'mail.message.draft.send',
         '--source',
         sourceLabel,
         '--format',

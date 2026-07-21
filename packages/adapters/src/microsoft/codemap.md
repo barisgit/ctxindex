@@ -14,12 +14,12 @@ Owns the shared Microsoft identity and Graph transport layer plus the Microsoft 
 
 ## Data & control flow
 
-1. `ctxindexMicrosoftExtension` registers the public App plus Microsoft Calendar and mailbox definitions; both Adapters directly reference `microsoftOAuthProvider`, separately add `Calendars.Read` and `Mail.ReadWrite`, and bind their concrete calendar or communication Profile.
+1. `ctxindexMicrosoftExtension` registers the public App plus Microsoft Calendar and mailbox definitions; both Adapters directly reference `microsoftOAuthProvider`, separately add `Calendars.Read` and `Mail.ReadWrite`, and bind their concrete calendar or mail Profile.
 2. `account add microsoft` may resolve the policy-matched bundled App; `oauth-app add microsoft <label> --from-env` plus explicit `account add microsoft --app <label>` remains the local BYOA path. Both run the same scope-union and loopback lifecycle, persist the selected App snapshot and refresh token on the Account's stable private Grant, and fetch Graph `/me` to establish identity.
 3. Authenticated operation contexts cross the shared Graph transport. Calendar sync/retrieve normalizes events and persists cursor progression; mailbox operations normalize messages and attachments, derive replies from complete local Resources, and attest one-mutation Draft results. No send capability is defined.
 
 ## Integration points
 
 - Exported from `packages/adapters/src/index.ts` as `microsoftOAuthProvider`, `ctxindexMicrosoftOAuthApp`, and Calendar/mailbox config schemas and Adapter definitions; the App and both Adapters are registered in `builtins.ts`.
-- Uses `defineProvider()` and `auth.oauth2()` from `@ctxindex/extension-sdk`; child modules consume core configuration/errors and concrete calendar/communication Profile definitions.
+- Uses `defineProvider()` and `auth.oauth2()` from `@ctxindex/extension-sdk`; child modules consume core configuration/errors and concrete calendar/mail Profile definitions.
 - External hosts: `login.microsoftonline.com` for authorization/tokens and `graph.microsoft.com` for identity, calendar, and mailbox data.

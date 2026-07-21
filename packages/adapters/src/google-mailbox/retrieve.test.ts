@@ -176,7 +176,7 @@ describe('Gmail retrieve', () => {
     expect(result.resources).toEqual([
       {
         ref,
-        profile: { id: 'communication.message', version: 1 },
+        profile: { id: 'mail.message', version: 1 },
         title: 'A subject',
         occurredAt: 123,
         providerUpdatedAt: 123,
@@ -327,7 +327,7 @@ describe('Gmail retrieve', () => {
     expect(result.resources).toEqual([
       {
         ref: draftRef,
-        profile: { id: 'communication.message', version: 1 },
+        profile: { id: 'mail.message', version: 1 },
         title: 'Draft subject',
         occurredAt: null,
         providerUpdatedAt: null,

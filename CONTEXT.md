@@ -126,7 +126,7 @@ _Avoid_: Source, import
 > **Domain expert:** "Not yet. It becomes a **Draft** when ctxindex invokes a typed Action through the chosen mailbox **Source** and persists it with the provider."
 
 > **Dev:** "Does the Gmail **Extension** implement `search` directly?"
-> **Domain expert:** "Its **Source Adapter** does. The **Extension** only bundles that adapter with the communication **Profiles** it uses."
+> **Domain expert:** "Its **Source Adapter** does. The **Extension** only bundles that adapter with the mail **Profiles** it uses."
 
 ## Flagged ambiguities
 

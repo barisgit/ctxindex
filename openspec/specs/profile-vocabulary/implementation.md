@@ -127,20 +127,20 @@ export function defineProfile<
 ): ProfileDefinition<TId, TVersion, TSchema>;
 ```
 
-### @ctxindex/profiles — communication reply vocabulary
+### @ctxindex/profiles/mail-message — mail reply vocabulary
 
 ```ts
-export type CommunicationMessage = z.infer<typeof communicationMessageSchema>
+export type MailMessage = z.infer<typeof mailMessageSchema>
 
-export function deriveCommunicationMessageReplyRecipient(
-  payload: CommunicationMessage,
+export function deriveMailMessageReplyRecipient(
+  payload: MailMessage,
 ): string | undefined;
 
-export function deriveCommunicationMessageReplySubject(
+export function deriveMailMessageReplySubject(
   subject: string | undefined,
 ): string;
 
-export function deriveCommunicationMessageReplyReferences(
+export function deriveMailMessageReplyReferences(
   references: readonly string[] | undefined,
   rfcMessageId: string,
 ): string[];
@@ -173,6 +173,8 @@ export function isNormalizedRelativeFilePath(path: string): boolean;
 ## Implementation doctrine
 
 `@ctxindex/extension-sdk` owns plain versioned authoring contracts and const-generic factories; it creates no runtime class identity. `@ctxindex/profiles` owns bundled schemas and pure vocabulary. Core registries erase authored definitions to runtime-safe interfaces and bind by `(id, version)`.
+
+The canonical email contract is exported from both `@ctxindex/profiles` and `@ctxindex/profiles/mail-message` through the `MailMessage`, `mailMessageSchema`, `mailMessageProfile`, `mailMessageDraft*`, and `deriveMailMessageReply*` symbols. No compatibility subpath, symbol, Profile id, Action id, or alias is retained for the former broad message vocabulary.
 
 Profiles own validation, titles/summaries, chunks, typed fields, Relations, Artifact descriptors, exports, docs/aliases/examples, and Action declarations. Adapters own provider I/O. Loaded registry metadata drives describe, kind aliases, field parsing, Source config, exports, and Action discovery.
 
