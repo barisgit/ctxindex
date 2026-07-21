@@ -22,6 +22,7 @@ import {
   CtxindexNotFoundError,
   CtxindexSyncError,
   CtxindexValidationError,
+  normalizeSyncError,
 } from '@ctxindex/core/errors'
 import type { ExportResourceResult } from '@ctxindex/core/export'
 import type { OAuthAppInventoryItem } from '@ctxindex/core/oauth-app'
@@ -377,15 +378,17 @@ function failure(error: unknown): RpcFailure {
           : `OAuth authorization failed: ${error.code}`,
     }
   }
-  if (error instanceof CtxindexSyncError) {
-    const retryAfterMs = error.retryAfterMs
+  const syncFailure = normalizeSyncError(error)
+  if (syncFailure) {
+    const retryAfterMs = syncFailure.retryAfterMs
     return {
       kind: 'ctxindex',
       taxonomy: 'sync',
-      code: error.code,
-      message:
-        error.code === 'not_found'
-          ? (trustedSyncMessages.get(error.code) ??
+      code: syncFailure.code,
+      message: syncFailure.publicMessage
+        ? syncFailure.message
+        : syncFailure.code === 'not_found'
+          ? (trustedSyncMessages.get(syncFailure.code) ??
             'The daemon could not complete the request.')
           : 'The daemon could not complete the request.',
       ...(retryAfterMs !== undefined &&

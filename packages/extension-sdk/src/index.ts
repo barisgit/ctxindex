@@ -82,3 +82,10 @@ export {
   type ProviderAuth,
   type ProviderDefinition,
 } from './provider'
+export {
+  isSyncError,
+  type SyncError,
+  type SyncErrorCode,
+  type SyncErrorOptions,
+  syncError,
+} from './sync-error'

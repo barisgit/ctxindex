@@ -9,6 +9,7 @@ Implements provider-neutral domain and application services: exported-value Exte
 - Capability folders expose `index.ts` seams; root/package export maps publish them without provider-specific logic.
 - The complete registry collects reachable exact Provider/Profile/Adapter/OAuth App values from Extension roots, validates them atomically, and exposes id-keyed runtime registries; Adapters remain the provider-I/O strategy boundary.
 - Factory services receive explicit database, registry, secrets, auth, and logger dependencies.
+- `errors.ts` owns core error classes and structurally normalizes the SDK's tagged public sync failures into native `CtxindexSyncError` values while retaining an explicit public-message marker; ordinary Errors do not cross that trust boundary.
 - Local OAuth App config enters only through Provider-declared registration environment names. `oauth-app/managed-policy.ts` is a pure host-policy matcher over exact active App identity, owning Extension, and supported bundled provenance; it never inspects config or scopes. Authorization snapshots either the managed-resolved or explicitly selected App config into Grant-owned refs for runtime refresh.
 
 ## Data & control flow

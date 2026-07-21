@@ -14,6 +14,7 @@ import {
   type CtxindexValidationErrorCode,
 } from '@ctxindex/core/errors'
 import { CtxindexSecretsError } from '@ctxindex/core/secrets'
+import { syncError } from '@ctxindex/extension-sdk'
 import { gmailAdapterDefinition } from '@ctxindex/official'
 import {
   createDaemonRouter,
@@ -1541,6 +1542,35 @@ test('Artifact download preserves trusted failure parity without exposing privat
     taxonomy: 'other',
     code: 'internal_error',
     message: 'The daemon could not complete the request.',
+  })
+})
+
+test('projects an explicitly public portable SDK sync failure and bounds retry metadata', async () => {
+  const app = application({
+    resourceService: {
+      get: async () => {
+        throw syncError(
+          'rate_limited',
+          'GitHub rate limit reached; retry later.',
+          { retryAfterMs: 30_000 },
+        )
+      },
+    },
+  })
+  app.markReady()
+
+  expect(
+    await rpcFailure(
+      clientFor(app).resource.get({
+        ref: 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/one',
+      }),
+    ),
+  ).toEqual({
+    kind: 'ctxindex',
+    taxonomy: 'sync',
+    code: 'rate_limited',
+    message: 'GitHub rate limit reached; retry later.',
+    retryAfterMs: 30_000,
   })
 })
 

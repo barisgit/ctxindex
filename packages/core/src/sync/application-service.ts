@@ -1,6 +1,10 @@
 import type { SyncMode } from '@ctxindex/extension-sdk'
 import type { AuthService } from '../auth'
-import { CtxindexError, CtxindexValidationError } from '../errors'
+import {
+  CtxindexError,
+  CtxindexValidationError,
+  normalizeSyncError,
+} from '../errors'
 import { compareStrings, type ExtensionRegistry } from '../registry'
 import {
   syncSource as defaultSyncSource,
@@ -91,6 +95,8 @@ export interface SyncApplicationServiceDeps {
 }
 
 function typedFailure(error: unknown): CtxindexError {
+  const syncFailure = normalizeSyncError(error)
+  if (syncFailure) return syncFailure
   if (error instanceof CtxindexError) return error
   const code = (error as { readonly code?: unknown })?.code
   const message = error instanceof Error ? error.message : 'Sync failed'

@@ -5,6 +5,7 @@ import {
   defineProfile,
   defineProvider,
   docs,
+  syncError,
   z,
 } from '@ctxindex/extension-sdk'
 
@@ -344,10 +345,16 @@ export const githubIssuesAdapter = defineAdapter({
         if (pages === 0 && cursor?.etag !== undefined) {
           headers.set('If-None-Match', cursor.etag)
         }
-        const response = await context.fetch(url, {
-          headers,
-          signal: context.signal,
-        })
+        let response: Response
+        try {
+          response = await context.fetch(url, {
+            headers,
+            signal: context.signal,
+          })
+        } catch {
+          context.signal.throwIfAborted()
+          throw syncError('network', 'GitHub Issues network request failed.')
+        }
         context.signal.throwIfAborted()
         pages += 1
         if (response.status === 304) {
@@ -358,8 +365,26 @@ export const githubIssuesAdapter = defineAdapter({
           return
         }
         if (!response.ok) {
-          throw new Error(
-            `GitHub Issues request failed with HTTP ${response.status}`,
+          const message = `GitHub Issues request failed with HTTP ${response.status}.`
+          if (response.status === 429) {
+            const retryAfter = response.headers.get('retry-after')
+            const retryAfterMs =
+              retryAfter !== null && /^\d+$/.test(retryAfter)
+                ? Number(retryAfter) * 1_000
+                : undefined
+            throw syncError(
+              'rate_limited',
+              message,
+              retryAfterMs !== undefined && retryAfterMs <= 60_000
+                ? { retryAfterMs }
+                : {},
+            )
+          }
+          throw syncError(
+            response.status >= 500
+              ? 'provider_unavailable'
+              : 'provider_bad_response',
+            message,
           )
         }
         const parsed = githubIssuesPageSchema.safeParse(

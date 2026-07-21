@@ -1,8 +1,8 @@
 import { Database } from 'bun:sqlite'
 import { afterEach, expect, test } from 'bun:test'
-import { defineProfile } from '@ctxindex/extension-sdk'
+import { defineProfile, syncError } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
-import { CtxindexAuthError } from '../errors'
+import { CtxindexAuthError, CtxindexSyncError } from '../errors'
 import { createProfileRegistry } from '../registry/profile-registry'
 import { applyPragmas } from '../storage/db'
 import { runMigrations } from '../storage/migrator'
@@ -425,6 +425,40 @@ test('drive failure preserves resources and cursor and releases lock', async () 
   ).toEqual({ cursor_json: '{ "page": 1 }', last_status: 'failed' })
   expect(db.prepare('SELECT count(*) AS count FROM sync_locks').get()).toEqual({
     count: 0,
+  })
+})
+
+test('normalizes a portable SDK sync failure without instanceof identity', async () => {
+  const { db, coordinator } = await setup()
+  const portable = syncError(
+    'rate_limited',
+    'GitHub rate limit reached; retry later.',
+    { retryAfterMs: 30_000 },
+  )
+  let caught: unknown
+  try {
+    await coordinator.run(
+      { sourceId, mode: 'sync', signal: new AbortController().signal },
+      async () => {
+        throw { ...portable }
+      },
+    )
+  } catch (error) {
+    caught = error
+  }
+
+  expect(caught).toBeInstanceOf(CtxindexSyncError)
+  expect(caught).toMatchObject({
+    code: 'rate_limited',
+    message: 'GitHub rate limit reached; retry later.',
+    retryAfterMs: 30_000,
+    publicMessage: true,
+  })
+  expect(
+    db.prepare('SELECT status, error_summary FROM sync_runs').get(),
+  ).toEqual({
+    status: 'failed',
+    error_summary: 'GitHub rate limit reached; retry later.',
   })
 })
 

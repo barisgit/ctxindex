@@ -8,7 +8,7 @@ Provides the public, credential-free GitHub Issues demonstration Extension. The 
 
 - `extension.ts` imports only public `@ctxindex/extension-sdk` authoring APIs. It exports stable `github.public`, `github.issues`, and `software.issue@1` definitions beneath the `ctxindex.github-issues-demo` Extension root.
 - `githubPublicProvider` uses `auth.none()`; `githubIssuesAdapter` is Provider-bound, sync-only, indexed, restricted to `api.github.com`, and accepts strict `{ owner, repository }` source configuration.
-- The adapter validates GitHub issue pages, removes pull requests returned by GitHub's shared Issues endpoint, normalizes labels and timestamps into `softwareIssueSchema`, and limits a snapshot to 100 pages or 10,000 issues.
+- The adapter validates GitHub issue pages, removes pull requests returned by GitHub's shared Issues endpoint, normalizes labels and timestamps into `softwareIssueSchema`, and limits a snapshot to 100 pages or 10,000 issues. Network and HTTP failures use the public SDK `syncError()` boundary: 429 is rate-limited with a bounded numeric retry delay, 5xx is provider-unavailable, and other non-success statuses such as 403 are provider-bad-response without exposing response bodies.
 - Pagination accepts only advancing canonical HTTPS GitHub API links with the exact expected query. A one-page completed snapshot can carry a validated ETag; multi-page snapshots deliberately do not reuse page-one validation as collection validation.
 - `docs/` supplies the required index plus Provider, Adapter, versioned Profile, and manual-demo pages through `docs('./docs')`; `website-handoff.ts` provides the website-facing target, stable IDs, demo Realm/Source labels, and public/default fallback repositories.
 
