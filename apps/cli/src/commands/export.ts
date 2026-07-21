@@ -5,6 +5,12 @@ import {
   exportSourceResource,
 } from '@ctxindex/core/export'
 import { defineCtxCommand } from '../command-model'
+import { daemonExport, selectDaemon } from '../daemon/client'
+import {
+  type DaemonRouteSelector,
+  ensureDaemonSelection,
+  selectEnsuredDaemonRoute,
+} from '../daemon/ensure'
 import { type CliDeps, openDeps } from '../deps'
 import { mapErrorToExit, runWithExit } from '../format/exit'
 
@@ -13,6 +19,20 @@ type OpenExportDeps = () => Promise<
 >
 type RunExport = (input: ExportResourceInput) => Promise<ExportResourceResult>
 
+export interface ExportCommandDeps extends DaemonRouteSelector {
+  readonly export: typeof daemonExport
+  readonly open: OpenExportDeps
+  readonly runExport: RunExport
+}
+
+const defaultDeps: ExportCommandDeps = {
+  selectDaemon,
+  ensureDaemonSelection,
+  export: daemonExport,
+  open: openDeps,
+  runExport: exportSourceResource,
+}
+
 export interface ExportCommandInput {
   readonly ref: string
   readonly format: string
@@ -20,8 +40,7 @@ export interface ExportCommandInput {
 
 export async function handleExportCommand(
   parsed: ExportCommandInput,
-  open: OpenExportDeps = openDeps,
-  runExport: RunExport = exportSourceResource,
+  services: ExportCommandDeps = defaultDeps,
 ): Promise<number> {
   try {
     parseRef(parsed.ref)
@@ -30,17 +49,28 @@ export async function handleExportCommand(
     return 2
   }
 
-  const deps = await open()
+  const controller = new AbortController()
+  const cancel = () => controller.abort()
+  process.once('SIGINT', cancel)
+  let deps: Awaited<ReturnType<OpenExportDeps>> | undefined
   try {
-    const result = await runExport({
-      db: deps.db,
-      ref: parsed.ref,
-      format: parsed.format,
-      registry: deps.registry,
-      authService: deps.authService,
-      logger: deps.logger,
-      signal: new AbortController().signal,
-    })
+    const daemon = await selectEnsuredDaemonRoute(services, controller.signal)
+    const result = daemon
+      ? await services.export(daemon, parsed, controller.signal)
+      : await (async () => {
+          deps = await services.open()
+          controller.signal.throwIfAborted()
+          return services.runExport({
+            db: deps.db,
+            ref: parsed.ref,
+            format: parsed.format,
+            registry: deps.registry,
+            authService: deps.authService,
+            logger: deps.logger,
+            signal: controller.signal,
+          })
+        })()
+    controller.signal.throwIfAborted()
     process.stdout.write(result.bytes)
     for (const warning of result.warnings) {
       console.error(`${warning.code}\t${warning.message}`)
@@ -50,7 +80,8 @@ export async function handleExportCommand(
     console.error(error instanceof Error ? error.message : String(error))
     return mapErrorToExit(error)
   } finally {
-    await deps.close()
+    process.removeListener('SIGINT', cancel)
+    await deps?.close()
   }
 }
 

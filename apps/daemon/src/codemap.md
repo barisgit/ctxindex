@@ -7,9 +7,9 @@ Implements the local daemon's application layer: process startup, production dep
 ## Design / patterns
 
 - `main.ts` is the direct Bun process entry point; it contains root selection, runtime startup, signal registration, lifetime waiting, and bounded rendering of structured startup failures to stable process exits. The CLI may launch it detached; no separate foreground product command is exposed.
-- `runtime.ts` is the composition root. Its injectable hooks isolate startup/lifecycle tests while `productionServices()` wires logger, Realm/Source/Auth, Action describe/run, search/retrieval/thread services, one shared secret vault/backend manager, and `SyncApplicationService`; startup separately adapts the exact loaded Extension documentation projection into a read-only core documentation service.
+- `runtime.ts` is the composition root. Its injectable hooks isolate startup/lifecycle tests while `productionServices()` wires logger, Realm/Source/Auth, Action describe/run, export, search/retrieval/thread services, one shared secret vault/backend manager, and `SyncApplicationService`; startup separately adapts the exact loaded Extension documentation projection into a read-only core documentation service.
 - `application.ts` implements the contract-derived nested `DaemonRpcApplication` tree; it translates public core results into bounded RPC DTOs, preserves trusted auth/sync/validation/lookup taxonomy separately from public codes, and never exposes raw provider, storage, or diagnostic text. Streamed sync uses a one-item rendezvous so consumer progress backpressures core observation. Its activity clock closes idle daemons without interrupting admitted business work; health and Source-status observation do not refresh the deadline.
-- `transport.ts` keeps Bun-specific `Bun.serve` and oRPC `RPCHandler` adaptation outside RPC contracts and core. `signals.ts` adapts process signals to `RunningDaemon.close()`.
+- `transfer.ts` owns the bounded in-memory, single-use, expiring byte-ticket registry. `transport.ts` keeps Bun-specific `Bun.serve`, the exact owner-private transfer route, and oRPC `RPCHandler` adaptation outside RPC contracts and core. `signals.ts` adapts process signals to `RunningDaemon.close()`.
 
 ## Data & control flow
 

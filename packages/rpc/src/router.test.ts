@@ -93,6 +93,7 @@ function createApplication() {
     status: 0,
     search: 0,
     resourceGet: 0,
+    exportPrepare: 0,
     threadGet: 0,
     actionDescribe: 0,
     actionRun: 0,
@@ -252,6 +253,25 @@ function createApplication() {
         }
       },
     },
+    export: {
+      async prepare(_input, context) {
+        record('exportPrepare', context)
+        return {
+          ok: true,
+          value: {
+            transfer: {
+              ticket: 'a'.repeat(64),
+              byteSize: 3,
+              expiresAt: 1_000,
+            },
+            mediaType: 'message/rfc822',
+            format: 'eml',
+            ref,
+            warnings: [],
+          },
+        }
+      },
+    },
     thread: {
       async get(_input, context) {
         record('threadGet', context)
@@ -329,6 +349,7 @@ describe('pure daemon contract', () => {
       ['status', 'get'],
       ['search', 'query'],
       ['resource', 'get'],
+      ['export', 'prepare'],
       ['thread', 'get'],
       ['action', 'describe'],
       ['action', 'run'],
@@ -388,6 +409,7 @@ describe('pure daemon contract', () => {
     expectTypeOf<DaemonRpcApplication['status']>().toHaveProperty('get')
     expectTypeOf<DaemonRpcApplication['search']>().toHaveProperty('query')
     expectTypeOf<DaemonRpcApplication['resource']>().toHaveProperty('get')
+    expectTypeOf<DaemonRpcApplication['export']>().toHaveProperty('prepare')
     expectTypeOf<DaemonRpcApplication['thread']>().toHaveProperty('get')
     expectTypeOf<DaemonRpcApplication['action']>().toHaveProperty('describe')
     expectTypeOf<DaemonRpcApplication['action']>().toHaveProperty('run')
@@ -463,6 +485,7 @@ describe('contract implementation', () => {
     await client.status.get({})
     await client.search.query({ text: 'query' })
     await client.resource.get({ ref })
+    await client.export.prepare({ ref, format: 'eml' })
     await client.thread.get({ ref })
     await client.action.describe({
       actionId: 'example.item.create',
@@ -492,6 +515,7 @@ describe('contract implementation', () => {
       status: 1,
       search: 1,
       resourceGet: 1,
+      exportPrepare: 1,
       threadGet: 1,
       actionDescribe: 1,
       actionRun: 1,

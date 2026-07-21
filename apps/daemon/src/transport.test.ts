@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test'
-import { parseDaemonRequestContext } from './transport'
+import { ByteTransferStore } from './transfer'
+import { parseDaemonRequestContext, serveByteTransfer } from './transport'
 
 const digest = 'a'.repeat(64)
 const runtime = {
@@ -37,4 +38,26 @@ test('transport rejects absent runtime metadata before dispatch', () => {
   expect(() => parseDaemonRequestContext(request)).toThrow(
     'Missing or oversized runtime identity',
   )
+})
+
+test('transport serves an exact transfer ticket once without accepting path variants', async () => {
+  const store = new ByteTransferStore({
+    randomBytes: () => new Uint8Array(32).fill(1),
+  })
+  const transfer = store.create(Uint8Array.of(0, 255, 1))
+  const request = new Request(`http://daemon/transfer/${transfer.ticket}`, {
+    method: 'GET',
+  })
+  const first = serveByteTransfer(request, store)
+  expect(first?.status).toBe(200)
+  expect(new Uint8Array(await (first as Response).arrayBuffer())).toEqual(
+    Uint8Array.of(0, 255, 1),
+  )
+  expect(serveByteTransfer(request, store)?.status).toBe(404)
+  expect(
+    serveByteTransfer(
+      new Request(`http://daemon/transfer/${transfer.ticket}/extra`),
+      store,
+    )?.status,
+  ).toBe(404)
 })

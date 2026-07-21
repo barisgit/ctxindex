@@ -10,6 +10,8 @@ import {
   rpcDocumentationListResultSchema,
   rpcDocumentationSearchInputSchema,
   rpcDocumentationSearchResultSchema,
+  rpcExportInputSchema,
+  rpcExportResultSchema,
   rpcFailureRegistry,
   rpcHealthInputSchema,
   rpcHealthResultSchema,
@@ -111,6 +113,11 @@ export const daemonContract = {
     get: procedure
       .input(rpcResourceGetInputSchema)
       .output(rpcResourceGetResultSchema),
+  },
+  export: {
+    prepare: procedure
+      .input(rpcExportInputSchema)
+      .output(rpcExportResultSchema),
   },
   thread: {
     get: procedure

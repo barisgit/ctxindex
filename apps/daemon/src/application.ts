@@ -18,6 +18,7 @@ import {
   CtxindexSyncError,
   CtxindexValidationError,
 } from '@ctxindex/core/errors'
+import type { ExportResourceResult } from '@ctxindex/core/export'
 import type { RealmService } from '@ctxindex/core/realm'
 import {
   describeRegistry,
@@ -53,6 +54,8 @@ import type {
   RpcDocumentationRow,
   RpcDocumentationSearchInput,
   RpcDocumentationSearchResult,
+  RpcExportInput,
+  RpcExportResult,
   RpcFailure,
   RpcHealthInput,
   RpcHealthResult,
@@ -100,6 +103,7 @@ import {
   rpcDocumentationGetResultSchema,
   rpcDocumentationListResultSchema,
   rpcDocumentationSearchResultSchema,
+  rpcExportResultSchema,
   rpcJsonCursorSchema,
   rpcJsonDefaultSchema,
   rpcResourceGetResultSchema,
@@ -107,6 +111,10 @@ import {
   rpcSearchResultSchema,
   rpcThreadGetResultSchema,
 } from '@ctxindex/rpc'
+import {
+  type ByteTransferRegistry,
+  ByteTransferTooLargeError,
+} from './transfer'
 
 export interface DaemonApplicationOptions {
   readonly protocol: RpcProtocolIdentity
@@ -126,6 +134,8 @@ export interface DaemonApplicationOptions {
   readonly observationTimeoutMs: number
   readonly authService?: Pick<AuthService, 'listGrants'>
   readonly actionService?: DaemonActionService
+  readonly exportService?: DaemonExportService
+  readonly transferStore?: ByteTransferRegistry
   readonly realmService?: Pick<RealmService, 'createRealm' | 'listRealms'>
   readonly registry?: ExtensionRegistry
   readonly searchService?: Pick<SearchPlanner, 'search'>
@@ -155,6 +165,14 @@ export interface DaemonActionService {
     readonly signal: AbortSignal
     readonly confirmIrreversible: boolean
   }) => Promise<RunActionResult>
+}
+
+export interface DaemonExportService {
+  readonly prepare: (input: {
+    readonly ref: string
+    readonly format: string
+    readonly signal: AbortSignal
+  }) => Promise<ExportResourceResult>
 }
 
 export interface DaemonIdleTimer {
@@ -671,6 +689,9 @@ export class DaemonApplication implements DaemonRpcApplication {
   readonly resource: DaemonRpcApplication['resource'] = {
     get: (input, context) => this.getResource(input, context),
   }
+  readonly export: DaemonRpcApplication['export'] = {
+    prepare: (input, context) => this.prepareExport(input, context),
+  }
   readonly thread: DaemonRpcApplication['thread'] = {
     get: (input, context) => this.getThread(input, context),
   }
@@ -1055,6 +1076,38 @@ export class DaemonApplication implements DaemonRpcApplication {
         warnings: result.warnings,
       }
       const parsed = rpcResourceGetResultSchema.safeParse(output)
+      if (!parsed.success) throw new ResultTooLargeError()
+      return parsed.data
+    })
+  }
+
+  prepareExport(
+    input: RpcExportInput,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcExportResult>> {
+    return this.#business(context, async (signal) => {
+      if (!this.#options.exportService || !this.#options.transferStore)
+        throw new Error('Export service missing')
+      const result = await this.#options.exportService.prepare({
+        ref: input.ref,
+        format: input.format,
+        signal,
+      })
+      let transfer: ReturnType<ByteTransferRegistry['create']>
+      try {
+        transfer = this.#options.transferStore.create(result.bytes)
+      } catch (error) {
+        if (error instanceof ByteTransferTooLargeError)
+          throw new ResultTooLargeError()
+        throw error
+      }
+      const parsed = rpcExportResultSchema.safeParse({
+        transfer,
+        mediaType: result.mediaType,
+        format: result.format,
+        ref: result.ref,
+        warnings: result.warnings,
+      })
       if (!parsed.success) throw new ResultTooLargeError()
       return parsed.data
     })

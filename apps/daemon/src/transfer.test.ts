@@ -37,6 +37,18 @@ test('byte transfer tickets expire and shutdown clears pending bytes', () => {
   expect(store.consume(pending.ticket)).toBeNull()
 })
 
+test('concurrent pending transfers remain distinct and independently consumable', () => {
+  let sequence = 0
+  const store = new ByteTransferStore({
+    randomBytes: () => Uint8Array.from({ length: 32 }, () => sequence++),
+  })
+  const first = store.create(Uint8Array.of(1))
+  const second = store.create(Uint8Array.of(2))
+  expect(first.ticket).not.toBe(second.ticket)
+  expect(store.consume(second.ticket)).toEqual(Uint8Array.of(2))
+  expect(store.consume(first.ticket)).toEqual(Uint8Array.of(1))
+})
+
 test('byte transfer rejects oversized payloads before retaining them', () => {
   const store = new ByteTransferStore({ maxBytes: 2 })
   expect(() => store.create(Uint8Array.of(1, 2, 3))).toThrow(

@@ -16,6 +16,7 @@ import {
   rpcDocumentationGetResultSchema,
   rpcDocumentationListResultSchema,
   rpcDocumentationSearchResultSchema,
+  rpcExportResultSchema,
   type rpcFailureRegistry,
   rpcFailureSchema,
   rpcHealthResultSchema,
@@ -528,6 +529,21 @@ export function createDaemonRouter(
                 applicationContext(context, signal),
               ),
             rpcResourceGetResultSchema,
+            errors,
+          ),
+        ),
+    },
+    export: {
+      prepare: os.export.prepare
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.export.prepare(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcExportResultSchema,
             errors,
           ),
         ),

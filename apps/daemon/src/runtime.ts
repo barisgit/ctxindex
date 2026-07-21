@@ -14,6 +14,7 @@ import {
   createDocumentationService,
   createExtensionDocumentationSource,
 } from '@ctxindex/core/documentation'
+import { exportSourceResource } from '@ctxindex/core/export'
 import {
   type LoadExtensionsResult,
   loadExtensions,
@@ -69,6 +70,7 @@ import {
   DaemonApplication,
   type DaemonIdleTimer,
 } from './application'
+import { ByteTransferStore } from './transfer'
 import {
   type BindDaemonTransportInput,
   bindDaemonTransport,
@@ -129,6 +131,13 @@ export function removeOwnedDaemonEndpoint(path: string): void {
 
 export interface DaemonServices {
   readonly actionService?: DaemonActionService
+  readonly exportService?: {
+    prepare(input: {
+      readonly ref: string
+      readonly format: string
+      readonly signal: AbortSignal
+    }): ReturnType<typeof exportSourceResource>
+  }
   readonly authService?: Pick<AuthService, 'listGrants'>
   readonly realmService?: Pick<RealmService, 'createRealm' | 'listRealms'>
   readonly registry?: ExtensionRegistry
@@ -320,6 +329,18 @@ async function productionServices(input: {
         }),
     },
     authService,
+    exportService: {
+      prepare: ({ ref, format, signal }) =>
+        exportSourceResource({
+          db: input.database,
+          ref,
+          format,
+          registry: input.registry,
+          authService,
+          logger,
+          signal,
+        }),
+    },
     realmService,
     registry: input.registry,
     searchService: new SearchPlanner({
@@ -440,6 +461,7 @@ export async function startDaemon(
   const instanceId = randomUUID()
   const ownerToken = createOwnerToken()
   const startedAt = new Date().toISOString()
+  const transferStore = new ByteTransferStore()
   let lifecycleLease: FileLease | undefined
   let databaseLease: FileLease | undefined
   let database: CtxindexDatabase | undefined
@@ -470,6 +492,7 @@ export async function startDaemon(
   const finalize = (): Promise<void> => {
     finalization ??= (async () => {
       await application.whenDrained()
+      transferStore.close()
       database?.close()
       database = undefined
       await listener?.stop()
@@ -554,6 +577,7 @@ export async function startDaemon(
       idleTimeoutMs,
       idleTimer: options.idleTimer ?? productionIdleTimer,
       observationTimeoutMs,
+      transferStore,
       ...services,
       onStopping: () => {
         try {
@@ -571,10 +595,12 @@ export async function startDaemon(
       endpoint: endpoint.path,
       application,
       expectations: { protocol: DAEMON_PROTOCOL, runtime: roots.identity },
+      transferStore,
     })
     application.markReady()
     writeLifecycle('ready')
   } catch (error) {
+    transferStore.close()
     const ownedLifecycle = lifecycleLease !== undefined
     try {
       await listener?.stop()

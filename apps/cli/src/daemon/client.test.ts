@@ -1,5 +1,5 @@
 import { expect, spyOn, test } from 'bun:test'
-import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { resolveRuntimeIdentity } from '@ctxindex/local-daemon'
@@ -13,9 +13,11 @@ import {
 import { ORPCError } from '@orpc/client'
 import {
   type DaemonSelection,
+  daemonExport,
   daemonFailureFromDeclaredError,
   daemonHealth,
   daemonSync,
+  daemonTransferToFile,
   selectDaemonForRuntime,
 } from './client'
 
@@ -126,6 +128,95 @@ test('hazardous transport errors become daemon_unavailable without leaking raw d
     ).rejects.toMatchObject({ code: 'cancelled' })
   } finally {
     fetch.mockRestore()
+    await setup.close()
+  }
+})
+
+test('daemon export consumes one opaque transfer as exact bytes over the Unix socket', async () => {
+  const setup = await fixture()
+  const selection = selectDaemonForRuntime(setup.runtime, {
+    testEndpoint: '/tmp/ctxd-export.sock',
+  }) as DaemonSelection
+  const ref = 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/one'
+  let request: { input: unknown; options: unknown } | undefined
+  let transferRequest:
+    | { url: unknown; init: RequestInit | undefined }
+    | undefined
+  const client = {
+    export: {
+      prepare: async (input: unknown, options: unknown) => {
+        request = { input, options }
+        return {
+          transfer: {
+            ticket: 'a'.repeat(64),
+            byteSize: 3,
+            expiresAt: 1_000,
+          },
+          mediaType: 'application/octet-stream',
+          format: 'binary',
+          ref,
+          warnings: [],
+        }
+      },
+    },
+  } as unknown as DaemonClient
+  try {
+    const result = await daemonExport(
+      selection,
+      { ref, format: 'binary' },
+      undefined,
+      {
+        createClient: () => client,
+        fetch: (async (url: unknown, init?: RequestInit) => {
+          transferRequest = { url, init }
+          return new Response(Uint8Array.of(0, 255, 1))
+        }) as typeof fetch,
+      },
+    )
+    expect(result).toEqual({
+      bytes: Uint8Array.of(0, 255, 1),
+      mediaType: 'application/octet-stream',
+      format: 'binary',
+      ref,
+      warnings: [],
+    })
+    expect(request?.input).toEqual({ ref, format: 'binary' })
+    expect(transferRequest).toMatchObject({
+      url: `http://localhost/transfer/${'a'.repeat(64)}`,
+      init: { method: 'GET', unix: selection.endpoint, redirect: 'manual' },
+    })
+  } finally {
+    await setup.close()
+  }
+})
+
+test('daemon transfer creates a private no-overwrite output atomically', async () => {
+  const setup = await fixture()
+  const selection = selectDaemonForRuntime(setup.runtime, {
+    testEndpoint: '/tmp/ctxd-transfer-file.sock',
+  }) as DaemonSelection
+  const output = join(setup.sandbox, 'export.bin')
+  const transfer = {
+    ticket: 'a'.repeat(64),
+    byteSize: 3,
+    expiresAt: 1_000,
+  }
+  const services = {
+    fetch: (async () =>
+      new Response(Uint8Array.of(0, 255, 1))) as unknown as typeof fetch,
+  }
+  try {
+    await daemonTransferToFile(selection, transfer, output, undefined, services)
+    expect(new Uint8Array(await readFile(output))).toEqual(
+      Uint8Array.of(0, 255, 1),
+    )
+    expect((await stat(output)).mode & 0o777).toBe(0o600)
+
+    await writeFile(output, 'existing')
+    await expect(
+      daemonTransferToFile(selection, transfer, output, undefined, services),
+    ).rejects.toMatchObject({ code: 'output_exists' })
+  } finally {
     await setup.close()
   }
 })

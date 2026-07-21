@@ -1,3 +1,6 @@
+import { chmod, link, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { basename, dirname, join } from 'node:path'
+import { CtxindexError } from '@ctxindex/core/errors'
 import { cacheDir, configDir, dataDir, stateDir } from '@ctxindex/core/paths'
 import {
   acquireFileLease,
@@ -13,12 +16,15 @@ import {
   type RpcActionDescribeInput,
   type RpcActionDescribeResult,
   type RpcActionRunResult,
+  type RpcByteTransferDescriptor,
   type RpcDocumentationGetInput,
   type RpcDocumentationGetResult,
   type RpcDocumentationListInput,
   type RpcDocumentationListResult,
   type RpcDocumentationSearchInput,
   type RpcDocumentationSearchResult,
+  type RpcExportInput,
+  type RpcExportResult,
   type RpcFailure,
   type RpcHealthResult,
   type RpcRealmAddInput,
@@ -196,15 +202,19 @@ export function selectDaemonForRuntime(
 function createClient(selection: DaemonSelection): DaemonClient {
   const link = new RPCLink({
     url: 'http://localhost/rpc',
-    headers: {
-      'x-ctxindex-protocol-id': CLI_DAEMON_PROTOCOL.id,
-      'x-ctxindex-protocol-version': String(CLI_DAEMON_PROTOCOL.version),
-      'x-ctxindex-runtime': JSON.stringify(selection.roots.identity),
-    },
+    headers: daemonHeaders(selection),
     fetch: async (request, init) =>
       fetch(request, { ...init, unix: selection.endpoint } as RequestInit),
   })
   return createORPCClient<DaemonClient>(link)
+}
+
+function daemonHeaders(selection: DaemonSelection): Record<string, string> {
+  return {
+    'x-ctxindex-protocol-id': CLI_DAEMON_PROTOCOL.id,
+    'x-ctxindex-protocol-version': String(CLI_DAEMON_PROTOCOL.version),
+    'x-ctxindex-runtime': JSON.stringify(selection.roots.identity),
+  }
 }
 
 export interface DaemonSyncServices {
@@ -221,10 +231,11 @@ async function invoke<T>(
   signal: AbortSignal | undefined,
   call: (client: DaemonClient) => Promise<T>,
   selection: DaemonSelection,
+  clientFactory: (selection: DaemonSelection) => DaemonClient = createClient,
 ): Promise<T> {
   let result: T
   try {
-    result = await call(createClient(selection))
+    result = await call(clientFactory(selection))
   } catch (error) {
     throw invocationError(error, signal, selection)
   }
@@ -236,6 +247,114 @@ async function invoke<T>(
     })
   }
   return result
+}
+
+export interface DaemonExportResult extends Omit<RpcExportResult, 'transfer'> {
+  readonly bytes: Uint8Array
+}
+
+export interface DaemonExportServices {
+  readonly createClient: (selection: DaemonSelection) => DaemonClient
+  readonly fetch: typeof fetch
+}
+
+export interface DaemonTransferServices {
+  readonly fetch: typeof fetch
+}
+
+const defaultDaemonExportServices: DaemonExportServices = {
+  createClient,
+  fetch: globalThis.fetch,
+}
+
+export async function daemonExport(
+  selection: DaemonSelection,
+  input: RpcExportInput,
+  signal?: AbortSignal,
+  services: DaemonExportServices = defaultDaemonExportServices,
+): Promise<DaemonExportResult> {
+  const prepared = await invoke(
+    signal,
+    (client) => client.export.prepare(input, requestOptions(signal)),
+    selection,
+    services.createClient,
+  )
+  const bytes = await daemonTransferBytes(
+    selection,
+    prepared.transfer,
+    signal,
+    services,
+  )
+  const { transfer: _transfer, ...metadata } = prepared
+  return { ...metadata, bytes }
+}
+
+export async function daemonTransferBytes(
+  selection: DaemonSelection,
+  transfer: RpcByteTransferDescriptor,
+  signal?: AbortSignal,
+  services: DaemonTransferServices = defaultDaemonExportServices,
+): Promise<Uint8Array> {
+  let response: Response
+  try {
+    response = await services.fetch(
+      `http://localhost/transfer/${transfer.ticket}`,
+      {
+        method: 'GET',
+        headers: daemonHeaders(selection),
+        redirect: 'manual',
+        ...(signal ? { signal } : {}),
+        unix: selection.endpoint,
+      } as RequestInit,
+    )
+  } catch (error) {
+    throw invocationError(error, signal, selection)
+  }
+  if (!response.ok) throw unavailable(selection)
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  if (signal?.aborted)
+    throw invocationError(new Error('cancelled'), signal, selection)
+  if (bytes.byteLength !== transfer.byteSize) {
+    throw new DaemonCliError({
+      kind: 'ctxindex',
+      taxonomy: 'other',
+      code: 'data_integrity',
+      message: 'The daemon byte transfer failed integrity validation.',
+    })
+  }
+  return bytes
+}
+
+export async function daemonTransferToFile(
+  selection: DaemonSelection,
+  transfer: RpcByteTransferDescriptor,
+  outputPath: string,
+  signal?: AbortSignal,
+  services: DaemonTransferServices = defaultDaemonExportServices,
+): Promise<void> {
+  const bytes = await daemonTransferBytes(selection, transfer, signal, services)
+  const directory = dirname(outputPath)
+  const temporaryDirectory = await mkdtemp(
+    join(directory, `.${basename(outputPath)}.ctxindex-transfer-`),
+  )
+  const temporaryPath = join(temporaryDirectory, 'content')
+  try {
+    await writeFile(temporaryPath, bytes, { mode: 0o600 })
+    await chmod(temporaryPath, 0o600)
+    try {
+      await link(temporaryPath, outputPath)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+        throw new CtxindexError(
+          `Output path already exists: ${outputPath}`,
+          'output_exists',
+        )
+      }
+      throw error
+    }
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true })
+  }
 }
 
 function invocationError(

@@ -1635,3 +1635,52 @@ test('Action describe and run resolve one Source and preserve cancellation and o
   })
   expect((run as { signal: unknown }).signal).toBeInstanceOf(AbortSignal)
 })
+
+test('export prepares one bounded transfer without exposing bytes in RPC', async () => {
+  const ref = 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/one'
+  let exportInput: unknown
+  let retained: Uint8Array | undefined
+  const app = application({
+    exportService: {
+      async prepare(input: unknown) {
+        exportInput = input
+        return {
+          bytes: Uint8Array.of(0, 255, 1),
+          mediaType: 'application/octet-stream',
+          format: 'binary',
+          ref,
+          warnings: [],
+        }
+      },
+    },
+    transferStore: {
+      create(bytes: Uint8Array) {
+        retained = bytes
+        return { ticket: 'a'.repeat(64), byteSize: 3, expiresAt: 1_000 }
+      },
+    },
+  })
+  app.markReady()
+  const result = await app.export.prepare(
+    { ref, format: 'binary' },
+    context('export-request'),
+  )
+
+  expect(result).toEqual({
+    ok: true,
+    value: {
+      transfer: { ticket: 'a'.repeat(64), byteSize: 3, expiresAt: 1_000 },
+      mediaType: 'application/octet-stream',
+      format: 'binary',
+      ref,
+      warnings: [],
+    },
+  })
+  expect(result).not.toHaveProperty('value.bytes')
+  expect(retained).toEqual(Uint8Array.of(0, 255, 1))
+  expect(exportInput).toMatchObject({
+    ref,
+    format: 'binary',
+    signal: expect.any(AbortSignal),
+  })
+})
