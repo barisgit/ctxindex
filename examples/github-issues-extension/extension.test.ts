@@ -78,7 +78,7 @@ function mockFetch(
 ) {
   const requests: { url: URL; init: RequestInit }[] = []
   const fetchImpl = Object.assign(
-    async (input: RequestInfo | URL, init: RequestInit = {}) => {
+    async (input: string | URL | Request, init: RequestInit = {}) => {
       const url = new URL(
         typeof input === 'string'
           ? input
