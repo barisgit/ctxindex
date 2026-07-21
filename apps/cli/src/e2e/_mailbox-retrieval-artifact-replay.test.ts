@@ -242,29 +242,33 @@ export async function buildCompiledCliHarness(): Promise<CompiledCliHarness> {
   const buildDir = join(dir, 'build')
   const relocatedDir = join(dir, 'relocated')
   const buildPath = join(buildDir, 'ctxindex')
+  const daemonBuildPath = join(buildDir, 'ctxindex-daemon')
   const relocatedPath = join(relocatedDir, 'ctxindex')
+  const relocatedDaemonPath = join(relocatedDir, 'ctxindex-daemon')
   await mkdir(buildDir, { recursive: true })
   await mkdir(relocatedDir, { recursive: true })
 
-  const build = Bun.spawn(
-    [
-      'bun',
-      'build',
-      '--compile',
-      'apps/cli/bin/ctxindex.mjs',
-      '--outfile',
-      buildPath,
-    ],
-    { cwd: repoRoot, stdout: 'pipe', stderr: 'pipe' },
-  )
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(build.stdout).text(),
-    new Response(build.stderr).text(),
-    build.exited,
+  for (const [entrypoint, output] of [
+    ['apps/cli/bin/ctxindex.mjs', buildPath],
+    ['apps/daemon/src/main.ts', daemonBuildPath],
+  ] as const) {
+    const build = Bun.spawn(
+      ['bun', 'build', '--compile', entrypoint, '--outfile', output],
+      { cwd: repoRoot, stdout: 'pipe', stderr: 'pipe' },
+    )
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(build.stdout).text(),
+      new Response(build.stderr).text(),
+      build.exited,
+    ])
+    expect(exitCode, `${stdout}\n${stderr}`).toBe(0)
+  }
+  await Promise.all([
+    Bun.write(relocatedPath, Bun.file(buildPath)),
+    Bun.write(relocatedDaemonPath, Bun.file(daemonBuildPath)),
   ])
-  expect(exitCode, `${stdout}\n${stderr}`).toBe(0)
-  await Bun.write(relocatedPath, Bun.file(buildPath))
   await chmod(relocatedPath, 0o755)
+  await chmod(relocatedDaemonPath, 0o755)
   await rm(buildDir, { recursive: true })
 
   return {

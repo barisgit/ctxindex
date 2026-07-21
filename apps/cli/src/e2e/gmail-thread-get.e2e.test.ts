@@ -22,9 +22,9 @@ async function initialize(
     PATH: `${bin}:${process.env.PATH ?? ''}`,
     CTXINDEX_LOOPBACK_TIMEOUT_SECS: '5',
   })
-  const init = await sandbox.run(['init'])
+  const init = await sandbox.run(['init'], { env })
   expect(init.exitCode, init.stderr).toBe(0)
-  const realm = await sandbox.run(['realm', 'add', 'mail'])
+  const realm = await sandbox.run(['realm', 'add', 'mail'], { env })
   expect(realm.exitCode, realm.stderr).toBe(0)
   const app = await sandbox.run(
     ['oauth-app', 'add', 'google', 'google', '--from-env'],

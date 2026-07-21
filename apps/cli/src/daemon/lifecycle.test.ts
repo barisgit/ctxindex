@@ -201,6 +201,31 @@ test('daemon spawn environment keeps infrastructure and drops Provider secrets',
   })
 })
 
+test('daemon spawn environment only forwards exact Provider test endpoints in test mode', () => {
+  const endpoints = {
+    CTXINDEX_GMAIL_MOCK_BASE_URL: 'http://127.0.0.1:1234',
+    CTXINDEX_GOOGLE_CALENDAR_MOCK_BASE_URL: 'http://127.0.0.1:2345',
+    CTXINDEX_GRAPH_MOCK_BASE_URL: 'http://127.0.0.1:3456',
+  }
+
+  expect(daemonSpawnEnvironment(endpoints)).toEqual({})
+  expect(
+    daemonSpawnEnvironment({
+      NODE_ENV: 'production',
+      ...endpoints,
+    }),
+  ).toEqual({ NODE_ENV: 'production' })
+  expect(
+    daemonSpawnEnvironment({
+      NODE_ENV: 'test',
+      ...endpoints,
+      CTXINDEX_GOOGLE_MOCK_BASE_URL: 'http://127.0.0.1:4567',
+      CTXINDEX_MICROSOFT_MOCK_BASE_URL: 'http://127.0.0.1:5678',
+      ACME_PROVIDER_MOCK_BASE_URL: 'http://127.0.0.1:6789',
+    }),
+  ).toEqual({ NODE_ENV: 'test', ...endpoints })
+})
+
 test('daemon diagnostics use owner-private directory and file modes', () => {
   const root = mkdtempSync(join(tmpdir(), 'ctxindex-daemon-diagnostics-'))
   cleanup.push(root)

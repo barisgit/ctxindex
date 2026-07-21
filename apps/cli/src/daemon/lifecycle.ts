@@ -178,13 +178,16 @@ const DAEMON_ENVIRONMENT_ALLOWLIST = [
   'CTXINDEX_LOG_SYNC',
   'CTXINDEX_SECRETS_PASSPHRASE',
   'CTXINDEX_KEYTAR_MOCK_FILE',
-  'CTXINDEX_GRAPH_MOCK_BASE_URL',
-  'CTXINDEX_GOOGLE_CALENDAR_MOCK_BASE_URL',
-  'CTXINDEX_GMAIL_MOCK_BASE_URL',
   'CTXINDEX_TEST_LOG_ROTATE_BYTES',
   'CTXINDEX_TEST_LOG_SPAM_BYTES',
   'CTXINDEX_TEST_SYNC_DELAY_MS',
   'CTXINDEX_E2E_TRACE_STORAGE_ACQUIRE__',
+] as const
+
+const DAEMON_PROVIDER_TEST_ENVIRONMENT_ALLOWLIST = [
+  'CTXINDEX_GRAPH_MOCK_BASE_URL',
+  'CTXINDEX_GOOGLE_CALENDAR_MOCK_BASE_URL',
+  'CTXINDEX_GMAIL_MOCK_BASE_URL',
 ] as const
 
 export function daemonSpawnEnvironment(
@@ -194,6 +197,12 @@ export function daemonSpawnEnvironment(
   for (const name of DAEMON_ENVIRONMENT_ALLOWLIST) {
     const value = source[name]
     if (value !== undefined) environment[name] = value
+  }
+  if (source.NODE_ENV === 'test') {
+    for (const name of DAEMON_PROVIDER_TEST_ENVIRONMENT_ALLOWLIST) {
+      const value = source[name]
+      if (value !== undefined) environment[name] = value
+    }
   }
   return environment
 }
