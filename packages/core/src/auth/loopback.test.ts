@@ -166,3 +166,65 @@ test('browser launcher failure emits the URL and continues waiting', async () =>
   ).rejects.toMatchObject({ code: 'loopback_timeout' })
   expect(emitted).toContain('code_challenge_method=S256')
 })
+
+test('pasted redirect URL completes the same state-checked PKCE flow', async () => {
+  const result = await openOAuthLoopback({
+    provider,
+    authorizationEndpoint: 'http://127.0.0.1/oauth/test/authorize',
+    clientId: 'client',
+    scopes: [],
+    noBrowser: true,
+    emitAuthorizationUrl() {},
+    readAuthorizationResponse: async ({ authorizationUrl, redirectUri }) => {
+      const state = new URL(authorizationUrl).searchParams.get('state')
+      return `${redirectUri}?state=${state}&code=pasted-code`
+    },
+  })
+
+  expect(result.code).toBe('pasted-code')
+})
+
+test('bare pasted authorization code completes the PKCE flow', async () => {
+  const result = await openOAuthLoopback({
+    provider,
+    authorizationEndpoint: 'http://127.0.0.1/oauth/test/authorize',
+    clientId: 'client',
+    scopes: [],
+    noBrowser: true,
+    emitAuthorizationUrl() {},
+    readAuthorizationResponse: async () => 'bare-code',
+  })
+
+  expect(result.code).toBe('bare-code')
+})
+
+test('pasted redirect rejects a foreign callback or mismatched state', async () => {
+  await expect(
+    openOAuthLoopback({
+      provider,
+      authorizationEndpoint: 'http://127.0.0.1/oauth/test/authorize',
+      clientId: 'client',
+      scopes: [],
+      noBrowser: true,
+      emitAuthorizationUrl() {},
+      readAuthorizationResponse: async ({ redirectUri }) =>
+        `${redirectUri}?state=wrong&code=pasted-code`,
+    }),
+  ).rejects.toMatchObject({ code: 'state_mismatch' })
+
+  await expect(
+    openOAuthLoopback({
+      provider,
+      authorizationEndpoint: 'http://127.0.0.1/oauth/test/authorize',
+      clientId: 'client',
+      scopes: [],
+      noBrowser: true,
+      emitAuthorizationUrl() {},
+      readAuthorizationResponse: async ({ authorizationUrl }) =>
+        `http://localhost:1/oauth/callback?state=${new URL(authorizationUrl).searchParams.get('state')}&code=pasted-code`,
+    }),
+  ).rejects.toMatchObject({
+    code: 'oauth_failed',
+    message: 'OAuth authorization failed: invalid_callback',
+  })
+})

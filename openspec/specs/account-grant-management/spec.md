@@ -44,6 +44,10 @@ Provider-backed Adapters MUST import exact Provider definitions and MUST NOT dup
 - **WHEN** Accounts authorize through active Google and Microsoft Apps
 - **THEN** core performs state-checked loopback authorization, token validation, identity resolution, and private persistence through one provider-neutral module
 
+#### Scenario: Remote terminal completes browser authorization manually
+- **WHEN** the provider redirects a browser that cannot reach the CLI host's loopback listener
+- **THEN** the CLI concurrently accepts one hidden pasted full redirect URL or bare authorization code, validates full redirects against the exact callback and state, and completes the same PKCE token exchange without exposing the pasted value on argv or terminal output
+
 #### Scenario: Named multi-method auth is absent
 - **WHEN** Provider authoring/runtime schemas are inspected
 - **THEN** they expose one direct `oauth2` or `none` declaration and no selector

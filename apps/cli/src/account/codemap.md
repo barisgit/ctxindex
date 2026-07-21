@@ -7,7 +7,7 @@ Orchestrates CLI authorization and lifecycle operations for globally labeled Acc
 ## Design / patterns
 
 - `commands/account.ts` owns the complete Citty grammar and passes a typed `AccountCommandInput` union to `handle-account-command.ts`, which owns the multi-step add/list/remove workflow.
-- Add validates the Provider, then either resolves one exact host-policy-matched bundled App when `--app` is omitted or accepts the explicit exact Extension/local App label. The selected label passes through the same OAuth App resolver in one retained shared-lease dependency lifetime before loopback consent and private App-config snapshotting; no config or token value is accepted on argv.
+- Add validates the Provider, then either resolves one exact host-policy-matched bundled App when `--app` is omitted or accepts the explicit exact Extension/local App label. The selected label passes through the same OAuth App resolver in one retained shared-lease dependency lifetime before loopback consent and private App-config snapshotting; the CLI races the local callback with one hidden pasted redirect URL or authorization code for remote terminals, and no config, token, or authorization value is accepted on argv or echoed.
 - List exposes Account authorization health and labeled Source inventory through shared pretty/text/json rendering without Grant identifiers, scopes, or App configuration; remove delegates transactional Source `needs_auth` detachment and Account/Grant secret cleanup to core.
 - The handler maps typed failures to stable exits and always closes whichever focused dependency set it opened.
 

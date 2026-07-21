@@ -2,6 +2,7 @@ import { readEnvironmentVariable } from '../config'
 import { CtxindexAuthError } from '../errors'
 import type { ResolvedOAuthApp } from '../oauth-app'
 import type { CompleteRegistry } from '../registry'
+import type { OAuthAuthorizationResponsePrompt } from './loopback'
 import { openOAuthLoopback } from './loopback'
 import {
   assertOAuthProviderHost,
@@ -30,6 +31,9 @@ export interface AuthorizeProviderDependencies {
   readonly readEnvironment?: (name: string) => string | undefined
   readonly launchBrowser?: (url: string) => Promise<void> | void
   readonly emitAuthorizationUrl?: (url: string) => void
+  readonly readAuthorizationResponse?: (
+    prompt: OAuthAuthorizationResponsePrompt,
+  ) => Promise<string | undefined>
   readonly now?: () => number
 }
 export interface AuthorizeProviderResult extends AddGrantResult {
@@ -85,6 +89,9 @@ export async function authorizeProvider(
       ...(deps.launchBrowser ? { launchBrowser: deps.launchBrowser } : {}),
       ...(deps.emitAuthorizationUrl
         ? { emitAuthorizationUrl: deps.emitAuthorizationUrl }
+        : {}),
+      ...(deps.readAuthorizationResponse
+        ? { readAuthorizationResponse: deps.readAuthorizationResponse }
         : {}),
     })
     token = await postOAuthToken({

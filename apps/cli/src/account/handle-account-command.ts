@@ -17,6 +17,7 @@ import {
 } from '../format/account'
 import { mapErrorToExit } from '../format/exit'
 import type { OutputFormat } from '../format/output'
+import { readHiddenOAuthResponse } from './read-hidden-oauth-response'
 
 export interface AccountCommandRuntime {
   readonly assertInitialized: typeof assertInitialized
@@ -184,6 +185,7 @@ export async function handleAccountCommand(
             return app
           },
           emitAuthorizationUrl: (url) => console.log(`Open this URL: ${url}`),
+          readAuthorizationResponse: readHiddenOAuthResponse,
         },
       )
       console.log(formatAccountAdded(result))

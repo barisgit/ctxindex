@@ -216,6 +216,7 @@ test('implicit command does not attach selection fallback after exact App resolu
           definition,
         })),
       authorizeProvider: async (_input, deps) => {
+        expect(deps.readAuthorizationResponse).toBeFunction()
         await expect(
           deps.resolveApp('google', 'ctxindex'),
         ).resolves.toMatchObject({ label: 'ctxindex' })

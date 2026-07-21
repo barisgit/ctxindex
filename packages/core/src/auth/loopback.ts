@@ -53,6 +53,93 @@ export interface OAuthLoopbackResult {
   readonly redirectUri: string
   readonly authorizationUrl: string
 }
+export interface OAuthAuthorizationResponsePrompt {
+  readonly authorizationUrl: string
+  readonly redirectUri: string
+  readonly signal: AbortSignal
+}
+
+function callbackResult(
+  value: string,
+  redirectUri: string,
+  state: string,
+): string {
+  const pasted = value.trim()
+  if (pasted.length === 0 || pasted.length > 16_384)
+    throw new CtxindexAuthError(
+      'missing_code',
+      'OAuth authorization failed: missing_code',
+    )
+
+  if (!/^https?:\/\//i.test(pasted)) {
+    if (/\s/.test(pasted))
+      throw new CtxindexAuthError(
+        'missing_code',
+        'OAuth authorization failed: missing_code',
+      )
+    return pasted
+  }
+
+  let callback: URL
+  try {
+    callback = new URL(pasted)
+  } catch {
+    throw new CtxindexAuthError(
+      'oauth_failed',
+      'OAuth authorization failed: invalid_callback',
+    )
+  }
+
+  const expected = new URL(redirectUri)
+  if (
+    callback.origin !== expected.origin ||
+    callback.pathname !== callbackPath ||
+    callback.username !== '' ||
+    callback.password !== '' ||
+    callback.hash !== ''
+  )
+    throw new CtxindexAuthError(
+      'oauth_failed',
+      'OAuth authorization failed: invalid_callback',
+    )
+  if (
+    callback.searchParams.getAll('state').length !== 1 ||
+    callback.searchParams.get('state') !== state
+  )
+    throw new CtxindexAuthError(
+      'state_mismatch',
+      'OAuth authorization failed: state_mismatch',
+    )
+  const providerError = callback.searchParams.get('error')
+  if (providerError === 'access_denied')
+    throw new CtxindexAuthError(
+      'authorization_denied',
+      'OAuth authorization failed: authorization_denied',
+    )
+  if (providerError) {
+    const safeError = /^[A-Za-z0-9._-]{1,64}$/.test(providerError)
+      ? providerError
+      : 'unknown_error'
+    const providerCode = callback.searchParams
+      .get('error_description')
+      ?.match(/\b[A-Z]{2,12}\d{3,10}\b/)?.[0]
+    const diagnostic = providerCode
+      ? `${safeError} (${providerCode})`
+      : safeError
+    throw new CtxindexAuthError(
+      'oauth_failed',
+      `OAuth authorization failed: ${diagnostic}`,
+    )
+  }
+  const codes = callback.searchParams.getAll('code')
+  if (codes.length !== 1 || !codes[0])
+    throw new CtxindexAuthError(
+      'missing_code',
+      'OAuth authorization failed: missing_code',
+    )
+  return codes[0]
+}
+
 export async function openOAuthLoopback(input: {
   readonly provider: OAuthProviderDefinition
   readonly authorizationEndpoint: string
@@ -62,6 +149,9 @@ export async function openOAuthLoopback(input: {
   readonly noBrowser?: boolean
   readonly launchBrowser?: (url: string) => Promise<void> | void
   readonly emitAuthorizationUrl?: (url: string) => void
+  readonly readAuthorizationResponse?: (
+    prompt: OAuthAuthorizationResponsePrompt,
+  ) => Promise<string | undefined>
 }): Promise<OAuthLoopbackResult> {
   const state = randomToken()
   const codeVerifier = randomToken()
@@ -86,16 +176,20 @@ export async function openOAuthLoopback(input: {
   const authorizationUrl = authorization.toString()
   let timer: ReturnType<typeof setTimeout> | undefined
   let settled = false
+  const manualInput = new AbortController()
+  let finishCallback: (error: CtxindexAuthError | null, code?: string) => void =
+    () => {}
   const callback = new Promise<string>((resolve, reject) => {
-    const finish = (error: CtxindexAuthError | null, code?: string) => {
+    finishCallback = (error: CtxindexAuthError | null, code?: string) => {
       if (settled) return
       settled = true
+      manualInput.abort()
       if (error) reject(error)
       else resolve(code ?? '')
     }
     timer = setTimeout(
       () =>
-        finish(
+        finishCallback(
           new CtxindexAuthError(
             'loopback_timeout',
             'OAuth authorization failed: loopback_timeout (callback timed out)',
@@ -110,66 +204,25 @@ export async function openOAuthLoopback(input: {
         response.end('not found')
         return
       }
-      if (url.searchParams.get('state') !== state) {
-        response.writeHead(400, { 'content-type': 'text/plain' })
-        response.end('state mismatch')
-        finish(
-          new CtxindexAuthError(
-            'state_mismatch',
-            'OAuth authorization failed: state_mismatch',
-          ),
+      try {
+        const code = callbackResult(url.toString(), redirectUri, state)
+        response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
+        response.end(
+          '<!doctype html><title>ctxindex authorization complete</title><p>You can close this window.</p>',
         )
-        return
-      }
-      const providerError = url.searchParams.get('error')
-      if (providerError === 'access_denied') {
+        finishCallback(null, code)
+      } catch (error) {
         response.writeHead(400, { 'content-type': 'text/plain' })
-        response.end('authorization denied')
-        finish(
-          new CtxindexAuthError(
-            'authorization_denied',
-            'OAuth authorization failed: authorization_denied',
-          ),
+        response.end('authorization failed')
+        finishCallback(
+          error instanceof CtxindexAuthError
+            ? error
+            : new CtxindexAuthError(
+                'oauth_failed',
+                'OAuth authorization failed: invalid_callback',
+              ),
         )
-        return
       }
-      if (providerError) {
-        const safeError = /^[A-Za-z0-9._-]{1,64}$/.test(providerError)
-          ? providerError
-          : 'unknown_error'
-        const providerCode = url.searchParams
-          .get('error_description')
-          ?.match(/\b[A-Z]{2,12}\d{3,10}\b/)?.[0]
-        const diagnostic = providerCode
-          ? `${safeError} (${providerCode})`
-          : safeError
-        response.writeHead(400, { 'content-type': 'text/plain' })
-        response.end(`authorization failed: ${diagnostic}`)
-        finish(
-          new CtxindexAuthError(
-            'oauth_failed',
-            `OAuth authorization failed: ${diagnostic}`,
-          ),
-        )
-        return
-      }
-      const code = url.searchParams.get('code')
-      if (!code) {
-        response.writeHead(400, { 'content-type': 'text/plain' })
-        response.end('missing code')
-        finish(
-          new CtxindexAuthError(
-            'missing_code',
-            'OAuth authorization failed: missing_code',
-          ),
-        )
-        return
-      }
-      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-      response.end(
-        '<!doctype html><title>ctxindex authorization complete</title><p>You can close this window.</p>',
-      )
-      finish(null, code)
     })
   })
   try {
@@ -180,6 +233,40 @@ export async function openOAuthLoopback(input: {
       } catch {
         input.emitAuthorizationUrl?.(authorizationUrl)
       }
+    }
+    if (input.readAuthorizationResponse) {
+      void input
+        .readAuthorizationResponse({
+          authorizationUrl,
+          redirectUri,
+          signal: manualInput.signal,
+        })
+        .then((value) => {
+          if (value === undefined || settled) return
+          try {
+            finishCallback(null, callbackResult(value, redirectUri, state))
+          } catch (error) {
+            finishCallback(
+              error instanceof CtxindexAuthError
+                ? error
+                : new CtxindexAuthError(
+                    'oauth_failed',
+                    'OAuth authorization failed: invalid_callback',
+                  ),
+            )
+          }
+        })
+        .catch((error) => {
+          if (!manualInput.signal.aborted)
+            finishCallback(
+              error instanceof CtxindexAuthError
+                ? error
+                : new CtxindexAuthError(
+                    'oauth_failed',
+                    'OAuth authorization failed: manual_input',
+                  ),
+            )
+        })
     }
     const code = await callback
     return { code, codeVerifier, redirectUri, authorizationUrl }
