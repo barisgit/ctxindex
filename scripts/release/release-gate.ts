@@ -160,7 +160,9 @@ async function main(args: readonly string[]): Promise<number> {
     console.log(
       result.publish
         ? `ctxindex@${result.version} is eligible for publication`
-        : `ctxindex@${result.version} is unchanged or already exists; skipping publication`,
+        : registry.status === 200
+          ? `ctxindex@${result.version} already exists; skipping publication`
+          : `ctxindex version is unchanged at ${result.version}; skipping publication`,
     )
     return 0
   }

@@ -15,8 +15,8 @@ install its native module.
 candidates. Before CI, it compares the current CLI version with the version at
 `github.event.before` and queries the exact `ctxindex@<version>` registry entry.
 A valid, strictly increased, unpublished semantic version proceeds. An already
-published exact version is a successful no-op. An unchanged unpublished version,
-an invalid or reversed version, or any registry result other than an exact match
+published exact version or unchanged unpublished version is a successful no-op.
+An invalid or reversed version, or any registry result other than an exact match
 or 404 fails closed.
 
 CI, build, pack, and the isolated global-install smoke run without OIDC
