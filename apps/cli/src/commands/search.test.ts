@@ -64,7 +64,7 @@ describe('search JSON output', () => {
       results: [
         {
           ref: longRef,
-          profile: { id: 'communication.message', version: 1 },
+          profile: { id: 'mail.message', version: 1 },
           sourceId: 'source',
           origin: 'provider' as const,
           originRank: 0,

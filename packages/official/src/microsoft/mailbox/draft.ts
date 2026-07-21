@@ -4,13 +4,13 @@ import {
 } from '@ctxindex/core/errors'
 import type { ActionContext, RetrievedResource } from '@ctxindex/extension-sdk'
 import {
-  type CommunicationMessage,
-  communicationMessageDraftCreateInputSchema,
-  communicationMessageDraftUpdateInputSchema,
-  communicationMessageSchema,
-  deriveCommunicationMessageReplyRecipient,
-  deriveCommunicationMessageReplyReferences,
-  deriveCommunicationMessageReplySubject,
+  deriveMailMessageReplyRecipient,
+  deriveMailMessageReplyReferences,
+  deriveMailMessageReplySubject,
+  type MailMessage,
+  mailMessageDraftCreateInputSchema,
+  mailMessageDraftUpdateInputSchema,
+  mailMessageSchema,
 } from '@ctxindex/profiles'
 import type { z } from 'zod'
 import { renderMimeMessage, resolveDraftAttachments } from '../../mail/mime'
@@ -24,10 +24,10 @@ import {
 } from './transport'
 
 export type MicrosoftDraftCreateInput = z.infer<
-  typeof communicationMessageDraftCreateInputSchema
+  typeof mailMessageDraftCreateInputSchema
 >
 export type MicrosoftDraftUpdateInput = z.infer<
-  typeof communicationMessageDraftUpdateInputSchema
+  typeof mailMessageDraftUpdateInputSchema
 >
 type MicrosoftStandaloneDraftCreateInput = Exclude<
   MicrosoftDraftCreateInput,
@@ -86,22 +86,22 @@ function validMailbox(value: string): boolean {
 }
 
 function parseCreateInput(input: unknown): MicrosoftDraftCreateInput {
-  const parsed = communicationMessageDraftCreateInputSchema.safeParse(input)
+  const parsed = mailMessageDraftCreateInputSchema.safeParse(input)
   if (!parsed.success)
     throw new CtxindexValidationError(
       'invalid_action_input',
-      'Invalid input for Action communication.message.draft.create',
+      'Invalid input for Action mail.message.draft.create',
       { cause: parsed.error },
     )
   return parsed.data
 }
 
 function parseUpdateInput(input: unknown): MicrosoftDraftUpdateInput {
-  const parsed = communicationMessageDraftUpdateInputSchema.safeParse(input)
+  const parsed = mailMessageDraftUpdateInputSchema.safeParse(input)
   if (!parsed.success)
     throw new CtxindexValidationError(
       'invalid_action_input',
-      'Invalid input for Action communication.message.draft.update',
+      'Invalid input for Action mail.message.draft.update',
       { cause: parsed.error },
     )
   return parsed.data
@@ -167,7 +167,7 @@ function localMessage(
   context: ActionContext<unknown>,
   ref: string,
   expectedDraft: boolean,
-): CommunicationMessage {
+): MailMessage {
   const resource = context.resolveResource(ref)
   const guidance = `Retrieve it first with: ctxindex get ${ref} --format json`
   if (!resource)
@@ -185,15 +185,12 @@ function localMessage(
       'invalid_action_input',
       `Reply Resource "${ref}" is incomplete. ${guidance}`,
     )
-  if (
-    resource.profile.id !== 'communication.message' ||
-    resource.profile.version !== 1
-  )
+  if (resource.profile.id !== 'mail.message' || resource.profile.version !== 1)
     throw new CtxindexValidationError(
       'invalid_action_input',
-      `Reply Resource "${ref}" must be communication.message@1`,
+      `Reply Resource "${ref}" must be mail.message@1`,
     )
-  const payload = communicationMessageSchema.safeParse(resource.payload)
+  const payload = mailMessageSchema.safeParse(resource.payload)
   if (
     !payload.success ||
     Boolean(payload.data.providerDraftId) !== expectedDraft
@@ -210,7 +207,7 @@ function replyDetails(
   replyToRef: string,
 ): MicrosoftReplyDetails {
   const parent = localMessage(context, replyToRef, false)
-  const replyRecipient = deriveCommunicationMessageReplyRecipient(parent)
+  const replyRecipient = deriveMailMessageReplyRecipient(parent)
   if (!replyRecipient || !parent.threadId) {
     throw new CtxindexValidationError(
       'invalid_action_input',
@@ -218,10 +215,10 @@ function replyDetails(
     )
   }
   recipient(replyRecipient)
-  const subject = deriveCommunicationMessageReplySubject(parent.subject)
+  const subject = deriveMailMessageReplySubject(parent.subject)
   const inReplyTo = parent.rfcMessageId
   const references = inReplyTo
-    ? deriveCommunicationMessageReplyReferences(parent.references, inReplyTo)
+    ? deriveMailMessageReplyReferences(parent.references, inReplyTo)
     : [...(parent.references ?? [])]
   if (
     [subject, ...(inReplyTo ? [inReplyTo] : []), ...references].some((value) =>
@@ -267,12 +264,9 @@ function rejectStoredReplyDraftUpdate(
   ref: string,
 ): void {
   const resource = context.resolveResource(ref)
-  if (
-    resource?.profile.id !== 'communication.message' ||
-    resource.profile.version !== 1
-  )
+  if (resource?.profile.id !== 'mail.message' || resource.profile.version !== 1)
     return
-  const draft = communicationMessageSchema.safeParse(resource.payload)
+  const draft = mailMessageSchema.safeParse(resource.payload)
   if (draft.success && draft.data.providerDraftId && draft.data.replyToRef)
     throw new CtxindexValidationError(
       'invalid_action_input',
@@ -352,7 +346,7 @@ function draftResource(
     )
   const ref = `ctx://${sourceId.toUpperCase()}/draft/${encodeURIComponent(message.id)}`
   const normalized = retrievedResource(ref, sourceId, message, [])
-  const basePayload = communicationMessageSchema.parse(normalized.payload)
+  const basePayload = mailMessageSchema.parse(normalized.payload)
   if (
     reply &&
     (basePayload.subject !== reply.details.subject ||
@@ -369,7 +363,7 @@ function draftResource(
       'provider_bad_response',
     )
   }
-  const payload = communicationMessageSchema.parse({
+  const payload = mailMessageSchema.parse({
     ...basePayload,
     providerDraftId: message.id,
     ...(managedAttachmentRefs !== undefined
@@ -472,11 +466,11 @@ export async function microsoftDraftUpdate(
     : (input as MicrosoftStandaloneDraftUpdateInput)
   const storedResource = context.resolveResource(input.ref)
   const stored =
-    storedResource?.profile.id === 'communication.message' &&
+    storedResource?.profile.id === 'mail.message' &&
     storedResource.profile.version === 1 &&
     storedResource.completeness === 'complete' &&
     storedResource.deletedAt === null
-      ? communicationMessageSchema.safeParse(storedResource.payload)
+      ? mailMessageSchema.safeParse(storedResource.payload)
       : undefined
   const managedAttachmentRefs =
     stored?.success && stored.data.providerDraftId === draftId

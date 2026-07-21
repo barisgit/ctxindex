@@ -384,7 +384,7 @@
     "packages/official/src/microsoft/transport.ts": "e3173ea9edc48f71693618214a329f41",
     "packages/profiles/package.json": "1a27dd1999970aee94c02046ab83f01d",
     "packages/profiles/src/calendar-event.ts": "3d678d7f916f75405bf0e1e06889394c",
-    "packages/profiles/src/communication-message.ts": "c2174ec57267a4ff8cccd9b6c8b17135",
+    "packages/profiles/src/mail-message.ts": "50f467c7cd137a3cf200388e63787630",
     "packages/profiles/src/file.ts": "8eb8c009e0e5e5de060417b733ea7cda",
     "packages/profiles/src/index.ts": "6c288cb1f394c6af33d68c1db0e1a389",
     "packages/rpc/package.json": "647b7de1995bd3aeb2ceb2208b45e083",

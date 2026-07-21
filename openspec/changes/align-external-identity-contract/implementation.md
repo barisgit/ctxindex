@@ -4,7 +4,7 @@
 
 ## Module Ownership
 
-No durable implementation doctrine changes. Profiles continue to own typed domain fields such as `communication.message.rfcMessageId`; provider-neutral core continues to own Source-scoped Resource identity, the generic field index, and Relation resolution.
+No durable implementation doctrine changes. Profiles continue to own typed domain fields such as `mail.message.rfcMessageId`; provider-neutral core continues to own Source-scoped Resource identity, the generic field index, and Relation resolution.
 
 ## Interfaces and Data Flow
 

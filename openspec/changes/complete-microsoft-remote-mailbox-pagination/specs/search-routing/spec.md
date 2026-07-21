@@ -4,11 +4,11 @@
 When the query positional is absent and at least one filter is present, search without `--remote` SHALL enumerate matching Resources from local projections only, ordered by `occurredAt` descending with NULL timestamps last, tie-broken by `ref` ascending. A query-less search MUST NOT invoke any `search-remote` Adapter operation unless `--remote` is explicit. A query-less `--remote` search SHALL be valid when at least one narrowing Realm, Adapter, Source, kind, field, or time filter is present; a bare search with no text and no filters SHALL remain invalid usage (exit 2).
 
 #### Scenario: Filter-only enumeration returns newest first
-- **WHEN** a caller runs `search --kind communication.message --realm work` with no query text and without `--remote`
+- **WHEN** a caller runs `search --kind mail.message --realm work` with no query text and without `--remote`
 - **THEN** matching local Resources are returned ordered by `occurredAt` descending, tie-broken by `ref` ascending, without contacting any provider
 
 #### Scenario: Query-less constrained remote request enumerates
-- **WHEN** a caller runs `search --remote --source work-outlook --kind communication.message` with no query text
+- **WHEN** a caller runs `search --remote --source work-outlook --kind mail.message` with no query text
 - **THEN** the exact Source's declared remote-search operation receives an empty normalized text query plus the narrowing filters
 
 #### Scenario: Federated Sources are skipped without remote override

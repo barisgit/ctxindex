@@ -1,6 +1,6 @@
 ## Context
 
-The built-in Extension registers exactly `communication.message@1`, `calendar.event@1`, and `file@1`, and its focused test locks that inventory. A copied rule in the canonical Profile specification and the accepted V1 design instead describe six bundled Profiles and future MBOX/ICS exports. Artifact is already a distinct descriptor and managed-byte concept, while conversation traversal is expressed through message Relations.
+The built-in Extension registers exactly `mail.message@1`, `calendar.event@1`, and `file@1`, and its focused test locks that inventory. A copied rule in the canonical Profile specification and the accepted V1 design instead describe six bundled Profiles and future MBOX/ICS exports. Artifact is already a distinct descriptor and managed-byte concept, while conversation traversal is expressed through message Relations.
 
 ## Goals / Non-Goals
 
@@ -18,7 +18,7 @@ The built-in Extension registers exactly `communication.message@1`, `calendar.ev
 
 ## Decisions
 
-The canonical contract will name the three bundled definitions with versions: `communication.message@1`, `calendar.event@1`, and `file@1`. It will separately state that extension-defined Profiles use the same public API, leaving future domain selection open.
+The canonical contract will name the three bundled definitions with versions: `mail.message@1`, `calendar.event@1`, and `file@1`. It will separately state that extension-defined Profiles use the same public API, leaving future domain selection open.
 
 The accepted design will describe conversation behavior as message Relations and Artifact composition as descriptors. MBOX and ICS will not appear as current Profile exports because neither format is registered.
 

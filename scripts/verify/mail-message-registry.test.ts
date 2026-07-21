@@ -4,23 +4,23 @@ import {
   describeRegistry,
 } from '@ctxindex/core/registry'
 import { defineExtension } from '@ctxindex/extension-sdk'
-import { communicationMessageProfile } from '@ctxindex/profiles/communication-message'
+import { mailMessageProfile } from '@ctxindex/profiles/mail-message'
 
-const communicationMessageExtension = defineExtension({
-  id: 'ctxindex.communication-message.test',
-  profiles: [communicationMessageProfile],
+const mailMessageExtension = defineExtension({
+  id: 'ctxindex.mail-message.test',
+  profiles: [mailMessageProfile],
   adapters: [],
 })
 
-test('bundled communication.message enters the public registry path', () => {
+test('bundled mail.message enters the public registry path', () => {
   const description = describeRegistry(
-    createExtensionRegistry([communicationMessageExtension]),
+    createExtensionRegistry([mailMessageExtension]),
   )
 
   expect(description).toEqual({
     kinds: [
       {
-        id: 'communication.message',
+        id: 'mail.message',
         version: 1,
         fields: [
           {
@@ -46,19 +46,19 @@ test('bundled communication.message enters the public registry path', () => {
     sources: [],
     actions: [
       {
-        id: 'communication.message.draft.create',
-        profile: { id: 'communication.message', version: 1 },
+        id: 'mail.message.draft.create',
+        profile: { id: 'mail.message', version: 1 },
         effect: 'reversible',
         input: expect.anything(),
-        output: { id: 'communication.message', version: 1 },
+        output: { id: 'mail.message', version: 1 },
         adapters: [],
       },
       {
-        id: 'communication.message.draft.update',
-        profile: { id: 'communication.message', version: 1 },
+        id: 'mail.message.draft.update',
+        profile: { id: 'mail.message', version: 1 },
         effect: 'reversible',
         input: expect.anything(),
-        output: { id: 'communication.message', version: 1 },
+        output: { id: 'mail.message', version: 1 },
         adapters: [],
       },
     ],

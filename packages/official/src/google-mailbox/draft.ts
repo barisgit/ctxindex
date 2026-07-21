@@ -4,13 +4,13 @@ import {
 } from '@ctxindex/core/errors'
 import type { ActionContext, RetrievedResource } from '@ctxindex/extension-sdk'
 import {
-  type CommunicationMessage,
-  communicationMessageDraftCreateInputSchema,
-  communicationMessageDraftUpdateInputSchema,
-  communicationMessageSchema,
-  deriveCommunicationMessageReplyRecipient,
-  deriveCommunicationMessageReplyReferences,
-  deriveCommunicationMessageReplySubject,
+  deriveMailMessageReplyRecipient,
+  deriveMailMessageReplyReferences,
+  deriveMailMessageReplySubject,
+  type MailMessage,
+  mailMessageDraftCreateInputSchema,
+  mailMessageDraftUpdateInputSchema,
+  mailMessageSchema,
 } from '@ctxindex/profiles'
 import { z } from 'zod'
 import { renderMimeMessage, resolveDraftAttachments } from '../mail/mime'
@@ -18,10 +18,10 @@ import { gmailJson } from './response'
 import { gmailApiUrl } from './url'
 
 export type GmailDraftCreateInput = z.infer<
-  typeof communicationMessageDraftCreateInputSchema
+  typeof mailMessageDraftCreateInputSchema
 >
 export type GmailDraftUpdateInput = z.infer<
-  typeof communicationMessageDraftUpdateInputSchema
+  typeof mailMessageDraftUpdateInputSchema
 >
 type GmailStandaloneDraftCreateInput = Exclude<
   GmailDraftCreateInput,
@@ -74,7 +74,7 @@ function localMessage(
   context: ActionContext<unknown>,
   ref: string,
   expectedDraft: boolean,
-): CommunicationMessage {
+): MailMessage {
   const resource = context.resolveResource(ref)
   const guidance = `Retrieve it first with: ctxindex get ${ref} --format json`
   if (!resource) {
@@ -96,15 +96,15 @@ function localMessage(
     )
   }
   if (
-    resource.profile.id !== 'communication.message' ||
+    resource.profile.id !== 'mail.message' ||
     resource.profile.version !== 1
   ) {
     throw new CtxindexValidationError(
       'invalid_action_input',
-      `Reply Resource "${ref}" must be communication.message@1`,
+      `Reply Resource "${ref}" must be mail.message@1`,
     )
   }
-  const payload = communicationMessageSchema.safeParse(resource.payload)
+  const payload = mailMessageSchema.safeParse(resource.payload)
   if (
     !payload.success ||
     Boolean(payload.data.providerDraftId) !== expectedDraft
@@ -122,15 +122,15 @@ function replyDetails(
   replyToRef: string,
 ): GmailReplyDetails {
   const parent = localMessage(context, replyToRef, false)
-  const recipient = deriveCommunicationMessageReplyRecipient(parent)
+  const recipient = deriveMailMessageReplyRecipient(parent)
   if (!recipient || !parent.rfcMessageId || !parent.threadId) {
     throw new CtxindexValidationError(
       'invalid_action_input',
       `Reply parent "${replyToRef}" lacks recipient or Gmail threading fields. Retrieve it first with: ctxindex get ${replyToRef} --format json`,
     )
   }
-  const subject = deriveCommunicationMessageReplySubject(parent.subject)
-  const references = deriveCommunicationMessageReplyReferences(
+  const subject = deriveMailMessageReplySubject(parent.subject)
+  const references = deriveMailMessageReplyReferences(
     parent.references,
     parent.rfcMessageId,
   )
@@ -205,12 +205,9 @@ function rejectStoredReplyDraftUpdate(
   ref: string,
 ): void {
   const resource = context.resolveResource(ref)
-  if (
-    resource?.profile.id !== 'communication.message' ||
-    resource.profile.version !== 1
-  )
+  if (resource?.profile.id !== 'mail.message' || resource.profile.version !== 1)
     return
-  const draft = communicationMessageSchema.safeParse(resource.payload)
+  const draft = mailMessageSchema.safeParse(resource.payload)
   if (draft.success && draft.data.providerDraftId && draft.data.replyToRef)
     throw new CtxindexValidationError(
       'invalid_action_input',
@@ -219,11 +216,11 @@ function rejectStoredReplyDraftUpdate(
 }
 
 function parseDraftUpdateInput(input: unknown): GmailDraftUpdateInput {
-  const parsed = communicationMessageDraftUpdateInputSchema.safeParse(input)
+  const parsed = mailMessageDraftUpdateInputSchema.safeParse(input)
   if (!parsed.success) {
     throw new CtxindexValidationError(
       'invalid_action_input',
-      'Invalid input for Action communication.message.draft.update',
+      'Invalid input for Action mail.message.draft.update',
       { cause: parsed.error },
     )
   }
@@ -356,7 +353,7 @@ export async function gmailDraftUpdate(
       'provider_bad_response',
     )
   }
-  const payload = communicationMessageSchema.parse({
+  const payload = mailMessageSchema.parse({
     providerDraftId: addressedDraftId,
     providerMessageId: message.id,
     to: details ? [details.recipient] : standalone?.to,
@@ -385,18 +382,18 @@ export async function gmailDraftUpdate(
   })
   return {
     ref: `ctx://${context.source.id.toUpperCase()}/draft/${encodeURIComponent(addressedDraftId)}`,
-    profile: { id: 'communication.message', version: 1 },
+    profile: { id: 'mail.message', version: 1 },
     title: (details?.subject ?? standalone?.subject) || null,
     payload,
   }
 }
 
 function parseDraftCreateInput(input: unknown): GmailDraftCreateInput {
-  const parsed = communicationMessageDraftCreateInputSchema.safeParse(input)
+  const parsed = mailMessageDraftCreateInputSchema.safeParse(input)
   if (!parsed.success) {
     throw new CtxindexValidationError(
       'invalid_action_input',
-      'Invalid input for Action communication.message.draft.create',
+      'Invalid input for Action mail.message.draft.create',
       { cause: parsed.error },
     )
   }
@@ -479,7 +476,7 @@ export async function gmailDraftCreate(
       'provider_bad_response',
     )
   }
-  const payload = communicationMessageSchema.parse({
+  const payload = mailMessageSchema.parse({
     providerDraftId,
     providerMessageId: message.id,
     to: details ? [details.recipient] : standalone?.to,
@@ -512,7 +509,7 @@ export async function gmailDraftCreate(
   })
   return {
     ref: `ctx://${context.source.id.toUpperCase()}/draft/${encodeURIComponent(providerDraftId)}`,
-    profile: { id: 'communication.message', version: 1 },
+    profile: { id: 'mail.message', version: 1 },
     title: (details?.subject ?? standalone?.subject) || null,
     payload,
   }

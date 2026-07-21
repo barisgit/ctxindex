@@ -32,15 +32,15 @@ For V1, `action describe <action-id>` SHALL derive schema, documentation, effect
 - **THEN** execution fails with an actionable unsupported-operation error and no provider mutation occurs
 
 ### Requirement: V1 email Draft Actions
-For V1, the system SHALL implement exactly the reversible provider-persisted email Actions `communication.message.draft.create` and `communication.message.draft.update`. Each Action MUST require an explicit mailbox Source, persist the Draft through that Source and authentication boundary, and return the resulting normalized `communication.message` Resource Ref. Both `google.mailbox` and `microsoft.mailbox` SHALL bind these same Profile contracts; provider-specific Action ids or input shapes MUST NOT be introduced.
+For V1, the system SHALL implement exactly the reversible provider-persisted email Actions `mail.message.draft.create` and `mail.message.draft.update`. Each Action MUST require an explicit mailbox Source, persist the Draft through that Source and authentication boundary, and return the resulting normalized `mail.message` Resource Ref. Both `google.mailbox` and `microsoft.mailbox` SHALL bind these same Profile contracts; provider-specific Action ids or input shapes MUST NOT be introduced.
 
 #### Scenario: Gmail Draft is created at the provider
 - **WHEN** valid create input is run through an explicit Google mailbox Source
-- **THEN** the Adapter persists a Gmail Draft and returns its normalized `communication.message` Resource and stable Ref
+- **THEN** the Adapter persists a Gmail Draft and returns its normalized `mail.message` Resource and stable Ref
 
 #### Scenario: Outlook Draft is created at the provider
 - **WHEN** valid create input is run through an explicit Microsoft mailbox Source
-- **THEN** the Adapter persists an Outlook Draft and returns its normalized `communication.message` Resource and stable immutable-id Ref
+- **THEN** the Adapter persists an Outlook Draft and returns its normalized `mail.message` Resource and stable immutable-id Ref
 
 #### Scenario: Existing Draft is updated at the provider
 - **WHEN** valid update input identifies an existing Google or Microsoft provider Draft through its explicit Source
@@ -72,7 +72,7 @@ An Action result that creates or changes addressable provider context SHOULD be 
 
 An irreversible Action MUST require an explicit non-interactive confirmation signal and MUST NOT be automatically retried after an ambiguous provider outcome. Milestone documents MAY ship only reversible Actions.
 
-A provider-persisted email Draft is a `communication.message` Resource produced by a reversible Action. Text composed only in an agent conversation is not a provider Draft and requires no ctxindex operation.
+A provider-persisted email Draft is a `mail.message` Resource produced by a reversible Action. Text composed only in an agent conversation is not a provider Draft and requires no ctxindex operation.
 
 When a milestone ships Draft Actions without sending, its Adapters MUST NOT bind a send Action, call a send endpoint, or request a send-only permission. A broader provider permission that is the narrowest available permission capable of Draft persistence MUST be paired with registry, request, and acceptance checks proving no send capability.
 

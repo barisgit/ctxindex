@@ -7,7 +7,7 @@ Accepted storage decision D13 defines Resources, typed field-index rows, chunks,
 **Goals:**
 
 - Make Source-scoped Resource identity and generic natural-key Relation resolution explicit.
-- Place RFC message identity in the `communication.message` Profile vocabulary as the typed `rfcMessageId` field.
+- Place RFC message identity in the `mail.message` Profile vocabulary as the typed `rfcMessageId` field.
 - Remove the implied separate external-reference persistence contract.
 - Keep cross-Source copies distinct while allowing zero-to-many Relation resolution.
 
@@ -20,7 +20,7 @@ Accepted storage decision D13 defines Resources, typed field-index rows, chunks,
 ## Decisions
 
 1. A Resource remains identified by its Source-scoped Ref. Provider identifiers may be Profile fields and natural keys, but do not form a second generic Resource identity layer.
-2. `communication.message.rfcMessageId` carries the normalized RFC Message-ID header value. Relations may target that exact value through the existing `(field, value)` natural-key contract.
+2. `mail.message.rfcMessageId` carries the normalized RFC Message-ID header value. Relations may target that exact value through the existing `(field, value)` natural-key contract.
 3. Natural-key resolution is global across Sources and returns zero-to-many Resource matches. Multiple matches remain distinct Resources with distinct Source-scoped Refs.
 4. Cross-Source collapse and any shared identity model remain deferred. Introducing either requires a future explicit capability and storage contract rather than anticipatory requirements now.
 5. Static verification will reject the obsolete first-class external-reference and uniqueness-tuple language in current-facing documentation.

@@ -226,7 +226,7 @@ describe('Gmail searchRemote', () => {
       resources: [
         {
           ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/b',
-          profile: { id: 'communication.message', version: 1 },
+          profile: { id: 'mail.message', version: 1 },
           title: 'Second',
           occurredAt: 2000,
           payload: {
@@ -246,7 +246,7 @@ describe('Gmail searchRemote', () => {
         },
         {
           ref: 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/a',
-          profile: { id: 'communication.message', version: 1 },
+          profile: { id: 'mail.message', version: 1 },
           title: 'First',
           occurredAt: 1000,
           payload: {

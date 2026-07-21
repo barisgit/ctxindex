@@ -14,10 +14,10 @@ test('profile codemaps describe bundled Adapter parity', async () => {
     const normalizedCodemap = codemap.replace(/\s+/g, ' ')
 
     expect(normalizedCodemap).toMatch(
-      /Google and Microsoft mailbox Adapters target `communication\.message@1`/,
+      /Google and Microsoft mailbox Adapters target `mail\.message@1`/,
     )
     expect(normalizedCodemap).toMatch(
-      /bind the same `communication\.message\.draft\.create` and `communication\.message\.draft\.update` Actions/,
+      /bind the same `mail\.message\.draft\.create` and `mail\.message\.draft\.update` Actions/,
     )
     expect(normalizedCodemap).toMatch(
       /Google and Microsoft calendar Adapters target `calendar\.event@1`/,
@@ -33,7 +33,7 @@ test('profile codemaps describe bundled Adapter parity', async () => {
   expect(sourceCodemap).toContain('`packages/official/src/google-mailbox/`')
   expect(sourceCodemap).toContain('`packages/official/src/microsoft/mailbox/`')
   expect(sourceCodemap).toMatch(
-    /Google and Microsoft provider modules.*create and consume communication-message payloads.*local-directory emits file payloads/s,
+    /Google and Microsoft provider modules.*create and consume mail-message payloads.*local-directory emits file payloads/s,
   )
   expect(sourceCodemap).not.toMatch(/Gmail provider modules under/)
 })

@@ -131,7 +131,7 @@ Package responsibilities are stable: the public unscoped `ctxindex` package pars
 | **Field Index** | Generic typed rows projected from Profile fields. |
 | **Sync Run** | One recorded refresh attempt, separate from current Source state. |
 
-Internal row ids are not Refs; the public Resource identity is its Source-scoped Ref. Provider and local identifiers may appear in Source-scoped Resource Refs, envelope metadata, or typed Profile fields, but core has no separate external-reference store. For `communication.message`, the normalized RFC `Message-ID` header value is the typed `rfcMessageId` Profile field. The same provider record exposed by two Sources remains two Resources; natural-key Relations resolve typed fields through the Field Index with zero-to-many exact-value matches across Sources and Realms, without collapsing Source-scoped identities. Relations are order-independent and bidirectional, and may resolve after a target arrives. Generic threading uses conversation and parent edges rather than mail-specific tables.
+Internal row ids are not Refs; the public Resource identity is its Source-scoped Ref. Provider and local identifiers may appear in Source-scoped Resource Refs, envelope metadata, or typed Profile fields, but core has no separate external-reference store. For `mail.message`, the normalized RFC `Message-ID` header value is the typed `rfcMessageId` Profile field. The same provider record exposed by two Sources remains two Resources; natural-key Relations resolve typed fields through the Field Index with zero-to-many exact-value matches across Sources and Realms, without collapsing Source-scoped identities. Relations are order-independent and bidirectional, and may resolve after a target arrives. Generic threading uses conversation and parent edges rather than mail-specific tables.
 
 ## 4. Trust boundaries and security model
 
@@ -256,8 +256,8 @@ Profiles declare Action id, input schema, output Profile, effect, docs, and exam
 
 V1 exposes exactly:
 
-- `communication.message.draft.create`
-- `communication.message.draft.update`
+- `mail.message.draft.create`
+- `mail.message.draft.update`
 
 Google and Microsoft mailbox Adapters bind the same strict provider-independent unions. Standalone create returns a normalized message Resource; standalone update replaces complete recipients, subject, and text for an existing same-Source Draft while preserving its Ref.
 

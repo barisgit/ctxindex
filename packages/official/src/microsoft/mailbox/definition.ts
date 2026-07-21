@@ -1,8 +1,8 @@
 import { defineAdapter } from '@ctxindex/extension-sdk'
 import {
-  communicationMessageDraftCreateInputSchema,
-  communicationMessageDraftUpdateInputSchema,
-  communicationMessageProfile,
+  mailMessageDraftCreateInputSchema,
+  mailMessageDraftUpdateInputSchema,
+  mailMessageProfile,
 } from '@ctxindex/profiles'
 import { microsoftOAuthProvider } from '../provider'
 import { microsoftMailboxSourceConfigSchema } from './config'
@@ -17,7 +17,7 @@ export const microsoftMailboxAdapterDefinition = defineAdapter({
   provider: microsoftOAuthProvider,
   access: { scopes: ['Mail.ReadWrite'] },
   providerApiHosts: ['graph.microsoft.com'],
-  profiles: [communicationMessageProfile],
+  profiles: [mailMessageProfile],
   routing: 'federated',
   capabilities: ['search-remote', 'retrieve', 'download'],
   operations: {
@@ -26,16 +26,16 @@ export const microsoftMailboxAdapterDefinition = defineAdapter({
     download: microsoftMailboxDownload,
   },
   actions: {
-    'communication.message.draft.create': {
-      profile: communicationMessageProfile,
-      input: communicationMessageDraftCreateInputSchema,
-      output: communicationMessageProfile,
+    'mail.message.draft.create': {
+      profile: mailMessageProfile,
+      input: mailMessageDraftCreateInputSchema,
+      output: mailMessageProfile,
       run: microsoftDraftCreate,
     },
-    'communication.message.draft.update': {
-      profile: communicationMessageProfile,
-      input: communicationMessageDraftUpdateInputSchema,
-      output: communicationMessageProfile,
+    'mail.message.draft.update': {
+      profile: mailMessageProfile,
+      input: mailMessageDraftUpdateInputSchema,
+      output: mailMessageProfile,
       run: microsoftDraftUpdate,
     },
   },

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { communicationMessageProfile } from '@ctxindex/profiles'
+import { mailMessageProfile } from '@ctxindex/profiles'
 import { microsoftOAuthProvider } from '../provider'
 import { microsoftMailboxSourceConfigSchema } from './config'
 import { microsoftMailboxAdapterDefinition } from './definition'
@@ -11,7 +11,7 @@ describe('Microsoft mailbox definition', () => {
       provider: microsoftOAuthProvider,
       access: { scopes: ['Mail.ReadWrite'] },
       providerApiHosts: ['graph.microsoft.com'],
-      profiles: [communicationMessageProfile],
+      profiles: [mailMessageProfile],
       routing: 'federated',
       capabilities: ['search-remote', 'retrieve', 'download'],
     })
@@ -21,17 +21,17 @@ describe('Microsoft mailbox definition', () => {
       microsoftOAuthProvider,
     )
     expect(microsoftMailboxAdapterDefinition.profiles[0]).toBe(
-      communicationMessageProfile,
+      mailMessageProfile,
     )
     expect(Object.keys(microsoftMailboxAdapterDefinition.actions)).toEqual([
-      'communication.message.draft.create',
-      'communication.message.draft.update',
+      'mail.message.draft.create',
+      'mail.message.draft.update',
     ])
     for (const binding of Object.values(
       microsoftMailboxAdapterDefinition.actions,
     )) {
-      expect(binding.profile).toBe(communicationMessageProfile)
-      expect(binding.output).toBe(communicationMessageProfile)
+      expect(binding.profile).toBe(mailMessageProfile)
+      expect(binding.output).toBe(mailMessageProfile)
     }
     expect(JSON.stringify(microsoftMailboxAdapterDefinition)).not.toMatch(
       /Mail\.Send|message\.send|\/send/i,

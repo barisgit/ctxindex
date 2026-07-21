@@ -82,9 +82,7 @@ test('workflow skills point to runtime vocabulary instead of declaring it', asyn
 })
 
 test('registry vocabulary guard catches identifiers without relying on backticks', () => {
-  expect(
-    containsRegistryInventory('communication.message', 'communication.message'),
-  ).toBe(true)
+  expect(containsRegistryInventory('mail.message', 'mail.message')).toBe(true)
   expect(containsRegistryInventory('- sender: message author', 'sender')).toBe(
     true,
   )

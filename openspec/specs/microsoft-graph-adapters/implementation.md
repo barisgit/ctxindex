@@ -77,11 +77,11 @@ export type GraphMessage = z.infer<typeof graphMessageSchema>
 
 ```ts
 export type MicrosoftDraftCreateInput = z.infer<
-  typeof communicationMessageDraftCreateInputSchema
+  typeof mailMessageDraftCreateInputSchema
 >
 
 export type MicrosoftDraftUpdateInput = z.infer<
-  typeof communicationMessageDraftUpdateInputSchema
+  typeof mailMessageDraftUpdateInputSchema
 >
 
 export async function microsoftDraftCreate(
@@ -119,7 +119,7 @@ export async function microsoftMailboxDownload(
 
 ## Implementation doctrine
 
-The Microsoft modules in `@ctxindex/official` own declarative OAuth metadata, provider DTOs, normalization, and operations. Calendar and mailbox operations depend on the provider-root Graph transport for request construction, continuation validation, response decoding, and normalized errors. Mailbox retrieval orchestrates message and attachment DTOs into generic Resources and Artifacts; Draft handlers map schema-inferred standalone or reply inputs and local Resource resolution into Graph requests, then normalize `RetrievedResource` results. Core sees only generic Resources, warnings, checkpoints, Artifacts, and Action results. Exact paging, sizing, retry, mutation, and diagnostic behavior lives in the capability spec and applicable delta specs.
+The Microsoft modules in `@ctxindex/official` own declarative OAuth metadata, provider DTOs, normalization, and operations. Calendar and mailbox operations depend on the provider-root Graph transport for request construction, continuation validation, response decoding, and normalized errors. Mailbox retrieval orchestrates message and attachment DTOs into generic `mail.message@1` Resources and Artifacts; Draft handlers map schema-inferred standalone or reply inputs and local Resource resolution into Graph requests, then normalize `RetrievedResource` results. Core sees only generic Resources, warnings, checkpoints, Artifacts, and Action results. Exact paging, sizing, retry, mutation, and diagnostic behavior lives in the capability spec and applicable delta specs.
 
 Attachment-bearing standalone and native-reply Draft creation normalizes and validates every To/Cc/Bcc value through the same Graph recipient seam, quotes display names where MIME requires it, renders one validated MIME message containing exact managed bytes, and performs one immutable-id POST without follow-up attachment mutations. Attachment-free standalone create retains the JSON request. Update always uses one JSON PATCH that omits the attachment collection, preserving existing provider attachments and immutable reply context without a provider read, retry, add/delete route, or send route.
 

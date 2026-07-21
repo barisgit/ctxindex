@@ -680,27 +680,27 @@ describe('search, Resource, and thread contracts', () => {
     expect(
       rpcSearchInputSchema.parse({
         sourceIds: ['work-outlook'],
-        kind: 'communication.message',
+        kind: 'mail.message',
         limit: 50,
         remote: true,
       }),
     ).toEqual({
       sourceIds: ['work-outlook'],
-      kind: 'communication.message',
+      kind: 'mail.message',
       limit: 50,
       remote: true,
     })
     expect(
       rpcSearchInputSchema.parse({
         sourceIds: ['work-outlook'],
-        kind: 'communication.message',
+        kind: 'mail.message',
         limit: 50,
         remote: true,
         continuation: 'opaque-next-page',
       }),
     ).toEqual({
       sourceIds: ['work-outlook'],
-      kind: 'communication.message',
+      kind: 'mail.message',
       limit: 50,
       remote: true,
       continuation: 'opaque-next-page',

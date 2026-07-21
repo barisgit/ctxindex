@@ -5,8 +5,8 @@ import { resolveManagedOAuthApp } from '@ctxindex/core/oauth-app'
 import type { AnyAdapterDefinition } from '@ctxindex/extension-sdk'
 import {
   calendarEventProfile,
-  communicationMessageProfile,
   fileProfile,
+  mailMessageProfile,
 } from '@ctxindex/profiles'
 import * as builtinModule from './index'
 import {
@@ -121,8 +121,7 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
         ),
       ).text(),
     ])
-    const inventory =
-      '`communication.message@1`, `calendar.event@1`, and `file@1`'
+    const inventory = '`mail.message@1`, `calendar.event@1`, and `file@1`'
 
     expect(specification).toContain(
       `The V1 bundled canonical Profiles MUST be ${inventory}.`,
@@ -160,9 +159,9 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
       'local.directory',
     ])
     expect(adapters[0]?.profiles[0]).toBe(calendarEventProfile)
-    expect(adapters[1]?.profiles[0]).toBe(communicationMessageProfile)
+    expect(adapters[1]?.profiles[0]).toBe(mailMessageProfile)
     expect(adapters[2]?.profiles[0]).toBe(calendarEventProfile)
-    expect(adapters[3]?.profiles[0]).toBe(communicationMessageProfile)
+    expect(adapters[3]?.profiles[0]).toBe(mailMessageProfile)
     expect(adapters[4]?.profiles[0]).toBe(fileProfile)
     expect(
       [...CTXINDEX_BUILTIN_EXTENSIONS, ...adapters].every(
@@ -232,8 +231,8 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
       'download',
     ])
     expect(Object.keys(microsoft?.actions ?? {})).toEqual([
-      'communication.message.draft.create',
-      'communication.message.draft.update',
+      'mail.message.draft.create',
+      'mail.message.draft.update',
     ])
     expect(microsoft?.configSchema.safeParse({}).success).toBe(true)
     expect(

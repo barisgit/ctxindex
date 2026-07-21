@@ -4,7 +4,7 @@ import type {
   RetrievedResource,
   SearchRemoteResource,
 } from '@ctxindex/extension-sdk'
-import { communicationMessageSchema } from '@ctxindex/profiles'
+import { mailMessageSchema } from '@ctxindex/profiles'
 import { z } from 'zod'
 
 const cleanString = z
@@ -105,7 +105,7 @@ function payload(
 ) {
   const occurred = message.receivedDateTime ?? message.sentDateTime ?? undefined
   const conversationId = message.conversationId ?? undefined
-  return communicationMessageSchema.parse({
+  return mailMessageSchema.parse({
     providerMessageId: message.id,
     ...(conversationId
       ? {
@@ -169,7 +169,7 @@ export function searchResource(
   const times = timestamps(message)
   return {
     ref: `ctx://${sourceId.toUpperCase()}/message/${encodeURIComponent(message.id)}`,
-    profile: { id: 'communication.message', version: 1 },
+    profile: { id: 'mail.message', version: 1 },
     title: message.subject ?? null,
     summary: message.bodyPreview ?? null,
     ...times,
@@ -191,7 +191,7 @@ export function retrievedResource(
   const times = timestamps(message)
   return {
     ref,
-    profile: { id: 'communication.message', version: 1 },
+    profile: { id: 'mail.message', version: 1 },
     title: message.subject ?? null,
     summary: message.bodyPreview ?? null,
     ...times,

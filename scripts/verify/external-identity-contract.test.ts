@@ -13,7 +13,7 @@ async function read(
 }
 
 function expectIndependentIdentityContract(document: string): void {
-  expect(document).toMatch(/communication\.message.*rfcMessageId/is)
+  expect(document).toMatch(/mail\.message.*rfcMessageId/is)
   expect(document).toMatch(/zero-to-many.*across Sources/is)
   expect(document).toMatch(/Source-scoped (?:Resource )?Ref/i)
   expect(document).toMatch(/cross-Source Resource collapse.*deferred/is)
