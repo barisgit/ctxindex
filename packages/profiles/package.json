@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./calendar-event": "./src/calendar-event.ts",
+    "./chat-message": "./src/chat-message.ts",
     "./communication-message": "./src/communication-message.ts",
     "./file": "./src/file.ts"
   },

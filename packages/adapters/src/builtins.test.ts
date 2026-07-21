@@ -122,7 +122,7 @@ describe('CTXINDEX_BUILTIN_EXTENSIONS', () => {
       ).text(),
     ])
     const inventory =
-      '`communication.message@1`, `calendar.event@1`, and `file@1`'
+      '`communication.message@1`, `chat.message@1`, `calendar.event@1`, and `file@1`'
 
     expect(specification).toContain(
       `The V1 bundled canonical Profiles MUST be ${inventory}.`,

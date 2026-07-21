@@ -146,6 +146,17 @@ export function deriveCommunicationMessageReplyReferences(
 ): string[];
 ```
 
+### @ctxindex/profiles — chat message vocabulary
+
+```ts
+export type ChatMessage = z.infer<typeof chatMessageSchema>
+
+export function chatMessageNaturalKey(
+  conversationKey: string,
+  providerMessageId: string,
+): string;
+```
+
 ### @ctxindex/profiles — calendar event vocabulary
 
 ```ts
@@ -175,6 +186,8 @@ export function isNormalizedRelativeFilePath(path: string): boolean;
 `@ctxindex/extension-sdk` owns plain versioned authoring contracts and const-generic factories; it creates no runtime class identity. `@ctxindex/profiles` owns bundled schemas and pure vocabulary. Core registries erase authored definitions to runtime-safe interfaces and bind by `(id, version)`.
 
 Profiles own validation, titles/summaries, chunks, typed fields, Relations, Artifact descriptors, exports, docs/aliases/examples, and Action declarations. Adapters own provider I/O. Loaded registry metadata drives describe, kind aliases, field parsing, Source config, exports, and Action discovery.
+
+The chat-message module owns an independent strict schema and pure projections rather than inheriting from or forming a union with the mail-oriented communication-message schema. Its compound natural-key helper is the single implementation used by both the indexed `messageKey` field and provider-id reply Relations. Core consumes its ordinary Profile hooks without chat-specific storage or traversal branches.
 
 ## Verification
 

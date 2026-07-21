@@ -56,6 +56,10 @@ _Avoid_: Suggested text, sent message
 A provider record occupying a timed interval or an all-day date range in one calendar; a meeting is one kind of Calendar Event, not a synonym for all Calendar Events.
 _Avoid_: Event, meeting
 
+**Chat Message**:
+One provider message authored in a chat conversation, with provider identity, a structured sender, portable text/attachment content, and generic conversation/reply Relations. It is distinct from an email message and does not imply mail headers, recipients, exports, or Draft Actions.
+_Avoid_: Email, universal communication message
+
 **Source Adapter**:
 Code that implements declared operations such as sync, remote search, retrieval, download, and Profile Actions for a Source. A Source Adapter may import one exact Provider or be providerless.
 _Avoid_: Plugin, Extension, connector
@@ -116,6 +120,7 @@ _Avoid_: Source, import
 - A **Source Adapter** emits **Resources** through sync, search, retrieval, and action results; each **Resource**'s **Profile** derives **Relations** and **Artifact** descriptors from its validated payload, and the owning Adapter downloads provider bytes for an **Artifact** on demand.
 - A **Resource** has one stable **Ref**, one primary **Profile**, and zero or more **Relations** and Profile-derived **Artifact** descriptors.
 - A provider-persisted **Draft** is a **Resource** created or updated by an **Action**.
+- A **Chat Message** belongs to a provider conversation through a generic `conversation` **Relation** and may reply to another message through a generic `parent` **Relation**; those roles do not require a separate conversation Resource.
 
 ## Example dialogue
 

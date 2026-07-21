@@ -4,6 +4,12 @@ export {
   calendarEventRef,
   calendarEventSchema,
 } from './calendar-event'
+export type { ChatMessage } from './chat-message'
+export {
+  chatMessageNaturalKey,
+  chatMessageProfile,
+  chatMessageSchema,
+} from './chat-message'
 export type { CommunicationMessage } from './communication-message'
 export {
   communicationMessageDraftAttachmentSchema,
