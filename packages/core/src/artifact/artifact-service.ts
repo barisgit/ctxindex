@@ -156,10 +156,17 @@ function publicArtifact(artifact: Artifact): DownloadedArtifact {
   return result
 }
 
+interface ArtifactMaterialization {
+  readonly controller: AbortController
+  promise: Promise<Artifact>
+  waiters: number
+  settled: boolean
+}
+
 export class ArtifactService {
   private readonly store: ArtifactStore
   private readonly resources: ResourceStore
-  private readonly inFlight = new Map<string, Promise<Artifact>>()
+  private readonly inFlight = new Map<string, ArtifactMaterialization>()
   private activeDownloads = 0
   private purging = false
 
@@ -398,21 +405,72 @@ export class ArtifactService {
     },
   ): Promise<ArtifactDownloadResult> {
     parseRef(ref)
+    options.signal?.throwIfAborted()
     const cached = await this.store.get(ref)
     if (cached) return this.finish(cached, 'hit', options.outputPath)
 
-    let pending = this.inFlight.get(ref)
-    if (!pending) {
-      pending = this.materialize(
-        ref,
-        options.signal ?? new AbortController().signal,
-      )
-      this.inFlight.set(ref, pending)
-      void pending
-        .finally(() => this.inFlight.delete(ref))
-        .catch(() => undefined)
+    const pending = this.materialization(ref)
+    const artifact = await this.waitForMaterialization(pending, options.signal)
+    return this.finish(artifact, 'miss', options.outputPath)
+  }
+
+  private materialization(ref: string): ArtifactMaterialization {
+    const current = this.inFlight.get(ref)
+    if (current) return current
+
+    const controller = new AbortController()
+    this.activeDownloads += 1
+    const materialization = this.materialize(ref, controller.signal)
+    const entry: ArtifactMaterialization = {
+      controller,
+      promise: materialization,
+      waiters: 0,
+      settled: false,
     }
-    return this.finish(await pending, 'miss', options.outputPath)
+    entry.promise = materialization.finally(() => {
+      entry.settled = true
+      this.activeDownloads -= 1
+      if (this.inFlight.get(ref) === entry) this.inFlight.delete(ref)
+    })
+    this.inFlight.set(ref, entry)
+    void entry.promise.catch(() => undefined)
+    return entry
+  }
+
+  private async waitForMaterialization(
+    entry: ArtifactMaterialization,
+    signal: AbortSignal | undefined,
+  ): Promise<Artifact> {
+    signal?.throwIfAborted()
+    entry.waiters += 1
+    let cancelled = false
+    try {
+      if (!signal) return await entry.promise
+      return await new Promise<Artifact>((resolve, reject) => {
+        let finished = false
+        const finish = (settle: () => void) => {
+          if (finished) return
+          finished = true
+          signal.removeEventListener('abort', onAbort)
+          settle()
+        }
+        const onAbort = () => {
+          cancelled = true
+          finish(() => reject(signal.reason))
+        }
+        signal.addEventListener('abort', onAbort, { once: true })
+        if (signal.aborted) onAbort()
+        void entry.promise.then(
+          (artifact) => finish(() => resolve(artifact)),
+          (error: unknown) => finish(() => reject(error)),
+        )
+      })
+    } finally {
+      entry.waiters -= 1
+      if (cancelled && entry.waiters === 0 && !entry.settled) {
+        entry.controller.abort()
+      }
+    }
   }
 
   private async finish(

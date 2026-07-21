@@ -65,6 +65,7 @@ async function fixture(
   )
 
   let calls = 0
+  let aborts = 0
   const profile = defineProfile({
     id: 'fake.message',
     version: 1,
@@ -89,7 +90,25 @@ async function fixture(
   const download = async (context: DownloadContext) => {
     calls += 1
     options.downloadStarted?.()
-    await options.waitForDownload
+    if (options.waitForDownload) {
+      await new Promise<void>((resolve, reject) => {
+        const onAbort = () => {
+          aborts += 1
+          reject(context.signal.reason)
+        }
+        context.signal.addEventListener('abort', onAbort, { once: true })
+        void options.waitForDownload?.then(
+          () => {
+            context.signal.removeEventListener('abort', onAbort)
+            resolve()
+          },
+          (error: unknown) => {
+            context.signal.removeEventListener('abort', onAbort)
+            reject(error)
+          },
+        )
+      })
+    }
     await context.write(bytes.subarray(0, 4))
     if (options.fail) throw options.fail
     await context.write(bytes.subarray(4))
@@ -128,7 +147,14 @@ async function fixture(
     logger,
     store,
   })
-  return { db, root, store, service, calls: () => calls }
+  return {
+    db,
+    root,
+    store,
+    service,
+    calls: () => calls,
+    aborts: () => aborts,
+  }
 }
 
 describe('ArtifactService', () => {
@@ -382,6 +408,70 @@ describe('ArtifactService', () => {
     ])
     expect(results.map((result) => result.cache)).toEqual(['miss', 'miss'])
     expect(f.calls()).toBe(1)
+  })
+
+  test('cancelling one same-Ref waiter does not abort another waiter', async () => {
+    let releaseDownload = () => {}
+    const waitForDownload = new Promise<void>((resolve) => {
+      releaseDownload = resolve
+    })
+    let markStarted = () => {}
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve
+    })
+    const f = await fixture({
+      downloadStarted: markStarted,
+      waitForDownload,
+    })
+    const firstController = new AbortController()
+    const secondController = new AbortController()
+    const first = f.service.download(artifactRef, {
+      signal: firstController.signal,
+    })
+    await started
+    const second = f.service.download(artifactRef, {
+      signal: secondController.signal,
+    })
+    await Promise.resolve()
+
+    firstController.abort()
+    await expect(first).rejects.toBeDefined()
+    expect(f.aborts()).toBe(0)
+    releaseDownload()
+    await expect(second).resolves.toMatchObject({ cache: 'miss' })
+    expect(f.calls()).toBe(1)
+    expect(f.aborts()).toBe(0)
+  })
+
+  test('aborts one same-Ref materialization after its final waiter cancels', async () => {
+    const waitForDownload = new Promise<void>(() => {})
+    let markStarted = () => {}
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve
+    })
+    const f = await fixture({
+      downloadStarted: markStarted,
+      waitForDownload,
+    })
+    const firstController = new AbortController()
+    const secondController = new AbortController()
+    const first = f.service.download(artifactRef, {
+      signal: firstController.signal,
+    })
+    await started
+    const second = f.service.download(artifactRef, {
+      signal: secondController.signal,
+    })
+    await Promise.resolve()
+
+    firstController.abort()
+    await expect(first).rejects.toBeDefined()
+    expect(f.aborts()).toBe(0)
+    secondController.abort()
+    await expect(second).rejects.toBeDefined()
+    expect(f.calls()).toBe(1)
+    expect(f.aborts()).toBe(1)
+    expect(await f.store.get(artifactRef)).toBeUndefined()
   })
 
   test('rejects same-process purge while a download is in flight', async () => {
