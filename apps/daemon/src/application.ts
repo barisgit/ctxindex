@@ -18,6 +18,7 @@ import type {
 } from '@ctxindex/core/documentation'
 import {
   CtxindexAuthError,
+  CtxindexError,
   CtxindexNotFoundError,
   CtxindexSyncError,
   CtxindexValidationError,
@@ -314,6 +315,49 @@ class StreamRendezvous<T, TReturn> {
 
 class ResultTooLargeError extends Error {}
 
+const trustedBaseSyncCodes = new Set([
+  'auth_expired',
+  'auth_revoked',
+  'rate_limited',
+  'network',
+  'provider_unavailable',
+  'provider_bad_response',
+  'provider_quota',
+  'permission_denied',
+  'cancelled',
+  'unknown',
+  'not_implemented_yet',
+])
+
+const trustedBaseOtherCodes = new Set([
+  'adapter_unavailable',
+  'conflict',
+  'data_integrity',
+  'egress_denied',
+  'invalid_action_result',
+  'invalid_retrieve_result',
+  'invalid_source_config',
+  'output_exists',
+  'remote_search_unsupported',
+  'retrieve_unsupported',
+  'storage_busy',
+  'sync_unsupported',
+  'unsupported_capability',
+])
+
+function boundedPublicMessage(message: string): string {
+  if (!message.isWellFormed())
+    return 'The daemon could not complete the request.'
+  for (const character of message) {
+    const code = character.codePointAt(0) ?? 0
+    if (code <= 31 || (code >= 127 && code <= 159))
+      return 'The daemon could not complete the request.'
+  }
+  return new TextEncoder().encode(message).byteLength <= 512
+    ? message
+    : 'The daemon could not complete the request.'
+}
+
 function failure(error: unknown): RpcFailure {
   if (error instanceof ResultTooLargeError) {
     return {
@@ -382,6 +426,24 @@ function failure(error: unknown): RpcFailure {
       message: messages[error.code],
     }
   }
+  if (error instanceof CtxindexError) {
+    if (trustedBaseSyncCodes.has(error.code)) {
+      return {
+        kind: 'ctxindex',
+        taxonomy: 'sync',
+        code: error.code,
+        message: boundedPublicMessage(error.message),
+      }
+    }
+    if (trustedBaseOtherCodes.has(error.code)) {
+      return {
+        kind: 'ctxindex',
+        taxonomy: 'other',
+        code: error.code,
+        message: boundedPublicMessage(error.message),
+      }
+    }
+  }
   return {
     kind: 'ctxindex',
     taxonomy: 'other',
@@ -396,7 +458,15 @@ async function resolveSourceGrant(
   account?: string,
 ): Promise<string | undefined> {
   const provider = adapter.provider
-  if (provider === undefined || provider.auth.kind === 'none') return undefined
+  if (provider === undefined || provider.auth.kind === 'none') {
+    if (account !== undefined) {
+      throw new CtxindexValidationError(
+        'invalid_filter',
+        `Adapter "${adapter.id}" does not accept an Account`,
+      )
+    }
+    return undefined
+  }
   if (provider.auth.kind !== 'oauth2') {
     throw new CtxindexValidationError(
       'invalid_filter',
@@ -408,7 +478,7 @@ async function resolveSourceGrant(
     access: adapter.access ?? { scopes: [] },
   }
   const providerId = providerIdForAuth(authorization)
-  const providerGrants = await authService.listGrants(providerId ?? undefined)
+  const providerGrants = await authService.listGrants(providerId)
   let grants = providerGrants
   if (account) {
     const byLabel = providerGrants.filter(
@@ -417,13 +487,8 @@ async function resolveSourceGrant(
     const byAccountId = providerGrants.filter(
       (grant) => grant.accountId === account,
     )
-    const byGrantId = providerGrants.filter((grant) => grant.id === account)
     grants =
-      byLabel.length > 0
-        ? byLabel
-        : byAccountId.length > 0
-          ? byAccountId
-          : byGrantId
+      byLabel.length > 0 ? byLabel : byAccountId.length > 0 ? byAccountId : []
   }
   const matches = grants.filter((grant) =>
     isGrantCompatible(authorization, grant),
@@ -432,14 +497,14 @@ async function resolveSourceGrant(
     throw new CtxindexValidationError(
       'invalid_filter',
       account
-        ? `no compatible Grant matches account "${account}"`
-        : `no compatible Grant available; run bun cli account add ${providerId ?? '<provider>'}`,
+        ? `no compatible Account authorization matches "${account}"`
+        : `no compatible Account authorization available; run bun cli account add ${providerId ?? '<provider>'} --app <label>`,
     )
   }
   if (matches.length > 1) {
     throw new CtxindexValidationError(
       'invalid_filter',
-      `multiple compatible Grants available; choose one with --account <label|account-id|grant-id>: ${matches.map((grant) => grant.accountLabel ?? grant.accountId).join(', ')}`,
+      `multiple compatible Accounts available; choose one with --account <label|account-id>: ${matches.map((grant) => grant.accountLabel ?? grant.accountId).join(', ')}`,
     )
   }
   return matches[0]?.id

@@ -6,6 +6,7 @@ import {
 import {
   CtxindexAuthError,
   type CtxindexAuthErrorCode,
+  CtxindexError,
   CtxindexNotFoundError,
   CtxindexSyncError,
   type CtxindexSyncErrorCode,
@@ -1470,6 +1471,83 @@ test('raw errors cannot impersonate trusted public validation failures', async (
   expect(JSON.stringify(result)).not.toContain(canary)
 })
 
+test('Artifact download preserves trusted unsupported and provider-network failures through RPC', async () => {
+  for (const [code, taxonomy, message] of [
+    [
+      'unsupported_capability',
+      'other',
+      'Source Adapter does not support Artifact download',
+    ],
+    ['network', 'sync', 'Provider request failed'],
+  ] as const) {
+    const app = application({
+      artifactService: {
+        download: async () => {
+          throw new CtxindexError(message, code)
+        },
+      } as never,
+    })
+    app.markReady()
+    expect(
+      await rpcFailure(
+        clientFor(app).artifact.download({
+          ref: 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/one/attachment/file',
+          transfer: false,
+        }),
+      ),
+    ).toEqual({ kind: 'ctxindex', taxonomy, code, message })
+  }
+
+  const unsafe = application({
+    artifactService: {
+      download: async () => {
+        throw new CtxindexError(
+          `unsafe control\n${'x'.repeat(600)}`,
+          'unsupported_capability',
+        )
+      },
+    } as never,
+  })
+  unsafe.markReady()
+  expect(
+    await rpcFailure(
+      clientFor(unsafe).artifact.download({
+        ref: 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/one/attachment/file',
+        transfer: false,
+      }),
+    ),
+  ).toEqual({
+    kind: 'ctxindex',
+    taxonomy: 'other',
+    code: 'unsupported_capability',
+    message: 'The daemon could not complete the request.',
+  })
+
+  const raw = application({
+    artifactService: {
+      download: async () => {
+        throw Object.assign(new Error('raw network canary'), {
+          code: 'network',
+        })
+      },
+    } as never,
+  })
+  raw.markReady()
+  expect(
+    await rpcFailure(
+      clientFor(raw).artifact.download({
+        ref: 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/one/attachment/file',
+        transfer: false,
+      }),
+    ),
+  ).toEqual({
+    kind: 'ctxindex',
+    taxonomy: 'other',
+    code: 'internal_error',
+    message: 'The daemon could not complete the request.',
+  })
+})
+
 test('status preserves established public warning and status fields through RPC', async () => {
   const publicRow = {
     sourceId: 'source-1',
@@ -2002,6 +2080,112 @@ test('Source add matches a real Adapter definition to its compatible Account Gra
     ),
   ).resolves.toMatchObject({ ok: true })
   expect(grantId).toBe('grant-1')
+})
+
+test('Source add matches direct Account selection and rejects providerless selection or Grant ids', async () => {
+  const grants = [
+    {
+      id: 'grant-by-label',
+      provider: 'test',
+      scopes: ['read'],
+      accountLabel: 'work',
+      accountId: 'account-by-label',
+    },
+    {
+      id: 'work',
+      provider: 'test',
+      scopes: ['read'],
+      accountLabel: 'other',
+      accountId: 'account-by-id',
+    },
+  ] as never
+  const additions: unknown[] = []
+  const adapters = {
+    authenticated: {
+      id: 'test.authenticated',
+      provider: { id: 'test', auth: { kind: 'oauth2' } },
+      access: { scopes: ['read'] },
+      configSchema: { safeParse: () => ({ success: true, data: {} }) },
+    },
+    providerless: {
+      id: 'test.providerless',
+      configSchema: { safeParse: () => ({ success: true, data: {} }) },
+    },
+  }
+  const app = application({
+    registry: {
+      adapters: {
+        get: ({ id }: { id: string }) =>
+          id === adapters.authenticated.id
+            ? adapters.authenticated
+            : id === adapters.providerless.id
+              ? adapters.providerless
+              : undefined,
+        list: () => Object.values(adapters),
+      },
+    } as never,
+    authService: { listGrants: async () => grants },
+    sourceService: {
+      resolveSourceId: (value: string) => value,
+      getStatus: () => [],
+      addSource: (input: unknown) => {
+        additions.push(input)
+        return { sourceId: `source-${additions.length}`, realmId: 'work' }
+      },
+    },
+  })
+  app.markReady()
+
+  expect(
+    await app.source.add(
+      {
+        adapterId: adapters.providerless.id,
+        realmSlug: 'work',
+        account: 'work',
+      },
+      context('providerless-account'),
+    ),
+  ).toMatchObject({
+    ok: false,
+    error: { code: 'invalid_filter' },
+  })
+  expect(
+    await app.source.add(
+      {
+        adapterId: adapters.authenticated.id,
+        realmSlug: 'work',
+        account: 'grant-by-label',
+      },
+      context('grant-id'),
+    ),
+  ).toMatchObject({
+    ok: false,
+    error: { code: 'invalid_filter' },
+  })
+  expect(
+    await app.source.add(
+      {
+        adapterId: adapters.authenticated.id,
+        realmSlug: 'work',
+        account: 'work',
+      },
+      context('account-label'),
+    ),
+  ).toMatchObject({ ok: true })
+  expect(
+    await app.source.add(
+      {
+        adapterId: adapters.authenticated.id,
+        realmSlug: 'work',
+        account: 'account-by-id',
+      },
+      context('account-id'),
+    ),
+  ).toMatchObject({ ok: true })
+  expect(additions).toEqual([
+    expect.objectContaining({ grantId: 'grant-by-label' }),
+    expect.objectContaining({ grantId: 'work' }),
+  ])
 })
 
 test('Action describe and run resolve one Source and preserve cancellation and output', async () => {

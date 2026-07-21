@@ -641,10 +641,13 @@ describe.skipIf(process.platform !== 'darwin')(
         expect(JSON.parse(direct.stdout)).toEqual([
           expect.objectContaining({ sourceId, adapterId: 'local.directory' }),
         ])
-        expect(
-          (await runCli(runtime, ['daemon', 'stop', '--format', 'json']))
-            .exitCode,
-        ).toBe(0)
+        const stoppedDirect = await runCli(runtime, [
+          'daemon',
+          'stop',
+          '--format',
+          'json',
+        ])
+        expect(stoppedDirect.exitCode, stoppedDirect.stderr).toBe(0)
 
         const missingEndpoint = join(runtime.runtimeRoot, 'missing.sock')
         const unavailable = await runCli(
@@ -948,10 +951,13 @@ describe.skipIf(process.platform !== 'darwin')(
         expect(JSON.parse(recoveredHealth.stdout).health.instanceId).not.toBe(
           metadata.instanceId,
         )
-        expect(
-          (await runCli(runtime, ['daemon', 'stop', '--format', 'json']))
-            .exitCode,
-        ).toBe(0)
+        const stoppedRecovered = await runCli(runtime, [
+          'daemon',
+          'stop',
+          '--format',
+          'json',
+        ])
+        expect(stoppedRecovered.exitCode, stoppedRecovered.stderr).toBe(0)
       } finally {
         if (daemon) await stopDaemon(daemon, 'SIGKILL')
         await cleanupRuntime(runtime)
@@ -1028,12 +1034,7 @@ describe.skipIf(process.platform !== 'darwin')(
           objectCountRemoved: 0,
         })
 
-        const statefulCommands: readonly (readonly string[])[] = [
-          ['init'],
-          ['account', 'add', 'google', '--app', 'unavailable'],
-          ['account', 'list'],
-          ['oauth-app', 'list'],
-        ]
+        const statefulCommands: readonly (readonly string[])[] = [['init']]
         for (const args of statefulCommands) {
           const result = await runCli(runtime, args)
           expect(result.exitCode, `${args.join(' ')}\n${result.stderr}`).toBe(
@@ -1043,6 +1044,25 @@ describe.skipIf(process.platform !== 'darwin')(
           expect(result.stderr).toContain(
             'unavailable while the local daemon owns the database',
           )
+        }
+
+        const invalidAccount = await runCli(runtime, [
+          'account',
+          'add',
+          'google',
+          '--app',
+          'unavailable',
+        ])
+        expect(invalidAccount.exitCode).toBe(2)
+        expect(invalidAccount.stderr).toContain(
+          'OAuth App "unavailable" is not available',
+        )
+        for (const args of [
+          ['account', 'list'],
+          ['oauth-app', 'list'],
+        ] as const) {
+          const result = await runCli(runtime, args)
+          expect(result.exitCode, `${args.join(' ')}\n${result.stderr}`).toBe(0)
         }
 
         const described = await runCli(runtime, [
