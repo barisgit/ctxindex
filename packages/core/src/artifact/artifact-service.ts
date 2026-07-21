@@ -416,7 +416,7 @@ export class ArtifactService {
 
   private materialization(ref: string): ArtifactMaterialization {
     const current = this.inFlight.get(ref)
-    if (current) return current
+    if (current && !current.controller.signal.aborted) return current
 
     const controller = new AbortController()
     this.activeDownloads += 1
