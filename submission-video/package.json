@@ -1,0 +1,23 @@
+{
+  "name": "ctxindex-submission-video",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio src/index.ts --no-open",
+    "still": "remotion still src/index.ts CtxindexSubmission out/preview.png --frame=960 --scale=0.5",
+    "render": "remotion render src/index.ts CtxindexSubmission out/ctxindex-submission.mp4 --codec=h264 --pixel-format=yuv420p",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "latest",
+    "@remotion/media": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "remotion": "latest"
+  },
+  "devDependencies": {
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "typescript": "latest"
+  }
+}

@@ -22,3 +22,10 @@ docs/release/run-logs/
 # external references (reference-explorer skill)
 .reference/
 reference.local.json
+
+# Turborepo
+.turbo
+
+# Local research artifacts
+research/
+ctxindex-private-live-acceptance-report.md
