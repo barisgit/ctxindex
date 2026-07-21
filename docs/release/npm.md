@@ -19,8 +19,10 @@ published exact version or unchanged unpublished version is a successful no-op.
 An invalid or reversed version, or any registry result other than an exact match
 or 404 fails closed.
 
-CI, build, pack, and the isolated global-install smoke run without OIDC
-permission. The workflow uploads the exact verified tarball and its checksum.
+The cached fast repository gate, integration tests, and CLI/daemon E2E tests
+run in parallel after the version gate. Build, pack, and the isolated
+global-install smoke wait for all three and run without OIDC permission. The
+workflow uploads the exact verified tarball and its checksum.
 Only the `Publish` job uses the protected `npm-production` environment and
 receives `id-token: write`; after approval it downloads and verifies that
 artifact, repeats the exact registry-absence check, and uses npm trusted

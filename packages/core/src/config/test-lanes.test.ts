@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -29,10 +29,6 @@ async function readBunfig(): Promise<Bunfig> {
   return TOML.parse(
     await Bun.file(join(repoRoot, 'bunfig.toml')).text(),
   ) as Bunfig
-}
-
-async function readFullTestSuite(): Promise<string> {
-  return Bun.file(join(repoRoot, 'scripts/verify/full-test-suite.sh')).text()
 }
 
 function asStringArray(value: unknown, label: string): string[] {
@@ -70,18 +66,67 @@ async function runBunTest(cwd: string): Promise<{
   return { exitCode, output: `${stdout}\n${stderr}` }
 }
 
-test('unit lane excludes integration', async () => {
+async function hasTestFile(
+  directory: string,
+  pattern: string,
+): Promise<boolean> {
+  for await (const _ of new Bun.Glob(pattern).scan({
+    cwd: directory,
+    onlyFiles: true,
+  })) {
+    return true
+  }
+  return false
+}
+
+test('unit lane is package-owned and excludes integration', async () => {
   const [rootPackageJson, corePackageJson, bunfig] = await Promise.all([
     readPackageJson(),
     readPackageJson(join(repoRoot, 'packages/core')),
     readBunfig(),
   ])
 
-  expect(script(rootPackageJson, 'test')).toBe('turbo run test')
-  expect(script(corePackageJson, 'test')).toBe('bun test')
+  expect(script(rootPackageJson, 'test')).toBe('turbo run test //#test:tooling')
+  expect(script(corePackageJson, 'test')).toContain('bun test')
+  expect(script(corePackageJson, 'test')).toContain('NODE_ENV=test')
+  expect(script(corePackageJson, 'test')).toContain(
+    'CTXINDEX_KEYTAR_MOCK_FILE=',
+  )
   expect(
     asStringArray(bunfig.test?.pathIgnorePatterns, 'pathIgnorePatterns'),
   ).toEqual(expect.arrayContaining([...unitIgnoreGlobs]))
+})
+
+test('every workspace with tests owns a unit task', async () => {
+  const rootPackageJson = await readPackageJson()
+  const workspaceDirectories = await Promise.all(
+    (
+      rootPackageJson as PackageJson & { workspaces?: string[] }
+    ).workspaces?.map(async (pattern) => {
+      const parent = join(repoRoot, pattern.replace(/\/\*$/, ''))
+      return (await readdir(parent, { withFileTypes: true }))
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => join(parent, entry.name))
+    }) ?? [],
+  )
+
+  for (const directory of workspaceDirectories.flat()) {
+    const packageJson = await readPackageJson(directory)
+    const testScript = script(packageJson, 'test')
+    expect(testScript, directory).toContain('bun test')
+    for (const ignore of unitIgnoreGlobs) {
+      expect(testScript, directory).toContain(ignore)
+    }
+
+    if (await hasTestFile(directory, '**/*.integration.test.ts')) {
+      expect(script(packageJson, 'test:integration'), directory).toContain(
+        'integration.test',
+      )
+    }
+    if (await hasTestFile(directory, '**/*.e2e.test.ts')) {
+      expect(script(packageJson, 'test:e2e'), directory).toContain('e2e.test')
+    }
+  }
 })
 
 test('e2e lane isolated', async () => {
@@ -99,11 +144,35 @@ test('e2e lane isolated', async () => {
   expect(command).not.toContain('integration.test')
 })
 
-test('full suite serializes tests with a hosted-runner timeout', async () => {
-  const command = await readFullTestSuite()
+test('root integration task names every repository-owned integration test', async () => {
+  const rootPackageJson = await readPackageJson()
+  const command = script(rootPackageJson, 'test:integration:tooling')
+  const integrationTests = [
+    ...(await readdir(join(repoRoot, 'scripts/release')))
+      .filter((path) => path.endsWith('.integration.test.ts'))
+      .map((path) => `scripts/release/${path}`),
+    ...(await readdir(join(repoRoot, 'scripts/verify')))
+      .filter((path) => path.endsWith('.integration.test.ts'))
+      .map((path) => `scripts/verify/${path}`),
+  ]
 
-  expect(command).toContain('--max-concurrency=1')
-  expect(command).toContain('--timeout=30000')
+  expect(integrationTests.length).toBeGreaterThan(0)
+  for (const path of integrationTests) {
+    expect(command).toContain(path)
+  }
+})
+
+test('repository CI delegates independent gates to Turbo', async () => {
+  const packageJson = await readPackageJson()
+  const command = script(packageJson, 'ci')
+
+  expect(command).toStartWith('turbo run ')
+  expect(command).toContain('build lint typecheck test')
+  expect(command).toContain('//#test:tooling')
+  expect(command).toContain('//#verify:cli-framework')
+  expect(command).toContain('//#verify:cli-command-drift')
+  expect(command).not.toContain('--max-concurrency=1')
+  expect(command).not.toContain('full-test-suite')
 })
 
 test('path-ignore-patterns honored', async () => {

@@ -6,7 +6,7 @@ Provides repository-level executable tooling: policy verification gates under `s
 
 ## Design/patterns
 
-- Verification scripts are deterministic command-line gates: they scan production source/config, optionally spawn or import runtime targets, print findings, and signal success or failure by exit status. The full-suite wrapper installs a temporary Keychain mock; completed milestone architecture assertions live in normal discovered tests rather than exhausted red contracts. See `scripts/verify/codemap.md`.
+- Verification scripts are deterministic command-line gates: they scan production source/config, optionally spawn or import runtime targets, print findings, and signal success or failure by exit status. Turbo owns orchestration through package tasks and root `//#...` tasks; workspace test scripts install lane-specific file-backed Keychain mocks. Completed milestone architecture assertions live in normal discovered tests rather than exhausted red contracts. See `scripts/verify/codemap.md`.
 - Release scripts build, stage, and inspect a minimal CLI package, smoke the exact archive in isolated global/state directories, and fail closed on invalid, unbumped, reversed, already raced, or indeterminate npm versions. See `scripts/release/codemap.md`.
 
 - `with-timeout.ts` is a process-supervisor wrapper. It runs a command in a detached process group where supported, forwards terminal streams/signals, and applies TERM-then-KILL timeout escalation.
@@ -22,7 +22,7 @@ Provides repository-level executable tooling: policy verification gates under `s
 
 ## Integration points
 
-- Root and `apps/cli/package.json` expose `cli` through `scripts/cli.sh`; the root manifest also exposes `with-timeout` and `ci`.
+- Root and `apps/cli/package.json` expose `cli` through `scripts/cli.sh`; the root manifest also exposes `with-timeout`, the Turbo-native `ci` graph, and root verifier/test tasks.
 - Verification targets include every root-declared `apps/*`, `packages/*`, and `examples/*` workspace, their manifests, CLI/core/Adapter architecture surfaces, and selected script sources.
 - Detailed map: `scripts/verify/codemap.md`.
 - Package and release tooling map: `scripts/release/codemap.md`.

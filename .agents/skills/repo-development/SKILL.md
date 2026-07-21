@@ -171,6 +171,8 @@ Expand only as the affected surface requires. Before completion, run the reposit
 
 ```sh
 bun run ci
+bun run test:integration
+bun run test:e2e
 bunx openspec validate --all --strict
 ```
 

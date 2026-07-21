@@ -39,9 +39,9 @@
     "build": "tsgo --noEmit -p tsconfig.json",
     "lint": "biome check .",
     "typecheck": "tsgo --noEmit -p tsconfig.json",
-    "test": "bun test",
-    "test:integration": "bun test --path-ignore-patterns '__none__' --pass-with-no-tests integration.test",
-    "test:e2e": "bun run ../../scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' --pass-with-no-tests e2e.test",
+    "test": "NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-unit.json bun test --path-ignore-patterns '**/*.integration.test.ts' --path-ignore-patterns '**/*.e2e.test.ts'",
+    "test:integration": "NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-integration.json bun test --path-ignore-patterns '__none__' --pass-with-no-tests integration.test",
+    "test:e2e": "NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-e2e.json bun run ../../scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' --pass-with-no-tests e2e.test",
     "format": "biome format --write .",
     "clean": "rm -rf .turbo dist coverage",
     "fullclean": "rm -rf .turbo dist coverage node_modules"
