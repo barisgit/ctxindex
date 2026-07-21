@@ -439,10 +439,13 @@ async function productionServices(input: {
           readEnvironment: (name) =>
             name === 'CTXINDEX_NO_BROWSER'
               ? '1'
-              : name === 'CTXINDEX_LOOPBACK_TIMEOUT_SECS' &&
-                  accountInput.loopbackTimeoutSeconds !== undefined
-                ? String(accountInput.loopbackTimeoutSeconds)
-                : readEnvironmentVariable(name),
+              : name === 'CTXINDEX_OAUTH_MOCK_BASE_URL' &&
+                  accountInput.oauthMockBaseUrl !== undefined
+                ? accountInput.oauthMockBaseUrl
+                : name === 'CTXINDEX_LOOPBACK_TIMEOUT_SECS' &&
+                    accountInput.loopbackTimeoutSeconds !== undefined
+                  ? String(accountInput.loopbackTimeoutSeconds)
+                  : readEnvironmentVariable(name),
         },
       )
       return { accountId: result.accountId }

@@ -197,16 +197,26 @@ test('Account add uses the ensured daemon and preserves authorization URL presen
         }),
         daemonAccountAdd: async (_selection, input, interaction) => {
           events.push(`add:${input.provider}:${input.app}:${input.label}`)
-          interaction.emitAuthorizationUrl('https://accounts.example/authorize')
+          await interaction.emitAuthorizationUrl(
+            'https://accounts.example/authorize',
+          )
           return { accountId: 'account-id' }
         },
+        launchOAuthBrowser: async (url) => {
+          events.push(`browser:${url}`)
+        },
+        readEnvironmentVariable: () => undefined,
         openDeps: async () => {
           throw new Error('direct dependencies opened')
         },
       }),
     )
     expect(exit).toBe(0)
-    expect(events).toEqual(['initialized', 'add:google:desktop:personal'])
+    expect(events).toEqual([
+      'initialized',
+      'add:google:desktop:personal',
+      'browser:https://accounts.example/authorize',
+    ])
     expect(output.mock.calls.map((call) => call[0])).toEqual([
       'Open this URL: https://accounts.example/authorize',
       'account added: account-id',

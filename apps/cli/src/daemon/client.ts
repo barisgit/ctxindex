@@ -548,7 +548,7 @@ export async function daemonRealmList(
 }
 
 export interface DaemonAccountInteraction {
-  readonly emitAuthorizationUrl: (url: string) => void
+  readonly emitAuthorizationUrl: (url: string) => void | Promise<void>
   readonly readAuthorizationResponse: (input: {
     readonly signal: AbortSignal
   }) => Promise<string | undefined>
@@ -596,7 +596,7 @@ export async function daemonAccountAdd(
       completed = true
       return event.value
     }
-    interaction.emitAuthorizationUrl(event.value.authorizationUrl)
+    await interaction.emitAuthorizationUrl(event.value.authorizationUrl)
     const requestId = event.value.requestId
     const prompt = linkedAbortController(signal)
     try {

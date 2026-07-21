@@ -431,6 +431,7 @@ export const rpcAccountAddInputSchema = z.strictObject({
   app: identifierSchema.optional(),
   label: identifierSchema.optional(),
   loopbackTimeoutSeconds: z.number().finite().min(0).max(3_600).optional(),
+  oauthMockBaseUrl: terminalSafeString(2_048).optional(),
 })
 export type RpcAccountAddInput = Readonly<
   z.infer<typeof rpcAccountAddInputSchema>

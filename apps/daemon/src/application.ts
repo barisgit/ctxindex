@@ -327,7 +327,10 @@ function failure(error: unknown): RpcFailure {
       kind: 'ctxindex',
       taxonomy: 'auth',
       code: error.code,
-      message: `OAuth authorization failed: ${error.code}`,
+      message:
+        error.code === 'loopback_timeout'
+          ? 'OAuth authorization failed: loopback_timeout (callback timed out)'
+          : `OAuth authorization failed: ${error.code}`,
     }
   }
   if (error instanceof CtxindexSyncError) {
@@ -400,7 +403,11 @@ async function resolveSourceGrant(
       'Adapter authentication is not supported by this command',
     )
   }
-  const providerId = providerIdForAuth(adapter)
+  const authorization = {
+    provider,
+    access: adapter.access ?? { scopes: [] },
+  }
+  const providerId = providerIdForAuth(authorization)
   const providerGrants = await authService.listGrants(providerId ?? undefined)
   let grants = providerGrants
   if (account) {
@@ -418,7 +425,9 @@ async function resolveSourceGrant(
           ? byAccountId
           : byGrantId
   }
-  const matches = grants.filter((grant) => isGrantCompatible(adapter, grant))
+  const matches = grants.filter((grant) =>
+    isGrantCompatible(authorization, grant),
+  )
   if (matches.length === 0) {
     throw new CtxindexValidationError(
       'invalid_filter',

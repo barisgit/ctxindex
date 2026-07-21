@@ -1,4 +1,8 @@
-import { authorizeProvider, resolveOAuthSelection } from '@ctxindex/core/auth'
+import {
+  authorizeProvider,
+  launchOAuthBrowser,
+  resolveOAuthSelection,
+} from '@ctxindex/core/auth'
 import { readEnvironmentVariable } from '@ctxindex/core/config'
 import { CtxindexValidationError } from '@ctxindex/core/errors'
 import {
@@ -41,6 +45,8 @@ export interface AccountCommandRuntime {
   readonly daemonAccountAdd?: typeof daemonAccountAdd
   readonly daemonAccountList?: typeof daemonAccountList
   readonly daemonAccountRemove?: typeof daemonAccountRemove
+  readonly launchOAuthBrowser: typeof launchOAuthBrowser
+  readonly readEnvironmentVariable: typeof readEnvironmentVariable
 }
 
 export type AccountCommandInput =
@@ -64,6 +70,8 @@ const accountCommandRuntime: AccountCommandRuntime = {
   daemonAccountAdd,
   daemonAccountList,
   daemonAccountRemove,
+  launchOAuthBrowser,
+  readEnvironmentVariable,
 }
 
 function availableOAuthAppLabels(
@@ -171,7 +179,12 @@ export async function handleAccountCommand(
         console.log(formatAccountRemoved(parsed.label))
       } else {
         const timeout = Number(
-          readEnvironmentVariable('CTXINDEX_LOOPBACK_TIMEOUT_SECS'),
+          runtime.readEnvironmentVariable('CTXINDEX_LOOPBACK_TIMEOUT_SECS'),
+        )
+        const noBrowser =
+          runtime.readEnvironmentVariable('CTXINDEX_NO_BROWSER') === '1'
+        const oauthMockBaseUrl = runtime.readEnvironmentVariable(
+          'CTXINDEX_OAUTH_MOCK_BASE_URL',
         )
         const result = await (runtime.daemonAccountAdd ?? daemonAccountAdd)(
           daemon,
@@ -182,10 +195,19 @@ export async function handleAccountCommand(
             ...(Number.isFinite(timeout) && timeout >= 0 && timeout <= 3_600
               ? { loopbackTimeoutSeconds: timeout }
               : {}),
+            ...(oauthMockBaseUrl ? { oauthMockBaseUrl } : {}),
           },
           {
-            emitAuthorizationUrl: (url) => console.log(`Open this URL: ${url}`),
-            readAuthorizationResponse: readHiddenOAuthResponse,
+            emitAuthorizationUrl: async (url) => {
+              console.log(`Open this URL: ${url}`)
+              if (!noBrowser) {
+                try {
+                  await runtime.launchOAuthBrowser(url)
+                } catch {}
+              }
+            },
+            readAuthorizationResponse: (input) =>
+              readHiddenOAuthResponse({ ...input, onCancel: cancel }),
           },
           controller.signal,
         )
@@ -262,7 +284,8 @@ export async function handleAccountCommand(
             return app
           },
           emitAuthorizationUrl: (url) => console.log(`Open this URL: ${url}`),
-          readAuthorizationResponse: readHiddenOAuthResponse,
+          readAuthorizationResponse: (input) =>
+            readHiddenOAuthResponse({ ...input, onCancel: cancel }),
         },
       )
       console.log(formatAccountAdded(result))

@@ -294,7 +294,9 @@ test('daemon Account add sends hidden input separately and races automatic loopb
         selection,
         { provider: 'google', app: 'desktop' },
         {
-          emitAuthorizationUrl: (url) => urls.push(url),
+          emitAuthorizationUrl: (url) => {
+            urls.push(url)
+          },
           readAuthorizationResponse: async () => secret,
         },
         undefined,
@@ -393,6 +395,60 @@ test('daemon Account add never replays after a declared admission rejection', as
     ).rejects.toMatchObject({ code: 'daemon_unavailable' })
     expect(calls).toBe(1)
     expect(reconnects).toBe(0)
+  } finally {
+    await setup.close()
+  }
+})
+
+test('daemon Account add maps prompt cancellation before transport teardown', async () => {
+  const setup = await fixture()
+  const controller = new AbortController()
+  const selection = selectDaemonForRuntime(setup.runtime, {
+    testEndpoint: '/tmp/ctxd-account-cancel.sock',
+  }) as DaemonSelection
+  let index = 0
+  const iterator = {
+    [Symbol.asyncIterator]() {
+      return this
+    },
+    async next() {
+      if (index++ === 0)
+        return {
+          done: false as const,
+          value: {
+            type: 'authorization.required' as const,
+            requestId: 'request-id',
+            authorizationUrl: 'https://accounts.example/authorize',
+          },
+        }
+      return new Promise<never>((_resolve, reject) => {
+        controller.signal.addEventListener(
+          'abort',
+          () => reject(new Error('transport closed')),
+          { once: true },
+        )
+      })
+    },
+  } as AsyncIteratorObject<RpcAccountAddEvent, RpcAccountAddResult, void>
+  try {
+    await expect(
+      daemonAccountAdd(
+        selection,
+        { provider: 'google' },
+        {
+          emitAuthorizationUrl() {},
+          readAuthorizationResponse: async () => {
+            controller.abort()
+            return undefined
+          },
+        },
+        controller.signal,
+        {
+          createClient: () =>
+            accountClient({ iterator, respond: async () => {} }),
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'cancelled' })
   } finally {
     await setup.close()
   }

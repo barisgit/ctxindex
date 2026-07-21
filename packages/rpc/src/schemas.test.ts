@@ -243,12 +243,14 @@ describe('Account and OAuth App wire values', () => {
         app: 'desktop',
         label: 'personal',
         loopbackTimeoutSeconds: 0.5,
+        oauthMockBaseUrl: 'http://127.0.0.1:43123',
       }),
     ).toEqual({
       provider: 'google',
       app: 'desktop',
       label: 'personal',
       loopbackTimeoutSeconds: 0.5,
+      oauthMockBaseUrl: 'http://127.0.0.1:43123',
     })
     expect(
       rpcAccountAddEventSchema.parse({

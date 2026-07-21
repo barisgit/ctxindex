@@ -13,6 +13,7 @@ import {
   type CtxindexValidationErrorCode,
 } from '@ctxindex/core/errors'
 import { CtxindexSecretsError } from '@ctxindex/core/secrets'
+import { gmailAdapterDefinition } from '@ctxindex/official'
 import {
   createDaemonRouter,
   type RpcRequestContext,
@@ -1292,7 +1293,10 @@ test('resource failures preserve every auth and sync taxonomy code through RPC',
       kind: 'ctxindex',
       taxonomy: 'auth',
       code,
-      message: `OAuth authorization failed: ${code}`,
+      message:
+        code === 'loopback_timeout'
+          ? 'OAuth authorization failed: loopback_timeout (callback timed out)'
+          : `OAuth authorization failed: ${code}`,
     })
   }
 
@@ -1883,6 +1887,50 @@ test('Source add checks cancellation after asynchronous Grant resolution', async
     error: { code: 'cancelled' },
   })
   expect(adds).toBe(0)
+})
+
+test('Source add matches a real Adapter definition to its compatible Account Grant', async () => {
+  let grantId: string | undefined
+  const app = application({
+    registry: {
+      adapters: {
+        get: ({ id }: { id: string }) =>
+          id === gmailAdapterDefinition.id ? gmailAdapterDefinition : undefined,
+        list: () => [gmailAdapterDefinition],
+      },
+    } as never,
+    authService: {
+      listGrants: async () => [
+        {
+          id: 'grant-1',
+          provider: 'google',
+          scopes: gmailAdapterDefinition.access.scopes,
+          accountLabel: 'personal',
+          accountId: 'account-1',
+        } as never,
+      ],
+    },
+    sourceService: {
+      resolveSourceId: (value: string) => value,
+      getStatus: () => [],
+      addSource: (input: { readonly grantId?: string }) => {
+        grantId = input.grantId
+        return { sourceId: 'source-1', realmId: 'personal' }
+      },
+    },
+  })
+  app.markReady()
+  await expect(
+    app.source.add(
+      {
+        adapterId: gmailAdapterDefinition.id,
+        realmSlug: 'personal',
+        account: 'personal',
+      },
+      context('source-add-real-adapter'),
+    ),
+  ).resolves.toMatchObject({ ok: true })
+  expect(grantId).toBe('grant-1')
 })
 
 test('Action describe and run resolve one Source and preserve cancellation and output', async () => {
