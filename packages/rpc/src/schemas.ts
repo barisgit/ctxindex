@@ -47,6 +47,7 @@ const optionalPublicStringSchema = boundedString(2_048, 0)
 const sourceConfigJsonSchema = boundedString(65_536, 0)
 const versionStringSchema = boundedString(64)
 const countSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER)
+export const RPC_BYTE_TRANSFER_MAX_BYTES = 64 * 1_024 * 1_024
 const signedTimestampMsSchema = z.number().int().safe()
 const boundedCountSchema = z.number().int().min(0).max(1_000_000)
 const timeoutMsSchema = z.number().int().min(0).max(60_000)
@@ -1257,6 +1258,35 @@ export const rpcResourceWarningSchema = z
     ref: refSchema,
   })
   .readonly()
+
+export const rpcByteTransferDescriptorSchema = z
+  .strictObject({
+    ticket: z.string().regex(/^[a-f0-9]{64}$/),
+    byteSize: z.number().int().min(0).max(RPC_BYTE_TRANSFER_MAX_BYTES),
+    expiresAt: countSchema,
+  })
+  .readonly()
+export type RpcByteTransferDescriptor = z.infer<
+  typeof rpcByteTransferDescriptorSchema
+>
+
+export const rpcExportInputSchema = z.strictObject({
+  ref: refSchema,
+  format: identifierSchema,
+})
+export type RpcExportInput = Readonly<z.infer<typeof rpcExportInputSchema>>
+
+export const rpcExportResultSchema = z
+  .strictObject({
+    transfer: rpcByteTransferDescriptorSchema,
+    mediaType: terminalSafeString(255),
+    format: identifierSchema,
+    ref: refSchema,
+    warnings: z.array(rpcResourceWarningSchema).max(256).readonly(),
+  })
+  .readonly()
+export type RpcExportResult = z.infer<typeof rpcExportResultSchema>
+
 export const rpcResourceGetResultSchema = z
   .strictObject({
     resource: rpcStoredResourceSchema,

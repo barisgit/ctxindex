@@ -6,12 +6,15 @@ import {
   rpcActionDescribeResultSchema,
   rpcActionRunInputSchema,
   rpcActionRunResultSchema,
+  rpcByteTransferDescriptorSchema,
   rpcDocumentationGetInputSchema,
   rpcDocumentationGetResultSchema,
   rpcDocumentationListInputSchema,
   rpcDocumentationListResultSchema,
   rpcDocumentationSearchInputSchema,
   rpcDocumentationSearchResultSchema,
+  rpcExportInputSchema,
+  rpcExportResultSchema,
   rpcFailureSchema,
   rpcHealthResultSchema,
   rpcJsonCursorSchema,
@@ -978,6 +981,44 @@ describe('search, Resource, and thread contracts', () => {
       rpcResourceGetResultSchema.parse({
         resource: { ...resource, payload: { valid: true }, secret: 'leak' },
         warnings: [],
+      }),
+    ).toThrow()
+  })
+
+  test('keeps export bytes out of unary RPC and bounds an opaque transfer ticket', () => {
+    const transfer = {
+      ticket: 'a'.repeat(64),
+      byteSize: 3,
+      expiresAt: 1_000,
+    }
+    expect(rpcExportInputSchema.parse({ ref, format: 'eml' })).toEqual({
+      ref,
+      format: 'eml',
+    })
+    expect(rpcByteTransferDescriptorSchema.parse(transfer)).toEqual(transfer)
+    expect(
+      rpcExportResultSchema.parse({
+        transfer,
+        mediaType: 'message/rfc822',
+        format: 'eml',
+        ref,
+        warnings: [],
+      }),
+    ).not.toHaveProperty('bytes')
+    expect(() =>
+      rpcByteTransferDescriptorSchema.parse({
+        ...transfer,
+        ticket: '../secret',
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcExportResultSchema.parse({
+        transfer,
+        mediaType: 'message/rfc822',
+        format: 'eml',
+        ref,
+        warnings: [],
+        bytes: [1, 2, 3],
       }),
     ).toThrow()
   })
