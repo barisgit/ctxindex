@@ -9,6 +9,16 @@ import {
 import type { CompleteRegistry } from '@ctxindex/core/registry'
 import { CTXINDEX_MANAGED_OAUTH_APP_POLICIES } from '@ctxindex/official'
 import { assertInitialized } from '../commands/db'
+import {
+  daemonAccountAdd,
+  daemonAccountList,
+  daemonAccountRemove,
+  selectDaemon,
+} from '../daemon/client'
+import {
+  ensureDaemonSelection,
+  selectEnsuredDaemonRoute,
+} from '../daemon/ensure'
 import { loadAuthDefinitionDeps, openAccountDeps, openDeps } from '../deps'
 import {
   formatAccountAdded,
@@ -25,6 +35,11 @@ export interface AccountCommandRuntime {
   readonly openAccountDeps: typeof openAccountDeps
   readonly openDeps: typeof openDeps
   readonly authorizeProvider: typeof authorizeProvider
+  readonly selectDaemon?: typeof selectDaemon
+  readonly ensureDaemonSelection?: typeof ensureDaemonSelection
+  readonly daemonAccountAdd?: typeof daemonAccountAdd
+  readonly daemonAccountList?: typeof daemonAccountList
+  readonly daemonAccountRemove?: typeof daemonAccountRemove
 }
 
 export type AccountCommandInput =
@@ -43,6 +58,11 @@ const accountCommandRuntime: AccountCommandRuntime = {
   openAccountDeps,
   openDeps,
   authorizeProvider,
+  selectDaemon,
+  ensureDaemonSelection,
+  daemonAccountAdd,
+  daemonAccountList,
+  daemonAccountRemove,
 }
 
 function availableOAuthAppLabels(
@@ -108,7 +128,64 @@ export async function handleAccountCommand(
     | Awaited<ReturnType<typeof openAccountDeps>>
     | undefined
   let managedProviderId: string | undefined
+  const controller = new AbortController()
+  const cancel = () => controller.abort()
+  process.once('SIGINT', cancel)
   try {
+    if (parsed.kind === 'add') {
+      try {
+        await runtime.assertInitialized()
+      } catch (initializationError) {
+        const definitions = await runtime.loadAuthDefinitionDeps()
+        resolveOAuthSelection(definitions.completeRegistry, parsed.provider)
+        throw initializationError
+      }
+    } else {
+      await runtime.assertInitialized()
+    }
+    const daemon = runtime.selectDaemon
+      ? await selectEnsuredDaemonRoute(
+          {
+            selectDaemon: runtime.selectDaemon,
+            ...(runtime.ensureDaemonSelection
+              ? { ensureDaemonSelection: runtime.ensureDaemonSelection }
+              : {}),
+          },
+          controller.signal,
+        )
+      : null
+    if (daemon) {
+      if (parsed.kind === 'list') {
+        const result = await (runtime.daemonAccountList ?? daemonAccountList)(
+          daemon,
+          controller.signal,
+        )
+        console.log(formatAccountInventory(result.rows, parsed.format))
+      } else if (parsed.kind === 'remove') {
+        await (runtime.daemonAccountRemove ?? daemonAccountRemove)(
+          daemon,
+          parsed.label,
+          controller.signal,
+        )
+        console.log(formatAccountRemoved(parsed.label))
+      } else {
+        const result = await (runtime.daemonAccountAdd ?? daemonAccountAdd)(
+          daemon,
+          {
+            provider: parsed.provider,
+            ...(parsed.app === undefined ? {} : { app: parsed.app }),
+            ...(parsed.label === undefined ? {} : { label: parsed.label }),
+          },
+          {
+            emitAuthorizationUrl: (url) => console.log(`Open this URL: ${url}`),
+            readAuthorizationResponse: readHiddenOAuthResponse,
+          },
+          controller.signal,
+        )
+        console.log(formatAccountAdded(result))
+      }
+      return 0
+    }
     if (parsed.kind === 'list') {
       deps = await runtime.openAccountDeps()
       console.log(
@@ -122,13 +199,6 @@ export async function handleAccountCommand(
       await deps.authService.removeAccount(parsed.label)
       console.log(formatAccountRemoved(parsed.label))
     } else {
-      try {
-        await runtime.assertInitialized()
-      } catch (initializationError) {
-        const definitions = await runtime.loadAuthDefinitionDeps()
-        resolveOAuthSelection(definitions.completeRegistry, parsed.provider)
-        throw initializationError
-      }
       const opened = await runtime.openDeps()
       deps = opened
       resolveOAuthSelection(opened.completeRegistry, parsed.provider)
@@ -195,6 +265,7 @@ export async function handleAccountCommand(
     console.error(formatAccountCommandError(error, managedProviderId))
     return mapErrorToExit(error)
   } finally {
+    process.removeListener('SIGINT', cancel)
     await deps?.close()
   }
 }

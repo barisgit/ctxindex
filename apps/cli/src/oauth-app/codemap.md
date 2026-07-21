@@ -7,12 +7,12 @@ Orchestrates local OAuth App add/list/remove commands without exposing configura
 ## Design / patterns
 
 - `commands/oauth-app.ts` declares the exact typed add/list/remove grammar and passes an `OAuthAppCommandInput` union to `handle-oauth-app-command.ts`, the workflow boundary.
-- Add acquires one retained direct database owner before Extension imports, reads local OAuth App identities and loads one complete-registry snapshot under that owner, then reads only Provider-declared `registration.environment` names when `--from-env` is selected. It validates the resulting config before opening mutable dependencies and reuses the exact snapshot and owner for collision checking and secret-backed persistence.
+- On supported hosts, add obtains the Provider-declared `registration.environment` map from the ensured daemon, reads only those names from the current CLI invocation, and sends the bounded record through the owner-private RPC without argv, logs, output, or persistent intermediaries. The daemon validates exact fields and persists it through the secret backend. Unsupported hosts retain the direct retained-owner path.
 - Inventory uses the safe OAuth App service projection through shared pretty/text/json rendering; removal remains keyed by exact `(provider, label)` identity.
 
 ## Data & control flow
 
-The shared command model validates required provider/label positionals and `--from-env` before effects, then the descriptor passes typed values to the handler. Add retains shared ownership across definition loading, initialization validation, dependency composition, collision rejection, and `OAuthAppService` persistence; all failure paths release it. List and remove acquire ownership inside ordinary dependency composition before definitions load, operate on local/Extension App inventory, and render through `format/oauth-app.ts`.
+The shared command model validates required provider/label positionals and `--from-env` before effects, then the descriptor passes typed values to the handler. Initialized add/list/remove ensure the daemon and invoke semantic OAuth App procedures; direct fallback retains shared ownership across definition loading and persistence. Inventory remains a safe projection rendered through `format/oauth-app.ts`.
 
 ## Integration points
 

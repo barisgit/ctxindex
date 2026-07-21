@@ -13,6 +13,10 @@ import {
 } from '@ctxindex/local-daemon'
 import {
   type DaemonClient,
+  type RpcAccountAddInput,
+  type RpcAccountAddResult,
+  type RpcAccountListResult,
+  type RpcAccountRemoveResult,
   type RpcActionDescribeInput,
   type RpcActionDescribeResult,
   type RpcActionRunResult,
@@ -27,6 +31,11 @@ import {
   type RpcExportResult,
   type RpcFailure,
   type RpcHealthResult,
+  type RpcOAuthAppAddInput,
+  type RpcOAuthAppAddResult,
+  type RpcOAuthAppListResult,
+  type RpcOAuthAppRegistrationResult,
+  type RpcOAuthAppRemoveResult,
   type RpcRealmAddInput,
   type RpcRealmAddResult,
   type RpcRealmListResult,
@@ -511,6 +520,182 @@ export async function daemonRealmList(
   return invoke(
     signal,
     (client) => client.realm.list({}, requestOptions(signal)),
+    selection,
+  )
+}
+
+export interface DaemonAccountInteraction {
+  readonly emitAuthorizationUrl: (url: string) => void
+  readonly readAuthorizationResponse: (input: {
+    readonly signal: AbortSignal
+  }) => Promise<string | undefined>
+}
+
+export interface DaemonAccountClientServices {
+  readonly createClient: (selection: DaemonSelection) => DaemonClient
+}
+
+const defaultDaemonAccountClientServices: DaemonAccountClientServices = {
+  createClient,
+}
+
+function linkedAbortController(signal?: AbortSignal): {
+  readonly controller: AbortController
+  readonly close: () => void
+} {
+  const controller = new AbortController()
+  const abort = () => controller.abort(signal?.reason)
+  if (signal?.aborted) abort()
+  else signal?.addEventListener('abort', abort, { once: true })
+  return {
+    controller,
+    close: () => signal?.removeEventListener('abort', abort),
+  }
+}
+
+export async function daemonAccountAdd(
+  selection: DaemonSelection,
+  input: RpcAccountAddInput,
+  interaction: DaemonAccountInteraction,
+  signal?: AbortSignal,
+  services: DaemonAccountClientServices = defaultDaemonAccountClientServices,
+): Promise<RpcAccountAddResult> {
+  const iterator = await invoke(
+    signal,
+    () =>
+      services
+        .createClient(selection)
+        .account.add(input, requestOptions(signal)),
+    selection,
+  )
+  let completed = false
+  try {
+    const event = await iterator.next()
+    if (event.done) {
+      completed = true
+      return event.value
+    }
+    interaction.emitAuthorizationUrl(event.value.authorizationUrl)
+    const requestId = event.value.requestId
+    const prompt = linkedAbortController(signal)
+    try {
+      const terminal = iterator.next()
+      const response = interaction
+        .readAuthorizationResponse({ signal: prompt.controller.signal })
+        .then((value) => ({ kind: 'response' as const, value }))
+      const winner = await Promise.race([
+        terminal.then((value) => ({ kind: 'terminal' as const, value })),
+        response,
+      ])
+      if (winner.kind === 'terminal') {
+        prompt.controller.abort()
+        if (!winner.value.done)
+          throw new TypeError('Unexpected repeated authorization request')
+        completed = true
+        return winner.value.value
+      }
+      if (winner.value !== undefined) {
+        const responseValue = winner.value
+        await invoke(
+          signal,
+          () =>
+            services
+              .createClient(selection)
+              .account.respond(
+                { requestId, response: responseValue },
+                requestOptions(signal),
+              ),
+          selection,
+        )
+      }
+      const result = await terminal
+      if (!result.done)
+        throw new TypeError('Unexpected repeated authorization request')
+      completed = true
+      return result.value
+    } finally {
+      prompt.close()
+    }
+  } catch (error) {
+    throw invocationError(error, signal, selection)
+  } finally {
+    if (!completed) {
+      try {
+        await iterator.return?.()
+      } catch {}
+    }
+  }
+}
+
+export async function daemonAccountList(
+  selection: DaemonSelection,
+  signal?: AbortSignal,
+): Promise<RpcAccountListResult> {
+  return invoke(
+    signal,
+    (client) => client.account.list({}, requestOptions(signal)),
+    selection,
+  )
+}
+
+export async function daemonAccountRemove(
+  selection: DaemonSelection,
+  label: string,
+  signal?: AbortSignal,
+): Promise<RpcAccountRemoveResult> {
+  return invoke(
+    signal,
+    (client) => client.account.remove({ label }, requestOptions(signal)),
+    selection,
+  )
+}
+
+export async function daemonOAuthAppRegistration(
+  selection: DaemonSelection,
+  provider: string,
+  signal?: AbortSignal,
+): Promise<RpcOAuthAppRegistrationResult> {
+  return invoke(
+    signal,
+    (client) =>
+      client.oauthApp.registration({ provider }, requestOptions(signal)),
+    selection,
+  )
+}
+
+export async function daemonOAuthAppAdd(
+  selection: DaemonSelection,
+  input: RpcOAuthAppAddInput,
+  signal?: AbortSignal,
+): Promise<RpcOAuthAppAddResult> {
+  return invoke(
+    signal,
+    (client) => client.oauthApp.add(input, requestOptions(signal)),
+    selection,
+  )
+}
+
+export async function daemonOAuthAppList(
+  selection: DaemonSelection,
+  signal?: AbortSignal,
+): Promise<RpcOAuthAppListResult> {
+  return invoke(
+    signal,
+    (client) => client.oauthApp.list({}, requestOptions(signal)),
+    selection,
+  )
+}
+
+export async function daemonOAuthAppRemove(
+  selection: DaemonSelection,
+  provider: string,
+  label: string,
+  signal?: AbortSignal,
+): Promise<RpcOAuthAppRemoveResult> {
+  return invoke(
+    signal,
+    (client) =>
+      client.oauthApp.remove({ provider, label }, requestOptions(signal)),
     selection,
   )
 }

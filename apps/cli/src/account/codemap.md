@@ -13,8 +13,8 @@ Orchestrates CLI authorization and lifecycle operations for globally labeled Acc
 
 ## Data & control flow
 
-The shared command model validates `account add|list|remove` before effects, and `commands/account.ts` converts inferred Citty values into `AccountCommandInput`. On initialized state, add opens the complete registry and local App inventory through `openDeps()`, retains that ownership through `authorizeProvider()`, and resolves the selected value with `OAuthAppService.resolveApp()`. Omitted selection first calls the pure managed-policy resolver over the complete registry and bundled release policy; explicit selection bypasses it. Managed failure adds deterministic local BYOA commands without starting a second flow. The definition-only fresh-state check preserves unknown-Provider-before-init ordering without opening SQLite. List/remove call Account/Auth services and render through `format/account.ts`.
+The shared command model validates `account add|list|remove` before effects, and `commands/account.ts` converts inferred Citty values into `AccountCommandInput`. Initialized commands ensure the daemon and use typed Account procedures. Add consumes one authorization event, presents its URL, races automatic loopback completion against hidden pasted input, and sends a manual response through the dedicated response procedure without echoing it. Unsupported platforms retain the prior direct service path. The definition-only fresh-state check preserves unknown-Provider-before-init ordering without opening SQLite.
 
 ## Integration points
 
-Called by `commands/account.ts`; uses `definitions.ts`, `deps.ts`, `format/account.ts`, `@ctxindex/core/auth`, and `@ctxindex/core/oauth-app`. Shared parsing, validation, and generated help come from `command-model.ts` and the command descriptor.
+Called by `commands/account.ts`; uses `daemon/client.ts`, `daemon/ensure.ts`, `definitions.ts`, `deps.ts`, and `format/account.ts`. Shared parsing, validation, and generated help come from `command-model.ts` and the command descriptor.

@@ -11,6 +11,11 @@ import {
   type RpcRequestContext,
   type RpcResult,
   type RpcTransportContext,
+  rpcAccountAddEventSchema,
+  rpcAccountAddResultSchema,
+  rpcAccountListResultSchema,
+  rpcAccountRemoveResultSchema,
+  rpcAccountRespondResultSchema,
   rpcActionDescribeResultSchema,
   rpcActionRunResultSchema,
   rpcDocumentationGetResultSchema,
@@ -20,6 +25,10 @@ import {
   type rpcFailureRegistry,
   rpcFailureSchema,
   rpcHealthResultSchema,
+  rpcOAuthAppAddResultSchema,
+  rpcOAuthAppListResultSchema,
+  rpcOAuthAppRegistrationResultSchema,
+  rpcOAuthAppRemoveResultSchema,
   rpcProtocolIdentitySchema,
   rpcRealmAddResultSchema,
   rpcRealmListResultSchema,
@@ -379,6 +388,115 @@ export function createDaemonRouter(
             ),
           ),
       },
+    },
+    account: {
+      add: os.account.add
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeStreamApplication(
+            () =>
+              application.account.add(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcAccountAddEventSchema,
+            rpcAccountAddResultSchema,
+            errors,
+          ),
+        ),
+      respond: os.account.respond
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.account.respond(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcAccountRespondResultSchema,
+            errors,
+          ),
+        ),
+      list: os.account.list
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.account.list(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcAccountListResultSchema,
+            errors,
+          ),
+        ),
+      remove: os.account.remove
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.account.remove(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcAccountRemoveResultSchema,
+            errors,
+          ),
+        ),
+    },
+    oauthApp: {
+      registration: os.oauthApp.registration
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.oauthApp.registration(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcOAuthAppRegistrationResultSchema,
+            errors,
+          ),
+        ),
+      add: os.oauthApp.add
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.oauthApp.add(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcOAuthAppAddResultSchema,
+            errors,
+          ),
+        ),
+      list: os.oauthApp.list
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.oauthApp.list(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcOAuthAppListResultSchema,
+            errors,
+          ),
+        ),
+      remove: os.oauthApp.remove
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.oauthApp.remove(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcOAuthAppRemoveResultSchema,
+            errors,
+          ),
+        ),
     },
     documentation: {
       list: os.documentation.list

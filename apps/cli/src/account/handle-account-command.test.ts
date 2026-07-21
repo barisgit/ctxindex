@@ -174,6 +174,48 @@ test('authorization failure after implicit App resolution does not add BYOA guid
   ).toBe('Provider denied the requested scopes')
 })
 
+test('Account add uses the ensured daemon and preserves authorization URL presentation', async () => {
+  const output = spyOn(console, 'log').mockImplementation(() => {})
+  const events: string[] = []
+  try {
+    const exit = await handleAccountCommand(
+      {
+        kind: 'add',
+        provider: 'google',
+        app: 'desktop',
+        label: 'personal',
+      },
+      commandRuntime({
+        assertInitialized: async () => {
+          events.push('initialized')
+        },
+        selectDaemon: () => ({ selectedBy: 'test_override' }) as never,
+        ensureDaemonSelection: async () => ({
+          status: 'selected',
+          selection: { selectedBy: 'test_override' } as never,
+          started: true,
+        }),
+        daemonAccountAdd: async (_selection, input, interaction) => {
+          events.push(`add:${input.provider}:${input.app}:${input.label}`)
+          interaction.emitAuthorizationUrl('https://accounts.example/authorize')
+          return { accountId: 'account-id' }
+        },
+        openDeps: async () => {
+          throw new Error('direct dependencies opened')
+        },
+      }),
+    )
+    expect(exit).toBe(0)
+    expect(events).toEqual(['initialized', 'add:google:desktop:personal'])
+    expect(output.mock.calls.map((call) => call[0])).toEqual([
+      'Open this URL: https://accounts.example/authorize',
+      'account added: account-id',
+    ])
+  } finally {
+    output.mockRestore()
+  }
+})
+
 test('implicit command keeps one fallback for exact App resolution failure', async () => {
   const error = spyOn(console, 'error').mockImplementation(() => {})
   let authorizations = 0

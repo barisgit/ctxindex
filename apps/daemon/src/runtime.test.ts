@@ -24,7 +24,24 @@ import {
   isDaemonStartupFailure,
   type StartDaemonOptions,
   startDaemon,
+  validateDaemonOAuthAppConfig,
 } from './runtime'
+
+test('daemon OAuth App config rejects unknown fields without exposing values', () => {
+  const secret = 'private-secret-canary'
+  const attempt = () =>
+    validateDaemonOAuthAppConfig(googleOAuthProvider, {
+      clientId: 'public-id',
+      clientSecret: secret,
+      unexpected: secret,
+    })
+  expect(attempt).toThrow('OAuth App configuration contains an unknown field')
+  try {
+    attempt()
+  } catch (error) {
+    expect(String(error)).not.toContain(secret)
+  }
+})
 
 const emptyDocumentation = {
   list: () => [],

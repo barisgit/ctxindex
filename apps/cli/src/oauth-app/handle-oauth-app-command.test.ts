@@ -116,3 +116,59 @@ test('OAuth App ownership conflict fails before Extension definition loading', a
     error.mockRestore()
   }
 })
+
+test('OAuth App add reads invocation-current environment then uses the ensured daemon', async () => {
+  const loaded = await loadCliDefinitions()
+  const output = spyOn(console, 'log').mockImplementation(() => {})
+  const events: string[] = []
+  try {
+    const exit = await handleOAuthAppCommand(
+      { kind: 'add', provider: 'google', label: 'work' },
+      {
+        acquireOwnership: () => {
+          throw new Error('direct ownership acquired')
+        },
+        loadDefinitions: async () => loaded,
+        assertInitialized: async () => {
+          events.push('initialized')
+        },
+        readEnvironmentVariable: (name) => {
+          events.push(`env:${name}`)
+          return `value-for-${name}`
+        },
+        open: async () => {
+          throw new Error('direct dependencies opened')
+        },
+        selectDaemon: () => ({ selectedBy: 'test_override' }) as never,
+        ensureDaemonSelection: async () => ({
+          status: 'selected',
+          selection: { selectedBy: 'test_override' } as never,
+          started: false,
+        }),
+        daemonOAuthAppRegistration: async () => ({
+          environment: {
+            clientId: 'CTXINDEX_GOOGLE_CLIENT_ID',
+            clientSecret: 'CTXINDEX_GOOGLE_CLIENT_SECRET',
+          },
+        }),
+        daemonOAuthAppAdd: async (_selection, input) => {
+          events.push(`add:${input.provider}:${input.label}`)
+          expect(input.config).toEqual({
+            clientId: 'value-for-CTXINDEX_GOOGLE_CLIENT_ID',
+            clientSecret: 'value-for-CTXINDEX_GOOGLE_CLIENT_SECRET',
+          })
+          return { providerId: input.provider, label: input.label }
+        },
+      },
+    )
+    expect(exit).toBe(0)
+    expect(events).toEqual([
+      'initialized',
+      'env:CTXINDEX_GOOGLE_CLIENT_ID',
+      'env:CTXINDEX_GOOGLE_CLIENT_SECRET',
+      'add:google:work',
+    ])
+  } finally {
+    output.mockRestore()
+  }
+})

@@ -1,7 +1,10 @@
+import { randomUUID } from 'node:crypto'
+import type { AccountInventoryItem } from '@ctxindex/core/account'
 import type {
   DescribeActionResult,
   RunActionResult,
 } from '@ctxindex/core/action'
+import type { OAuthAuthorizationResponsePrompt } from '@ctxindex/core/auth'
 import {
   type AuthService,
   isGrantCompatible,
@@ -19,6 +22,7 @@ import {
   CtxindexValidationError,
 } from '@ctxindex/core/errors'
 import type { ExportResourceResult } from '@ctxindex/core/export'
+import type { OAuthAppInventoryItem } from '@ctxindex/core/oauth-app'
 import type { RealmService } from '@ctxindex/core/realm'
 import {
   describeRegistry,
@@ -44,6 +48,13 @@ import type {
 import type { ThreadResult, ThreadService } from '@ctxindex/core/thread'
 import type {
   DaemonRpcApplication,
+  RpcAccountAddEvent,
+  RpcAccountAddInput,
+  RpcAccountAddResult,
+  RpcAccountListResult,
+  RpcAccountRemoveResult,
+  RpcAccountRespondInput,
+  RpcAccountRespondResult,
   RpcActionDescribeInput,
   RpcActionDescribeResult,
   RpcActionRunResult,
@@ -60,6 +71,11 @@ import type {
   RpcHealthInput,
   RpcHealthResult,
   RpcJsonCursor,
+  RpcOAuthAppAddInput,
+  RpcOAuthAppAddResult,
+  RpcOAuthAppListResult,
+  RpcOAuthAppRegistrationResult,
+  RpcOAuthAppRemoveResult,
   RpcProtocolIdentity,
   RpcRealmAddInput,
   RpcRealmAddResult,
@@ -133,6 +149,9 @@ export interface DaemonApplicationOptions {
   readonly idleTimer?: DaemonIdleTimer
   readonly observationTimeoutMs: number
   readonly authService?: Pick<AuthService, 'listGrants'>
+  readonly accountService?: DaemonAccountService
+  readonly oauthAppService?: DaemonOAuthAppService
+  readonly createAuthorizationRequestId?: () => string
   readonly actionService?: DaemonActionService
   readonly exportService?: DaemonExportService
   readonly transferStore?: ByteTransferRegistry
@@ -151,6 +170,28 @@ export interface DaemonApplicationOptions {
   readonly sourceService: Pick<SourceService, 'resolveSourceId' | 'getStatus'> &
     Partial<Pick<SourceService, 'addSource' | 'listSources' | 'removeSource'>>
   readonly onStopping?: () => void
+}
+
+export interface DaemonAccountService {
+  readonly authorize: (
+    input: RpcAccountAddInput,
+    interaction: {
+      readonly readAuthorizationResponse: (
+        prompt: OAuthAuthorizationResponsePrompt,
+      ) => Promise<string | undefined>
+    },
+  ) => Promise<{ readonly accountId: string }>
+  readonly list: () => readonly AccountInventoryItem[]
+  readonly remove: (label: string) => Promise<void>
+}
+
+export interface DaemonOAuthAppService {
+  readonly registration: (
+    providerId: string,
+  ) => Readonly<Record<string, string>>
+  readonly add: (input: RpcOAuthAppAddInput) => Promise<void>
+  readonly list: () => readonly OAuthAppInventoryItem[]
+  readonly remove: (providerId: string, label: string) => Promise<void>
 }
 
 export interface DaemonActionService {
@@ -189,6 +230,10 @@ interface ActiveRequest {
 interface SecretAccessWaiter {
   readonly mode: 'shared' | 'exclusive'
   readonly resolve: (release: () => void) => void
+}
+
+interface PendingAuthorizationResponse {
+  readonly resolve: (value: string | undefined) => void
 }
 
 interface RendezvousItem<T> {
@@ -641,6 +686,10 @@ function documentationSearchRow(value: DocumentationSearchResult) {
 
 export class DaemonApplication implements DaemonRpcApplication {
   readonly #active = new Map<string, ActiveRequest>()
+  readonly #pendingAuthorizationResponses = new Map<
+    string,
+    PendingAuthorizationResponse
+  >()
   readonly #options: DaemonApplicationOptions
   #lifecycle: RpcHealthResult['lifecycle'] = 'starting'
   #idleDeadline: number | undefined
@@ -665,6 +714,18 @@ export class DaemonApplication implements DaemonRpcApplication {
     backend: {
       set: (input, context) => this.secretsBackendSet(input, context),
     },
+  }
+  readonly account: DaemonRpcApplication['account'] = {
+    add: (input, context) => this.accountAdd(input, context),
+    respond: (input, context) => this.accountRespond(input, context),
+    list: (input, context) => this.accountList(input, context),
+    remove: (input, context) => this.accountRemove(input, context),
+  }
+  readonly oauthApp: DaemonRpcApplication['oauthApp'] = {
+    registration: (input, context) => this.oauthAppRegistration(input, context),
+    add: (input, context) => this.oauthAppAdd(input, context),
+    list: (input, context) => this.oauthAppList(input, context),
+    remove: (input, context) => this.oauthAppRemove(input, context),
   }
   readonly documentation: DaemonRpcApplication['documentation'] = {
     list: (input, context) => this.documentationList(input, context),
@@ -838,6 +899,137 @@ export class DaemonApplication implements DaemonRpcApplication {
       true,
       'exclusive',
     )
+  }
+
+  accountAdd(
+    input: RpcAccountAddInput,
+    context: RpcRequestContext,
+  ): ReturnType<DaemonRpcApplication['account']['add']> {
+    return this.#businessStream<RpcAccountAddEvent, RpcAccountAddResult>(
+      context,
+      async (signal, emit) => {
+        const service = this.#options.accountService
+        if (!service) throw new Error('Account service missing')
+        return service.authorize(input, {
+          readAuthorizationResponse: async (prompt) => {
+            const requestId =
+              this.#options.createAuthorizationRequestId?.() ?? randomUUID()
+            if (this.#pendingAuthorizationResponses.has(requestId))
+              throw new Error('Authorization request id collision')
+            let settle!: (value: string | undefined) => void
+            const response = new Promise<string | undefined>((resolve) => {
+              settle = resolve
+            })
+            this.#pendingAuthorizationResponses.set(requestId, {
+              resolve: settle,
+            })
+            const finish = () => settle(undefined)
+            prompt.signal.addEventListener('abort', finish, { once: true })
+            signal.addEventListener('abort', finish, { once: true })
+            try {
+              await emit({
+                type: 'authorization.required',
+                requestId,
+                authorizationUrl: prompt.authorizationUrl,
+              })
+              return await response
+            } finally {
+              prompt.signal.removeEventListener('abort', finish)
+              signal.removeEventListener('abort', finish)
+              this.#pendingAuthorizationResponses.delete(requestId)
+            }
+          },
+        })
+      },
+    )
+  }
+
+  accountRespond(
+    input: RpcAccountRespondInput,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcAccountRespondResult>> {
+    return this.#business(context, async () => {
+      const pending = this.#pendingAuthorizationResponses.get(input.requestId)
+      if (!pending)
+        throw new CtxindexNotFoundError(
+          'The OAuth authorization request is no longer active.',
+        )
+      this.#pendingAuthorizationResponses.delete(input.requestId)
+      pending.resolve(input.response)
+      return { accepted: true }
+    })
+  }
+
+  accountList(
+    _input: Record<string, never>,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcAccountListResult>> {
+    return this.#business(context, async () => {
+      const service = this.#options.accountService
+      if (!service) throw new Error('Account service missing')
+      return { rows: service.list() }
+    })
+  }
+
+  accountRemove(
+    input: { readonly label: string },
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcAccountRemoveResult>> {
+    return this.#business(context, async (signal) => {
+      const service = this.#options.accountService
+      if (!service) throw new Error('Account service missing')
+      signal.throwIfAborted()
+      await service.remove(input.label)
+      return { label: input.label }
+    })
+  }
+
+  oauthAppRegistration(
+    input: { readonly provider: string },
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcOAuthAppRegistrationResult>> {
+    return this.#business(context, async () => {
+      const service = this.#options.oauthAppService
+      if (!service) throw new Error('OAuth App service missing')
+      return { environment: service.registration(input.provider) }
+    })
+  }
+
+  oauthAppAdd(
+    input: RpcOAuthAppAddInput,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcOAuthAppAddResult>> {
+    return this.#business(context, async (signal) => {
+      const service = this.#options.oauthAppService
+      if (!service) throw new Error('OAuth App service missing')
+      signal.throwIfAborted()
+      await service.add(input)
+      return { providerId: input.provider, label: input.label }
+    })
+  }
+
+  oauthAppList(
+    _input: Record<string, never>,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcOAuthAppListResult>> {
+    return this.#business(context, async () => {
+      const service = this.#options.oauthAppService
+      if (!service) throw new Error('OAuth App service missing')
+      return { rows: service.list() }
+    })
+  }
+
+  oauthAppRemove(
+    input: { readonly provider: string; readonly label: string },
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcOAuthAppRemoveResult>> {
+    return this.#business(context, async (signal) => {
+      const service = this.#options.oauthAppService
+      if (!service) throw new Error('OAuth App service missing')
+      signal.throwIfAborted()
+      await service.remove(input.provider, input.label)
+      return { providerId: input.provider, label: input.label }
+    })
   }
 
   documentationList(

@@ -5,6 +5,8 @@ import { join } from 'node:path'
 import { resolveRuntimeIdentity } from '@ctxindex/local-daemon'
 import {
   type DaemonClient,
+  type RpcAccountAddEvent,
+  type RpcAccountAddResult,
   type RpcFailure,
   type RpcSyncEvent,
   type RpcSyncResult,
@@ -13,6 +15,7 @@ import {
 import { ORPCError } from '@orpc/client'
 import {
   type DaemonSelection,
+  daemonAccountAdd,
   daemonExport,
   daemonFailureFromDeclaredError,
   daemonHealth,
@@ -229,6 +232,119 @@ function syncClient(
     sync: { run: async () => iterator },
   } as unknown as DaemonClient
 }
+
+function accountClient(input: {
+  readonly iterator: AsyncIteratorObject<
+    RpcAccountAddEvent,
+    RpcAccountAddResult,
+    void
+  >
+  readonly respond: (value: string) => Promise<void>
+}): DaemonClient {
+  return {
+    account: {
+      add: async () => input.iterator,
+      respond: async ({ response }: { readonly response: string }) => {
+        await input.respond(response)
+        return { accepted: true }
+      },
+    },
+  } as unknown as DaemonClient
+}
+
+test('daemon Account add sends hidden input separately and races automatic loopback completion', async () => {
+  const setup = await fixture()
+  const selection = selectDaemonForRuntime(setup.runtime, {
+    testEndpoint: '/tmp/ctxd-account-client.sock',
+  }) as DaemonSelection
+  const event: RpcAccountAddEvent = {
+    type: 'authorization.required',
+    requestId: 'request-id',
+    authorizationUrl: 'https://accounts.example/authorize?state=opaque',
+  }
+  let index = 0
+  let settle!: () => void
+  const settled = new Promise<void>((resolve) => {
+    settle = resolve
+  })
+  const responses: string[] = []
+  const iterator = {
+    [Symbol.asyncIterator]() {
+      return this
+    },
+    async next() {
+      if (index++ === 0) return { done: false as const, value: event }
+      await settled
+      return { done: true as const, value: { accountId: 'account-id' } }
+    },
+  } as AsyncIteratorObject<RpcAccountAddEvent, RpcAccountAddResult, void>
+  const client = accountClient({
+    iterator,
+    respond: async (value) => {
+      responses.push(value)
+      settle()
+    },
+  })
+  const urls: string[] = []
+  const secret = 'http://localhost/callback?code=private-code&state=opaque'
+  try {
+    expect(
+      await daemonAccountAdd(
+        selection,
+        { provider: 'google', app: 'desktop' },
+        {
+          emitAuthorizationUrl: (url) => urls.push(url),
+          readAuthorizationResponse: async () => secret,
+        },
+        undefined,
+        { createClient: () => client },
+      ),
+    ).toEqual({ accountId: 'account-id' })
+    expect(urls).toEqual([event.authorizationUrl])
+    expect(responses).toEqual([secret])
+
+    let promptAborted = false
+    let automaticIndex = 0
+    const automatic = {
+      [Symbol.asyncIterator]() {
+        return this
+      },
+      async next() {
+        return automaticIndex++ === 0
+          ? { done: false as const, value: event }
+          : { done: true as const, value: { accountId: 'automatic-id' } }
+      },
+    } as AsyncIteratorObject<RpcAccountAddEvent, RpcAccountAddResult, void>
+    expect(
+      await daemonAccountAdd(
+        selection,
+        { provider: 'google' },
+        {
+          emitAuthorizationUrl() {},
+          readAuthorizationResponse: ({ signal }) =>
+            new Promise((resolve) => {
+              signal.addEventListener(
+                'abort',
+                () => {
+                  promptAborted = true
+                  resolve(undefined)
+                },
+                { once: true },
+              )
+            }),
+        },
+        undefined,
+        {
+          createClient: () =>
+            accountClient({ iterator: automatic, respond: async () => {} }),
+        },
+      ),
+    ).toEqual({ accountId: 'automatic-id' })
+    expect(promptAborted).toBe(true)
+  } finally {
+    await setup.close()
+  }
+})
 
 function syncIterator(
   events: readonly RpcSyncEvent[],

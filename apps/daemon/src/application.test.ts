@@ -199,6 +199,202 @@ async function consumeRpcSync(
   }
 }
 
+test('Account authorization streams one URL and accepts one hidden response without echoing it', async () => {
+  const observed: string[] = []
+  const app = application({
+    createAuthorizationRequestId: () => 'authorization-request',
+    accountService: {
+      authorize: async (
+        _input: unknown,
+        interaction: {
+          readonly readAuthorizationResponse: (prompt: {
+            readonly authorizationUrl: string
+            readonly redirectUri: string
+            readonly signal: AbortSignal
+          }) => Promise<string | undefined>
+        },
+      ) => {
+        const response = await interaction.readAuthorizationResponse({
+          authorizationUrl:
+            'https://accounts.example/authorize?state=opaque-state',
+          redirectUri: 'http://localhost/callback',
+          signal: new AbortController().signal,
+        })
+        if (response !== undefined) observed.push(response)
+        return { accountId: 'account-id' }
+      },
+      list: () => [],
+      remove: async () => {},
+    },
+  })
+  app.markReady()
+  const opened = await app.account.add(
+    { provider: 'google', app: 'desktop', label: 'personal' },
+    context('account-add'),
+  )
+  if (!opened.ok) throw new Error('Expected Account stream admission')
+  expect(await opened.value.next()).toEqual({
+    done: false,
+    value: {
+      type: 'authorization.required',
+      requestId: 'authorization-request',
+      authorizationUrl: 'https://accounts.example/authorize?state=opaque-state',
+    },
+  })
+  const accepted = await app.account.respond(
+    {
+      requestId: 'authorization-request',
+      response:
+        'http://localhost/callback?code=private-code&state=opaque-state',
+    },
+    context('account-respond'),
+  )
+  expect(accepted).toEqual({ ok: true, value: { accepted: true } })
+  const terminal = await opened.value.next()
+  expect(terminal).toEqual({
+    done: true,
+    value: { ok: true, value: { accountId: 'account-id' } },
+  })
+  expect(observed).toEqual([
+    'http://localhost/callback?code=private-code&state=opaque-state',
+  ])
+  expect(JSON.stringify(accepted)).not.toContain('private-code')
+  expect(JSON.stringify(terminal)).not.toContain('private-code')
+})
+
+test('automatic loopback completion aborts and removes pending manual input', async () => {
+  const app = application({
+    createAuthorizationRequestId: () => 'automatic-request',
+    accountService: {
+      authorize: async (
+        _input: unknown,
+        interaction: {
+          readonly readAuthorizationResponse: (prompt: {
+            readonly authorizationUrl: string
+            readonly redirectUri: string
+            readonly signal: AbortSignal
+          }) => Promise<string | undefined>
+        },
+      ) => {
+        const manual = new AbortController()
+        const response = interaction.readAuthorizationResponse({
+          authorizationUrl: 'https://accounts.example/authorize',
+          redirectUri: 'http://localhost/callback',
+          signal: manual.signal,
+        })
+        manual.abort()
+        expect(await response).toBeUndefined()
+        return { accountId: 'account-id' }
+      },
+      list: () => [],
+      remove: async () => {},
+    },
+  })
+  app.markReady()
+  const opened = await app.account.add(
+    { provider: 'google' },
+    context('automatic-account'),
+  )
+  if (!opened.ok) throw new Error('Expected Account stream admission')
+  expect((await opened.value.next()).done).toBe(false)
+  expect(await opened.value.next()).toEqual({
+    done: true,
+    value: { ok: true, value: { accountId: 'account-id' } },
+  })
+  expect(
+    await app.account.respond(
+      { requestId: 'automatic-request', response: 'late-private-code' },
+      context('late-response'),
+    ),
+  ).toMatchObject({ ok: false, error: { taxonomy: 'lookup' } })
+})
+
+test('Account and OAuth App inventory mutations delegate with safe result shapes', async () => {
+  const events: string[] = []
+  const app = application({
+    accountService: {
+      authorize: async () => ({ accountId: 'unused' }),
+      list: () => [
+        {
+          id: 'account-id',
+          provider: 'google',
+          label: 'personal',
+          expiresAt: null,
+          expiryState: 'unknown',
+          sources: [],
+        },
+      ],
+      remove: async (label: string) => events.push(`account:${label}`),
+    },
+    oauthAppService: {
+      registration: () => ({ clientId: 'CTXINDEX_GOOGLE_CLIENT_ID' }),
+      add: async (input: { provider: string; label: string }) =>
+        events.push(`app-add:${input.provider}:${input.label}`),
+      list: () => [
+        {
+          providerId: 'google',
+          label: 'desktop',
+          origin: 'local',
+          provenance: { kind: 'local' },
+        },
+      ],
+      remove: async (provider: string, label: string) =>
+        events.push(`app-remove:${provider}:${label}`),
+    },
+  })
+  app.markReady()
+  expect(await app.account.list({}, context('account-list'))).toMatchObject({
+    ok: true,
+    value: { rows: [{ id: 'account-id' }] },
+  })
+  expect(
+    await app.account.remove({ label: 'personal' }, context('account-remove')),
+  ).toEqual({ ok: true, value: { label: 'personal' } })
+  expect(
+    await app.oauthApp.registration(
+      { provider: 'google' },
+      context('app-registration'),
+    ),
+  ).toEqual({
+    ok: true,
+    value: { environment: { clientId: 'CTXINDEX_GOOGLE_CLIENT_ID' } },
+  })
+  const secret = 'private-client-secret'
+  expect(
+    await app.oauthApp.add(
+      {
+        provider: 'google',
+        label: 'desktop',
+        config: { clientId: 'public-id', clientSecret: secret },
+      },
+      context('app-add'),
+    ),
+  ).toEqual({
+    ok: true,
+    value: { providerId: 'google', label: 'desktop' },
+  })
+  const listed = await app.oauthApp.list({}, context('app-list'))
+  expect(listed).toMatchObject({
+    ok: true,
+    value: { rows: [{ providerId: 'google', label: 'desktop' }] },
+  })
+  expect(JSON.stringify(listed)).not.toContain(secret)
+  expect(
+    await app.oauthApp.remove(
+      { provider: 'google', label: 'desktop' },
+      context('app-remove'),
+    ),
+  ).toEqual({
+    ok: true,
+    value: { providerId: 'google', label: 'desktop' },
+  })
+  expect(events).toEqual([
+    'account:personal',
+    'app-add:google:desktop',
+    'app-remove:google:desktop',
+  ])
+})
+
 test('tracks a business request and propagates request cancellation', async () => {
   let observed: AbortSignal | undefined
   const app = application({

@@ -1,5 +1,14 @@
 import { type ContractRouterClient, eventIterator, oc } from '@orpc/contract'
 import {
+  rpcAccountAddEventSchema,
+  rpcAccountAddInputSchema,
+  rpcAccountAddResultSchema,
+  rpcAccountListInputSchema,
+  rpcAccountListResultSchema,
+  rpcAccountRemoveInputSchema,
+  rpcAccountRemoveResultSchema,
+  rpcAccountRespondInputSchema,
+  rpcAccountRespondResultSchema,
   rpcActionDescribeInputSchema,
   rpcActionDescribeResultSchema,
   rpcActionRunInputSchema,
@@ -15,6 +24,14 @@ import {
   rpcFailureRegistry,
   rpcHealthInputSchema,
   rpcHealthResultSchema,
+  rpcOAuthAppAddInputSchema,
+  rpcOAuthAppAddResultSchema,
+  rpcOAuthAppListInputSchema,
+  rpcOAuthAppListResultSchema,
+  rpcOAuthAppRegistrationInputSchema,
+  rpcOAuthAppRegistrationResultSchema,
+  rpcOAuthAppRemoveInputSchema,
+  rpcOAuthAppRemoveResultSchema,
   rpcRealmAddInputSchema,
   rpcRealmAddResultSchema,
   rpcRealmListInputSchema,
@@ -72,6 +89,36 @@ export const daemonContract = {
         .input(rpcSecretsBackendSetInputSchema)
         .output(rpcSecretsBackendSetResultSchema),
     },
+  },
+  account: {
+    add: procedure
+      .input(rpcAccountAddInputSchema)
+      .output(
+        eventIterator(rpcAccountAddEventSchema, rpcAccountAddResultSchema),
+      ),
+    respond: procedure
+      .input(rpcAccountRespondInputSchema)
+      .output(rpcAccountRespondResultSchema),
+    list: procedure
+      .input(rpcAccountListInputSchema)
+      .output(rpcAccountListResultSchema),
+    remove: procedure
+      .input(rpcAccountRemoveInputSchema)
+      .output(rpcAccountRemoveResultSchema),
+  },
+  oauthApp: {
+    registration: procedure
+      .input(rpcOAuthAppRegistrationInputSchema)
+      .output(rpcOAuthAppRegistrationResultSchema),
+    add: procedure
+      .input(rpcOAuthAppAddInputSchema)
+      .output(rpcOAuthAppAddResultSchema),
+    list: procedure
+      .input(rpcOAuthAppListInputSchema)
+      .output(rpcOAuthAppListResultSchema),
+    remove: procedure
+      .input(rpcOAuthAppRemoveInputSchema)
+      .output(rpcOAuthAppRemoveResultSchema),
   },
   documentation: {
     list: procedure

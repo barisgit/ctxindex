@@ -15,6 +15,8 @@ import type {
 } from './router'
 import { createDaemonRouter } from './router'
 import {
+  type RpcAccountAddEvent,
+  type RpcAccountAddResult,
   type RpcFailure,
   type RpcResult,
   type RpcSyncEvent,
@@ -64,6 +66,13 @@ async function* syncStream(
   return terminal
 }
 
+async function* accountStream(
+  events: readonly RpcAccountAddEvent[] = [],
+): AsyncGenerator<RpcAccountAddEvent, RpcResult<RpcAccountAddResult>, void> {
+  for (const event of events) yield event
+  return { ok: true, value: { accountId: 'account-id' } }
+}
+
 function transportContext(
   overrides: Partial<RpcTransportContext> = {},
 ): RpcTransportContext {
@@ -82,6 +91,14 @@ function createApplication() {
     realmList: 0,
     secretsStatus: 0,
     secretsBackendSet: 0,
+    accountAdd: 0,
+    accountRespond: 0,
+    accountList: 0,
+    accountRemove: 0,
+    oauthAppRegistration: 0,
+    oauthAppAdd: 0,
+    oauthAppList: 0,
+    oauthAppRemove: 0,
     documentationList: 0,
     documentationGet: 0,
     documentationSearch: 0,
@@ -177,6 +194,51 @@ function createApplication() {
             },
           }
         },
+      },
+    },
+    account: {
+      async add(_input, context) {
+        record('accountAdd', context)
+        return { ok: true, value: accountStream() }
+      },
+      async respond(_input, context) {
+        record('accountRespond', context)
+        return { ok: true, value: { accepted: true } }
+      },
+      async list(_input, context) {
+        record('accountList', context)
+        return { ok: true, value: { rows: [] } }
+      },
+      async remove(input, context) {
+        record('accountRemove', context)
+        return { ok: true, value: { label: input.label } }
+      },
+    },
+    oauthApp: {
+      async registration(_input, context) {
+        record('oauthAppRegistration', context)
+        return {
+          ok: true,
+          value: { environment: { clientId: 'CTXINDEX_CLIENT_ID' } },
+        }
+      },
+      async add(input, context) {
+        record('oauthAppAdd', context)
+        return {
+          ok: true,
+          value: { providerId: input.provider, label: input.label },
+        }
+      },
+      async list(_input, context) {
+        record('oauthAppList', context)
+        return { ok: true, value: { rows: [] } }
+      },
+      async remove(input, context) {
+        record('oauthAppRemove', context)
+        return {
+          ok: true,
+          value: { providerId: input.provider, label: input.label },
+        }
       },
     },
     documentation: {
@@ -338,6 +400,14 @@ describe('pure daemon contract', () => {
       ['realm', 'list'],
       ['secrets', 'status'],
       ['secrets', 'backend', 'set'],
+      ['account', 'add'],
+      ['account', 'respond'],
+      ['account', 'list'],
+      ['account', 'remove'],
+      ['oauthApp', 'registration'],
+      ['oauthApp', 'add'],
+      ['oauthApp', 'list'],
+      ['oauthApp', 'remove'],
       ['documentation', 'list'],
       ['documentation', 'get'],
       ['documentation', 'search'],
@@ -389,6 +459,9 @@ describe('pure daemon contract', () => {
     expectTypeOf<DaemonRpcApplication['secrets']['backend']>().toHaveProperty(
       'set',
     )
+    expectTypeOf<DaemonRpcApplication['account']>().toHaveProperty('add')
+    expectTypeOf<DaemonRpcApplication['account']>().toHaveProperty('respond')
+    expectTypeOf<DaemonRpcApplication['oauthApp']>().toHaveProperty('add')
     expectTypeOf<DaemonRpcApplication['documentation']>().toHaveProperty('list')
     expectTypeOf<DaemonRpcApplication['documentation']>().toHaveProperty('get')
     expectTypeOf<DaemonRpcApplication['documentation']>().toHaveProperty(
@@ -463,6 +536,22 @@ describe('contract implementation', () => {
     await client.realm.list({})
     await client.secrets.status({})
     await client.secrets.backend.set({ target: 'keychain' })
+    const account = await client.account.add({ provider: 'google' })
+    expect(await account.next()).toEqual({
+      done: true,
+      value: { accountId: 'account-id' },
+    })
+    await client.account.respond({ requestId: 'request', response: 'code' })
+    await client.account.list({})
+    await client.account.remove({ label: 'personal' })
+    await client.oauthApp.registration({ provider: 'google' })
+    await client.oauthApp.add({
+      provider: 'google',
+      label: 'desktop',
+      config: { clientId: 'id' },
+    })
+    await client.oauthApp.list({})
+    await client.oauthApp.remove({ provider: 'google', label: 'desktop' })
     await client.documentation.list({})
     await client.documentation.get({
       extensionId: 'fixture.docs',
@@ -504,6 +593,14 @@ describe('contract implementation', () => {
       realmList: 1,
       secretsStatus: 1,
       secretsBackendSet: 1,
+      accountAdd: 1,
+      accountRespond: 1,
+      accountList: 1,
+      accountRemove: 1,
+      oauthAppRegistration: 1,
+      oauthAppAdd: 1,
+      oauthAppList: 1,
+      oauthAppRemove: 1,
       documentationList: 1,
       documentationGet: 1,
       documentationSearch: 1,

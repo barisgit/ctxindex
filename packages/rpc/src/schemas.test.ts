@@ -2,6 +2,10 @@ import { describe, expect, test } from 'bun:test'
 import { z } from 'zod'
 import {
   defineRpcFailureRegistry,
+  rpcAccountAddEventSchema,
+  rpcAccountAddInputSchema,
+  rpcAccountListResultSchema,
+  rpcAccountRespondInputSchema,
   rpcActionDescribeInputSchema,
   rpcActionDescribeResultSchema,
   rpcActionRunInputSchema,
@@ -19,6 +23,9 @@ import {
   rpcHealthResultSchema,
   rpcJsonCursorSchema,
   rpcJsonDefaultSchema,
+  rpcOAuthAppAddInputSchema,
+  rpcOAuthAppListResultSchema,
+  rpcOAuthAppRegistrationResultSchema,
   rpcProtocolIdentitySchema,
   rpcRealmAddInputSchema,
   rpcRealmListResultSchema,
@@ -219,6 +226,105 @@ describe('wire identity and common bounds', () => {
     expect(() =>
       rpcFailureSchema.parse({ ...failure, ownerTupleDigest: digest }),
     ).toThrow()
+  })
+})
+
+describe('Account and OAuth App wire values', () => {
+  test('accepts bounded Account authorization interaction and safe inventory', () => {
+    expect(
+      rpcAccountAddInputSchema.parse({
+        provider: 'google',
+        app: 'desktop',
+        label: 'personal',
+      }),
+    ).toEqual({ provider: 'google', app: 'desktop', label: 'personal' })
+    expect(
+      rpcAccountAddEventSchema.parse({
+        type: 'authorization.required',
+        requestId: 'request',
+        authorizationUrl: 'https://accounts.example/authorize?state=opaque',
+      }),
+    ).toMatchObject({ requestId: 'request' })
+    expect(
+      rpcAccountRespondInputSchema.parse({
+        requestId: 'request',
+        response: 'http://localhost/callback?code=opaque&state=opaque',
+      }),
+    ).toMatchObject({ requestId: 'request' })
+    expect(
+      rpcAccountListResultSchema.parse({
+        rows: [
+          {
+            id: 'account-id',
+            provider: 'google',
+            label: 'personal',
+            expiresAt: null,
+            expiryState: 'unknown',
+            sources: [
+              {
+                id: 'source-id',
+                label: 'mail',
+                adapter: { id: 'google.mailbox' },
+                realm: { id: 'realm-id', slug: 'personal', label: null },
+              },
+            ],
+          },
+        ],
+      }).rows,
+    ).toHaveLength(1)
+  })
+
+  test('bounds secret-bearing OAuth App input and rejects unknown config fields later', () => {
+    expect(
+      rpcOAuthAppRegistrationResultSchema.parse({
+        environment: {
+          clientId: 'CTXINDEX_GOOGLE_CLIENT_ID',
+          clientSecret: 'CTXINDEX_GOOGLE_CLIENT_SECRET',
+        },
+      }),
+    ).toMatchObject({ environment: { clientId: expect.any(String) } })
+    expect(
+      rpcOAuthAppAddInputSchema.parse({
+        provider: 'google',
+        label: 'work',
+        config: { clientId: 'public-id', clientSecret: 'private-value' },
+      }),
+    ).toMatchObject({ provider: 'google', label: 'work' })
+    expect(() =>
+      rpcOAuthAppAddInputSchema.parse({
+        provider: 'google',
+        label: 'work',
+        config: Object.fromEntries(
+          Array.from({ length: 33 }, (_, index) => [`field${index}`, 'value']),
+        ),
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcOAuthAppAddInputSchema.parse({
+        provider: 'google',
+        label: 'work',
+        config: { clientSecret: 'x'.repeat(16_385) },
+      }),
+    ).toThrow()
+  })
+
+  test('OAuth App inventory contains only safe provenance', () => {
+    const value = rpcOAuthAppListResultSchema.parse({
+      rows: [
+        {
+          providerId: 'google',
+          label: 'ctxindex',
+          origin: 'extension',
+          provenance: {
+            kind: 'extension',
+            source: 'builtin',
+            packageName: '@ctxindex/official',
+            packageVersion: '0.1.0',
+          },
+        },
+      ],
+    })
+    expect(JSON.stringify(value)).not.toMatch(/client.?id|secret|token/i)
   })
 })
 
