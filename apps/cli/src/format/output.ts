@@ -45,6 +45,21 @@ export interface OutputColumn {
 
 type OutputRow = Readonly<Record<string, unknown>>
 
+function escapeTerminalControls(value: string): string {
+  return Array.from(value, (character) => {
+    const codePoint = character.codePointAt(0) ?? 0
+    const isControl =
+      codePoint <= 0x08 ||
+      codePoint === 0x0b ||
+      codePoint === 0x0c ||
+      (codePoint >= 0x0e && codePoint <= 0x1f) ||
+      (codePoint >= 0x7f && codePoint <= 0x9f)
+    return isControl
+      ? `\\u${codePoint.toString(16).padStart(4, '0')}`
+      : character
+  }).join('')
+}
+
 function scalar(value: unknown): string {
   if (value === null || value === undefined) return '-'
   if (typeof value === 'string') return value
@@ -55,6 +70,15 @@ function scalar(value: unknown): string {
   )
     return String(value)
   return JSON.stringify(value)
+}
+
+function displayScalar(value: unknown): string {
+  return escapeTerminalControls(
+    scalar(value)
+      .replaceAll('\r\n', '\n')
+      .replaceAll('\r', '\n')
+      .replaceAll('\t', '  '),
+  )
 }
 
 export function escapeTsv(value: unknown): string {
@@ -89,7 +113,7 @@ function naturalTableWidth(
         Bun.stringWidth(column.label),
         ...rows.map((row) =>
           Math.max(
-            ...scalar(row[column.key])
+            ...displayScalar(row[column.key])
               .split('\n')
               .map((line) => Bun.stringWidth(line)),
           ),
@@ -140,7 +164,7 @@ function formatPlainCards(
         lines.push(wrapDisplayText(`Record ${index + 1}:`, available))
       for (const column of columns) {
         lines.push(wrapDisplayText(`${column.label}:`, available))
-        lines.push(wrapDisplayText(scalar(row[column.key]), available))
+        lines.push(wrapDisplayText(displayScalar(row[column.key]), available))
       }
       return lines.join('\n')
     })
@@ -178,7 +202,7 @@ function formatCards(
       for (const column of columns)
         table.push([
           wrapDisplayText(column.label, labelWidth - 2),
-          wrapDisplayText(scalar(row[column.key]), valueWidth - 2),
+          wrapDisplayText(displayScalar(row[column.key]), valueWidth - 2),
         ])
       return table.toString()
     })
@@ -200,7 +224,8 @@ export function formatPrettyCollection(
     colAligns: columns.map(({ align }) => align ?? 'left'),
     style: tableStyle,
   })
-  for (const row of rows) table.push(columns.map(({ key }) => scalar(row[key])))
+  for (const row of rows)
+    table.push(columns.map(({ key }) => displayScalar(row[key])))
   return table.toString()
 }
 
