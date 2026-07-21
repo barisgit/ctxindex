@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { isAbsolute, join } from 'node:path'
+import { isAbsolute, join, relative } from 'node:path'
 import {
   type DirectExtensionInstallationRecord,
   directExtensionDocumentSchema,
@@ -25,8 +25,13 @@ function record(digest = 'a'.repeat(64)): DirectExtensionInstallationRecord {
     source: {
       kind: 'npm',
       requested_target: '@example/mail@^2',
+      package: '@example/mail',
       exact_version: '2.3.4',
       integrity: 'sha512-safe',
+    },
+    dependency_resolution: {
+      format: 'bun.lock@1.3.14',
+      digest: 'f'.repeat(64),
     },
     materialization_digest: digest,
     package_root: 'node_modules/@example/mail',
@@ -42,6 +47,37 @@ describe('direct Extension records', () => {
       extensions: [record()],
     })
     expect(parsed.extensions[0]).toEqual(record())
+    const { dependency_resolution: _, ...legacyRecord } = record()
+    expect(() =>
+      directExtensionDocumentSchema.parse({
+        schema_version: 1,
+        extensions: [legacyRecord],
+      }),
+    ).toThrow()
+    const npmSource = record().source
+    if (npmSource.kind !== 'npm') throw new TypeError('Expected npm fixture')
+    const { package: _package, ...npmWithoutPackage } = npmSource
+    expect(() =>
+      directExtensionDocumentSchema.parse({
+        schema_version: 1,
+        extensions: [{ ...record(), source: npmWithoutPackage }],
+      }),
+    ).toThrow()
+    expect(() =>
+      directExtensionDocumentSchema.parse({
+        schema_version: 1,
+        extensions: [
+          {
+            ...record(),
+            source: {
+              kind: 'git',
+              requested_target: 'git+https://example.com/repository.git#main',
+              commit: 'b'.repeat(40),
+            },
+          },
+        ],
+      }),
+    ).toThrow()
     expect(() =>
       directExtensionDocumentSchema.parse({
         schema_version: 1,
@@ -58,6 +94,7 @@ describe('direct Extension records', () => {
             source: {
               kind: 'git',
               requested_target: 'git+https://example.com/repository.git#main',
+              repository: 'git+https://example.com/repository.git',
               commit: 'b'.repeat(40),
             },
           },
@@ -96,6 +133,111 @@ describe('direct Extension records', () => {
     ).toThrow()
   })
 
+  test('strictly validates structured Catalog source locators', () => {
+    const curated = {
+      ...record(),
+      curation: {
+        extension_id: 'example.mail',
+        catalog_name: 'example-catalog',
+        catalog_id: 'example.catalog',
+        repository: 'https://example.test/catalog.git',
+        commit: 'c'.repeat(40),
+        snapshot_acquired_at: 10,
+        source_locator: { kind: 'package', entryIndex: 0 },
+        execution_materialization_digest: record().materialization_digest,
+      },
+    }
+
+    expect(
+      directExtensionDocumentSchema.parse({
+        schema_version: 1,
+        extensions: [curated],
+      }).extensions[0]?.curation?.source_locator,
+    ).toEqual({ kind: 'package', entryIndex: 0 })
+    expect(() =>
+      directExtensionDocumentSchema.parse({
+        schema_version: 1,
+        extensions: [
+          {
+            ...curated,
+            curation: {
+              ...curated.curation,
+              source_locator: { kind: 'package', entryIndex: -1 },
+            },
+          },
+        ],
+      }),
+    ).toThrow()
+    expect(() =>
+      directExtensionDocumentSchema.parse({
+        schema_version: 1,
+        extensions: [
+          {
+            ...curated,
+            curation: {
+              ...curated.curation,
+              source_locator: { kind: 'package', entryIndex: 256 },
+            },
+          },
+        ],
+      }),
+    ).toThrow()
+    expect(() =>
+      directExtensionDocumentSchema.parse({
+        schema_version: 1,
+        extensions: [
+          {
+            ...curated,
+            curation: {
+              ...curated.curation,
+              source_locator: {
+                kind: 'literal',
+                module: './catalog.ts',
+                catalogId: 'example.catalog',
+                entryIndex: 0,
+                extensionId: 'other.extension',
+              },
+            },
+          },
+        ],
+      }),
+    ).toThrow()
+  })
+
+  test('fails managed loading closed when any record is invalid or duplicated', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ctxindex-strict-loading-'))
+    roots.push(root)
+    const store = new DirectExtensionStore({
+      configRoot: join(root, 'config'),
+      dataRoot: join(root, 'data'),
+    })
+    await mkdir(join(root, 'config'), { recursive: true })
+
+    await writeFile(
+      store.recordsPath,
+      JSON.stringify({
+        schema_version: 1,
+        extensions: [record(), { id: 'invalid' }],
+      }),
+    )
+    expect(await store.readRecordsForLoading()).toEqual({
+      records: [],
+      diagnostics: ['Direct Extension record document is invalid'],
+    })
+
+    await writeFile(
+      store.recordsPath,
+      JSON.stringify({
+        schema_version: 1,
+        extensions: [record(), record()],
+      }),
+    )
+    expect(await store.readRecordsForLoading()).toEqual({
+      records: [],
+      diagnostics: ['Direct Extension record document is invalid'],
+    })
+  })
+
   test.each([
     'git+ssh://git@example.com/repository.git#main',
     'git@example.com:repository.git#main',
@@ -111,6 +253,7 @@ describe('direct Extension records', () => {
       source: {
         kind: 'git' as const,
         requested_target: requestedTarget,
+        repository: requestedTarget.replace(/#.*$/, ''),
         commit: 'b'.repeat(40),
       },
     }
@@ -138,6 +281,7 @@ describe('direct Extension records', () => {
             source: {
               kind: 'git',
               requested_target: requestedTarget,
+              repository: 'git+ssh://git@example.com/repository.git',
               commit: 'b'.repeat(40),
             },
           },
@@ -197,6 +341,69 @@ describe('direct Extension records', () => {
         join(directExtensionMaterializationPath(dataRoot, digest), 'index.ts'),
       ).exists(),
     ).toBe(true)
+  })
+
+  test('syncs every published file and containing directory before the record document', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ctxindex-direct-durable-'))
+    roots.push(root)
+    const configRoot = join(root, 'config')
+    const dataRoot = join(root, 'data')
+    const events: string[] = []
+    const store = new DirectExtensionStore({
+      configRoot,
+      dataRoot,
+      durability: {
+        syncFile: async (path) => {
+          events.push(`file:${relative(root, path)}`)
+        },
+        syncDirectory: async (path) => {
+          events.push(`directory:${relative(root, path)}`)
+          return 'synced'
+        },
+      },
+    })
+    const staging = join(root, 'staging')
+    await mkdir(join(staging, 'nested'), { recursive: true })
+    await writeFile(join(staging, 'index.ts'), 'export default 1')
+    await writeFile(join(staging, 'nested', 'asset.txt'), 'asset')
+    const digest = await hashDirectory(staging)
+
+    await store.publishMaterialization(staging, digest)
+    await store.writeRecords([record(digest)])
+
+    const recordSync = events.findIndex((event) =>
+      event.startsWith('file:config/direct-extensions.json.'),
+    )
+    expect(recordSync).toBeGreaterThan(-1)
+    const publicationEvents = events.slice(0, recordSync)
+    const publishedRoot = join(
+      'data',
+      'direct-extensions',
+      'materializations',
+      digest,
+    )
+    expect(publicationEvents).toEqual(
+      expect.arrayContaining([
+        `file:${join(publishedRoot, 'index.ts')}`,
+        `file:${join(publishedRoot, 'nested', 'asset.txt')}`,
+        `directory:${join(publishedRoot, 'nested')}`,
+        `directory:${publishedRoot}`,
+        `directory:${join('data', 'direct-extensions', 'materializations')}`,
+        `directory:${join('data', 'direct-extensions')}`,
+        `directory:data`,
+      ]),
+    )
+
+    events.length = 0
+    await store.publishMaterialization(staging, digest)
+    expect(events).toEqual(
+      expect.arrayContaining([
+        `file:${join(publishedRoot, 'index.ts')}`,
+        `file:${join(publishedRoot, 'nested', 'asset.txt')}`,
+        `directory:${join(publishedRoot, 'nested')}`,
+        `directory:${publishedRoot}`,
+      ]),
+    )
   })
 
   test('serializes writers and removes only unreferenced materializations', async () => {

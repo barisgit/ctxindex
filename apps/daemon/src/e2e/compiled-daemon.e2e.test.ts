@@ -730,14 +730,6 @@ describe.skipIf(process.platform !== 'darwin')(
           ['export', `ctx://${sourceId}/file/one`, '--format', 'text'],
           ['action', 'describe', 'missing.action'],
           ['purge', 'artifacts'],
-          [
-            'extensions',
-            'install',
-            'missing',
-            'fixture.missing@1',
-            '--trust',
-            '--no-refresh',
-          ],
         ]
         for (const args of statefulCommands) {
           const result = await runCli(runtime, args)

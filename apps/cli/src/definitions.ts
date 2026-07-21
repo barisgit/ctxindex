@@ -1,6 +1,6 @@
+import { join } from 'node:path'
 import * as CTXINDEX_BUILTIN_MODULE from '@ctxindex/adapters'
 import { DirectExtensionStore } from '@ctxindex/core'
-import { CatalogStore } from '@ctxindex/core/catalog'
 import { type CtxindexConfig, readConfig } from '@ctxindex/core/config'
 import {
   type LoadExtensionsResult,
@@ -19,20 +19,32 @@ export interface CliDefinitions extends LoadExtensionsResult {
 
 export interface LoadCliDefinitionsOptions {
   readonly config?: CtxindexConfig
+  readonly configRoot?: string
+  readonly dataRoot?: string
   readonly localOAuthAppIdentities?: readonly OAuthAppIdentity[]
 }
 
 export async function loadCliDefinitions(
   options: LoadCliDefinitionsOptions = {},
 ): Promise<CliDefinitions> {
-  const config = options.config ?? (await readConfig())
-  const installed = await new CatalogStore().readInstalled()
-  const direct = await new DirectExtensionStore().readRecordsForLoading()
+  const config =
+    options.config ??
+    (await readConfig(
+      options.configRoot === undefined
+        ? undefined
+        : join(options.configRoot, 'config.toml'),
+    ))
+  const installed = await new DirectExtensionStore({
+    ...(options.configRoot === undefined
+      ? {}
+      : { configRoot: options.configRoot }),
+    ...(options.dataRoot === undefined ? {} : { dataRoot: options.dataRoot }),
+  }).readRecordsForLoading()
   const loaded = await loadExtensions({
     config,
     builtins: CTXINDEX_BUILTIN_MODULE,
-    installed,
-    directInstalled: direct.records,
+    installed: installed.records,
+    ...(options.dataRoot === undefined ? {} : { dataRoot: options.dataRoot }),
     ...(options.localOAuthAppIdentities === undefined
       ? {}
       : { localOAuthAppIdentities: options.localOAuthAppIdentities }),
@@ -40,8 +52,8 @@ export async function loadCliDefinitions(
   return {
     ...loaded,
     diagnostics: [
-      ...direct.diagnostics.map((message) => ({
-        path: 'direct-records',
+      ...installed.diagnostics.map((message) => ({
+        path: 'installed-records',
         message,
       })),
       ...loaded.diagnostics,

@@ -17,7 +17,6 @@ import { configDir, dataDir } from '../paths'
 import {
   type DirectExtensionInstallationRecord,
   directExtensionDocumentSchema,
-  directExtensionInstallationRecordSchema,
 } from './schema'
 
 const DIGEST_PATTERN = /^[0-9a-f]{64}$/
@@ -86,14 +85,37 @@ async function fsyncFile(path: string): Promise<void> {
   }
 }
 
-async function fsyncTree(root: string): Promise<void> {
-  const entries = await readdir(root, { withFileTypes: true })
-  for (const entry of entries) {
-    const path = join(root, entry.name)
-    if (entry.isDirectory()) await fsyncTree(path)
-    else if (entry.isFile()) await fsyncFile(path)
+const UNSUPPORTED_DIRECTORY_SYNC_CODES = new Set([
+  'EBADF',
+  'EINVAL',
+  'ENOSYS',
+  'ENOTSUP',
+])
+
+function isUnsupportedDirectorySync(cause: unknown): boolean {
+  const code = (cause as NodeJS.ErrnoException).code ?? ''
+  return (
+    UNSUPPORTED_DIRECTORY_SYNC_CODES.has(code) ||
+    (process.platform === 'win32' && (code === 'EISDIR' || code === 'EPERM'))
+  )
+}
+
+export type DirectExtensionDirectoryDurability = 'synced' | 'unsupported'
+
+async function fsyncDirectory(
+  path: string,
+): Promise<DirectExtensionDirectoryDurability> {
+  let handle: Awaited<ReturnType<typeof open>> | undefined
+  try {
+    handle = await open(path, 'r')
+    await handle.sync()
+    return 'synced'
+  } catch (cause) {
+    if (!isUnsupportedDirectorySync(cause)) throw cause
+    return 'unsupported'
+  } finally {
+    await handle?.close()
   }
-  await fsyncFile(root)
 }
 
 async function delay(milliseconds: number): Promise<void> {
@@ -104,6 +126,25 @@ export interface DirectExtensionStoreOptions {
   readonly configRoot?: string
   readonly dataRoot?: string
   readonly lockTimeoutMs?: number
+  /** @internal Failure-injection seam for durability tests. */
+  readonly durability?: {
+    readonly syncFile: (path: string) => Promise<void>
+    readonly syncDirectory: (
+      path: string,
+    ) => Promise<DirectExtensionDirectoryDurability>
+  }
+}
+
+export class DirectExtensionRecordDurabilityError extends Error {
+  readonly recordRenamed = true
+
+  constructor(cause: unknown) {
+    super(
+      'Direct Extension record was renamed but its containing directory could not be synced',
+      { cause },
+    )
+    this.name = 'DirectExtensionRecordDurabilityError'
+  }
 }
 
 export class DirectExtensionStore {
@@ -111,10 +152,15 @@ export class DirectExtensionStore {
   readonly materializationsRoot: string
   readonly lockPath: string
   readonly lockTimeoutMs: number
+  private readonly dataRoot: string
+  private readonly durability: NonNullable<
+    DirectExtensionStoreOptions['durability']
+  >
 
   constructor(options: DirectExtensionStoreOptions = {}) {
     const configRoot = options.configRoot ?? configDir()
     const dataRoot = options.dataRoot ?? dataDir()
+    this.dataRoot = dataRoot
     this.recordsPath = join(configRoot, 'direct-extensions.json')
     this.materializationsRoot = join(
       dataRoot,
@@ -123,6 +169,10 @@ export class DirectExtensionStore {
     )
     this.lockPath = join(configRoot, '.direct-extensions.lock')
     this.lockTimeoutMs = options.lockTimeoutMs ?? 5_000
+    this.durability = options.durability ?? {
+      syncFile: fsyncFile,
+      syncDirectory: fsyncDirectory,
+    }
   }
 
   async readRecords(): Promise<readonly DirectExtensionInstallationRecord[]> {
@@ -154,45 +204,21 @@ export class DirectExtensionStore {
         diagnostics: ['Direct Extension records are not valid JSON'],
       }
     }
-    if (
-      parsed === null ||
-      typeof parsed !== 'object' ||
-      (parsed as { schema_version?: unknown }).schema_version !== 1 ||
-      !Array.isArray((parsed as { extensions?: unknown }).extensions)
-    ) {
+    const result = directExtensionDocumentSchema.safeParse(parsed)
+    if (!result.success) {
       return {
         records: [],
         diagnostics: ['Direct Extension record document is invalid'],
       }
     }
-    const records: DirectExtensionInstallationRecord[] = []
-    const diagnostics: string[] = []
-    const seen = new Set<string>()
-    const duplicate = new Set<string>()
-    for (const [index, candidate] of (
-      parsed as { extensions: readonly unknown[] }
-    ).extensions.entries()) {
-      const result =
-        directExtensionInstallationRecordSchema.safeParse(candidate)
-      if (!result.success) {
-        diagnostics.push(`Direct Extension record ${index} is invalid`)
-        continue
-      }
-      if (seen.has(result.data.id)) duplicate.add(result.data.id)
-      seen.add(result.data.id)
-      records.push(result.data)
-    }
-    for (const id of duplicate)
-      diagnostics.push(`Direct Extension ${id} has duplicate records`)
-    return {
-      records: records.filter((record) => !duplicate.has(record.id)),
-      diagnostics,
-    }
+    return { records: result.data.extensions, diagnostics: [] }
   }
 
   async writeRecords(
     records: readonly DirectExtensionInstallationRecord[],
-  ): Promise<void> {
+  ): Promise<{
+    readonly recordDirectoryDurability: DirectExtensionDirectoryDurability
+  }> {
     const document = directExtensionDocumentSchema.parse({
       schema_version: 1,
       extensions: [...records].sort((a, b) =>
@@ -205,9 +231,17 @@ export class DirectExtensionStore {
       await writeFile(temporary, `${JSON.stringify(document, null, 2)}\n`, {
         mode: 0o600,
       })
-      await fsyncFile(temporary)
+      await this.durability.syncFile(temporary)
       await rename(temporary, this.recordsPath)
-      await fsyncFile(dirname(this.recordsPath)).catch(() => undefined)
+      try {
+        return {
+          recordDirectoryDurability: await this.durability.syncDirectory(
+            dirname(this.recordsPath),
+          ),
+        }
+      } catch (cause) {
+        throw new DirectExtensionRecordDurabilityError(cause)
+      }
     } finally {
       await rm(temporary, { force: true })
     }
@@ -277,6 +311,7 @@ export class DirectExtensionStore {
           exitCode: 50,
         })
       }
+      await this.syncPublishedMaterialization(target)
       return target
     }
     const candidate = await mkdtemp(
@@ -293,7 +328,6 @@ export class DirectExtensionStore {
           'Staged materialization digest changed during publication',
         )
       }
-      await fsyncTree(candidate)
       try {
         await rename(candidate, target)
       } catch (cause) {
@@ -306,11 +340,27 @@ export class DirectExtensionStore {
           })
         }
       }
-      await fsyncFile(this.materializationsRoot)
+      await this.syncPublishedMaterialization(target)
       return target
     } finally {
       await rm(candidate, { recursive: true, force: true })
     }
+  }
+
+  private async syncPublishedMaterialization(root: string): Promise<void> {
+    const syncTree = async (directory: string): Promise<void> => {
+      const entries = await readdir(directory, { withFileTypes: true })
+      for (const entry of entries) {
+        const path = join(directory, entry.name)
+        if (entry.isDirectory()) await syncTree(path)
+        else if (entry.isFile()) await this.durability.syncFile(path)
+      }
+      await this.durability.syncDirectory(directory)
+    }
+    await syncTree(root)
+    await this.durability.syncDirectory(this.materializationsRoot)
+    await this.durability.syncDirectory(dirname(this.materializationsRoot))
+    await this.durability.syncDirectory(this.dataRoot)
   }
 
   async collectUnreferencedMaterializations(): Promise<void> {

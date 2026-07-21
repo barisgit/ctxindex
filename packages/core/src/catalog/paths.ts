@@ -1,11 +1,13 @@
+import { createHash } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import {
   CATALOG_MANIFEST_MAX_BYTES,
-  CATALOG_SETUP_MAX_BYTES,
   type CatalogManifest,
+  type CatalogReplayPayload,
   parseCatalogManifest,
   validateCatalogName,
+  validateCatalogPackagePath,
   validateCatalogRelativePath,
 } from './schema'
 
@@ -39,34 +41,64 @@ function isInside(root: string, target: string): boolean {
   )
 }
 
-async function validateSnapshotPath(
-  snapshotRoot: string,
-  relativePath: string,
-  kind: 'source' | 'setup',
-): Promise<void> {
-  const path = validateCatalogRelativePath(relativePath)
-  const canonicalRoot = await realpath(snapshotRoot)
+async function validateContainedPath(input: {
+  readonly snapshotRoot: string
+  readonly relativePath: string
+  readonly kind: 'module' | 'package' | 'resolution artifact'
+}): Promise<string> {
+  const path =
+    input.kind === 'package'
+      ? validateCatalogPackagePath(input.relativePath)
+      : validateCatalogRelativePath(input.relativePath)
+  const canonicalRoot = await realpath(input.snapshotRoot)
   let canonicalTarget: string
   try {
-    canonicalTarget = await realpath(resolve(snapshotRoot, path))
+    canonicalTarget = await realpath(resolve(input.snapshotRoot, path))
   } catch (cause) {
-    throw new TypeError(`Catalog ${kind} path does not exist: ${path}`, {
+    throw new TypeError(`Catalog ${input.kind} path does not exist: ${path}`, {
       cause,
     })
   }
   if (!isInside(canonicalRoot, canonicalTarget)) {
-    throw new TypeError(`Catalog ${kind} path escapes snapshot: ${path}`)
+    throw new TypeError(`Catalog ${input.kind} path escapes snapshot: ${path}`)
   }
   const info = await stat(canonicalTarget)
-  if (kind === 'source' && !info.isDirectory()) {
-    throw new TypeError(`Catalog source path is not a package root: ${path}`)
+  if (input.kind === 'package' ? !info.isDirectory() : !info.isFile()) {
+    throw new TypeError(
+      `Catalog ${input.kind} path is not a ${input.kind === 'package' ? 'directory' : 'regular file'}: ${path}`,
+    )
   }
-  if (kind === 'setup' && !info.isFile()) {
-    throw new TypeError(`Catalog setup path is not a regular file: ${path}`)
+  return canonicalTarget
+}
+
+async function validateReplay(
+  snapshotRoot: string,
+  replay: CatalogReplayPayload,
+  validatedArtifacts: Set<string>,
+): Promise<void> {
+  if (replay.source.kind === 'local') {
+    await validateContainedPath({
+      snapshotRoot,
+      relativePath: replay.source.path,
+      kind: 'package',
+    })
   }
-  if (kind === 'setup' && info.size > CATALOG_SETUP_MAX_BYTES) {
-    throw new TypeError(`Catalog setup file exceeds 1 MiB: ${path}`)
+  if (validatedArtifacts.has(replay.lock.path)) return
+  const artifact = await validateContainedPath({
+    snapshotRoot,
+    relativePath: replay.lock.path,
+    kind: 'resolution artifact',
+  })
+  const info = await stat(artifact)
+  if (info.size !== replay.lock.byteLength) {
+    throw new TypeError('Catalog resolution artifact byte length mismatch')
   }
+  const bytes = new Uint8Array(await Bun.file(artifact).arrayBuffer())
+  const digest = createHash('sha256').update(bytes).digest('hex')
+  if (digest !== replay.lock.digest) {
+    throw new TypeError('Catalog resolution artifact digest mismatch')
+  }
+  validatedArtifacts.add(replay.lock.path)
 }
 
 export async function validateCatalogSnapshot(
@@ -99,11 +131,23 @@ export async function validateCatalogSnapshot(
     throw new TypeError('Catalog manifest is not valid UTF-8', { cause })
   }
   const manifest = parseCatalogManifest(manifestText)
+  const validatedArtifacts = new Set<string>()
   for (const entry of manifest.extensions) {
-    await validateSnapshotPath(snapshotRoot, entry.source.path, 'source')
-    if (entry.setup !== undefined) {
-      await validateSnapshotPath(snapshotRoot, entry.setup.path, 'setup')
+    const replay =
+      entry.source.kind === 'literal'
+        ? entry.source.authorPackage
+        : entry.source.replay
+    if (entry.source.kind === 'literal') {
+      await validateContainedPath({
+        snapshotRoot,
+        relativePath: entry.source.locator.module,
+        kind: 'module',
+      })
+      if (entry.source.locator.catalogId !== manifest.catalog.id) {
+        throw new TypeError('Catalog literal locator Catalog id mismatch')
+      }
     }
+    await validateReplay(snapshotRoot, replay, validatedArtifacts)
   }
   return manifest
 }

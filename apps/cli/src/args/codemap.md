@@ -14,7 +14,7 @@ Pure argv parsing into typed discriminated command unions.
 - Ref-bearing parsers validate stable `ctx://` / Artifact Refs; search/sync/status/Action source flags remain strings for later label-or-ID resolution.
 - Source add preflights common grammar and potentially generated `--config-*` value shape before active-definition retrieval, then performs Adapter-specific option/type validation against that immutable projection.
 - `search.ts` permits query-less filtered remote execution and accepts a non-blank opaque `--continuation` only with `--remote`, exactly one `--source`, and no `--offset`; offsets remain local-only pagination.
-- `extensions.ts` keeps exact Catalog `<id>@<version>` selectors and trust/refresh flags distinct from direct `npm|git|local` target plus `--extension <id>` forms, and owns direct update/uninstall/force grammar without performing acquisition.
+- `extensions.ts` parses trusted package-backed `catalog build`, trusted Git Catalog add and versionless Catalog install, stored-or-refreshed Catalog list/show/search reads, explicit direct `npm|git|local` targets with `--extension <id>`, and one origin-neutral `uninstall <id> [--force]` grammar without performing acquisition.
 
 ## Data & control flow
 

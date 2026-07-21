@@ -46,13 +46,13 @@ describe('parseExtensionsArgs Catalog surface', () => {
         'catalog',
         'show',
         'team',
-        'fixture.extension@2',
+        'fixture.extension',
         '--json',
       ]),
     ).toEqual({
       kind: 'catalog-show',
       name: 'team',
-      extension: { id: 'fixture.extension', version: 2 },
+      extensionId: 'fixture.extension',
       noRefresh: false,
       json: true,
     })
@@ -68,28 +68,60 @@ describe('parseExtensionsArgs Catalog surface', () => {
     })
   })
 
-  test('parses install and uninstall exact selectors', () => {
+  test('parses Catalog build, Marketplace search, install, and uninstall', () => {
+    expect(
+      parseExtensionsArgs([
+        'catalog',
+        'build',
+        '/tmp/catalog',
+        '--catalog',
+        'fixture.catalog',
+        '--output',
+        '/tmp/catalog/ctxindex-catalog.json',
+        '--trust',
+        '--json',
+      ]),
+    ).toEqual({
+      kind: 'catalog-build',
+      packageRoot: '/tmp/catalog',
+      catalogId: 'fixture.catalog',
+      output: '/tmp/catalog/ctxindex-catalog.json',
+      trust: true,
+      json: true,
+    })
+    expect(parseExtensionsArgs(['search', 'calendar', '--json'])).toEqual({
+      kind: 'search',
+      query: 'calendar',
+      noRefresh: false,
+      json: true,
+    })
+    expect(parseExtensionsArgs(['search', '--no-refresh'])).toEqual({
+      kind: 'search',
+      noRefresh: true,
+      json: false,
+    })
     expect(
       parseExtensionsArgs([
         'install',
         'team',
-        'fixture.extension@1',
+        'fixture.extension',
         '--trust',
         '--json',
       ]),
     ).toEqual({
       kind: 'catalog-install',
       catalog: 'team',
-      extension: { id: 'fixture.extension', version: 1 },
+      extensionId: 'fixture.extension',
       trust: true,
       noRefresh: false,
       json: true,
     })
     expect(
-      parseExtensionsArgs(['uninstall', 'fixture.extension@1', '--json']),
+      parseExtensionsArgs(['uninstall', 'fixture.extension', '--json']),
     ).toEqual({
-      kind: 'catalog-uninstall',
-      extension: { id: 'fixture.extension', version: 1 },
+      kind: 'uninstall',
+      extensionId: 'fixture.extension',
+      force: false,
       json: true,
     })
   })
@@ -110,17 +142,32 @@ describe('parseExtensionsArgs Catalog surface', () => {
       parseExtensionsArgs([
         'install',
         'team',
-        'fixture.extension@1',
+        'fixture.extension',
         '--trust',
         '--no-refresh',
       ]),
     ).toEqual({
       kind: 'catalog-install',
       catalog: 'team',
-      extension: { id: 'fixture.extension', version: 1 },
+      extensionId: 'fixture.extension',
       trust: true,
       noRefresh: true,
       json: false,
+    })
+  })
+
+  test('reports the versionless Catalog show usage exactly', () => {
+    expect(parseExtensionsArgs(['catalog', 'show'])).toEqual({
+      kind: 'unknown',
+      message: 'extensions catalog show: expected <name> [<extension-id>]',
+    })
+  })
+
+  test('reports Catalog build output as a manifest file path', () => {
+    expect(parseExtensionsArgs(['catalog', 'build'])).toEqual({
+      kind: 'unknown',
+      message:
+        'extensions catalog build: expected <package-root> [--catalog <id>] [--output <manifest-path>]',
     })
   })
 
@@ -149,7 +196,7 @@ describe('parseExtensionsArgs Catalog surface', () => {
     expect(
       parseExtensionsArgs(['uninstall', 'example.mail', '--force', '--json']),
     ).toEqual({
-      kind: 'direct-uninstall',
+      kind: 'uninstall',
       extensionId: 'example.mail',
       force: true,
       json: true,
@@ -162,21 +209,21 @@ describe('parseExtensionsArgs Catalog surface', () => {
     'local',
   ])('keeps %s available as a Catalog name', (catalog) => {
     expect(
-      parseExtensionsArgs([
-        'install',
-        catalog,
-        'fixture.extension@1',
-        '--trust',
-      ]),
+      parseExtensionsArgs(['install', catalog, 'fixture.extension', '--trust']),
     ).toMatchObject({ kind: 'catalog-install', catalog })
   })
 
   test.each([
     ['catalog', 'add', 'team', '/tmp/repo', '--ref', 'refs/heads/main'],
-    ['install', 'team', 'fixture.extension@1'],
     ['install', 'team', 'fixture.extension'],
-    ['uninstall', 'fixture.extension@0'],
+    ['install', 'team', 'fixture.extension@1', '--trust'],
+    ['install', 'team', 'fixture.extension'],
+    ['uninstall', 'fixture.extension@1'],
     ['catalog', 'show', 'team', 'fixture.extension@x'],
+    ['catalog', 'build'],
+    ['catalog', 'build', '/tmp/package'],
+    ['catalog', 'build', '/tmp/package', '--unknown'],
+    ['search', 'one', 'two'],
     ['catalog', 'list', '--unknown'],
     ['install', 'npm', '@example/mail'],
     ['install', '@example/mail'],

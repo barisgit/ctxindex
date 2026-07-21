@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite'
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import {
   defineAdapter,
@@ -9,8 +9,12 @@ import {
   docs,
 } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
-import { catalogSnapshotPath, type InstalledExtensionRecord } from '../catalog'
 import { defaultConfig } from '../config'
+import {
+  DirectExtensionStore,
+  type GenericExtensionInstallationRecord,
+  hashDirectory,
+} from '../direct-extension'
 import { runMigrations } from '../storage'
 import { createSandbox } from '../testing'
 import { testOAuthProvider } from '../testing/oauth-provider'
@@ -21,16 +25,54 @@ const databases: Database[] = []
 async function writeExtensionPackage(
   root: string,
   source: string,
+  entry = 'entry.ts',
 ): Promise<void> {
   await mkdir(root, { recursive: true })
   await writeFile(
     join(root, 'package.json'),
     JSON.stringify({
       name: '@ctxindex/catalog-fixture',
-      ctxindex: { extensions: ['./entry.ts'] },
+      ctxindex: { extensions: [`./${entry}`] },
     }),
   )
-  await writeFile(join(root, 'entry.ts'), source)
+  await writeFile(join(root, entry), source)
+}
+
+async function publishInstalledExtension(input: {
+  readonly root: string
+  readonly dataRoot: string
+  readonly id: string
+  readonly source?: string
+  readonly entry?: string
+}): Promise<GenericExtensionInstallationRecord> {
+  const staging = join(input.root, `staging-${input.id}`)
+  await writeExtensionPackage(
+    join(staging, 'package'),
+    input.source ??
+      `export default { kind: 'extension', id: '${input.id}', providers: [{ kind: 'provider', id: '${input.id}.provider', auth: { kind: 'none' } }], oauthApps: [], profiles: [], adapters: [] }\n`,
+    input.entry,
+  )
+  const materializationDigest = await hashDirectory(staging)
+  await new DirectExtensionStore({
+    configRoot: join(input.root, 'config'),
+    dataRoot: input.dataRoot,
+  }).publishMaterialization(staging, materializationDigest)
+  return {
+    id: input.id,
+    source: {
+      kind: 'local',
+      requested_target: `/unavailable/${input.id}`,
+      content_digest: 'd'.repeat(64),
+    },
+    dependency_resolution: {
+      format: 'bun.lock@1.3.14',
+      digest: 'e'.repeat(64),
+    },
+    materialization_digest: materializationDigest,
+    package_root: 'package',
+    installed_at: 10,
+    updated_at: 20,
+  }
 }
 
 afterEach(() => {
@@ -513,50 +555,53 @@ export default defineExtension({ id: 'fixture.redaction', oauthApps: [app] })
     ).rejects.toThrow('Duplicate OAuth App')
   })
 
-  test('loads exact installed Catalog provenance offline', async () => {
+  test('loads curated generic records offline after the data root is relocated', async () => {
     const sandbox = await createSandbox()
     try {
+      const originalDataRoot = join(sandbox.dir, 'original-data')
+      const relocatedDataRoot = join(sandbox.dir, 'relocated-data')
       const commit = 'a'.repeat(40)
-      const snapshot = catalogSnapshotPath(
-        sandbox.env.CTXINDEX_DATA_HOME,
-        'fixture',
-        commit,
-      )
-      await mkdir(snapshot, { recursive: true })
-      await writeExtensionPackage(
-        join(snapshot, 'extension-package'),
-        `export default { kind: 'extension', id: 'fixture.installed', providers: [], oauthApps: [], profiles: [], adapters: [] }\n`,
-      )
-      await writeFile(
-        join(snapshot, 'ctxindex-catalog.json'),
-        JSON.stringify({
-          schemaVersion: 1,
-          catalog: { id: 'fixture.catalog', name: 'Fixture' },
-          extensions: [
-            {
-              id: 'fixture.installed',
-              version: 1,
-              source: { kind: 'inline', path: 'extension-package' },
-            },
-          ],
-        }),
-      )
-      const installed: InstalledExtensionRecord = {
+      const generic = await publishInstalledExtension({
+        root: sandbox.dir,
+        dataRoot: originalDataRoot,
         id: 'fixture.installed',
-        version: 1,
-        catalog_name: 'fixture',
-        catalog_id: 'fixture.catalog',
-        repository: '/local/catalog.git',
-        commit,
-        snapshot_acquired_at: 1,
-        source_path: 'extension-package',
+        entry: 'catalog.ts',
+        source: `const extension = (id) => ({ kind: 'extension', id, providers: [], oauthApps: [], profiles: [], adapters: [] })
+export default {
+  kind: 'catalog',
+  id: 'fixture.catalog',
+  label: 'Fixture Catalog',
+  extensions: [extension('fixture.first'), extension('fixture.second'), extension('fixture.installed')],
+}
+`,
+      })
+      const sourceLocator = {
+        kind: 'literal' as const,
+        module: './catalog.ts',
+        catalogId: 'fixture.catalog',
+        entryIndex: 2,
+        extensionId: generic.id,
       }
+      const installed: GenericExtensionInstallationRecord = {
+        ...generic,
+        curation: {
+          extension_id: generic.id,
+          catalog_name: 'fixture',
+          catalog_id: 'fixture.catalog',
+          repository: 'https://example.invalid/catalog.git',
+          commit,
+          snapshot_acquired_at: 1,
+          source_locator: sourceLocator,
+          execution_materialization_digest: generic.materialization_digest,
+        },
+      }
+      await rename(originalDataRoot, relocatedDataRoot)
 
       const result = await loadExtensions({
         config: defaultConfig(),
         builtins: {},
         installed: [installed],
-        dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
+        dataRoot: relocatedDataRoot,
       })
 
       expect(result.registry.list().map(({ id }) => id)).toEqual([
@@ -569,10 +614,16 @@ export default defineExtension({ id: 'fixture.redaction', oauthApps: [app] })
           kind: 'catalog',
           catalog: 'fixture',
           catalogId: 'fixture.catalog',
-          repository: '/local/catalog.git',
+          repository: 'https://example.invalid/catalog.git',
           commit,
           snapshotAcquiredAt: 1,
-          sourcePath: 'extension-package',
+          sourceLocator,
+          sourceKind: 'local',
+          requestedTarget: '/unavailable/fixture.installed',
+          resolvedIdentity: 'd'.repeat(64),
+          materializationDigest: generic.materialization_digest,
+          installedAt: 10,
+          updatedAt: 20,
         },
       ])
     } finally {
@@ -580,34 +631,65 @@ export default defineExtension({ id: 'fixture.redaction', oauthApps: [app] })
     }
   })
 
-  test('keeps built-ins active when an installed Catalog identity conflicts', async () => {
+  test('loads a curated package record through exact Extension selection', async () => {
     const sandbox = await createSandbox()
     try {
+      const generic = await publishInstalledExtension({
+        root: sandbox.dir,
+        dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
+        id: 'fixture.curated-package',
+        source: `export const sibling = { kind: 'extension', id: 'fixture.unselected', providers: [], oauthApps: [], profiles: [], adapters: [] }
+export default { kind: 'extension', id: 'fixture.curated-package', providers: [], oauthApps: [], profiles: [], adapters: [] }
+`,
+      })
       const commit = 'c'.repeat(40)
-      const snapshot = catalogSnapshotPath(
-        sandbox.env.CTXINDEX_DATA_HOME,
-        'fixture',
-        commit,
-      )
-      await mkdir(snapshot, { recursive: true })
-      await writeExtensionPackage(
-        join(snapshot, 'extension-package'),
-        `export default { kind: 'extension', id: 'fixture.builtin', providers: [{ kind: 'provider', id: 'fixture.catalog-provider', auth: { kind: 'none' } }], oauthApps: [], profiles: [], adapters: [] }\n`,
-      )
-      await writeFile(
-        join(snapshot, 'ctxindex-catalog.json'),
-        JSON.stringify({
-          schemaVersion: 1,
-          catalog: { id: 'fixture.catalog', name: 'Fixture' },
-          extensions: [
-            {
-              id: 'fixture.builtin',
-              version: 1,
-              source: { kind: 'inline', path: 'extension-package' },
-            },
-          ],
+      const installed: GenericExtensionInstallationRecord = {
+        ...generic,
+        curation: {
+          extension_id: generic.id,
+          catalog_name: 'community',
+          catalog_id: 'community.catalog',
+          repository: 'https://example.invalid/community.git',
+          commit,
+          snapshot_acquired_at: 30,
+          source_locator: { kind: 'package', entryIndex: 4 },
+          execution_materialization_digest: generic.materialization_digest,
+        },
+      }
+
+      const result = await loadExtensions({
+        config: defaultConfig(),
+        builtins: {},
+        installed: [installed],
+        dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
+      })
+
+      expect(result.registry.list().map(({ id }) => id)).toEqual([
+        'fixture.curated-package',
+      ])
+      expect(result.diagnostics).toEqual([])
+      expect(result.provenance).toEqual([
+        expect.objectContaining({
+          id: 'fixture.curated-package',
+          kind: 'catalog',
+          catalog: 'community',
+          catalogId: 'community.catalog',
+          sourceLocator: { kind: 'package', entryIndex: 4 },
         }),
-      )
+      ])
+    } finally {
+      await sandbox.cleanup()
+    }
+  })
+
+  test('degrades only a colliding generic installed record', async () => {
+    const sandbox = await createSandbox()
+    try {
+      const installed = await publishInstalledExtension({
+        root: sandbox.dir,
+        dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
+        id: 'fixture.builtin',
+      })
       const builtin = defineExtension({
         id: 'fixture.builtin',
         profiles: [],
@@ -617,18 +699,7 @@ export default defineExtension({ id: 'fixture.redaction', oauthApps: [app] })
       const result = await loadExtensions({
         config: defaultConfig(),
         builtins: { builtin },
-        installed: [
-          {
-            id: 'fixture.builtin',
-            version: 1,
-            catalog_name: 'fixture',
-            catalog_id: 'fixture.catalog',
-            repository: '/local/catalog.git',
-            commit,
-            snapshot_acquired_at: 1,
-            source_path: 'extension-package',
-          },
-        ],
+        installed: [installed],
         dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
       })
 
@@ -638,7 +709,7 @@ export default defineExtension({ id: 'fixture.redaction', oauthApps: [app] })
       ])
       expect(result.diagnostics).toEqual([
         {
-          path: join(snapshot, 'extension-package'),
+          path: 'installed:fixture.builtin',
           message: 'Conflicting Extension definition',
         },
       ])
@@ -647,33 +718,37 @@ export default defineExtension({ id: 'fixture.redaction', oauthApps: [app] })
     }
   })
 
-  test('reports missing installed snapshots without fetching or activating', async () => {
+  test('degrades a missing generic materialization without affecting siblings', async () => {
     const sandbox = await createSandbox()
     try {
-      const commit = 'b'.repeat(40)
+      const valid = await publishInstalledExtension({
+        root: sandbox.dir,
+        dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
+        id: 'fixture.available',
+      })
       const result = await loadExtensions({
         config: defaultConfig(),
         builtins: {},
         installed: [
           {
+            ...valid,
             id: 'fixture.missing',
-            version: 1,
-            catalog_name: 'missing',
-            catalog_id: 'missing.catalog',
-            repository: 'https://example.invalid/catalog.git',
-            commit,
-            snapshot_acquired_at: 1,
-            source_path: 'extension-package',
+            materialization_digest: 'f'.repeat(64),
           },
+          valid,
         ],
         dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
       })
 
-      expect(result.registry.list()).toEqual([])
-      expect(result.provenance).toEqual([])
+      expect(result.registry.list().map(({ id }) => id)).toEqual([
+        'fixture.available',
+      ])
+      expect(result.provenance).toEqual([
+        expect.objectContaining({ id: 'fixture.available', kind: 'direct' }),
+      ])
       expect(result.diagnostics).toHaveLength(1)
-      expect(result.diagnostics[0]?.message).toContain(
-        'Catalog Extension package could not be loaded',
+      expect(result.diagnostics[0]).toEqual(
+        expect.objectContaining({ path: 'installed:fixture.missing' }),
       )
     } finally {
       await sandbox.cleanup()

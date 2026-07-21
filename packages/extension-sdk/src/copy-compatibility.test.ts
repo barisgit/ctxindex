@@ -95,11 +95,23 @@ test('definitions compose across two physical SDK and Zod copies', async () => {
       profiles: [profile],
       adapters: [adapter],
     })
+    const catalog = sdkB.defineCatalog({
+      id: 'copy.catalog',
+      label: 'Copy Catalog',
+      extensions: [
+        extension,
+        sdkA.packageExtension(
+          { kind: 'npm', target: '@copy/package@^1' },
+          'copy.package',
+        ),
+      ],
+    })
 
     expect(sdkA.z).not.toBe(sdkB.z)
     expect(sdkA.z.ZodObject).not.toBe(sdkB.z.ZodObject)
     expect(extension.providers[0]).toBe(provider)
     expect(extension.profiles[0]).toBe(profile)
+    expect(catalog.extensions[0]).toBe(extension)
 
     const compileFixture = join(root, 'compile-fixture.ts')
     await writeFile(
@@ -130,6 +142,19 @@ sdkB.defineExtension({
   profiles: [profile],
   adapters: [adapter],
 })
+const extension = sdkA.defineExtension({ id: 'copy.extension' })
+const catalog: sdkB.AnyCatalogDefinition = sdkB.defineCatalog({
+  id: 'copy.catalog',
+  label: 'Copy Catalog',
+  extensions: [
+    extension,
+    sdkA.packageExtension(
+      { kind: 'local', target: './fixture' },
+      'copy.local',
+    ),
+  ],
+})
+void catalog
 `,
     )
     const tsgo = join(import.meta.dir, '../../../node_modules/.bin/tsgo')
