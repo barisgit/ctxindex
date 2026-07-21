@@ -483,7 +483,9 @@ export async function smokeExtensionSdkPackage(archive: string): Promise<void> {
           'defineProfile',
           'defineProvider',
           'docs',
+          'isSyncError',
           'packageExtension',
+          'syncError',
           'z',
         ])
     ) {

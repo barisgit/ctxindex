@@ -543,9 +543,18 @@ export async function smokeProfilesPackage(archive: string): Promise<void> {
     })
     const manifest = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
-    ) as { dependencies: Record<string, string> }
+    ) as {
+      dependencies: Record<string, string>
+      overrides?: Record<string, string>
+    }
     manifest.dependencies['@ctxindex/extension-sdk'] =
       localSdkArchive === undefined ? sdkVersion : `file:${localSdkArchive}`
+    if (localSdkArchive !== undefined) {
+      manifest.overrides = {
+        ...manifest.overrides,
+        '@ctxindex/extension-sdk': `file:${localSdkArchive}`,
+      }
+    }
     manifest.dependencies['@ctxindex/profiles'] = `file:${resolvedArchive}`
     await writeFile(
       join(root, 'package.json'),

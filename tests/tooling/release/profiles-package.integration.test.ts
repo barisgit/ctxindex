@@ -31,7 +31,7 @@ test('packs and verifies Profiles through a clean external install', async () =>
     }
     expect(paths.some((path) => path.includes('/src/'))).toBe(false)
     expect(checksum).toMatch(
-      /^[a-f0-9]{64} {2}ctxindex-profiles-0\.1\.0\.tgz\n$/,
+      /^[a-f0-9]{64} {2}ctxindex-profiles-0\.1\.1\.tgz\n$/,
     )
   } finally {
     await rm(root, { recursive: true, force: true })
