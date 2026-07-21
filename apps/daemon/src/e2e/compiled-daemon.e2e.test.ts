@@ -1005,14 +1005,34 @@ describe.skipIf(process.platform !== 'darwin')(
         daemon = startDaemon(runtime)
         await waitForReady(runtime, daemon)
 
+        const artifactList = await runCli(runtime, [
+          'artifact',
+          'list',
+          `ctx://${sourceId}/file/one`,
+          '--format',
+          'json',
+        ])
+        expect(artifactList.exitCode, artifactList.stderr).toBe(2)
+        expect(artifactList.stderr).not.toContain(
+          'unavailable while the local daemon owns the database',
+        )
+        const artifactPurge = await runCli(runtime, [
+          'artifact',
+          'purge',
+          '--format',
+          'json',
+        ])
+        expect(artifactPurge.exitCode, artifactPurge.stderr).toBe(0)
+        expect(JSON.parse(artifactPurge.stdout)).toMatchObject({
+          artifactCountRemoved: 0,
+          objectCountRemoved: 0,
+        })
+
         const statefulCommands: readonly (readonly string[])[] = [
           ['init'],
           ['account', 'add', 'google', '--app', 'unavailable'],
           ['account', 'list'],
           ['oauth-app', 'list'],
-          ['artifact', 'list', `ctx://${sourceId}/file/one`],
-          ['export', `ctx://${sourceId}/file/one`, '--format', 'text'],
-          ['artifact', 'purge'],
         ]
         for (const args of statefulCommands) {
           const result = await runCli(runtime, args)

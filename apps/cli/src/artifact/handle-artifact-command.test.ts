@@ -58,6 +58,12 @@ function direct(open: ArtifactCommandDeps['open']): ArtifactCommandDeps {
     list: async () => {
       throw new Error('daemon list must not run')
     },
+    download: async () => {
+      throw new Error('daemon download must not run')
+    },
+    transferToFile: async () => {
+      throw new Error('daemon transfer must not run')
+    },
     purge: async () => {
       throw new Error('daemon purge must not run')
     },
@@ -186,6 +192,30 @@ describe('artifact command output and handlers', () => {
         calls.push(['purge', selected, signal])
         return purged
       },
+      async download(
+        selected: unknown,
+        input: { readonly ref: string; readonly transfer: boolean },
+        signal?: AbortSignal,
+      ) {
+        calls.push(['download', selected, input, signal])
+        return {
+          artifact: downloaded.artifact,
+          cache: downloaded.cache,
+          transfer: {
+            ticket: 'b'.repeat(64),
+            byteSize: 4,
+            expiresAt: 10,
+          },
+        }
+      },
+      async transferToFile(
+        selected: unknown,
+        transfer: unknown,
+        outputPath: string,
+        signal?: AbortSignal,
+      ) {
+        calls.push(['transferToFile', selected, transfer, outputPath, signal])
+      },
       async open() {
         throw new Error('direct state must not open')
       },
@@ -204,6 +234,17 @@ describe('artifact command output and handlers', () => {
     ).toBe(0)
     expect(
       await handleArtifactCommand(
+        {
+          kind: 'download',
+          ref: artifactRef,
+          outputPath: '/tmp/file.bin',
+          json: true,
+        },
+        services,
+      ),
+    ).toBe(0)
+    expect(
+      await handleArtifactCommand(
         { kind: 'list', ref: 'bad-ref', format: 'json' },
         services,
       ),
@@ -213,6 +254,9 @@ describe('artifact command output and handlers', () => {
       'list',
       'ensure',
       'purge',
+      'ensure',
+      'download',
+      'transferToFile',
     ])
     log.mockRestore()
     error.mockRestore()

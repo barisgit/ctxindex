@@ -3,9 +3,12 @@ import type {
   ArtifactPurgeResult,
   ArtifactService,
 } from '@ctxindex/core/artifact'
+import { CtxindexError } from '@ctxindex/core/errors'
 import {
+  daemonArtifactDownload,
   daemonArtifactList,
   daemonArtifactPurge,
+  daemonTransferToFile,
   selectDaemon,
 } from '../daemon/client'
 import {
@@ -32,6 +35,8 @@ export interface ArtifactCommandDeps {
   readonly select: typeof selectDaemon
   readonly ensure?: typeof ensureDaemonSelection
   readonly list: typeof daemonArtifactList
+  readonly download: typeof daemonArtifactDownload
+  readonly transferToFile: typeof daemonTransferToFile
   readonly purge: typeof daemonArtifactPurge
   readonly open: OpenArtifactDeps
 }
@@ -40,6 +45,8 @@ const defaultDeps: ArtifactCommandDeps = {
   select: selectDaemon,
   ensure: ensureDaemonSelection,
   list: daemonArtifactList,
+  download: daemonArtifactDownload,
+  transferToFile: daemonTransferToFile,
   purge: daemonArtifactPurge,
   open: openDeps,
 }
@@ -130,13 +137,37 @@ export async function handleArtifactCommand(
       return 0
     }
 
-    deps = await services.open()
-    const result = await deps.artifactService.download(input.ref, {
-      ...(input.outputPath === undefined
-        ? {}
-        : { outputPath: input.outputPath }),
-      signal: controller.signal,
-    })
+    const result = selection
+      ? await (async () => {
+          const prepared = await services.download(
+            selection,
+            { ref: input.ref, transfer: input.outputPath !== undefined },
+            controller.signal,
+          )
+          const { transfer, ...receipt } = prepared
+          if (input.outputPath === undefined) return receipt
+          if (!transfer)
+            throw new CtxindexError(
+              'The daemon did not prepare the Artifact byte transfer',
+              'data_integrity',
+            )
+          await services.transferToFile(
+            selection,
+            transfer,
+            input.outputPath,
+            controller.signal,
+          )
+          return { ...receipt, outputPath: input.outputPath }
+        })()
+      : await (async () => {
+          deps = await services.open()
+          return deps.artifactService.download(input.ref, {
+            ...(input.outputPath === undefined
+              ? {}
+              : { outputPath: input.outputPath }),
+            signal: controller.signal,
+          })
+        })()
     console.log(
       input.json
         ? formatArtifactDownloadJson(result)

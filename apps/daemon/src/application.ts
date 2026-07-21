@@ -4,8 +4,8 @@ import type {
   DescribeActionResult,
   RunActionResult,
 } from '@ctxindex/core/action'
-import type { OAuthAuthorizationResponsePrompt } from '@ctxindex/core/auth'
 import type { ArtifactService } from '@ctxindex/core/artifact'
+import type { OAuthAuthorizationResponsePrompt } from '@ctxindex/core/auth'
 import {
   type AuthService,
   isGrantCompatible,

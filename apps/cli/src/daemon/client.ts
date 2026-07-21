@@ -20,9 +20,10 @@ import {
   type RpcActionDescribeInput,
   type RpcActionDescribeResult,
   type RpcActionRunResult,
-  type RpcByteTransferDescriptor,
+  type RpcArtifactDownloadResult,
   type RpcArtifactListResult,
   type RpcArtifactPurgeResult,
+  type RpcByteTransferDescriptor,
   type RpcDocumentationGetInput,
   type RpcDocumentationGetResult,
   type RpcDocumentationListInput,
@@ -846,6 +847,18 @@ export async function daemonArtifactList(
   return invoke(
     signal,
     (client) => client.artifact.list({ ref }, requestOptions(signal)),
+    selection,
+  )
+}
+
+export async function daemonArtifactDownload(
+  selection: DaemonSelection,
+  input: { readonly ref: string; readonly transfer: boolean },
+  signal?: AbortSignal,
+): Promise<RpcArtifactDownloadResult> {
+  return invoke(
+    signal,
+    (client) => client.artifact.download(input, requestOptions(signal)),
     selection,
   )
 }
