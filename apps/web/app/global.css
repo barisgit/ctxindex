@@ -150,6 +150,43 @@
   text-decoration-line: underline;
 }
 
+.ctx-copy-button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-ctx-control);
+  border: 1px solid var(--ctx-terminal-muted);
+  padding-inline: 0.875rem;
+  color: var(--ctx-terminal-foreground);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  transition:
+    border-color 160ms ease-out,
+    background-color 160ms ease-out;
+}
+
+.ctx-copy-button:hover {
+  border-color: var(--ctx-terminal-muted-foreground);
+  background: var(--ctx-terminal-muted);
+}
+
+.ctx-copy-button:focus-visible {
+  outline: 2px solid var(--color-fd-ring);
+  outline-offset: 2px;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
 .legal-document code {
   border-radius: 0.25rem;
   background: var(--color-fd-muted);
@@ -170,6 +207,7 @@
 
 html {
   scrollbar-gutter: stable;
+  scroll-behavior: smooth;
 }
 
 html > body[data-scroll-locked] {
@@ -228,6 +266,12 @@ html > body[data-scroll-locked] {
 
   .ctx-cursor {
     animation: ctx-blink 1.1s step-end infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
   }
 }
 
