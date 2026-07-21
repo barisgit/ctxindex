@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-Houses external Extension examples that demonstrate the public authoring contract with deterministic data. The providerless tender fixture is detailed in `examples/tenders-extension/codemap.md`; the OAuth provider-backed issue-search graph is detailed in `examples/issues-extension/codemap.md`.
+Houses external Extension examples that demonstrate the public authoring contract through deterministic fixtures and bounded provider integrations. The providerless tender fixture is detailed in `examples/tenders-extension/codemap.md`; the OAuth provider-backed issue-search graph is detailed in `examples/issues-extension/codemap.md`; the credential-free GitHub REST sync demo is detailed in `examples/github-issues-extension/codemap.md`.
 
 ## Design/patterns
 
@@ -10,6 +10,7 @@ Houses external Extension examples that demonstrate the public authoring contrac
 - `examples/tenders-extension/extension.ts` exports ordinary SDK definition values and declares the adjacent `docs/` tree; `fixtures.ts` provides immutable typed inputs.
 - The example composes a strict schema, Profile, Adapter, and Extension under stable `enarocanje.*` IDs.
 - `examples/issues-extension/extension.ts` composes a strict issue Profile, OAuth Provider, public App, scoped remote-search Adapter, Extension root, and adjacent documentation tree under stable `example.*` IDs.
+- `examples/github-issues-extension/extension.ts` composes a strict `software.issue@1` Profile, `auth.none()` public GitHub Provider, host-scoped indexed sync Adapter, Extension root, and documentation tree under stable `github.*` and `ctxindex.github-issues-demo` IDs; `website-handoff.ts` keeps the live-demo setup contract available to the website.
 
 ## Data & control flow
 
@@ -18,6 +19,7 @@ Houses external Extension examples that demonstrate the public authoring contrac
 3. Sync emits source-scoped `upsertResource` operations and then a versioned `checkpoint` through `context.emit()`.
 4. The providerless Adapter performs no Account, Grant, token, or Provider egress resolution.
 5. The issue Adapter receives only host-scoped provider fetch, validates Source configuration and provider JSON, and normalizes remote results into `example.issue@1` Resources.
+6. The GitHub Adapter follows validated, bounded REST pagination through injected fetch, excludes pull requests, reconciles its complete Source snapshot with upserts/removals, and checkpoints sorted issue numbers with a one-page-only ETag fast path.
 
 ## Integration points
 
@@ -26,3 +28,4 @@ Houses external Extension examples that demonstrate the public authoring contrac
 - Fixture input: `examples/tenders-extension/fixtures.ts` (`TENDER_FIXTURES`, `TenderFixture`).
 - Runtime boundary: package-entry discovery, exported-value collection, complete-registry validation, and sync `context.emit()`.
 - Provider-backed proof: `examples/issues-extension/` uses reserved `.invalid` endpoints and a test-injected fetch fixture; no live provider egress or secret state is required.
+- Public-network demo: `examples/github-issues-extension/` allows only `api.github.com`, uses `auth.none()` with no stored credential, and documents a manual public-repository sync. Its tests inject response fixtures rather than contacting GitHub.
