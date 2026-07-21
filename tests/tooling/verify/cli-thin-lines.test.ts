@@ -7,7 +7,7 @@ import {
   discoverProductionCommandFiles,
   findThinCommandViolations,
   maxCommandLines,
-} from './cli-thin-lines'
+} from '../../../scripts/verify/cli-thin-lines'
 
 const tempDirs: string[] = []
 

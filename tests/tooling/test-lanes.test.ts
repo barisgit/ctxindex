@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as TOML from '@iarna/toml'
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const unitIgnoreGlobs = [
   '**/*.integration.test.ts',
   '**/*.e2e.test.ts',
@@ -13,6 +13,14 @@ const unitIgnoreGlobs = [
 
 type PackageJson = {
   scripts?: Record<string, string>
+}
+
+async function readTurboConfig(): Promise<TurboConfig> {
+  return JSON.parse(await Bun.file(join(repoRoot, 'turbo.json')).text())
+}
+
+type TurboConfig = {
+  tasks?: Record<string, { inputs?: unknown; outputs?: unknown }>
 }
 
 type Bunfig = {
@@ -65,6 +73,51 @@ async function runBunTest(cwd: string): Promise<{
 
   return { exitCode, output: `${stdout}\n${stderr}` }
 }
+
+test('repository verifiers declare focused Turbo cache inputs', async () => {
+  const turbo = await readTurboConfig()
+  const focusedTasks = [
+    '//#verify:package-dependencies',
+    '//#verify:architecture',
+    '//#verify:cli-no-business-logic',
+    '//#verify:cli-framework',
+    '//#verify:cli-command-drift',
+    '//#verify:cli-thin-lines',
+    '//#verify:cli-reference',
+    '//#verify:exports-map',
+    '//#verify:network-egress',
+  ]
+
+  for (const taskName of focusedTasks) {
+    const task = turbo.tasks?.[taskName]
+    expect(task, `missing turbo task ${taskName}`).toBeDefined()
+    expect(
+      asStringArray(task?.inputs, `${taskName}.inputs`).length,
+    ).toBeGreaterThan(0)
+    expect(task?.outputs).toEqual([])
+  }
+
+  expect(turbo.tasks?.['//#verify:cli-command-drift']?.inputs).toContain(
+    '**/*.{md,mdx,sh,ts,tsx}',
+  )
+  expect(turbo.tasks?.['//#verify:network-egress']?.inputs).toContain(
+    '{apps,packages}/**/*.ts',
+  )
+})
+
+test('root developer commands have one canonical package script surface', async () => {
+  const packageJson = await readPackageJson()
+
+  expect(await Bun.file(join(repoRoot, 'justfile')).exists()).toBe(false)
+  for (const duplicate of [
+    'dev:web',
+    'start:web',
+    'build:cli-package',
+    'with-timeout',
+  ]) {
+    expect(packageJson.scripts?.[duplicate]).toBeUndefined()
+  }
+})
 
 async function hasTestFile(
   directory: string,
@@ -150,12 +203,12 @@ test('root integration task names every repository-owned integration test', asyn
   const rootPackageJson = await readPackageJson()
   const command = script(rootPackageJson, 'test:integration:tooling')
   const integrationTests = [
-    ...(await readdir(join(repoRoot, 'scripts/release')))
+    ...(await readdir(join(repoRoot, 'tests/tooling/release')))
       .filter((path) => path.endsWith('.integration.test.ts'))
-      .map((path) => `scripts/release/${path}`),
-    ...(await readdir(join(repoRoot, 'scripts/verify')))
+      .map((path) => `tests/tooling/release/${path}`),
+    ...(await readdir(join(repoRoot, 'tests/tooling/verify')))
       .filter((path) => path.endsWith('.integration.test.ts'))
-      .map((path) => `scripts/verify/${path}`),
+      .map((path) => `tests/tooling/verify/${path}`),
   ]
 
   expect(integrationTests.length).toBeGreaterThan(0)
@@ -173,6 +226,7 @@ test('repository CI delegates independent gates to Turbo', async () => {
   expect(command).toContain('//#test:tooling')
   expect(command).toContain('//#verify:cli-framework')
   expect(command).toContain('//#verify:cli-command-drift')
+  expect(command).toContain('//#verify:network-egress')
   expect(command).not.toContain('--max-concurrency=1')
   expect(command).not.toContain('full-test-suite')
 })

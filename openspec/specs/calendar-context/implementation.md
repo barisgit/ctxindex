@@ -71,4 +71,4 @@ Calendar sync uses generic operation contexts. Adapter cursors retain an anchore
 
 ## Verification
 
-Profile tests cover timed/all-day validation and deterministic projections. Provider normalization, sync reconciliation, exact retrieval, and `scripts/verify/calendar-event-profile.integration.test.ts` prove both Adapters use the same generic seam.
+Profile tests cover timed/all-day validation and deterministic projections. Provider normalization, sync reconciliation, exact retrieval, and `tests/tooling/verify/calendar-event-profile.integration.test.ts` prove both Adapters use the same generic seam.

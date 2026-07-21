@@ -32,7 +32,7 @@ Implementation sidecars describe seams at the module/package level; `codemap.md`
 | Realm, Source, Resource, Ref, storage, orchestration, and other shared runtime behavior | Provider-neutral core |
 | Argument parsing, generated help, formatting, and service delegation | Thin CLI |
 
-Profiles define domain vocabulary; Providers define reusable external-service authorization; Adapters perform Source I/O and may be provider-bound or providerless; Extensions only bundle exact imported plain values. Core must remain provider-neutral, and the CLI must not absorb business logic. Repository gates such as `scripts/verify/module-architecture.test.ts`, `scripts/verify/cli-no-business-logic.ts`, and `scripts/verify/cli-thin-lines.ts` enforce these boundaries.
+Profiles define domain vocabulary; Providers define reusable external-service authorization; Adapters perform Source I/O and may be provider-bound or providerless; Extensions only bundle exact imported plain values. Core must remain provider-neutral, and the CLI must not absorb business logic. Repository gates such as `tests/tooling/verify/module-architecture.test.ts`, `scripts/verify/cli-no-business-logic.ts`, and `scripts/verify/cli-thin-lines.ts` enforce these boundaries.
 
 For non-trivial behavior changes, work from the active OpenSpec change and apply tasks in dependency order. If no current capability or approved change owns a new contract, create the OpenSpec change before implementation. Trivial fixes may proceed directly when they do not alter a stable contract.
 
@@ -51,7 +51,8 @@ ctxindex --help
 
 ```sh
 bun install
-bash scripts/verify/cli.sh
+bun run build:cli
+bun cli --help
 bun cli extension list
 bun cli describe
 ```
@@ -162,7 +163,7 @@ Do not run live provider tests from the general automated lane. Accepted live ch
 Start with the narrowest test or gate that directly covers the edit. Examples:
 
 ```sh
-bun test scripts/verify/repo-development-skill.test.ts
+bun test ././tests/tooling/verify/repo-development-skill.test.ts
 bun test <focused-test-path>
 bun run scripts/verify/cli-thin-lines.ts
 ```

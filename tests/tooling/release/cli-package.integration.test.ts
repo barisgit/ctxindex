@@ -2,7 +2,10 @@ import { expect, test } from 'bun:test'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { packCliPackage, smokeCliPackage } from './cli-package'
+import {
+  packCliPackage,
+  smokeCliPackage,
+} from '../../../scripts/release/cli-package'
 
 test('the exact packed CLI installs globally and runs outside the checkout', async () => {
   const sandbox = await mkdtemp(join(tmpdir(), 'ctxindex-package-smoke-test-'))

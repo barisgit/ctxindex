@@ -7,7 +7,7 @@ import {
   extractPackageImports,
   packageNameFromSpecifier,
   verifyWorkspaceDependencies,
-} from './package-dependencies'
+} from '../../../scripts/verify/package-dependencies'
 
 let fixtureRoot: string | undefined
 

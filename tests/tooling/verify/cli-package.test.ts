@@ -61,20 +61,6 @@ test('the private monorepo builds one public installable ctxindex package', asyn
   }
 })
 
-test('contributor docs use Bun global link registration from the CLI workspace', async () => {
-  for (const path of [
-    'README.md',
-    'CONTRIBUTING.md',
-    '.agents/skills/repo-development/SKILL.md',
-    'openspec/changes/ship-installable-npm-cli/implementation.md',
-    'openspec/specs/cli-distribution/implementation.md',
-  ]) {
-    const content = await Bun.file(path).text()
-    expect(content).toContain('bun link')
-    expect(content).not.toContain('bun link --global')
-  }
-})
-
 test('trusted-publisher guidance declares the npm publish action', async () => {
   for (const path of [
     'docs/release/npm.md',

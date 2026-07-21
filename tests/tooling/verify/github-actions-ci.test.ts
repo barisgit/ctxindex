@@ -65,7 +65,7 @@ function expectLane(
 
 test('pull request CI runs cached fast, integration, and E2E lanes in parallel', async () => {
   const workflowSource = await readFile(
-    new URL('../../.github/workflows/ci.yml', import.meta.url),
+    new URL('../../../.github/workflows/ci.yml', import.meta.url),
     'utf8',
   )
   const workflow = Bun.YAML.parse(workflowSource) as Workflow

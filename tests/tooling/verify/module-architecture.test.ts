@@ -2,10 +2,10 @@ import { expect, test } from 'bun:test'
 import { readdir } from 'node:fs/promises'
 import { CTXINDEX_BUILTIN_EXTENSIONS } from '@ctxindex/adapters'
 
-const adapterRoot = new URL('../../packages/adapters/src/', import.meta.url)
-const coreSourceRoot = new URL('../../packages/core/src/', import.meta.url)
-const cliRoot = new URL('../../apps/cli/src/', import.meta.url)
-const profileRoot = new URL('../../packages/profiles/src/', import.meta.url)
+const adapterRoot = new URL('../../../packages/adapters/src/', import.meta.url)
+const coreSourceRoot = new URL('../../../packages/core/src/', import.meta.url)
+const cliRoot = new URL('../../../apps/cli/src/', import.meta.url)
+const profileRoot = new URL('../../../packages/profiles/src/', import.meta.url)
 
 function isProductionTypeScript(name: string): boolean {
   return name.endsWith('.ts') && !name.endsWith('.test.ts')
@@ -264,7 +264,7 @@ test('built-in Extension root composes definitions without owning Adapter behavi
   expect(source).not.toContain("from 'zod'")
 })
 
-const sdkRoot = new URL('../../packages/extension-sdk/src/', import.meta.url)
+const sdkRoot = new URL('../../../packages/extension-sdk/src/', import.meta.url)
 
 test('public Extension SDK is a stable barrel over core-independent modules', async () => {
   const entries = await readdir(sdkRoot, { withFileTypes: true })
@@ -293,7 +293,7 @@ test('public Extension SDK is a stable barrel over core-independent modules', as
   expect(publicIndex).not.toMatch(/export (?:interface|function|class|const)\b/)
 })
 
-const formatRoot = new URL('../../apps/cli/src/format/', import.meta.url)
+const formatRoot = new URL('../../../apps/cli/src/format/', import.meta.url)
 
 test('registry presentation is split behind a declaration-free facade', async () => {
   const productionFiles = (await readdir(formatRoot, { withFileTypes: true }))
@@ -376,24 +376,10 @@ test('core subpaths target capability indexes without root shims', async () => {
       false,
     )
   }
-
-  expect(
-    await Bun.file(
-      new URL(
-        '../../scripts/verify/repo-development-skill.test.ts',
-        import.meta.url,
-      ),
-    ).exists(),
-  ).toBe(true)
-  expect(
-    await Bun.file(
-      new URL('meta/repo-development-skill.test.ts', coreSourceRoot),
-    ).exists(),
-  ).toBe(false)
 })
 
 test('secret backend selection has one explicit owner and no literal-secret CLI', async () => {
-  const cliRoot = new URL('../../apps/cli/src/', import.meta.url)
+  const cliRoot = new URL('../../../apps/cli/src/', import.meta.url)
   const deps = await Bun.file(new URL('deps.ts', cliRoot)).text()
   expect(deps).not.toContain('loadWritableSecretsStore')
   expect(deps).not.toMatch(/backend_unavailable[\s\S]{0,500}new FileBackend/)

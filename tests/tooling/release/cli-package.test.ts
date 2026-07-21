@@ -9,7 +9,7 @@ import {
   packageContentManifest,
   packCliPackage,
   readPackageFiles,
-} from './cli-package'
+} from '../../../scripts/release/cli-package'
 
 test('native keytar probe distinguishes a missing Linux host library', () => {
   expect(
