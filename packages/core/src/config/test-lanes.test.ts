@@ -92,6 +92,8 @@ test('unit lane is package-owned and excludes integration', async () => {
   expect(script(corePackageJson, 'test')).toContain(
     'CTXINDEX_KEYTAR_MOCK_FILE=',
   )
+  expect(script(corePackageJson, 'test')).toContain('--max-concurrency=1')
+  expect(script(corePackageJson, 'test')).toContain('--timeout=30000')
   expect(
     asStringArray(bunfig.test?.pathIgnorePatterns, 'pathIgnorePatterns'),
   ).toEqual(expect.arrayContaining([...unitIgnoreGlobs]))
