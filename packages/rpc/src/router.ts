@@ -11,12 +11,27 @@ import {
   type RpcRequestContext,
   type RpcResult,
   type RpcTransportContext,
+  rpcAccountAddEventSchema,
+  rpcAccountAddResultSchema,
+  rpcAccountListResultSchema,
+  rpcAccountRemoveResultSchema,
+  rpcAccountRespondResultSchema,
+  rpcActionDescribeResultSchema,
+  rpcActionRunResultSchema,
+  rpcArtifactDownloadResultSchema,
+  rpcArtifactListResultSchema,
+  rpcArtifactPurgeResultSchema,
   rpcDocumentationGetResultSchema,
   rpcDocumentationListResultSchema,
   rpcDocumentationSearchResultSchema,
+  rpcExportResultSchema,
   type rpcFailureRegistry,
   rpcFailureSchema,
   rpcHealthResultSchema,
+  rpcOAuthAppAddResultSchema,
+  rpcOAuthAppListResultSchema,
+  rpcOAuthAppRegistrationResultSchema,
+  rpcOAuthAppRemoveResultSchema,
   rpcProtocolIdentitySchema,
   rpcRealmAddResultSchema,
   rpcRealmListResultSchema,
@@ -24,6 +39,8 @@ import {
   rpcResultSchema,
   rpcRuntimeIdentitySchema,
   rpcSearchResultSchema,
+  rpcSecretsBackendSetResultSchema,
+  rpcSecretsStatusResultSchema,
   rpcShutdownAcceptedSchema,
   rpcSourceAddResultSchema,
   rpcSourceDefinitionsResultSchema,
@@ -345,6 +362,145 @@ export function createDaemonRouter(
           ),
         ),
     },
+    secrets: {
+      status: os.secrets.status
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.secrets.status(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcSecretsStatusResultSchema,
+            errors,
+          ),
+        ),
+      backend: {
+        set: os.secrets.backend.set
+          .use(compatibility)
+          .handler(({ input, context, signal, errors }) =>
+            invokeApplication(
+              () =>
+                application.secrets.backend.set(
+                  input,
+                  applicationContext(context, signal),
+                ),
+              rpcSecretsBackendSetResultSchema,
+              errors,
+            ),
+          ),
+      },
+    },
+    account: {
+      add: os.account.add
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeStreamApplication(
+            () =>
+              application.account.add(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcAccountAddEventSchema,
+            rpcAccountAddResultSchema,
+            errors,
+          ),
+        ),
+      respond: os.account.respond
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.account.respond(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcAccountRespondResultSchema,
+            errors,
+          ),
+        ),
+      list: os.account.list
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.account.list(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcAccountListResultSchema,
+            errors,
+          ),
+        ),
+      remove: os.account.remove
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.account.remove(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcAccountRemoveResultSchema,
+            errors,
+          ),
+        ),
+    },
+    oauthApp: {
+      registration: os.oauthApp.registration
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.oauthApp.registration(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcOAuthAppRegistrationResultSchema,
+            errors,
+          ),
+        ),
+      add: os.oauthApp.add
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.oauthApp.add(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcOAuthAppAddResultSchema,
+            errors,
+          ),
+        ),
+      list: os.oauthApp.list
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.oauthApp.list(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcOAuthAppListResultSchema,
+            errors,
+          ),
+        ),
+      remove: os.oauthApp.remove
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.oauthApp.remove(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcOAuthAppRemoveResultSchema,
+            errors,
+          ),
+        ),
+    },
     documentation: {
       list: os.documentation.list
         .use(compatibility)
@@ -498,6 +654,21 @@ export function createDaemonRouter(
           ),
         ),
     },
+    export: {
+      prepare: os.export.prepare
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.export.prepare(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcExportResultSchema,
+            errors,
+          ),
+        ),
+    },
     thread: {
       get: os.thread.get
         .use(compatibility)
@@ -509,6 +680,75 @@ export function createDaemonRouter(
                 applicationContext(context, signal),
               ),
             rpcThreadGetResultSchema,
+            errors,
+          ),
+        ),
+    },
+    action: {
+      describe: os.action.describe
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.action.describe(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcActionDescribeResultSchema,
+            errors,
+          ),
+        ),
+      run: os.action.run
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.action.run(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcActionRunResultSchema,
+            errors,
+          ),
+        ),
+    },
+    artifact: {
+      list: os.artifact.list
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.artifact.list(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcArtifactListResultSchema,
+            errors,
+          ),
+        ),
+      download: os.artifact.download
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.artifact.download(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcArtifactDownloadResultSchema,
+            errors,
+          ),
+        ),
+      purge: os.artifact.purge
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.artifact.purge(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcArtifactPurgeResultSchema,
             errors,
           ),
         ),

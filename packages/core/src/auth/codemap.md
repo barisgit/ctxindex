@@ -6,7 +6,7 @@ Owns provider-neutral Account authorization, private one-stable-Grant lifecycle,
 
 ## Design / patterns
 
-- `authorize-provider.ts` resolves one exact OAuth App label, derives Provider base scopes plus every loaded same-provider Adapter access scope, and completes loopback or validated pasted-callback consent through the imported Provider definition.
+- `authorize-provider.ts` resolves one exact OAuth App label, derives Provider base scopes plus every loaded same-provider Adapter access scope, and completes loopback or validated pasted-callback consent through the imported Provider definition. Its request-scoped abort signal closes the loopback listener and propagates through token and identity egress.
 - `selection.ts` owns deterministic scope union; OAuth modules isolate endpoints, token/identity validation, and host policy.
 - `createAuthService()` writes typed Grant refs plus a private snapshot of the selected App config, composes Account upsert transactionally, serializes mutations per exact Account identity, updates reauthorization in place under the same Grant ID, and reports cleanup-pending warnings with only Provider id, Grant id, lifecycle phase, and failed-entry count.
 - Refresh always uses the Grant-owned App snapshot and token refs, never the current App inventory or environment.

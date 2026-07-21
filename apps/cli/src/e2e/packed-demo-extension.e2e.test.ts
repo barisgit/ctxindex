@@ -1,10 +1,11 @@
 import { expect, test } from 'bun:test'
 import { createHash } from 'node:crypto'
-import { chmod, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { buildCompiledCliHarness } from './_compiled-cli-harness'
 
 const repoRoot = resolve(import.meta.dir, '../../../..')
 const demoPackageRoot = join(repoRoot, 'examples/tenders-extension')
@@ -33,8 +34,7 @@ async function runProcess(
 
 test('relocated compiled CLI installs and uses the exact packed demo artifact', async () => {
   const sandbox = await mkdtemp(join(tmpdir(), 'ctxindex-packed-demo-'))
-  const buildPath = join(sandbox, 'build', 'ctxindex')
-  const relocatedPath = join(sandbox, 'relocated', 'ctxindex')
+  const harness = await buildCompiledCliHarness()
   const tarballs = join(sandbox, 'tarballs')
   const extracted = join(sandbox, 'extracted')
   const packageRoot = join(extracted, 'package')
@@ -71,10 +71,9 @@ test('relocated compiled CLI installs and uses the exact packed demo artifact', 
     response.writeHead(404)
     response.end('not found')
   })
+  let cliEnv: Readonly<Record<string, string | undefined>> | undefined
 
   try {
-    await mkdir(join(sandbox, 'build'), { recursive: true })
-    await mkdir(join(sandbox, 'relocated'), { recursive: true })
     await mkdir(tarballs, { recursive: true })
     await mkdir(extracted, { recursive: true })
 
@@ -103,21 +102,6 @@ test('relocated compiled CLI installs and uses the exact packed demo artifact', 
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     const registry = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
 
-    const built = await runProcess(
-      [
-        'bun',
-        'build',
-        '--compile',
-        'apps/cli/bin/ctxindex.mjs',
-        '--outfile',
-        buildPath,
-      ],
-      { cwd: repoRoot },
-    )
-    expect(built.exitCode, `${built.stdout}\n${built.stderr}`).toBe(0)
-    await Bun.write(relocatedPath, Bun.file(buildPath))
-    await chmod(relocatedPath, 0o755)
-
     const env = {
       ...process.env,
       NODE_ENV: 'test',
@@ -128,8 +112,8 @@ test('relocated compiled CLI installs and uses the exact packed demo artifact', 
       CTXINDEX_KEYTAR_MOCK_FILE: join(sandbox, 'keytar.json'),
       BUN_CONFIG_REGISTRY: registry,
     }
-    const run = (args: readonly string[]) =>
-      runProcess([relocatedPath, ...args], { cwd: '/', env })
+    cliEnv = env
+    const run = (args: readonly string[]) => harness.run(args, env)
 
     expect((await run(['init'])).exitCode).toBe(0)
     const installed = await run([
@@ -225,6 +209,12 @@ test('relocated compiled CLI installs and uses the exact packed demo artifact', 
       warnings: [],
     })
   } finally {
+    if (cliEnv) {
+      await harness
+        .run(['daemon', 'stop', '--format', 'json'], cliEnv)
+        .catch(() => undefined)
+    }
+    await harness.cleanup()
     await new Promise<void>((resolve) => server.close(() => resolve()))
     await rm(sandbox, { recursive: true, force: true })
   }

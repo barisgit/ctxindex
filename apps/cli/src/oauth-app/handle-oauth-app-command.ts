@@ -1,6 +1,18 @@
 import { readEnvironmentVariable } from '@ctxindex/core/config'
 import { CtxindexValidationError } from '@ctxindex/core/errors'
+import type { OAuthAppInventoryItem } from '@ctxindex/core/oauth-app'
 import { assertInitialized } from '../commands/db'
+import {
+  daemonOAuthAppAdd,
+  daemonOAuthAppList,
+  daemonOAuthAppRegistration,
+  daemonOAuthAppRemove,
+  selectDaemon,
+} from '../daemon/client'
+import {
+  ensureDaemonSelection,
+  selectEnsuredDaemonRoute,
+} from '../daemon/ensure'
 import { loadCliDefinitions } from '../definitions'
 import { openDeps } from '../deps'
 import {
@@ -21,6 +33,12 @@ export interface OAuthAppCommandDeps {
   readonly open: typeof openDeps
   readonly assertInitialized: typeof assertInitialized
   readonly readEnvironmentVariable: typeof readEnvironmentVariable
+  readonly selectDaemon?: typeof selectDaemon
+  readonly ensureDaemonSelection?: typeof ensureDaemonSelection
+  readonly daemonOAuthAppRegistration?: typeof daemonOAuthAppRegistration
+  readonly daemonOAuthAppAdd?: typeof daemonOAuthAppAdd
+  readonly daemonOAuthAppList?: typeof daemonOAuthAppList
+  readonly daemonOAuthAppRemove?: typeof daemonOAuthAppRemove
 }
 
 export type OAuthAppCommandInput =
@@ -38,6 +56,12 @@ const defaultDeps: OAuthAppCommandDeps = {
   open: openDeps,
   assertInitialized,
   readEnvironmentVariable,
+  selectDaemon,
+  ensureDaemonSelection,
+  daemonOAuthAppRegistration,
+  daemonOAuthAppAdd,
+  daemonOAuthAppList,
+  daemonOAuthAppRemove,
 }
 
 export async function handleOAuthAppCommand(
@@ -46,7 +70,92 @@ export async function handleOAuthAppCommand(
 ): Promise<number> {
   let deps: Awaited<ReturnType<typeof openDeps>> | undefined
   let ownership: DirectDatabaseOwnership | undefined
+  const controller = new AbortController()
+  const cancel = () => controller.abort()
+  process.once('SIGINT', cancel)
   try {
+    if (services.selectDaemon) {
+      if (parsed.kind === 'add') {
+        const definitions = await services.loadDefinitions()
+        const provider = definitions.completeRegistry.providers.get(
+          parsed.provider,
+        )
+        if (!provider || provider.auth.kind !== 'oauth2') {
+          throw new CtxindexValidationError(
+            'invalid_oauth_selection',
+            `Unknown OAuth provider: ${parsed.provider}`,
+          )
+        }
+      }
+      await services.assertInitialized()
+      const daemon = await selectEnsuredDaemonRoute(
+        {
+          selectDaemon: services.selectDaemon,
+          ...(services.ensureDaemonSelection
+            ? { ensureDaemonSelection: services.ensureDaemonSelection }
+            : {}),
+        },
+        controller.signal,
+      )
+      if (daemon) {
+        if (parsed.kind === 'add') {
+          const registration = await (
+            services.daemonOAuthAppRegistration ?? daemonOAuthAppRegistration
+          )(daemon, parsed.provider, controller.signal)
+          const config: Record<string, string> = {}
+          for (const [field, name] of Object.entries(
+            registration.environment,
+          )) {
+            const value = services.readEnvironmentVariable(name)
+            if (value !== undefined) config[field] = value
+          }
+          await (services.daemonOAuthAppAdd ?? daemonOAuthAppAdd)(
+            daemon,
+            { provider: parsed.provider, label: parsed.label, config },
+            controller.signal,
+          )
+          console.log(formatOAuthAppAdded(parsed.provider, parsed.label))
+        } else if (parsed.kind === 'list') {
+          const result = await (
+            services.daemonOAuthAppList ?? daemonOAuthAppList
+          )(daemon, controller.signal)
+          const rows: OAuthAppInventoryItem[] = result.rows.map((row) => ({
+            providerId: row.providerId,
+            label: row.label,
+            origin: row.origin,
+            provenance:
+              row.provenance.kind === 'local'
+                ? { kind: 'local' }
+                : {
+                    kind: 'extension',
+                    source: row.provenance.source,
+                    ...(row.provenance.packageName === undefined
+                      ? {}
+                      : { packageName: row.provenance.packageName }),
+                    ...(row.provenance.packageVersion === undefined
+                      ? {}
+                      : { packageVersion: row.provenance.packageVersion }),
+                    ...(row.provenance.integrity === undefined
+                      ? {}
+                      : { integrity: row.provenance.integrity }),
+                    ...(row.provenance.commit === undefined
+                      ? {}
+                      : { commit: row.provenance.commit }),
+                  },
+          }))
+          console.log(formatOAuthAppInventory(rows, parsed.format))
+        } else {
+          await (services.daemonOAuthAppRemove ?? daemonOAuthAppRemove)(
+            daemon,
+            parsed.provider,
+            parsed.label,
+            controller.signal,
+          )
+          console.log(formatOAuthAppRemoved(parsed.provider, parsed.label))
+        }
+        return 0
+      }
+    }
     if (parsed.kind === 'add') {
       ownership = services.acquireOwnership()
       const definitions = await services.loadDefinitions({
@@ -97,7 +206,7 @@ export async function handleOAuthAppCommand(
       ) {
         throw new CtxindexValidationError(
           'invalid_filter',
-          `OAuth App label "${parsed.label}" is already taken for Provider "${parsed.provider}"`,
+          `OAuth App "${parsed.label}" already exists for Provider "${parsed.provider}"`,
         )
       }
       await deps.oauthAppService.addLocalApp({
@@ -126,6 +235,7 @@ export async function handleOAuthAppCommand(
     console.error(error instanceof Error ? error.message : String(error))
     return mapErrorToExit(error)
   } finally {
+    process.removeListener('SIGINT', cancel)
     await deps?.close()
     ownership?.close()
   }

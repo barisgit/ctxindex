@@ -2,7 +2,6 @@ import { Database } from 'bun:sqlite'
 import { expect, test } from 'bun:test'
 import { createHash } from 'node:crypto'
 import {
-  chmod,
   cp,
   mkdir,
   mkdtemp,
@@ -15,6 +14,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { buildCompiledCliHarness } from './_compiled-cli-harness'
 
 const repoRoot = new URL('../../../../', import.meta.url).pathname
 const fixtureRoot = join(import.meta.dir, 'fixtures', 'direct-extension')
@@ -71,8 +71,7 @@ function integrity(bytes: Uint8Array): string {
 
 test('relocated compiled CLI manages direct npm, Git, and local pins offline', async () => {
   const sandbox = await mkdtemp(join(tmpdir(), 'ctxindex-compiled-direct-'))
-  const buildPath = join(sandbox, 'build', 'ctxindex')
-  const relocatedPath = join(sandbox, 'relocated', 'ctxindex')
+  const harness = await buildCompiledCliHarness()
   const packages = join(sandbox, 'packages')
   const localPackage = join(packages, 'local')
   const gitPackage = join(packages, 'git')
@@ -88,6 +87,7 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
   let registryEnabled = true
   let registryRequests = 0
   const npmVersions = new Map<string, string>()
+  let cliEnv: Readonly<Record<string, string | undefined>> | undefined
 
   const server = createServer(async (request, response) => {
     registryRequests++
@@ -183,8 +183,6 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
   })
 
   try {
-    await mkdir(join(sandbox, 'build'), { recursive: true })
-    await mkdir(join(sandbox, 'relocated'), { recursive: true })
     await mkdir(packages, { recursive: true })
     await mkdir(tarballs, { recursive: true })
     await cp(join(fixtureRoot, 'local'), localPackage, { recursive: true })
@@ -250,21 +248,6 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
 
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     const registry = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
-    const build = await runProcess(
-      [
-        'bun',
-        'build',
-        '--compile',
-        'apps/cli/bin/ctxindex.mjs',
-        '--outfile',
-        buildPath,
-      ],
-      { cwd: repoRoot },
-    )
-    expect(build.exitCode, `${build.stdout}\n${build.stderr}`).toBe(0)
-    await Bun.write(relocatedPath, Bun.file(buildPath))
-    await chmod(relocatedPath, 0o755)
-    await rm(join(sandbox, 'build'), { recursive: true })
 
     const baseEnv = {
       ...process.env,
@@ -276,8 +259,9 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       CTXINDEX_KEYTAR_MOCK_FILE: join(sandbox, 'keytar.json'),
       BUN_CONFIG_REGISTRY: registry,
     }
+    cliEnv = baseEnv
     const run = (args: readonly string[], env = baseEnv) =>
-      runProcess([relocatedPath, ...args], { cwd: '/', env })
+      harness.run(args, env)
 
     const invalid = await run([
       'extension',
@@ -573,7 +557,7 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       ['thread', '--format', 'json', resourceRef],
       ['artifact', 'list', '--format', 'json', resourceRef],
       ['extension', 'catalog', 'list', '--no-refresh', '--format', 'json'],
-      ['skills', 'list', '--format', 'json'],
+      ['docs', 'get-skill', '--format', 'json'],
     ]) {
       const result = await run(args, offlineEnv)
       expect(result.exitCode, `${args.join(' ')}\n${result.stderr}`).toBe(0)
@@ -620,6 +604,12 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
     )
   } finally {
     registryEnabled = false
+    if (cliEnv) {
+      await harness
+        .run(['daemon', 'stop', '--format', 'json'], cliEnv)
+        .catch(() => undefined)
+    }
+    await harness.cleanup()
     server.closeAllConnections()
     if (server.listening) {
       await new Promise<void>((resolve) => server.close(() => resolve()))

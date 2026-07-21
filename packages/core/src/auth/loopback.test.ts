@@ -228,3 +228,22 @@ test('pasted redirect rejects a foreign callback or mismatched state', async () 
     message: 'OAuth authorization failed: invalid_callback',
   })
 })
+
+test('abort closes a pending loopback immediately', async () => {
+  const controller = new AbortController()
+  const pending = openOAuthLoopback({
+    provider,
+    authorizationEndpoint: 'http://127.0.0.1/oauth/test/authorize',
+    clientId: 'client',
+    scopes: [],
+    noBrowser: true,
+    emitAuthorizationUrl() {
+      controller.abort()
+    },
+    signal: controller.signal,
+  })
+  await expect(pending).rejects.toMatchObject({
+    code: 'oauth_failed',
+    message: 'OAuth authorization cancelled',
+  })
+})

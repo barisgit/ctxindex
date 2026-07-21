@@ -13,8 +13,8 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 
 ## Entry points
 
-- `package.json` — private workspace manifest for `apps/*`, `packages/*`, and package-managed `examples/*`, plus the root command surface; Turbo dispatches package-owned tasks, `cli` routes through `scripts/cli.sh`, and package scripts build, pack, verify, and smoke the public CLI and `@ctxindex/extension-sdk` artifacts.
-- `.github/workflows/ci.yml` and `.github/workflows/release.yml` — least-privilege cached fast/integration/E2E lanes and guarded exact-artifact npm trusted publishing with Bun 1.3.14.
+- `package.json` — private workspace manifest for `apps/*`, `packages/*`, and package-managed `examples/*`, plus the root command surface; Turbo dispatches package-owned tasks, `cli` routes through `scripts/cli.sh`, and package scripts build, pack, verify, and smoke the public CLI, Extension SDK, and Profiles artifacts.
+- `.github/workflows/ci.yml`, `release.yml`, and `publish-packages.yml` — least-privilege cached fast/integration/E2E lanes, the CLI binary release, and independently version-gated SDK/Profiles trusted publishing with Bun 1.3.14.
 - `.agents/skills/repo-development/SKILL.md` — triggered contributor doctrine, CLI workflow, and verification guidance.
 - `DESIGN.md` — project-wide visual doctrine for the adaptive ctxindex mark, semantic color roles, typography, component treatment, motion, and accessibility; the web app supplies its executable specimen.
 - `apps/cli/bin/ctxindex.mjs` — executable shim forwarding argv to `runCli` and assigning its exit code.

@@ -1,9 +1,9 @@
 import { expect } from 'bun:test'
-import { chmod, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import type { Sandbox } from '@ctxindex/core/testing'
+import type { CliResult, CompiledCliHarness } from './_compiled-cli-harness'
 import { startMockGmail } from './_mock-gmail'
 import { startMockGraph } from './_mock-graph'
 import { installLoopbackBrowser } from './_oauth-account'
@@ -12,20 +12,6 @@ import {
   mailboxReplayFixture,
   microsoftMailboxReplayMessages,
 } from './fixtures/mailbox-retrieval-artifact-replay'
-
-interface CliResult {
-  readonly stdout: string
-  readonly stderr: string
-  readonly exitCode: number
-}
-
-export interface CompiledCliHarness {
-  run(
-    args: readonly string[],
-    env: Readonly<Record<string, string | undefined>>,
-  ): Promise<CliResult>
-  cleanup(): Promise<void>
-}
 
 interface SafeRequest {
   readonly method: string
@@ -52,7 +38,6 @@ export interface MailboxReplayDriver {
   start(stateDir: string): Promise<ActiveMailboxReplayDriver>
 }
 
-const repoRoot = fileURLToPath(new URL('../../../../', import.meta.url))
 const unreachableLoopback = 'http://127.0.0.1:1'
 const realm = 'invented-mailbox-replay'
 const foreignSourceId = '01ARZ3NDEKTSV4RRFFQ69G5FAV'
@@ -226,70 +211,6 @@ export const mailboxReplayDrivers: readonly MailboxReplayDriver[] = [
   googleDriver,
   microsoftDriver,
 ]
-
-export function isolatedChildEnvironment(
-  env: Readonly<Record<string, string | undefined>>,
-): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(env).filter(
-      (entry): entry is [string, string] => entry[1] !== undefined,
-    ),
-  )
-}
-
-export async function buildCompiledCliHarness(): Promise<CompiledCliHarness> {
-  const dir = await mkdtemp(join(tmpdir(), 'ctxindex-mailbox-replay-bin-'))
-  const buildDir = join(dir, 'build')
-  const relocatedDir = join(dir, 'relocated')
-  const buildPath = join(buildDir, 'ctxindex')
-  const relocatedPath = join(relocatedDir, 'ctxindex')
-  await mkdir(buildDir, { recursive: true })
-  await mkdir(relocatedDir, { recursive: true })
-
-  const build = Bun.spawn(
-    [
-      'bun',
-      'build',
-      '--compile',
-      'apps/cli/bin/ctxindex.mjs',
-      '--outfile',
-      buildPath,
-    ],
-    { cwd: repoRoot, stdout: 'pipe', stderr: 'pipe' },
-  )
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(build.stdout).text(),
-    new Response(build.stderr).text(),
-    build.exited,
-  ])
-  expect(exitCode, `${stdout}\n${stderr}`).toBe(0)
-  await Bun.write(relocatedPath, Bun.file(buildPath))
-  await chmod(relocatedPath, 0o755)
-  await rm(buildDir, { recursive: true })
-
-  return {
-    async run(args, env) {
-      const child = Bun.spawn([relocatedPath, ...args], {
-        cwd: '/',
-        env: isolatedChildEnvironment(env),
-        stdin: null,
-        stdout: 'pipe',
-        stderr: 'pipe',
-      })
-      const [childStdout, childStderr, childExitCode] = await Promise.all([
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
-        child.exited,
-      ])
-      return {
-        stdout: childStdout,
-        stderr: childStderr,
-        exitCode: childExitCode,
-      }
-    },
-    cleanup: () => rm(dir, { recursive: true, force: true }),
-  }
-}
 
 async function runOk(
   harness: CompiledCliHarness,

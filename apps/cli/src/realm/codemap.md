@@ -2,12 +2,12 @@
 
 ## Responsibility
 
-Orchestrates Realm add/list across selected-daemon and direct core paths.
+Orchestrates Realm add/list across ensured-daemon and unsupported-platform direct core paths.
 
 ## Design / patterns
 
 - `commands/realm.ts` defines and validates add/list arguments, then passes a typed `RealmCommandInput` to the handler before any route or storage effect.
-- The handler installs request-scoped SIGINT cancellation and never opens direct dependencies after daemon selection.
+- The handler installs request-scoped SIGINT cancellation, ensures the daemon on supported platforms, and never opens direct dependencies after selection.
 - Realm inventory uses the shared compact JSON, escaped TSV, or width-aware pretty renderer with stable exit mapping in both daemon and direct modes.
 
 ## Integration points

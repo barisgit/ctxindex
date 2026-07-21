@@ -1,13 +1,13 @@
 import { Database } from 'bun:sqlite'
 import { expect, test } from 'bun:test'
-import { chmod, mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Sandbox } from '@ctxindex/core/testing'
+import { buildCompiledCliHarness } from './_compiled-cli-harness'
 import { type MockGraphMessage, startMockGraph } from './_mock-graph'
 import { installLoopbackBrowser } from './_oauth-account'
 
-const repoRoot = new URL('../../../../', import.meta.url).pathname
 const storageAcquireTrace = '[ctxindex-e2e] storage-acquire\n'
 
 function parseSourceId(stdout: string): string {
@@ -34,8 +34,12 @@ const messages: readonly MockGraphMessage[] = Array.from(
 
 test('compiled CLI serializes concurrent remote-search cache batches across processes', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'ctxindex-concurrent-search-'))
-  const buildPath = join(dir, 'build', 'ctxindex')
-  const binaryPath = join(dir, 'bin', 'ctxindex')
+  const harness = await buildCompiledCliHarness({
+    daemonBuildArgs: [
+      '--define',
+      '__CTXINDEX_E2E_TRACE_STORAGE_ACQUIRE__=true',
+    ],
+  })
   const sandbox = { dir } as Sandbox
   const graph = startMockGraph({
     messages,
@@ -43,34 +47,11 @@ test('compiled CLI serializes concurrent remote-search cache batches across proc
     tokenScopes: 'Calendars.Read Mail.ReadWrite User.Read',
   })
   let lockDatabase: Database | undefined
+  let env: Readonly<Record<string, string | undefined>> | undefined
 
   try {
-    await mkdir(join(dir, 'build'), { recursive: true })
-    await mkdir(join(dir, 'bin'), { recursive: true })
-    const build = Bun.spawn(
-      [
-        'bun',
-        'build',
-        '--compile',
-        '--define',
-        '__CTXINDEX_E2E_TRACE_STORAGE_ACQUIRE__=true',
-        'apps/cli/bin/ctxindex.mjs',
-        '--outfile',
-        buildPath,
-      ],
-      { cwd: repoRoot, stdout: 'pipe', stderr: 'pipe' },
-    )
-    const [buildStdout, buildStderr, buildExit] = await Promise.all([
-      new Response(build.stdout).text(),
-      new Response(build.stderr).text(),
-      build.exited,
-    ])
-    expect(buildExit, `${buildStdout}\n${buildStderr}`).toBe(0)
-    await Bun.write(binaryPath, Bun.file(buildPath))
-    await chmod(binaryPath, 0o755)
-
     const browserBin = await installLoopbackBrowser(dir)
-    const env = {
+    env = {
       ...process.env,
       ...graph.env(sandbox),
       CTXINDEX_CONFIG_HOME: join(dir, 'config'),
@@ -81,78 +62,24 @@ test('compiled CLI serializes concurrent remote-search cache batches across proc
       CTXINDEX_LOOPBACK_TIMEOUT_SECS: '5',
       PATH: `${browserBin}:${process.env.PATH ?? ''}`,
     }
-    const run = async (args: readonly string[]) => {
-      const child = Bun.spawn([binaryPath, ...args], {
-        cwd: '/',
-        env,
-        stdin: null,
-        stdout: 'pipe',
-        stderr: 'pipe',
-      })
-      const [stdout, stderr, exitCode] = await Promise.all([
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
-        child.exited,
-      ])
-      return { stdout, stderr, exitCode }
-    }
+    const run = (args: readonly string[]) => harness.run(args, env ?? {})
     const ok = async (args: readonly string[]) => {
       const result = await run(args)
       expect(result.exitCode, `${args.join(' ')}\n${result.stderr}`).toBe(0)
       return result
     }
-    const startObservedSearch = () => {
-      const child = Bun.spawn(
-        [
-          binaryPath,
-          'search',
-          'Concurrent',
-          '--remote',
-          '--source',
-          'work-mailbox',
-          '--limit',
-          '20',
-          '--format',
-          'json',
-        ],
-        {
-          cwd: '/',
-          env,
-          stdin: null,
-          stdout: 'pipe',
-          stderr: 'pipe',
-        },
-      )
-      let markAcquireReached: (() => void) | undefined
-      const acquireReached = new Promise<void>((resolve) => {
-        markAcquireReached = resolve
-      })
-      const stderr = (async () => {
-        const reader = child.stderr.getReader()
-        const decoder = new TextDecoder()
-        let output = ''
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          output += decoder.decode(value, { stream: true })
-          if (output.includes(storageAcquireTrace)) markAcquireReached?.()
-        }
-        output += decoder.decode()
-        return output.replaceAll(storageAcquireTrace, '')
-      })()
-      return {
-        acquireReached,
-        result: Promise.all([
-          new Response(child.stdout).text(),
-          stderr,
-          child.exited,
-        ]).then(([stdout, childStderr, exitCode]) => ({
-          stdout,
-          stderr: childStderr,
-          exitCode,
-        })),
-      }
-    }
+    const startObservedSearch = () =>
+      run([
+        'search',
+        'Concurrent',
+        '--remote',
+        '--source',
+        'work-mailbox',
+        '--limit',
+        '20',
+        '--format',
+        'json',
+      ])
 
     await ok(['init'])
     await ok(['realm', 'add', 'work'])
@@ -189,20 +116,21 @@ test('compiled CLI serializes concurrent remote-search cache batches across proc
       }),
     ])
     graph.releaseSearchBarrier()
-    await Promise.race([
-      Promise.all(pendingSearches.map(({ acquireReached }) => acquireReached)),
-      Bun.sleep(4000).then(() => {
-        throw new Error(
-          'Remote searches did not reach SQLite cache acquisition',
-        )
-      }),
-    ])
+    const startupLog = join(dir, 'state', 'daemon', 'startup.log')
+    const acquisitionDeadline = Date.now() + 4000
+    while (Date.now() <= acquisitionDeadline) {
+      const trace = await readFile(startupLog, 'utf8').catch(() => '')
+      if (trace.includes(storageAcquireTrace)) break
+      await Bun.sleep(10)
+    }
+    expect(
+      (await readFile(startupLog, 'utf8')).split(storageAcquireTrace).length -
+        1,
+    ).toBeGreaterThanOrEqual(1)
     lockDatabase.exec('ROLLBACK')
     lockDatabase.close()
     lockDatabase = undefined
-    const searches = await Promise.all(
-      pendingSearches.map(({ result }) => result),
-    )
+    const searches = await Promise.all(pendingSearches)
 
     expect(
       searches.every(({ exitCode }) => exitCode === 0),
@@ -255,6 +183,12 @@ test('compiled CLI serializes concurrent remote-search cache batches across proc
       }
       lockDatabase.close()
     }
+    if (env) {
+      await harness
+        .run(['daemon', 'stop', '--format', 'json'], env)
+        .catch(() => undefined)
+    }
+    await harness.cleanup()
     graph.stop()
     await rm(dir, { recursive: true, force: true })
   }

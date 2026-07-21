@@ -15,12 +15,15 @@ const repoRoot = resolve(import.meta.dir, '../..')
 const sdkRoot = join(repoRoot, 'packages/extension-sdk')
 const stagingRoot = join(repoRoot, 'dist/npm/extension-sdk-package')
 const tsc = join(repoRoot, 'node_modules/.bin/tsc')
+const semverPattern =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/
 
 export interface ExtensionSdkSourceManifest {
   readonly name: string
   readonly version: string
   readonly description: string
   readonly license: string
+  readonly private: boolean
   readonly type: string
   readonly dependencies: Readonly<Record<string, string>>
 }
@@ -93,10 +96,13 @@ function isAllowedPackagePath(path: string): boolean {
 export function createExtensionSdkPublishManifest(
   source: ExtensionSdkSourceManifest,
 ): ExtensionSdkPublishManifest {
+  if (!semverPattern.test(source.version)) {
+    throw new TypeError(`${source.version} is not a valid semantic version`)
+  }
   if (
     source.name !== '@ctxindex/extension-sdk' ||
-    source.version !== '0.1.0' ||
     source.license !== 'MIT' ||
+    source.private !== true ||
     source.type !== 'module' ||
     source.dependencies.zod !== '^4.4.3'
   ) {
@@ -129,6 +135,13 @@ export function createExtensionSdkPublishManifest(
     },
     dependencies: { zod: '^4.4.3' },
   }
+}
+
+export function extensionSdkPackageArchiveName(version: string): string {
+  if (!semverPattern.test(version)) {
+    throw new TypeError(`${version} is not a valid semantic version`)
+  }
+  return `ctxindex-extension-sdk-${version}.tgz`
 }
 
 export function assertSafeExtensionSdkPackageFiles(
@@ -192,6 +205,7 @@ export function assertSafeExtensionSdkPackageFiles(
     version: String(manifest.version ?? ''),
     description: String(manifest.description ?? ''),
     license: String(manifest.license ?? ''),
+    private: true,
     type: String(manifest.type ?? ''),
     dependencies:
       typeof manifest.dependencies === 'object' &&
@@ -355,7 +369,7 @@ export async function packExtensionSdkPackage(
   const resolvedDestination = resolve(destination)
   const archive = join(
     resolvedDestination,
-    `ctxindex-extension-sdk-${manifest.version}.tgz`,
+    extensionSdkPackageArchiveName(manifest.version),
   )
   await mkdir(resolvedDestination, { recursive: true, mode: 0o755 })
   await rm(archive, { force: true })
@@ -469,7 +483,9 @@ export async function smokeExtensionSdkPackage(archive: string): Promise<void> {
           'defineProfile',
           'defineProvider',
           'docs',
+          'isSyncError',
           'packageExtension',
+          'syncError',
           'z',
         ])
     ) {

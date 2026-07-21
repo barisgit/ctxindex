@@ -7,7 +7,10 @@ import {
   formatArtifactListPretty,
   formatArtifactListText,
 } from '../format/artifact'
-import { handleArtifactCommand } from './handle-artifact-command'
+import {
+  type ArtifactCommandDeps,
+  handleArtifactCommand,
+} from './handle-artifact-command'
 
 const originRef = 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/one'
 const artifactRef = `${originRef}/attachment/file`
@@ -49,6 +52,25 @@ const purged = {
   },
 }
 
+function direct(open: ArtifactCommandDeps['open']): ArtifactCommandDeps {
+  return {
+    select: () => null,
+    list: async () => {
+      throw new Error('daemon list must not run')
+    },
+    download: async () => {
+      throw new Error('daemon download must not run')
+    },
+    transferToFile: async () => {
+      throw new Error('daemon transfer must not run')
+    },
+    purge: async () => {
+      throw new Error('daemon purge must not run')
+    },
+    open,
+  }
+}
+
 describe('artifact command output and handlers', () => {
   test('formats deterministic compact text and JSON without binary or CAS paths', () => {
     expect(formatArtifactListText(listed)).toBe(
@@ -87,7 +109,7 @@ describe('artifact command output and handlers', () => {
     expect(
       await handleArtifactCommand(
         { kind: 'list', ref: originRef, format: 'json' },
-        open,
+        direct(open),
       ),
     ).toBe(0)
     expect(
@@ -98,7 +120,7 @@ describe('artifact command output and handlers', () => {
           outputPath: '/tmp/file.bin',
           json: false,
         },
-        open,
+        direct(open),
       ),
     ).toBe(0)
     expect(calls).toEqual([
@@ -125,7 +147,7 @@ describe('artifact command output and handlers', () => {
     const log = spyOn(console, 'log').mockImplementation(() => {})
 
     expect(
-      await handleArtifactCommand({ kind: 'purge', json: true }, open),
+      await handleArtifactCommand({ kind: 'purge', json: true }, direct(open)),
     ).toBe(0)
     expect(calls).toEqual(['purge'])
     expect(log).toHaveBeenCalledWith(JSON.stringify(purged))
@@ -142,10 +164,101 @@ describe('artifact command output and handlers', () => {
     expect(
       await handleArtifactCommand(
         { kind: 'download', ref: 'bad-ref', json: false },
-        open as never,
+        direct(open as never),
       ),
     ).toBe(2)
     expect(opened).toBe(false)
+    error.mockRestore()
+  })
+
+  test('validates then routes list and purge through one ensured daemon without opening direct state', async () => {
+    const calls: unknown[] = []
+    const selection = { endpoint: '/tmp/daemon.sock' }
+    const services = {
+      select: () => null,
+      ensure: async (signal?: AbortSignal) => {
+        calls.push(['ensure', signal])
+        return {
+          status: 'selected' as const,
+          selection: selection as never,
+          started: true,
+        }
+      },
+      async list(selected: unknown, ref: string, signal?: AbortSignal) {
+        calls.push(['list', selected, ref, signal])
+        return listed
+      },
+      async purge(selected: unknown, signal?: AbortSignal) {
+        calls.push(['purge', selected, signal])
+        return purged
+      },
+      async download(
+        selected: unknown,
+        input: { readonly ref: string; readonly transfer: boolean },
+        signal?: AbortSignal,
+      ) {
+        calls.push(['download', selected, input, signal])
+        return {
+          artifact: downloaded.artifact,
+          cache: downloaded.cache,
+          transfer: {
+            ticket: 'b'.repeat(64),
+            byteSize: 4,
+            expiresAt: 10,
+          },
+        }
+      },
+      async transferToFile(
+        selected: unknown,
+        transfer: unknown,
+        outputPath: string,
+        signal?: AbortSignal,
+      ) {
+        calls.push(['transferToFile', selected, transfer, outputPath, signal])
+      },
+      async open() {
+        throw new Error('direct state must not open')
+      },
+    } as ArtifactCommandDeps
+    const log = spyOn(console, 'log').mockImplementation(() => {})
+    const error = spyOn(console, 'error').mockImplementation(() => {})
+
+    expect(
+      await handleArtifactCommand(
+        { kind: 'list', ref: originRef, format: 'json' },
+        services,
+      ),
+    ).toBe(0)
+    expect(
+      await handleArtifactCommand({ kind: 'purge', json: true }, services),
+    ).toBe(0)
+    expect(
+      await handleArtifactCommand(
+        {
+          kind: 'download',
+          ref: artifactRef,
+          outputPath: '/tmp/file.bin',
+          json: true,
+        },
+        services,
+      ),
+    ).toBe(0)
+    expect(
+      await handleArtifactCommand(
+        { kind: 'list', ref: 'bad-ref', format: 'json' },
+        services,
+      ),
+    ).toBe(2)
+    expect(calls.map((call) => (call as unknown[])[0])).toEqual([
+      'ensure',
+      'list',
+      'ensure',
+      'purge',
+      'ensure',
+      'download',
+      'transferToFile',
+    ])
+    log.mockRestore()
     error.mockRestore()
   })
 })

@@ -3,6 +3,7 @@ import {
   assertSafeExtensionSdkPackageFiles,
   createExtensionSdkPublishManifest,
   type ExtensionSdkSourceManifest,
+  extensionSdkPackageArchiveName,
 } from '../../../scripts/release/extension-sdk-package'
 
 const sourceManifest: ExtensionSdkSourceManifest = {
@@ -10,6 +11,7 @@ const sourceManifest: ExtensionSdkSourceManifest = {
   version: '0.1.0',
   description: 'Type-safe authoring SDK for ctxindex Extensions and Catalogs.',
   license: 'MIT',
+  private: true,
   type: 'module',
   dependencies: { zod: '^4.4.3' },
 }
@@ -42,6 +44,32 @@ test('creates the minimal public Extension SDK manifest', () => {
     },
     dependencies: { zod: '^4.4.3' },
   })
+})
+
+test('preserves a future semantic version in the public manifest', () => {
+  const version = '2.3.4-beta.5+build.7'
+
+  expect(
+    createExtensionSdkPublishManifest({ ...sourceManifest, version }).version,
+  ).toBe(version)
+  expect(extensionSdkPackageArchiveName(version)).toBe(
+    `ctxindex-extension-sdk-${version}.tgz`,
+  )
+})
+
+test('rejects an invalid semantic version', () => {
+  expect(() =>
+    createExtensionSdkPublishManifest({
+      ...sourceManifest,
+      version: '02.3.4',
+    }),
+  ).toThrow('valid semantic version')
+})
+
+test('requires a private workspace manifest', () => {
+  expect(() =>
+    createExtensionSdkPublishManifest({ ...sourceManifest, private: false }),
+  ).toThrow('not publishable')
 })
 
 test('rejects workspace metadata, lifecycle scripts, secrets, and private imports', () => {

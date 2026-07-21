@@ -12,6 +12,7 @@ Coordinates transactional Source synchronization: validates Adapter emissions, s
 - Each validated emission advances cumulative count-only progress and awaits an optional observer, propagating consumer backpressure through the Adapter's awaited `emit` call.
 - `sync_locks` provides global mutual exclusion, including stale-lock recovery via process liveness; bounded warning/error summaries prevent unbounded persistence.
 - The only accepted operation contract is the current strict SDK `SyncEmission` union parsed by `emission.ts`; no prototype item/mail operation path remains.
+- Portable SDK `syncError()` values are recognized structurally and normalized to core `CtxindexSyncError` instances before durable status mapping and rethrow, so external Adapters do not import core or depend on class identity.
 
 ## Data & control flow
 
@@ -19,7 +20,7 @@ Coordinates transactional Source synchronization: validates Adapter emissions, s
 2. `run()` loads the Source and prior cursor, creates a running `sync_runs` row, recovers stale ownership, and atomically acquires the global `sync_locks` row.
 3. The drive emits through `parseSyncEmission()`; warnings are collected, checkpoints advance the prospective cursor, Resource refs are checked against the requested Source, and an optional observer receives cumulative progress in emission order.
 4. Non-diff runs transactionally apply upserts/removals via `ResourceStore`, persist checkpoints, advance `source_sync_state`, finalize counters/status, and release the lock. Diff runs calculate effects but roll back Resource writes and do not advance state.
-5. Cancellation/auth/provider failures finalize the run, map `source_sync_state` to `needs_auth` or `failed`, preserve the prior cursor, release the lock, and rethrow.
+5. Cancellation/auth/provider failures, including portable SDK sync failures, finalize the run, map `source_sync_state` to `needs_auth` or `failed`, preserve the prior cursor, release the lock, and rethrow the normalized core failure.
 
 ## Integration points
 

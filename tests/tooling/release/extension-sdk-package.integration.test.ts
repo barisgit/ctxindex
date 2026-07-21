@@ -21,7 +21,7 @@ test('packs and verifies the exact SDK artifact through a clean external install
     expect(paths).toContain('package/dist/index.d.ts')
     expect(paths.some((path) => path.includes('/src/'))).toBe(false)
     expect(checksum).toMatch(
-      /^[a-f0-9]{64} {2}ctxindex-extension-sdk-0\.1\.0\.tgz\n$/,
+      /^[a-f0-9]{64} {2}ctxindex-extension-sdk-0\.1\.1\.tgz\n$/,
     )
   } finally {
     await rm(root, { recursive: true, force: true })

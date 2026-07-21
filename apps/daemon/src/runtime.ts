@@ -2,19 +2,38 @@ import { randomUUID } from 'node:crypto'
 import { lstatSync, rmSync } from 'node:fs'
 import { userInfo } from 'node:os'
 import { join } from 'node:path'
-import { type AuthService, createAuthService } from '@ctxindex/core/auth'
-import { type CtxindexConfig, readConfig } from '@ctxindex/core/config'
+import { createAccountService } from '@ctxindex/core/account'
+import { describeAction, runAction } from '@ctxindex/core/action'
+import { ArtifactService } from '@ctxindex/core/artifact'
+import {
+  type AuthService,
+  authorizeProvider,
+  createAuthService,
+  resolveOAuthSelection,
+} from '@ctxindex/core/auth'
+import {
+  type CtxindexConfig,
+  readConfig,
+  readEnvironmentVariable,
+  writeConfig,
+} from '@ctxindex/core/config'
 import { DirectExtensionStore } from '@ctxindex/core/direct-extension'
 import {
   createDocumentationService,
   createExtensionDocumentationSource,
 } from '@ctxindex/core/documentation'
+import { CtxindexValidationError } from '@ctxindex/core/errors'
+import { exportSourceResource } from '@ctxindex/core/export'
 import {
   type LoadExtensionsResult,
   loadExtensions,
 } from '@ctxindex/core/extension'
 import { createLogger } from '@ctxindex/core/logger'
-import { listLocalOAuthAppIdentities } from '@ctxindex/core/oauth-app'
+import {
+  createOAuthAppService,
+  listLocalOAuthAppIdentities,
+  resolveManagedOAuthApp,
+} from '@ctxindex/core/oauth-app'
 import { createRealmService, type RealmService } from '@ctxindex/core/realm'
 import type {
   CompleteRegistry,
@@ -22,9 +41,12 @@ import type {
 } from '@ctxindex/core/registry'
 import { SearchPlanner } from '@ctxindex/core/search'
 import {
+  createSecretBackendManager,
   createSecretVault,
   FileBackend,
   KeychainBackend,
+  type SecretBackendManager,
+  type SecretVault,
 } from '@ctxindex/core/secrets'
 import {
   createSourceService,
@@ -38,6 +60,7 @@ import {
 } from '@ctxindex/core/storage'
 import { SyncApplicationService } from '@ctxindex/core/sync'
 import { createThreadService, type ThreadService } from '@ctxindex/core/thread'
+import type { OAuthProviderDefinition } from '@ctxindex/extension-sdk'
 import {
   assertRetainedDatabaseLeaseTarget,
   cleanupDiscoveryMetadata,
@@ -56,7 +79,14 @@ import {
 } from '@ctxindex/local-daemon'
 import * as CTXINDEX_BUILTIN_MODULE from '@ctxindex/official'
 import type { RpcFailure, RpcRequestContext } from '@ctxindex/rpc'
-import { DaemonApplication } from './application'
+import {
+  type DaemonAccountService,
+  type DaemonActionService,
+  DaemonApplication,
+  type DaemonIdleTimer,
+  type DaemonOAuthAppService,
+} from './application'
+import { ByteTransferStore } from './transfer'
 import {
   type BindDaemonTransportInput,
   bindDaemonTransport,
@@ -65,7 +95,20 @@ import {
 
 export const DAEMON_PROTOCOL = { id: 'ctxindex.local', version: 2 } as const
 const DEFAULT_OBSERVATION_TIMEOUT_MS = 5_000
+const DEFAULT_IDLE_TIMEOUT_MS = 5 * 60_000
 const PUBLIC_VERSION = /^[a-z0-9][a-z0-9.+_-]{0,63}$/i
+
+const productionIdleTimer: DaemonIdleTimer = {
+  now: Date.now,
+  setTimeout(callback, delayMs) {
+    const timer = setTimeout(callback, delayMs)
+    timer.unref?.()
+    return timer
+  },
+  clearTimeout(handle) {
+    clearTimeout(handle as ReturnType<typeof setTimeout>)
+  },
+}
 
 function buildVersion(): string {
   const candidate = process.env.CTXINDEX_BUILD_VERSION
@@ -103,10 +146,25 @@ export function removeOwnedDaemonEndpoint(path: string): void {
 }
 
 export interface DaemonServices {
+  readonly accountService?: DaemonAccountService
+  readonly actionService?: DaemonActionService
+  readonly exportService?: {
+    prepare(input: {
+      readonly ref: string
+      readonly format: string
+      readonly signal: AbortSignal
+    }): ReturnType<typeof exportSourceResource>
+  }
+  readonly artifactService?: Pick<
+    ArtifactService,
+    'list' | 'download' | 'downloadForTransfer' | 'purge'
+  >
   readonly authService?: Pick<AuthService, 'listGrants'>
+  readonly oauthAppService?: DaemonOAuthAppService
   readonly realmService?: Pick<RealmService, 'createRealm' | 'listRealms'>
   readonly registry?: ExtensionRegistry
   readonly searchService?: Pick<SearchPlanner, 'search'>
+  readonly secretBackendManager?: SecretBackendManager
   readonly resourceService?: {
     get(input: {
       readonly ref: string
@@ -166,6 +224,8 @@ export interface DaemonRuntimeHooks {
 export interface StartDaemonOptions {
   readonly roots: RuntimePathInput
   readonly endpointRuntimeRoot?: string
+  readonly idleTimeoutMs?: number
+  readonly idleTimer?: DaemonIdleTimer
   readonly observationTimeoutMs?: number
   readonly leaseBackend?: FileLeaseBackend
   readonly hooks?: Partial<DaemonRuntimeHooks>
@@ -209,6 +269,34 @@ function databaseLeaseConflict(databaseDigest: string): DaemonStartupFailure {
   })
 }
 
+export function validateDaemonOAuthAppConfig(
+  provider: OAuthProviderDefinition,
+  config: Readonly<Record<string, string>>,
+): Readonly<Record<string, unknown>> {
+  const allowedFields = new Set(
+    Object.keys(provider.auth.registration.environment),
+  )
+  if (Object.keys(config).some((field) => !allowedFields.has(field))) {
+    throw new CtxindexValidationError(
+      'invalid_filter',
+      'OAuth App configuration contains an unknown field',
+    )
+  }
+  const validated = provider.auth.registration.configSchema.safeParse(config)
+  if (
+    !validated.success ||
+    validated.data === null ||
+    typeof validated.data !== 'object' ||
+    Array.isArray(validated.data)
+  ) {
+    throw new CtxindexValidationError(
+      'invalid_filter',
+      'OAuth App configuration is invalid for the selected Provider',
+    )
+  }
+  return validated.data as Readonly<Record<string, unknown>>
+}
+
 async function productionServices(input: {
   readonly database: CtxindexDatabase
   readonly config: CtxindexConfig
@@ -227,10 +315,40 @@ async function productionServices(input: {
     realmService,
     registry: input.registry,
   })
-  const secretVault = createSecretVault({
-    fileStore: new FileBackend(),
-    keychainStore: new KeychainBackend(),
+  const fileStore = new FileBackend()
+  const keychainStore = new KeychainBackend()
+  let selectedVault = createSecretVault({
+    fileStore,
+    keychainStore,
     backend: input.config.secrets.backend,
+  })
+  const secretVault: SecretVault = {
+    get backend() {
+      return selectedVault.backend
+    },
+    getSecret: (ref) => selectedVault.getSecret(ref),
+    setSecret: (scope, key, value) =>
+      selectedVault.setSecret(scope, key, value),
+    deleteSecret: (ref) => selectedVault.deleteSecret(ref),
+    listKeys: () => selectedVault.listKeys(),
+  }
+  const secretBackendManager = createSecretBackendManager({
+    db: input.database,
+    fileStore,
+    keychainStore,
+    logger,
+    backend: input.config.secrets.backend,
+    commitBackend: async (target) => {
+      await writeConfig(
+        { ...input.config, secrets: { backend: target } },
+        join(input.roots.configRoot, 'config.toml'),
+      )
+      selectedVault = createSecretVault({
+        fileStore,
+        keychainStore,
+        backend: target,
+      })
+    },
   })
   const authService: AuthService = createAuthService({
     db: input.database,
@@ -238,8 +356,179 @@ async function productionServices(input: {
     logger,
     registry: input.completeRegistry,
   })
+  const accountService = createAccountService({ db: input.database })
+  const oauthAppService = createOAuthAppService({
+    db: input.database,
+    store: secretVault,
+    registry: input.completeRegistry,
+  })
+  const localOAuthAppGuidance = (providerId: string, label: string) =>
+    [
+      `Configure a local OAuth App with: bun cli oauth-app add ${providerId} ${label} --from-env`,
+      `Then authorize with: bun cli account add ${providerId} --app ${label}`,
+    ].join('. ')
+  const daemonAccountService: DaemonAccountService = {
+    authorize: async (accountInput, interaction, signal) => {
+      resolveOAuthSelection(input.completeRegistry, accountInput.provider)
+      let appLabel = accountInput.app
+      if (appLabel === undefined) {
+        const resolution = resolveManagedOAuthApp(
+          input.completeRegistry,
+          CTXINDEX_BUILTIN_MODULE.CTXINDEX_MANAGED_OAUTH_APP_POLICIES,
+          accountInput.provider,
+        )
+        if (resolution.status !== 'selected') {
+          throw new CtxindexValidationError(
+            'invalid_oauth_selection',
+            `No managed OAuth App is available for Provider "${accountInput.provider}". ${localOAuthAppGuidance(accountInput.provider, '<label>')}`,
+          )
+        }
+        appLabel = resolution.label
+      }
+      let app: Awaited<ReturnType<typeof oauthAppService.resolveApp>>
+      try {
+        app = await oauthAppService.resolveApp(accountInput.provider, appLabel)
+      } catch (error) {
+        if (
+          error instanceof CtxindexValidationError &&
+          error.code === 'invalid_oauth_selection'
+        ) {
+          const available = oauthAppService
+            .listApps()
+            .filter(
+              (candidate) => candidate.providerId === accountInput.provider,
+            )
+            .map((candidate) => candidate.label)
+            .sort()
+          const guidance =
+            available.length === 0
+              ? localOAuthAppGuidance(accountInput.provider, appLabel)
+              : `Available labels: ${available.join(', ')}`
+          throw new CtxindexValidationError(
+            'invalid_oauth_selection',
+            `OAuth App "${appLabel}" is not available for Provider "${accountInput.provider}". ${guidance}`,
+            { cause: error },
+          )
+        }
+        throw error
+      }
+      const result = await authorizeProvider(
+        {
+          provider: accountInput.provider,
+          app: appLabel,
+          mode: 'loopback',
+          ...(accountInput.label === undefined
+            ? {}
+            : { label: accountInput.label }),
+        },
+        {
+          registry: input.completeRegistry,
+          authService,
+          resolveApp: async (providerId, label) => {
+            if (providerId !== accountInput.provider || label !== appLabel) {
+              throw new CtxindexValidationError(
+                'invalid_oauth_selection',
+                'OAuth App selection changed during authorization',
+              )
+            }
+            return app
+          },
+          readAuthorizationResponse: interaction.readAuthorizationResponse,
+          signal,
+          launchBrowser: () => {},
+          readEnvironment: (name) =>
+            name === 'CTXINDEX_NO_BROWSER'
+              ? '1'
+              : name === 'CTXINDEX_OAUTH_MOCK_BASE_URL' &&
+                  accountInput.oauthMockBaseUrl !== undefined
+                ? accountInput.oauthMockBaseUrl
+                : name === 'CTXINDEX_LOOPBACK_TIMEOUT_SECS' &&
+                    accountInput.loopbackTimeoutSeconds !== undefined
+                  ? String(accountInput.loopbackTimeoutSeconds)
+                  : readEnvironmentVariable(name),
+        },
+      )
+      return { accountId: result.accountId }
+    },
+    list: () => accountService.listAccountInventory(),
+    remove: (label) => authService.removeAccount(label),
+  }
+  const daemonOAuthAppService: DaemonOAuthAppService = {
+    registration: (providerId) => {
+      const provider = input.completeRegistry.providers.get(providerId)
+      if (!provider || provider.auth.kind !== 'oauth2') {
+        throw new CtxindexValidationError(
+          'invalid_oauth_selection',
+          `Unknown OAuth provider: ${providerId}`,
+        )
+      }
+      return provider.auth.registration.environment
+    },
+    add: async (appInput) => {
+      const provider = input.completeRegistry.providers.get(appInput.provider)
+      if (!provider || provider.auth.kind !== 'oauth2') {
+        throw new CtxindexValidationError(
+          'invalid_oauth_selection',
+          `Unknown OAuth provider: ${appInput.provider}`,
+        )
+      }
+      validateDaemonOAuthAppConfig(
+        provider as OAuthProviderDefinition,
+        appInput.config,
+      )
+      await oauthAppService.addLocalApp({
+        providerId: appInput.provider,
+        label: appInput.label,
+        config: appInput.config,
+      })
+    },
+    list: () => oauthAppService.listApps(),
+    remove: (providerId, label) =>
+      oauthAppService.removeLocalApp(providerId, label),
+  }
   return {
+    accountService: daemonAccountService,
+    actionService: {
+      describe: ({ actionId, sourceId }) =>
+        describeAction({
+          db: input.database,
+          registry: input.registry,
+          actionId,
+          sourceId,
+        }),
+      run: ({ actionId, sourceId, actionInput, signal, confirmIrreversible }) =>
+        runAction({
+          db: input.database,
+          registry: input.registry,
+          authService,
+          logger,
+          actionId,
+          sourceId,
+          actionInput,
+          signal,
+          confirmIrreversible,
+        }),
+    },
+    artifactService: new ArtifactService({
+      db: input.database,
+      registry: input.registry,
+      authService,
+      logger,
+    }),
     authService,
+    exportService: {
+      prepare: ({ ref, format, signal }) =>
+        exportSourceResource({
+          db: input.database,
+          ref,
+          format,
+          registry: input.registry,
+          authService,
+          logger,
+          signal,
+        }),
+    },
+    oauthAppService: daemonOAuthAppService,
     realmService,
     registry: input.registry,
     searchService: new SearchPlanner({
@@ -259,6 +548,7 @@ async function productionServices(input: {
           signal,
         }),
     },
+    secretBackendManager,
     threadService: createThreadService({
       db: input.database,
       profiles: input.registry.profiles,
@@ -350,11 +640,16 @@ export async function startDaemon(
   const observationTimeoutMs = requireObservationTimeout(
     options.observationTimeoutMs ?? DEFAULT_OBSERVATION_TIMEOUT_MS,
   )
+  const idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS
+  if (!Number.isSafeInteger(idleTimeoutMs) || idleTimeoutMs < 1) {
+    throw new RangeError('Daemon idle timeout must be a positive integer')
+  }
   const hooks = { ...defaultHooks(roots), ...options.hooks }
   const leaseBackend = options.leaseBackend ?? createFileLeaseBackend()
   const instanceId = randomUUID()
   const ownerToken = createOwnerToken()
   const startedAt = new Date().toISOString()
+  const transferStore = new ByteTransferStore()
   let lifecycleLease: FileLease | undefined
   let databaseLease: FileLease | undefined
   let database: CtxindexDatabase | undefined
@@ -385,6 +680,7 @@ export async function startDaemon(
   const finalize = (): Promise<void> => {
     finalization ??= (async () => {
       await application.whenDrained()
+      transferStore.close()
       database?.close()
       database = undefined
       await listener?.stop()
@@ -466,7 +762,10 @@ export async function startDaemon(
       documentationService: createDocumentationService([
         createExtensionDocumentationSource(loaded.documentation),
       ]),
+      idleTimeoutMs,
+      idleTimer: options.idleTimer ?? productionIdleTimer,
       observationTimeoutMs,
+      transferStore,
       ...services,
       onStopping: () => {
         try {
@@ -484,10 +783,12 @@ export async function startDaemon(
       endpoint: endpoint.path,
       application,
       expectations: { protocol: DAEMON_PROTOCOL, runtime: roots.identity },
+      transferStore,
     })
     application.markReady()
     writeLifecycle('ready')
   } catch (error) {
+    transferStore.close()
     const ownedLifecycle = lifecycleLease !== undefined
     try {
       await listener?.stop()

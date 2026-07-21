@@ -55,7 +55,7 @@ describe('search JSON output', () => {
         warnings: [],
       }),
     ).toBe(
-      '{"results":[],"pagination":{"offset":20,"limit":20,"hasMore":true},"warnings":[]}',
+      '{"results":[],"warnings":[],"pagination":{"offset":20,"limit":20,"hasMore":true}}',
     )
   })
 
@@ -94,7 +94,14 @@ describe('search JSON output', () => {
           refs: false,
         },
         {
-          selectDaemon: () => ({}) as never,
+          selectDaemon: () => {
+            throw new Error('legacy selection invoked')
+          },
+          ensureDaemonSelection: async () => ({
+            status: 'selected',
+            selection: {} as never,
+            started: true,
+          }),
           search: async (_selection, input) => {
             expect(input.text).toBe('needle')
             return {
@@ -213,7 +220,7 @@ describe('search JSON output', () => {
         warnings: [],
       }),
     ).toBe(
-      '{"results":[],"pagination":{"limit":50,"hasMore":true,"continuation":"opaque-next-page"},"warnings":[]}',
+      '{"results":[],"warnings":[],"pagination":{"limit":50,"hasMore":true,"continuation":"opaque-next-page"}}',
     )
   })
 })

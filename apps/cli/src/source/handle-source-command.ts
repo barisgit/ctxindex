@@ -14,6 +14,10 @@ import {
   daemonSourceRemove,
   selectDaemon,
 } from '../daemon/client'
+import {
+  ensureDaemonSelection,
+  selectEnsuredDaemonRoute,
+} from '../daemon/ensure'
 import { loadCliDefinitions } from '../definitions'
 import { openDeps } from '../deps'
 import {
@@ -31,6 +35,7 @@ import { resolveSourceGrant } from './resolve-source-grant'
 
 export interface SourceCommandDeps {
   readonly selectDaemon: typeof selectDaemon
+  readonly ensureDaemonSelection?: typeof ensureDaemonSelection
   readonly sourceDefinitions: typeof daemonSourceDefinitions
   readonly sourceAdd: typeof daemonSourceAdd
   readonly sourceList: typeof daemonSourceList
@@ -42,6 +47,7 @@ export interface SourceCommandDeps {
 
 const defaultDeps: SourceCommandDeps = {
   selectDaemon,
+  ensureDaemonSelection,
   sourceDefinitions: daemonSourceDefinitions,
   sourceAdd: daemonSourceAdd,
   sourceList: daemonSourceList,
@@ -131,7 +137,7 @@ export async function resolveSourceCommandRoute(
   needsDefinitions: boolean,
   services: SourceCommandDeps = defaultDeps,
 ): Promise<SourceCommandRoute> {
-  const selection = services.selectDaemon()
+  const selection = await selectEnsuredDaemonRoute(services)
   if (selection) {
     return needsDefinitions
       ? {

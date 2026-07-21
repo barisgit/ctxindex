@@ -110,13 +110,11 @@ bun cli describe action <generated-action-id> --source <source-id> --format json
 bun cli action run <generated-action-id> --source <source-id> --input <json-or-file> --format json
 ```
 
-## Inspect bundled skills
+## Inspect the portable Agent Skill
 
 ```sh
-bun cli skills list
-bun cli skills get getting-started
-bun cli skills get getting-started --inline
-bun cli skills path
+bun cli docs get-skill
+bun cli docs get-skill --output ./SKILL.md
 ```
 
 ## Configure secrets, OAuth Apps, and Accounts

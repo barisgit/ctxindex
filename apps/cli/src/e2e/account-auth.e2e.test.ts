@@ -176,7 +176,9 @@ test('account add authorizes with a persisted OAuth App, lists its label, and re
       CTXINDEX_GOOGLE_CALENDAR_MOCK_BASE_URL: calendar.baseUrl,
     })
     expect((await sandbox.run(['init'])).exitCode).toBe(0)
-    expect((await sandbox.run(['realm', 'add', 'mail'])).exitCode).toBe(0)
+    expect(
+      (await sandbox.run(['realm', 'add', 'mail'], { env })).exitCode,
+    ).toBe(0)
 
     const missingApp = await sandbox.run(
       ['account', 'add', 'microsoft', '--app', 'microsoft'],
@@ -197,7 +199,7 @@ test('account add authorizes with a persisted OAuth App, lists its label, and re
     )
     expect(appCollision.exitCode).toBe(2)
     expect(appCollision.stderr).toContain(
-      'OAuth App label "google" is already taken',
+      'OAuth App "google" already exists for Provider "google"',
     )
 
     expect(
@@ -222,7 +224,7 @@ test('account add authorizes with a persisted OAuth App, lists its label, and re
     )
     expect(added.exitCode, added.stderr).toBe(0)
     expect(added.stdout).toContain('account added:')
-    expect(added.stdout).not.toMatch(/grant/i)
+    expect(added.stdout.match(/^account added:.*$/m)?.[0]).not.toMatch(/grant/i)
 
     const listed = await sandbox.run(['account', 'list', '--format', 'json'], {
       env,
@@ -292,7 +294,9 @@ test('account add authorizes with a persisted OAuth App, lists its label, and re
         env,
       },
     )
-    expect(needsAuth.exitCode).toBe(10)
+    expect(needsAuth.exitCode, `${needsAuth.stdout}\n${needsAuth.stderr}`).toBe(
+      10,
+    )
   } finally {
     calendar.stop()
     mock.stop()

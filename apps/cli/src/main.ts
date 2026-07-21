@@ -19,7 +19,6 @@ import { oauthAppCommand } from './commands/oauth-app'
 import { realmCommand } from './commands/realm'
 import { searchCommand } from './commands/search'
 import { secretsCommand } from './commands/secrets'
-import { skillsCommand } from './commands/skills'
 import { createSourceCommandRuntime, sourceCommand } from './commands/source'
 import { statusCommand } from './commands/status'
 import { syncCommand } from './commands/sync'
@@ -84,7 +83,6 @@ function createRootCommand(source = sourceCommand) {
       search: searchCommand,
       status: statusCommand,
       secrets: secretsCommand,
-      skills: skillsCommand,
     },
   })
 }

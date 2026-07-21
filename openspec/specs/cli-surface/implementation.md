@@ -66,7 +66,7 @@ export async function loadCliDefinitions(
 
 ```
 
-`LoadExtensionsResult` includes core's passive Extension documentation projection, but current CLI command registration and bundled skills do not render, list, or inline it. Bundled skills remain release-versioned workflow guidance; registry descriptions remain authoritative for interface facts. A CLI or agent presentation surface for Extension documentation requires a separately accepted consumer contract.
+`LoadExtensionsResult` includes core's passive Extension documentation projection, consumed by the docs runtime in direct or selected-daemon mode. Registry descriptions remain authoritative for loaded interface facts. The one portable Agent Skill remains release-versioned workflow guidance and does not inline Extension documentation or loaded schemas.
 
 ### @ctxindex/cli — composition boundary
 
@@ -454,23 +454,20 @@ export type SecretsArgs =
 export function parseSecretsArgs(args: string[]): SecretsArgs;
 ```
 
-### @ctxindex/cli — skill arguments
+### @ctxindex/cli — portable Agent Skill
 
 ```ts
-export type SkillsArgs =
-  | { readonly kind: 'list'; readonly json: boolean }
-  | {
-      readonly kind: 'get'
-      readonly name: string
-      readonly inline: boolean
-      readonly json: boolean
-    }
-  | { readonly kind: 'path' }
-  | { readonly kind: 'help' }
-  | { readonly kind: 'unknown'; readonly message: string }
+export interface BundledAgentSkill {
+  readonly name: string
+  readonly description: string
+  readonly byteSize: number
+  readonly content: string
+}
 
-export function parseSkillsArgs(args: string[]): SkillsArgs;
+export function resolveAgentSkill(): BundledAgentSkill;
 ```
+
+`skills/ctxindex/SKILL.md` is the canonical source. A build-time macro validates exact `name` and `description` frontmatter plus a non-empty body, then embeds an immutable value. Runtime command code does not resolve repository paths or maintain a skill registry. `docs get-skill` is the sole command surface; the removed generic `skills` group has no compatibility parser.
 
 ### @ctxindex/cli — Source arguments
 
@@ -583,4 +580,4 @@ boundary.
 
 ## Verification
 
-Argument tests cover every discriminated parser and invalid form, including optional managed App selection, explicit exact App labels, exact direct source-kind and Extension selection, Catalog/direct separation, zero-effect invalid selection, static BYOA guidance, and rejection of every Client compatibility route. Command tests inject dependency/service interfaces. CLI e2e tests cover empty and config-only initialization guards with no OAuth App configuration or durable-state side effects, readable/JSON stream separation, stable exits, registry-derived help/describe behavior, bundled skills, local Catalog trust, direct package trust, default command-time refresh, stored-snapshot age and `--no-refresh`, observable refresh failure, offline pinned startup/loading, guarded removal, and relocated compiled execution.
+Argument tests cover every discriminated parser and invalid form, including optional managed App selection, explicit exact App labels, exact direct source-kind and Extension selection, Catalog/direct separation, zero-effect invalid selection, static BYOA guidance, and rejection of every Client compatibility route. Command tests inject dependency/service interfaces. CLI e2e tests cover empty and config-only initialization guards with no OAuth App configuration or durable-state side effects, readable/JSON stream separation, stable exits, registry-derived help/describe behavior, the portable bundled Agent Skill, local Catalog trust, direct package trust, default command-time refresh, stored-snapshot age and `--no-refresh`, observable refresh failure, offline pinned startup/loading, guarded removal, and relocated compiled execution.

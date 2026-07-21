@@ -160,20 +160,21 @@ test('selected daemon handles Source list and remove without direct open', async
   }
 })
 
-test('runCli retains one selected daemon from Source argument construction through execution', async () => {
+test('runCli discovers from the selected daemon then retains one ensured route', async () => {
   const output: string[] = []
   const log = spyOn(console, 'log').mockImplementation((value) => {
     output.push(String(value))
   })
   const selection = { endpoint: 'retained' } as never
-  let selections = 0
+  let ensures = 0
   let definitionRequests = 0
   let directLoads = 0
   let directOpens = 0
   const deps: SourceCommandDeps = {
-    selectDaemon: () => {
-      selections += 1
-      return selections === 1 ? selection : null
+    selectDaemon: () => selection,
+    ensureDaemonSelection: async () => {
+      ensures += 1
+      return { status: 'selected', selection, started: true }
     },
     sourceDefinitions: async (actual) => {
       expect(actual).toBe(selection)
@@ -223,8 +224,8 @@ test('runCli retains one selected daemon from Source argument construction throu
         { source: deps },
       ),
     ).toBe(0)
-    expect(selections).toBe(1)
-    expect(definitionRequests).toBe(1)
+    expect(ensures).toBe(1)
+    expect(definitionRequests).toBe(2)
     expect(directLoads).toBe(0)
     expect(directOpens).toBe(0)
     expect(output).toEqual(['source added: source-1'])
@@ -391,8 +392,11 @@ test('direct Source add retains one ownership and definition snapshot through ex
             return ownership
           },
           loadDefinitions: async (options) => {
-            if (!options) throw new Error('definition options are required')
             definitionLoads += 1
+            if (!options) {
+              events.push('load-public-definitions')
+              return loaded
+            }
             events.push('load-definitions')
             expect(options.localOAuthAppIdentities).toEqual([])
             return loaded
@@ -416,8 +420,9 @@ test('direct Source add retains one ownership and definition snapshot through ex
     )
 
     expect(exit).toBe(0)
-    expect(definitionLoads).toBe(1)
+    expect(definitionLoads).toBe(2)
     expect(events).toEqual([
+      'load-public-definitions',
       'acquire-owner',
       'read-identities',
       'load-definitions',
@@ -553,7 +558,7 @@ test('direct Source definition failure releases ownership', async () => {
   expect(events).toEqual(['read-identities', 'load-definitions', 'close-owner'])
 })
 
-test('Source invocation cleanup releases ownership when Citty rejects a generated option', async () => {
+test('Source invocation rejects an unknown generated option before ownership', async () => {
   const loaded = await loadCliDefinitions()
   const events: string[] = []
   const error = spyOn(console, 'error').mockImplementation(() => {})
@@ -588,12 +593,7 @@ test('Source invocation cleanup releases ownership when Citty rejects a generate
     )
 
     expect(exit).not.toBe(0)
-    expect(events).toEqual([
-      'acquire-owner',
-      'read-identities',
-      'load-definitions',
-      'close-owner',
-    ])
+    expect(events).toEqual(['load-definitions'])
   } finally {
     error.mockRestore()
   }

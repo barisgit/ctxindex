@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite'
 import { expect, test } from 'bun:test'
-import { readFile, stat } from 'node:fs/promises'
+import { mkdir, readFile, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { readConfig, writeConfig } from '@ctxindex/core/config'
 import {
@@ -243,10 +243,18 @@ test('secret backend status and switching preserve typed refs without exposing v
     )
     expect(await keychain.listKeys()).toEqual([])
 
-    const failedSwitch = await sandbox.run(
-      ['secrets', 'backend', 'set', 'keychain'],
-      { env: { CTXINDEX_KEYTAR_MOCK_FILE: unavailableMock } },
-    )
+    // The daemon retains the mock path it received on first startup. Turn that
+    // same file-backed mock unavailable instead of trying to replace its
+    // environment in later client commands.
+    await rm(mockFile, { force: true })
+    await mkdir(mockFile)
+
+    const failedSwitch = await sandbox.run([
+      'secrets',
+      'backend',
+      'set',
+      'keychain',
+    ])
     expect(failedSwitch.exitCode).toBe(50)
     expectNoValues(failedSwitch.stdout + failedSwitch.stderr)
     expect((await readConfig(configPath(sandbox))).secrets.backend).toBe('file')
@@ -255,10 +263,12 @@ test('secret backend status and switching preserve typed refs without exposing v
       refreshValue,
     )
 
-    const unavailableStatus = await sandbox.run(
-      ['secrets', 'status', '--format', 'json'],
-      { env: { CTXINDEX_KEYTAR_MOCK_FILE: unavailableMock } },
-    )
+    const unavailableStatus = await sandbox.run([
+      'secrets',
+      'status',
+      '--format',
+      'json',
+    ])
     expect(unavailableStatus.exitCode).toBe(0)
     expect(JSON.parse(unavailableStatus.stdout)).toMatchObject({
       backend: 'file',

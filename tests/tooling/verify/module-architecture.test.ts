@@ -282,6 +282,7 @@ test('public Extension SDK is a stable barrel over core-independent modules', as
     'operations.ts',
     'profile.ts',
     'provider.ts',
+    'sync-error.ts',
   ])
 
   for (const filename of productionFiles) {

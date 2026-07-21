@@ -9,7 +9,7 @@ import type {
 
 const REALM_SLUG_PATTERN = /^[a-z][a-z0-9_-]*$/i
 
-function assertValidRealmSlug(slug: string): void {
+export function assertValidRealmSlug(slug: string): void {
   if (!REALM_SLUG_PATTERN.test(slug)) {
     throw new CtxindexValidationError(
       'invalid_filter',

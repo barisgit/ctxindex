@@ -72,7 +72,13 @@ async function mkSandbox(): Promise<{
   await mkdir(join(dir, 'data'), { recursive: true })
   // bootstrap the DB
   await spawnCli(['init'], env, 'null')
-  return { env, cleanup: () => rm(dir, { recursive: true, force: true }) }
+  return {
+    env,
+    cleanup: async () => {
+      await spawnCli(['daemon', 'stop'], env, 'null').catch(() => {})
+      await rm(dir, { recursive: true, force: true })
+    },
+  }
 }
 
 describe('no-prompts contract', () => {
@@ -157,36 +163,16 @@ describe('no-prompts contract', () => {
     }
   })
 
-  test('skills list: exits 0 with stdin=null', async () => {
-    const { env, cleanup } = await mkSandbox()
-    try {
-      const { exitCode } = await spawnCli(['skills', 'list'], env, 'null')
-      expect(exitCode).toBe(0)
-    } finally {
-      await cleanup()
-    }
-  })
-
-  test('skills path: exits 0 with stdin=null', async () => {
-    const { env, cleanup } = await mkSandbox()
-    try {
-      const { exitCode } = await spawnCli(['skills', 'path'], env, 'null')
-      expect(exitCode).toBe(0)
-    } finally {
-      await cleanup()
-    }
-  })
-
-  test('skills get: exits 0 with stdin=null', async () => {
+  test('docs get-skill: exits 0 with stdin=null', async () => {
     const { env, cleanup } = await mkSandbox()
     try {
       const { exitCode, stdout, stderr } = await spawnCli(
-        ['skills', 'get', 'getting-started'],
+        ['docs', 'get-skill'],
         env,
         'null',
       )
       expect(exitCode).toBe(0)
-      expect(stdout).toContain('# Getting started with ctxindex')
+      expect(stdout).toContain('name: ctxindex')
       expect(stderr).toBe('')
     } finally {
       await cleanup()
@@ -291,16 +277,12 @@ describe('no-prompts contract', () => {
     }
   })
 
-  test('skills get (missing name): exits non-zero fast', async () => {
+  test('removed skills command exits non-zero fast', async () => {
     const { env, cleanup } = await mkSandbox()
     try {
-      const { exitCode, stderr } = await spawnCli(
-        ['skills', 'get'],
-        env,
-        'null',
-      )
+      const { exitCode, stderr } = await spawnCli(['skills'], env, 'null')
       expect(exitCode).toBe(2)
-      expect(stderr).toContain('Missing required positional argument: NAME')
+      expect(stderr).toContain('unknown command skills')
     } finally {
       await cleanup()
     }

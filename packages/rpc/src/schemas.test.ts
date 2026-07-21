@@ -2,16 +2,36 @@ import { describe, expect, test } from 'bun:test'
 import { z } from 'zod'
 import {
   defineRpcFailureRegistry,
+  rpcAccountAddEventSchema,
+  rpcAccountAddInputSchema,
+  rpcAccountListResultSchema,
+  rpcAccountRespondInputSchema,
+  rpcActionDescribeInputSchema,
+  rpcActionDescribeResultSchema,
+  rpcActionRunInputSchema,
+  rpcActionRunResultSchema,
+  rpcArtifactDownloadInputSchema,
+  rpcArtifactDownloadResultSchema,
+  rpcArtifactListInputSchema,
+  rpcArtifactListResultSchema,
+  rpcArtifactPurgeInputSchema,
+  rpcArtifactPurgeResultSchema,
+  rpcByteTransferDescriptorSchema,
   rpcDocumentationGetInputSchema,
   rpcDocumentationGetResultSchema,
   rpcDocumentationListInputSchema,
   rpcDocumentationListResultSchema,
   rpcDocumentationSearchInputSchema,
   rpcDocumentationSearchResultSchema,
+  rpcExportInputSchema,
+  rpcExportResultSchema,
   rpcFailureSchema,
   rpcHealthResultSchema,
   rpcJsonCursorSchema,
   rpcJsonDefaultSchema,
+  rpcOAuthAppAddInputSchema,
+  rpcOAuthAppListResultSchema,
+  rpcOAuthAppRegistrationResultSchema,
   rpcProtocolIdentitySchema,
   rpcRealmAddInputSchema,
   rpcRealmListResultSchema,
@@ -22,6 +42,9 @@ import {
   rpcSafeJsonSchema,
   rpcSearchInputSchema,
   rpcSearchResultSchema,
+  rpcSecretsBackendSetInputSchema,
+  rpcSecretsBackendSetResultSchema,
+  rpcSecretsStatusResultSchema,
   rpcShutdownAcceptedSchema,
   rpcSourceAddInputSchema,
   rpcSourceListResultSchema,
@@ -209,6 +232,113 @@ describe('wire identity and common bounds', () => {
     expect(() =>
       rpcFailureSchema.parse({ ...failure, ownerTupleDigest: digest }),
     ).toThrow()
+  })
+})
+
+describe('Account and OAuth App wire values', () => {
+  test('accepts bounded Account authorization interaction and safe inventory', () => {
+    expect(
+      rpcAccountAddInputSchema.parse({
+        provider: 'google',
+        app: 'desktop',
+        label: 'personal',
+        loopbackTimeoutSeconds: 0.5,
+        oauthMockBaseUrl: 'http://127.0.0.1:43123',
+      }),
+    ).toEqual({
+      provider: 'google',
+      app: 'desktop',
+      label: 'personal',
+      loopbackTimeoutSeconds: 0.5,
+      oauthMockBaseUrl: 'http://127.0.0.1:43123',
+    })
+    expect(
+      rpcAccountAddEventSchema.parse({
+        type: 'authorization.required',
+        requestId: 'request',
+        authorizationUrl: 'https://accounts.example/authorize?state=opaque',
+      }),
+    ).toMatchObject({ requestId: 'request' })
+    expect(
+      rpcAccountRespondInputSchema.parse({
+        requestId: 'request',
+        response: 'http://localhost/callback?code=opaque&state=opaque',
+      }),
+    ).toMatchObject({ requestId: 'request' })
+    expect(
+      rpcAccountListResultSchema.parse({
+        rows: [
+          {
+            id: 'account-id',
+            provider: 'google',
+            label: 'personal',
+            expiresAt: null,
+            expiryState: 'unknown',
+            sources: [
+              {
+                id: 'source-id',
+                label: 'mail',
+                adapter: { id: 'google.mailbox' },
+                realm: { id: 'realm-id', slug: 'personal', label: null },
+              },
+            ],
+          },
+        ],
+      }).rows,
+    ).toHaveLength(1)
+  })
+
+  test('bounds secret-bearing OAuth App input and rejects unknown config fields later', () => {
+    expect(
+      rpcOAuthAppRegistrationResultSchema.parse({
+        environment: {
+          clientId: 'CTXINDEX_GOOGLE_CLIENT_ID',
+          clientSecret: 'CTXINDEX_GOOGLE_CLIENT_SECRET',
+        },
+      }),
+    ).toMatchObject({ environment: { clientId: expect.any(String) } })
+    expect(
+      rpcOAuthAppAddInputSchema.parse({
+        provider: 'google',
+        label: 'work',
+        config: { clientId: 'public-id', clientSecret: 'private-value' },
+      }),
+    ).toMatchObject({ provider: 'google', label: 'work' })
+    expect(() =>
+      rpcOAuthAppAddInputSchema.parse({
+        provider: 'google',
+        label: 'work',
+        config: Object.fromEntries(
+          Array.from({ length: 33 }, (_, index) => [`field${index}`, 'value']),
+        ),
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcOAuthAppAddInputSchema.parse({
+        provider: 'google',
+        label: 'work',
+        config: { clientSecret: 'x'.repeat(16_385) },
+      }),
+    ).toThrow()
+  })
+
+  test('OAuth App inventory contains only safe provenance', () => {
+    const value = rpcOAuthAppListResultSchema.parse({
+      rows: [
+        {
+          providerId: 'google',
+          label: 'ctxindex',
+          origin: 'extension',
+          provenance: {
+            kind: 'extension',
+            source: 'builtin',
+            packageName: '@ctxindex/official',
+            packageVersion: '0.1.0',
+          },
+        },
+      ],
+    })
+    expect(JSON.stringify(value)).not.toMatch(/client.?id|secret|token/i)
   })
 })
 
@@ -467,6 +597,54 @@ describe('sync/status and internal application results', () => {
 })
 
 describe('realm/source management envelopes', () => {
+  test('accepts only bounded secret backend status and switch projections', () => {
+    expect(
+      rpcSecretsStatusResultSchema.parse({
+        backend: 'file',
+        backends: {
+          file: { available: true, referenceCount: 2 },
+          keychain: { available: false, referenceCount: 1 },
+        },
+      }),
+    ).toEqual({
+      backend: 'file',
+      backends: {
+        file: { available: true, referenceCount: 2 },
+        keychain: { available: false, referenceCount: 1 },
+      },
+    })
+    expect(
+      rpcSecretsBackendSetInputSchema.parse({ target: 'keychain' }),
+    ).toEqual({ target: 'keychain' })
+    expect(
+      rpcSecretsBackendSetResultSchema.parse({
+        backend: 'keychain',
+        copied: 2,
+        cleaned: 1,
+        cleanupPending: true,
+        warnings: ['Secret backend cleanup remains pending.'],
+      }),
+    ).toEqual({
+      backend: 'keychain',
+      copied: 2,
+      cleaned: 1,
+      cleanupPending: true,
+      warnings: ['Secret backend cleanup remains pending.'],
+    })
+    expect(() =>
+      rpcSecretsBackendSetInputSchema.parse({ target: 'env' }),
+    ).toThrow()
+    expect(() =>
+      rpcSecretsBackendSetResultSchema.parse({
+        backend: 'file',
+        copied: 0,
+        cleaned: 0,
+        cleanupPending: true,
+        warnings: ['secret\nvalue'],
+      }),
+    ).toThrow()
+  })
+
   test('accepts strict bounded realm inputs and rows', () => {
     expect(
       rpcRealmAddInputSchema.parse({ slug: 'work', displayName: 'Work' }),
@@ -556,6 +734,182 @@ describe('realm/source management envelopes', () => {
     expect(() =>
       rpcSourceListResultSchema.parse({
         rows: [{ ...row, config_json: 'x'.repeat(65_537) }],
+      }),
+    ).toThrow()
+  })
+})
+
+describe('Artifact envelopes', () => {
+  const artifactRef = `${ref}/attachment/file`
+  const listed = {
+    resourceRef: ref,
+    artifacts: [
+      {
+        ref: artifactRef,
+        filename: 'file.bin',
+        mediaType: 'application/octet-stream',
+        byteSize: 14,
+      },
+    ],
+    warnings: [],
+  } as const
+  const purged = {
+    artifactCountRemoved: 1,
+    objectCountRemoved: 1,
+    logicalBytesFreed: 14,
+    physicalBytesFreed: 14,
+    diskAccounting: {
+      artifactCount: 0,
+      objectCount: 0,
+      logicalBytes: 0,
+      physicalBytes: 0,
+    },
+  } as const
+
+  test('accepts strict descriptor listing and purge bookkeeping', () => {
+    expect(rpcArtifactListInputSchema.parse({ ref })).toEqual({ ref })
+    expect(rpcArtifactListResultSchema.parse(listed)).toEqual(listed)
+    expect(rpcArtifactPurgeInputSchema.parse({})).toEqual({})
+    expect(rpcArtifactPurgeResultSchema.parse(purged)).toEqual(purged)
+    const download = {
+      artifact: {
+        ref: artifactRef,
+        originRef: ref,
+        contentHash: `sha256:${'a'.repeat(64)}`,
+        mediaType: 'application/octet-stream',
+        byteSize: 14,
+        retentionClass: 'cached',
+        createdAt: 1,
+      },
+      cache: 'miss',
+      transfer: {
+        ticket: 'b'.repeat(64),
+        byteSize: 14,
+        expiresAt: 2,
+      },
+    } as const
+    expect(
+      rpcArtifactDownloadInputSchema.parse({
+        ref: artifactRef,
+        transfer: true,
+      }),
+    ).toEqual({ ref: artifactRef, transfer: true })
+    expect(rpcArtifactDownloadResultSchema.parse(download)).toEqual(download)
+    expect(
+      rpcArtifactDownloadResultSchema.parse({
+        artifact: download.artifact,
+        cache: 'hit',
+      }),
+    ).toEqual({ artifact: download.artifact, cache: 'hit' })
+  })
+
+  test('rejects paths, unbounded arrays, malformed descriptors, and extra purge data', () => {
+    expect(() =>
+      rpcArtifactListResultSchema.parse({
+        ...listed,
+        artifacts: Array.from({ length: 1_025 }, () => listed.artifacts[0]),
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcArtifactListResultSchema.parse({
+        ...listed,
+        artifacts: [{ ...listed.artifacts[0], localPath: '/private/cache' }],
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcArtifactListResultSchema.parse({
+        ...listed,
+        artifacts: [{ ...listed.artifacts[0], byteSize: -1 }],
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcArtifactPurgeResultSchema.parse({ ...purged, path: '/private/cache' }),
+    ).toThrow()
+    expect(() => rpcArtifactPurgeInputSchema.parse({ confirm: true })).toThrow()
+    expect(() =>
+      rpcArtifactDownloadResultSchema.parse({
+        artifact: {
+          ref: artifactRef,
+          originRef: ref,
+          contentHash: `sha256:${'a'.repeat(64)}`,
+          mediaType: 'application/octet-stream',
+          byteSize: 14,
+          retentionClass: 'cached',
+          createdAt: 1,
+          localPath: '/private/cache',
+        },
+        cache: 'hit',
+      }),
+    ).toThrow()
+  })
+})
+
+describe('Action envelopes', () => {
+  const description = {
+    id: 'example.item.create',
+    profile: { id: 'example.item', version: 1 },
+    effect: 'reversible',
+    input: { type: 'object', additionalProperties: false },
+    output: { id: 'example.item', version: 1 },
+    adapters: [{ id: 'example.adapter' }],
+    sources: [
+      {
+        id: sourceId,
+        adapter: { id: 'example.adapter' },
+        available: true,
+      },
+    ],
+  } as const
+
+  test('accepts exact source-aware describe and arbitrary JSON run input', () => {
+    expect(
+      rpcActionDescribeInputSchema.parse({
+        actionId: description.id,
+        source: sourceId,
+      }),
+    ).toEqual({ actionId: description.id, source: sourceId })
+    expect(rpcActionDescribeResultSchema.parse(description)).toEqual(
+      description,
+    )
+    expect(
+      rpcActionRunInputSchema.parse({
+        actionId: description.id,
+        source: sourceId,
+        actionInput: [null, true, 1.5, 'text'],
+        confirmIrreversible: false,
+      }),
+    ).toMatchObject({ actionInput: [null, true, 1.5, 'text'] })
+    expect(rpcActionRunResultSchema.parse({ resource, warnings: [] })).toEqual({
+      resource,
+      warnings: [],
+    })
+  })
+
+  test('rejects ambiguous availability and unsafe or extra values', () => {
+    expect(() =>
+      rpcActionDescribeResultSchema.parse({
+        ...description,
+        sources: [
+          {
+            ...description.sources[0],
+            available: false,
+          },
+        ],
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcActionRunInputSchema.parse({
+        actionId: description.id,
+        source: sourceId,
+        actionInput: { body: undefined },
+        confirmIrreversible: false,
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcActionDescribeInputSchema.parse({
+        actionId: description.id,
+        source: sourceId,
+        extra: true,
       }),
     ).toThrow()
   })
@@ -852,6 +1206,44 @@ describe('search, Resource, and thread contracts', () => {
       rpcResourceGetResultSchema.parse({
         resource: { ...resource, payload: { valid: true }, secret: 'leak' },
         warnings: [],
+      }),
+    ).toThrow()
+  })
+
+  test('keeps export bytes out of unary RPC and bounds an opaque transfer ticket', () => {
+    const transfer = {
+      ticket: 'a'.repeat(64),
+      byteSize: 3,
+      expiresAt: 1_000,
+    }
+    expect(rpcExportInputSchema.parse({ ref, format: 'eml' })).toEqual({
+      ref,
+      format: 'eml',
+    })
+    expect(rpcByteTransferDescriptorSchema.parse(transfer)).toEqual(transfer)
+    expect(
+      rpcExportResultSchema.parse({
+        transfer,
+        mediaType: 'message/rfc822',
+        format: 'eml',
+        ref,
+        warnings: [],
+      }),
+    ).not.toHaveProperty('bytes')
+    expect(() =>
+      rpcByteTransferDescriptorSchema.parse({
+        ...transfer,
+        ticket: '../secret',
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcExportResultSchema.parse({
+        transfer,
+        mediaType: 'message/rfc822',
+        format: 'eml',
+        ref,
+        warnings: [],
+        bytes: [1, 2, 3],
       }),
     ).toThrow()
   })

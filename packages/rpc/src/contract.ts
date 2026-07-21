@@ -1,14 +1,43 @@
 import { type ContractRouterClient, eventIterator, oc } from '@orpc/contract'
 import {
+  rpcAccountAddEventSchema,
+  rpcAccountAddInputSchema,
+  rpcAccountAddResultSchema,
+  rpcAccountListInputSchema,
+  rpcAccountListResultSchema,
+  rpcAccountRemoveInputSchema,
+  rpcAccountRemoveResultSchema,
+  rpcAccountRespondInputSchema,
+  rpcAccountRespondResultSchema,
+  rpcActionDescribeInputSchema,
+  rpcActionDescribeResultSchema,
+  rpcActionRunInputSchema,
+  rpcActionRunResultSchema,
+  rpcArtifactDownloadInputSchema,
+  rpcArtifactDownloadResultSchema,
+  rpcArtifactListInputSchema,
+  rpcArtifactListResultSchema,
+  rpcArtifactPurgeInputSchema,
+  rpcArtifactPurgeResultSchema,
   rpcDocumentationGetInputSchema,
   rpcDocumentationGetResultSchema,
   rpcDocumentationListInputSchema,
   rpcDocumentationListResultSchema,
   rpcDocumentationSearchInputSchema,
   rpcDocumentationSearchResultSchema,
+  rpcExportInputSchema,
+  rpcExportResultSchema,
   rpcFailureRegistry,
   rpcHealthInputSchema,
   rpcHealthResultSchema,
+  rpcOAuthAppAddInputSchema,
+  rpcOAuthAppAddResultSchema,
+  rpcOAuthAppListInputSchema,
+  rpcOAuthAppListResultSchema,
+  rpcOAuthAppRegistrationInputSchema,
+  rpcOAuthAppRegistrationResultSchema,
+  rpcOAuthAppRemoveInputSchema,
+  rpcOAuthAppRemoveResultSchema,
   rpcRealmAddInputSchema,
   rpcRealmAddResultSchema,
   rpcRealmListInputSchema,
@@ -17,6 +46,10 @@ import {
   rpcResourceGetResultSchema,
   rpcSearchInputSchema,
   rpcSearchResultSchema,
+  rpcSecretsBackendSetInputSchema,
+  rpcSecretsBackendSetResultSchema,
+  rpcSecretsStatusInputSchema,
+  rpcSecretsStatusResultSchema,
   rpcShutdownAcceptedSchema,
   rpcShutdownInputSchema,
   rpcSourceAddInputSchema,
@@ -52,6 +85,46 @@ export const daemonContract = {
     list: procedure
       .input(rpcRealmListInputSchema)
       .output(rpcRealmListResultSchema),
+  },
+  secrets: {
+    status: procedure
+      .input(rpcSecretsStatusInputSchema)
+      .output(rpcSecretsStatusResultSchema),
+    backend: {
+      set: procedure
+        .input(rpcSecretsBackendSetInputSchema)
+        .output(rpcSecretsBackendSetResultSchema),
+    },
+  },
+  account: {
+    add: procedure
+      .input(rpcAccountAddInputSchema)
+      .output(
+        eventIterator(rpcAccountAddEventSchema, rpcAccountAddResultSchema),
+      ),
+    respond: procedure
+      .input(rpcAccountRespondInputSchema)
+      .output(rpcAccountRespondResultSchema),
+    list: procedure
+      .input(rpcAccountListInputSchema)
+      .output(rpcAccountListResultSchema),
+    remove: procedure
+      .input(rpcAccountRemoveInputSchema)
+      .output(rpcAccountRemoveResultSchema),
+  },
+  oauthApp: {
+    registration: procedure
+      .input(rpcOAuthAppRegistrationInputSchema)
+      .output(rpcOAuthAppRegistrationResultSchema),
+    add: procedure
+      .input(rpcOAuthAppAddInputSchema)
+      .output(rpcOAuthAppAddResultSchema),
+    list: procedure
+      .input(rpcOAuthAppListInputSchema)
+      .output(rpcOAuthAppListResultSchema),
+    remove: procedure
+      .input(rpcOAuthAppRemoveInputSchema)
+      .output(rpcOAuthAppRemoveResultSchema),
   },
   documentation: {
     list: procedure
@@ -94,10 +167,34 @@ export const daemonContract = {
       .input(rpcResourceGetInputSchema)
       .output(rpcResourceGetResultSchema),
   },
+  export: {
+    prepare: procedure
+      .input(rpcExportInputSchema)
+      .output(rpcExportResultSchema),
+  },
   thread: {
     get: procedure
       .input(rpcThreadGetInputSchema)
       .output(rpcThreadGetResultSchema),
+  },
+  action: {
+    describe: procedure
+      .input(rpcActionDescribeInputSchema)
+      .output(rpcActionDescribeResultSchema),
+    run: procedure
+      .input(rpcActionRunInputSchema)
+      .output(rpcActionRunResultSchema),
+  },
+  artifact: {
+    list: procedure
+      .input(rpcArtifactListInputSchema)
+      .output(rpcArtifactListResultSchema),
+    download: procedure
+      .input(rpcArtifactDownloadInputSchema)
+      .output(rpcArtifactDownloadResultSchema),
+    purge: procedure
+      .input(rpcArtifactPurgeInputSchema)
+      .output(rpcArtifactPurgeResultSchema),
   },
 } as const
 

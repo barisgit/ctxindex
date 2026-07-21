@@ -17,6 +17,10 @@ import {
   readLeasedDirectExtensionSourceBindings,
   readLeasedLocalOAuthAppIdentities,
 } from '../direct-database'
+import {
+  coordinateExtensionMutation,
+  type ExtensionMutationCoordinator,
+} from './daemon-coordination'
 
 export interface ExtensionCommandServices {
   readonly catalogs: CatalogService
@@ -28,6 +32,7 @@ export interface ExtensionCommandServices {
   readonly loadDefinitions: typeof loadCliDefinitions
   readonly readOAuthAppIdentities: typeof readLeasedLocalOAuthAppIdentities
   readonly readSourceBindings: typeof readLeasedDirectExtensionSourceBindings
+  readonly coordinateMutation: ExtensionMutationCoordinator
 }
 
 export interface CreateExtensionCommandServicesOptions {
@@ -36,6 +41,7 @@ export interface CreateExtensionCommandServicesOptions {
   readonly loadDefinitions?: typeof loadCliDefinitions
   readonly readOAuthAppIdentities?: typeof readLeasedLocalOAuthAppIdentities
   readonly readSourceBindings?: typeof readLeasedDirectExtensionSourceBindings
+  readonly coordinateMutation?: ExtensionMutationCoordinator
 }
 
 export function createExtensionCommandServices(
@@ -47,6 +53,8 @@ export function createExtensionCommandServices(
     options.readOAuthAppIdentities ?? readLeasedLocalOAuthAppIdentities
   const readSourceBindings =
     options.readSourceBindings ?? readLeasedDirectExtensionSourceBindings
+  const coordinateMutation =
+    options.coordinateMutation ?? coordinateExtensionMutation
   const store = new DirectExtensionStore({
     ...(options.configRoot === undefined
       ? {}
@@ -101,5 +109,6 @@ export function createExtensionCommandServices(
     loadDefinitions,
     readOAuthAppIdentities,
     readSourceBindings,
+    coordinateMutation,
   }
 }

@@ -6,6 +6,9 @@ import { join } from 'node:path'
 const repoRoot = new URL('../../../../', import.meta.url).pathname
 
 test('relocated compiled CLI serves product documentation offline', async () => {
+  const expectedSkill = await Bun.file(
+    join(repoRoot, 'skills/ctxindex/SKILL.md'),
+  ).text()
   const sandbox = await mkdtemp(join(tmpdir(), 'ctxindex-compiled-docs-'))
   const buildPath = join(sandbox, 'build', 'ctxindex')
   const relocatedPath = join(sandbox, 'relocated', 'ctxindex')
@@ -66,6 +69,16 @@ test('relocated compiled CLI serves product documentation offline', async () => 
     const get = await run(['docs', 'get', 'getting-started.md'])
     expect(get.exitCode, get.stderr).toBe(0)
     expect(get.stdout).toContain('Getting started')
+    const getSkill = await run(['docs', 'get-skill'])
+    expect(getSkill.exitCode, getSkill.stderr).toBe(0)
+    expect(getSkill.stdout).toBe(expectedSkill)
+    const getSkillJson = await run(['docs', 'get-skill', '--format', 'json'])
+    expect(getSkillJson.exitCode, getSkillJson.stderr).toBe(0)
+    expect(JSON.parse(getSkillJson.stdout)).toMatchObject({
+      name: 'ctxindex',
+      byteSize: Buffer.byteLength(expectedSkill),
+      content: expectedSkill,
+    })
     const extensionGet = await run([
       'docs',
       'get',

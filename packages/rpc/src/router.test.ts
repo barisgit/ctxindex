@@ -15,6 +15,8 @@ import type {
 } from './router'
 import { createDaemonRouter } from './router'
 import {
+  type RpcAccountAddEvent,
+  type RpcAccountAddResult,
   type RpcFailure,
   type RpcResult,
   type RpcSyncEvent,
@@ -25,6 +27,23 @@ import {
 const digest = 'a'.repeat(64)
 const sourceId = '01ARZ3NDEKTSV4RRFFQ69G5FAV'
 const ref = `ctx://${sourceId}/item/one`
+const resource = {
+  id: 'resource-id',
+  ref,
+  sourceId,
+  realmId: 'work',
+  profile: { id: 'example.item', version: 1 },
+  origin: 'synced' as const,
+  title: 'One',
+  summary: null,
+  occurredAt: null,
+  providerUpdatedAt: null,
+  deletedAt: null,
+  hydratedAt: 1,
+  payload: { body: 'safe' },
+  createdAt: 1,
+  updatedAt: 1,
+}
 const protocol = { id: 'ctxindex.local', version: 2 } as const
 const runtime = {
   tupleDigest: digest,
@@ -47,6 +66,13 @@ async function* syncStream(
   return terminal
 }
 
+async function* accountStream(
+  events: readonly RpcAccountAddEvent[] = [],
+): AsyncGenerator<RpcAccountAddEvent, RpcResult<RpcAccountAddResult>, void> {
+  for (const event of events) yield event
+  return { ok: true, value: { accountId: 'account-id' } }
+}
+
 function transportContext(
   overrides: Partial<RpcTransportContext> = {},
 ): RpcTransportContext {
@@ -63,6 +89,16 @@ function createApplication() {
     health: 0,
     realmAdd: 0,
     realmList: 0,
+    secretsStatus: 0,
+    secretsBackendSet: 0,
+    accountAdd: 0,
+    accountRespond: 0,
+    accountList: 0,
+    accountRemove: 0,
+    oauthAppRegistration: 0,
+    oauthAppAdd: 0,
+    oauthAppList: 0,
+    oauthAppRemove: 0,
     documentationList: 0,
     documentationGet: 0,
     documentationSearch: 0,
@@ -74,7 +110,13 @@ function createApplication() {
     status: 0,
     search: 0,
     resourceGet: 0,
+    exportPrepare: 0,
     threadGet: 0,
+    actionDescribe: 0,
+    actionRun: 0,
+    artifactList: 0,
+    artifactDownload: 0,
+    artifactPurge: 0,
     shutdown: 0,
   }
   const contexts: RpcRequestContext[] = []
@@ -125,6 +167,81 @@ function createApplication() {
       async list(_input, context) {
         record('realmList', context)
         return { ok: true, value: { rows: [] } }
+      },
+    },
+    secrets: {
+      async status(_input, context) {
+        record('secretsStatus', context)
+        return {
+          ok: true,
+          value: {
+            backend: 'file',
+            backends: {
+              file: { available: true, referenceCount: 2 },
+              keychain: { available: false, referenceCount: 1 },
+            },
+          },
+        }
+      },
+      backend: {
+        async set(input, context) {
+          record('secretsBackendSet', context)
+          return {
+            ok: true,
+            value: {
+              backend: input.target,
+              copied: 2,
+              cleaned: 2,
+              cleanupPending: false,
+              warnings: [],
+            },
+          }
+        },
+      },
+    },
+    account: {
+      async add(_input, context) {
+        record('accountAdd', context)
+        return { ok: true, value: accountStream() }
+      },
+      async respond(_input, context) {
+        record('accountRespond', context)
+        return { ok: true, value: { accepted: true } }
+      },
+      async list(_input, context) {
+        record('accountList', context)
+        return { ok: true, value: { rows: [] } }
+      },
+      async remove(input, context) {
+        record('accountRemove', context)
+        return { ok: true, value: { label: input.label } }
+      },
+    },
+    oauthApp: {
+      async registration(_input, context) {
+        record('oauthAppRegistration', context)
+        return {
+          ok: true,
+          value: { environment: { clientId: 'CTXINDEX_CLIENT_ID' } },
+        }
+      },
+      async add(input, context) {
+        record('oauthAppAdd', context)
+        return {
+          ok: true,
+          value: { providerId: input.provider, label: input.label },
+        }
+      },
+      async list(_input, context) {
+        record('oauthAppList', context)
+        return { ok: true, value: { rows: [] } }
+      },
+      async remove(input, context) {
+        record('oauthAppRemove', context)
+        return {
+          ok: true,
+          value: { providerId: input.provider, label: input.label },
+        }
       },
     },
     documentation: {
@@ -195,23 +312,26 @@ function createApplication() {
         return {
           ok: true,
           value: {
-            resource: {
-              id: 'resource-id',
-              ref,
-              sourceId,
-              realmId: 'work',
-              profile: { id: 'example.item', version: 1 },
-              origin: 'synced',
-              title: 'One',
-              summary: null,
-              occurredAt: null,
-              providerUpdatedAt: null,
-              deletedAt: null,
-              hydratedAt: 1,
-              payload: { body: 'safe' },
-              createdAt: 1,
-              updatedAt: 1,
+            resource,
+            warnings: [],
+          },
+        }
+      },
+    },
+    export: {
+      async prepare(_input, context) {
+        record('exportPrepare', context)
+        return {
+          ok: true,
+          value: {
+            transfer: {
+              ticket: 'a'.repeat(64),
+              byteSize: 3,
+              expiresAt: 1_000,
             },
+            mediaType: 'message/rfc822',
+            format: 'eml',
+            ref,
             warnings: [],
           },
         }
@@ -221,6 +341,78 @@ function createApplication() {
       async get(_input, context) {
         record('threadGet', context)
         return { ok: true, value: { mode: 'flat', messages: [], warnings: [] } }
+      },
+    },
+    action: {
+      async describe(_input, context) {
+        record('actionDescribe', context)
+        return {
+          ok: true,
+          value: {
+            id: 'example.item.create',
+            profile: { id: 'example.item', version: 1 },
+            effect: 'reversible',
+            input: { type: 'object' },
+            output: { id: 'example.item', version: 1 },
+            adapters: [{ id: 'example.adapter' }],
+            sources: [
+              {
+                id: sourceId,
+                adapter: { id: 'example.adapter' },
+                available: true,
+              },
+            ],
+          },
+        }
+      },
+      async run(_input, context) {
+        record('actionRun', context)
+        return { ok: true, value: { resource, warnings: [] } }
+      },
+    },
+    artifact: {
+      async list(_input, context) {
+        record('artifactList', context)
+        return {
+          ok: true,
+          value: { resourceRef: ref, artifacts: [], warnings: [] },
+        }
+      },
+      async download(_input, context) {
+        record('artifactDownload', context)
+        return {
+          ok: true,
+          value: {
+            artifact: {
+              ref: `${ref}/attachment/file`,
+              originRef: ref,
+              contentHash: `sha256:${'a'.repeat(64)}`,
+              mediaType: 'application/octet-stream',
+              byteSize: 4,
+              retentionClass: 'cached',
+              createdAt: 1,
+            },
+            cache: 'hit',
+          },
+        }
+      },
+      async purge(_input, context) {
+        record('artifactPurge', context)
+        return {
+          ok: true,
+          value: {
+            artifactCountRemoved: 0,
+            objectCountRemoved: 0,
+            logicalBytesFreed: 0,
+            physicalBytesFreed: 0,
+            diskAccounting: {
+              artifactCount: 0,
+              objectCount: 0,
+              logicalBytes: 0,
+              physicalBytes: 0,
+            },
+          },
+        }
       },
     },
   }
@@ -254,6 +446,16 @@ describe('pure daemon contract', () => {
       ['system', 'shutdown'],
       ['realm', 'add'],
       ['realm', 'list'],
+      ['secrets', 'status'],
+      ['secrets', 'backend', 'set'],
+      ['account', 'add'],
+      ['account', 'respond'],
+      ['account', 'list'],
+      ['account', 'remove'],
+      ['oauthApp', 'registration'],
+      ['oauthApp', 'add'],
+      ['oauthApp', 'list'],
+      ['oauthApp', 'remove'],
       ['documentation', 'list'],
       ['documentation', 'get'],
       ['documentation', 'search'],
@@ -265,7 +467,13 @@ describe('pure daemon contract', () => {
       ['status', 'get'],
       ['search', 'query'],
       ['resource', 'get'],
+      ['export', 'prepare'],
       ['thread', 'get'],
+      ['action', 'describe'],
+      ['action', 'run'],
+      ['artifact', 'list'],
+      ['artifact', 'download'],
+      ['artifact', 'purge'],
     ] as const
     for (const path of paths) {
       expect(getContractRouter(daemonContract, path)).toBeDefined()
@@ -298,6 +506,13 @@ describe('pure daemon contract', () => {
     expectTypeOf<DaemonRpcApplication['system']>().toHaveProperty('shutdown')
     expectTypeOf<DaemonRpcApplication['realm']>().toHaveProperty('add')
     expectTypeOf<DaemonRpcApplication['realm']>().toHaveProperty('list')
+    expectTypeOf<DaemonRpcApplication['secrets']>().toHaveProperty('status')
+    expectTypeOf<DaemonRpcApplication['secrets']['backend']>().toHaveProperty(
+      'set',
+    )
+    expectTypeOf<DaemonRpcApplication['account']>().toHaveProperty('add')
+    expectTypeOf<DaemonRpcApplication['account']>().toHaveProperty('respond')
+    expectTypeOf<DaemonRpcApplication['oauthApp']>().toHaveProperty('add')
     expectTypeOf<DaemonRpcApplication['documentation']>().toHaveProperty('list')
     expectTypeOf<DaemonRpcApplication['documentation']>().toHaveProperty('get')
     expectTypeOf<DaemonRpcApplication['documentation']>().toHaveProperty(
@@ -318,7 +533,13 @@ describe('pure daemon contract', () => {
     expectTypeOf<DaemonRpcApplication['status']>().toHaveProperty('get')
     expectTypeOf<DaemonRpcApplication['search']>().toHaveProperty('query')
     expectTypeOf<DaemonRpcApplication['resource']>().toHaveProperty('get')
+    expectTypeOf<DaemonRpcApplication['export']>().toHaveProperty('prepare')
     expectTypeOf<DaemonRpcApplication['thread']>().toHaveProperty('get')
+    expectTypeOf<DaemonRpcApplication['action']>().toHaveProperty('describe')
+    expectTypeOf<DaemonRpcApplication['action']>().toHaveProperty('run')
+    expectTypeOf<DaemonRpcApplication['artifact']>().toHaveProperty('list')
+    expectTypeOf<DaemonRpcApplication['artifact']>().toHaveProperty('download')
+    expectTypeOf<DaemonRpcApplication['artifact']>().toHaveProperty('purge')
   })
 
   test('infers every declared bounded failure variant', () => {
@@ -367,6 +588,24 @@ describe('contract implementation', () => {
     expect(await client.system.health({})).toMatchObject({ ready: true })
     await client.realm.add({ slug: 'work' })
     await client.realm.list({})
+    await client.secrets.status({})
+    await client.secrets.backend.set({ target: 'keychain' })
+    const account = await client.account.add({ provider: 'google' })
+    expect(await account.next()).toEqual({
+      done: true,
+      value: { accountId: 'account-id' },
+    })
+    await client.account.respond({ requestId: 'request', response: 'code' })
+    await client.account.list({})
+    await client.account.remove({ label: 'personal' })
+    await client.oauthApp.registration({ provider: 'google' })
+    await client.oauthApp.add({
+      provider: 'google',
+      label: 'desktop',
+      config: { clientId: 'id' },
+    })
+    await client.oauthApp.list({})
+    await client.oauthApp.remove({ provider: 'google', label: 'desktop' })
     await client.documentation.list({})
     await client.documentation.get({
       extensionId: 'fixture.docs',
@@ -389,12 +628,39 @@ describe('contract implementation', () => {
     await client.status.get({})
     await client.search.query({ text: 'query' })
     await client.resource.get({ ref })
+    await client.export.prepare({ ref, format: 'eml' })
     await client.thread.get({ ref })
+    await client.action.describe({
+      actionId: 'example.item.create',
+      source: sourceId,
+    })
+    await client.action.run({
+      actionId: 'example.item.create',
+      source: sourceId,
+      actionInput: { title: 'One' },
+      confirmIrreversible: false,
+    })
+    await client.artifact.list({ ref })
+    await client.artifact.download({
+      ref: `${ref}/attachment/file`,
+      transfer: false,
+    })
+    await client.artifact.purge({})
     await client.system.shutdown({})
     expect(fixture.calls).toEqual({
       health: 1,
       realmAdd: 1,
       realmList: 1,
+      secretsStatus: 1,
+      secretsBackendSet: 1,
+      accountAdd: 1,
+      accountRespond: 1,
+      accountList: 1,
+      accountRemove: 1,
+      oauthAppRegistration: 1,
+      oauthAppAdd: 1,
+      oauthAppList: 1,
+      oauthAppRemove: 1,
       documentationList: 1,
       documentationGet: 1,
       documentationSearch: 1,
@@ -406,7 +672,13 @@ describe('contract implementation', () => {
       status: 1,
       search: 1,
       resourceGet: 1,
+      exportPrepare: 1,
       threadGet: 1,
+      actionDescribe: 1,
+      actionRun: 1,
+      artifactList: 1,
+      artifactDownload: 1,
+      artifactPurge: 1,
       shutdown: 1,
     })
   })

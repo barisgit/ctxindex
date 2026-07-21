@@ -1,3 +1,11 @@
+import { randomUUID } from 'node:crypto'
+import type { AccountInventoryItem } from '@ctxindex/core/account'
+import type {
+  DescribeActionResult,
+  RunActionResult,
+} from '@ctxindex/core/action'
+import type { ArtifactService } from '@ctxindex/core/artifact'
+import type { OAuthAuthorizationResponsePrompt } from '@ctxindex/core/auth'
 import {
   type AuthService,
   isGrantCompatible,
@@ -10,16 +18,24 @@ import type {
 } from '@ctxindex/core/documentation'
 import {
   CtxindexAuthError,
+  CtxindexError,
   CtxindexNotFoundError,
   CtxindexSyncError,
   CtxindexValidationError,
+  normalizeSyncError,
 } from '@ctxindex/core/errors'
+import type { ExportResourceResult } from '@ctxindex/core/export'
+import type { OAuthAppInventoryItem } from '@ctxindex/core/oauth-app'
 import type { RealmService } from '@ctxindex/core/realm'
 import {
   describeRegistry,
   type ExtensionRegistry,
 } from '@ctxindex/core/registry'
 import type { SearchPlanner } from '@ctxindex/core/search'
+import {
+  CtxindexSecretsError,
+  type SecretBackendManager,
+} from '@ctxindex/core/secrets'
 import type {
   SourceResourceResult,
   SourceService,
@@ -35,6 +51,21 @@ import type {
 import type { ThreadResult, ThreadService } from '@ctxindex/core/thread'
 import type {
   DaemonRpcApplication,
+  RpcAccountAddEvent,
+  RpcAccountAddInput,
+  RpcAccountAddResult,
+  RpcAccountListResult,
+  RpcAccountRemoveResult,
+  RpcAccountRespondInput,
+  RpcAccountRespondResult,
+  RpcActionDescribeInput,
+  RpcActionDescribeResult,
+  RpcActionRunResult,
+  RpcArtifactDownloadInput,
+  RpcArtifactDownloadResult,
+  RpcArtifactListInput,
+  RpcArtifactListResult,
+  RpcArtifactPurgeResult,
   RpcDocumentationGetInput,
   RpcDocumentationGetResult,
   RpcDocumentationListInput,
@@ -42,10 +73,17 @@ import type {
   RpcDocumentationRow,
   RpcDocumentationSearchInput,
   RpcDocumentationSearchResult,
+  RpcExportInput,
+  RpcExportResult,
   RpcFailure,
   RpcHealthInput,
   RpcHealthResult,
   RpcJsonCursor,
+  RpcOAuthAppAddInput,
+  RpcOAuthAppAddResult,
+  RpcOAuthAppListResult,
+  RpcOAuthAppRegistrationResult,
+  RpcOAuthAppRemoveResult,
   RpcProtocolIdentity,
   RpcRealmAddInput,
   RpcRealmAddResult,
@@ -58,6 +96,10 @@ import type {
   RpcRuntimeIdentity,
   RpcSearchInput,
   RpcSearchResult,
+  RpcSecretsBackendSetInput,
+  RpcSecretsBackendSetResult,
+  RpcSecretsStatusInput,
+  RpcSecretsStatusResult,
   RpcShutdownAccepted,
   RpcShutdownInput,
   RpcSourceAddInput,
@@ -80,9 +122,16 @@ import type {
   RpcWarning,
 } from '@ctxindex/rpc'
 import {
+  RPC_BYTE_TRANSFER_MAX_BYTES,
+  rpcActionDescribeResultSchema,
+  rpcActionRunResultSchema,
+  rpcArtifactDownloadResultSchema,
+  rpcArtifactListResultSchema,
+  rpcArtifactPurgeResultSchema,
   rpcDocumentationGetResultSchema,
   rpcDocumentationListResultSchema,
   rpcDocumentationSearchResultSchema,
+  rpcExportResultSchema,
   rpcJsonCursorSchema,
   rpcJsonDefaultSchema,
   rpcResourceGetResultSchema,
@@ -90,6 +139,10 @@ import {
   rpcSearchResultSchema,
   rpcThreadGetResultSchema,
 } from '@ctxindex/rpc'
+import {
+  type ByteTransferRegistry,
+  ByteTransferTooLargeError,
+} from './transfer'
 
 export interface DaemonApplicationOptions {
   readonly protocol: RpcProtocolIdentity
@@ -104,11 +157,24 @@ export interface DaemonApplicationOptions {
     DocumentationService,
     'list' | 'get' | 'search'
   >
+  readonly idleTimeoutMs?: number
+  readonly idleTimer?: DaemonIdleTimer
   readonly observationTimeoutMs: number
   readonly authService?: Pick<AuthService, 'listGrants'>
+  readonly accountService?: DaemonAccountService
+  readonly oauthAppService?: DaemonOAuthAppService
+  readonly createAuthorizationRequestId?: () => string
+  readonly actionService?: DaemonActionService
+  readonly exportService?: DaemonExportService
+  readonly artifactService?: Pick<
+    ArtifactService,
+    'list' | 'download' | 'downloadForTransfer' | 'purge'
+  >
+  readonly transferStore?: ByteTransferRegistry
   readonly realmService?: Pick<RealmService, 'createRealm' | 'listRealms'>
   readonly registry?: ExtensionRegistry
   readonly searchService?: Pick<SearchPlanner, 'search'>
+  readonly secretBackendManager?: SecretBackendManager
   readonly resourceService?: {
     get(input: {
       readonly ref: string
@@ -122,9 +188,69 @@ export interface DaemonApplicationOptions {
   readonly onStopping?: () => void
 }
 
+export interface DaemonAccountService {
+  readonly authorize: (
+    input: RpcAccountAddInput,
+    interaction: {
+      readonly readAuthorizationResponse: (
+        prompt: OAuthAuthorizationResponsePrompt,
+      ) => Promise<string | undefined>
+    },
+    signal: AbortSignal,
+  ) => Promise<{ readonly accountId: string }>
+  readonly list: () => readonly AccountInventoryItem[]
+  readonly remove: (label: string) => Promise<void>
+}
+
+export interface DaemonOAuthAppService {
+  readonly registration: (
+    providerId: string,
+  ) => Readonly<Record<string, string>>
+  readonly add: (input: RpcOAuthAppAddInput) => Promise<void>
+  readonly list: () => readonly OAuthAppInventoryItem[]
+  readonly remove: (providerId: string, label: string) => Promise<void>
+}
+
+export interface DaemonActionService {
+  readonly describe: (input: {
+    readonly actionId: string
+    readonly sourceId: string
+  }) => DescribeActionResult
+  readonly run: (input: {
+    readonly actionId: string
+    readonly sourceId: string
+    readonly actionInput: unknown
+    readonly signal: AbortSignal
+    readonly confirmIrreversible: boolean
+  }) => Promise<RunActionResult>
+}
+
+export interface DaemonExportService {
+  readonly prepare: (input: {
+    readonly ref: string
+    readonly format: string
+    readonly signal: AbortSignal
+  }) => Promise<ExportResourceResult>
+}
+
+export interface DaemonIdleTimer {
+  now(): number
+  setTimeout(callback: () => void, delayMs: number): unknown
+  clearTimeout(handle: unknown): void
+}
+
 interface ActiveRequest {
   readonly controller: AbortController
   readonly settled: Promise<void>
+}
+
+interface SecretAccessWaiter {
+  readonly mode: 'shared' | 'exclusive'
+  readonly resolve: (release: () => void) => void
+}
+
+interface PendingAuthorizationResponse {
+  readonly resolve: (value: string | undefined) => void
 }
 
 interface RendezvousItem<T> {
@@ -190,6 +316,49 @@ class StreamRendezvous<T, TReturn> {
 
 class ResultTooLargeError extends Error {}
 
+const trustedSyncMessages = new Map<string, string>([
+  ['auth_expired', 'Authentication expired.'],
+  ['auth_revoked', 'Authentication was revoked.'],
+  ['rate_limited', 'The provider rate limit was reached.'],
+  ['network', 'The provider network request failed.'],
+  ['provider_unavailable', 'The provider is unavailable.'],
+  ['provider_bad_response', 'The provider returned an invalid response.'],
+  ['provider_quota', 'The provider quota was exhausted.'],
+  ['not_found', 'The provider resource was not found (status 404).'],
+  ['permission_denied', 'The provider denied permission.'],
+  ['cancelled', 'The request was cancelled.'],
+  ['unknown', 'The provider request failed.'],
+  ['not_implemented_yet', 'The requested operation is not implemented yet.'],
+])
+
+const trustedBaseOtherMessages = new Map<string, string>([
+  ['adapter_unavailable', 'The Source Adapter is unavailable.'],
+  ['conflict', 'The request conflicts with current state.'],
+  ['data_integrity', 'Stored data failed integrity validation.'],
+  ['egress_denied', 'The requested network destination is not allowed.'],
+  [
+    'invalid_action_result',
+    'The Source Adapter returned an invalid Action result.',
+  ],
+  [
+    'invalid_retrieve_result',
+    'The Source Adapter returned an invalid retrieval result.',
+  ],
+  ['invalid_source_config', 'The Source configuration is invalid.'],
+  ['output_exists', 'The requested output already exists.'],
+  [
+    'remote_search_unsupported',
+    'The Source Adapter does not support remote search.',
+  ],
+  ['retrieve_unsupported', 'The Source Adapter does not support retrieval.'],
+  ['storage_busy', 'Local storage is temporarily busy; retry the request.'],
+  ['sync_unsupported', 'The Source Adapter does not support synchronization.'],
+  [
+    'unsupported_capability',
+    'The Source Adapter does not support the requested capability.',
+  ],
+])
+
 function failure(error: unknown): RpcFailure {
   if (error instanceof ResultTooLargeError) {
     return {
@@ -203,16 +372,25 @@ function failure(error: unknown): RpcFailure {
       kind: 'ctxindex',
       taxonomy: 'auth',
       code: error.code,
-      message: 'The daemon could not complete the request.',
+      message:
+        error.code === 'loopback_timeout'
+          ? 'OAuth authorization failed: loopback_timeout (callback timed out)'
+          : `OAuth authorization failed: ${error.code}`,
     }
   }
-  if (error instanceof CtxindexSyncError) {
-    const retryAfterMs = error.retryAfterMs
+  const syncFailure = normalizeSyncError(error)
+  if (syncFailure) {
+    const retryAfterMs = syncFailure.retryAfterMs
     return {
       kind: 'ctxindex',
       taxonomy: 'sync',
-      code: error.code,
-      message: 'The daemon could not complete the request.',
+      code: syncFailure.code,
+      message: syncFailure.publicMessage
+        ? syncFailure.message
+        : syncFailure.code === 'not_found'
+          ? (trustedSyncMessages.get(syncFailure.code) ??
+            'The daemon could not complete the request.')
+          : 'The daemon could not complete the request.',
       ...(retryAfterMs !== undefined &&
       Number.isSafeInteger(retryAfterMs) &&
       retryAfterMs >= 0 &&
@@ -237,6 +415,44 @@ function failure(error: unknown): RpcFailure {
       message: error.message,
     }
   }
+  if (error instanceof CtxindexSecretsError) {
+    const messages = {
+      backend_unavailable: 'The configured secret backend is unavailable.',
+      not_found: 'A required secret is unavailable.',
+      invalid_ref: 'Stored secret metadata is invalid.',
+      invalid_key: 'Secret metadata is invalid.',
+      decrypt_failed:
+        'The configured secret backend could not decrypt its data.',
+      io: 'The secret backend operation failed.',
+      unknown: 'The secret backend operation failed.',
+    } as const
+    return {
+      kind: 'ctxindex',
+      taxonomy: 'other',
+      code: error.code,
+      message: messages[error.code],
+    }
+  }
+  if (error instanceof CtxindexError) {
+    const syncMessage = trustedSyncMessages.get(error.code)
+    if (syncMessage) {
+      return {
+        kind: 'ctxindex',
+        taxonomy: 'sync',
+        code: error.code,
+        message: syncMessage,
+      }
+    }
+    const otherMessage = trustedBaseOtherMessages.get(error.code)
+    if (otherMessage) {
+      return {
+        kind: 'ctxindex',
+        taxonomy: 'other',
+        code: error.code,
+        message: otherMessage,
+      }
+    }
+  }
   return {
     kind: 'ctxindex',
     taxonomy: 'other',
@@ -251,15 +467,27 @@ async function resolveSourceGrant(
   account?: string,
 ): Promise<string | undefined> {
   const provider = adapter.provider
-  if (provider === undefined || provider.auth.kind === 'none') return undefined
+  if (provider === undefined || provider.auth.kind === 'none') {
+    if (account !== undefined) {
+      throw new CtxindexValidationError(
+        'invalid_filter',
+        `Adapter "${adapter.id}" does not accept an Account`,
+      )
+    }
+    return undefined
+  }
   if (provider.auth.kind !== 'oauth2') {
     throw new CtxindexValidationError(
       'invalid_filter',
       'Adapter authentication is not supported by this command',
     )
   }
-  const providerId = providerIdForAuth(adapter)
-  const providerGrants = await authService.listGrants(providerId ?? undefined)
+  const authorization = {
+    provider,
+    access: adapter.access ?? { scopes: [] },
+  }
+  const providerId = providerIdForAuth(authorization)
+  const providerGrants = await authService.listGrants(providerId)
   let grants = providerGrants
   if (account) {
     const byLabel = providerGrants.filter(
@@ -268,27 +496,24 @@ async function resolveSourceGrant(
     const byAccountId = providerGrants.filter(
       (grant) => grant.accountId === account,
     )
-    const byGrantId = providerGrants.filter((grant) => grant.id === account)
     grants =
-      byLabel.length > 0
-        ? byLabel
-        : byAccountId.length > 0
-          ? byAccountId
-          : byGrantId
+      byLabel.length > 0 ? byLabel : byAccountId.length > 0 ? byAccountId : []
   }
-  const matches = grants.filter((grant) => isGrantCompatible(adapter, grant))
+  const matches = grants.filter((grant) =>
+    isGrantCompatible(authorization, grant),
+  )
   if (matches.length === 0) {
     throw new CtxindexValidationError(
       'invalid_filter',
       account
-        ? `no compatible Grant matches account "${account}"`
-        : `no compatible Grant available; run bun cli account add ${providerId ?? '<provider>'}`,
+        ? `no compatible Account authorization matches "${account}"`
+        : `no compatible Account authorization available; run bun cli account add ${providerId ?? '<provider>'} --app <label>`,
     )
   }
   if (matches.length > 1) {
     throw new CtxindexValidationError(
       'invalid_filter',
-      `multiple compatible Grants available; choose one with --account <label|account-id|grant-id>: ${matches.map((grant) => grant.accountLabel ?? grant.accountId).join(', ')}`,
+      `multiple compatible Accounts available; choose one with --account <label|account-id>: ${matches.map((grant) => grant.accountLabel ?? grant.accountId).join(', ')}`,
     )
   }
   return matches[0]?.id
@@ -475,7 +700,8 @@ function sourceRow(
 function presentResource(
   value:
     | SourceResourceResult['resource']
-    | ThreadResult['messages'][number]['resource'],
+    | ThreadResult['messages'][number]['resource']
+    | RunActionResult['resource'],
 ) {
   return {
     ...('id' in value ? { id: value.id } : {}),
@@ -558,9 +784,19 @@ function documentationSearchRow(value: DocumentationSearchResult) {
 
 export class DaemonApplication implements DaemonRpcApplication {
   readonly #active = new Map<string, ActiveRequest>()
+  readonly #pendingAuthorizationResponses = new Map<
+    string,
+    PendingAuthorizationResponse
+  >()
   readonly #options: DaemonApplicationOptions
   #lifecycle: RpcHealthResult['lifecycle'] = 'starting'
+  #idleDeadline: number | undefined
+  #idleGeneration = 0
+  #idleTimerHandle: unknown
   #requestSequence = 0
+  readonly #secretAccessQueue: SecretAccessWaiter[] = []
+  #secretAccessReaders = 0
+  #secretAccessWriter = false
   #stoppingNotified = false
 
   readonly system: DaemonRpcApplication['system'] = {
@@ -570,6 +806,24 @@ export class DaemonApplication implements DaemonRpcApplication {
   readonly realm: DaemonRpcApplication['realm'] = {
     add: (input, context) => this.realmAdd(input, context),
     list: (input, context) => this.realmList(input, context),
+  }
+  readonly secrets: DaemonRpcApplication['secrets'] = {
+    status: (input, context) => this.secretsStatus(input, context),
+    backend: {
+      set: (input, context) => this.secretsBackendSet(input, context),
+    },
+  }
+  readonly account: DaemonRpcApplication['account'] = {
+    add: (input, context) => this.accountAdd(input, context),
+    respond: (input, context) => this.accountRespond(input, context),
+    list: (input, context) => this.accountList(input, context),
+    remove: (input, context) => this.accountRemove(input, context),
+  }
+  readonly oauthApp: DaemonRpcApplication['oauthApp'] = {
+    registration: (input, context) => this.oauthAppRegistration(input, context),
+    add: (input, context) => this.oauthAppAdd(input, context),
+    list: (input, context) => this.oauthAppList(input, context),
+    remove: (input, context) => this.oauthAppRemove(input, context),
   }
   readonly documentation: DaemonRpcApplication['documentation'] = {
     list: (input, context) => this.documentationList(input, context),
@@ -594,8 +848,20 @@ export class DaemonApplication implements DaemonRpcApplication {
   readonly resource: DaemonRpcApplication['resource'] = {
     get: (input, context) => this.getResource(input, context),
   }
+  readonly export: DaemonRpcApplication['export'] = {
+    prepare: (input, context) => this.prepareExport(input, context),
+  }
   readonly thread: DaemonRpcApplication['thread'] = {
     get: (input, context) => this.getThread(input, context),
+  }
+  readonly action: DaemonRpcApplication['action'] = {
+    describe: (input, context) => this.describeAction(input, context),
+    run: (input, context) => this.runAction(input, context),
+  }
+  readonly artifact: DaemonRpcApplication['artifact'] = {
+    list: (input, context) => this.listArtifacts(input, context),
+    download: (input, context) => this.downloadArtifact(input, context),
+    purge: (input, context) => this.purgeArtifacts(input, context),
   }
 
   constructor(options: DaemonApplicationOptions) {
@@ -614,11 +880,13 @@ export class DaemonApplication implements DaemonRpcApplication {
     if (this.#lifecycle !== 'starting')
       throw new Error('Daemon cannot become ready')
     this.#lifecycle = 'ready'
+    this.#touchIdle(true)
   }
 
   beginStopping(): boolean {
     const alreadyStopping = this.#lifecycle === 'stopping'
     this.#lifecycle = 'stopping'
+    this.#clearIdleTimer()
     for (const request of this.#active.values()) request.controller.abort()
     if (!this.#stoppingNotified) {
       this.#stoppingNotified = true
@@ -696,6 +964,183 @@ export class DaemonApplication implements DaemonRpcApplication {
     return this.#business(context, async () => {
       if (!this.#options.realmService) throw new Error('Realm service missing')
       return { rows: this.#options.realmService.listRealms() }
+    })
+  }
+
+  secretsStatus(
+    _input: RpcSecretsStatusInput,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcSecretsStatusResult>> {
+    return this.#business(context, async (signal) => {
+      signal.throwIfAborted()
+      if (!this.#options.secretBackendManager)
+        throw new Error('Secret backend manager missing')
+      return this.#options.secretBackendManager.getStatus()
+    })
+  }
+
+  secretsBackendSet(
+    input: RpcSecretsBackendSetInput,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcSecretsBackendSetResult>> {
+    return this.#business(
+      context,
+      async (signal) => {
+        signal.throwIfAborted()
+        if (!this.#options.secretBackendManager)
+          throw new Error('Secret backend manager missing')
+        const result = await this.#options.secretBackendManager.switchBackend(
+          input.target,
+        )
+        return {
+          ...result,
+          warnings: result.cleanupPending
+            ? ['Secret backend cleanup remains pending.']
+            : [],
+        }
+      },
+      true,
+      'exclusive',
+    )
+  }
+
+  accountAdd(
+    input: RpcAccountAddInput,
+    context: RpcRequestContext,
+  ): ReturnType<DaemonRpcApplication['account']['add']> {
+    return this.#businessStream<RpcAccountAddEvent, RpcAccountAddResult>(
+      context,
+      async (signal, emit) => {
+        const service = this.#options.accountService
+        if (!service) throw new Error('Account service missing')
+        return service.authorize(
+          input,
+          {
+            readAuthorizationResponse: async (prompt) => {
+              const requestId =
+                this.#options.createAuthorizationRequestId?.() ?? randomUUID()
+              if (this.#pendingAuthorizationResponses.has(requestId))
+                throw new Error('Authorization request id collision')
+              let settle!: (value: string | undefined) => void
+              const response = new Promise<string | undefined>((resolve) => {
+                settle = resolve
+              })
+              this.#pendingAuthorizationResponses.set(requestId, {
+                resolve: settle,
+              })
+              const finish = () => settle(undefined)
+              prompt.signal.addEventListener('abort', finish, { once: true })
+              signal.addEventListener('abort', finish, { once: true })
+              try {
+                await emit({
+                  type: 'authorization.required',
+                  requestId,
+                  authorizationUrl: prompt.authorizationUrl,
+                })
+                return await response
+              } finally {
+                prompt.signal.removeEventListener('abort', finish)
+                signal.removeEventListener('abort', finish)
+                this.#pendingAuthorizationResponses.delete(requestId)
+              }
+            },
+          },
+          signal,
+        )
+      },
+    )
+  }
+
+  accountRespond(
+    input: RpcAccountRespondInput,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcAccountRespondResult>> {
+    return this.#business(
+      context,
+      async () => {
+        const pending = this.#pendingAuthorizationResponses.get(input.requestId)
+        if (!pending)
+          throw new CtxindexNotFoundError(
+            'The OAuth authorization request is no longer active.',
+          )
+        this.#pendingAuthorizationResponses.delete(input.requestId)
+        pending.resolve(input.response)
+        return { accepted: true }
+      },
+      true,
+      'none',
+    )
+  }
+
+  accountList(
+    _input: Record<string, never>,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcAccountListResult>> {
+    return this.#business(context, async () => {
+      const service = this.#options.accountService
+      if (!service) throw new Error('Account service missing')
+      return { rows: service.list() }
+    })
+  }
+
+  accountRemove(
+    input: { readonly label: string },
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcAccountRemoveResult>> {
+    return this.#business(context, async (signal) => {
+      const service = this.#options.accountService
+      if (!service) throw new Error('Account service missing')
+      signal.throwIfAborted()
+      await service.remove(input.label)
+      return { label: input.label }
+    })
+  }
+
+  oauthAppRegistration(
+    input: { readonly provider: string },
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcOAuthAppRegistrationResult>> {
+    return this.#business(context, async () => {
+      const service = this.#options.oauthAppService
+      if (!service) throw new Error('OAuth App service missing')
+      return { environment: service.registration(input.provider) }
+    })
+  }
+
+  oauthAppAdd(
+    input: RpcOAuthAppAddInput,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcOAuthAppAddResult>> {
+    return this.#business(context, async (signal) => {
+      const service = this.#options.oauthAppService
+      if (!service) throw new Error('OAuth App service missing')
+      signal.throwIfAborted()
+      await service.add(input)
+      return { providerId: input.provider, label: input.label }
+    })
+  }
+
+  oauthAppList(
+    _input: Record<string, never>,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcOAuthAppListResult>> {
+    return this.#business(context, async () => {
+      const service = this.#options.oauthAppService
+      if (!service) throw new Error('OAuth App service missing')
+      return { rows: service.list() }
+    })
+  }
+
+  oauthAppRemove(
+    input: { readonly provider: string; readonly label: string },
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcOAuthAppRemoveResult>> {
+    return this.#business(context, async (signal) => {
+      const service = this.#options.oauthAppService
+      if (!service) throw new Error('OAuth App service missing')
+      signal.throwIfAborted()
+      await service.remove(input.provider, input.label)
+      return { providerId: input.provider, label: input.label }
     })
   }
 
@@ -940,6 +1385,38 @@ export class DaemonApplication implements DaemonRpcApplication {
     })
   }
 
+  prepareExport(
+    input: RpcExportInput,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcExportResult>> {
+    return this.#business(context, async (signal) => {
+      if (!this.#options.exportService || !this.#options.transferStore)
+        throw new Error('Export service missing')
+      const result = await this.#options.exportService.prepare({
+        ref: input.ref,
+        format: input.format,
+        signal,
+      })
+      let transfer: ReturnType<ByteTransferRegistry['create']>
+      try {
+        transfer = this.#options.transferStore.create(result.bytes)
+      } catch (error) {
+        if (error instanceof ByteTransferTooLargeError)
+          throw new ResultTooLargeError()
+        throw error
+      }
+      const parsed = rpcExportResultSchema.safeParse({
+        transfer,
+        mediaType: result.mediaType,
+        format: result.format,
+        ref: result.ref,
+        warnings: result.warnings,
+      })
+      if (!parsed.success) throw new ResultTooLargeError()
+      return parsed.data
+    })
+  }
+
   getThread(
     input: RpcThreadGetInput,
     context: RpcRequestContext,
@@ -959,20 +1436,135 @@ export class DaemonApplication implements DaemonRpcApplication {
     })
   }
 
+  describeAction(
+    input: RpcActionDescribeInput,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcActionDescribeResult>> {
+    return this.#business(context, async () => {
+      if (!this.#options.actionService)
+        throw new Error('Action service missing')
+      const sourceId = this.#options.sourceService.resolveSourceId(input.source)
+      const parsed = rpcActionDescribeResultSchema.safeParse(
+        this.#options.actionService.describe({
+          actionId: input.actionId,
+          sourceId,
+        }),
+      )
+      if (!parsed.success) throw new ResultTooLargeError()
+      return parsed.data
+    })
+  }
+
+  runAction(
+    input: Parameters<DaemonRpcApplication['action']['run']>[0],
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcActionRunResult>> {
+    return this.#business(context, async (signal) => {
+      if (!this.#options.actionService)
+        throw new Error('Action service missing')
+      const sourceId = this.#options.sourceService.resolveSourceId(input.source)
+      const result = await this.#options.actionService.run({
+        actionId: input.actionId,
+        sourceId,
+        actionInput: input.actionInput,
+        signal,
+        confirmIrreversible: input.confirmIrreversible,
+      })
+      const parsed = rpcActionRunResultSchema.safeParse({
+        resource: presentResource(result.resource),
+        warnings: result.warnings,
+      })
+      if (!parsed.success) throw new ResultTooLargeError()
+      return parsed.data
+    })
+  }
+
+  listArtifacts(
+    input: RpcArtifactListInput,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcArtifactListResult>> {
+    return this.#business(context, async () => {
+      if (!this.#options.artifactService)
+        throw new Error('Artifact service missing')
+      const parsed = rpcArtifactListResultSchema.safeParse(
+        await this.#options.artifactService.list(input.ref),
+      )
+      if (!parsed.success) throw new ResultTooLargeError()
+      return parsed.data
+    })
+  }
+
+  downloadArtifact(
+    input: RpcArtifactDownloadInput,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcArtifactDownloadResult>> {
+    return this.#business(context, async (signal) => {
+      if (!this.#options.artifactService)
+        throw new Error('Artifact service missing')
+      let output: RpcArtifactDownloadResult
+      if (input.transfer) {
+        if (!this.#options.transferStore)
+          throw new Error('Byte transfer store missing')
+        const prepared =
+          await this.#options.artifactService.downloadForTransfer(
+            input.ref,
+            RPC_BYTE_TRANSFER_MAX_BYTES,
+            signal,
+          )
+        let transfer: ReturnType<ByteTransferRegistry['create']>
+        try {
+          transfer = this.#options.transferStore.create(prepared.bytes)
+        } catch (error) {
+          if (error instanceof ByteTransferTooLargeError)
+            throw new ResultTooLargeError()
+          throw error
+        }
+        output = { ...prepared.download, transfer }
+      } else {
+        output = await this.#options.artifactService.download(input.ref, {
+          signal,
+        })
+      }
+      const parsed = rpcArtifactDownloadResultSchema.safeParse(output)
+      if (!parsed.success) throw new ResultTooLargeError()
+      return parsed.data
+    })
+  }
+
+  purgeArtifacts(
+    _input: Parameters<DaemonRpcApplication['artifact']['purge']>[0],
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcArtifactPurgeResult>> {
+    return this.#business(context, async (signal) => {
+      if (!this.#options.artifactService)
+        throw new Error('Artifact service missing')
+      signal.throwIfAborted()
+      const parsed = rpcArtifactPurgeResultSchema.safeParse(
+        await this.#options.artifactService.purge(),
+      )
+      if (!parsed.success) throw new ResultTooLargeError()
+      return parsed.data
+    })
+  }
+
   getStatus(
     input: RpcStatusInput,
     context: RpcRequestContext,
   ): Promise<RpcResult<RpcStatusResult>> {
-    return this.#business(context, async () => {
-      const sourceId = input.source
-        ? this.#options.sourceService.resolveSourceId(input.source)
-        : undefined
-      return {
-        rows: this.#options.sourceService
-          .getStatus(sourceId ? { sourceId } : {})
-          .map(statusRow),
-      }
-    })
+    return this.#business(
+      context,
+      async () => {
+        const sourceId = input.source
+          ? this.#options.sourceService.resolveSourceId(input.source)
+          : undefined
+        return {
+          rows: this.#options.sourceService
+            .getStatus(sourceId ? { sourceId } : {})
+            .map(statusRow),
+        }
+      },
+      false,
+    )
   }
 
   async shutdown(
@@ -995,6 +1587,8 @@ export class DaemonApplication implements DaemonRpcApplication {
   #business<T>(
     context: RpcRequestContext,
     invoke: (signal: AbortSignal) => Promise<T>,
+    resetsIdle = true,
+    secretAccess: 'shared' | 'exclusive' | 'none' = 'shared',
   ): Promise<RpcResult<T>> {
     if (this.#lifecycle !== 'ready')
       return Promise.resolve(unavailable(this.#lifecycle))
@@ -1009,8 +1603,17 @@ export class DaemonApplication implements DaemonRpcApplication {
       settle = resolve
     })
     this.#active.set(key, { controller, settled })
+    this.#touchIdle(resetsIdle)
 
-    return invoke(controller.signal)
+    const operation = () => {
+      controller.signal.throwIfAborted()
+      return invoke(controller.signal)
+    }
+    return (
+      secretAccess === 'none'
+        ? Promise.resolve().then(operation)
+        : this.#withSecretAccess(secretAccess, operation)
+    )
       .then(
         (value): RpcResult<T> =>
           controller.signal.aborted
@@ -1041,7 +1644,58 @@ export class DaemonApplication implements DaemonRpcApplication {
         context.signal.removeEventListener('abort', cancel)
         this.#active.delete(key)
         settle()
+        this.#touchIdle(resetsIdle)
       })
+  }
+
+  async #withSecretAccess<T>(
+    mode: 'shared' | 'exclusive',
+    invoke: () => Promise<T>,
+  ): Promise<T> {
+    const release = await this.#acquireSecretAccess(mode)
+    try {
+      return await invoke()
+    } finally {
+      release()
+    }
+  }
+
+  #acquireSecretAccess(mode: 'shared' | 'exclusive'): Promise<() => void> {
+    return new Promise((resolve) => {
+      this.#secretAccessQueue.push({ mode, resolve })
+      this.#drainSecretAccess()
+    })
+  }
+
+  #drainSecretAccess(): void {
+    if (this.#secretAccessWriter) return
+    const next = this.#secretAccessQueue[0]
+    if (!next) return
+    if (next.mode === 'exclusive') {
+      if (this.#secretAccessReaders > 0) return
+      this.#secretAccessQueue.shift()
+      this.#secretAccessWriter = true
+      let released = false
+      next.resolve(() => {
+        if (released) return
+        released = true
+        this.#secretAccessWriter = false
+        this.#drainSecretAccess()
+      })
+      return
+    }
+    while (this.#secretAccessQueue[0]?.mode === 'shared') {
+      const reader = this.#secretAccessQueue.shift()
+      if (!reader) return
+      this.#secretAccessReaders += 1
+      let released = false
+      reader.resolve(() => {
+        if (released) return
+        released = true
+        this.#secretAccessReaders -= 1
+        this.#drainSecretAccess()
+      })
+    }
   }
 
   #businessStream<TEvent, TResult>(
@@ -1056,23 +1710,27 @@ export class DaemonApplication implements DaemonRpcApplication {
     const controller = new AbortController()
     const rendezvous = new StreamRendezvous<TEvent, RpcResult<TResult>>()
     const cancellation = new CtxindexSyncError('Sync cancelled', 'cancelled')
-    const cancel = () => {
-      controller.abort(context.signal.reason)
-      rendezvous.close(cancellation)
-    }
-    if (context.signal.aborted) cancel()
-    else context.signal.addEventListener('abort', cancel, { once: true })
-
     const key = `${context.requestId}:${this.#requestSequence++}`
     let settle!: () => void
     const settled = new Promise<void>((resolve) => {
       settle = resolve
     })
     this.#active.set(key, { controller, settled })
+    this.#touchIdle(true)
 
-    const producer = invoke(controller.signal, (event) =>
-      rendezvous.push(event),
-    )
+    let finalized = false
+    const finalize = (): void => {
+      if (finalized) return
+      finalized = true
+      context.signal.removeEventListener('abort', cancel)
+      this.#active.delete(key)
+      settle()
+      this.#touchIdle(true)
+    }
+    const producer = this.#withSecretAccess('shared', () => {
+      controller.signal.throwIfAborted()
+      return invoke(controller.signal, (event) => rendezvous.push(event))
+    })
       .then((value) =>
         rendezvous.finish(
           controller.signal.aborted
@@ -1099,11 +1757,14 @@ export class DaemonApplication implements DaemonRpcApplication {
             : failure(error),
         }),
       )
-      .finally(() => {
-        context.signal.removeEventListener('abort', cancel)
-        this.#active.delete(key)
-        settle()
-      })
+
+    const cancel = () => {
+      controller.abort(context.signal.reason)
+      rendezvous.close(cancellation)
+      void producer.then(finalize, finalize)
+    }
+    if (context.signal.aborted) cancel()
+    else context.signal.addEventListener('abort', cancel, { once: true })
 
     let completed = false
     const cancelledResult: RpcResult<TResult> = {
@@ -1115,11 +1776,13 @@ export class DaemonApplication implements DaemonRpcApplication {
       },
     }
     const stop = async (): Promise<void> => {
-      if (completed) return
-      controller.abort()
-      rendezvous.close(cancellation)
-      await producer
-      completed = true
+      if (!completed) {
+        controller.abort()
+        rendezvous.close(cancellation)
+        await producer
+        completed = true
+      }
+      finalize()
     }
     const iterator: AsyncIteratorObject<TEvent, RpcResult<TResult>, void> = {
       [Symbol.asyncIterator]() {
@@ -1129,9 +1792,18 @@ export class DaemonApplication implements DaemonRpcApplication {
         await stop()
       },
       async next() {
-        const step = await rendezvous.next()
-        if (step.done) completed = true
-        return step
+        try {
+          const step = await rendezvous.next()
+          if (step.done) {
+            completed = true
+            finalize()
+          }
+          return step
+        } catch (error) {
+          await producer
+          finalize()
+          throw error
+        }
       },
       async return(value) {
         await stop()
@@ -1146,5 +1818,38 @@ export class DaemonApplication implements DaemonRpcApplication {
       },
     }
     return Promise.resolve({ ok: true, value: iterator })
+  }
+
+  #touchIdle(resetDeadline: boolean): void {
+    const timeoutMs = this.#options.idleTimeoutMs
+    const timer = this.#options.idleTimer
+    if (timeoutMs === undefined || timer === undefined) return
+    if (this.#lifecycle !== 'ready') return
+    if (resetDeadline || this.#idleDeadline === undefined) {
+      this.#idleDeadline = timer.now() + timeoutMs
+    }
+    this.#clearIdleTimer()
+    const deadline = this.#idleDeadline
+    const generation = this.#idleGeneration
+    this.#idleTimerHandle = timer.setTimeout(
+      () => {
+        if (generation !== this.#idleGeneration) return
+        this.#idleTimerHandle = undefined
+        if (this.#lifecycle !== 'ready' || this.#active.size > 0) return
+        if (timer.now() < deadline) {
+          this.#touchIdle(false)
+          return
+        }
+        this.beginStopping()
+      },
+      Math.max(0, deadline - timer.now()),
+    )
+  }
+
+  #clearIdleTimer(): void {
+    this.#idleGeneration++
+    if (this.#idleTimerHandle === undefined) return
+    this.#options.idleTimer?.clearTimeout(this.#idleTimerHandle)
+    this.#idleTimerHandle = undefined
   }
 }

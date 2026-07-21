@@ -2,7 +2,6 @@ import { CtxindexValidationError } from '@ctxindex/core/errors'
 import { syncSource } from '@ctxindex/core/source'
 import {
   type FailedSourceSyncResult,
-  mapSyncErrorCode,
   type RunSyncResult,
   type SyncApplicationEvent,
   SyncApplicationService,
@@ -11,6 +10,10 @@ import {
 } from '@ctxindex/core/sync'
 import type { RpcSyncEvent } from '@ctxindex/rpc'
 import { daemonSync, selectDaemon } from '../daemon/client'
+import {
+  ensureDaemonSelection,
+  selectEnsuredDaemonRoute,
+} from '../daemon/ensure'
 import { type CliDeps, openDeps } from '../deps'
 import { mapErrorToExit } from '../format/exit'
 
@@ -26,6 +29,7 @@ export interface SyncServices {
 
 export interface SyncRouteServices {
   readonly selectDaemon: typeof selectDaemon
+  readonly ensureDaemonSelection?: typeof ensureDaemonSelection
   readonly daemonSync: typeof daemonSync
 }
 
@@ -93,7 +97,11 @@ export interface SyncOutput {
 }
 
 const defaultServices: SyncServices = { syncSource }
-const defaultRouteServices: SyncRouteServices = { selectDaemon, daemonSync }
+const defaultRouteServices: SyncRouteServices = {
+  selectDaemon,
+  ensureDaemonSelection,
+  daemonSync,
+}
 
 function errorCode(error: unknown): string {
   const code = (error as { code?: unknown }).code
@@ -194,8 +202,7 @@ function renderLiveEvent(
 }
 
 export function mapRpcSyncFailureToExit(code: string): number {
-  return mapSyncErrorCode(code as Parameters<typeof mapSyncErrorCode>[0])
-    .exitCode
+  return mapErrorToExit({ code })
 }
 
 export function formatSyncOutput(
@@ -263,7 +270,7 @@ export async function handleSyncCommand(
   process.once('SIGINT', cancel)
   let deps: SyncDeps | undefined
   try {
-    const daemon = routes.selectDaemon()
+    const daemon = await selectEnsuredDaemonRoute(routes, controller.signal)
     if (daemon) {
       const result = await routes.daemonSync(
         daemon,

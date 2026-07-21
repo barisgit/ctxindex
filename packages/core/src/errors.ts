@@ -1,16 +1,6 @@
-export type CtxindexSyncErrorCode =
-  | 'auth_expired'
-  | 'auth_revoked'
-  | 'rate_limited'
-  | 'network'
-  | 'provider_unavailable'
-  | 'provider_bad_response'
-  | 'provider_quota'
-  | 'not_found'
-  | 'permission_denied'
-  | 'cancelled'
-  | 'unknown'
-  | 'not_implemented_yet'
+import { isSyncError, type SyncErrorCode } from '@ctxindex/extension-sdk'
+
+export type CtxindexSyncErrorCode = SyncErrorCode
 
 export interface CtxindexErrorOptions {
   readonly cause?: unknown
@@ -150,11 +140,13 @@ export class CtxindexConfigError extends CtxindexError {
 
 export interface CtxindexSyncErrorOptions extends CtxindexErrorOptions {
   readonly retryAfterMs?: number
+  readonly publicMessage?: boolean
 }
 
 export class CtxindexSyncError extends CtxindexError {
   override readonly code: CtxindexSyncErrorCode
   readonly retryAfterMs?: number
+  readonly publicMessage: boolean
 
   constructor(
     message: string,
@@ -167,5 +159,18 @@ export class CtxindexSyncError extends CtxindexError {
     if (options && 'retryAfterMs' in options) {
       this.retryAfterMs = options.retryAfterMs
     }
+    this.publicMessage = options?.publicMessage === true
   }
+}
+
+export function normalizeSyncError(error: unknown): CtxindexSyncError | null {
+  if (error instanceof CtxindexSyncError) return error
+  if (!isSyncError(error)) return null
+  return new CtxindexSyncError(error.message, error.code, {
+    cause: error,
+    publicMessage: true,
+    ...(error.retryAfterMs === undefined
+      ? {}
+      : { retryAfterMs: error.retryAfterMs }),
+  })
 }

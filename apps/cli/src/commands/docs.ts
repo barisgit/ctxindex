@@ -1,6 +1,7 @@
 import { defineCtxCommand } from '../command-model'
 import {
   docsGetCommand,
+  docsGetSkillCommand,
   docsListCommand,
   docsSearchCommand,
 } from '../docs/command'
@@ -13,6 +14,7 @@ export const docsCommand = defineCtxCommand({
   subCommands: {
     list: docsListCommand,
     get: docsGetCommand,
+    'get-skill': docsGetSkillCommand,
     search: docsSearchCommand,
   },
 })
