@@ -308,7 +308,10 @@ test('runner receives executable and argv without shell interpolation', async ()
   }
 })
 
-async function materializeGit(lockText: string) {
+async function materializeGit(
+  lockText: string,
+  requestedTarget = 'git+https://example.com/repository.git#main',
+) {
   const root = await mkdtemp(join(tmpdir(), 'ctxindex-git-materializer-'))
   roots.push(root)
   const materializer = new BunPackageMaterializer({
@@ -322,8 +325,7 @@ async function materializeGit(lockText: string) {
           join(input.cwd, 'package.json'),
           JSON.stringify({
             dependencies: {
-              'fixture-git-extension':
-                'git+https://example.com/repository.git#main',
+              'fixture-git-extension': requestedTarget,
             },
           }),
         )
@@ -361,10 +363,55 @@ async function materializeGit(lockText: string) {
     materializer,
     result: await materializer.materialize({
       kind: 'git',
-      requestedTarget: 'git+https://example.com/repository.git#main',
+      requestedTarget,
     }),
   }
 }
+
+test.each([
+  [
+    'URL',
+    'git+ssh://git@example.com/repository.git#main',
+    'git+ssh://git@example.com/repository.git',
+  ],
+  [
+    'scp-like',
+    'git@example.com:repository.git#main',
+    'git+ssh://git@example.com/repository.git',
+  ],
+])('Git SSH materialization and frozen exact replay allow the credential-free git user in %s syntax', async (_label, requestedTarget, resolvedRepository) => {
+  const commit = 'b'.repeat(40)
+  const { materializer, result } = await materializeGit(
+    JSON.stringify({
+      lockfileVersion: 1,
+      packages: {
+        'fixture-git-extension': [
+          `fixture-git-extension@${resolvedRepository}`,
+          {},
+          commit,
+        ],
+      },
+    }),
+    requestedTarget,
+  )
+  try {
+    expect(result.source).toMatchObject({
+      kind: 'git',
+      requested_target: requestedTarget,
+      repository: resolvedRepository,
+      commit,
+    })
+    const replayed = await materializer.materializeExact({
+      source: result.source,
+      packageRoot: result.packageRoot,
+      materializationDigest: result.materializationDigest,
+      dependencyResolutionArtifact: result.dependencyResolutionArtifact,
+    })
+    await replayed.cleanup()
+  } finally {
+    await result.cleanup()
+  }
+})
 
 test('Git materialization records the selected package tuple commit', async () => {
   const unrelatedCommit = 'a'.repeat(40)
@@ -634,7 +681,7 @@ test('materialization emits a sanitized exact Bun resolution artifact and frozen
   }
 })
 
-async function expectRejectedResolution(lockfile: unknown): Promise<void> {
+async function materializeResolutionArtifact(lockfile: unknown) {
   const root = await mkdtemp(join(tmpdir(), 'ctxindex-hostile-lock-'))
   roots.push(root)
   const materializer = new BunPackageMaterializer({
@@ -654,13 +701,43 @@ async function expectRejectedResolution(lockfile: unknown): Promise<void> {
       await writeFile(join(input.cwd, 'bun.lock'), JSON.stringify(lockfile))
     },
   })
-  await expect(
-    materializer.materialize({
-      kind: 'npm',
-      requestedTarget: 'fixture-hostile@1',
-    }),
-  ).rejects.toMatchObject({ code: 'extension_acquisition_failed' })
+  return materializer.materialize({
+    kind: 'npm',
+    requestedTarget: 'fixture-hostile@1',
+  })
 }
+
+async function expectRejectedResolution(lockfile: unknown): Promise<void> {
+  await expect(materializeResolutionArtifact(lockfile)).rejects.toMatchObject({
+    code: 'extension_acquisition_failed',
+  })
+}
+
+test.each([
+  'internal',
+  '127.0.0.1',
+])('accepts a package-prefixed credential-free scp-like Git lock resolution for host %s', async (host) => {
+  const result = await materializeResolutionArtifact({
+    lockfileVersion: 1,
+    packages: {
+      nested: [`nested@git@${host}:repository.git`, {}, 'b'.repeat(40)],
+    },
+  })
+  await result.cleanup()
+})
+
+test.each([
+  'fixture@file:repository',
+  '@scope/fixture@file:repository',
+  'fixture@git:repository',
+  '@scope/fixture@git:repository',
+])('accepts the complete package protocol resolution %s', async (resolution) => {
+  const result = await materializeResolutionArtifact({
+    lockfileVersion: 1,
+    packages: { nested: resolution },
+  })
+  await result.cleanup()
+})
 
 test.each([
   ['unknown lock format', { lockfileVersion: 2, packages: {} }],
@@ -702,6 +779,27 @@ test.each([
       },
     },
   ],
+  ...[
+    ['SSH password', 'git+ssh://git:secret@example.test/hostile.git'],
+    ['non-git SSH user', 'git+ssh://user@example.test/hostile.git'],
+    ['encoded SSH user', 'git+ssh://g%69t@example.test/hostile.git'],
+    ['HTTPS userinfo', 'git+https://git@example.test/hostile.git'],
+    ['scp-like internal host user', 'user@internal:hostile.git'],
+    ['scp-like IPv4 host user', 'user@127.0.0.1:hostile.git'],
+    ['scp-like protocol-named Git host user', 'user@git:hostile.git'],
+    ['scp-like protocol-named file host user', 'user@file:hostile.git'],
+  ].map(
+    ([label, repository]) =>
+      [
+        label,
+        {
+          lockfileVersion: 1,
+          packages: {
+            hostile: [`hostile@${repository}`, {}, 'b'.repeat(40)],
+          },
+        },
+      ] as const,
+  ),
   [
     'embedded install scripts',
     {

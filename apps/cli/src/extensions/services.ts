@@ -59,7 +59,13 @@ export function createExtensionCommandServices(
     materializer,
     loadActiveState: async () => {
       const localOAuthAppIdentities = await readOAuthAppIdentities()
-      const loaded = await loadDefinitions({ localOAuthAppIdentities })
+      const loaded = await loadDefinitions({
+        ...(options.configRoot === undefined
+          ? {}
+          : { configRoot: options.configRoot }),
+        dataRoot,
+        localOAuthAppIdentities,
+      })
       return {
         registry: loaded.registry,
         roots: loaded.roots,

@@ -107,20 +107,33 @@ runtime-complete validation, publication, collision policy, and record writing
 to the canonical generic installer. CLI modules depend on these services;
 Catalog core never depends on CLI or provider Adapters.
 
-Acquisition uses isolated temporary bare Git storage, resolves one full ref or exact OID to a commit, archives committed objects, validates the complete candidate snapshot, and publishes it by atomic rename. A concurrent publisher of the same valid target is accepted after target validation; unrelated filesystem errors remain failures. Git executes without terminal prompts, credential helpers, hooks, filters, submodules, or external protocol helpers. Public HTTPS repositories exclude userinfo, query, fragment, localhost, and literal loopback, IPv4-mapped, private, unique-local, link-local, site-local, unspecified, or multicast destinations; persisted acquisition inputs are revalidated at the Git boundary. Snapshot and record writes fail without changing the previously visible pin or installed provenance.
+Acquisition is implemented with isolated temporary bare Git storage, exact-commit
+object archival, complete-candidate validation, and atomic snapshot publication.
+Repository inputs are revalidated at the system-Git boundary, whose environment
+and command configuration suppress ambient Git integration. The authoritative
+repository policy and acquisition outcomes are specified by
+[Explicit trusted Catalog acquisition](spec.md#requirement-explicit-trusted-catalog-acquisition)
+and
+[Hardened Git execution and repository policy](spec.md#requirement-hardened-git-execution-and-repository-policy).
 
-Configured Catalog records and generic installed-extension records persist in
-their respective stores. Catalog records include the exact snapshot acquisition
-time as portable provenance; absolute snapshot paths are always derived from the
-active data root. Explicit refresh and refresh-enabled reads change only the
-Catalog pin, while `refresh: false` uses stored inert state. The canonical
-installer publishes managed bytes and atomically rewrites one stable-id generic
-record containing exact source provenance and optional Catalog curation. Only a
-record curated by the same configured Catalog name and Catalog id is replaceable;
-direct, other-Catalog, built-in, and explicit-path identity conflicts fail before
-persistence. Origin-neutral uninstall is owned by the generic direct lifecycle,
-and Catalog removal checks those same records under the lifecycle lock while
-retaining snapshots and all Source/Resource storage.
+Configured Catalog records and generic installed-extension records use separate
+stores, while absolute snapshot paths are derived from the active data root.
+Catalog lifecycle commits and generic record publication coordinate through the
+canonical installation lifecycle lock. The generic record is the single
+execution record and may carry Catalog curation beside exact source provenance;
+origin-neutral uninstall remains owned by the generic direct lifecycle. The
+Catalog service stages acquisition outside the lock. Refresh commits only when
+the complete originally observed Catalog record remains current, preserves the
+acquisition timestamp for an unchanged commit, and records `now` for a changed
+commit. Catalog installation likewise stages exact replay outside the lock and
+revalidates the selected snapshot plus exact indexed entry before publication.
+Git replay schemas accept credential-free SSH with no user or the exact `git`
+user and reject passwords or other users. The
+authoritative refresh, collision, replacement, removal, and retention rules are
+specified by
+[Independent pin refresh and installed provenance](spec.md#requirement-independent-pin-refresh-and-installed-provenance)
+and
+[Safe removal, uninstall, and retained state](spec.md#requirement-safe-removal-uninstall-and-retained-state).
 
 ## Verification
 

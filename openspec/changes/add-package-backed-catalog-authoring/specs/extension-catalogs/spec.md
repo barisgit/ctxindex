@@ -179,6 +179,10 @@ unchanged and SHALL NOT change its stable Catalog id.
 Package-manager execution and module import SHALL occur only during explicitly
 trusted build or install operations.
 
+Credential-free Git replay metadata MAY use SSH URLs or scp-like SSH syntax
+with no user or with the exact `git` user. It SHALL reject a password or any
+other SSH user, and non-SSH URLs SHALL reject all userinfo.
+
 #### Scenario: Refresh encounters package entries
 
 - **WHEN** refresh validates a schema-v2 snapshot containing package and literal
@@ -215,6 +219,19 @@ A subsequent install SHALL replace an installed record automatically only when
 both configured Catalog name and Catalog id match. Direct records, another
 Catalog, builtins, and explicit-path Extensions SHALL require uninstall first.
 
+Refresh SHALL acquire and validate outside the lifecycle lock, then commit only
+when the complete configured Catalog record it originally observed is still
+current under that lock. A stale staged refresh SHALL fail rather than overwrite
+a newer committed refresh. Refreshing the same exact commit SHALL preserve the
+stored snapshot acquisition time; advancing to a different commit SHALL record
+the new acquisition time.
+
+Catalog install SHALL stage exact replay outside the lifecycle lock. Before
+commit, it SHALL require the configured Catalog snapshot and the selected exact
+entry at its recorded locator to equal the snapshot and entry originally
+selected. Removal or same-id refresh winning the lock SHALL invalidate the
+pending install without retrying acquisition under the lock.
+
 #### Scenario: Catalog refresh advances after install
 
 - **WHEN** a configured Catalog refreshes to a newer commit after one of its
@@ -227,6 +244,23 @@ Catalog, builtins, and explicit-path Extensions SHALL require uninstall first.
 - **WHEN** the selected Catalog name and Catalog id match the installed record
   and exact replay and validation succeed
 - **THEN** the generic record and managed materialization are atomically replaced
+
+#### Scenario: Concurrent refresh commits a newer snapshot first
+
+- **WHEN** an older staged refresh reaches commit after another refresh changed
+  the originally observed configured Catalog record
+- **THEN** the older refresh fails without overwriting the newer snapshot
+
+#### Scenario: Refresh resolves the stored commit again
+
+- **WHEN** refresh resolves the same exact commit already configured
+- **THEN** the Catalog keeps its existing snapshot acquisition time
+
+#### Scenario: Selected entry changes while install is staged
+
+- **WHEN** a Catalog install stages replay and a same-id refresh changes the
+  selected snapshot or exact entry before commit
+- **THEN** install fails pre-commit and changes no installed state
 
 #### Scenario: Another origin uses the stable id
 

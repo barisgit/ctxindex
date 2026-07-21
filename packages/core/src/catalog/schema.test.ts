@@ -117,6 +117,72 @@ describe('Catalog schema-v2 manifest', () => {
   })
 
   test.each([
+    [
+      'git+ssh URL',
+      'git+ssh://git@example.test/fixture.git#main',
+      'git+ssh://git@example.test/fixture.git',
+    ],
+    [
+      'scp-like SSH target',
+      'git@example.test:fixture.git#main',
+      'git@example.test:fixture.git',
+    ],
+  ])('accepts credential-free Git replay over %s', (_label, requestedTarget, repository) => {
+    const extension = (manifest() as { extensions: Record<string, unknown>[] })
+      .extensions[2]
+    expect(() =>
+      parseCatalogManifest(
+        JSON.stringify(
+          manifest({
+            extensions: [
+              {
+                ...extension,
+                source: {
+                  kind: 'package',
+                  replay: replay({
+                    kind: 'git',
+                    requestedTarget,
+                    repository,
+                    commit: 'b'.repeat(40),
+                  }),
+                },
+              },
+            ],
+          }),
+        ),
+      ),
+    ).not.toThrow()
+  })
+
+  test.each([
+    ['password', 'git+ssh://git:secret@example.test/fixture.git'],
+    ['non-git SSH user', 'git+ssh://user@example.test/fixture.git'],
+  ])('rejects a Git repository identity with %s', (_label, repository) => {
+    expect(() =>
+      parseCatalogManifest(
+        JSON.stringify(
+          manifest({
+            extensions: [
+              {
+                id: 'fixture.git',
+                source: {
+                  kind: 'package',
+                  replay: replay({
+                    kind: 'git',
+                    requestedTarget: repository,
+                    repository,
+                    commit: 'b'.repeat(40),
+                  }),
+                },
+              },
+            ],
+          }),
+        ),
+      ),
+    ).toThrow('credentials')
+  })
+
+  test.each([
     ['schema v1', { schemaVersion: 1 }],
     ['unknown root field', { forbidden: true }],
     [

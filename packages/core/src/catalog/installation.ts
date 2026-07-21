@@ -30,6 +30,25 @@ function catalogChanged(name: string): never {
   )
 }
 
+function selectedCatalogEntryIsCurrent(input: {
+  readonly configured: CatalogRecord
+  readonly selected: CatalogRecord
+  readonly entryIndex: number
+  readonly entry: CatalogManifestEntry
+}): boolean {
+  return (
+    input.configured.name === input.selected.name &&
+    input.configured.catalog_id === input.selected.catalog_id &&
+    input.configured.repository === input.selected.repository &&
+    input.configured.ref === input.selected.ref &&
+    input.configured.commit === input.selected.commit &&
+    input.configured.snapshot_acquired_at ===
+      input.selected.snapshot_acquired_at &&
+    JSON.stringify(input.configured.extensions[input.entryIndex]) ===
+      JSON.stringify(input.entry)
+  )
+}
+
 function exactCandidate(input: {
   readonly entry: CatalogManifestEntry
   readonly replay: CatalogReplayPayload
@@ -163,7 +182,14 @@ export class CatalogInstallationService {
             throw cause
           catalogChanged(catalog.name)
         }
-        if (configured.catalog_id !== catalog.catalog_id)
+        if (
+          !selectedCatalogEntryIsCurrent({
+            configured,
+            selected: catalog,
+            entryIndex,
+            entry: recordedEntry,
+          })
+        )
           catalogChanged(catalog.name)
       },
       ...(input.signal === undefined ? {} : { signal: input.signal }),

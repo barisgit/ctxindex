@@ -418,6 +418,54 @@ describe('Catalog snapshot authoring', () => {
     expect(installer.disposed).toHaveLength(2)
   })
 
+  test('rejects duplicate stable ids before resolving entries or publishing output', async () => {
+    const root = await fixturePackage()
+    const installer = new FixtureInstaller()
+    Object.defineProperty(installer, 'catalog', {
+      value: {
+        kind: 'catalog',
+        id: 'fixture.catalog',
+        label: 'Fixture Catalog',
+        extensions: [
+          defineExtension({ id: 'fixture.duplicate' }),
+          {
+            kind: 'package-extension',
+            source: { kind: 'npm', target: '@fixture/duplicate@^1' },
+            extensionId: 'fixture.duplicate',
+          },
+        ],
+      },
+    })
+    const outputPath = join(root, 'ctxindex-catalog.json')
+
+    await expect(
+      buildCatalogSnapshot({
+        packageRoot: root,
+        outputPath,
+        catalogId: 'fixture.catalog',
+        trusted: true,
+        installer,
+      }),
+    ).rejects.toThrow('Duplicate Catalog Extension id fixture.duplicate')
+
+    expect(installer.calls).toEqual([
+      {
+        target: { kind: 'local', target: '.' },
+        selection: {
+          kind: 'catalog',
+          module: 'index.ts',
+          catalogId: 'fixture.catalog',
+        },
+        immutableBaseRoot: root,
+      },
+    ])
+    expect(installer.disposed).toHaveLength(1)
+    expect(await Bun.file(outputPath).exists()).toBe(false)
+    await expect(
+      readdir(join(root, 'ctxindex-resolutions')),
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
   test('requires one declared module and lets the resolver select a sole Catalog root', async () => {
     const root = await fixturePackage(['./index.ts', './other.ts'])
     const installer = new FixtureInstaller()

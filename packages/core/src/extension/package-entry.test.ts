@@ -95,6 +95,74 @@ export const futureRoot = { kind: 'future-definition', id: 'fixture.future' }
     delete (globalThis as Record<string, unknown>)[counter]
   })
 
+  test('inspects Catalog entry summaries for literal and package entries', async () => {
+    const root = await sandbox()
+    await writeFile(
+      join(root, 'entry.mjs'),
+      `const literal = { kind: 'extension', id: 'fixture.literal', providers: [], oauthApps: [], profiles: [], adapters: [] }
+const packageEntry = { kind: 'package-extension', source: { kind: 'npm', target: '@fixture/package@^1' }, extensionId: 'fixture.package' }
+export default {
+  kind: 'catalog',
+  id: 'fixture.catalog',
+  label: 'Fixture',
+  summary: 'Catalog summary.',
+  entrySummaries: {
+    'fixture.literal': 'Literal summary.',
+    'fixture.package': 'Package summary.',
+  },
+  extensions: [literal, packageEntry],
+}
+`,
+    )
+    const resolved = await resolvePackageEntries(
+      root,
+      { ctxindex: { extensions: ['./entry.mjs'] } },
+      provenance,
+    )
+
+    const inspected = await inspectPackageEntries(resolved)
+
+    expect(inspected).toHaveLength(1)
+    expect(inspected[0]?.definition).toMatchObject({
+      kind: 'catalog',
+      summary: 'Catalog summary.',
+      entrySummaries: {
+        'fixture.literal': 'Literal summary.',
+        'fixture.package': 'Package summary.',
+      },
+    })
+  })
+
+  test.each([
+    ['non-object map', '[]'],
+    ['unknown entry id', `{ 'fixture.missing': 'Missing.' }`],
+    ['empty summary', `{ 'fixture.literal': '' }`],
+    ['non-string summary', `{ 'fixture.literal': 1 }`],
+  ])('rejects Catalog entry summaries with an invalid %s', async (_label, map) => {
+    const root = await sandbox()
+    await writeFile(
+      join(root, 'entry.mjs'),
+      `const literal = { kind: 'extension', id: 'fixture.literal', providers: [], oauthApps: [], profiles: [], adapters: [] }
+export default {
+  kind: 'catalog',
+  id: 'fixture.catalog',
+  label: 'Fixture',
+  entrySummaries: ${map},
+  extensions: [literal],
+}
+`,
+    )
+    const resolved = await resolvePackageEntries(
+      root,
+      { ctxindex: { extensions: ['./entry.mjs'] } },
+      provenance,
+    )
+
+    await expect(inspectPackageEntries(resolved)).rejects.toThrow(
+      'Invalid Catalog export',
+    )
+  })
+
   test.each([
     ['malformed Extension', `{ kind: 'extension', id: 'fixture.invalid' }`],
     [

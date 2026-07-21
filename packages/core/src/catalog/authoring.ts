@@ -188,6 +188,17 @@ function requireSelectedExtension(
   }
 }
 
+function validateUniqueCatalogEntryIds(catalog: AnyCatalogDefinition): void {
+  const ids = new Set<string>()
+  for (const entry of catalog.extensions) {
+    const id = entry.kind === 'extension' ? entry.id : entry.extensionId
+    if (ids.has(id)) {
+      throw new TypeError(`Duplicate Catalog Extension id ${id}`)
+    }
+    ids.add(id)
+  }
+}
+
 function canonicalValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalValue)
   if (!isRecord(value)) return value
@@ -293,6 +304,7 @@ export async function buildCatalogSnapshot(
   let authorReplay: CatalogReplayPayload
   try {
     catalog = requireSelectedCatalog(authorResolution, input.catalogId)
+    validateUniqueCatalogEntryIds(catalog)
     authorReplay = snapshotArtifact(authorResolution, artifacts)
   } finally {
     await authorResolution.dispose()

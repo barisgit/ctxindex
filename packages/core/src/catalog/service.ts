@@ -193,7 +193,10 @@ export class CatalogService {
       repository: current.repository,
       ref: current.ref,
       commit: acquired.commit,
-      snapshotAcquiredAt: this.now(),
+      snapshotAcquiredAt:
+        acquired.commit === current.commit
+          ? current.snapshot_acquired_at
+          : this.now(),
       manifest: acquired.manifest,
     })
     return this.installationRecords.withLifecycleLock(async () => {

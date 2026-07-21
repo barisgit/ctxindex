@@ -8,7 +8,7 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import {
   auth,
   defineAdapter,
@@ -172,12 +172,18 @@ function exactInstallInput(resolved: ResolvedExtensionCandidate) {
   }
 }
 
-async function fixtureService() {
+async function fixtureService(
+  options: Pick<
+    NonNullable<ConstructorParameters<typeof DirectExtensionStore>[0]>,
+    'durability'
+  > = {},
+) {
   const root = await mkdtemp(join(tmpdir(), 'ctxindex-direct-lifecycle-'))
   roots.push(root)
   const store = new DirectExtensionStore({
     configRoot: join(root, 'config'),
     dataRoot: join(root, 'data'),
+    ...options,
   })
   const materializer = new FixtureMaterializer()
   const service = new DirectExtensionService({
@@ -1038,6 +1044,160 @@ test('failed update preserves the prior exact record', async () => {
     ),
   })
   expect(await store.readRecords()).toEqual([installed])
+})
+
+test('publication durability failure leaves the prior record authoritative and new bytes inert', async () => {
+  let failContainerSync = false
+  const { materializer, service, store } = await fixtureService({
+    durability: {
+      syncFile: async () => {},
+      syncDirectory: async (path) => {
+        if (failContainerSync && path === store.materializationsRoot) {
+          throw new Error('materialization directory sync failed')
+        }
+        return 'synced'
+      },
+    },
+  })
+  const installed = await service.install({
+    target: { kind: 'npm', requestedTarget: 'example-package@^1' },
+    extensionId: 'example.direct',
+    loadValidationContext: loadValidationContext(),
+  })
+  materializer.entry = `// changed materialization\n${materializer.entry}`
+  failContainerSync = true
+
+  await expect(
+    service.update({
+      extensionId: 'example.direct',
+      loadValidationContext: loadValidationContext(
+        createExtensionRegistry([defineExtension({ id: 'example.direct' })]),
+      ),
+    }),
+  ).rejects.toThrow('materialization directory sync failed')
+
+  expect(await store.readRecords()).toEqual([installed])
+  const published = (await readdir(store.materializationsRoot)).filter(
+    (entry) => !entry.startsWith('.'),
+  )
+  expect(published).toHaveLength(2)
+  expect(published).toContain(installed.materialization_digest)
+
+  failContainerSync = false
+  await store.collectUnreferencedMaterializations()
+  expect(await readdir(store.materializationsRoot)).toEqual([
+    installed.materialization_digest,
+  ])
+})
+
+test('record directory sync failure retains bytes for either crash-visible record', async () => {
+  let failRecordDirectorySync = false
+  const { materializer, service, store } = await fixtureService({
+    durability: {
+      syncFile: async () => {},
+      syncDirectory: async (path) => {
+        if (failRecordDirectorySync && path === dirname(store.recordsPath)) {
+          throw new Error('record directory sync failed')
+        }
+        return 'synced'
+      },
+    },
+  })
+  const installed = await service.install({
+    target: { kind: 'npm', requestedTarget: 'example-package@^1' },
+    extensionId: 'example.direct',
+    loadValidationContext: loadValidationContext(),
+  })
+  materializer.entry = `// changed materialization\n${materializer.entry}`
+  failRecordDirectorySync = true
+
+  await expect(
+    service.update({
+      extensionId: 'example.direct',
+      loadValidationContext: loadValidationContext(
+        createExtensionRegistry([defineExtension({ id: 'example.direct' })]),
+      ),
+    }),
+  ).rejects.toMatchObject({
+    name: 'DirectExtensionRecordDurabilityError',
+    recordRenamed: true,
+  })
+
+  const [renamed] = await store.readRecords()
+  expect(renamed?.materialization_digest).not.toBe(
+    installed.materialization_digest,
+  )
+  expect(
+    (await readdir(store.materializationsRoot)).filter(
+      (entry) => !entry.startsWith('.'),
+    ),
+  ).toEqual(
+    expect.arrayContaining([
+      installed.materialization_digest,
+      renamed?.materialization_digest,
+    ]),
+  )
+})
+
+test('unsupported record directory sync retains the prior crash-visible bytes', async () => {
+  let recordDirectorySyncUnsupported = false
+  const { materializer, service, store } = await fixtureService({
+    durability: {
+      syncFile: async () => {},
+      syncDirectory: async (path) =>
+        recordDirectorySyncUnsupported && path === dirname(store.recordsPath)
+          ? 'unsupported'
+          : 'synced',
+    },
+  })
+  const installed = await service.install({
+    target: { kind: 'npm', requestedTarget: 'example-package@^1' },
+    extensionId: 'example.direct',
+    loadValidationContext: loadValidationContext(),
+  })
+  materializer.entry = `// changed materialization\n${materializer.entry}`
+  recordDirectorySyncUnsupported = true
+
+  const updated = await service.update({
+    extensionId: 'example.direct',
+    loadValidationContext: loadValidationContext(
+      createExtensionRegistry([defineExtension({ id: 'example.direct' })]),
+    ),
+  })
+
+  expect(updated.materialization_digest).not.toBe(
+    installed.materialization_digest,
+  )
+  expect(
+    (await readdir(store.materializationsRoot)).filter(
+      (entry) => !entry.startsWith('.'),
+    ),
+  ).toEqual(
+    expect.arrayContaining([
+      installed.materialization_digest,
+      updated.materialization_digest,
+    ]),
+  )
+
+  await service.uninstall({
+    extensionId: 'example.direct',
+    loadValidationContext: loadUninstallContext(
+      createExtensionRegistry([defineExtension({ id: 'example.direct' })]),
+      [],
+    ),
+    force: false,
+  })
+  expect(await store.readRecords()).toEqual([])
+  expect(
+    (await readdir(store.materializationsRoot)).filter(
+      (entry) => !entry.startsWith('.'),
+    ),
+  ).toEqual(
+    expect.arrayContaining([
+      installed.materialization_digest,
+      updated.materialization_digest,
+    ]),
+  )
 })
 
 test('same-content update is an idempotent no-op', async () => {

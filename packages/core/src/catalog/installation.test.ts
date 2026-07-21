@@ -208,7 +208,7 @@ test('delegates one exact package replay with structured Catalog curation', asyn
   }
 })
 
-test('rejects commit when the configured Catalog identity changed after selection', async () => {
+test('rejects commit when the selected Catalog snapshot and exact entry changed after selection', async () => {
   const sandbox = await createSandbox()
   try {
     const entryReplay = {
@@ -224,15 +224,38 @@ test('rejects commit when the configured Catalog identity changed after selectio
       lock,
     }
     const selected = catalog({ kind: 'package', replay: entryReplay })
-    const replaced = { ...selected, catalog_id: 'replacement.catalog' }
+    const selectedEntry = selected.extensions[0]
+    if (selectedEntry === undefined) throw new Error('Missing fixture entry')
+    const replaced = {
+      ...selected,
+      commit: 'b'.repeat(40),
+      snapshot_acquired_at: 2_000,
+      extensions: [
+        {
+          ...selectedEntry,
+          source: {
+            kind: 'package' as const,
+            replay: {
+              ...entryReplay,
+              source: { ...entryReplay.source, version: '2.0.0' },
+            },
+          },
+        },
+      ],
+    }
     await writeSnapshot(sandbox.env.CTXINDEX_DATA_HOME, selected)
-    let shows = 0
+    let current = selected
+    let installStaged: (() => void) | undefined
+    const staged = new Promise<void>((resolve) => {
+      installStaged = resolve
+    })
+    let releasePreCommit: (() => void) | undefined
+    const released = new Promise<void>((resolve) => {
+      releasePreCommit = resolve
+    })
     const service = new CatalogInstallationService({
       catalogs: {
-        show: async () => {
-          shows += 1
-          return shows === 1 ? selected : replaced
-        },
+        show: async () => current,
       },
       installer: {
         installExact: async (input) => {
@@ -241,6 +264,8 @@ test('rejects commit when the configured Catalog identity changed after selectio
               readonly validatePreCommit?: () => Promise<void>
             }
           ).validatePreCommit
+          installStaged?.()
+          await released
           await validatePreCommit?.()
           return result(input)
         },
@@ -248,14 +273,15 @@ test('rejects commit when the configured Catalog identity changed after selectio
       dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
     })
 
-    await expect(
-      service.install({
-        catalog: 'fixture',
-        extensionId: 'fixture.extension',
-        trust: true,
-      }),
-    ).rejects.toMatchObject({ code: 'extension_conflict' })
-    expect(shows).toBe(2)
+    const install = service.install({
+      catalog: 'fixture',
+      extensionId: 'fixture.extension',
+      trust: true,
+    })
+    await staged
+    current = replaced
+    releasePreCommit?.()
+    await expect(install).rejects.toMatchObject({ code: 'extension_conflict' })
   } finally {
     await sandbox.cleanup()
   }

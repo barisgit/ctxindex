@@ -6,7 +6,7 @@ Discovers exported Extension and authoring-time Catalog values from package modu
 
 ## Design
 
-- `package-entry.ts` resolves the ordered, unique, contained module paths declared by `package.json` `ctxindex.extensions`. Runtime imports collect Extension roots; the authoring inspection path additionally validates Catalog exports and supports exact Catalog selection plus indexed literal-Extension selection. Whole-package imports resolve every Extension root, while exact imports resolve documentation only for the selected root.
+- `package-entry.ts` resolves the ordered, unique, contained module paths declared by `package.json` `ctxindex.extensions`. Runtime imports collect Extension roots; the authoring inspection path additionally validates Catalog exports, including id-keyed entry-summary maps, and supports exact Catalog selection plus indexed literal-Extension selection. Whole-package imports resolve every Extension root, while exact imports resolve documentation only for the selected root.
 - `collector.ts` filters module namespaces for structurally valid named/default Extension values, ignores unrelated exports and functions, and attaches entry/export provenance.
 - `import.ts` reads package manifests, derives package provenance, and composes entry resolution, namespace import, collection, and optional exact selection.
 - `diagnostics.ts` owns branded host-generated Extension diagnostics. Import/evaluation boundaries discard arbitrary thrown causes; callers render only branded safe messages plus separately validated path, Catalog, or Extension identity.

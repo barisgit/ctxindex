@@ -7,7 +7,7 @@ Implements the thin CLI adapter for loaded Extension inspection, trusted package
 ## Design / patterns
 
 - `command.ts` declares `extensions list`, `extensions search`, nested `extensions catalog build|add|list|show|refresh|remove`, dual Catalog/direct install forms, direct update, and one origin-neutral uninstall form.
-- `services.ts` composes `CatalogService`, `CatalogInstallationService`, one shared generic package installer, and direct lifecycle services. `handle-extensions-command.ts` delegates build/install through those seams, defaults Catalog reads and search to refresh, and wires SIGINT cancellation around acquisition/evaluation operations.
+- `services.ts` composes `CatalogService`, `CatalogInstallationService`, one shared generic package installer, and direct lifecycle services under the same explicit config/data roots. Active-state validation reloads definitions and installed materializations through those roots. `handle-extensions-command.ts` delegates build/install through those seams, defaults Catalog reads and search to refresh, and wires SIGINT cancellation around acquisition/evaluation operations.
 - `index.ts` is the bounded barrel re-exported by the compatibility-sized `commands/extensions.ts` descriptor entry.
 
 ## Data & control flow

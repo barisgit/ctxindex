@@ -201,12 +201,27 @@ private resolution/replay phases; they do not create a parallel adapter.
 6. reads active state itself and performs intrinsic validation and complete
    active-registry validation;
 7. acquires the lifecycle lock, rechecks collisions, publishes managed bytes,
-   and atomically rewrites the generic record document;
+   syncs every published file and managed containing directory, and atomically
+   rewrites the generic record document;
 8. cleans staging and later removes any unreferenced inert materialization.
 
 Neither operation may follow symlinks outside its immutable base, invoke
 dependency lifecycle scripts, use ambient credentials, or accept an unpinned
 source as replay authority.
+
+Managed file sync is mandatory. Directory handles are synced through the
+portable Node/Bun filesystem API where the host supports directory sync. Known
+unsupported-directory errors are tolerated because that API exposes no
+cross-platform stronger fallback; every other sync error aborts before the
+record switch. Existing same-digest trees pass the same revalidation and sync
+barrier before a new record may reference them.
+If record parent-directory sync fails after rename, the store raises a typed
+post-rename durability error. The installer reports that error but treats the
+record as potentially committed for cleanup, retaining both old and new
+materializations so either crash-visible record remains loadable.
+The directory-sync port returns `synced | unsupported`; an unsupported record
+parent result is tolerated but suppresses unreferenced-materialization
+collection for the mutation.
 
 ### Sanitized Bun lock contract
 
@@ -216,7 +231,8 @@ path and is covered by `sha256` and `byteLength` bounds.
 
 Sanitization and validation reject:
 
-- credentials, userinfo, tokens, authentication headers, or secret query data;
+- credentials, tokens, authentication headers, secret query data, or URL
+  userinfo other than the exact password-free `git` user for SSH Git;
 - absolute host paths, home-directory paths, traversal, or symlink escapes;
 - mutable Git refs or an npm resolution lacking exact version and integrity;
 - file dependencies outside the immutable snapshot;
@@ -288,6 +304,12 @@ Add, refresh, list, show, Marketplace search, and default Catalog parsing call
 only inert schema/storage code. Tests inject a throwing installer/import/package
 runner to prove those paths cannot acquire or execute anything.
 
+Add and refresh stage acquisition outside the generic lifecycle lock. Refresh
+publishes only if the complete configured record it originally observed remains
+current under the lock, so the first concurrent refresh to commit wins. A
+refresh that resolves the same commit preserves `snapshot_acquired_at`; a
+changed commit records the current acquisition time.
+
 ### Generic execution record with optional curation
 
 The installed document remains one strict atomically rewritten generic store:
@@ -354,7 +376,10 @@ source locator. Stored/offline output includes acquisition age.
 Catalog install requires a positional configured Catalog name and stable Extension id. The service
 checks `--trust` before default refresh or any file/execution acquisition,
 refreshes only the selected Catalog unless `--no-refresh`, resolves exactly one
-entry, loads contained replay bytes, and calls `installExact`.
+entry, loads contained replay bytes, and calls `installExact`. Its pre-commit
+callback runs under the lifecycle lock and revalidates the selected Catalog
+identity, repository, ref, commit, acquisition time, and exact indexed entry.
+It performs no acquisition or retry while the lock is held.
 
 CLI behavior stays explicit and thin:
 
@@ -388,8 +413,10 @@ snapshot age where applicable.
   import. Repository-add trust and install execution trust remain separate.
 - Install trust is checked before refresh, snapshot/artifact acquisition, Bun,
   import, or publication.
-- Git uses hardened non-interactive credential-free policy; npm and Git exact
-  provenance is verified; local and literal paths are contained.
+- Git uses hardened non-interactive credential-free policy. Replay metadata
+  accepts SSH with no user or the exact `git` user and rejects passwords or
+  other users; npm and Git exact provenance is verified; local and literal paths
+  are contained.
 - Bun scripts are disabled. Unknown lock formats and unsafe dependency forms fail
   closed.
 - Catalog read paths and startup have no package-manager or network capability.

@@ -47,6 +47,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return isRecord(value) && Object.getPrototypeOf(value) === Object.prototype
+}
+
 const DEFINITION_ID_PATTERN = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/u
 
 function hasExactKeys(
@@ -119,7 +123,14 @@ function parseCatalogDefinition(value: unknown): AnyCatalogDefinition {
     !isRecord(value) ||
     value.kind !== 'catalog' ||
     !Object.keys(value).every((key) =>
-      ['kind', 'id', 'label', 'summary', 'extensions'].includes(key),
+      [
+        'kind',
+        'id',
+        'label',
+        'summary',
+        'entrySummaries',
+        'extensions',
+      ].includes(key),
     ) ||
     !isStableId(value.id) ||
     typeof value.label !== 'string' ||
@@ -144,6 +155,16 @@ function parseCatalogDefinition(value: unknown): AnyCatalogDefinition {
         `Duplicate Catalog Extension id ${id}`,
       )
     ids.add(id)
+  }
+  if (value.entrySummaries !== undefined) {
+    if (!isPlainRecord(value.entrySummaries)) {
+      throw createExtensionHostDiagnostic('Invalid Catalog export')
+    }
+    for (const [id, summary] of Object.entries(value.entrySummaries)) {
+      if (!ids.has(id) || typeof summary !== 'string' || summary.length === 0) {
+        throw createExtensionHostDiagnostic('Invalid Catalog export')
+      }
+    }
   }
   return value as unknown as AnyCatalogDefinition
 }

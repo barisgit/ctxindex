@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { isAbsolute, join } from 'node:path'
+import { isAbsolute, join, relative } from 'node:path'
 import {
   type DirectExtensionInstallationRecord,
   directExtensionDocumentSchema,
@@ -341,6 +341,69 @@ describe('direct Extension records', () => {
         join(directExtensionMaterializationPath(dataRoot, digest), 'index.ts'),
       ).exists(),
     ).toBe(true)
+  })
+
+  test('syncs every published file and containing directory before the record document', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ctxindex-direct-durable-'))
+    roots.push(root)
+    const configRoot = join(root, 'config')
+    const dataRoot = join(root, 'data')
+    const events: string[] = []
+    const store = new DirectExtensionStore({
+      configRoot,
+      dataRoot,
+      durability: {
+        syncFile: async (path) => {
+          events.push(`file:${relative(root, path)}`)
+        },
+        syncDirectory: async (path) => {
+          events.push(`directory:${relative(root, path)}`)
+          return 'synced'
+        },
+      },
+    })
+    const staging = join(root, 'staging')
+    await mkdir(join(staging, 'nested'), { recursive: true })
+    await writeFile(join(staging, 'index.ts'), 'export default 1')
+    await writeFile(join(staging, 'nested', 'asset.txt'), 'asset')
+    const digest = await hashDirectory(staging)
+
+    await store.publishMaterialization(staging, digest)
+    await store.writeRecords([record(digest)])
+
+    const recordSync = events.findIndex((event) =>
+      event.startsWith('file:config/direct-extensions.json.'),
+    )
+    expect(recordSync).toBeGreaterThan(-1)
+    const publicationEvents = events.slice(0, recordSync)
+    const publishedRoot = join(
+      'data',
+      'direct-extensions',
+      'materializations',
+      digest,
+    )
+    expect(publicationEvents).toEqual(
+      expect.arrayContaining([
+        `file:${join(publishedRoot, 'index.ts')}`,
+        `file:${join(publishedRoot, 'nested', 'asset.txt')}`,
+        `directory:${join(publishedRoot, 'nested')}`,
+        `directory:${publishedRoot}`,
+        `directory:${join('data', 'direct-extensions', 'materializations')}`,
+        `directory:${join('data', 'direct-extensions')}`,
+        `directory:data`,
+      ]),
+    )
+
+    events.length = 0
+    await store.publishMaterialization(staging, digest)
+    expect(events).toEqual(
+      expect.arrayContaining([
+        `file:${join(publishedRoot, 'index.ts')}`,
+        `file:${join(publishedRoot, 'nested', 'asset.txt')}`,
+        `directory:${join(publishedRoot, 'nested')}`,
+        `directory:${publishedRoot}`,
+      ]),
+    )
   })
 
   test('serializes writers and removes only unreferenced materializations', async () => {

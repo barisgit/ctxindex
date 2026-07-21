@@ -393,14 +393,37 @@ function canonicalValue(value: unknown): unknown {
 }
 
 function containsCredentials(value: string): boolean {
-  const scpUser =
-    /^([^/@\s]+)@(?:localhost|[a-z0-9.-]+\.[a-z]{2,}):[^\s]+$/i.exec(value)?.[1]
-  if (scpUser !== undefined) return scpUser !== 'git'
   const parsed = resolutionUrl(value)
-  return (
-    parsed !== undefined &&
-    (parsed.username.length > 0 || parsed.password.length > 0)
-  )
+  if (parsed !== undefined) {
+    if (parsed.protocol === 'ssh:') {
+      return (
+        parsed.password.length > 0 ||
+        (parsed.username.length > 0 && parsed.username !== 'git')
+      )
+    }
+    return parsed.username.length > 0 || parsed.password.length > 0
+  }
+  const packageProtocol =
+    /^(?:@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*|[a-z0-9][a-z0-9._-]*)@([a-z][a-z0-9+.-]*):[^\s]+$/i.exec(
+      value,
+    )?.[1]
+  if (
+    packageProtocol !== undefined &&
+    allowedResolutionProtocols.has(`${packageProtocol.toLowerCase()}:`)
+  ) {
+    return false
+  }
+  const scp = /([^/@\s]+)@([^/@:\s]+):[^\s]+$/.exec(value)
+  if (scp !== null) {
+    const packagePrefix = value.slice(0, scp.index)
+    const validPackagePrefix =
+      packagePrefix.length === 0 ||
+      /^(?:@[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._-]*|[a-z0-9][a-z0-9._-]*)@$/i.test(
+        packagePrefix,
+      )
+    return !validPackagePrefix || scp[1] !== 'git'
+  }
+  return false
 }
 
 function resolutionUrl(value: string): URL | undefined {

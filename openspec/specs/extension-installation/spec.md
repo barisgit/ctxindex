@@ -150,10 +150,11 @@ identity, and materialization-digest mismatch SHALL fail before commit.
 
 The canonical installer SHALL sanitize and validate replay lock artifacts before
 snapshot publication and again before replay. It SHALL reject credentials,
-tokens, userinfo, authentication headers, secret query data, absolute host paths,
-home paths, traversal, symlink escapes, mutable Git refs, unsupported protocols,
+tokens, authentication headers, secret query data, absolute host paths, home
+paths, traversal, symlink escapes, mutable Git refs, unsupported protocols,
 external file dependencies, lifecycle scripts, and lock formats not replayable
-by Bun 1.3.14.
+by Bun 1.3.14. SSH Git resolutions MAY contain only the exact `git` username and
+no password; every other URL userinfo form SHALL be rejected.
 
 Package subprocesses SHALL be non-interactive and SHALL NOT use ambient
 credential helpers or authentication configuration.
@@ -211,6 +212,18 @@ parent-directory sync. Failure before durable rename SHALL leave the prior
 record authoritative. Published but unreferenced bytes SHALL remain inert and
 SHALL be cleaned idempotently.
 
+Before the record-document rename, the installer SHALL durably sync every
+regular file in the published materialization and every directory required to
+reach it within the managed data root. An existing same-digest materialization
+SHALL be revalidated and re-synced before it can become newly authoritative.
+Any supported-platform durability failure SHALL abort before record replacement.
+If the record rename succeeds but its parent-directory sync fails, the operation
+SHALL report a durability failure and retain every materialization referenced by
+either the prior or renamed document so either crash-visible outcome is valid.
+If the platform reports directory sync as unsupported, the operation MAY
+succeed but SHALL likewise retain both outcomes instead of collecting the prior
+materialization.
+
 The implementation SHALL NOT create activation generations, pointer files,
 rollback history, or a separate Catalog curation/execution store.
 
@@ -226,6 +239,27 @@ rollback history, or a separate Catalog curation/execution store.
 - **WHEN** the complete replacement document is durably renamed
 - **THEN** startup observes the new execution and optional curation together
   without consulting a pointer or history
+
+#### Scenario: Published materialization sync fails
+
+- **WHEN** managed bytes were renamed into their immutable digest path but file
+  or supported directory durability fails before the record-document rename
+- **THEN** the previous record remains authoritative and the new bytes remain
+  inert until idempotent cleanup
+
+#### Scenario: Record parent-directory sync fails after rename
+
+- **WHEN** the record document was atomically renamed but syncing its parent
+  directory fails
+- **THEN** the operation reports a durability failure and retains the immutable
+  bytes for both the prior and renamed record outcomes
+
+#### Scenario: Record parent-directory sync is unsupported
+
+- **WHEN** the host exposes no supported operation for syncing the record parent
+  directory after rename
+- **THEN** ctxindex does not collect the prior materialization, so either
+  crash-visible record remains loadable
 
 ### Requirement: Catalog replacement is limited to the same Catalog
 

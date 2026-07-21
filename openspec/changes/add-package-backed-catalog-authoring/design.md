@@ -133,8 +133,11 @@ the generic installation lifecycle lock. Their commit phase re-reads configured
 Catalogs under that lock and writes from the current list: add rechecks name/id
 uniqueness, while refresh requires its originally selected record to remain
 unchanged and preserves its stable Catalog id. This prevents stale refresh from
-resurrecting removal, prevents concurrent add/refresh list overwrites, and keeps
-Catalog identity stable across an installation pre-commit check.
+resurrecting removal or overwriting a newer refresh, prevents concurrent
+add/refresh list overwrites, and keeps Catalog identity stable across an
+installation pre-commit check. Resolving the already configured exact commit is
+a no-op for snapshot age and preserves its acquisition timestamp; a changed
+commit records the current acquisition time.
 
 ### 6. One atomic generic record owns execution and optional curation
 
@@ -163,7 +166,7 @@ configured Catalog. This permits a refreshed commit from that same Catalog to
 replace its prior installation.
 
 Every other collision fails with an uninstall-first diagnostic: a direct generic
-record, another Catalog, a builtin, or an explicit-path Extension. Exact replay
+record, another Catalog, a built-in, or an explicit-path Extension. Exact replay
 of an already identical same-Catalog record is idempotent. Direct install/update
 cannot silently take over a Catalog-curated record.
 
@@ -172,9 +175,12 @@ managed bytes under the same lifecycle lock. Removing a configured Catalog is
 blocked while any installed record cites it. The removal blocker check and
 configured-record write share that lock with generic installation. Exact replay
 remains outside the lock; before commit, Catalog installation re-reads stored
-configured state under the lock and requires the selected Catalog name and id
-to remain present. Thus removal winning the lock invalidates the pending install,
-while install winning the lock leaves a curated record that blocks removal.
+configured state under the lock and requires the selected Catalog identity,
+repository, ref, commit, snapshot acquisition time, and exact entry at its
+recorded index to equal the original selection. Thus removal or same-id refresh
+winning the lock invalidates the pending install, while install winning the lock
+leaves a curated record that blocks removal. Acquisition is never retried while
+holding the lock.
 
 ### 8. Trust and offline behavior stay explicit
 

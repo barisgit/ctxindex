@@ -209,6 +209,35 @@ describe('CatalogService inert lifecycle', () => {
     }
   })
 
+  test('refresh preserves the acquisition time for an unchanged commit and advances it for a changed commit', async () => {
+    const sandbox = await createSandbox()
+    let currentTime = 1_000
+    try {
+      const repository = await createRepository(sandbox)
+      const catalogs = service(sandbox, () => currentTime)
+      const added = await catalogs.add({
+        name: 'fixture',
+        repository,
+        ref: 'refs/heads/main',
+        trust: true,
+      })
+
+      currentTime = 1_600
+      const unchanged = await catalogs.refresh({ name: 'fixture' })
+      expect(unchanged.commit).toBe(added.commit)
+      expect(unchanged.snapshot_acquired_at).toBe(1_000)
+
+      await writeFile(join(repository, 'README.md'), 'advanced\n')
+      const advancedCommit = await commit(repository, 'advance catalog')
+      currentTime = 2_200
+      const changed = await catalogs.refresh({ name: 'fixture' })
+      expect(changed.commit).toBe(advancedCommit)
+      expect(changed.snapshot_acquired_at).toBe(2_200)
+    } finally {
+      await sandbox.cleanup()
+    }
+  })
+
   test('search refreshes by default and stored search reports snapshot age', async () => {
     const sandbox = await createSandbox()
     let currentTime = 1_000
@@ -551,6 +580,72 @@ describe('CatalogService inert lifecycle', () => {
       expect(
         (await catalogs.list({ refresh: false })).map(({ name }) => name),
       ).toEqual(['added', 'fixture'])
+    } finally {
+      await sandbox.cleanup()
+    }
+  })
+
+  test('an older staged refresh cannot overwrite a newer committed snapshot', async () => {
+    const sandbox = await createSandbox()
+    try {
+      const repository = await createRepository(sandbox)
+      const installationRecords = new DirectExtensionStore({
+        configRoot: sandbox.env.CTXINDEX_CONFIG_HOME,
+        dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
+      })
+      const catalogs = new CatalogService({
+        configRoot: sandbox.env.CTXINDEX_CONFIG_HOME,
+        dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
+        installationRecords,
+      })
+      await catalogs.add({
+        name: 'fixture',
+        repository,
+        ref: 'refs/heads/main',
+        trust: true,
+      })
+
+      let olderStaged: (() => void) | undefined
+      const staged = new Promise<void>((resolve) => {
+        olderStaged = resolve
+      })
+      let releaseOlder: (() => void) | undefined
+      const released = new Promise<void>((resolve) => {
+        releaseOlder = resolve
+      })
+      const olderCommit = '1'.repeat(40)
+      const newerCommit = '2'.repeat(40)
+      const older = new CatalogService({
+        configRoot: sandbox.env.CTXINDEX_CONFIG_HOME,
+        dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
+        installationRecords,
+        acquireSnapshot: async () => {
+          olderStaged?.()
+          await released
+          return acquiredCatalog('fixture', 'fixture.catalog', olderCommit)
+        },
+      })
+      const newer = new CatalogService({
+        configRoot: sandbox.env.CTXINDEX_CONFIG_HOME,
+        dataRoot: sandbox.env.CTXINDEX_DATA_HOME,
+        installationRecords,
+        acquireSnapshot: async () =>
+          acquiredCatalog('fixture', 'fixture.catalog', newerCommit),
+      })
+
+      const staleRefresh = older.refresh({ name: 'fixture' })
+      await staged
+      await expect(newer.refresh({ name: 'fixture' })).resolves.toMatchObject({
+        commit: newerCommit,
+      })
+      releaseOlder?.()
+
+      await expect(staleRefresh).rejects.toMatchObject({
+        code: 'extension_conflict',
+      })
+      expect((await catalogs.show('fixture', { refresh: false })).commit).toBe(
+        newerCommit,
+      )
     } finally {
       await sandbox.cleanup()
     }

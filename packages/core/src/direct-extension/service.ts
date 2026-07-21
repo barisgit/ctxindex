@@ -43,7 +43,10 @@ import {
   type GenericExtensionInstallationRecord,
   projectDirectExtensionRecord,
 } from './schema'
-import type { DirectExtensionStore } from './store'
+import {
+  DirectExtensionRecordDurabilityError,
+  type DirectExtensionStore,
+} from './store'
 import {
   type DirectExtensionTarget,
   parseDirectExtensionTarget,
@@ -632,19 +635,26 @@ async function publishValidatedCandidate(input: {
       materialized.materializationDigest,
     )
     try {
-      await input.store.writeRecords([
+      const publication = await input.store.writeRecords([
         ...input.current.filter(
           (candidate) => candidate.id !== input.extensionId,
         ),
         record,
       ])
       committed = true
+      if (publication.recordDirectoryDurability === 'unsupported') {
+        return record
+      }
     } catch (cause) {
-      await input.store
-        .discardMaterializationIfUnreferenced(
-          materialized.materializationDigest,
-        )
-        .catch(() => undefined)
+      if (cause instanceof DirectExtensionRecordDurabilityError) {
+        committed = true
+      } else {
+        await input.store
+          .discardMaterializationIfUnreferenced(
+            materialized.materializationDigest,
+          )
+          .catch(() => undefined)
+      }
       throw cause
     }
     await input.store
@@ -1254,12 +1264,14 @@ export class DirectExtensionService {
           { blockingSources },
         )
       }
-      await this.store.writeRecords(
+      const publication = await this.store.writeRecords(
         current.filter((record) => record.id !== input.extensionId),
       )
-      await this.store
-        .collectUnreferencedMaterializations()
-        .catch(() => undefined)
+      if (publication.recordDirectoryDurability === 'synced') {
+        await this.store
+          .collectUnreferencedMaterializations()
+          .catch(() => undefined)
+      }
       return {
         extension: projectDirectExtensionRecord(installed),
         blockingSources,

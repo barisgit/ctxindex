@@ -75,6 +75,12 @@ function credentialFree(value: string): boolean {
   if (!/^[a-z][a-z0-9+.-]*:/i.test(value)) return true
   try {
     const parsed = new URL(value.replace(/^git\+/, ''))
+    if (parsed.protocol === 'ssh:') {
+      return (
+        parsed.password.length === 0 &&
+        (parsed.username.length === 0 || parsed.username === 'git')
+      )
+    }
     return parsed.username.length === 0 && parsed.password.length === 0
   } catch {
     return true
