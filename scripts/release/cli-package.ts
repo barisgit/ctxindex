@@ -575,7 +575,7 @@ export async function smokeCliPackage(
     database.close()
   }
 
-  if (process.platform === 'darwin') {
+  if (process.platform === 'darwin' || process.platform === 'linux') {
     let lifecycleFailure: unknown
     let startedInstanceId: string | undefined
     try {
