@@ -26,7 +26,7 @@ Contains reusable workspace libraries defining ctxindex's provider-neutral domai
 | --- | --- | --- |
 | `packages/extension-sdk/` | Shared contracts for definitions, Catalog curation, contexts, emissions, and operations. | `packages/extension-sdk/codemap.md` |
 | `packages/profiles/` | Provider-neutral calendar-event, communication-message, and file vocabularies. | `packages/profiles/codemap.md` |
-| `packages/adapters/` | Built-in Google, Microsoft, and local-directory provider integrations. | `packages/adapters/codemap.md` |
+| `packages/official/` | Built-in Google, Microsoft, and local-directory provider integrations. | `packages/official/codemap.md` |
 | `packages/core/` | Provider-neutral services, registries, SQLite storage/schema, operation pipelines, and runtime infrastructure. | `packages/core/codemap.md` |
 | `packages/rpc/` | Bounded local-daemon DTO schemas, compatibility middleware, router contract, and typed client surface. | `packages/rpc/codemap.md` |
 | `packages/local-daemon/` | Runtime identity, secure discovery/endpoint metadata, and retained filesystem lease infrastructure. | `packages/local-daemon/codemap.md` |

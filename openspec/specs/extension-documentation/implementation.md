@@ -24,7 +24,7 @@ The existing protocol/runtime compatibility middleware and request-scoped cancel
 
 ## Distribution
 
-External and installed package roots resolve `./docs` beside the module entry already imported by the package-entry seam. Built-in source directories live under `packages/adapters/src/builtin-documentation/`; `packages/adapters/scripts/generate-documentation.ts` resolves those descriptors with the shared core resolver and writes the embedded virtual module. Built-in freshness tests compare both forms, and the relocated compiled-host gate reads the embedded projection without checkout files.
+External and installed package roots resolve `./docs` beside the module entry already imported by the package-entry seam. Built-in source directories live under `packages/official/src/builtin-documentation/`; `packages/official/scripts/generate-documentation.ts` resolves those descriptors with the shared core resolver and writes the embedded virtual module. Built-in freshness tests compare both forms, and the relocated compiled-host gate reads the embedded projection without checkout files.
 
 Public authoring guidance is backed by repository example workspaces rather than documentation-only pseudo-APIs. Providerless and provider-backed examples import the public SDK facade, expose plain roots through package-owned `ctxindex.extensions` modules, resolve normal package dependencies before host loading, and exercise real package-entry/documentation discovery. The checked source remains authoritative when a guide presents a shortened excerpt.
 

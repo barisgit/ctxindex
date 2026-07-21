@@ -42,7 +42,7 @@
     "fullclean": "rm -rf .turbo dist coverage node_modules"
   },
   "devDependencies": {
-    "@ctxindex/adapters": "workspace:*",
+    "@ctxindex/official": "workspace:*",
     "@ctxindex/core": "workspace:*",
     "@ctxindex/extension-sdk": "workspace:*",
     "@ctxindex/local-daemon": "workspace:*",

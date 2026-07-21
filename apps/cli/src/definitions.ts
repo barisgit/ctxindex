@@ -1,5 +1,4 @@
 import { join } from 'node:path'
-import * as CTXINDEX_BUILTIN_MODULE from '@ctxindex/adapters'
 import { DirectExtensionStore } from '@ctxindex/core'
 import { type CtxindexConfig, readConfig } from '@ctxindex/core/config'
 import {
@@ -11,6 +10,7 @@ import {
   describeRegistry,
   type RegistryDescription,
 } from '@ctxindex/core/registry'
+import * as CTXINDEX_BUILTIN_MODULE from '@ctxindex/official'
 
 export interface CliDefinitions extends LoadExtensionsResult {
   readonly config: CtxindexConfig

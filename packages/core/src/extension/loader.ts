@@ -171,9 +171,9 @@ export async function loadExtensions(
     )
   }
   let activeRoots: readonly CollectedExtension[] = await Promise.all(
-    collectExtensionExports(input.builtins, 'builtin:@ctxindex/adapters', {
+    collectExtensionExports(input.builtins, 'builtin:@ctxindex/official', {
       origin: 'builtin',
-      packageName: '@ctxindex/adapters',
+      packageName: '@ctxindex/official',
     }).map((root) => resolveCollectedExtensionDocumentation(root)),
   )
   assertCompatibleExtensionDocumentation(activeRoots)

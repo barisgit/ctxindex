@@ -124,7 +124,7 @@ export async function runAction(
 ): Promise<RunActionResult>;
 ```
 
-### @ctxindex/adapters — Gmail Draft contracts
+### @ctxindex/official — Gmail Draft contracts
 
 ```ts
 export type GmailDraftCreateInput = z.infer<
@@ -146,7 +146,7 @@ export async function gmailDraftCreate(
 ): Promise<RetrievedResource>;
 ```
 
-### @ctxindex/adapters — Microsoft Draft contracts
+### @ctxindex/official — Microsoft Draft contracts
 
 ```ts
 export type MicrosoftDraftCreateInput = z.infer<

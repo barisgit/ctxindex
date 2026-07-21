@@ -24,7 +24,7 @@ The prototype adds these workspace boundaries and dependency directions:
        │
        ├──> @ctxindex/local-daemon (canonical identity, discovery, leases)
        ├──> @ctxindex/core     (provider-neutral application/domain services)
-       └──> @ctxindex/adapters (explicit built-in Extension composition)
+       └──> @ctxindex/official (explicit built-in Extension composition)
 
 @ctxindex/cli ──> @ctxindex/local-daemon (endpoint discovery and retained shared lease)
 @ctxindex/cli ──> @ctxindex/core only for commands outside the prototype slice

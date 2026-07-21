@@ -4,7 +4,7 @@
 
 ## Module Ownership
 
-`@ctxindex/adapters` remains the sole owner of Microsoft Graph request construction, provider response contracts, attachment normalization, and Graph diagnostic parsing. The Microsoft mailbox retrieval module owns message and bounded attachment-page orchestration; the shared Microsoft transport owns preference headers, response decoding, next-link validation, status mapping, and safe provider diagnostics. Provider-neutral core continues to own Ref dispatch, Resource/Artifact persistence, content-addressed caching, and CLI exit mapping, and MUST NOT gain Microsoft-specific branches.
+`@ctxindex/official` remains the sole owner of Microsoft Graph request construction, provider response contracts, attachment normalization, and Graph diagnostic parsing. The Microsoft mailbox retrieval module owns message and bounded attachment-page orchestration; the shared Microsoft transport owns preference headers, response decoding, next-link validation, status mapping, and safe provider diagnostics. Provider-neutral core continues to own Ref dispatch, Resource/Artifact persistence, content-addressed caching, and CLI exit mapping, and MUST NOT gain Microsoft-specific branches.
 
 Dependencies continue to point from Adapter operations through injected SDK contexts into core egress and persistence interfaces. The CLI remains a formatting/delegation shell.
 

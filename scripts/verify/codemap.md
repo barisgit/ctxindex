@@ -32,7 +32,7 @@ Contains executable static and runtime verification gates for CLI layering, fram
 
 ## Integration
 
-- Scans `apps/cli/src`, `apps/cli/bin/ctxindex.mjs`, `apps/web`, root-declared package/example workspaces, `packages/core`, `packages/adapters`, and selected `scripts` paths according to each gate.
+- Scans `apps/cli/src`, `apps/cli/bin/ctxindex.mjs`, `apps/web`, root-declared package/example workspaces, `packages/core`, `packages/official`, and selected `scripts` paths according to each gate.
 - `cli-framework-citty.ts` invokes the Bun CLI entry point and inspects command modules under `apps/cli/src/commands/`.
 - `exports-map.ts` consumes `packages/core/package.json` and imports `@ctxindex/core/{auth,sync,realm,source,search,errors}`.
 - All scripts target Bun APIs/runtime and expose process exit status as their integration contract for higher-level verification runners.

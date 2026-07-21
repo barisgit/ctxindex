@@ -6,7 +6,7 @@
 ## 2. Microsoft mailbox resumable enumeration
 
 - [x] 2.1 Add failing Microsoft mailbox tests for query-less constrained enumeration, documented exact `unread=true`/`false` translation, Source-and-query-bound continuation validation, 50-result continuation, resumed-page immutable-id headers, cross-page duplicate/Draft suppression, and malformed/oversized provider pages.
-- [x] 2.2 Implement bounded versioned Microsoft cursor handling, omitted match-all `$search`, exact unread `$filter`, and supported combined text/unread verification while preserving Graph next-link validation and Profile-backed verification; pass `bun test packages/adapters/src/microsoft/mailbox/search-remote.test.ts packages/core/src/source/remote-search.test.ts` before continuing.
+- [x] 2.2 Implement bounded versioned Microsoft cursor handling, omitted match-all `$search`, exact unread `$filter`, and supported combined text/unread verification while preserving Graph next-link validation and Profile-backed verification; pass `bun test packages/official/src/microsoft/mailbox/search-remote.test.ts packages/core/src/source/remote-search.test.ts` before continuing.
 
 ## 3. Generic CLI workflow and guidance
 

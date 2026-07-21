@@ -23,5 +23,5 @@ Defines the private workspace authoring/runtime contract for ctxindex Extension 
 ## Integration points
 
 - Depends only on Zod; the package manifest owns build, quality, test, and clean/fullclean tasks dispatched by root Turbo commands.
-- Used by `packages/profiles/src/`, `packages/adapters/src/`, and external extension modules.
+- Used by `packages/profiles/src/`, `packages/official/src/`, and external extension modules.
 - Core loads extension roots in `packages/core/src/extension/loader.ts`, builds reachable graphs in `packages/core/src/registry/complete-registry.ts`, and exposes definitions through `definition-registries.ts`.

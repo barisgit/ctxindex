@@ -6,7 +6,7 @@
 
 These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
 
-### @ctxindex/adapters — Google Calendar configuration
+### @ctxindex/official — Google Calendar configuration
 
 ```ts
 export type GoogleCalendarSourceConfig = z.infer<
@@ -14,7 +14,7 @@ export type GoogleCalendarSourceConfig = z.infer<
 >
 ```
 
-### @ctxindex/adapters — Google Calendar normalization
+### @ctxindex/official — Google Calendar normalization
 
 ```ts
 export interface GoogleCalendarWarning {
@@ -31,7 +31,7 @@ export interface NormalizedGoogleCalendarEvent {
 
 ```
 
-### @ctxindex/adapters — Google Calendar response contracts
+### @ctxindex/official — Google Calendar response contracts
 
 ```ts
 export type GoogleCalendarEventsPage = z.infer<typeof eventsPageSchema>
@@ -42,13 +42,13 @@ export class GoogleCalendarSyncTokenInvalidError extends Error {
 
 ```
 
-### @ctxindex/adapters — Google Calendar sync
+### @ctxindex/official — Google Calendar sync
 
 ```ts
 export async function googleCalendarSync(context: SyncContext): Promise<void>;
 ```
 
-### @ctxindex/adapters — Google Calendar retrieval
+### @ctxindex/official — Google Calendar retrieval
 
 ```ts
 export async function googleCalendarRetrieve(
@@ -58,7 +58,7 @@ export async function googleCalendarRetrieve(
 
 ## Implementation doctrine
 
-The Google Calendar module in `@ctxindex/adapters` keeps configuration, transport validation, event normalization, sync, retrieval, and its definition together. It emits `calendar.event@1`; Profile semantics and OAuth orchestration stay outside the module.
+The Google Calendar module in `@ctxindex/official` keeps configuration, transport validation, event normalization, sync, retrieval, and its definition together. It emits `calendar.event@1`; Profile semantics and OAuth orchestration stay outside the module.
 
 One Source selects one calendar and anchored past/future window. The cursor stores the final opaque sync token and sorted Source-local manifest. Full scans require a final token and compare complete results before removals/checkpoint; incremental sync retains the window and applies explicit provider deletions. Exact retrieval uses the same normalizer as sync.
 

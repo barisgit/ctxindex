@@ -156,7 +156,7 @@ test('rpc package rejects transport, lifecycle, storage, provider, formatting, a
   fixtureRoot = await createFixtureRoot()
   for (const [directory, name] of [
     ['packages/core', '@ctxindex/core'],
-    ['packages/adapters', '@ctxindex/adapters'],
+    ['packages/official', '@ctxindex/official'],
     ['packages/local-daemon', '@ctxindex/local-daemon'],
     ['apps/cli', '@ctxindex/cli'],
     ['apps/daemon', '@ctxindex/daemon'],
@@ -178,7 +178,7 @@ test('rpc package rejects transport, lifecycle, storage, provider, formatting, a
     join(fixtureRoot, 'packages/rpc/src/router.ts'),
     `
 import '@ctxindex/core'
-import '@ctxindex/adapters'
+import '@ctxindex/official'
 import '@ctxindex/local-daemon'
 import '@ctxindex/cli/src/formatters'
 import '@ctxindex/daemon'
@@ -202,12 +202,12 @@ void query
     ),
   ).toEqual(
     [
-      '@ctxindex/adapters',
       '@ctxindex/cli',
       '@ctxindex/cli/src/formatters',
       '@ctxindex/core',
       '@ctxindex/daemon',
       '@ctxindex/local-daemon',
+      '@ctxindex/official',
       'Bun.serve',
       'bun',
       'bun:sqlite',
@@ -326,7 +326,7 @@ test('local daemon package rejects RPC, business, transport, formatting, provide
   for (const [directory, name] of [
     ['packages/rpc', '@ctxindex/rpc'],
     ['packages/core', '@ctxindex/core'],
-    ['packages/adapters', '@ctxindex/adapters'],
+    ['packages/official', '@ctxindex/official'],
     ['apps/cli', '@ctxindex/cli'],
     ['apps/daemon', '@ctxindex/daemon'],
   ] as const) {
@@ -352,7 +352,7 @@ test('local daemon package rejects RPC, business, transport, formatting, provide
     `
 import '@ctxindex/rpc'
 import '@ctxindex/core/src/sync/application-service'
-import '@ctxindex/adapters'
+import '@ctxindex/official'
 import '@ctxindex/cli/src/formatters'
 import '@ctxindex/daemon'
 import '@orpc/server'
@@ -376,11 +376,11 @@ void query
     ),
   ).toEqual(
     [
-      '@ctxindex/adapters',
       '@ctxindex/cli',
       '@ctxindex/cli/src/formatters',
       '@ctxindex/core',
       '@ctxindex/daemon',
+      '@ctxindex/official',
       '@ctxindex/rpc',
       '@orpc/server',
       'Bun.serve',
@@ -901,7 +901,7 @@ test('rejects workspace dependencies outside the accepted direction', async () =
     ['packages/extension-sdk', '@ctxindex/extension-sdk'],
     ['packages/profiles', '@ctxindex/profiles'],
     ['packages/core', '@ctxindex/core'],
-    ['packages/adapters', '@ctxindex/adapters'],
+    ['packages/official', '@ctxindex/official'],
     ['apps/cli', '@ctxindex/cli'],
   ] as const
   for (const [directory, name] of manifests) {
@@ -914,7 +914,7 @@ test('rejects workspace dependencies outside the accepted direction', async () =
     ['packages/extension-sdk', '@ctxindex/extension-sdk', '@ctxindex/core'],
     ['packages/profiles', '@ctxindex/profiles', '@ctxindex/core'],
     ['packages/core', '@ctxindex/core', '@ctxindex/profiles'],
-    ['packages/adapters', '@ctxindex/adapters', '@ctxindex/cli'],
+    ['packages/official', '@ctxindex/official', '@ctxindex/cli'],
   ] as const
   for (const [directory, name, dependency] of invalidEdges) {
     await writeFixture(
@@ -953,15 +953,15 @@ test('accepts the established downward workspace dependency direction', async ()
     ],
     ['packages/core', '@ctxindex/core', ['@ctxindex/extension-sdk']],
     [
-      'packages/adapters',
-      '@ctxindex/adapters',
+      'packages/official',
+      '@ctxindex/official',
       ['@ctxindex/core', '@ctxindex/extension-sdk', '@ctxindex/profiles'],
     ],
     [
       'apps/cli',
       '@ctxindex/cli',
       [
-        '@ctxindex/adapters',
+        '@ctxindex/official',
         '@ctxindex/core',
         '@ctxindex/extension-sdk',
         '@ctxindex/profiles',

@@ -4,11 +4,12 @@
 TBD - created by archiving change deepen-module-architecture. Update Purpose after archive.
 ## Requirements
 ### Requirement: Implementation follows explicit module ownership
-The repository MUST organize behavior by its domain owner, keep composition roots free of provider-specific implementations, use package manifests/imports for dependencies, and use one Extension activation boundary for every origin.
+The repository MUST organize behavior by its domain owner, keep composition roots free of provider-specific implementations, use package manifests/imports for dependencies, and use one Extension activation boundary for every origin. The `@ctxindex/official` package MUST distribute official Provider, OAuth App, Source Adapter, transport, documentation-tree, and Extension-root implementations, while generic Adapter authoring contracts remain owned by `@ctxindex/extension-sdk`.
 
 #### Scenario: Built-in integration locality
 - **WHEN** a maintainer inspects a built-in integration
 - **THEN** Provider auth/App-schema declarations are Provider-owned, Adapter behavior is Adapter-owned, vocabulary is Profile-owned, package dependencies are manifest-owned, and the Extension root only composes imported values
+- **THEN** official implementations are distributed from `@ctxindex/official` without moving generic Adapter contracts out of `@ctxindex/extension-sdk`
 
 #### Scenario: Providerless Adapter locality
 - **WHEN** a maintainer inspects a providerless local Adapter
@@ -43,7 +44,7 @@ The system MUST preserve the following contract without changing the normative f
 
 Code under `apps/cli/src/**` MUST NOT import `bun:sqlite` or `drizzle-orm/*`. It MUST NOT contain raw SQL literals for `INSERT`, `UPDATE`, `DELETE`, or `SELECT` statements.
 
-Code under `apps/cli/src/**` MUST NOT issue `fetch()` calls to provider APIs such as OAuth, Google, or Microsoft endpoints. Provider HTTP behavior belongs in `@ctxindex/core` or `@ctxindex/adapters`.
+Code under `apps/cli/src/**` MUST NOT issue `fetch()` calls to provider APIs such as OAuth, Google, or Microsoft endpoints. Provider HTTP behavior belongs in `@ctxindex/core` or `@ctxindex/official`.
 
 Code under `apps/cli/src/**` MUST NOT generate ULIDs or UUIDs and MUST NOT encode schema column names. Identity assignment and schema knowledge are core concerns.
 

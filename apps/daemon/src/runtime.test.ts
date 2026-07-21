@@ -10,7 +10,6 @@ import {
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { googleOAuthProvider } from '@ctxindex/adapters'
 import { defaultConfig } from '@ctxindex/core/config'
 import { loadExtensions } from '@ctxindex/core/extension'
 import { openDatabase, runMigrations } from '@ctxindex/core/storage'
@@ -20,6 +19,7 @@ import {
   resolveEndpoint,
   resolveRuntimeIdentity,
 } from '@ctxindex/local-daemon'
+import { googleOAuthProvider } from '@ctxindex/official'
 import {
   isDaemonStartupFailure,
   type StartDaemonOptions,

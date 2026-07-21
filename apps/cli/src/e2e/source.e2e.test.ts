@@ -81,7 +81,7 @@ describe('source e2e', () => {
       await writeFile(
         join(packageRoot, 'entry.ts'),
         `import { defineAdapter, defineExtension, defineOAuthApp, z } from ${JSON.stringify(join(repoRoot, 'packages/extension-sdk/src/index.ts'))}
-import { googleOAuthProvider } from ${JSON.stringify(join(repoRoot, 'packages/adapters/src/google-oauth-provider.ts'))}
+import { googleOAuthProvider } from ${JSON.stringify(join(repoRoot, 'packages/official/src/google-oauth-provider.ts'))}
 
 const shadowedApp = defineOAuthApp(googleOAuthProvider, {
   label: 'shadowed',

@@ -30,8 +30,8 @@ test('profile codemaps describe bundled Adapter parity', async () => {
   expect(codemaps.join('\n')).not.toMatch(/binds? Gmail Draft Actions/)
 
   const sourceCodemap = codemaps[1]
-  expect(sourceCodemap).toContain('`packages/adapters/src/google-mailbox/`')
-  expect(sourceCodemap).toContain('`packages/adapters/src/microsoft/mailbox/`')
+  expect(sourceCodemap).toContain('`packages/official/src/google-mailbox/`')
+  expect(sourceCodemap).toContain('`packages/official/src/microsoft/mailbox/`')
   expect(sourceCodemap).toMatch(
     /Google and Microsoft provider modules.*create and consume communication-message payloads.*local-directory emits file payloads/s,
   )

@@ -18,7 +18,7 @@ ALLOWLIST=(
 ALLOWLIST_PATTERN=$(IFS='|'; echo "${ALLOWLIST[*]}")
 PRODUCTION_RUNTIME_ROOTS=(
   "packages/core/src"
-  "packages/adapters/src"
+  "packages/official/src"
   "apps/cli/src"
 )
 for scan_root in "${PRODUCTION_RUNTIME_ROOTS[@]}"; do
@@ -100,7 +100,7 @@ done < <(
     --exclude-dir='.git' \
     --exclude-dir='node_modules' \
     'context\.fetch[[:space:]]*\(' \
-    packages/adapters/src \
+    packages/official/src \
     | sort
 )
 
@@ -108,9 +108,9 @@ done < <(
 # surface. Their focused tests prove production ignores them and nonproduction
 # accepts loopback hosts only.
 expected_mock_owners="$(cat <<'EOF'
-packages/adapters/src/google-calendar/url.ts
-packages/adapters/src/google-mailbox/url.ts
-packages/adapters/src/microsoft/transport.ts
+packages/official/src/google-calendar/url.ts
+packages/official/src/google-mailbox/url.ts
+packages/official/src/microsoft/transport.ts
 packages/core/src/auth/oauth-endpoints.ts
 packages/core/src/config/env-loader.ts
 EOF
@@ -137,15 +137,15 @@ if [[ -s "$violations" ]]; then
   exit 1
 fi
 
-NODE_ENV=production bun test --path-ignore-patterns '__none__' ./packages/adapters/src/local-directory/sync.test.ts
+NODE_ENV=production bun test --path-ignore-patterns '__none__' ./packages/official/src/local-directory/sync.test.ts
 NODE_ENV=production bun test --path-ignore-patterns '__none__' ./packages/core/src/net/index.test.ts
 NODE_ENV=test bun test --path-ignore-patterns '__none__' \
-  ./packages/adapters/src/google-mailbox/draft.test.ts \
-  ./packages/adapters/src/google-calendar/response.test.ts \
-  ./packages/adapters/src/microsoft/mailbox/transport.test.ts \
+  ./packages/official/src/google-mailbox/draft.test.ts \
+  ./packages/official/src/google-calendar/response.test.ts \
+  ./packages/official/src/microsoft/mailbox/transport.test.ts \
   ./packages/core/src/source/provider-context.test.ts \
   ./packages/core/src/logger/redaction.integration.test.ts \
-  ./packages/adapters/src/google-mailbox/no-send.integration.test.ts \
+  ./packages/official/src/google-mailbox/no-send.integration.test.ts \
   ./apps/cli/src/e2e/compiled-direct-extension.e2e.test.ts \
   ./apps/cli/src/e2e/network-egress.e2e.test.ts \
   ./apps/cli/src/e2e/malformed-zero-side-effects.e2e.test.ts

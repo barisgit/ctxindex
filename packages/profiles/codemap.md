@@ -20,7 +20,7 @@ Defines ctxindex's bundled provider-neutral Profile vocabularies in the private 
 ## Integration points
 
 - Depends on `@ctxindex/extension-sdk` definition helpers and Zod; its manifest owns build, quality, test, and clean/fullclean tasks dispatched by root Turbo commands.
-- `packages/adapters/src/builtins.ts` exposes built-in Extension roots whose Adapters target all three Profiles: Google and Microsoft mailbox Adapters target `communication.message@1`; Google and Microsoft calendar Adapters target `calendar.event@1`; local-directory targets `file@1`.
+- `packages/official/src/builtins.ts` exposes built-in Extension roots whose Adapters target all three Profiles: Google and Microsoft mailbox Adapters target `communication.message@1`; Google and Microsoft calendar Adapters target `calendar.event@1`; local-directory targets `file@1`.
 - Google and Microsoft mailbox Adapters bind the same `communication.message.draft.create` and `communication.message.draft.update` Actions.
 - The local-directory Adapter targets `file@1`.
 - Core registry, resource, search, relation, artifact, export, and Action services consume Profile hooks through SDK contracts.

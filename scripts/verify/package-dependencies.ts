@@ -235,7 +235,7 @@ async function extractRpcBoundaryUses(
     const builtinRoot = specifier.replace(/^node:/, '').split('/')[0]
     if (
       packageName === '@ctxindex/core' ||
-      packageName === '@ctxindex/adapters' ||
+      packageName === '@ctxindex/official' ||
       packageName === '@ctxindex/local-daemon' ||
       (packageName !== undefined && applicationPackages.has(packageName))
     )
@@ -568,7 +568,7 @@ function allowedWorkspaceDependencies(
   }
 
   const allowed: Record<string, string[]> = {
-    '@ctxindex/adapters': [
+    '@ctxindex/official': [
       '@ctxindex/core',
       '@ctxindex/extension-sdk',
       '@ctxindex/profiles',

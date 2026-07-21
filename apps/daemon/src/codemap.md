@@ -23,4 +23,4 @@ Implements the local daemon's application layer: process startup, production dep
 
 - `index.ts` exposes the reusable application, runtime, signal, and transport APIs.
 - `main.ts` is compiled/executed directly as the daemon sibling; `e2e/compiled-daemon.e2e.test.ts` verifies detached start/status/stop, crash recovery, and direct process ownership paths.
-- Depends on public `@ctxindex/core/*`, `@ctxindex/local-daemon`, `@ctxindex/rpc`, `@ctxindex/adapters`, and `@orpc/server` seams only.
+- Depends on public `@ctxindex/core/*`, `@ctxindex/local-daemon`, `@ctxindex/rpc`, `@ctxindex/official`, and `@orpc/server` seams only.

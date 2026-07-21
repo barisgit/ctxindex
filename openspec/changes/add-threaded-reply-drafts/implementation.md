@@ -7,7 +7,7 @@
 
 ## Module Ownership
 
-`@ctxindex/profiles` owns the discriminated standalone/reply input schemas, portable message payload fields, and pure reply-subject/reference helpers shared by provider adapters. `@ctxindex/extension-sdk` owns the provider-neutral Action context resolver contract. `@ctxindex/core` constructs that resolver from generic Resource storage and Source Ref parsing before it creates an authenticated provider context. `@ctxindex/adapters` owns eligibility checks against portable message payloads, provider identifiers, request construction, response normalization, and provider-specific mutation errors. `@ctxindex/cli` remains a thin consumer of the registry-derived schemas and Action service.
+`@ctxindex/profiles` owns the discriminated standalone/reply input schemas, portable message payload fields, and pure reply-subject/reference helpers shared by provider adapters. `@ctxindex/extension-sdk` owns the provider-neutral Action context resolver contract. `@ctxindex/core` constructs that resolver from generic Resource storage and Source Ref parsing before it creates an authenticated provider context. `@ctxindex/official` owns eligibility checks against portable message payloads, provider identifiers, request construction, response normalization, and provider-specific mutation errors. `@ctxindex/cli` remains a thin consumer of the registry-derived schemas and Action service.
 
 ## Interfaces and Data Flow
 

@@ -23,7 +23,7 @@ Provides the official instant-demo external Extension: eight deterministic synth
 ## Integration
 
 - Uses `@ctxindex/extension-sdk` only while authoring/building and embeds runtime dependencies in the checked package entry; relative `fixtures.ts` is deterministic input.
-- Declares `@ctxindex/core` and `@ctxindex/adapters` as workspace dev dependencies used by tests for package-entry discovery and built-in Extension isolation.
+- Declares `@ctxindex/core` and `@ctxindex/official` as workspace dev dependencies used by tests for package-entry discovery and built-in Extension isolation.
 - Exports Profile ID `ctxindex.demo.tender`, Adapter ID `ctxindex.demo.tenders`, and Extension ID `ctxindex.demo` as ordinary values.
 - The allowlisted standalone package is self-contained and needs no published SDK; npm publication and anonymous installation remain a launch Human checkpoint.
 - Emits sync operations through `context.emit()`; resource refs use `context.source.id`.
