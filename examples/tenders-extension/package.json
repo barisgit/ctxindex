@@ -1,18 +1,38 @@
 {
-  "name": "@ctxindex/example-tenders-extension",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@ctxindex/demo-tenders",
+  "version": "0.1.0",
+  "description": "Deterministic providerless tender data for trying ctxindex without accounts or secrets",
+  "license": "MIT",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/barisgit/ctxindex.git",
+    "directory": "examples/tenders-extension"
+  },
+  "keywords": [
+    "ctxindex",
+    "extension",
+    "demo",
+    "synthetic-data"
+  ],
+  "files": [
+    "demo-extension.js",
+    "docs",
+    "README.md",
+    "expected-output.md",
+    "LICENSE"
+  ],
   "ctxindex": {
     "extensions": [
-      "./extension.ts"
+      "./demo-extension.js"
     ]
   },
-  "dependencies": {
-    "@ctxindex/extension-sdk": "workspace:*"
+  "scripts": {
+    "build": "bun build extension.ts --outfile demo-extension.js --target=bun --minify"
   },
   "devDependencies": {
-    "@ctxindex/adapters": "workspace:*",
-    "@ctxindex/core": "workspace:*"
+    "@ctxindex/adapters": "0.0.0",
+    "@ctxindex/core": "0.0.0",
+    "@ctxindex/extension-sdk": "0.0.0"
   }
 }

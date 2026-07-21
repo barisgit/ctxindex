@@ -9,21 +9,22 @@ import extension, {
   tenderProfile,
   tenderSchema,
 } from './extension'
+import { TENDER_FIXTURES } from './fixtures'
 
 const extensionPath = resolve(import.meta.dir, 'extension.ts')
 
-describe('external tenders Extension proof', () => {
+describe('official instant-demo tenders Extension', () => {
   test('exports ordinary SDK values with a providerless Adapter', () => {
     expect(extension).toMatchObject({
       kind: 'extension',
-      id: 'enarocanje.proof',
+      id: 'ctxindex.demo',
       adapters: [tenderAdapter],
     })
     expect(extension).not.toHaveProperty('version')
     expect(extension).not.toHaveProperty('dependencies')
     expect(tenderAdapter).toMatchObject({
       kind: 'adapter',
-      id: 'enarocanje.fixture',
+      id: 'ctxindex.demo.tenders',
       profiles: [tenderProfile],
     })
     expect(tenderAdapter).not.toHaveProperty('version')
@@ -41,6 +42,8 @@ describe('external tenders Extension proof', () => {
       'reference',
       'buyer',
       'status',
+      'category',
+      'estimatedValue',
       'deadline',
       'publishedAt',
     ])
@@ -66,8 +69,11 @@ describe('external tenders Extension proof', () => {
     const manifest = await Bun.file(resolve(packageRoot, 'package.json')).json()
     expect(manifest).toMatchObject({
       type: 'module',
-      ctxindex: { extensions: ['./extension.ts'] },
-      dependencies: { '@ctxindex/extension-sdk': 'workspace:*' },
+      name: '@ctxindex/demo-tenders',
+      version: '0.1.0',
+      license: 'MIT',
+      ctxindex: { extensions: ['./demo-extension.js'] },
+      devDependencies: { '@ctxindex/extension-sdk': '0.0.0' },
     })
     const resolved = await resolvePackageEntries(packageRoot, manifest, {
       origin: 'explicit-path',
@@ -79,9 +85,22 @@ describe('external tenders Extension proof', () => {
     expect(collected[0]?.definition).not.toHaveProperty('docs')
     expect(collected[0]?.documentation?.files.map(({ path }) => path)).toEqual([
       'README.md',
-      'adapters/enarocanje.fixture.md',
-      'profiles/enarocanje.tender@1.md',
+      'adapters/ctxindex.demo.tenders.md',
+      'profiles/ctxindex.demo.tender@1.md',
     ])
+  })
+
+  test('keeps the checked package entry byte-for-byte current', async () => {
+    const result = await Bun.build({
+      entrypoints: [extensionPath],
+      target: 'bun',
+      minify: true,
+    })
+    expect(result.success, result.logs.map(String).join('\n')).toBe(true)
+    expect(result.outputs).toHaveLength(1)
+    expect(await result.outputs[0]?.text()).toBe(
+      await Bun.file(resolve(import.meta.dir, 'demo-extension.js')).text(),
+    )
   })
 })
 
@@ -111,13 +130,13 @@ test('uses ordinary public SDK imports and is not bundled', async () => {
   const { CTXINDEX_BUILTIN_EXTENSIONS } = await import('@ctxindex/adapters')
   expect(
     CTXINDEX_BUILTIN_EXTENSIONS.some(
-      (extension) => String(extension.id) === 'enarocanje.proof',
+      (extension) => String(extension.id) === 'ctxindex.demo',
     ),
   ).toBe(false)
   expect(
     CTXINDEX_BUILTIN_EXTENSIONS.some((extension) =>
       extension.adapters.some(
-        (adapter) => String(adapter.id) === 'enarocanje.fixture',
+        (adapter) => String(adapter.id) === 'ctxindex.demo.tenders',
       ),
     ),
   ).toBe(false)
@@ -155,28 +174,18 @@ test('emits deterministic complete Resources and an ordered checkpoint without p
     },
   })
 
-  const expectedPayloads = [
-    {
-      reference: 'JN-001/2026',
-      title: 'Supply of laboratory equipment',
-      buyer: 'National Research Institute',
-      publishedAt: '2026-01-15T09:00:00.000Z',
-      deadline: '2026-02-12T11:00:00.000Z',
-      status: 'open',
-      description: 'Supply and installation of laboratory analysis equipment.',
-    },
-    {
-      reference: 'JN-002/2026',
-      title: 'Municipal bridge inspection',
-      buyer: 'Municipality of Triglav',
-      publishedAt: '2026-01-20T08:30:00.000Z',
-      deadline: '2026-02-20T10:00:00.000Z',
-      status: 'open',
-      description: 'Structural inspection and reporting for municipal bridges.',
-    },
-  ]
+  const expectedPayloads = TENDER_FIXTURES
 
   expect(fetchCalls).toBe(0)
+  expect(expectedPayloads).toHaveLength(8)
+  expect(new Set(expectedPayloads.map(({ reference }) => reference)).size).toBe(
+    8,
+  )
+  expect(new Set(expectedPayloads.map(({ buyer }) => buyer)).size).toBe(8)
+  expect(new Set(expectedPayloads.map(({ category }) => category)).size).toBe(8)
+  expect(new Set(expectedPayloads.map(({ status }) => status))).toEqual(
+    new Set(['open', 'planned', 'awarded', 'cancelled']),
+  )
   expect(
     profile.schema.safeParse({ ...expectedPayloads[0], unexpected: true })
       .success,
@@ -190,7 +199,7 @@ test('emits deterministic complete Resources and an ordered checkpoint without p
       type: 'upsertResource',
       resource: {
         ref: `ctx://${sourceId}/tender/${encodeURIComponent(payload.reference)}`,
-        profile: { id: 'enarocanje.tender', version: 1 },
+        profile: { id: 'ctxindex.demo.tender', version: 1 },
         completeness: 'complete',
         title: payload.title,
         summary: payload.description,
@@ -203,7 +212,7 @@ test('emits deterministic complete Resources and an ordered checkpoint without p
       type: 'checkpoint',
       cursor: {
         version: 1,
-        references: ['JN-001/2026', 'JN-002/2026'],
+        references: expectedPayloads.map(({ reference }) => reference),
       },
     },
   ])
@@ -214,7 +223,10 @@ test('emits deterministic complete Resources and an ordered checkpoint without p
     expect(profile.search?.occurredAt?.(payload)).toEqual(
       new Date(payload.publishedAt),
     )
-    expect(profile.search?.chunks?.(payload)).toEqual([payload.description])
+    expect(profile.search?.chunks?.(payload)).toEqual([
+      payload.description,
+      `${payload.buyer} ${payload.category}`,
+    ])
     expect(
       Object.fromEntries(
         Object.entries(profile.search?.fields ?? {}).map(([name, field]) => [
@@ -226,6 +238,8 @@ test('emits deterministic complete Resources and an ordered checkpoint without p
       reference: payload.reference,
       buyer: payload.buyer,
       status: payload.status,
+      category: payload.category,
+      estimatedValue: payload.estimatedValue,
       deadline: new Date(payload.deadline),
       publishedAt: new Date(payload.publishedAt),
     })

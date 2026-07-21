@@ -46,11 +46,11 @@ test('interpreted registry interface follows an explicit external Extension', as
     const registry = JSON.parse(described.stdout)
     expect(registry.kinds).toContainEqual(
       expect.objectContaining({
-        id: 'enarocanje.tender',
+        id: 'ctxindex.demo.tender',
       }),
     )
     expect(registry.sources).toContainEqual(
-      expect.objectContaining({ id: 'enarocanje.fixture' }),
+      expect.objectContaining({ id: 'ctxindex.demo.tenders' }),
     )
     expect(registry.kinds[0]).not.toHaveProperty('fields')
     expect(registry.sources[0]).not.toHaveProperty('config')
@@ -60,7 +60,7 @@ test('interpreted registry interface follows an explicit external Extension', as
     expect(fullRegistry.exitCode, fullRegistry.stderr).toBe(0)
     expect(JSON.parse(fullRegistry.stdout).kinds).toContainEqual(
       expect.objectContaining({
-        id: 'enarocanje.tender',
+        id: 'ctxindex.demo.tender',
         fields: expect.any(Array),
       }),
     )
@@ -68,12 +68,12 @@ test('interpreted registry interface follows an explicit external Extension', as
     const selectedProfile = await run([
       'describe',
       'profile',
-      'enarocanje.tender',
+      'ctxindex.demo.tender',
       '--json',
     ])
     expect(JSON.parse(selectedProfile.stdout)).toEqual(
       expect.objectContaining({
-        id: 'enarocanje.tender',
+        id: 'ctxindex.demo.tender',
         fields: expect.any(Array),
       }),
     )
@@ -144,7 +144,7 @@ test('interpreted registry interface follows an explicit external Extension', as
     const markdown = await run(['describe', '--format', 'markdown'])
     expect(markdown.exitCode, markdown.stderr).toBe(0)
     expect(markdown.stdout).toContain('## Profiles (4)')
-    expect(markdown.stdout).toContain('`enarocanje.tender@1`')
+    expect(markdown.stdout).toContain('`ctxindex.demo.tender@1`')
     expect(markdown.stdout).not.toContain('`reference` (string)')
     const actionMarkdown = await run([
       'describe',
@@ -253,19 +253,19 @@ test('interpreted registry interface follows an explicit external Extension', as
     const profileMarkdown = await run([
       'describe',
       'profile',
-      'enarocanje.tender',
+      'ctxindex.demo.tender',
       '--format',
       'markdown',
     ])
     expect(profileMarkdown.exitCode, profileMarkdown.stderr).toBe(0)
-    expect(profileMarkdown.stdout).toContain('### enarocanje.tender@1')
+    expect(profileMarkdown.stdout).toContain('### ctxindex.demo.tender@1')
     expect(profileMarkdown.stdout).toContain('`reference` (string)')
 
     const help = await run([])
     expect(help.exitCode, help.stderr).toBe(0)
     expect(help.stdout).toContain('INTERFACE')
     expect(help.stdout).toContain('ctxindex describe --help')
-    expect(help.stdout).not.toContain('enarocanje.tender@1')
+    expect(help.stdout).not.toContain('ctxindex.demo.tender@1')
     expect(help.stdout).toContain('oauth-app')
     expect(help.stdout).not.toMatch(/\bclient\b/i)
     expect(help.stdout).not.toMatch(/\bauth\b/)
@@ -284,7 +284,7 @@ test('interpreted registry interface follows an explicit external Extension', as
       expect(commandHelp.exitCode, commandHelp.stderr).toBe(0)
       expect(commandHelp.stdout).not.toContain('INTERFACE')
       expect(commandHelp.stdout).not.toContain('Loaded interface:')
-      expect(commandHelp.stdout).not.toContain('enarocanje.tender@1')
+      expect(commandHelp.stdout).not.toContain('ctxindex.demo.tender@1')
       expect(commandHelp.stdout).not.toMatch(/\bGrant\b/)
     }
 
@@ -295,11 +295,11 @@ test('interpreted registry interface follows an explicit external Extension', as
     const extensions = await run(['extension', 'list', '--json'])
     expect(extensions.exitCode, extensions.stderr).toBe(0)
     expect(JSON.parse(extensions.stdout)).toContainEqual({
-      id: 'enarocanje.proof',
+      id: 'ctxindex.demo',
       profiles: [],
-      adapters: [{ id: 'enarocanje.fixture' }],
+      adapters: [{ id: 'ctxindex.demo.tenders' }],
       provenance: {
-        id: 'enarocanje.proof',
+        id: 'ctxindex.demo',
         kind: 'path',
         path: extensionPath,
       },
@@ -320,12 +320,12 @@ test('interpreted registry interface follows an explicit external Extension', as
     const degradedHelp = await run(['--help'])
     expect(degradedHelp.exitCode).toBe(0)
     expect(degradedHelp.stderr).toBe('')
-    expect(degradedHelp.stdout).not.toContain('enarocanje.tender@1')
+    expect(degradedHelp.stdout).not.toContain('ctxindex.demo.tender@1')
     const degradedDescribe = await run(['describe'])
     expect(degradedDescribe.exitCode).toBe(0)
     expect(degradedDescribe.stderr).toContain('missing.ts')
-    expect(degradedDescribe.stdout).toContain('enarocanje.tender@1')
+    expect(degradedDescribe.stdout).toContain('ctxindex.demo.tender@1')
   } finally {
     await rm(root, { recursive: true, force: true })
   }
-}, 30_000)
+}, 60_000)

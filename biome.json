@@ -7,7 +7,13 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!**/migrations", "!**/node_modules", "!.charters"]
+    "includes": [
+      "**",
+      "!**/migrations",
+      "!**/node_modules",
+      "!.charters",
+      "!examples/tenders-extension/demo-extension.js"
+    ]
   },
   "formatter": {
     "enabled": true,

@@ -128,19 +128,19 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
     expect(help.stderr).toBe('')
     expect(help.stdout).not.toContain('\n  tender ')
 
-    const realm = await run(['realm', 'add', 'procurement'])
+    const realm = await run(['realm', 'add', 'demo'])
     expect(realm.exitCode, realm.stderr).toBe(0)
-    expect(realm.stdout).toBe('realm added: procurement\n')
+    expect(realm.stdout).toBe('realm added: demo\n')
     expect(realm.stderr).toBe('')
 
     const added = await run([
       'source',
       'add',
-      'enarocanje.fixture',
+      'ctxindex.demo.tenders',
       '--realm',
-      'procurement',
+      'demo',
       '--label',
-      'public-tenders',
+      'demo-tenders',
     ])
     expect(added.exitCode, added.stderr).toBe(0)
     expect(added.stderr).toBe('')
@@ -148,7 +148,7 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
     expect(sourceMatch?.[1]).toBeDefined()
     const sourceId = sourceMatch?.[1] as string
 
-    const synced = await run(['sync', '--source', 'public-tenders', '--json'])
+    const synced = await run(['sync', '--source', 'demo-tenders', '--json'])
     expect(synced.exitCode, synced.stderr).toBe(0)
     expect(synced.stderr).toBe('')
     expect(JSON.parse(synced.stdout)).toEqual({
@@ -161,7 +161,7 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
             runId: expect.any(String),
             mode: 'sync',
             status: 'completed',
-            added: 2,
+            added: 8,
             updated: 0,
             deleted: 0,
             warningsCount: 0,
@@ -176,13 +176,13 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
 
     const typedFieldMiss = await run([
       'search',
-      'equipment',
+      'cybersecurity',
       '--kind',
-      'enarocanje.tender',
+      'ctxindex.demo.tender',
       '--source',
       sourceId,
       '--field',
-      'reference=JN-002/2026',
+      'status=awarded',
       '--json',
     ])
     expect(typedFieldMiss.exitCode, typedFieldMiss.stderr).toBe(0)
@@ -194,34 +194,37 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
 
     const searched = await run([
       'search',
-      'equipment',
+      'cybersecurity',
       '--kind',
-      'enarocanje.tender',
+      'ctxindex.demo.tender',
       '--source',
       sourceId,
       '--field',
-      'reference=JN-001/2026',
+      'status=open',
+      '--field',
+      'category=cybersecurity services',
       '--json',
     ])
     expect(searched.exitCode, searched.stderr).toBe(0)
     expect(searched.stderr).toBe('')
-    const ref = `ctx://${sourceId}/tender/${encodeURIComponent('JN-001/2026')}`
+    const ref = `ctx://${sourceId}/tender/DEMO-2026-001`
     expect(JSON.parse(searched.stdout)).toEqual({
       results: [
         {
           ref,
           sourceId,
-          profile: { id: 'enarocanje.tender', version: 1 },
+          profile: { id: 'ctxindex.demo.tender', version: 1 },
           origin: 'local',
           originRank: 0,
-          title: 'Supply of laboratory equipment',
-          summary: 'Supply and installation of laboratory analysis equipment.',
-          occurredAt: Date.parse('2026-01-15T09:00:00.000Z'),
+          title: 'Cybersecurity incident response retainer',
+          summary:
+            'Three-year incident response retainer covering 24/7 triage, threat hunting, forensic analysis, and annual tabletop exercises.',
+          occurredAt: Date.parse('2026-07-06T08:00:00.000Z'),
           chunks: [
             {
-              index: 0,
+              index: 1,
               snippet:
-                'Supply and installation of laboratory analysis <mark>equipment</mark>.',
+                'Alpine Example Digital Agency <mark>cybersecurity</mark> services',
             },
           ],
         },
@@ -237,20 +240,23 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
       resource: {
         ref,
         sourceId,
-        profile: { id: 'enarocanje.tender', version: 1 },
+        profile: { id: 'ctxindex.demo.tender', version: 1 },
         origin: 'synced',
-        title: 'Supply of laboratory equipment',
+        title: 'Cybersecurity incident response retainer',
         deletedAt: null,
         hydratedAt: expect.any(Number),
         payload: {
-          reference: 'JN-001/2026',
-          title: 'Supply of laboratory equipment',
-          buyer: 'National Research Institute',
-          publishedAt: '2026-01-15T09:00:00.000Z',
-          deadline: '2026-02-12T11:00:00.000Z',
+          reference: 'DEMO-2026-001',
+          title: 'Cybersecurity incident response retainer',
+          buyer: 'Alpine Example Digital Agency',
+          publishedAt: '2026-07-06T08:00:00.000Z',
+          deadline: '2026-08-14T10:00:00.000Z',
           status: 'open',
+          category: 'cybersecurity services',
+          currency: 'EUR',
+          estimatedValue: 480000,
           description:
-            'Supply and installation of laboratory analysis equipment.',
+            'Three-year incident response retainer covering 24/7 triage, threat hunting, forensic analysis, and annual tabletop exercises.',
         },
       },
       warnings: [],
@@ -295,7 +301,7 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
       }
     }
     const syncedResources = resourceSnapshot()
-    expect(syncedResources).toHaveLength(2)
+    expect(syncedResources).toHaveLength(8)
 
     await writeFile(configPath, configText([]))
 
@@ -314,10 +320,10 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
       lastStatus: 'idle',
     })
 
-    const degradedSearch = await run(['search', '--json', 'equipment'])
+    const degradedSearch = await run(['search', '--json', 'cybersecurity'])
     expect(degradedSearch.exitCode, degradedSearch.stderr).toBe(0)
     expect(JSON.parse(degradedSearch.stdout)).toMatchObject({
-      results: [{ ref, title: 'Supply of laboratory equipment' }],
+      results: [{ ref, title: 'Cybersecurity incident response retainer' }],
       warnings: [{ sourceId, code: 'extension_unavailable' }],
     })
 
@@ -365,12 +371,12 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
       'search',
       '--json',
       '--kind',
-      'enarocanje.tender',
-      'equipment',
+      'ctxindex.demo.tender',
+      'cybersecurity',
     ])
     expect(restoredSearch.exitCode, restoredSearch.stderr).toBe(0)
     expect(JSON.parse(restoredSearch.stdout)).toMatchObject({
-      results: [{ ref, title: 'Supply of laboratory equipment' }],
+      results: [{ ref, title: 'Cybersecurity incident response retainer' }],
       warnings: [],
     })
     expect(resourceSnapshot()).toEqual(syncedResources)
@@ -388,7 +394,16 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
       ).toEqual({
         cursor_json: JSON.stringify({
           version: 1,
-          references: ['JN-001/2026', 'JN-002/2026'],
+          references: [
+            'DEMO-2026-001',
+            'DEMO-2026-002',
+            'DEMO-2026-003',
+            'DEMO-2026-004',
+            'DEMO-2026-005',
+            'DEMO-2026-006',
+            'DEMO-2026-007',
+            'DEMO-2026-008',
+          ],
         }),
       })
       const tables = (

@@ -74,6 +74,22 @@ bun add --global ctxindex
 ctxindex --help
 ```
 
+## Instant no-account demo
+
+After `@ctxindex/demo-tenders` is published, install the official providerless Extension and Sync eight complete fictional tender Resources. It needs no OAuth, secrets, provider traffic, or prepared files:
+
+```sh
+ctxindex extension install npm \
+  '@ctxindex/demo-tenders@0.1.0' \
+  ctxindex.demo
+ctxindex realm add demo --name 'Instant demo'
+ctxindex source add ctxindex.demo.tenders --realm demo --label demo-tenders
+ctxindex sync --source demo-tenders
+ctxindex search 'solar schools' --realm demo
+```
+
+The install command is an explicit trust grant for package code and records an immutable exact version and integrity. Package publication plus anonymous install is a launch Human checkpoint; the [five-minute walkthrough](examples/tenders-extension/README.md) documents the current packed-artifact proof and continues through typed field filtering and complete Resource retrieval. All included tender records and organizations are synthetic.
+
 ## Packaging and release
 
 The public package is a Bun-target bundle plus the native `keytar` runtime

@@ -14,23 +14,34 @@ export const tenderSchema = z
     buyer: z.string().min(1),
     publishedAt: z.string().datetime(),
     deadline: z.string().datetime(),
-    status: z.string().min(1),
+    status: z.enum(['open', 'planned', 'awarded', 'cancelled']),
+    category: z.string().min(1),
+    currency: z.literal('EUR'),
+    estimatedValue: z.number().nonnegative(),
     description: z.string().min(1),
   })
   .strict()
 
 export const tenderProfile = defineProfile({
-  id: 'enarocanje.tender',
+  id: 'ctxindex.demo.tender',
   version: 1,
   schema: tenderSchema,
   search: {
     title: (payload) => payload.title,
     occurredAt: (payload) => new Date(payload.publishedAt),
-    chunks: (payload) => [payload.description],
+    chunks: (payload) => [
+      payload.description,
+      `${payload.buyer} ${payload.category}`,
+    ],
     fields: {
       reference: { type: 'string', extract: (payload) => payload.reference },
       buyer: { type: 'string', extract: (payload) => payload.buyer },
       status: { type: 'string', extract: (payload) => payload.status },
+      category: { type: 'string', extract: (payload) => payload.category },
+      estimatedValue: {
+        type: 'number',
+        extract: (payload) => payload.estimatedValue,
+      },
       deadline: {
         type: 'datetime',
         extract: (payload) => new Date(payload.deadline),
@@ -44,7 +55,7 @@ export const tenderProfile = defineProfile({
 })
 
 export const tenderAdapter = defineAdapter({
-  id: 'enarocanje.fixture',
+  id: 'ctxindex.demo.tenders',
   configSchema: z.object({}).strict(),
   profiles: [tenderProfile],
   routing: 'indexed',
@@ -79,7 +90,7 @@ export const tenderAdapter = defineAdapter({
 })
 
 const extension = defineExtension({
-  id: 'enarocanje.proof',
+  id: 'ctxindex.demo',
   adapters: [tenderAdapter],
   docs: docs('./docs'),
 })

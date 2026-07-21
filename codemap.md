@@ -35,7 +35,7 @@ CLI input is parsed and dispatched by `apps/cli/` into core services. Realm, Sou
 - Root orchestration: Bun workspaces and Turbo tasks in `package.json`; repository gates enforce dependency and architecture boundaries.
 - Runtime: core storage, schema, configuration, secrets, logging, networking, auth, and operation services under `packages/core/src/`.
 - External systems: Google OAuth/Gmail/Calendar, Microsoft OAuth/Graph Calendar and Outlook mailbox, and filesystem access under `packages/adapters/src/`.
-- Public extension boundary: `packages/extension-sdk/src/index.ts`, demonstrated by manifest-discoverable providerless `examples/tenders-extension/` and provider-backed `examples/issues-extension/` packages.
+- Public extension boundary: `packages/extension-sdk/src/index.ts`, demonstrated by the separately publishable providerless `examples/tenders-extension/` instant demo and provider-backed `examples/issues-extension/` package.
 
 ## Directory map
 
