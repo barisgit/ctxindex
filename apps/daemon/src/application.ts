@@ -180,6 +180,7 @@ export interface DaemonAccountService {
         prompt: OAuthAuthorizationResponsePrompt,
       ) => Promise<string | undefined>
     },
+    signal: AbortSignal,
   ) => Promise<{ readonly accountId: string }>
   readonly list: () => readonly AccountInventoryItem[]
   readonly remove: (label: string) => Promise<void>
@@ -312,7 +313,7 @@ function failure(error: unknown): RpcFailure {
       kind: 'ctxindex',
       taxonomy: 'auth',
       code: error.code,
-      message: 'The daemon could not complete the request.',
+      message: `OAuth authorization failed: ${error.code}`,
     }
   }
   if (error instanceof CtxindexSyncError) {
@@ -910,36 +911,40 @@ export class DaemonApplication implements DaemonRpcApplication {
       async (signal, emit) => {
         const service = this.#options.accountService
         if (!service) throw new Error('Account service missing')
-        return service.authorize(input, {
-          readAuthorizationResponse: async (prompt) => {
-            const requestId =
-              this.#options.createAuthorizationRequestId?.() ?? randomUUID()
-            if (this.#pendingAuthorizationResponses.has(requestId))
-              throw new Error('Authorization request id collision')
-            let settle!: (value: string | undefined) => void
-            const response = new Promise<string | undefined>((resolve) => {
-              settle = resolve
-            })
-            this.#pendingAuthorizationResponses.set(requestId, {
-              resolve: settle,
-            })
-            const finish = () => settle(undefined)
-            prompt.signal.addEventListener('abort', finish, { once: true })
-            signal.addEventListener('abort', finish, { once: true })
-            try {
-              await emit({
-                type: 'authorization.required',
-                requestId,
-                authorizationUrl: prompt.authorizationUrl,
+        return service.authorize(
+          input,
+          {
+            readAuthorizationResponse: async (prompt) => {
+              const requestId =
+                this.#options.createAuthorizationRequestId?.() ?? randomUUID()
+              if (this.#pendingAuthorizationResponses.has(requestId))
+                throw new Error('Authorization request id collision')
+              let settle!: (value: string | undefined) => void
+              const response = new Promise<string | undefined>((resolve) => {
+                settle = resolve
               })
-              return await response
-            } finally {
-              prompt.signal.removeEventListener('abort', finish)
-              signal.removeEventListener('abort', finish)
-              this.#pendingAuthorizationResponses.delete(requestId)
-            }
+              this.#pendingAuthorizationResponses.set(requestId, {
+                resolve: settle,
+              })
+              const finish = () => settle(undefined)
+              prompt.signal.addEventListener('abort', finish, { once: true })
+              signal.addEventListener('abort', finish, { once: true })
+              try {
+                await emit({
+                  type: 'authorization.required',
+                  requestId,
+                  authorizationUrl: prompt.authorizationUrl,
+                })
+                return await response
+              } finally {
+                prompt.signal.removeEventListener('abort', finish)
+                signal.removeEventListener('abort', finish)
+                this.#pendingAuthorizationResponses.delete(requestId)
+              }
+            },
           },
-        })
+          signal,
+        )
       },
     )
   }

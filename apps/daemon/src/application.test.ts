@@ -1179,7 +1179,7 @@ test('resource failures preserve every auth and sync taxonomy code through RPC',
       kind: 'ctxindex',
       taxonomy: 'auth',
       code,
-      message: 'The daemon could not complete the request.',
+      message: `OAuth authorization failed: ${code}`,
     })
   }
 

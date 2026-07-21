@@ -279,6 +279,26 @@ async function invoke<T>(
   return result
 }
 
+async function invokeOnce<T>(
+  signal: AbortSignal | undefined,
+  call: (client: DaemonClient, selection: DaemonSelection) => Promise<T>,
+  selection: DaemonSelection,
+  clientFactory: (selection: DaemonSelection) => DaemonClient = createClient,
+): Promise<T> {
+  try {
+    const result = await call(clientFactory(selection), selection)
+    if (signal?.aborted)
+      throw new DaemonCliError({
+        kind: 'cancelled',
+        code: 'cancelled',
+        message: 'The daemon request was cancelled.',
+      })
+    return result
+  } catch (error) {
+    throw invocationError(error, signal, selection)
+  }
+}
+
 export interface DaemonExportResult extends Omit<RpcExportResult, 'transfer'> {
   readonly bytes: Uint8Array
 }
@@ -560,13 +580,11 @@ export async function daemonAccountAdd(
   signal?: AbortSignal,
   services: DaemonAccountClientServices = defaultDaemonAccountClientServices,
 ): Promise<RpcAccountAddResult> {
-  const iterator = await invoke(
+  const iterator = await invokeOnce(
     signal,
-    () =>
-      services
-        .createClient(selection)
-        .account.add(input, requestOptions(signal)),
+    (client) => client.account.add(input, requestOptions(signal)),
     selection,
+    services.createClient,
   )
   let completed = false
   try {
@@ -596,17 +614,21 @@ export async function daemonAccountAdd(
       }
       if (winner.value !== undefined) {
         const responseValue = winner.value
-        await invoke(
-          signal,
-          () =>
-            services
-              .createClient(selection)
-              .account.respond(
+        try {
+          await invokeOnce(
+            signal,
+            (client) =>
+              client.account.respond(
                 { requestId, response: responseValue },
                 requestOptions(signal),
               ),
-          selection,
-        )
+            selection,
+            services.createClient,
+          )
+        } catch (error) {
+          if (!(error instanceof DaemonCliError && error.code === 'not_found'))
+            throw error
+        }
       }
       const result = await terminal
       if (!result.done)
@@ -667,11 +689,13 @@ export async function daemonOAuthAppAdd(
   selection: DaemonSelection,
   input: RpcOAuthAppAddInput,
   signal?: AbortSignal,
+  services: DaemonAccountClientServices = defaultDaemonAccountClientServices,
 ): Promise<RpcOAuthAppAddResult> {
-  return invoke(
+  return invokeOnce(
     signal,
     (client) => client.oauthApp.add(input, requestOptions(signal)),
     selection,
+    services.createClient,
   )
 }
 

@@ -118,7 +118,6 @@ test('OAuth App ownership conflict fails before Extension definition loading', a
 })
 
 test('OAuth App add reads invocation-current environment then uses the ensured daemon', async () => {
-  const loaded = await loadCliDefinitions()
   const output = spyOn(console, 'log').mockImplementation(() => {})
   const events: string[] = []
   try {
@@ -128,7 +127,9 @@ test('OAuth App add reads invocation-current environment then uses the ensured d
         acquireOwnership: () => {
           throw new Error('direct ownership acquired')
         },
-        loadDefinitions: async () => loaded,
+        loadDefinitions: async () => {
+          throw new Error('CLI registry composed')
+        },
         assertInitialized: async () => {
           events.push('initialized')
         },

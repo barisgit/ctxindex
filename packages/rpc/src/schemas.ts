@@ -430,6 +430,7 @@ export const rpcAccountAddInputSchema = z.strictObject({
   provider: identifierSchema,
   app: identifierSchema.optional(),
   label: identifierSchema.optional(),
+  loopbackTimeoutSeconds: z.number().finite().min(0).max(3_600).optional(),
 })
 export type RpcAccountAddInput = Readonly<
   z.infer<typeof rpcAccountAddInputSchema>

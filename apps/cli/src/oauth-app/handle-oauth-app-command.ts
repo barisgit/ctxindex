@@ -75,18 +75,6 @@ export async function handleOAuthAppCommand(
   process.once('SIGINT', cancel)
   try {
     if (services.selectDaemon) {
-      if (parsed.kind === 'add') {
-        const definitions = await services.loadDefinitions()
-        const provider = definitions.completeRegistry.providers.get(
-          parsed.provider,
-        )
-        if (!provider || provider.auth.kind !== 'oauth2') {
-          throw new CtxindexValidationError(
-            'invalid_oauth_selection',
-            `Unknown OAuth provider: ${parsed.provider}`,
-          )
-        }
-      }
       await services.assertInitialized()
       const daemon = await selectEnsuredDaemonRoute(
         {

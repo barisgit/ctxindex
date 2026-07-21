@@ -236,8 +236,14 @@ describe('Account and OAuth App wire values', () => {
         provider: 'google',
         app: 'desktop',
         label: 'personal',
+        loopbackTimeoutSeconds: 0.5,
       }),
-    ).toEqual({ provider: 'google', app: 'desktop', label: 'personal' })
+    ).toEqual({
+      provider: 'google',
+      app: 'desktop',
+      label: 'personal',
+      loopbackTimeoutSeconds: 0.5,
+    })
     expect(
       rpcAccountAddEventSchema.parse({
         type: 'authorization.required',

@@ -19,6 +19,7 @@ import {
   daemonExport,
   daemonFailureFromDeclaredError,
   daemonHealth,
+  daemonOAuthAppAdd,
   daemonSync,
   daemonTransferToFile,
   registerDaemonReconnect,
@@ -341,6 +342,104 @@ test('daemon Account add sends hidden input separately and races automatic loopb
       ),
     ).toEqual({ accountId: 'automatic-id' })
     expect(promptAborted).toBe(true)
+  } finally {
+    await setup.close()
+  }
+})
+
+test('daemon Account add never replays after a declared admission rejection', async () => {
+  const setup = await fixture()
+  let reconnects = 0
+  let calls = 0
+  const rejection: RpcFailure = {
+    kind: 'daemon_unavailable',
+    code: 'daemon_unavailable',
+    message: 'The daemon is stopping and is not accepting new work.',
+  }
+  try {
+    const base = selectDaemonForRuntime(setup.runtime, {
+      testEndpoint: '/tmp/ctxd-account-no-replay.sock',
+    }) as DaemonSelection
+    const selection = registerDaemonReconnect(base, async () => {
+      reconnects += 1
+      return { ...base, endpoint: '/tmp/ctxd-account-replacement.sock' }
+    })
+    await expect(
+      daemonAccountAdd(
+        selection,
+        { provider: 'google' },
+        {
+          emitAuthorizationUrl() {},
+          readAuthorizationResponse: async () => undefined,
+        },
+        undefined,
+        {
+          createClient: () => {
+            calls += 1
+            return {
+              account: {
+                add: async () => {
+                  throw new ORPCError(rejection.kind, {
+                    defined: true,
+                    message: rpcFailureRegistry[rejection.kind].message,
+                    data: rejection,
+                  })
+                },
+              },
+            } as unknown as DaemonClient
+          },
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'daemon_unavailable' })
+    expect(calls).toBe(1)
+    expect(reconnects).toBe(0)
+  } finally {
+    await setup.close()
+  }
+})
+
+test('daemon OAuth App add never replays secret-bearing config', async () => {
+  const setup = await fixture()
+  let reconnects = 0
+  let calls = 0
+  const rejection: RpcFailure = {
+    kind: 'daemon_unavailable',
+    code: 'daemon_unavailable',
+    message: 'The daemon is stopping and is not accepting new work.',
+  }
+  try {
+    const base = selectDaemonForRuntime(setup.runtime, {
+      testEndpoint: '/tmp/ctxd-oauth-app-no-replay.sock',
+    }) as DaemonSelection
+    const selection = registerDaemonReconnect(base, async () => {
+      reconnects += 1
+      return { ...base, endpoint: '/tmp/ctxd-oauth-app-replacement.sock' }
+    })
+    await expect(
+      daemonOAuthAppAdd(
+        selection,
+        { provider: 'google', label: 'desktop', config: { clientId: 'id' } },
+        undefined,
+        {
+          createClient: () => {
+            calls += 1
+            return {
+              oauthApp: {
+                add: async () => {
+                  throw new ORPCError(rejection.kind, {
+                    defined: true,
+                    message: rpcFailureRegistry[rejection.kind].message,
+                    data: rejection,
+                  })
+                },
+              },
+            } as unknown as DaemonClient
+          },
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'daemon_unavailable' })
+    expect(calls).toBe(1)
+    expect(reconnects).toBe(0)
   } finally {
     await setup.close()
   }

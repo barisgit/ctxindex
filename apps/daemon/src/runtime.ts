@@ -13,6 +13,7 @@ import {
 import {
   type CtxindexConfig,
   readConfig,
+  readEnvironmentVariable,
   writeConfig,
 } from '@ctxindex/core/config'
 import { DirectExtensionStore } from '@ctxindex/core/direct-extension'
@@ -362,7 +363,7 @@ async function productionServices(input: {
       `Then authorize with: bun cli account add ${providerId} --app ${label}`,
     ].join('. ')
   const daemonAccountService: DaemonAccountService = {
-    authorize: async (accountInput, interaction) => {
+    authorize: async (accountInput, interaction, signal) => {
       resolveOAuthSelection(input.completeRegistry, accountInput.provider)
       let appLabel = accountInput.app
       if (appLabel === undefined) {
@@ -428,6 +429,15 @@ async function productionServices(input: {
             return app
           },
           readAuthorizationResponse: interaction.readAuthorizationResponse,
+          signal,
+          launchBrowser: () => {},
+          readEnvironment: (name) =>
+            name === 'CTXINDEX_NO_BROWSER'
+              ? '1'
+              : name === 'CTXINDEX_LOOPBACK_TIMEOUT_SECS' &&
+                  accountInput.loopbackTimeoutSeconds !== undefined
+                ? String(accountInput.loopbackTimeoutSeconds)
+                : readEnvironmentVariable(name),
         },
       )
       return { accountId: result.accountId }

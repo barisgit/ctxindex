@@ -1,4 +1,5 @@
 import { authorizeProvider, resolveOAuthSelection } from '@ctxindex/core/auth'
+import { readEnvironmentVariable } from '@ctxindex/core/config'
 import { CtxindexValidationError } from '@ctxindex/core/errors'
 import {
   type ManagedOAuthAppPolicy,
@@ -169,12 +170,18 @@ export async function handleAccountCommand(
         )
         console.log(formatAccountRemoved(parsed.label))
       } else {
+        const timeout = Number(
+          readEnvironmentVariable('CTXINDEX_LOOPBACK_TIMEOUT_SECS'),
+        )
         const result = await (runtime.daemonAccountAdd ?? daemonAccountAdd)(
           daemon,
           {
             provider: parsed.provider,
             ...(parsed.app === undefined ? {} : { app: parsed.app }),
             ...(parsed.label === undefined ? {} : { label: parsed.label }),
+            ...(Number.isFinite(timeout) && timeout >= 0 && timeout <= 3_600
+              ? { loopbackTimeoutSeconds: timeout }
+              : {}),
           },
           {
             emitAuthorizationUrl: (url) => console.log(`Open this URL: ${url}`),
