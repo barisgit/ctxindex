@@ -13,7 +13,7 @@ Use `ctxindex` with an installed binary. From the repository root during develop
 
 There is no ctxindex MCP server. The CLI already provides the properties an agent integration needs:
 
-- deterministic commands and `--json` output;
+- deterministic commands, escaped low-token text, and compact `--json` output;
 - stable exit codes for branching and recovery;
 - one provider-neutral vocabulary across mail, calendars, files, and extension-defined domains;
 - registry-derived descriptions of loaded Profiles, Source Adapters, fields, formats, and Actions.
@@ -112,9 +112,15 @@ ctxindex action run communication.message.draft.create \
 
 Reply Draft updates require the complete local Draft and parent in that Source and must repeat the Draft's immutable `replyToRef`. The reply update branch accepts exactly `{ref, replyToRef, bodyText}`; it does not accept recipient or subject overrides. See [Mail workflows](/docs/guides/mail-workflows#update-an-existing-draft) for both complete update shapes.
 
+## Choose output for the consumer
+
+Use `--format text` when an agent benefits from fewer repeated JSON keys: collections are escaped TSV and `get` is a complete labeled Resource envelope with compact nested payload JSON. Use `--json` (shorthand for `--format json`) when the caller needs typed structured fields. Omitted output selection is destination-aware: pretty on a TTY, text through a pipe. Never combine `--json` and `--format`.
+
+Pretty output is terminal-width-aware and switches long rows, including Microsoft message Refs, to vertical cards without ellipsizing values. Refs remain opaque and copyable in every mode.
+
 ## Agent execution rules
 
-- Request `--json` on commands that expose it, and parse the JSON instead of scraping human output.
+- Select `--format text` for deterministic low-token reads or `--json` for typed envelopes; never scrape pretty output.
 - Check the process exit code before consuming output.
 - Keep Source selection explicit for Actions.
 - Preserve per-origin warnings from search; one provider failure can coexist with valid results from other origins.

@@ -8,6 +8,7 @@ import {
 } from '../args/source'
 import { defineCtxCommand } from '../command-model'
 import { runWithExit } from '../format/exit'
+import { resolveOutputFormat } from '../format/output'
 import {
   defaultSourceCommandDeps,
   handleSourceCommand,
@@ -66,7 +67,7 @@ export function createSourceCommandRuntime(
         run: ({ args }) =>
           runWithExit(async () =>
             handleSourceCommand(
-              { kind: 'list', args },
+              { kind: 'list', args, format: resolveOutputFormat(args) },
               await route(),
               services,
             ),

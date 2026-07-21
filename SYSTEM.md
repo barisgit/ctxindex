@@ -4,7 +4,7 @@
 >
 > **Last refreshed:** 2026-07-21
 >
-> **Sources consulted for this refresh:** `CONTEXT.md`; the current `cli-surface`, `documentation-consumption`, `extension-documentation`, `extension-installation`, `extension-catalogs`, and `extension-loading` capability specs; their present implementation sidecars; the active `unify-cli-command-model` and `rebuild-product-extension-sdk-docs` implementation artifacts; and affected CLI, core, web, and Extension codemaps. Canonical capability specs take precedence over older pre-alpha interface listings. Section 13 retains the full source map.
+> **Sources consulted for this refresh:** `CONTEXT.md`; the current `cli-surface`, `search-routing`, `documentation-consumption`, `extension-documentation`, `extension-installation`, `extension-catalogs`, and `extension-loading` capability specs; their present implementation sidecars; the active `unify-cli-output-formats`, `unify-cli-command-model`, and `rebuild-product-extension-sdk-docs` artifacts; and affected CLI, core, web, and Extension codemaps. Canonical capability specs take precedence over older pre-alpha interface listings. Section 13 retains the full source map.
 
 ## 1. 10-minute tour
 
@@ -52,6 +52,8 @@ To exercise the prototype, initialize before starting it, then run `bun cli daem
 
 Expected output shapes, omitting generated ids and timestamps:
 
+Structured reads accept `--format pretty|text|json`: omission selects width-aware pretty output on an interactive terminal and deterministic escaped text through a pipe. `--json` is shorthand for compact JSON. Long Refs remain complete, and `get` carries the full Resource envelope and payload in every mode.
+
 | Command | Shape and meaning |
 | --- | --- |
 | `init` | Readable initialization confirmation. It creates no implicit Realm. |
@@ -97,7 +99,7 @@ ctxindex is a **local personal-context gateway** with four operations over the s
 
 This is a deterministic access model, not a canonical database. A Ref survives synced, remote, cached, and temporarily unavailable states.
 
-The CLI is the sole agent integration surface. Agents compose generic commands with `--json`; loaded registries define valid kinds, fields, Source options, exports, and Actions. The private local RPC boundary is application plumbing, not a public API or an alternative agent interface. There is no provider-specific command family, SaaS canonical store, workflow-policy engine, arbitrary Extension command surface, or MCP server in the current product.
+The CLI is the sole agent integration surface. Agents compose generic commands with escaped low-token text or compact `--json`; loaded registries define valid kinds, fields, Source options, exports, and Actions. The private local RPC boundary is application plumbing, not a public API or an alternative agent interface. There is no provider-specific command family, SaaS canonical store, workflow-policy engine, arbitrary Extension command surface, or MCP server in the current product.
 
 The public landing and documentation web surface is a non-normative projection of those contracts. Documentation pages are prerendered, while site search needs a compatible Next.js server or serverless runtime. The site stores no ctxindex user or provider state and does not operate a hosted Extension marketplace. The current Marketplace is a local deterministic search over configured Catalog snapshots, not a hosted registry.
 
@@ -294,11 +296,13 @@ Managed runnable bytes are content-addressed beneath the data directory, and abs
 
 The CLI is deterministic and non-interactive. Input comes from non-secret flags, declared environments, typed references, files, or declared stdin. Missing input fails instead of prompting. The only interactive surface is a browser in an explicitly requested OAuth loopback.
 
-Readable output is compact; JSON goes to stdout and diagnostics to stderr. Registry-backed `describe` owns fields, formats, config flags, OAuth declarations, and Action schemas, avoiding duplicated help. The same Citty definitions own parsing, complete-path `--help`, constrained values, and the generated web CLI reference.
+The launch-critical structured reads—search, get, status, and Source, Realm, Account, OAuth App, and Extension inventories—share `--format pretty|text|json`. Omission selects width-aware `cli-table3` tables or vertical cards on a TTY and deterministic escaped TSV or labeled complete Resource text otherwise. Values are not ellipsized; this keeps long provider Refs copyable. `--json` is shorthand for compact JSON and conflicts with explicit `--format`. Pretty/text warnings go only to stderr, while JSON result envelopes retain their warnings on stdout.
+
+Profile `export --format` and reference-oriented `describe --format` retain separate format semantics. Sync still uses summary/events/compact/JSON while streaming responses are integrated; that follow-up is expected to map human progress to pretty, deterministic line-oriented events to text, and structured events plus a terminal result to JSON. Registry-backed `describe` owns fields, formats, config flags, OAuth declarations, and Action schemas, avoiding duplicated help. The same Citty definitions own parsing, complete-path `--help`, constrained values, and the generated web CLI reference.
 
 `docs list|get|search` reads a bounded build-time product documentation bundle plus loaded Extension documentation without the web runtime or network. Markdown remains inert text, binary assets require an explicit output path, and loaded schema truth still comes from `describe`.
 
-Generic verbs cover initialization, OAuth App/Account/Realm/Source management, sync, search, get, threads, Artifacts, exports, Actions, status, purge, Extensions, secrets, and bundled skills. OAuth lifecycle grammar includes `oauth-app add <provider> <label> --from-env`, `oauth-app list [--json]`, `oauth-app remove <provider> <label>`, and `account add <provider> [--app <label>] [--label <label>]`; there is no `client` alias or literal-config argument. Omitted App selection is restricted to exact managed policy, while explicit labels remain exact and deterministic. Search help exposes local offsets and exact-Source remote continuation without provider-specific commands. Bundled skills provide concise orientation to what ctxindex is, when to use it, and the live discovery surfaces; generated help and loaded-definition output remain authoritative for interface facts.
+Generic verbs cover initialization, OAuth App/Account/Realm/Source management, sync, search, get, threads, Artifacts, exports, Actions, status, purge, Extensions, secrets, and bundled skills. OAuth lifecycle grammar includes `oauth-app add <provider> <label> --from-env`, `oauth-app list [--format pretty|text|json] [--json]`, `oauth-app remove <provider> <label>`, and `account add <provider> [--app <label>] [--label <label>]`; there is no `client` alias or literal-config argument. Omitted App selection is restricted to exact managed policy, while explicit labels remain exact and deterministic. Search help exposes local offsets and exact-Source remote continuation without provider-specific commands. Merged multi-Source search has no global continuation; a truncation warning names the exact Source that must be selected for a resumable rerun. Bundled skills provide concise orientation to what ctxindex is, when to use it, and the live discovery surfaces; generated help and loaded-definition output remain authoritative for interface facts.
 
 The active prototype adds `daemon serve`, `daemon health`, and `daemon shutdown`. Serve is foreground-only; health and shutdown support readable and JSON output. Realm add/list, Source add/list/remove, sync/status, search, exact get, and local thread traversal are daemon-routed business commands. Validated discovery metadata for the exact canonical runtime tuple selects RPC; after selection, stale metadata, an unreachable socket, or a lost connection returns `daemon_unavailable` with no direct-storage fallback. Without a selector, these commands keep their direct path after shared database-lease acquisition.
 
@@ -329,6 +333,7 @@ Sync Run history records `completed`, `cancelled` for cancellation, and `failed`
 - Profile expressibility does not equal complete bundled provider coverage for tasks, files, communication, or arbitrary Extension domains.
 - Full-text search is baseline; semantic/vector search, watch/notifications, and mature quota policy are optional or deferred.
 - Multi-Source remote continuation and mixed-search offset pagination are unsupported; resumable remote pagination requires one exact Source.
+- Sync output has not yet joined the shared structured read modes; streaming integration owns that mapping.
 - `resync` and `diff` depend on Adapter support; `sync` is baseline.
 - Cached Artifact bytes have one retention class and no automatic eviction. Raw provider payloads are optional and off by default.
 - External Extensions are trusted in-process bundled, explicit-path, or generically installed npm/Git/local package code; a Catalog may curate either literal roots from its author package or exact package descriptors. Sandboxing, ambient/undeclared discovery, startup refresh or repair, arbitrary commands, private/credentialed or SSH Catalog repositories, nested Catalog values, submodules, Git LFS, lifecycle scripts, unsafe/unsupported lock protocols, polling, and non-TypeScript/out-of-process Adapters are unsupported. Versioned Catalog selectors are invalid. Package dependencies used by an acquired package remain ordinary imports; ctxindex has no Extension dependency graph.
@@ -347,7 +352,7 @@ Sync Run history records `completed`, `cancelled` for cancellation, and `failed`
 
 ## 13. Source index
 
-The durable package-backed Catalog behavior now lives in the canonical `cli-surface`, `extension-catalogs`, `extension-installation`, and `extension-loading` specs. The still-active `add-package-backed-catalog-authoring` implementation sidecar supplements Sections 1–5 and 10–12 with non-normative ownership and seam detail; it does not override those specs. Active `provide-official-oauth-apps` evidence supplements Sections 1, 3–6, 8, 11, and 12 while live provider verification remains pending. Active `prototype-local-daemon-orpc` evidence supplements every affected row below, and `promote-local-daemon-architecture` records the remaining gates before that prototype can become the normal stateful runtime.
+The durable package-backed Catalog behavior now lives in the canonical `cli-surface`, `extension-catalogs`, `extension-installation`, and `extension-loading` specs. The active `unify-cli-output-formats` proposal, CLI/Search deltas, design, and implementation artifact supplement Sections 1, 2, 7, 11, and 12 until archive. The still-active `add-package-backed-catalog-authoring` implementation sidecar supplements Sections 1–5 and 10–12 with non-normative ownership and seam detail; it does not override those specs. Active `provide-official-oauth-apps` evidence supplements Sections 1, 3–6, 8, 11, and 12 while live provider verification remains pending. Active `prototype-local-daemon-orpc` evidence supplements every affected row below, and `promote-local-daemon-architecture` records the remaining gates before that prototype can become the normal stateful runtime.
 
 Capability specifications are normative. Sidecars, codemaps, and design/skill documents explain intended implementation, structure, and rationale. The exact sources below cover the canonical capability specs and sidecars present on 2026-07-20. For this refresh, the older CLI/Catalog sidecar listings were consulted but not treated as current where they conflict with the canonical specs; `openspec/changes/add-package-backed-catalog-authoring/implementation.md` and the affected codemaps supplied the current non-normative ownership model.
 

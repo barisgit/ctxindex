@@ -17,10 +17,17 @@ The CLI is the integration surface: any code-executing agent can use ctxindex
 with zero integration work. Codex CLI, OpenClaw, Claude Code, and similar
 agents compose `search`, `get`, `thread`, `export`, and `action` directly from
 a shell, including from Hermes-driven OpenClaw sessions. There is no MCP
-server and none is required; deterministic commands, `--json` output, and
-stable exit codes are the contract. ctxindex was originally built to give a
+server and none is required; deterministic commands, low-token `--format text`,
+compact `--json` output, and stable exit codes are the contract. ctxindex was originally built to give a
 personal OpenClaw agent governed, realm-scoped access to mail and calendar
 across multiple accounts.
+
+Structured reads accept `--format pretty|text|json`. With no format flag, an
+interactive terminal gets width-aware pretty output and a pipe gets escaped
+TSV or labeled complete text. `--json` remains shorthand for `--format json`;
+do not combine the two. `get` includes the complete Resource envelope and
+payload in every structured mode. Profile-defined `export --format` and
+reference-oriented `describe --format` are separate format domains.
 
 V1 and V1.1 are shipped. The project remains pre-alpha but functional: it provides multi-provider mail and calendar workflows through `search`, `sync`, `get`, `thread`, and `export`, plus reversible Draft actions. The implementation receives no schema or CLI compatibility treatment until a released version creates that obligation. Current behavior is owned by the capability specs under `openspec/specs/`; use `openspec list` for the authoritative active-change inventory.
 

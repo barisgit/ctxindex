@@ -43,7 +43,7 @@ test('selected daemon handles Realm list with unchanged JSON formatting', async 
   })
   try {
     const exit = await handleRealmCommand(
-      { kind: 'list', json: true },
+      { kind: 'list', format: 'json' },
       {
         selectDaemon: () => ({}) as never,
         realmAdd: async () => ({ realmId: 'unused' }),

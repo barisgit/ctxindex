@@ -1,6 +1,11 @@
 import { describe, expect, spyOn, test } from 'bun:test'
 import type { SourceResourceResult } from '@ctxindex/core/source'
-import { formatGetJson, formatGetText, handleGetCommand } from './get'
+import {
+  formatGetJson,
+  formatGetPretty,
+  formatGetText,
+  handleGetCommand,
+} from './get'
 
 const result: SourceResourceResult = {
   resource: {
@@ -30,16 +35,22 @@ describe('get output', () => {
     )
   })
 
-  test('formats concise text', () => {
-    expect(formatGetText(result)).toBe(
-      'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/item/one\tTitle',
-    )
+  test('formats the complete Resource envelope and payload as labeled text', () => {
+    const text = formatGetText(result)
+    expect(text).toContain('ref\tctx://01KXHBNECDAH1T4MJ38X88EPFJ/item/one')
+    expect(text).toContain('profile\t{"id":"fake.item","version":1}')
+    expect(text).toContain('payload\t{"text":"body"}')
+    expect(text).toContain('hydratedAt\t789')
+  })
+
+  test('pretty output includes the complete payload', () => {
+    expect(formatGetPretty(result)).toContain('{"text":"body"}')
   })
 
   test('returns exit 2 for an invalid Ref before opening dependencies', async () => {
     const error = spyOn(console, 'error').mockImplementation(() => {})
 
-    expect(await handleGetCommand({ ref: 'not-a-ref', json: false })).toBe(2)
+    expect(await handleGetCommand({ ref: 'not-a-ref', format: 'text' })).toBe(2)
     expect(error).toHaveBeenCalledWith('get: invalid <ref>: not-a-ref')
     error.mockRestore()
   })
@@ -49,7 +60,7 @@ describe('get output', () => {
     let opened = false
     try {
       const exit = await handleGetCommand(
-        { ref: result.resource.ref, json: true },
+        { ref: result.resource.ref, format: 'json' },
         {
           selectDaemon: () => ({}) as never,
           get: async () => result as never,
@@ -67,11 +78,45 @@ describe('get output', () => {
     }
   })
 
+  test('JSON keeps warnings in stdout without duplicating them on stderr', async () => {
+    const log = spyOn(console, 'log').mockImplementation(() => {})
+    const error = spyOn(console, 'error').mockImplementation(() => {})
+    const warned = {
+      ...result,
+      warnings: [
+        {
+          code: 'degraded',
+          message: 'partial metadata',
+          ref: result.resource.ref,
+        },
+      ],
+    }
+    try {
+      expect(
+        await handleGetCommand(
+          { ref: result.resource.ref, format: 'json' },
+          {
+            selectDaemon: () => ({}) as never,
+            get: async () => warned as never,
+            open: async () => {
+              throw new Error('direct dependencies opened')
+            },
+          },
+        ),
+      ).toBe(0)
+      expect(log).toHaveBeenCalledWith(formatGetJson(warned))
+      expect(error).not.toHaveBeenCalled()
+    } finally {
+      log.mockRestore()
+      error.mockRestore()
+    }
+  })
+
   test('direct get normalizes SIGINT to cancelled before local retrieval', async () => {
     const error = spyOn(console, 'error').mockImplementation(() => {})
     try {
       const exit = await handleGetCommand(
-        { ref: result.resource.ref, json: false },
+        { ref: result.resource.ref, format: 'text' },
         {
           selectDaemon: () => null,
           get: async () => {

@@ -16,6 +16,7 @@ import {
 import { formatDirectExtensionUninstall } from '../format/direct-extension'
 import { mapErrorToExit } from '../format/exit'
 import { formatExtensionLifecycle } from '../format/extension-lifecycle'
+import type { OutputFormat } from '../format/output'
 import { formatExtensions } from '../format/registry'
 import {
   createExtensionCommandServices,
@@ -36,7 +37,7 @@ export async function runWithSigintCancellation<T>(
 }
 
 export type ExtensionCommandInput =
-  | { readonly kind: 'list'; readonly json: boolean }
+  | { readonly kind: 'list'; readonly format: OutputFormat }
   | {
       readonly kind: 'catalog-build'
       readonly packageRoot: string
@@ -113,7 +114,7 @@ export async function handleExtensionsCommand(
         console.log(
           formatExtensions(
             loaded.registry,
-            parsed.json,
+            parsed.format,
             loaded.provenance,
             await services.direct.list(),
           ),

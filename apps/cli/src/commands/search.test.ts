@@ -1,6 +1,13 @@
 import { describe, expect, spyOn, test } from 'bun:test'
 import { SearchPlanner } from '@ctxindex/core/search'
-import { formatSearchJson, handleSearchCommand } from './search'
+import {
+  formatSearchJson,
+  formatSearchPretty,
+  formatSearchText,
+  handleSearchCommand,
+} from './search'
+
+const longRef = `ctx://source/message/${'immutable-id'.repeat(20)}`
 
 describe('search JSON output', () => {
   test('uses the unified deterministic result envelope', () => {
@@ -38,6 +45,28 @@ describe('search JSON output', () => {
     )
   })
 
+  test('keeps long Refs complete in text and narrow pretty output', () => {
+    const result = {
+      results: [
+        {
+          ref: longRef,
+          profile: { id: 'communication.message', version: 1 },
+          sourceId: 'source',
+          origin: 'provider' as const,
+          originRank: 0,
+          title: 'FedEx',
+          summary: null,
+          occurredAt: null,
+          chunks: [],
+        },
+      ],
+      warnings: [],
+    }
+    expect(formatSearchText(result)).toContain(longRef)
+    expect(formatSearchPretty(result, { columns: 40 })).toContain(longRef)
+    expect(formatSearchPretty(result, { columns: 40 })).not.toContain('…')
+  })
+
   test('selected daemon search preserves output without opening direct dependencies', async () => {
     const log = spyOn(console, 'log').mockImplementation(() => {})
     let opened = false
@@ -45,7 +74,7 @@ describe('search JSON output', () => {
       const exit = await handleSearchCommand(
         {
           input: { text: 'needle' },
-          json: true,
+          format: 'json',
           refs: false,
         },
         {
@@ -74,6 +103,39 @@ describe('search JSON output', () => {
     }
   })
 
+  test('JSON search warnings stay only in the stdout envelope', async () => {
+    const log = spyOn(console, 'log').mockImplementation(() => {})
+    const error = spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      expect(
+        await handleSearchCommand(
+          { input: { text: 'needle' }, format: 'json', refs: false },
+          {
+            selectDaemon: () => ({}) as never,
+            search: async () => ({
+              results: [],
+              warnings: [
+                {
+                  sourceId: 'source',
+                  code: 'degraded',
+                  message: 'provider unavailable',
+                },
+              ],
+            }),
+            open: async () => {
+              throw new Error('direct dependencies opened')
+            },
+          },
+        ),
+      ).toBe(0)
+      expect(String(log.mock.calls[0]?.[0])).toContain('"warnings"')
+      expect(error).not.toHaveBeenCalled()
+    } finally {
+      log.mockRestore()
+      error.mockRestore()
+    }
+  })
+
   test('direct remote search without Source selectors forwards SIGINT and exits cancelled', async () => {
     const error = spyOn(console, 'error').mockImplementation(() => {})
     const search = spyOn(SearchPlanner.prototype, 'search').mockImplementation(
@@ -87,7 +149,7 @@ describe('search JSON output', () => {
       const exit = await handleSearchCommand(
         {
           input: { text: 'needle', remote: true },
-          json: false,
+          format: 'text',
           refs: false,
         },
         {

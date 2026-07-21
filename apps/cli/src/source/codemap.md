@@ -14,7 +14,7 @@ Orchestrates typed Source add/list/remove execution and provider-scoped Account/
 
 ## Data & control flow
 
-Typed Citty values enter through `SourceCommandInput`. Add normalization in `args/source.ts` maps generated config flags to JSON before transport; the handler delegates the same Realm, label, Account selector, routing, and sync policy across the selected daemon or direct boundary. Invocation cleanup closes dependencies and releases any retained direct owner even when dynamic validation prevents execution.
+Typed Citty values enter through `SourceCommandInput`. Add normalization in `args/source.ts` maps generated config flags to JSON before transport; list resolves the shared pretty/text/json mode before route acquisition. The handler delegates the same Realm, label, Account selector, routing, and sync policy across the selected daemon or direct boundary. Invocation cleanup closes dependencies and releases any retained direct owner even when dynamic validation prevents execution.
 
 ## Integration points
 

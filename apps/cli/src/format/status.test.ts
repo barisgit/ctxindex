@@ -19,23 +19,16 @@ const row: StatusRow = {
   cursor: { page: 3 },
 }
 
-test('status output projects availability only for text display', () => {
-  expect(JSON.parse(formatStatus([row], { json: true }))).toEqual([row])
-  expect(formatStatus([row], { json: false, format: 'compact' })).toContain(
-    'status=extension_unavailable',
+test('status output preserves complete diagnostics across shared modes', () => {
+  expect(JSON.parse(formatStatus([row], 'json'))).toEqual([row])
+  expect(formatStatus([row], 'text')).toContain('extension_unavailable')
+  expect(formatStatus([row], 'text')).toContain(
+    'provider returned partial data',
   )
-  expect(formatStatus([row], { json: false, format: 'compact' })).toContain(
-    'warnings=2 warning=degraded:provider_returned_partial_data errors=1',
-  )
-  expect(formatStatus([row], { json: false })).toContain(
-    'extension_unavailable',
-  )
-  expect(formatStatus([row], { json: false })).toContain(
-    'warnings=2\tdegraded: provider returned partial data\terrors=1',
-  )
+  expect(formatStatus([row], 'pretty')).toContain('adapter unavailable')
 })
 
-test('compact status output normalizes whitespace in warning refs', () => {
+test('text status output escapes whitespace without losing warning refs', () => {
   expect(
     formatStatus(
       [
@@ -48,9 +41,7 @@ test('compact status output normalizes whitespace in warning refs', () => {
           },
         },
       ],
-      { json: false, format: 'compact' },
+      'text',
     ),
-  ).toContain(
-    'warning=degraded:partial_response:ref=ctx://source-1/records/with_whitespace',
-  )
+  ).toContain('ctx://source-1/records/with whitespace')
 })

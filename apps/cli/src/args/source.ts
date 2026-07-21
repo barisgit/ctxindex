@@ -1,5 +1,6 @@
 import { compareStrings, type SourceDescription } from '@ctxindex/core/registry'
 import type { CtxParsedArgs } from '../command-model'
+import { structuredOutputArgs } from '../format/output'
 
 export type SourceArgumentDescription = Pick<SourceDescription, 'id'> & {
   readonly configOptions: readonly {
@@ -55,13 +56,7 @@ export const sourceAddBaseArgs = {
 
 export const sourceListArgs = {
   realm: { type: 'string', description: 'Realm slug' },
-  format: {
-    type: 'enum',
-    options: ['table', 'compact'] as ['table', 'compact'],
-    default: 'table',
-    description: 'Output format',
-  },
-  json: { type: 'boolean', description: 'Print JSON' },
+  ...structuredOutputArgs,
 } as const
 
 export const sourceRemoveArgs = {

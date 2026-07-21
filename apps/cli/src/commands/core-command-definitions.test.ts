@@ -75,8 +75,8 @@ test('core command definitions own required arguments and bounded choices', asyn
     expect.objectContaining({
       name: 'format',
       type: 'enum',
-      choices: ['summary', 'compact'],
-      defaultValue: 'summary',
+      choices: ['pretty', 'text', 'json'],
+      required: false,
     }),
   )
   expect(commands.get('ctxindex sync')?.arguments).toContainEqual(

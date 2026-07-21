@@ -73,3 +73,18 @@ for (const args of [
     expect(await runCli([...args])).toBe(2)
   })
 }
+
+test('rejects --json with --format before initialization or command effects', async () => {
+  const error = spyOn(console, 'error').mockImplementation(() => {})
+
+  expect(
+    await runCli([
+      'get',
+      'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/item/one',
+      '--json',
+      '--format',
+      'json',
+    ]),
+  ).toBe(2)
+  expect(error).toHaveBeenCalledWith('cannot combine --json with --format')
+})

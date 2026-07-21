@@ -16,6 +16,7 @@ import {
   formatAccountRemoved,
 } from '../format/account'
 import { mapErrorToExit } from '../format/exit'
+import type { OutputFormat } from '../format/output'
 
 export interface AccountCommandRuntime {
   readonly assertInitialized: typeof assertInitialized
@@ -32,7 +33,7 @@ export type AccountCommandInput =
       readonly label?: string
       readonly app?: string
     }
-  | { readonly kind: 'list'; readonly json: boolean }
+  | { readonly kind: 'list'; readonly format: OutputFormat }
   | { readonly kind: 'remove'; readonly label: string }
 
 const accountCommandRuntime: AccountCommandRuntime = {
@@ -112,7 +113,7 @@ export async function handleAccountCommand(
       console.log(
         formatAccountInventory(
           deps.accountService.listAccountInventory(),
-          parsed.json,
+          parsed.format,
         ),
       )
     } else if (parsed.kind === 'remove') {

@@ -36,7 +36,7 @@ describe('search CLI arguments', () => {
         '--json',
       ]),
     ).toEqual({
-      json: true,
+      format: 'json',
       refs: false,
       input: {
         text: 'project',
@@ -56,7 +56,7 @@ describe('search CLI arguments', () => {
     expect(
       await resolve(['--realm', 'work', '--limit', '20', '--json']),
     ).toEqual({
-      json: true,
+      format: 'json',
       refs: false,
       input: { realms: ['work'], limit: 20 },
     })

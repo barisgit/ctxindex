@@ -1,23 +1,21 @@
 import { parseRef } from '@ctxindex/core'
-import {
-  getSourceResource,
-  type SourceResourceResult,
-} from '@ctxindex/core/source'
-import type { RpcResourceGetResult } from '@ctxindex/rpc'
+import { getSourceResource } from '@ctxindex/core/source'
 import { defineCtxCommand } from '../command-model'
 import { daemonResourceGet, selectDaemon } from '../daemon/client'
 import { openDeps } from '../deps'
 import { mapErrorToExit, runWithExit } from '../format/exit'
+import {
+  type OutputFormat,
+  resolveOutputFormat,
+  structuredOutputArgs,
+} from '../format/output'
+import {
+  formatGetJson,
+  formatGetPretty,
+  formatGetText,
+} from '../format/resource'
 
-type GetResult = SourceResourceResult | RpcResourceGetResult
-
-export function formatGetJson(result: GetResult): string {
-  return JSON.stringify(result)
-}
-
-export function formatGetText(result: GetResult): string {
-  return `${result.resource.ref}${result.resource.title ? `\t${result.resource.title}` : ''}`
-}
+export { formatGetJson, formatGetPretty, formatGetText }
 
 export interface GetCommandDeps {
   readonly selectDaemon: typeof selectDaemon
@@ -25,9 +23,9 @@ export interface GetCommandDeps {
   readonly open: typeof openDeps
 }
 
-export interface GetCommandInput {
+export type GetCommandInput = {
   readonly ref: string
-  readonly json: boolean
+  readonly format: OutputFormat
 }
 
 const defaultDeps: GetCommandDeps = {
@@ -69,9 +67,17 @@ export async function handleGetCommand(
           controller.signal.throwIfAborted()
           return directResult
         })()
-    console.log(parsed.json ? formatGetJson(result) : formatGetText(result))
-    for (const warning of result.warnings) {
-      console.error(`${warning.code}\t${warning.message}`)
+    console.log(
+      parsed.format === 'json'
+        ? formatGetJson(result)
+        : parsed.format === 'pretty'
+          ? formatGetPretty(result)
+          : formatGetText(result),
+    )
+    if (parsed.format !== 'json') {
+      for (const warning of result.warnings) {
+        console.error(`${warning.code}\t${warning.message}`)
+      }
     }
     return 0
   } catch (error) {
@@ -87,10 +93,10 @@ export const getCommand = defineCtxCommand({
   meta: { name: 'get', description: 'Get a Resource by exact Ref.' },
   args: {
     ref: { type: 'positional', required: true, description: 'Resource Ref' },
-    json: { type: 'boolean', description: 'Print deterministic JSON' },
+    ...structuredOutputArgs,
   },
   run: ({ args }) =>
     runWithExit(() =>
-      handleGetCommand({ ref: args.ref, json: args.json ?? false }),
+      handleGetCommand({ ref: args.ref, format: resolveOutputFormat(args) }),
     ),
 })

@@ -1,5 +1,6 @@
 import { defineCtxCommand } from '../command-model'
 import { runWithExit } from '../format/exit'
+import { resolveOutputFormat, structuredOutputArgs } from '../format/output'
 import { handleOAuthAppCommand } from '../oauth-app/handle-oauth-app-command'
 
 export const oauthAppCommand = defineCtxCommand({
@@ -30,10 +31,13 @@ export const oauthAppCommand = defineCtxCommand({
     }),
     list: defineCtxCommand({
       meta: { name: 'list', description: 'List available OAuth Apps.' },
-      args: { json: { type: 'boolean', description: 'Output JSON' } },
+      args: structuredOutputArgs,
       run: ({ args }) =>
         runWithExit(() =>
-          handleOAuthAppCommand({ kind: 'list', json: args.json ?? false }),
+          handleOAuthAppCommand({
+            kind: 'list',
+            format: resolveOutputFormat(args),
+          }),
         ),
     }),
     remove: defineCtxCommand({

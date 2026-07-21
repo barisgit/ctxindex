@@ -42,6 +42,7 @@ let releaseBarrier: (() => void) | undefined
 let continuationSource: string | undefined
 let validationFailureSource: string | undefined
 let continuationValidationFailureSource: string | undefined
+let truncatedSource: string | undefined
 
 const profile = defineProfile({
   id: 'fake.item',
@@ -118,7 +119,15 @@ async function remote({ source, query, signal }: SearchContext) {
         payload: { title: query.text, sender: ['alice@example.com'] },
       },
     ],
-    warnings: [],
+    warnings:
+      source.id === truncatedSource
+        ? [
+            {
+              code: 'truncated',
+              message: 'resume with the returned continuation',
+            },
+          ]
+        : [],
     ...(source.id === continuationSource && query.continuation === undefined
       ? { continuation: 'adapter-next-page' }
       : {}),
@@ -247,6 +256,7 @@ afterEach(() => {
   continuationSource = undefined
   validationFailureSource = undefined
   continuationValidationFailureSource = undefined
+  truncatedSource = undefined
   for (const db of dbs.splice(0)) db.close()
 })
 
@@ -639,6 +649,27 @@ describe('SearchPlanner', () => {
       service.search({ remote: true, includeDeleted: true }),
     ).rejects.toMatchObject({ code: 'invalid_filter' })
     expect(calls).toHaveLength(2)
+  })
+
+  test('replaces unusable multi-Source continuation guidance with an exact Source rerun', async () => {
+    const db = await database()
+    addSource(db, ids.federated, 'fake.federated')
+    addSource(db, ids.federated2, 'fake.federated')
+    truncatedSource = ids.federated
+    continuationSource = ids.federated
+
+    const result = await planner(db).search({
+      text: 'shipment',
+      remote: true,
+      sourceIds: [ids.federated, ids.federated2],
+    })
+
+    expect(result.pagination).toBeUndefined()
+    expect(result.warnings).toContainEqual({
+      sourceId: ids.federated,
+      code: 'truncated',
+      message: `Remote results were truncated; rerun the unchanged search with exact Source ${ids.federated}`,
+    })
   })
 
   test('rejects invalid continuation modes before provider execution', async () => {

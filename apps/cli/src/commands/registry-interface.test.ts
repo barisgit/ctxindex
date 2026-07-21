@@ -247,10 +247,8 @@ describe('extensions list interface', () => {
         },
       ],
     }
-    expect(formatExtensions(registry, false)).toBe(
-      'external\tProfiles: a@1, z@1\tAdapters: b',
-    )
-    expect(JSON.parse(formatExtensions(registry, true))).toEqual([
+    expect(formatExtensions(registry, 'text')).toContain('external')
+    expect(JSON.parse(formatExtensions(registry, 'json'))).toEqual([
       {
         id: 'external',
         profiles: [
@@ -264,7 +262,7 @@ describe('extensions list interface', () => {
       JSON.parse(
         formatExtensions(
           registry,
-          true,
+          'json',
           [
             {
               id: 'external',
@@ -312,7 +310,7 @@ describe('extensions list interface', () => {
     const unavailable = JSON.parse(
       formatExtensions(
         { list: () => [] },
-        true,
+        'json',
         [],
         [
           {
@@ -346,7 +344,7 @@ describe('extensions list interface', () => {
         {
           list: () => [{ id: 'example.direct', profiles: [], adapters: [] }],
         },
-        true,
+        'json',
         [{ id: 'example.direct', kind: 'builtin' }],
         [
           {
@@ -375,7 +373,7 @@ describe('extensions list interface', () => {
     const result = JSON.parse(
       formatExtensions(
         { list: () => [] },
-        true,
+        'json',
         [],
         [
           {

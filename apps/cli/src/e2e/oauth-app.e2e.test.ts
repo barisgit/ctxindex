@@ -190,7 +190,7 @@ test('oauth-app validates providers and manages safe labeled inventory', async (
 
     const listed = await sandbox.run(['oauth-app', 'list'])
     expect(listed.exitCode, listed.stderr).toBe(0)
-    expect(listed.stdout).toContain('google "work" origin=local')
+    expect(listed.stdout).toContain('google\twork\tlocal\t')
     expect(listed.stdout).not.toContain('canary')
     expect(listed.stdout).not.toContain('keychain:')
 
