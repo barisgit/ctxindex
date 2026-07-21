@@ -167,6 +167,7 @@ test('every workspace with tests owns a unit task', async () => {
   )
 
   for (const directory of workspaceDirectories.flat()) {
+    if (!(await Bun.file(join(directory, 'package.json')).exists())) continue
     const packageJson = await readPackageJson(directory)
     const testScript = script(packageJson, 'test')
     expect(testScript, directory).toContain('bun test')
