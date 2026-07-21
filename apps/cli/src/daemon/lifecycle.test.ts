@@ -247,6 +247,88 @@ test('absent start launches and polls compatible health', async () => {
   expect(launches).toBe(1)
 })
 
+test('start waits for a stopping owner to release before launching its replacement', async () => {
+  let current: DaemonSelection | null = {
+    ...selection,
+    metadata: { ...metadata, lifecycle: 'stopping' },
+  }
+  let clock = 0
+  let launches = 0
+  const lifecycle = createDaemonLifecycle(
+    dependencies({
+      select: () => current,
+      health: async (selected) => {
+        if (selected.metadata?.lifecycle === 'ready') return health
+        throw new DaemonCliError({
+          kind: 'daemon_unavailable',
+          code: 'daemon_unavailable',
+          message: 'The daemon is stopping and is not accepting new work.',
+        })
+      },
+      cleanupStale: () => {
+        if (clock < 750) return 'busy'
+        current = null
+        return 'removed'
+      },
+      launch: () => {
+        launches += 1
+        if (current === null) current = selection
+      },
+      now: () => clock,
+      sleep: async (milliseconds) => {
+        clock += milliseconds
+      },
+    }),
+  )
+
+  await expect(lifecycle.start()).resolves.toEqual({
+    status: 'running',
+    started: true,
+    health,
+  })
+  expect(clock).toBeGreaterThanOrEqual(750)
+  expect(launches).toBe(1)
+})
+
+test.each([
+  'start',
+  'status',
+  'stop',
+] as const)('%s preserves health-probe cancellation without lifecycle side effects', async (action) => {
+  let launches = 0
+  let shutdowns = 0
+  let cleanups = 0
+  const lifecycle = createDaemonLifecycle(
+    dependencies({
+      health: async () => {
+        throw Object.assign(new Error('cancelled health probe'), {
+          code: 'cancelled' as const,
+        })
+      },
+      launch: () => {
+        launches += 1
+      },
+      shutdown: async () => {
+        shutdowns += 1
+        throw new Error('must not shut down after cancellation')
+      },
+      cleanupStale: () => {
+        cleanups += 1
+        return 'removed'
+      },
+    }),
+  )
+
+  await expect(lifecycle[action]()).rejects.toMatchObject({
+    code: 'cancelled',
+  })
+  expect({ launches, shutdowns, cleanups }).toEqual({
+    launches: 0,
+    shutdowns: 0,
+    cleanups: 0,
+  })
+})
+
 test('launch failures do not expose host paths or raw errors', async () => {
   const lifecycle = createDaemonLifecycle(
     dependencies({
