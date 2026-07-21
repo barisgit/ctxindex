@@ -262,7 +262,7 @@ test('interpreted registry interface follows an explicit external Extension', as
     const help = await run([])
     expect(help.exitCode, help.stderr).toBe(0)
     expect(help.stdout).toContain('INTERFACE')
-    expect(help.stdout).toContain('ctxindex describe <type> <id> --json')
+    expect(help.stdout).toContain('ctxindex describe --help')
     expect(help.stdout).not.toContain('enarocanje.tender@1')
     expect(help.stdout).toContain('oauth-app')
     expect(help.stdout).not.toMatch(/\bclient\b/i)
@@ -273,17 +273,14 @@ test('interpreted registry interface follows an explicit external Extension', as
       ['export', '--help'],
       ['action', '--help'],
       ['describe', '--help'],
-      ['extensions', '--help'],
+      ['extension', '--help'],
       ['oauth-app', '--help'],
       ['account', '--help'],
       ['source', '--help'],
     ]) {
       const commandHelp = await run(args)
       expect(commandHelp.exitCode, commandHelp.stderr).toBe(0)
-      expect(commandHelp.stdout).toContain('INTERFACE')
-      expect(commandHelp.stdout).toContain(
-        'ctxindex describe <type> <id> --json',
-      )
+      expect(commandHelp.stdout).not.toContain('INTERFACE')
       expect(commandHelp.stdout).not.toContain('Loaded interface:')
       expect(commandHelp.stdout).not.toContain('enarocanje.tender@1')
       expect(commandHelp.stdout).not.toMatch(/\bGrant\b/)
@@ -293,7 +290,7 @@ test('interpreted registry interface follows an explicit external Extension', as
     expect(removedClientAlias.exitCode).toBe(2)
     expect(removedClientAlias.stderr).toContain('Unknown command')
 
-    const extensions = await run(['extensions', 'list', '--json'])
+    const extensions = await run(['extension', 'list', '--json'])
     expect(extensions.exitCode, extensions.stderr).toBe(0)
     expect(JSON.parse(extensions.stdout)).toContainEqual({
       id: 'enarocanje.proof',
@@ -309,7 +306,7 @@ test('interpreted registry interface follows an explicit external Extension', as
     const builtInHelp = await run(['source', 'add', '--help'])
     expect(builtInHelp.exitCode, builtInHelp.stderr).toBe(0)
     expect(builtInHelp.stdout).toContain('--config-root-path')
-    expect(builtInHelp.stdout).toContain('ctxindex describe <type> <id>')
+    expect(builtInHelp.stdout).not.toContain('INTERFACE')
     const localDetail = await run(['describe', 'adapter', 'local.directory'])
     expect(localDetail.exitCode, localDetail.stderr).toBe(0)
     expect(localDetail.stdout).toContain('--config-root-path')

@@ -30,7 +30,7 @@ test('skills get returns markdown', async () => {
     expect(result.stdout).toContain(
       'ctxindex describe <profile|adapter|action> <id> --json',
     )
-    expect(result.stdout).toContain('ctxindex extensions list')
+    expect(result.stdout).toContain('ctxindex extension list')
     expect(result.stdout).toContain('ctxindex skills list')
     expect(result.stdout).toContain('ctxindex skills get <name>')
     expect(result.stdout).not.toMatch(/--from-env|oauth-app add|account add/)

@@ -49,22 +49,6 @@ afterEach(() => {
   spyOn(console, 'error').mockRestore()
 })
 
-test('malformed lifecycle argv performs zero selection or transport work', async () => {
-  const error = spyOn(console, 'error').mockImplementation(() => {})
-  let selected = 0
-  const commandDeps = deps({
-    select: () => {
-      selected += 1
-      return selection
-    },
-  })
-  expect(await handleDaemonCommand(['health', '--unknown'], commandDeps)).toBe(
-    2,
-  )
-  expect(selected).toBe(0)
-  expect(String(error.mock.calls[0]?.[0])).toContain('unknown flag')
-})
-
 test('foreground launch uses the pinned Bun executable in source mode', () => {
   const launch = resolveDaemonLaunch({
     sourceMode: true,
@@ -76,7 +60,10 @@ test('foreground launch uses the pinned Bun executable in source mode', () => {
 
 test('foreground serve preserves the daemon structured startup exit', async () => {
   expect(
-    await handleDaemonCommand(['serve'], deps({ serve: async () => 50 })),
+    await handleDaemonCommand(
+      { kind: 'serve' },
+      deps({ serve: async () => 50 }),
+    ),
   ).toBe(50)
 })
 
@@ -92,14 +79,18 @@ test('compiled launch rejects a missing sibling without ambient PATH lookup', ()
 
 test('health JSON is the result value without an RPC envelope', async () => {
   const log = spyOn(console, 'log').mockImplementation(() => {})
-  expect(await handleDaemonCommand(['health', '--json'], deps())).toBe(0)
+  expect(
+    await handleDaemonCommand({ kind: 'health', json: true }, deps()),
+  ).toBe(0)
   expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual(health)
   expect(String(log.mock.calls[0]?.[0])).not.toContain('"ok"')
 })
 
 test('shutdown reports complete only after the facade observes release', async () => {
   const log = spyOn(console, 'log').mockImplementation(() => {})
-  expect(await handleDaemonCommand(['shutdown', '--json'], deps())).toBe(0)
+  expect(
+    await handleDaemonCommand({ kind: 'shutdown', json: true }, deps()),
+  ).toBe(0)
   expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
     status: 'complete',
     instanceId: 'instance-1',
@@ -136,7 +127,7 @@ test.each([
           }
   expect(
     await handleDaemonCommand(
-      ['health'],
+      { kind: 'health', json: false },
       deps({
         health: async () => {
           throw new DaemonCliError(failure)

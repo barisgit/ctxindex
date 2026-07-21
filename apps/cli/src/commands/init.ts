@@ -1,4 +1,4 @@
-import { defineCommand } from 'citty'
+import { defineCtxCommand } from '../command-model'
 import { initializeDirectStorage } from '../direct-database'
 import { runWithExit } from '../format/exit'
 
@@ -6,7 +6,7 @@ export async function initCtxindex(): Promise<void> {
   await initializeDirectStorage()
 }
 
-export const initCommand = defineCommand({
+export const initCommand = defineCtxCommand({
   meta: {
     name: 'init',
     description:

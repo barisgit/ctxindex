@@ -1,5 +1,12 @@
-import { defineCommand } from 'citty'
-import { generatedSourceConfigArgs, preflightSourceArgs } from '../args/source'
+import type { CommandDef } from 'citty'
+import {
+  needsDynamicSourceArgs,
+  resolveSourceAdapterId,
+  sourceAddArgs,
+  sourceListArgs,
+  sourceRemoveArgs,
+} from '../args/source'
+import { defineCtxCommand } from '../command-model'
 import { runWithExit } from '../format/exit'
 import {
   defaultSourceCommandDeps,
@@ -9,14 +16,8 @@ import {
   sourceRouteDescriptions,
 } from '../source/handle-source-command'
 
-const sourceOptionArgs = {
-  realm: { type: 'string', description: 'Realm slug' },
-  format: { type: 'string', description: 'Output format: table or compact' },
-  json: { type: 'boolean', description: 'Print JSON' },
-} as const
-
 export interface SourceCommandRuntime {
-  readonly command: ReturnType<typeof defineCommand>
+  readonly command: CommandDef
   close(): Promise<void>
   error(): unknown
 }
@@ -25,60 +26,59 @@ export function createSourceCommandRuntime(
   invocationArgs: string[] = [],
   services: SourceCommandDeps = defaultSourceCommandDeps,
 ): SourceCommandRuntime {
-  const retained = retainSourceCommandRoute(invocationArgs, services)
+  const retained = retainSourceCommandRoute(
+    invocationArgs[0] === 'add',
+    services,
+  )
   const route = retained.resolve
   const activeSourceDescriptions = async () => {
-    const preliminary = preflightSourceArgs(invocationArgs)
-    const needsDefinitions =
-      preliminary.kind === 'needs-definitions' ||
-      (preliminary.kind === 'help' && invocationArgs[0] === 'add')
-    if (!needsDefinitions) {
-      return []
+    if (!needsDynamicSourceArgs(invocationArgs)) return []
+    const descriptions = sourceRouteDescriptions(await route())
+    if (invocationArgs.includes('--help') || invocationArgs.includes('-h')) {
+      await retained.close()
     }
-    const activeRoute = await route()
-    const descriptions = sourceRouteDescriptions(activeRoute)
-    if (preliminary.kind === 'help') await retained.close()
     return descriptions
   }
-  const run = (args: string[]) =>
-    runWithExit(async () => handleSourceCommand(args, services, await route()))
 
-  const command = defineCommand({
+  const command = defineCtxCommand({
     meta: { name: 'source', description: 'Manage indexed sources.' },
     subCommands: {
-      add: defineCommand({
+      add: defineCtxCommand<ReturnType<typeof sourceAddArgs>>({
         meta: { name: 'add', description: 'Add a source.' },
-        args: async () => ({
-          adapter: { type: 'string', description: 'Adapter ID' },
-          label: { type: 'string', description: 'Global Source label' },
-          account: {
-            type: 'string',
-            description: 'Account label or Account ID',
-          },
-          'config-json': { type: 'string', description: 'Adapter config JSON' },
-          'search-routing': {
-            type: 'string',
-            description: 'indexed, federated, or hybrid routing override',
-          },
-          'no-sync': {
-            type: 'boolean',
-            description: 'Disable synchronization for this Source',
-          },
-          'adapter-id': { type: 'positional', required: false },
-          realm: sourceOptionArgs.realm,
-          ...generatedSourceConfigArgs(await activeSourceDescriptions()),
-        }),
-        run: ({ rawArgs }) => run(['add', ...rawArgs]),
+        args: async () => sourceAddArgs(await activeSourceDescriptions()),
+        run: ({ args }) =>
+          runWithExit(async () => {
+            resolveSourceAdapterId(args)
+            return handleSourceCommand(
+              { kind: 'add', args },
+              await route(),
+              services,
+            )
+          }),
       }),
-      list: defineCommand({
+      list: defineCtxCommand({
         meta: { name: 'list', description: 'List sources.' },
-        args: sourceOptionArgs,
-        run: ({ rawArgs }) => run(['list', ...rawArgs]),
+        args: sourceListArgs,
+        run: ({ args }) =>
+          runWithExit(async () =>
+            handleSourceCommand(
+              { kind: 'list', args },
+              await route(),
+              services,
+            ),
+          ),
       }),
-      remove: defineCommand({
+      remove: defineCtxCommand({
         meta: { name: 'remove', description: 'Remove a source.' },
-        args: { source: { type: 'positional', required: false } },
-        run: ({ rawArgs }) => run(['remove', ...rawArgs]),
+        args: sourceRemoveArgs,
+        run: ({ args }) =>
+          runWithExit(async () =>
+            handleSourceCommand(
+              { kind: 'remove', args },
+              await route(),
+              services,
+            ),
+          ),
       }),
     },
   })

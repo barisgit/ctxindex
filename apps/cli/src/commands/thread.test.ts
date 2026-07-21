@@ -75,7 +75,7 @@ describe('thread output', () => {
       },
     })
 
-    expect(await handleThreadGetCommand(['--json', ref], open)).toBe(0)
+    expect(await handleThreadGetCommand({ ref, json: true }, open)).toBe(0)
     expect(log).toHaveBeenCalledWith(formatThreadJson(result))
     expect(closed).toBe(true)
     log.mockRestore()
@@ -86,7 +86,7 @@ describe('thread output', () => {
     let opened = false
     try {
       const exit = await handleThreadGetCommand(
-        ['--json', ref],
+        { ref, json: true },
         async () => {
           opened = true
           throw new Error('direct dependencies opened')
@@ -119,9 +119,11 @@ describe('thread output', () => {
       }
     }
 
-    expect(await handleThreadGetCommand(['bad-ref'], open)).toBe(2)
+    expect(
+      await handleThreadGetCommand({ ref: 'bad-ref', json: false }, open),
+    ).toBe(2)
     expect(opens).toBe(0)
-    expect(await handleThreadGetCommand([ref], open)).toBe(2)
+    expect(await handleThreadGetCommand({ ref, json: false }, open)).toBe(2)
     expect(opens).toBe(1)
     error.mockRestore()
   })

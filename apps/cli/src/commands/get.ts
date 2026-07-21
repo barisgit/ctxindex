@@ -1,10 +1,10 @@
+import { parseRef } from '@ctxindex/core'
 import {
   getSourceResource,
   type SourceResourceResult,
 } from '@ctxindex/core/source'
 import type { RpcResourceGetResult } from '@ctxindex/rpc'
-import { defineCommand } from 'citty'
-import { getUsage, parseGetArgs } from '../args/get'
+import { defineCtxCommand } from '../command-model'
 import { daemonResourceGet, selectDaemon } from '../daemon/client'
 import { openDeps } from '../deps'
 import { mapErrorToExit, runWithExit } from '../format/exit'
@@ -25,6 +25,11 @@ export interface GetCommandDeps {
   readonly open: typeof openDeps
 }
 
+export interface GetCommandInput {
+  readonly ref: string
+  readonly json: boolean
+}
+
 const defaultDeps: GetCommandDeps = {
   selectDaemon,
   get: daemonResourceGet,
@@ -32,13 +37,13 @@ const defaultDeps: GetCommandDeps = {
 }
 
 export async function handleGetCommand(
-  args: string[],
+  parsed: GetCommandInput,
   services: GetCommandDeps = defaultDeps,
 ): Promise<number> {
-  const parsed = parseGetArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(`${parsed.message}. Try: ${getUsage}`)
+  try {
+    parseRef(parsed.ref)
+  } catch {
+    console.error(`get: invalid <ref>: ${parsed.ref}`)
     return 2
   }
 
@@ -78,11 +83,14 @@ export async function handleGetCommand(
   }
 }
 
-export const getCommand = defineCommand({
+export const getCommand = defineCtxCommand({
   meta: { name: 'get', description: 'Get a Resource by exact Ref.' },
   args: {
-    ref: { type: 'positional', required: false, description: 'Resource Ref' },
+    ref: { type: 'positional', required: true, description: 'Resource Ref' },
     json: { type: 'boolean', description: 'Print deterministic JSON' },
   },
-  run: ({ rawArgs }) => runWithExit(() => handleGetCommand(rawArgs)),
+  run: ({ args }) =>
+    runWithExit(() =>
+      handleGetCommand({ ref: args.ref, json: args.json ?? false }),
+    ),
 })

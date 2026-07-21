@@ -1,4 +1,3 @@
-import { parseRealmArgs, realmUsage } from '../args/realm'
 import { daemonRealmAdd, daemonRealmList, selectDaemon } from '../daemon/client'
 import { openDeps } from '../deps'
 import { mapErrorToExit } from '../format/exit'
@@ -15,6 +14,10 @@ export interface RealmCommandDeps {
   readonly open: typeof openDeps
 }
 
+export type RealmCommandInput =
+  | { readonly kind: 'add'; readonly slug: string; readonly name?: string }
+  | { readonly kind: 'list'; readonly json: boolean }
+
 const defaultDeps: RealmCommandDeps = {
   selectDaemon,
   realmAdd: daemonRealmAdd,
@@ -23,16 +26,9 @@ const defaultDeps: RealmCommandDeps = {
 }
 
 export async function handleRealmCommand(
-  args: string[],
+  parsed: RealmCommandInput,
   services: RealmCommandDeps = defaultDeps,
 ): Promise<number> {
-  const parsed = parseRealmArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(`${parsed.message}. Try: ${realmUsage}`)
-    return 2
-  }
-
   let deps: Awaited<ReturnType<typeof openDeps>> | undefined
   const controller = new AbortController()
   const cancel = () => controller.abort()

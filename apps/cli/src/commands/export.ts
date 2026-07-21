@@ -1,10 +1,10 @@
+import { parseRef } from '@ctxindex/core'
 import {
   type ExportResourceInput,
   type ExportResourceResult,
   exportSourceResource,
 } from '@ctxindex/core/export'
-import { defineCommand } from 'citty'
-import { exportUsage, parseExportArgs } from '../args/export'
+import { defineCtxCommand } from '../command-model'
 import { type CliDeps, openDeps } from '../deps'
 import { mapErrorToExit, runWithExit } from '../format/exit'
 
@@ -13,15 +13,20 @@ type OpenExportDeps = () => Promise<
 >
 type RunExport = (input: ExportResourceInput) => Promise<ExportResourceResult>
 
+export interface ExportCommandInput {
+  readonly ref: string
+  readonly format: string
+}
+
 export async function handleExportCommand(
-  args: string[],
+  parsed: ExportCommandInput,
   open: OpenExportDeps = openDeps,
   runExport: RunExport = exportSourceResource,
 ): Promise<number> {
-  const parsed = parseExportArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(`${parsed.message}. Try: ${exportUsage}`)
+  try {
+    parseRef(parsed.ref)
+  } catch {
+    console.error(`export: invalid <ref>: ${parsed.ref}`)
     return 2
   }
 
@@ -49,14 +54,17 @@ export async function handleExportCommand(
   }
 }
 
-export const exportCommand = defineCommand({
+export const exportCommand = defineCtxCommand({
   meta: {
     name: 'export',
     description: 'Export a Resource in a Profile format.',
   },
   args: {
-    ref: { type: 'positional', required: false, description: 'Resource Ref' },
-    format: { type: 'string', description: 'Export format' },
+    ref: { type: 'positional', required: true, description: 'Resource Ref' },
+    format: { type: 'string', required: true, description: 'Export format' },
   },
-  run: ({ rawArgs }) => runWithExit(() => handleExportCommand(rawArgs)),
+  run: ({ args }) =>
+    runWithExit(() =>
+      handleExportCommand({ ref: args.ref, format: args.format }),
+    ),
 })

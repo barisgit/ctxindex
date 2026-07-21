@@ -1,7 +1,5 @@
 import { describe, expect, test } from 'bun:test'
 import type { RegistryDescription } from '@ctxindex/core/registry'
-import { parseDescribeArgs } from '../args/describe'
-import { parseExtensionsArgs } from '../args/extensions'
 import {
   filterRegistryDescription,
   formatExtensions,
@@ -77,45 +75,6 @@ const description: RegistryDescription = {
 }
 
 describe('describe interface', () => {
-  test('parses selectors and formats and rejects invalid values', () => {
-    expect(
-      parseDescribeArgs(['profile', 'fake.kind', '--format', 'markdown']),
-    ).toEqual({
-      kind: 'describe',
-      selector: 'profile',
-      id: 'fake.kind',
-      format: 'markdown',
-      full: false,
-    })
-    expect(parseDescribeArgs(['--json'])).toEqual({
-      kind: 'describe',
-      format: 'json',
-      full: false,
-    })
-    expect(parseDescribeArgs(['action', '--full', '--json'])).toEqual({
-      kind: 'describe',
-      selector: 'action',
-      format: 'json',
-      full: true,
-    })
-    expect(parseDescribeArgs(['unknown'])).toMatchObject({ kind: 'unknown' })
-    expect(parseDescribeArgs(['--format', 'yaml'])).toMatchObject({
-      kind: 'unknown',
-    })
-    expect(parseDescribeArgs(['--unknown'])).toMatchObject({ kind: 'unknown' })
-    expect(parseDescribeArgs(['--format'])).toMatchObject({ kind: 'unknown' })
-    expect(parseDescribeArgs(['--json=false'])).toMatchObject({
-      kind: 'unknown',
-    })
-    expect(parseDescribeArgs(['action', 'fake.run', '--full'])).toMatchObject({
-      kind: 'unknown',
-      message: 'describe: --full is redundant with an exact id',
-    })
-    expect(parseDescribeArgs(['--full=false'])).toMatchObject({
-      kind: 'unknown',
-    })
-  })
-
   test('formats the provider id and renamed authorization URL', () => {
     const [source] = description.sources
     if (!source) throw new Error('expected source fixture')
@@ -275,18 +234,7 @@ describe('describe interface', () => {
 })
 
 describe('extensions list interface', () => {
-  test('supports only list and deterministic exact references', () => {
-    expect(parseExtensionsArgs(['list', '--json'])).toEqual({
-      kind: 'list',
-      json: true,
-    })
-    expect(parseExtensionsArgs(['install'])).toMatchObject({ kind: 'unknown' })
-    expect(parseExtensionsArgs(['list', '--unknown'])).toMatchObject({
-      kind: 'unknown',
-    })
-    expect(parseExtensionsArgs(['list', '--json=false'])).toMatchObject({
-      kind: 'unknown',
-    })
+  test('formats deterministic exact references', () => {
     const registry = {
       list: () => [
         {

@@ -130,7 +130,7 @@ export function formatCatalogBuild(
 }
 
 export function formatInstalledExtension(
-  action: 'Installed' | 'Uninstalled',
+  action: 'Installed' | 'Updated' | 'Uninstalled',
   extension: GenericExtensionInstallationRecord,
   json: boolean,
 ): string {

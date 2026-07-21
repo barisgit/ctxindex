@@ -6,9 +6,10 @@ Orchestrates local Resource-thread retrieval and presentation across daemon and 
 
 ## Design / patterns
 
+- `handle-thread-get-command.ts` consumes the typed `thread <ref>` input and validates the Resource Ref before daemon selection or direct dependency opening.
 - A selected daemon handles the bounded thread request without client SQLite access or fallback.
 - Text output walks the validated tree deterministically; JSON preserves the typed envelope and warnings.
 
 ## Integration points
 
-Called by `commands/thread.ts`; uses the daemon client, direct `ThreadService`, and stable exit mapping.
+Called by the leaf `commands/thread.ts` definition; uses the daemon client, direct `ThreadService`, and stable exit mapping. The former redundant nested operation and its argv parser are absent.

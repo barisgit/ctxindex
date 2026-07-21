@@ -145,7 +145,7 @@ describe('Action handler', () => {
 
     expect(
       await handleActionCommand(
-        ['describe', actionId, '--source', sourceId, '--json'],
+        { kind: 'describe', actionId, sourceId, json: true },
         open as () => Promise<ActionDeps>,
         services as ActionServices,
       ),
@@ -155,7 +155,7 @@ describe('Action handler', () => {
     expect(closed).toBe(true)
   })
 
-  test('parses input before deps and propagates explicit Source, confirmation, signal, output, warnings, and close', async () => {
+  test('parses input before deps and propagates explicit Source, signal, output, warnings, and close', async () => {
     const log = spyOn(console, 'log').mockImplementation(() => {})
     const error = spyOn(console, 'error').mockImplementation(() => {})
     let opened = 0
@@ -186,15 +186,13 @@ describe('Action handler', () => {
 
     expect(
       await handleActionCommand(
-        [
-          'run',
+        {
+          kind: 'run',
           actionId,
-          '--source',
           sourceId,
-          '--input',
-          '{"body":"hi"}',
-          '--confirm-irreversible',
-        ],
+          input: '{"body":"hi"}',
+          json: false,
+        },
         open as () => Promise<ActionDeps>,
         services as ActionServices,
       ),
@@ -208,7 +206,7 @@ describe('Action handler', () => {
       actionId,
       sourceId,
       actionInput: { body: 'hi' },
-      confirmIrreversible: true,
+      confirmIrreversible: false,
     })
     expect(received?.signal).toBeInstanceOf(AbortSignal)
     expect(log).toHaveBeenCalledWith(formatActionRunText(runResult))
@@ -243,7 +241,13 @@ describe('Action handler', () => {
 
     expect(
       await handleActionCommand(
-        ['run', actionId, '--source', sourceId, '--input', raw],
+        {
+          kind: 'run',
+          actionId,
+          sourceId,
+          input: raw,
+          json: false,
+        },
         open as () => Promise<ActionDeps>,
         services,
       ),
@@ -266,7 +270,13 @@ describe('Action handler', () => {
     for (const input of ['missing-input-file.json', invalidPath]) {
       expect(
         await handleActionCommand(
-          ['run', actionId, '--source', sourceId, '--input', input],
+          {
+            kind: 'run',
+            actionId,
+            sourceId,
+            input,
+            json: false,
+          },
           open as () => Promise<ActionDeps>,
         ),
       ).toBe(2)
@@ -303,7 +313,7 @@ describe('Action handler', () => {
     }
     expect(
       await handleActionCommand(
-        ['describe', actionId],
+        { kind: 'describe', actionId, json: false },
         open as () => Promise<ActionDeps>,
         services as ActionServices,
       ),

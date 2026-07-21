@@ -27,6 +27,12 @@ const definitions = {
           type: 'string',
           required: true,
         },
+        {
+          property: 'labels',
+          flag: '--config-labels',
+          type: 'string[]',
+          required: false,
+        },
       ],
     },
   ],
@@ -60,14 +66,16 @@ test('selected daemon handles Source add using its active definitions without di
   let opened = false
   try {
     const exit = await handleSourceCommand(
-      [
-        'add',
-        'local.directory',
-        '--realm',
-        'work',
-        '--config-root-path',
-        '/tmp/work',
-      ],
+      {
+        kind: 'add',
+        args: {
+          _: [],
+          'adapter-id': 'local.directory',
+          realm: 'work',
+          'config-root-path': '/tmp/work',
+        } as never,
+      },
+      { kind: 'daemon', selection: {} as never, definitions },
       {
         selectDaemon: () => ({}) as never,
         sourceDefinitions: async () => definitions,
@@ -120,61 +128,30 @@ test('selected daemon handles Source list and remove without direct open', async
         throw new Error('direct dependencies opened')
       },
     }
-    expect(await handleSourceCommand(['list', '--json'], deps)).toBe(0)
-    expect(await handleSourceCommand(['remove', 'source-1'], deps)).toBe(0)
+    const route = { kind: 'daemon', selection: {} as never } as const
+    expect(
+      await handleSourceCommand(
+        {
+          kind: 'list',
+          args: { _: [], format: 'table', json: true } as never,
+        },
+        route,
+        deps,
+      ),
+    ).toBe(0)
+    expect(
+      await handleSourceCommand(
+        {
+          kind: 'remove',
+          args: { _: [], source: 'source-1' } as never,
+        },
+        route,
+        deps,
+      ),
+    ).toBe(0)
     expect(output).toEqual(['[]', 'source removed: source-1'])
   } finally {
     log.mockRestore()
-  }
-})
-
-test('malformed Source commands exit locally without daemon transport', async () => {
-  const error = spyOn(console, 'error').mockImplementation(() => {})
-  let transports = 0
-  const deps = {
-    selectDaemon: () => ({}) as never,
-    sourceDefinitions: async () => {
-      transports += 1
-      throw new Error('transport invoked')
-    },
-    sourceAdd: async () => {
-      transports += 1
-      throw new Error('transport invoked')
-    },
-    sourceList: async () => {
-      transports += 1
-      throw new Error('transport invoked')
-    },
-    sourceRemove: async () => {
-      transports += 1
-      throw new Error('transport invoked')
-    },
-    loadDefinitions: async () => {
-      throw new Error('local definitions loaded')
-    },
-    open: async () => {
-      throw new Error('direct dependencies opened')
-    },
-  }
-  try {
-    expect(await handleSourceCommand(['add'], deps)).toBe(2)
-    expect(
-      await handleSourceCommand(['add', 'local.directory', '--realm'], deps),
-    ).toBe(2)
-    expect(
-      await handleSourceCommand(['add', 'local.directory', 'unexpected'], deps),
-    ).toBe(2)
-    expect(
-      await handleSourceCommand(
-        ['add', 'local.directory', '--search-routing', 'invalid'],
-        deps,
-      ),
-    ).toBe(2)
-    expect(await handleSourceCommand(['list', '--unknown'], deps)).toBe(2)
-    expect(await handleSourceCommand(['remove'], deps)).toBe(2)
-    expect(transports).toBe(0)
-  } finally {
-    error.mockRestore()
   }
 })
 
@@ -202,7 +179,10 @@ test('runCli retains one selected daemon from Source argument construction throu
       expect(actual).toBe(selection)
       expect(input).toMatchObject({
         adapterId: 'local.directory',
-        configJson: JSON.stringify({ root_path: '/tmp/work' }),
+        configJson: JSON.stringify({
+          root_path: '/tmp/work',
+          labels: ['first', 'second'],
+        }),
       })
       return { sourceId: 'source-1', realmId: 'work' }
     },
@@ -229,6 +209,9 @@ test('runCli retains one selected daemon from Source argument construction throu
           'work',
           '--config-root-path',
           '/tmp/work',
+          '--config-labels',
+          'first',
+          '--config-labels=second',
         ],
         { source: deps },
       ),
@@ -277,11 +260,17 @@ test('runCli rejects locally malformed Source argv before selection or transport
   }
 
   try {
-    expect(
-      await runCli(['source', 'add', 'local.directory', '--realm'], {
-        source: deps,
-      }),
-    ).toBe(2)
+    for (const args of [
+      ['source', 'add', 'local.directory', '--realm'],
+      ['source', 'add', '--realm', 'work'],
+      ['source', 'add', 'local.directory', '--adapter', 'other.adapter'],
+    ]) {
+      expect(
+        await runCli(args, {
+          source: deps,
+        }),
+      ).toBe(2)
+    }
     expect(selections).toBe(0)
     expect(transports).toBe(0)
   } finally {
@@ -321,6 +310,7 @@ test('runCli loads active Source definitions for add help without executing', as
     expect(definitionRequests).toBe(1)
     expect(executions).toBe(0)
     expect(output.join('\n')).toContain('--config-root-path')
+    expect(output.join('\n')).toContain('--config-labels')
   } finally {
     log.mockRestore()
   }
@@ -402,21 +392,23 @@ test('direct Source ownership conflict fails before definition loading', async (
   const error = spyOn(console, 'error').mockImplementation(() => {})
   let loadedDefinitions = false
   try {
-    const exit = await handleSourceCommand(['list'], {
-      selectDaemon: () => null,
-      sourceDefinitions: async () => ({ rows: [] }),
-      sourceAdd: async () => ({ sourceId: 'unused', realmId: 'unused' }),
-      sourceList: async () => ({ rows: [] }),
-      sourceRemove: async () => ({ sourceId: 'unused' }),
-      acquireOwnership: () => {
-        throw new PrototypeUnsupportedError()
-      },
-      loadDefinitions: async () => {
-        loadedDefinitions = true
-        throw new Error('definitions loaded without ownership')
-      },
-      open: async () => {
-        throw new Error('direct dependencies opened without ownership')
+    const exit = await runCli(['source', 'list'], {
+      source: {
+        selectDaemon: () => null,
+        sourceDefinitions: async () => ({ rows: [] }),
+        sourceAdd: async () => ({ sourceId: 'unused', realmId: 'unused' }),
+        sourceList: async () => ({ rows: [] }),
+        sourceRemove: async () => ({ sourceId: 'unused' }),
+        acquireOwnership: () => {
+          throw new PrototypeUnsupportedError()
+        },
+        loadDefinitions: async () => {
+          loadedDefinitions = true
+          throw new Error('definitions loaded without ownership')
+        },
+        open: async () => {
+          throw new Error('direct dependencies opened without ownership')
+        },
       },
     })
 
@@ -503,7 +495,7 @@ test('direct Source add help releases ownership after generating dynamic options
 test('direct Source definition failure releases ownership', async () => {
   const events: string[] = []
   await expect(
-    resolveSourceCommandRoute(['add', 'local.directory'], {
+    resolveSourceCommandRoute(true, {
       selectDaemon: () => null,
       sourceDefinitions: async () => {
         throw new Error('daemon definitions requested')
@@ -575,31 +567,41 @@ test('cleanup failures do not replace success and ownership release is independe
   const events: string[] = []
   const output = spyOn(console, 'log').mockImplementation(() => {})
   try {
-    const exit = await handleSourceCommand(['list'], {
-      selectDaemon: () => null,
-      sourceDefinitions: async () => ({ rows: [] }),
-      sourceAdd: async () => ({ sourceId: 'unused', realmId: 'unused' }),
-      sourceList: async () => ({ rows: [] }),
-      sourceRemove: async () => ({ sourceId: 'unused' }),
-      acquireOwnership: () =>
-        ({
-          readLocalOAuthAppIdentities: async () => [],
-          close: () => {
-            events.push('close-owner')
-            throw new Error('owner cleanup failure')
-          },
-        }) as never,
-      loadDefinitions: async () => loaded,
-      open: async () =>
-        ({
-          registry: loaded.registry,
-          sourceService: { listSources: () => [] },
-          close: async () => {
-            events.push('close-deps')
-            throw new Error('deps cleanup failure')
-          },
-        }) as never,
-    })
+    const route = {
+      kind: 'direct',
+      ownership: {
+        readLocalOAuthAppIdentities: async () => [],
+        close: () => {
+          events.push('close-owner')
+          throw new Error('owner cleanup failure')
+        },
+      } as never,
+      definitions: loaded,
+    } as const
+    const exit = await handleSourceCommand(
+      {
+        kind: 'list',
+        args: { _: [], format: 'table', json: false } as never,
+      },
+      route,
+      {
+        selectDaemon: () => null,
+        sourceDefinitions: async () => ({ rows: [] }),
+        sourceAdd: async () => ({ sourceId: 'unused', realmId: 'unused' }),
+        sourceList: async () => ({ rows: [] }),
+        sourceRemove: async () => ({ sourceId: 'unused' }),
+        loadDefinitions: async () => loaded,
+        open: async () =>
+          ({
+            registry: loaded.registry,
+            sourceService: { listSources: () => [] },
+            close: async () => {
+              events.push('close-deps')
+              throw new Error('deps cleanup failure')
+            },
+          }) as never,
+      },
+    )
     expect(exit).toBe(0)
     expect(events).toEqual(['close-deps', 'close-owner'])
   } finally {

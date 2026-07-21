@@ -6,7 +6,7 @@ const requiredDiscoverySnippets = [
   'ctxindex --help',
   'ctxindex describe',
   'ctxindex describe <profile|adapter|action> <id> --json',
-  'ctxindex extensions list',
+  'ctxindex extension list',
   'ctxindex skills list',
   'ctxindex skills get <name>',
 ] as const
@@ -75,7 +75,7 @@ test('workflow skills point to runtime vocabulary instead of declaring it', asyn
   )
   expect(prose).toContain('ctxindex --help')
   expect(prose).toContain('ctxindex describe')
-  expect(prose).toContain('ctxindex extensions list')
+  expect(prose).toContain('ctxindex extension list')
   expect(prose).toContain('ctxindex skills list')
   expect(prose).toContain('ctxindex skills get <name>')
   expect(prose).not.toContain('--config-root-path')

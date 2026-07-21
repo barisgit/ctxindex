@@ -8,7 +8,6 @@ import {
   resolveManagedOAuthApp,
 } from '@ctxindex/core/oauth-app'
 import type { CompleteRegistry } from '@ctxindex/core/registry'
-import { accountUsage, parseAccountArgs } from '../args/account'
 import { assertInitialized } from '../commands/db'
 import { loadAuthDefinitionDeps, openAccountDeps, openDeps } from '../deps'
 import {
@@ -25,6 +24,16 @@ export interface AccountCommandRuntime {
   readonly openDeps: typeof openDeps
   readonly authorizeProvider: typeof authorizeProvider
 }
+
+export type AccountCommandInput =
+  | {
+      readonly kind: 'add'
+      readonly provider: string
+      readonly label?: string
+      readonly app?: string
+    }
+  | { readonly kind: 'list'; readonly json: boolean }
+  | { readonly kind: 'remove'; readonly label: string }
 
 const accountCommandRuntime: AccountCommandRuntime = {
   assertInitialized,
@@ -89,16 +98,9 @@ export function resolveAccountOAuthAppLabel(
 }
 
 export async function handleAccountCommand(
-  args: string[],
+  parsed: AccountCommandInput,
   runtime: AccountCommandRuntime = accountCommandRuntime,
 ): Promise<number> {
-  const parsed = parseAccountArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(`${parsed.message}. Try: ${accountUsage}`)
-    return 2
-  }
-
   let deps:
     | Awaited<ReturnType<typeof openDeps>>
     | Awaited<ReturnType<typeof openAccountDeps>>

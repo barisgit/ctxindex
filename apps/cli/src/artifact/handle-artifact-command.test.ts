@@ -35,6 +35,18 @@ const downloaded = {
   cache: 'miss' as const,
   outputPath: '/tmp/file.bin',
 }
+const purged = {
+  artifactCountRemoved: 2,
+  objectCountRemoved: 3,
+  logicalBytesFreed: 12,
+  physicalBytesFreed: 19,
+  diskAccounting: {
+    artifactCount: 0,
+    objectCount: 0,
+    logicalBytes: 0,
+    physicalBytes: 0,
+  },
+}
 
 describe('artifact command output and handlers', () => {
   test('formats deterministic compact text and JSON without binary or CAS paths', () => {
@@ -67,11 +79,19 @@ describe('artifact command output and handlers', () => {
     const log = spyOn(console, 'log').mockImplementation(() => {})
 
     expect(
-      await handleArtifactCommand(['list', originRef, '--json'], open),
+      await handleArtifactCommand(
+        { kind: 'list', ref: originRef, json: true },
+        open,
+      ),
     ).toBe(0)
     expect(
       await handleArtifactCommand(
-        ['download', artifactRef, '--output', '/tmp/file.bin'],
+        {
+          kind: 'download',
+          ref: artifactRef,
+          outputPath: '/tmp/file.bin',
+          json: false,
+        },
         open,
       ),
     ).toBe(0)
@@ -87,14 +107,38 @@ describe('artifact command output and handlers', () => {
     log.mockRestore()
   })
 
-  test('maps invalid args before opening dependencies', async () => {
+  test('purges through the same ArtifactService and formats JSON', async () => {
+    const calls: string[] = []
+    const service = {
+      async purge() {
+        calls.push('purge')
+        return purged
+      },
+    } as ArtifactService
+    const open = async () => ({ artifactService: service, async close() {} })
+    const log = spyOn(console, 'log').mockImplementation(() => {})
+
+    expect(
+      await handleArtifactCommand({ kind: 'purge', json: true }, open),
+    ).toBe(0)
+    expect(calls).toEqual(['purge'])
+    expect(log).toHaveBeenCalledWith(JSON.stringify(purged))
+    log.mockRestore()
+  })
+
+  test('validates Refs before opening dependencies', async () => {
     let opened = false
     const open = async () => {
       opened = true
       throw new Error('must not open')
     }
     const error = spyOn(console, 'error').mockImplementation(() => {})
-    expect(await handleArtifactCommand(['download'], open as never)).toBe(2)
+    expect(
+      await handleArtifactCommand(
+        { kind: 'download', ref: 'bad-ref', json: false },
+        open as never,
+      ),
+    ).toBe(2)
     expect(opened).toBe(false)
     error.mockRestore()
   })

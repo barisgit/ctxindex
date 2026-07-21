@@ -1,10 +1,10 @@
+import { parseRef } from '@ctxindex/core'
 import type {
   ThreadNode,
   ThreadResult,
   ThreadService,
 } from '@ctxindex/core/thread'
 import type { RpcThreadGetResult } from '@ctxindex/rpc'
-import { parseThreadGetArgs, threadGetUsage } from '../args/thread-get'
 import { daemonThreadGet, selectDaemon } from '../daemon/client'
 import { openDeps } from '../deps'
 import { mapErrorToExit } from '../format/exit'
@@ -39,15 +39,20 @@ export function formatThreadText(
   return lines.join('\n')
 }
 
+export interface ThreadCommandInput {
+  readonly ref: string
+  readonly json: boolean
+}
+
 export async function handleThreadGetCommand(
-  args: string[],
+  input: ThreadCommandInput,
   open: OpenThreadDeps = openDeps,
   daemon = { select: selectDaemon, get: daemonThreadGet },
 ): Promise<number> {
-  const parsed = parseThreadGetArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(`${parsed.message}. Try: ${threadGetUsage}`)
+  try {
+    parseRef(input.ref)
+  } catch {
+    console.error(`thread: invalid <ref>: ${input.ref}`)
     return 2
   }
 
@@ -58,15 +63,15 @@ export async function handleThreadGetCommand(
   try {
     const selection = daemon.select()
     const result = selection
-      ? await daemon.get(selection, parsed.ref, controller.signal)
+      ? await daemon.get(selection, input.ref, controller.signal)
       : await (async () => {
           deps = await open()
-          return deps.threadService.get(parsed.ref)
+          return deps.threadService.get(input.ref)
         })()
     console.log(
-      parsed.json ? formatThreadJson(result) : formatThreadText(result),
+      input.json ? formatThreadJson(result) : formatThreadText(result),
     )
-    if (!parsed.json) {
+    if (!input.json) {
       for (const warning of result.warnings) {
         console.error(
           `${warning.code}\tUnavailable Profile ${warning.profileId}@${warning.profileVersion}`,

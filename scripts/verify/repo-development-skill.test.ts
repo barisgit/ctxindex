@@ -12,7 +12,7 @@ const requiredDiscoverySnippets = [
   'ctxindex --help',
   'ctxindex describe',
   'ctxindex describe <profile|adapter|action> <id> --json',
-  'ctxindex extensions list',
+  'ctxindex extension list',
   'ctxindex skills list',
   'ctxindex skills get <name>',
 ] as const
@@ -155,7 +155,7 @@ test('repo-development skill exists', async () => {
 test('repo-development skill keeps the supported CLI walkthrough', async () => {
   const skill = await readSkill()
   for (const command of [
-    'bun cli extensions list',
+    'bun cli extension list',
     'bun cli describe',
     'bun cli init',
     'bun cli realm add',
@@ -163,11 +163,11 @@ test('repo-development skill keeps the supported CLI walkthrough', async () => {
     'bun cli sync',
     'bun cli search',
     'bun cli get',
-    'bun cli thread get',
+    'bun cli thread <ref>',
     'bun cli artifact list',
     'bun cli artifact download',
     'bun cli export',
-    'bun cli action describe',
+    'bun cli describe action',
     'bun cli action run',
     'bun cli skills list',
     'bun cli secrets status',
@@ -219,7 +219,7 @@ test('bundled skill is concise orientation to live discovery', async () => {
   ).toEqual([])
 
   for (const command of implementedCommands(mainSource)) {
-    if (['describe', 'extensions', 'skills'].includes(command)) continue
+    if (['describe', 'extension', 'skills'].includes(command)) continue
     expect(orientation).not.toMatch(new RegExp(`ctxindex\\s+${command}\\b`))
   }
 

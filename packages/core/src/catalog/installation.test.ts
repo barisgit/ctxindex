@@ -7,7 +7,10 @@ import type {
   GenericExtensionInstallationRecord,
 } from '../direct-extension'
 import { createSandbox } from '../testing'
-import { CatalogInstallationService } from './installation'
+import {
+  CatalogInstallationService,
+  InstalledExtensionLifecycleService,
+} from './installation'
 import { catalogSnapshotPath } from './paths'
 import type { CatalogRecord } from './schema'
 
@@ -97,19 +100,112 @@ async function writeSnapshot(
   return root
 }
 
-test('requires install trust before refresh or snapshot access', async () => {
+test('installed lifecycle follows direct persisted provenance', async () => {
+  const direct = result({
+    replay: {
+      source: {
+        kind: 'npm',
+        requestedTarget: '@fixture/extension@^1',
+        package: '@fixture/extension',
+        version: '1.0.0',
+        integrity: 'sha512-fixture',
+      },
+      packageRoot: 'node_modules/@fixture/extension',
+      materializationDigest: digest,
+      lock,
+    },
+    lockBytes,
+    immutableSnapshotRoot: '/unused',
+    selection: { kind: 'extension', extensionId: 'fixture.extension' },
+  })
+  const calls: unknown[] = []
+  const service = new InstalledExtensionLifecycleService({
+    records: { readRecords: async () => [direct] },
+    installer: {
+      updateDirect: async (input) => {
+        calls.push(input)
+        return direct
+      },
+    },
+    catalogInstallation: {
+      install: async () => {
+        throw new Error('must not use Catalog installation')
+      },
+    } as unknown as CatalogInstallationService,
+  })
+
+  expect(await service.update({ extensionId: direct.id })).toBe(direct)
+  expect(calls).toEqual([{ extensionId: direct.id }])
+})
+
+test('installed lifecycle refreshes only the recorded Catalog curation', async () => {
+  const base = result({
+    replay: {
+      source: {
+        kind: 'npm',
+        requestedTarget: '@fixture/extension@^1',
+        package: '@fixture/extension',
+        version: '1.0.0',
+        integrity: 'sha512-fixture',
+      },
+      packageRoot: 'node_modules/@fixture/extension',
+      materializationDigest: digest,
+      lock,
+    },
+    lockBytes,
+    immutableSnapshotRoot: '/unused',
+    selection: { kind: 'extension', extensionId: 'fixture.extension' },
+  })
+  const curated: GenericExtensionInstallationRecord = {
+    ...base,
+    curation: {
+      extension_id: base.id,
+      catalog_name: 'team',
+      catalog_id: 'team.catalog',
+      repository: '/tmp/team.git',
+      commit,
+      snapshot_acquired_at: 1_000,
+      source_locator: { kind: 'package', entryIndex: 0 },
+      execution_materialization_digest: base.materialization_digest,
+    },
+  }
+  let received: unknown
+  const service = new InstalledExtensionLifecycleService({
+    records: { readRecords: async () => [curated] },
+    installer: {
+      updateDirect: async () => {
+        throw new Error('must not use direct update')
+      },
+    },
+    catalogInstallation: {
+      install: async (input: unknown) => {
+        received = input
+        return curated
+      },
+    } as CatalogInstallationService,
+  })
+
+  expect(await service.update({ extensionId: curated.id })).toBe(curated)
+  expect(received).toEqual({
+    catalog: 'team',
+    extensionId: curated.id,
+    expectedPrevious: curated,
+  })
+})
+
+test('install invocation delegates without a redundant trust flag', async () => {
   let shows = 0
-  let installs = 0
   const service = new CatalogInstallationService({
     catalogs: {
       show: async () => {
         shows += 1
-        throw new Error('must not refresh')
+        throw Object.assign(new Error('unknown Catalog'), {
+          code: 'invalid_args',
+        })
       },
     },
     installer: {
       installExact: async () => {
-        installs += 1
         throw new Error('must not install')
       },
     },
@@ -120,11 +216,9 @@ test('requires install trust before refresh or snapshot access', async () => {
     service.install({
       catalog: 'fixture',
       extensionId: 'fixture.extension',
-      trust: false,
     }),
   ).rejects.toMatchObject({ code: 'invalid_args' })
-  expect(shows).toBe(0)
-  expect(installs).toBe(0)
+  expect(shows).toBe(1)
 })
 
 test('delegates one exact package replay with structured Catalog curation', async () => {
@@ -172,7 +266,6 @@ test('delegates one exact package replay with structured Catalog curation', asyn
     await service.install({
       catalog: 'fixture',
       extensionId: 'fixture.extension',
-      trust: true,
       noRefresh: true,
     })
 
@@ -276,7 +369,6 @@ test('rejects commit when the selected Catalog snapshot and exact entry changed 
     const install = service.install({
       catalog: 'fixture',
       extensionId: 'fixture.extension',
-      trust: true,
     })
     await staged
     current = replaced
@@ -327,7 +419,6 @@ test('replays literal author packages from the immutable snapshot locator', asyn
     await service.install({
       catalog: 'fixture',
       extensionId: 'fixture.extension',
-      trust: true,
     })
 
     expect(calls[0]).toMatchObject({
@@ -394,7 +485,6 @@ test('rejects snapshot drift before exact install', async () => {
       service.install({
         catalog: 'fixture',
         extensionId: 'fixture.extension',
-        trust: true,
       }),
     ).rejects.toThrow('snapshot')
     expect(installs).toBe(0)

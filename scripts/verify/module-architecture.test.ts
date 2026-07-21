@@ -203,12 +203,9 @@ test('provider implementation and endpoint literals stay outside core and CLI', 
 test('OAuth App and Account CLIs have no literal long-lived credential inputs', async () => {
   const accessSources = (
     await Promise.all(
-      [
-        'args/oauth-app.ts',
-        'commands/oauth-app.ts',
-        'args/account.ts',
-        'commands/account.ts',
-      ].map((path) => Bun.file(new URL(path, cliRoot)).text()),
+      ['commands/oauth-app.ts', 'commands/account.ts'].map((path) =>
+        Bun.file(new URL(path, cliRoot)).text(),
+      ),
     )
   ).join('\n')
   expect(accessSources).not.toMatch(
@@ -403,7 +400,7 @@ test('secret backend selection has one explicit owner and no literal-secret CLI'
 
   const secretCli = (
     await Promise.all(
-      ['args/secrets.ts', 'commands/secrets.ts'].map((path) =>
+      ['commands/secrets.ts'].map((path) =>
         Bun.file(new URL(path, cliRoot)).text(),
       ),
     )

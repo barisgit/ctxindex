@@ -1,37 +1,48 @@
-import { defineCommand } from 'citty'
 import { handleAccountCommand } from '../account/handle-account-command'
+import { defineCtxCommand } from '../command-model'
 import { runWithExit } from '../format/exit'
 
-export const accountCommand = defineCommand({
+export const accountCommand = defineCtxCommand({
   meta: { name: 'account', description: 'Authorize and manage Accounts.' },
   subCommands: {
-    add: defineCommand({
+    add: defineCtxCommand({
       meta: {
         name: 'add',
         description: 'Authorize one provider Account.',
       },
       args: {
-        provider: { type: 'positional', required: false },
+        provider: { type: 'positional', required: true },
         label: { type: 'string', description: 'Global Account label' },
         app: { type: 'string', description: 'Provider-scoped OAuth App label' },
       },
-      run: ({ rawArgs }) =>
-        runWithExit(() => handleAccountCommand(['add', ...rawArgs])),
+      run: ({ args }) =>
+        runWithExit(() =>
+          handleAccountCommand({
+            kind: 'add',
+            provider: args.provider,
+            ...(args.app !== undefined ? { app: args.app } : {}),
+            ...(args.label !== undefined ? { label: args.label } : {}),
+          }),
+        ),
     }),
-    list: defineCommand({
+    list: defineCtxCommand({
       meta: {
         name: 'list',
         description: 'List Accounts with bound Sources.',
       },
       args: { json: { type: 'boolean', description: 'Print JSON' } },
-      run: ({ rawArgs }) =>
-        runWithExit(() => handleAccountCommand(['list', ...rawArgs])),
+      run: ({ args }) =>
+        runWithExit(() =>
+          handleAccountCommand({ kind: 'list', json: args.json ?? false }),
+        ),
     }),
-    remove: defineCommand({
+    remove: defineCtxCommand({
       meta: { name: 'remove', description: 'Remove an Account by label.' },
-      args: { label: { type: 'positional', required: false } },
-      run: ({ rawArgs }) =>
-        runWithExit(() => handleAccountCommand(['remove', ...rawArgs])),
+      args: { label: { type: 'positional', required: true } },
+      run: ({ args }) =>
+        runWithExit(() =>
+          handleAccountCommand({ kind: 'remove', label: args.label }),
+        ),
     }),
   },
 })

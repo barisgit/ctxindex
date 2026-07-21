@@ -10,6 +10,7 @@ import type {
 import { fromMarkdown } from 'mdast-util-from-markdown'
 import { z } from 'zod'
 import { compareUnicodeCodePoints } from '../internal/code-point-order'
+import { containsTerminalControlCharacters } from '../internal/terminal-controls'
 import type { CollectedExtension } from '../registry/complete-registry'
 import { createExtensionHostDiagnostic } from './diagnostics'
 
@@ -464,7 +465,8 @@ function normalizeCandidates(
         candidate.path.startsWith('assets/') ||
         candidate.mediaType !== 'text/markdown' ||
         typeof candidate.content !== 'string' ||
-        byteLength(candidate.content) > MAX_MARKDOWN_BYTES
+        byteLength(candidate.content) > MAX_MARKDOWN_BYTES ||
+        containsTerminalControlCharacters(candidate.content)
       )
         invalid(candidate.path)
       const references = markdownReferences(candidate.content, candidate.path)

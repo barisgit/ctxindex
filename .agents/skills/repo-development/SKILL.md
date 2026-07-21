@@ -52,7 +52,7 @@ ctxindex --help
 ```sh
 bun install
 bash scripts/verify/cli.sh
-bun cli extensions list
+bun cli extension list
 bun cli describe
 ```
 
@@ -92,10 +92,10 @@ Use `sync` only when the selected Adapter declares that capability. Federated So
 
 ```sh
 bun cli get <ref> --json
-bun cli thread get <ref> --json
+bun cli thread <ref> --json
 bun cli artifact list <ref> --json
 bun cli artifact download <artifact-ref> --output <path> --json
-bun cli export <ref> --format <generated-format> --output <path> --json
+bun cli export <ref> --format <generated-format> > output.ext
 ```
 
 For a recent remote mailbox listing, select one Source and message kind explicitly; query text is optional when a Source, kind, field, or time constraint narrows `--remote`. Derive the exact kind and boolean field name from `describe` rather than copying provider vocabulary. For a Profile that declares `unread`, both `--field unread=true` and `--field unread=false` are exact booleans.
@@ -105,7 +105,7 @@ Remote paging is cursor-based and distinct from local offsets when the selected 
 Before any provider mutation, inspect the generated reversible Action schema and select the Source explicitly. Provider mutations stop at reversible email Draft create/update; ctxindex never sends mail.
 
 ```sh
-bun cli action describe <generated-action-id> --source <source-id> --json
+bun cli describe action <generated-action-id> --source <source-id> --json
 bun cli action run <generated-action-id> --source <source-id> --input <json-or-file> --json
 ```
 

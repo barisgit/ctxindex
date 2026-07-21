@@ -85,6 +85,23 @@ test.each([
   )
 })
 
+test.each([
+  ['escape', '\u001b[31mred'],
+  ['bell', '\u0007alert'],
+  ['standalone carriage return', 'safe\roverwrite'],
+  ['C1 control', '\u009b31mred'],
+] as const)('rejects %s terminal controls in Markdown', async (_, control) => {
+  await expect(
+    resolveFiles([markdown('README.md', `# Fixture\n\n${control}`)]),
+  ).rejects.toThrow('Invalid Extension documentation at README.md')
+})
+
+test('preserves safe Markdown whitespace exactly', async () => {
+  const content = '# Fixture\r\n\r\n\tIndented\r\n'
+  const result = await resolveFiles([markdown('README.md', content)])
+  expect(result.documentation?.files[0]?.content).toBe(content)
+})
+
 test('accepts passive fragment and HTTPS links without fetching them', async () => {
   const result = await resolveFiles([
     markdown(

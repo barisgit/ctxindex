@@ -280,22 +280,20 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       runProcess([relocatedPath, ...args], { cwd: '/', env })
 
     const invalid = await run([
-      'extensions',
+      'extension',
       'install',
       'npm',
       'fixture@../local',
-      '--extension',
       'fixture.invalid',
       '--json',
     ])
     expect(invalid.exitCode).toBe(2)
     expect(registryRequests).toBe(0)
     const credentialed = await run([
-      'extensions',
+      'extension',
       'install',
       'git',
       'git+https://user:secret@example.invalid/repository.git',
-      '--extension',
       'fixture.invalid',
       '--json',
     ])
@@ -304,11 +302,10 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
 
     expect((await run(['init'])).exitCode).toBe(0)
     const npmInstalled = await run([
-      'extensions',
+      'extension',
       'install',
       'npm',
       'fixture-direct-npm@^1',
-      '--extension',
       'fixture.direct.npm',
       '--json',
     ])
@@ -334,11 +331,10 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
     ).toBe(false)
 
     const gitInstalled = await run([
-      'extensions',
+      'extension',
       'install',
       'git',
       `git+${registry}/repo.git#main`,
-      '--extension',
       'fixture.direct.git',
       '--json',
     ])
@@ -350,11 +346,10 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
     expect(gitResolvedIdentity).toMatch(/^[0-9a-f]{40,64}$/)
 
     const localInstalled = await run([
-      'extensions',
+      'extension',
       'install',
       'local',
       localPackage,
-      '--extension',
       'fixture.direct.local',
       '--json',
     ])
@@ -423,7 +418,7 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
     )
 
     const npmUpdated = await run([
-      'extensions',
+      'extension',
       'update',
       'fixture.direct.npm',
       '--json',
@@ -433,7 +428,7 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       npmV1.materializationDigest,
     )
     const gitUpdated = await run([
-      'extensions',
+      'extension',
       'update',
       'fixture.direct.git',
       '--json',
@@ -443,7 +438,7 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       gitResolvedIdentity,
     )
     const localUpdated = await run([
-      'extensions',
+      'extension',
       'update',
       'fixture.direct.local',
       '--json',
@@ -529,7 +524,7 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
     ).sort()
     const resourceRef = 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/file/offline-note'
     for (const args of [
-      ['extensions', 'list', '--json'],
+      ['extension', 'list', '--json'],
       ['describe', 'adapter', 'fixture.direct.local-adapter', '--json'],
       ['oauth-app', 'list', '--json'],
       ['account', 'list', '--json'],
@@ -557,7 +552,7 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       ['export', '--format', 'json', resourceRef],
       ['thread', 'get', '--json', resourceRef],
       ['artifact', 'list', '--json', resourceRef],
-      ['extensions', 'catalog', 'list', '--no-refresh', '--json'],
+      ['extension', 'catalog', 'list', '--no-refresh', '--json'],
       ['skills', 'list', '--json'],
     ]) {
       const result = await run(args, offlineEnv)
@@ -571,13 +566,13 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
     expect(registryRequests).toBe(requestsBeforeOffline)
 
     const blocked = await run(
-      ['extensions', 'uninstall', 'fixture.direct.local', '--json'],
+      ['extension', 'uninstall', 'fixture.direct.local', '--json'],
       offlineEnv,
     )
     expect(blocked.exitCode).toBe(2)
     expect(blocked.stderr).toContain('fixture-source')
     const forced = await run(
-      ['extensions', 'uninstall', 'fixture.direct.local', '--force', '--json'],
+      ['extension', 'uninstall', 'fixture.direct.local', '--force', '--json'],
       offlineEnv,
     )
     expect(forced.exitCode, forced.stderr).toBe(0)

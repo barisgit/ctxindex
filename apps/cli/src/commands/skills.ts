@@ -1,5 +1,4 @@
-import { defineCommand } from 'citty'
-import { parseSkillsArgs, skillsUsage } from '../args/skills'
+import { defineCtxCommand } from '../command-model'
 import { mapErrorToExit, runWithExit } from '../format/exit'
 import { formatSkill, formatSkillsList } from '../format/skills'
 import { getSkillContent, listSkills } from '../skills/loader'
@@ -9,14 +8,19 @@ function printOutput(output: string): void {
   if (output.length > 0) console.log(output)
 }
 
-export async function handleSkillsCommand(args: string[]): Promise<number> {
-  const parsed = parseSkillsArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(`${parsed.message}. Try: ${skillsUsage}`)
-    return 2
-  }
+export type SkillsCommandInput =
+  | { readonly kind: 'list'; readonly json: boolean }
+  | {
+      readonly kind: 'get'
+      readonly name: string
+      readonly inline: boolean
+      readonly json: boolean
+    }
+  | { readonly kind: 'path' }
 
+export async function handleSkillsCommand(
+  parsed: SkillsCommandInput,
+): Promise<number> {
   try {
     const skills = resolveBundledSkills()
     if (parsed.kind === 'list') {
@@ -35,28 +39,37 @@ export async function handleSkillsCommand(args: string[]): Promise<number> {
   }
 }
 
-export const skillsCommand = defineCommand({
+export const skillsCommand = defineCtxCommand({
   meta: { name: 'skills', description: 'Inspect bundled skills.' },
   subCommands: {
-    list: defineCommand({
+    list: defineCtxCommand({
       meta: { name: 'list', description: 'List bundled skills.' },
       args: { json: { type: 'boolean', description: 'Print JSON' } },
-      run: ({ rawArgs }) =>
-        runWithExit(() => handleSkillsCommand(['list', ...rawArgs])),
+      run: ({ args }) =>
+        runWithExit(() =>
+          handleSkillsCommand({ kind: 'list', json: args.json ?? false }),
+        ),
     }),
-    get: defineCommand({
+    get: defineCtxCommand({
       meta: { name: 'get', description: 'Print a bundled skill.' },
       args: {
-        name: { type: 'positional', required: false },
+        name: { type: 'positional', required: true },
         inline: { type: 'boolean', description: 'Inline file references' },
         json: { type: 'boolean', description: 'Print JSON' },
       },
-      run: ({ rawArgs }) =>
-        runWithExit(() => handleSkillsCommand(['get', ...rawArgs])),
+      run: ({ args }) =>
+        runWithExit(() =>
+          handleSkillsCommand({
+            kind: 'get',
+            name: args.name,
+            inline: args.inline ?? false,
+            json: args.json ?? false,
+          }),
+        ),
     }),
-    path: defineCommand({
+    path: defineCtxCommand({
       meta: { name: 'path', description: 'Print bundled skills location.' },
-      run: () => runWithExit(() => handleSkillsCommand(['path'])),
+      run: () => runWithExit(() => handleSkillsCommand({ kind: 'path' })),
     }),
   },
 })

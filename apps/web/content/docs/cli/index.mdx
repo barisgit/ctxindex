@@ -1,77 +1,1312 @@
 ---
 title: CLI reference
-description: Complete command index for the deterministic ctxindex CLI.
+description: Generated command and option reference for ctxindex.
 ---
 
-The CLI is the integration surface for ctxindex. Installed builds use `ctxindex`; from the repository root, use `bun cli` instead.
+<!-- Generated from the Citty command tree. Do not edit by hand. -->
 
-```sh
-ctxindex --help
-# Development checkout
-bun cli --help
+The command tree below is generated from the same definitions used for parsing and `--help`. For task-oriented workflows, use the guides and examples instead.
+
+## `ctxindex`
+
+Give shell-capable agents one local, typed interface to your personal context.
+
+```text
+Give shell-capable agents one local, typed interface to your personal context. (ctxindex v0.0.0)
+
+USAGE ctxindex [OPTIONS] init|account|oauth-app|describe|docs|daemon|extension|action|artifact|realm|source|sync|get|export|thread|search|status|secrets|skills
+
+OPTIONS
+
+  --log-level=<trace|debug|info|warn|error|fatal>    Diagnostic verbosity
+
+COMMANDS
+
+       init    Set up ctxindex config, data, state, cache, logs, and SQLite.
+    account    Authorize and manage Accounts.
+  oauth-app    Manage available OAuth Apps.
+   describe    Describe loaded Profiles, Adapters, and Actions.
+       docs    Inspect bundled and loaded Extension documentation offline.
+     daemon    Manage the foreground local daemon.
+  extension    Inspect and manage Extensions.
+     action    Run typed Actions.
+   artifact    List, download, and purge managed Artifacts.
+      realm    Manage indexing realms.
+     source    Manage indexed sources.
+       sync    Run a sync for one or all sources.
+        get    Get a Resource by exact Ref.
+     export    Export a Resource in a Profile format.
+     thread    Get a local related Resource thread.
+     search    Search context Resources.
+     status    Show last sync status.
+    secrets    Inspect and select secret storage.
+     skills    Inspect bundled skills.
+
+Use ctxindex <command> --help for more information about a command.
+
+INTERFACE
+
+  ctxindex describe --help  Describe loaded Profiles, Adapters, and Actions.
 ```
 
-<Callout title="Discover registry-defined options">
-Profiles, kinds, fields, export formats, Actions, and Adapter configuration come from the loaded registry. Use `ctxindex describe` for the current vocabulary instead of assuming provider-specific values.
-</Callout>
-
-## Commands
-
-| Command | Purpose | `--json` |
+| Argument | Description | Contract |
 | --- | --- | --- |
-| `ctxindex init` | Initialize config, data, state, cache, logs, and SQLite. | No |
-| `ctxindex account add` | Authorize a provider Account. | No |
-| `ctxindex account list` | List Accounts with authorization health and bound Sources. | Yes |
-| `ctxindex account remove` | Remove an Account and its Grant. | No |
-| `ctxindex oauth-app add` | Persist a local OAuth App from Provider-declared environment variables. | No |
-| `ctxindex oauth-app list` | List available Extension and local OAuth Apps safely. | Yes |
-| `ctxindex oauth-app remove` | Remove a local OAuth App. | No |
-| `ctxindex describe` | Inspect loaded Profiles, Adapters, and Actions. | Yes |
-| `ctxindex extensions list` | List loaded Extensions. | Yes |
-| `ctxindex extensions catalog add` | Trust and add a pinned Git Catalog. | Yes |
-| `ctxindex extensions catalog list` | Refresh and list merged local Catalog entries. | Yes |
-| `ctxindex extensions catalog show` | Refresh and inspect a Catalog or exact Extension entry. | Yes |
-| `ctxindex extensions catalog refresh` | Refresh one Catalog snapshot. | Yes |
-| `ctxindex extensions catalog remove` | Remove an unused Catalog. | Yes |
-| `ctxindex extensions install` | Trust and install an exact Catalog Extension. | Yes |
-| `ctxindex extensions uninstall` | Uninstall an exact Catalog Extension. | Yes |
-| `ctxindex action describe` | Inspect a typed Action and Source availability. | Yes |
-| `ctxindex action run` | Validate and run a typed Action through one Source. | Yes |
-| `ctxindex artifact list` | List Artifact descriptors for a Resource. | Yes |
-| `ctxindex artifact download` | Download Artifact bytes into the managed cache. | Yes |
-| `ctxindex purge artifacts` | Remove managed Artifact cache state. | Yes |
-| `ctxindex realm add` | Create a Realm. | No |
-| `ctxindex realm list` | List Realms. | Yes |
-| `ctxindex source add` | Configure a Source in a Realm. | No |
-| `ctxindex source list` | List Sources. | Yes |
-| `ctxindex source remove` | Remove a Source. | No |
-| `ctxindex sync` | Synchronize one or all Sources. | Yes |
-| `ctxindex get` | Retrieve a Resource by exact Ref. | Yes |
-| `ctxindex export` | Stream a Profile export. | Use `--format json` |
-| `ctxindex thread get` | Traverse a local Resource thread. | Yes |
-| `ctxindex search` | Search Resources across selected Sources. | Yes |
-| `ctxindex status` | Show last sync status. | Yes |
-| `ctxindex secrets status` | Inspect safe secret-backend status. | Yes |
-| `ctxindex secrets backend set` | Move secrets to the selected backend. | No |
-| `ctxindex skills list` | List bundled skills. | Yes |
-| `ctxindex skills get` | Print one bundled skill. | Yes |
-| `ctxindex skills path` | Print the bundled-skills location. | No |
+| `--log-level` | Diagnostic verbosity | Optional. Choices: `trace`, `debug`, `info`, `warn`, `error`, `fatal` |
 
-## Machine-readable output
+## `ctxindex init`
 
-Commands that expose `--json` write JSON to stdout and diagnostics to stderr. Prefer it in scripts and agent calls. `export` is a byte-stream command: select its always-available JSON representation with `--format json` rather than `--json`.
+Set up ctxindex config, data, state, cache, logs, and SQLite.
 
-## Exit codes
+```text
+Set up ctxindex config, data, state, cache, logs, and SQLite. (ctxindex init v0.0.0)
 
-Exit codes are a stable API. Callers should branch on the code instead of parsing diagnostic text.
+USAGE ctxindex init
+```
 
-| Exit | Meaning |
-| ---: | --- |
-| `0` | Success |
-| `2` | Invalid usage |
-| `10` | `needs_auth` |
-| `20` | Rate limited |
-| `30` | Network or provider failure |
-| `40` | Permission denied |
-| `50` | Other sync failure |
-| `130` | Cancelled by SIGINT |
+## `ctxindex account`
+
+Authorize and manage Accounts.
+
+```text
+Authorize and manage Accounts. (ctxindex account v0.0.0)
+
+USAGE ctxindex account add|list|remove
+
+COMMANDS
+
+     add    Authorize one provider Account.
+    list    List Accounts with bound Sources.
+  remove    Remove an Account by label.
+
+Use ctxindex account <command> --help for more information about a command.
+```
+
+## `ctxindex account add`
+
+Authorize one provider Account.
+
+```text
+Authorize one provider Account. (ctxindex account add v0.0.0)
+
+USAGE ctxindex account add [OPTIONS] <PROVIDER>
+
+ARGUMENTS
+
+  PROVIDER    (Required)
+
+OPTIONS
+
+  --label=<label>    Global Account label
+      --app=<app>    Provider-scoped OAuth App label
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<provider>` |  | Required |
+| `--label` | Global Account label | Optional |
+| `--app` | Provider-scoped OAuth App label | Optional |
+
+## `ctxindex account list`
+
+List Accounts with bound Sources.
+
+```text
+List Accounts with bound Sources. (ctxindex account list v0.0.0)
+
+USAGE ctxindex account list [OPTIONS]
+
+OPTIONS
+
+  --json    Print JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `--json` | Print JSON | Optional |
+
+## `ctxindex account remove`
+
+Remove an Account by label.
+
+```text
+Remove an Account by label. (ctxindex account remove v0.0.0)
+
+USAGE ctxindex account remove [OPTIONS] <LABEL>
+
+ARGUMENTS
+
+  LABEL    (Required)
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<label>` |  | Required |
+
+## `ctxindex oauth-app`
+
+Manage available OAuth Apps.
+
+```text
+Manage available OAuth Apps. (ctxindex oauth-app v0.0.0)
+
+USAGE ctxindex oauth-app add|list|remove
+
+COMMANDS
+
+     add    Add a local OAuth App from declared environment values.
+    list    List available OAuth Apps.
+  remove    Remove a local OAuth App.
+
+Use ctxindex oauth-app <command> --help for more information about a command.
+```
+
+## `ctxindex oauth-app add`
+
+Add a local OAuth App from declared environment values.
+
+```text
+Add a local OAuth App from declared environment values. (ctxindex oauth-app add v0.0.0)
+
+USAGE ctxindex oauth-app add [OPTIONS] <PROVIDER> <LABEL> --from-env
+
+ARGUMENTS
+
+  PROVIDER    (Required)
+     LABEL    (Required)
+
+OPTIONS
+
+  --from-env    Read Provider-declared environment values (Required)
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<provider>` |  | Required |
+| `<label>` |  | Required |
+| `--from-env` | Read Provider-declared environment values | Required |
+
+## `ctxindex oauth-app list`
+
+List available OAuth Apps.
+
+```text
+List available OAuth Apps. (ctxindex oauth-app list v0.0.0)
+
+USAGE ctxindex oauth-app list [OPTIONS]
+
+OPTIONS
+
+  --json    Output JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `--json` | Output JSON | Optional |
+
+## `ctxindex oauth-app remove`
+
+Remove a local OAuth App.
+
+```text
+Remove a local OAuth App. (ctxindex oauth-app remove v0.0.0)
+
+USAGE ctxindex oauth-app remove [OPTIONS] <PROVIDER> <LABEL>
+
+ARGUMENTS
+
+  PROVIDER    (Required)
+     LABEL    (Required)
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<provider>` |  | Required |
+| `<label>` |  | Required |
+
+## `ctxindex describe`
+
+Describe loaded Profiles, Adapters, and Actions.
+
+```text
+Describe loaded Profiles, Adapters, and Actions. (ctxindex describe v0.0.0)
+
+USAGE ctxindex describe [OPTIONS] [SELECTOR] [ID]
+
+ARGUMENTS
+
+  SELECTOR=<profile|adapter|action>    Definition kind: profile, adapter, or action
+                                 ID    Definition id
+
+OPTIONS
+
+  --format=<text|markdown|json>    Output format (Default: text)
+                         --json    Print pure JSON
+                         --full    Show every matched definition
+              --source=<source>    Exact Source label or ID
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<selector>` | Definition kind: profile, adapter, or action | Optional. Choices: `profile`, `adapter`, `action` |
+| `<id>` | Definition id | Optional |
+| `--format` | Output format | Optional. Choices: `text`, `markdown`, `json`. Default: `text` |
+| `--json` | Print pure JSON | Optional |
+| `--full` | Show every matched definition | Optional |
+| `--source` | Exact Source label or ID | Optional |
+
+## `ctxindex docs`
+
+Inspect bundled and loaded Extension documentation offline.
+
+```text
+Inspect bundled and loaded Extension documentation offline. (ctxindex docs v0.0.0)
+
+USAGE ctxindex docs list|get|search
+
+COMMANDS
+
+    list    List offline documentation.
+     get    Retrieve exact offline documentation.
+  search    Search offline documentation.
+
+Use ctxindex docs <command> --help for more information about a command.
+```
+
+## `ctxindex docs list`
+
+List offline documentation.
+
+```text
+List offline documentation. (ctxindex docs list v0.0.0)
+
+USAGE ctxindex docs list [OPTIONS]
+
+OPTIONS
+
+  --extension=<extension>    Select one exact loaded Extension id
+                   --json    Print JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `--extension` | Select one exact loaded Extension id | Optional |
+| `--json` | Print JSON | Optional |
+
+## `ctxindex docs get`
+
+Retrieve exact offline documentation.
+
+```text
+Retrieve exact offline documentation. (ctxindex docs get v0.0.0)
+
+USAGE ctxindex docs get [OPTIONS] <PATH>
+
+ARGUMENTS
+
+  PATH    Normalized logical POSIX path (Required)
+
+OPTIONS
+
+  --extension=<extension>    Select one exact loaded Extension id
+        --output=<output>    Copy content to this explicit output path
+                   --json    Print JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<path>` | Normalized logical POSIX path | Required |
+| `--extension` | Select one exact loaded Extension id | Optional |
+| `--output` | Copy content to this explicit output path | Optional |
+| `--json` | Print JSON | Optional |
+
+## `ctxindex docs search`
+
+Search offline documentation.
+
+```text
+Search offline documentation. (ctxindex docs search v0.0.0)
+
+USAGE ctxindex docs search [OPTIONS] <QUERY>
+
+ARGUMENTS
+
+  QUERY    Case-insensitive text query (Required)
+
+OPTIONS
+
+  --extension=<extension>    Select one exact loaded Extension id
+                   --json    Print JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<query>` | Case-insensitive text query | Required |
+| `--extension` | Select one exact loaded Extension id | Optional |
+| `--json` | Print JSON | Optional |
+
+## `ctxindex daemon`
+
+Manage the foreground local daemon.
+
+```text
+Manage the foreground local daemon. (ctxindex daemon v0.0.0)
+
+USAGE ctxindex daemon serve|health|shutdown
+
+COMMANDS
+
+     serve    Serve in the foreground.
+    health    Inspect daemon health.
+  shutdown    Request graceful shutdown.
+
+Use ctxindex daemon <command> --help for more information about a command.
+```
+
+## `ctxindex daemon serve`
+
+Serve in the foreground.
+
+```text
+Serve in the foreground. (ctxindex daemon serve v0.0.0)
+
+USAGE ctxindex daemon serve
+```
+
+## `ctxindex daemon health`
+
+Inspect daemon health.
+
+```text
+Inspect daemon health. (ctxindex daemon health v0.0.0)
+
+USAGE ctxindex daemon health [OPTIONS]
+
+OPTIONS
+
+  --json    Print JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `--json` | Print JSON | Optional |
+
+## `ctxindex daemon shutdown`
+
+Request graceful shutdown.
+
+```text
+Request graceful shutdown. (ctxindex daemon shutdown v0.0.0)
+
+USAGE ctxindex daemon shutdown [OPTIONS]
+
+OPTIONS
+
+  --json    Print JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `--json` | Print JSON | Optional |
+
+## `ctxindex extension`
+
+Inspect and manage Extensions.
+
+```text
+Inspect and manage Extensions. (ctxindex extension v0.0.0)
+
+USAGE ctxindex extension list|catalog|install|update|uninstall
+
+COMMANDS
+
+       list    List loaded Extensions.
+    catalog    Manage trusted Git Catalogs.
+    install    Trust, acquire, and execute one exact Catalog, npm, Git, or local Extension.
+     update    Trust, reacquire, and execute an installed Extension from its persisted provenance.
+  uninstall    Uninstall an Extension.
+
+Use ctxindex extension <command> --help for more information about a command.
+```
+
+## `ctxindex extension list`
+
+List loaded Extensions.
+
+```text
+List loaded Extensions. (ctxindex extension list v0.0.0)
+
+USAGE ctxindex extension list [OPTIONS]
+
+OPTIONS
+
+  --json    Print JSON (Default: false)
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `--json` | Print JSON | Optional. Default: `false` |
+
+## `ctxindex extension catalog`
+
+Manage trusted Git Catalogs.
+
+```text
+Manage trusted Git Catalogs. (ctxindex extension catalog v0.0.0)
+
+USAGE ctxindex extension catalog build|add|list|show|search|refresh|remove
+
+COMMANDS
+
+    build    Build an inert Catalog snapshot from a trusted local package.
+      add    Add a trusted Git Catalog.
+     list    List Git Catalogs.
+     show    Show a Git Catalog entry.
+   search    Search Extensions across configured Catalogs.
+  refresh    Refresh a Git Catalog pin.
+   remove    Remove a Git Catalog.
+
+Use ctxindex extension catalog <command> --help for more information about a command.
+```
+
+## `ctxindex extension catalog build`
+
+Build an inert Catalog snapshot from a trusted local package.
+
+```text
+Build an inert Catalog snapshot from a trusted local package. (ctxindex extension catalog build v0.0.0)
+
+USAGE ctxindex extension catalog build [OPTIONS] <PACKAGE-ROOT> --trust
+
+ARGUMENTS
+
+  PACKAGE-ROOT    Catalog author package root (Required)
+
+OPTIONS
+
+  --catalog=<catalog>    Exact Catalog id
+    --output=<output>    Write the generated ctxindex-catalog.json manifest to this file path
+              --trust    Acknowledge the explicit trust boundary (Required)
+               --json    Print JSON (Default: false)
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<package-root>` | Catalog author package root | Required |
+| `--catalog` | Exact Catalog id | Optional |
+| `--output` | Write the generated ctxindex-catalog.json manifest to this file path | Optional |
+| `--trust` | Acknowledge the explicit trust boundary | Required |
+| `--json` | Print JSON | Optional. Default: `false` |
+
+## `ctxindex extension catalog add`
+
+Add a trusted Git Catalog.
+
+```text
+Add a trusted Git Catalog. (ctxindex extension catalog add v0.0.0)
+
+USAGE ctxindex extension catalog add [OPTIONS] <NAME> <REPOSITORY> --ref=<ref> --trust
+
+ARGUMENTS
+
+        NAME    (Required)
+  REPOSITORY    (Required)
+
+OPTIONS
+
+  --ref=<ref>    (Required)
+      --trust    Acknowledge the explicit trust boundary (Required)
+       --json    Print JSON (Default: false)
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<name>` |  | Required |
+| `<repository>` |  | Required |
+| `--ref` |  | Required |
+| `--trust` | Acknowledge the explicit trust boundary | Required |
+| `--json` | Print JSON | Optional. Default: `false` |
+
+## `ctxindex extension catalog list`
+
+List Git Catalogs.
+
+```text
+List Git Catalogs. (ctxindex extension catalog list v0.0.0)
+
+USAGE ctxindex extension catalog list [OPTIONS]
+
+OPTIONS
+
+     --refresh    Refresh Catalog state before reading (Default: true)
+  --no-refresh    Use the stored Catalog snapshot without refreshing
+        --json    Print JSON (Default: false)
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `--refresh` | Refresh Catalog state before reading | Optional. Default: `true` |
+| `--json` | Print JSON | Optional. Default: `false` |
+
+## `ctxindex extension catalog show`
+
+Show a Git Catalog entry.
+
+```text
+Show a Git Catalog entry. (ctxindex extension catalog show v0.0.0)
+
+USAGE ctxindex extension catalog show [OPTIONS] <NAME> [EXTENSION-ID]
+
+ARGUMENTS
+
+          NAME    (Required)
+  EXTENSION-ID
+
+OPTIONS
+
+     --refresh    Refresh Catalog state before reading (Default: true)
+  --no-refresh    Use the stored Catalog snapshot without refreshing
+        --json    Print JSON (Default: false)
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<name>` |  | Required |
+| `<extension-id>` |  | Optional |
+| `--refresh` | Refresh Catalog state before reading | Optional. Default: `true` |
+| `--json` | Print JSON | Optional. Default: `false` |
+
+## `ctxindex extension catalog search`
+
+Search Extensions across configured Catalogs.
+
+```text
+Search Extensions across configured Catalogs. (ctxindex extension catalog search v0.0.0)
+
+USAGE ctxindex extension catalog search [OPTIONS] [QUERY]
+
+ARGUMENTS
+
+  QUERY
+
+OPTIONS
+
+     --refresh    Refresh Catalog state before reading (Default: true)
+  --no-refresh    Use the stored Catalog snapshot without refreshing
+        --json    Print JSON (Default: false)
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<query>` |  | Optional |
+| `--refresh` | Refresh Catalog state before reading | Optional. Default: `true` |
+| `--json` | Print JSON | Optional. Default: `false` |
+
+## `ctxindex extension catalog refresh`
+
+Refresh a Git Catalog pin.
+
+```text
+Refresh a Git Catalog pin. (ctxindex extension catalog refresh v0.0.0)
+
+USAGE ctxindex extension catalog refresh [OPTIONS] <NAME>
+
+ARGUMENTS
+
+  NAME    (Required)
+
+OPTIONS
+
+  --json    Print JSON (Default: false)
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<name>` |  | Required |
+| `--json` | Print JSON | Optional. Default: `false` |
+
+## `ctxindex extension catalog remove`
+
+Remove a Git Catalog.
+
+```text
+Remove a Git Catalog. (ctxindex extension catalog remove v0.0.0)
+
+USAGE ctxindex extension catalog remove [OPTIONS] <NAME>
+
+ARGUMENTS
+
+  NAME    (Required)
+
+OPTIONS
+
+  --json    Print JSON (Default: false)
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<name>` |  | Required |
+| `--json` | Print JSON | Optional. Default: `false` |
+
+## `ctxindex extension install`
+
+Trust, acquire, and execute one exact Catalog, npm, Git, or local Extension.
+
+```text
+Trust, acquire, and execute one exact Catalog, npm, Git, or local Extension. (ctxindex extension install v0.0.0)
+
+USAGE ctxindex extension install [OPTIONS] <SOURCE-KIND> <TARGET> <EXTENSION-ID>
+
+ARGUMENTS
+
+  SOURCE-KIND=<catalog|npm|git|local>    Exact Extension source kind (Required)
+                               TARGET    Catalog name or direct package target (Required)
+                         EXTENSION-ID    Stable Extension id (Required)
+
+OPTIONS
+
+     --refresh    Refresh Catalog state before reading (Default: true)
+  --no-refresh    Use the stored Catalog snapshot without refreshing
+        --json    Print JSON (Default: false)
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<source-kind>` | Exact Extension source kind | Required. Choices: `catalog`, `npm`, `git`, `local` |
+| `<target>` | Catalog name or direct package target | Required |
+| `<extension-id>` | Stable Extension id | Required |
+| `--refresh` | Refresh Catalog state before reading | Optional. Default: `true` |
+| `--json` | Print JSON | Optional. Default: `false` |
+
+## `ctxindex extension update`
+
+Trust, reacquire, and execute an installed Extension from its persisted provenance.
+
+```text
+Trust, reacquire, and execute an installed Extension from its persisted provenance. (ctxindex extension update v0.0.0)
+
+USAGE ctxindex extension update [OPTIONS] <EXTENSION-ID>
+
+ARGUMENTS
+
+  EXTENSION-ID    (Required)
+
+OPTIONS
+
+  --json    Print JSON (Default: false)
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<extension-id>` |  | Required |
+| `--json` | Print JSON | Optional. Default: `false` |
+
+## `ctxindex extension uninstall`
+
+Uninstall an Extension.
+
+```text
+Uninstall an Extension. (ctxindex extension uninstall v0.0.0)
+
+USAGE ctxindex extension uninstall [OPTIONS] <EXTENSION-ID>
+
+ARGUMENTS
+
+  EXTENSION-ID    (Required)
+
+OPTIONS
+
+  --force    Remove activation while preserving dependent Sources and data (Default: false)
+   --json    Print JSON (Default: false)
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<extension-id>` |  | Required |
+| `--force` | Remove activation while preserving dependent Sources and data | Optional. Default: `false` |
+| `--json` | Print JSON | Optional. Default: `false` |
+
+## `ctxindex action`
+
+Run typed Actions.
+
+```text
+Run typed Actions. (ctxindex action v0.0.0)
+
+USAGE ctxindex action run
+
+COMMANDS
+
+  run    Run a registry Action.
+
+Use ctxindex action <command> --help for more information about a command.
+```
+
+## `ctxindex action run`
+
+Run a registry Action.
+
+```text
+Run a registry Action. (ctxindex action run v0.0.0)
+
+USAGE ctxindex action run [OPTIONS] <ACTION-ID> --source=<source> --input=<input>
+
+ARGUMENTS
+
+  ACTION-ID    (Required)
+
+OPTIONS
+
+  --source=<source>    Exact Source label or ID (Required)
+    --input=<input>    Inline JSON object or UTF-8 JSON file path (Required)
+             --json    Print deterministic JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<action-id>` |  | Required |
+| `--source` | Exact Source label or ID | Required |
+| `--input` | Inline JSON object or UTF-8 JSON file path | Required |
+| `--json` | Print deterministic JSON | Optional |
+
+## `ctxindex artifact`
+
+List, download, and purge managed Artifacts.
+
+```text
+List, download, and purge managed Artifacts. (ctxindex artifact v0.0.0)
+
+USAGE ctxindex artifact list|download|purge
+
+COMMANDS
+
+      list    List Artifact descriptors for a Resource.
+  download    Download an Artifact into the managed cache.
+     purge    Remove all managed Artifact cache state.
+
+Use ctxindex artifact <command> --help for more information about a command.
+```
+
+## `ctxindex artifact list`
+
+List Artifact descriptors for a Resource.
+
+```text
+List Artifact descriptors for a Resource. (ctxindex artifact list v0.0.0)
+
+USAGE ctxindex artifact list [OPTIONS] <REF>
+
+ARGUMENTS
+
+  REF    Resource Ref (Required)
+
+OPTIONS
+
+  --json    Print deterministic JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<ref>` | Resource Ref | Required |
+| `--json` | Print deterministic JSON | Optional |
+
+## `ctxindex artifact download`
+
+Download an Artifact into the managed cache.
+
+```text
+Download an Artifact into the managed cache. (ctxindex artifact download v0.0.0)
+
+USAGE ctxindex artifact download [OPTIONS] <REF>
+
+ARGUMENTS
+
+  REF    Artifact Ref (Required)
+
+OPTIONS
+
+  --output=<output>    Copy cached bytes to this path
+             --json    Print deterministic JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<ref>` | Artifact Ref | Required |
+| `--output` | Copy cached bytes to this path | Optional |
+| `--json` | Print deterministic JSON | Optional |
+
+## `ctxindex artifact purge`
+
+Remove all managed Artifact cache state.
+
+```text
+Remove all managed Artifact cache state. (ctxindex artifact purge v0.0.0)
+
+USAGE ctxindex artifact purge [OPTIONS]
+
+OPTIONS
+
+  --json    Print deterministic JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `--json` | Print deterministic JSON | Optional |
+
+## `ctxindex realm`
+
+Manage indexing realms.
+
+```text
+Manage indexing realms. (ctxindex realm v0.0.0)
+
+USAGE ctxindex realm add|list
+
+COMMANDS
+
+   add    Add a realm.
+  list    List existing realms.
+
+Use ctxindex realm <command> --help for more information about a command.
+```
+
+## `ctxindex realm add`
+
+Add a realm.
+
+```text
+Add a realm. (ctxindex realm add v0.0.0)
+
+USAGE ctxindex realm add [OPTIONS] <SLUG>
+
+ARGUMENTS
+
+  SLUG    (Required)
+
+OPTIONS
+
+  --name=<name>    Realm display name
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<slug>` |  | Required |
+| `--name` | Realm display name | Optional |
+
+## `ctxindex realm list`
+
+List existing realms.
+
+```text
+List existing realms. (ctxindex realm list v0.0.0)
+
+USAGE ctxindex realm list [OPTIONS]
+
+OPTIONS
+
+  --json    Print JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `--json` | Print JSON | Optional |
+
+## `ctxindex source`
+
+Manage indexed sources.
+
+```text
+Manage indexed sources. (ctxindex source v0.0.0)
+
+USAGE ctxindex source add|list|remove
+
+COMMANDS
+
+     add    Add a source.
+    list    List sources.
+  remove    Remove a source.
+
+Use ctxindex source <command> --help for more information about a command.
+```
+
+## `ctxindex source add`
+
+Add a source.
+
+```text
+Add a source. (ctxindex source add v0.0.0)
+
+USAGE ctxindex source add [OPTIONS] [ADAPTER-ID]
+
+ARGUMENTS
+
+  ADAPTER-ID    Adapter ID
+
+OPTIONS
+
+                          --adapter=<adapter>    Adapter ID
+                              --label=<label>    Global Source label
+                          --account=<account>    Account label or Account ID
+                  --config-json=<config_json>    Adapter config JSON
+  --search-routing=<indexed|federated|hybrid>    Source search routing override
+                                    --no-sync    Disable synchronization for this Source
+                              --realm=<realm>    Realm slug
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `--adapter` | Adapter ID | Optional |
+| `--label` | Global Source label | Optional |
+| `--account` | Account label or Account ID | Optional |
+| `--config-json` | Adapter config JSON | Optional |
+| `--search-routing` | Source search routing override | Optional. Choices: `indexed`, `federated`, `hybrid` |
+| `--no-sync` | Disable synchronization for this Source | Optional |
+| `<adapter-id>` | Adapter ID | Optional |
+| `--realm` | Realm slug | Optional |
+
+## `ctxindex source list`
+
+List sources.
+
+```text
+List sources. (ctxindex source list v0.0.0)
+
+USAGE ctxindex source list [OPTIONS]
+
+OPTIONS
+
+           --realm=<realm>    Realm slug
+  --format=<table|compact>    Output format (Default: table)
+                    --json    Print JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `--realm` | Realm slug | Optional |
+| `--format` | Output format | Optional. Choices: `table`, `compact`. Default: `table` |
+| `--json` | Print JSON | Optional |
+
+## `ctxindex source remove`
+
+Remove a source.
+
+```text
+Remove a source. (ctxindex source remove v0.0.0)
+
+USAGE ctxindex source remove [OPTIONS] <SOURCE>
+
+ARGUMENTS
+
+  SOURCE    Exact Source label or ID (Required)
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<source>` | Exact Source label or ID | Required |
+
+## `ctxindex sync`
+
+Run a sync for one or all sources.
+
+```text
+Run a sync for one or all sources. (ctxindex sync v0.0.0)
+
+USAGE ctxindex sync [OPTIONS]
+
+OPTIONS
+
+                  --source=<source>    Source label or ID
+          --mode=<sync|resync|diff>    Sync mode (sync|resync|diff) (Default: sync)
+                             --json    Print JSON
+  --format=<summary|events|compact>    Output format (Default: summary)
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `--source` | Source label or ID | Optional |
+| `--mode` | Sync mode (sync\|resync\|diff) | Optional. Choices: `sync`, `resync`, `diff`. Default: `sync` |
+| `--json` | Print JSON | Optional |
+| `--format` | Output format | Optional. Choices: `summary`, `events`, `compact`. Default: `summary` |
+
+## `ctxindex get`
+
+Get a Resource by exact Ref.
+
+```text
+Get a Resource by exact Ref. (ctxindex get v0.0.0)
+
+USAGE ctxindex get [OPTIONS] <REF>
+
+ARGUMENTS
+
+  REF    Resource Ref (Required)
+
+OPTIONS
+
+  --json    Print deterministic JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<ref>` | Resource Ref | Required |
+| `--json` | Print deterministic JSON | Optional |
+
+## `ctxindex export`
+
+Export a Resource in a Profile format.
+
+```text
+Export a Resource in a Profile format. (ctxindex export v0.0.0)
+
+USAGE ctxindex export [OPTIONS] <REF> --format=<format>
+
+ARGUMENTS
+
+  REF    Resource Ref (Required)
+
+OPTIONS
+
+  --format=<format>    Export format (Required)
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<ref>` | Resource Ref | Required |
+| `--format` | Export format | Required |
+
+## `ctxindex thread`
+
+Get a local related Resource thread.
+
+```text
+Get a local related Resource thread. (ctxindex thread v0.0.0)
+
+USAGE ctxindex thread [OPTIONS] <REF>
+
+ARGUMENTS
+
+  REF    Resource Ref (Required)
+
+OPTIONS
+
+  --json    Print deterministic JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<ref>` | Resource Ref | Required |
+| `--json` | Print deterministic JSON | Optional |
+
+## `ctxindex search`
+
+Search context Resources.
+
+```text
+Search context Resources. (ctxindex search v0.0.0)
+
+USAGE ctxindex search [OPTIONS] [QUERY]
+
+ARGUMENTS
+
+  QUERY    Query text
+
+OPTIONS
+
+                --realm=<realm>    Exact Realm slug (repeatable)
+            --adapter=<adapter>    Adapter ID
+              --source=<source>    Exact Source label or ID (repeatable)
+                  --kind=<kind>    Profile kind or alias
+                --field=<field>    Typed equality filter name=value (repeatable)
+                --since=<since>    Start ISO date
+                --until=<until>    End ISO date
+                --limit=<limit>    Result limit
+              --offset=<offset>    Local pagination offset
+  --continuation=<continuation>    Opaque continuation for one exact remote Source
+              --include-deleted    Include deleted local Resources
+                         --refs    Print Resource Refs only
+                   --local-only    Search local only
+                       --remote    Search remote Sources only
+                      --explain    Explain per-Source routing
+                         --json    Print deterministic JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<query>` | Query text | Optional |
+| `--realm` | Exact Realm slug (repeatable) | Optional. Repeatable |
+| `--adapter` | Adapter ID | Optional |
+| `--source` | Exact Source label or ID (repeatable) | Optional. Repeatable |
+| `--kind` | Profile kind or alias | Optional |
+| `--field` | Typed equality filter name=value (repeatable) | Optional. Repeatable |
+| `--since` | Start ISO date | Optional |
+| `--until` | End ISO date | Optional |
+| `--limit` | Result limit | Optional |
+| `--offset` | Local pagination offset | Optional |
+| `--continuation` | Opaque continuation for one exact remote Source | Optional |
+| `--include-deleted` | Include deleted local Resources | Optional |
+| `--refs` | Print Resource Refs only | Optional |
+| `--local-only` | Search local only | Optional |
+| `--remote` | Search remote Sources only | Optional |
+| `--explain` | Explain per-Source routing | Optional |
+| `--json` | Print deterministic JSON | Optional |
+
+## `ctxindex status`
+
+Show last sync status.
+
+```text
+Show last sync status. (ctxindex status v0.0.0)
+
+USAGE ctxindex status [OPTIONS]
+
+OPTIONS
+
+           --source=<source>    Source label or ID
+  --format=<summary|compact>    Output format: summary or compact (Default: summary)
+                      --json    Print JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `--source` | Source label or ID | Optional |
+| `--format` | Output format: summary or compact | Optional. Choices: `summary`, `compact`. Default: `summary` |
+| `--json` | Print JSON | Optional |
+
+## `ctxindex secrets`
+
+Inspect and select secret storage.
+
+```text
+Inspect and select secret storage. (ctxindex secrets v0.0.0)
+
+USAGE ctxindex secrets status|backend
+
+COMMANDS
+
+   status    Show safe backend status.
+  backend    Manage the active backend.
+
+Use ctxindex secrets <command> --help for more information about a command.
+```
+
+## `ctxindex secrets status`
+
+Show safe backend status.
+
+```text
+Show safe backend status. (ctxindex secrets status v0.0.0)
+
+USAGE ctxindex secrets status [OPTIONS]
+
+OPTIONS
+
+  --json    Print JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `--json` | Print JSON | Optional |
+
+## `ctxindex secrets backend`
+
+Manage the active backend.
+
+```text
+Manage the active backend. (ctxindex secrets backend v0.0.0)
+
+USAGE ctxindex secrets backend set
+
+COMMANDS
+
+  set    Set keychain or file backend.
+
+Use ctxindex secrets backend <command> --help for more information about a command.
+```
+
+## `ctxindex secrets backend set`
+
+Set keychain or file backend.
+
+```text
+Set keychain or file backend. (ctxindex secrets backend set v0.0.0)
+
+USAGE ctxindex secrets backend set [OPTIONS] <TARGET>
+
+ARGUMENTS
+
+  TARGET=<keychain|file>    (Required)
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<target>` |  | Required. Choices: `keychain`, `file` |
+
+## `ctxindex skills`
+
+Inspect bundled skills.
+
+```text
+Inspect bundled skills. (ctxindex skills v0.0.0)
+
+USAGE ctxindex skills list|get|path
+
+COMMANDS
+
+  list    List bundled skills.
+   get    Print a bundled skill.
+  path    Print bundled skills location.
+
+Use ctxindex skills <command> --help for more information about a command.
+```
+
+## `ctxindex skills list`
+
+List bundled skills.
+
+```text
+List bundled skills. (ctxindex skills list v0.0.0)
+
+USAGE ctxindex skills list [OPTIONS]
+
+OPTIONS
+
+  --json    Print JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `--json` | Print JSON | Optional |
+
+## `ctxindex skills get`
+
+Print a bundled skill.
+
+```text
+Print a bundled skill. (ctxindex skills get v0.0.0)
+
+USAGE ctxindex skills get [OPTIONS] <NAME>
+
+ARGUMENTS
+
+  NAME    (Required)
+
+OPTIONS
+
+  --inline    Inline file references
+    --json    Print JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `<name>` |  | Required |
+| `--inline` | Inline file references | Optional |
+| `--json` | Print JSON | Optional |
+
+## `ctxindex skills path`
+
+Print bundled skills location.
+
+```text
+Print bundled skills location. (ctxindex skills path v0.0.0)
+
+USAGE ctxindex skills path
+```

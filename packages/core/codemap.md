@@ -8,6 +8,7 @@ Defines the private `@ctxindex/core` workspace package, exposing provider-neutra
 
 - `package.json` is an explicit ESM facade: `.` targets `src/index.ts`, while named capability subpaths expose bounded barrels.
 - `src/` is organized by capability. Registries and services coordinate Profile semantics with Adapter-owned Google, Microsoft, or filesystem I/O while repositories and sync workflows isolate SQLite mutation.
+- The exported `documentation` subpath composes immutable bundled and Extension documentation sources behind deterministic list, exact-get, and bounded-search operations; passive-content validation and generated Extension metadata remain owned by `src/extension/`.
 - `src/sync/application-service.ts` extracts target resolution, deterministic multi-Source orchestration, failure normalization, and warning aggregation from presentation and transport so direct CLI and daemon composition share one application behavior.
 - Runtime dependencies reflect core boundaries: Extension SDK contracts, Zod validation, Drizzle/Bun SQLite persistence, and Pino logging; provider SDK details remain outside core.
 
@@ -20,6 +21,6 @@ Defines the private `@ctxindex/core` workspace package, exposing provider-neutra
 
 ## Integration points
 
-- Implementation and aggregate map: `packages/core/src/index.ts` and `packages/core/src/codemap.md`; package-backed authoring, trusted Git distribution, marketplace projection, and curated installation are mapped under `packages/core/src/catalog/codemap.md`.
+- Implementation and aggregate map: `packages/core/src/index.ts` and `packages/core/src/codemap.md`; offline query composition is mapped under `packages/core/src/documentation/codemap.md`, while package-backed authoring, trusted Git distribution, marketplace projection, and curated installation are mapped under `packages/core/src/catalog/codemap.md`.
 - Contracts and definitions: `packages/extension-sdk/`, `packages/profiles/`, and built-in Adapters including Microsoft identity/mailbox under `packages/adapters/src/microsoft/`.
 - Primary consumers/composition roots: `apps/cli/src/deps.ts` and `apps/daemon/src/runtime.ts`; storage initialization consumes core migrations, while both sync routes construct the same core application service.

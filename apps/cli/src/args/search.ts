@@ -1,10 +1,44 @@
-import {
-  type FlagValue,
-  hasHelpFlag,
-  listFlag,
-  parseFlags,
-  stringFlag,
-} from './flags'
+import type { CtxParsedArgs } from '../command-model'
+
+export const searchArgs = {
+  query: { type: 'positional', required: false, description: 'Query text' },
+  realm: {
+    type: 'string',
+    multiple: true,
+    description: 'Exact Realm slug (repeatable)',
+  },
+  adapter: { type: 'string', description: 'Adapter ID' },
+  source: {
+    type: 'string',
+    multiple: true,
+    description: 'Exact Source label or ID (repeatable)',
+  },
+  kind: { type: 'string', description: 'Profile kind or alias' },
+  field: {
+    type: 'string',
+    multiple: true,
+    description: 'Typed equality filter name=value (repeatable)',
+  },
+  since: { type: 'string', description: 'Start ISO date' },
+  until: { type: 'string', description: 'End ISO date' },
+  limit: { type: 'string', description: 'Result limit' },
+  offset: { type: 'string', description: 'Local pagination offset' },
+  continuation: {
+    type: 'string',
+    description: 'Opaque continuation for one exact remote Source',
+  },
+  'include-deleted': {
+    type: 'boolean',
+    description: 'Include deleted local Resources',
+  },
+  refs: { type: 'boolean', description: 'Print Resource Refs only' },
+  'local-only': { type: 'boolean', description: 'Search local only' },
+  remote: { type: 'boolean', description: 'Search remote Sources only' },
+  explain: { type: 'boolean', description: 'Explain per-Source routing' },
+  json: { type: 'boolean', description: 'Print deterministic JSON' },
+} as const
+
+export type SearchCommandArgs = CtxParsedArgs<typeof searchArgs>
 
 export interface ExecuteSearchInput {
   readonly text?: string
@@ -24,199 +58,135 @@ export interface ExecuteSearchInput {
   readonly remote?: boolean
 }
 
-export type SearchArgs =
-  | {
-      readonly kind: 'search'
-      readonly input: ExecuteSearchInput
-      readonly json: boolean
-      readonly refs: boolean
-    }
-  | { readonly kind: 'help' }
-  | { readonly kind: 'unknown'; readonly message: string }
+export interface ResolvedSearchArgs {
+  readonly input: ExecuteSearchInput
+  readonly json: boolean
+  readonly refs: boolean
+}
 
-export const searchUsage =
-  'search [query] [--realm <slug>] [--adapter <id>] [--source <id>] [--kind <kind>] [--field <name=value> ...] [--since <iso>] [--until <iso>] [--limit <n>] [--offset <n>|--continuation <token>] [--include-deleted] [--local-only|--remote] [--explain] [--refs] [--json] (query optional when a filter is present; continuation requires --remote and one --source)'
+function invalid(message: string): never {
+  throw Object.assign(new Error(message), { code: 'invalid_args' })
+}
 
-function parseDateFlag(
-  name: string,
-  value: FlagValue | undefined,
-): { ok: true; value?: number } | { ok: false; message: string } {
-  if (value === undefined || value === false) return { ok: true }
-  const raw = Array.isArray(value) ? value.at(-1) : value
-  if (raw === true || raw === undefined)
-    return { ok: false, message: `search: --${name} requires a date` }
+function parseDate(
+  name: 'since' | 'until',
+  raw: string | undefined,
+): number | undefined {
+  if (raw === undefined) return undefined
   const parsed = Date.parse(raw)
-  return Number.isNaN(parsed)
-    ? { ok: false, message: `search: invalid --${name} date: ${raw}` }
-    : { ok: true, value: parsed }
+  if (Number.isNaN(parsed)) invalid(`search: invalid --${name} date: ${raw}`)
+  return parsed
 }
 
 function parseCount(
   name: 'limit' | 'offset',
-  value: FlagValue | undefined,
+  raw: string | undefined,
   minimum: number,
-): { ok: true; value?: number } | { ok: false; message: string } {
-  if (value === undefined || value === false) return { ok: true }
-  const raw = Array.isArray(value) ? value.at(-1) : value
-  if (raw === true || raw === undefined)
-    return { ok: false, message: `search: --${name} requires a number` }
+): number | undefined {
+  if (raw === undefined) return undefined
   const parsed = Number.parseInt(raw, 10)
-  return Number.isFinite(parsed) && parsed >= minimum && String(parsed) === raw
-    ? { ok: true, value: parsed }
-    : { ok: false, message: `search: invalid --${name}: ${raw}` }
+  if (!Number.isFinite(parsed) || parsed < minimum || String(parsed) !== raw) {
+    invalid(`search: invalid --${name}: ${raw}`)
+  }
+  return parsed
 }
 
-function parseField(
-  raw: string,
-): { readonly name: string; readonly value: string } | undefined {
+function parseField(raw: string): {
+  readonly name: string
+  readonly value: string
+} {
   const equals = raw.indexOf('=')
-  if (equals <= 0 || equals === raw.length - 1) return undefined
+  if (equals <= 0 || equals === raw.length - 1) {
+    invalid('search: --field requires name=value')
+  }
   return { name: raw.slice(0, equals), value: raw.slice(equals + 1) }
 }
 
-export function parseSearchArgs(args: string[]): SearchArgs {
-  if (hasHelpFlag(args)) return { kind: 'help' }
-  const { flags, positional } = parseFlags(args, {
-    booleanFlags: [
-      'json',
-      'refs',
-      'include-deleted',
-      'explain',
-      'local-only',
-      'remote',
-    ],
-    valueFlags: ['limit', 'offset', 'continuation'],
-  })
-  const text = positional.join(' ').trim()
-  if (flags['local-only'] === true && flags.remote === true) {
-    return {
-      kind: 'unknown',
-      message: 'search: --local-only and --remote are mutually exclusive',
-    }
+export function resolveSearchArgs(args: SearchCommandArgs): ResolvedSearchArgs {
+  const text = args.query?.trim()
+  const since = parseDate('since', args.since)
+  const until = parseDate('until', args.until)
+  const limit = parseCount('limit', args.limit, 1)
+  const offset = parseCount('offset', args.offset, 0)
+  const continuation = args.continuation
+  const fields = args.field.map(parseField)
+
+  if (args['local-only'] === true && args.remote === true) {
+    invalid('search: --local-only and --remote are mutually exclusive')
   }
-  const since = parseDateFlag('since', flags.since)
-  if (!since.ok) return { kind: 'unknown', message: since.message }
-  const until = parseDateFlag('until', flags.until)
-  if (!until.ok) return { kind: 'unknown', message: until.message }
-  if (
-    since.value !== undefined &&
-    until.value !== undefined &&
-    since.value > until.value
-  ) {
-    return {
-      kind: 'unknown',
-      message: 'search: --since must not be after --until',
-    }
+  if (since !== undefined && until !== undefined && since > until) {
+    invalid('search: --since must not be after --until')
   }
-  const limit = parseCount('limit', flags.limit, 1)
-  if (!limit.ok) return { kind: 'unknown', message: limit.message }
-  const offset = parseCount('offset', flags.offset, 0)
-  if (!offset.ok) return { kind: 'unknown', message: offset.message }
-  const continuation = stringFlag(flags, 'continuation')
-  if (
-    flags.continuation !== undefined &&
-    (continuation === undefined || continuation.trim().length === 0)
-  ) {
-    return {
-      kind: 'unknown',
-      message: 'search: --continuation requires a token',
-    }
+  if (continuation !== undefined && continuation.trim().length === 0) {
+    invalid('search: --continuation requires a token')
   }
-  const rawFields = listFlag(flags, 'field')
-  const fields = rawFields.map(parseField)
-  if (fields.some((field) => field === undefined)) {
-    return { kind: 'unknown', message: 'search: --field requires name=value' }
+  if (fields.length > 0 && args.kind === undefined) {
+    invalid('search: --field requires --kind to select a kind')
   }
-  const kind = stringFlag(flags, 'kind')
-  if (fields.length > 0 && kind === undefined) {
-    return {
-      kind: 'unknown',
-      message: 'search: --field requires --kind to select a kind',
-    }
-  }
-  const realms = listFlag(flags, 'realm')
-  const adapterId = stringFlag(flags, 'adapter')
-  const sourceIds = listFlag(flags, 'source')
+
   const hasFilter =
-    realms.length > 0 ||
-    adapterId !== undefined ||
-    sourceIds.length > 0 ||
-    kind !== undefined ||
+    args.realm.length > 0 ||
+    args.adapter !== undefined ||
+    args.source.length > 0 ||
+    args.kind !== undefined ||
     fields.length > 0 ||
-    since.value !== undefined ||
-    until.value !== undefined ||
-    flags['include-deleted'] === true
+    since !== undefined ||
+    until !== undefined ||
+    args['include-deleted'] === true
   const hasRemoteFilter =
-    realms.length > 0 ||
-    adapterId !== undefined ||
-    sourceIds.length > 0 ||
-    kind !== undefined ||
+    args.realm.length > 0 ||
+    args.adapter !== undefined ||
+    args.source.length > 0 ||
+    args.kind !== undefined ||
     fields.length > 0 ||
-    since.value !== undefined ||
-    until.value !== undefined
+    since !== undefined ||
+    until !== undefined
   if (!text && !hasFilter) {
-    return {
-      kind: 'unknown',
-      message:
-        'search: provide <query> or at least one filter (--realm/--adapter/--source/--kind/--field/--since/--until/--include-deleted)',
-    }
+    invalid(
+      'search: provide <query> or at least one filter (--realm/--adapter/--source/--kind/--field/--since/--until/--include-deleted)',
+    )
   }
-  if (!text && flags.remote === true && !hasRemoteFilter) {
-    return {
-      kind: 'unknown',
-      message:
-        'search: query-less --remote requires a narrowing Realm, Adapter, Source, kind, field, or time filter',
-    }
+  if (!text && args.remote === true && !hasRemoteFilter) {
+    invalid(
+      'search: query-less --remote requires a narrowing Realm, Adapter, Source, kind, field, or time filter',
+    )
   }
-  if (continuation !== undefined && flags.remote !== true) {
-    return {
-      kind: 'unknown',
-      message: 'search: --continuation requires --remote',
-    }
+  if (continuation !== undefined && args.remote !== true) {
+    invalid('search: --continuation requires --remote')
   }
-  if (continuation !== undefined && sourceIds.length !== 1) {
-    return {
-      kind: 'unknown',
-      message: 'search: --continuation requires exactly one --source',
-    }
+  if (continuation !== undefined && args.source.length !== 1) {
+    invalid('search: --continuation requires exactly one --source')
   }
-  if (continuation !== undefined && offset.value !== undefined) {
-    return {
-      kind: 'unknown',
-      message: 'search: --continuation cannot be combined with --offset',
-    }
+  if (continuation !== undefined && offset !== undefined) {
+    invalid('search: --continuation cannot be combined with --offset')
   }
   const localExecution =
-    (!text && flags.remote !== true) || flags['local-only'] === true
-  if (offset.value !== undefined && !localExecution) {
-    return {
-      kind: 'unknown',
-      message:
-        'search: --offset requires local execution; omit <query> or add --local-only',
-    }
+    (!text && args.remote !== true) || args['local-only'] === true
+  if (offset !== undefined && !localExecution) {
+    invalid(
+      'search: --offset requires local execution; omit <query> or add --local-only',
+    )
   }
+
   return {
-    kind: 'search',
-    json: flags.json === true,
-    refs: flags.refs === true,
+    json: args.json === true,
+    refs: args.refs === true,
     input: {
       ...(text ? { text } : {}),
-      ...(realms.length === 0 ? {} : { realms }),
-      ...(sourceIds.length === 0 ? {} : { sourceIds }),
-      ...(adapterId === undefined ? {} : { adapterId }),
-      ...(kind === undefined ? {} : { kind }),
-      ...(fields.length === 0
-        ? {}
-        : { fields: fields as { name: string; value: string }[] }),
-      ...(since.value === undefined ? {} : { since: since.value }),
-      ...(until.value === undefined ? {} : { until: until.value }),
-      ...(limit.value === undefined ? {} : { limit: limit.value }),
-      ...(offset.value === undefined ? {} : { offset: offset.value }),
+      ...(args.realm.length === 0 ? {} : { realms: args.realm }),
+      ...(args.source.length === 0 ? {} : { sourceIds: args.source }),
+      ...(args.adapter === undefined ? {} : { adapterId: args.adapter }),
+      ...(args.kind === undefined ? {} : { kind: args.kind }),
+      ...(fields.length === 0 ? {} : { fields }),
+      ...(since === undefined ? {} : { since }),
+      ...(until === undefined ? {} : { until }),
+      ...(limit === undefined ? {} : { limit }),
+      ...(offset === undefined ? {} : { offset }),
       ...(continuation === undefined ? {} : { continuation }),
-      ...(flags['include-deleted'] === true ? { includeDeleted: true } : {}),
-      ...(flags.explain === true ? { explain: true } : {}),
-      ...(flags['local-only'] === true ? { localOnly: true } : {}),
-      ...(flags.remote === true ? { remote: true } : {}),
+      ...(args['include-deleted'] === true ? { includeDeleted: true } : {}),
+      ...(args.explain === true ? { explain: true } : {}),
+      ...(args['local-only'] === true ? { localOnly: true } : {}),
+      ...(args.remote === true ? { remote: true } : {}),
     },
   }
 }

@@ -109,7 +109,7 @@ export function Terminal() {
         </pre>
         <div className="mt-3">
           <Prompt>
-            ctxindex thread get '{REF}' <Flag>--json</Flag>
+            ctxindex thread '{REF}' <Flag>--json</Flag>
           </Prompt>
         </div>
         <pre className="mt-1 break-words whitespace-pre-wrap font-mono">

@@ -816,7 +816,7 @@ export class GenericExtensionPackageInstaller {
     ) {
       throw lifecycleError(
         'extension_target_invalid',
-        `Direct Extension ${input.extensionId} is already installed; use extensions update ${input.extensionId}`,
+        `Direct Extension ${input.extensionId} is already installed; use extension update ${input.extensionId}`,
       )
     }
     const staged = await this.stageDirectCandidate({
@@ -847,7 +847,7 @@ export class GenericExtensionPackageInstaller {
     if (expectedPrevious.curation !== undefined) {
       throw lifecycleError(
         'extension_target_invalid',
-        `Extension ${input.extensionId} is Catalog-curated and must be replaced by Catalog install`,
+        `Extension ${input.extensionId} is Catalog-curated; use extension update ${input.extensionId}`,
       )
     }
     const target = targetFromRecord(expectedPrevious)
@@ -925,7 +925,7 @@ export class GenericExtensionPackageInstaller {
           if (previous !== undefined) {
             throw lifecycleError(
               'extension_target_invalid',
-              `Direct Extension ${input.extensionId} is already installed; use extensions update ${input.extensionId}`,
+              `Direct Extension ${input.extensionId} is already installed; use extension update ${input.extensionId}`,
             )
           }
         } else {
@@ -938,7 +938,7 @@ export class GenericExtensionPackageInstaller {
           if (previous.curation !== undefined) {
             throw lifecycleError(
               'extension_target_invalid',
-              `Extension ${input.extensionId} is Catalog-curated and must be replaced by Catalog install`,
+              `Extension ${input.extensionId} is Catalog-curated; retry extension update ${input.extensionId}`,
             )
           }
           if (
@@ -981,6 +981,7 @@ export class GenericExtensionPackageInstaller {
   async installExact(
     input: ExactExtensionInstallCandidate & {
       readonly curation?: CatalogCurationProvenanceInput
+      readonly expectedPrevious?: GenericExtensionInstallationRecord
       readonly validatePreCommit?: () => Promise<void>
       readonly signal?: AbortSignal
     },
@@ -1108,6 +1109,15 @@ export class GenericExtensionPackageInstaller {
       return await this.store.withLifecycleLock(async () => {
         const current = await this.store.readRecords()
         const previous = current.find((record) => record.id === extensionId)
+        if (
+          input.expectedPrevious !== undefined &&
+          JSON.stringify(previous) !== JSON.stringify(input.expectedPrevious)
+        ) {
+          throw lifecycleError(
+            'extension_conflict',
+            `Extension ${extensionId} changed during update; retry`,
+          )
+        }
         if (
           previous !== undefined &&
           (input.curation === undefined ||

@@ -2,14 +2,15 @@
 
 ## Responsibility
 
-Owns the CLI workflow for listing Resource Artifact descriptors and downloading Artifact bytes into the managed cache.
+Owns CLI workflows for listing Resource Artifact descriptors, downloading bytes into the managed cache, and explicitly purging that cache.
 
 ## Design / patterns
 
-- `handle-artifact-command.ts` parses list/download argv before dependency loading, delegates exclusively to `ArtifactService`, formats through `format/artifact.ts`, maps errors, prints list warnings, and closes dependencies.
+- `handle-artifact-command.ts` consumes a typed list/download/purge input, validates list/download Refs before dependency loading, and delegates exclusively to `ArtifactService`.
+- List and download use `format/artifact.ts`; purge emits deterministic byte/object accounting. All branches map errors and close dependencies, while readable list output preserves warnings.
 - An injectable dependency factory keeps focused tests independent of storage and provider I/O.
 
 ## Integration points
 
 - Called only by `commands/artifact.ts`.
-- Uses the public core Artifact service, `args/artifact.ts`, focused formatters, and shared exit mapping.
+- Uses the public core Artifact service, focused formatters, and shared exit mapping; no command-specific argv parser or top-level purge command remains.

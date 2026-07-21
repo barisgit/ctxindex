@@ -49,7 +49,9 @@ run_gate package-dependencies bun run scripts/verify/package-dependencies.ts
 run_gate architecture-lint bun run scripts/verify/architecture-lint.ts
 run_gate cli-no-business-logic bun run scripts/verify/cli-no-business-logic.ts
 run_gate cli-framework-citty bun run scripts/verify/cli-framework-citty.ts
+run_gate cli-command-drift bun run scripts/verify/cli-command-drift.ts
 run_gate cli-thin-lines bun run scripts/verify/cli-thin-lines.ts
+run_gate cli-reference bun run check:cli-reference
 run_gate exports-map bun run scripts/verify/exports-map.ts
 
 run_gate full-test-suite bash scripts/verify/full-test-suite.sh

@@ -33,7 +33,7 @@ test('OAuth App add retains one ownership and definition snapshot through persis
   let definitionLoads = 0
   try {
     const exit = await handleOAuthAppCommand(
-      ['add', 'google', 'work', '--from-env'],
+      { kind: 'add', provider: 'google', label: 'work' },
       {
         acquireOwnership: () => {
           events.push('acquire-owner')
@@ -93,7 +93,7 @@ test('OAuth App ownership conflict fails before Extension definition loading', a
   let loadedDefinitions = false
   try {
     const exit = await handleOAuthAppCommand(
-      ['add', 'google', 'work', '--from-env'],
+      { kind: 'add', provider: 'google', label: 'work' },
       {
         acquireOwnership: () => {
           throw new PrototypeUnsupportedError()
