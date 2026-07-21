@@ -11,6 +11,7 @@
     "lint": "biome check",
     "format": "biome format --write",
     "typecheck": "fumadocs-mdx && next typegen && tsc --noEmit",
+    "test": "NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-unit.json bun test --path-ignore-patterns '**/*.integration.test.ts' --path-ignore-patterns '**/*.e2e.test.ts'",
     "clean": "rm -rf .next .source .turbo out coverage tsconfig.tsbuildinfo",
     "fullclean": "rm -rf .next .source .turbo out coverage node_modules tsconfig.tsbuildinfo"
   },

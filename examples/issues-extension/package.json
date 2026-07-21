@@ -8,6 +8,9 @@
       "./extension.ts"
     ]
   },
+  "scripts": {
+    "test": "NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-unit.json bun test --path-ignore-patterns '**/*.integration.test.ts' --path-ignore-patterns '**/*.e2e.test.ts'"
+  },
   "dependencies": {
     "@ctxindex/extension-sdk": "workspace:*"
   },

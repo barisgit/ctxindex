@@ -5,7 +5,7 @@ default:
 
 # Install deps + run all gates
 ci:
-    bash scripts/verify/ci.sh
+    bun run ci
 
 # Bun + biome + tsgo
 install:
@@ -21,16 +21,13 @@ typecheck:
     bun run typecheck
 
 test:
-    bun test
+    bun run test
 
 test-integration:
     bun run test:integration
 
 test-e2e:
     bun run test:e2e
-
-full-test-suite:
-    bash scripts/verify/full-test-suite.sh
 
 cli *args:
     bun apps/cli/bin/ctxindex.mjs {{args}}

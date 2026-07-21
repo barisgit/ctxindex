@@ -35,7 +35,9 @@ do not add parallel `in-progress` labels.
 5. Run the focused checks plus the repository gates documented in the
    [`repo-development` skill](.agents/skills/repo-development/SKILL.md).
 6. Open one pull request that links and closes the issue. Pull requests into
-   `main` run the repository gates as individually named CI steps. Include the
+   `main` run the fast repository gate, integration tests, and E2E tests as
+   parallel required jobs; Turbo exposes their package and root verifier tasks.
+   Include the
    observed behavior change, verification evidence, remaining risk, and any
    human checkpoint still required.
 7. Run `openspec-verify-change` after implementation. Archive a completed

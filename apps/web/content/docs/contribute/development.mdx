@@ -23,8 +23,14 @@ Before completing a non-trivial change:
 
 ```sh
 bun run ci
+bun run test:integration
+bun run test:e2e
 bunx openspec validate --all --strict
 ```
+
+The three test/gate lanes are separate so pull requests can run them in
+parallel. Turbo dispatches package-owned tests and cached root verifier tasks;
+each automated test task uses a workspace-local Keychain mock.
 
 Worktrees created by the repository helper isolate CLI state so one change's tests do not reuse another worktree's database, config, or installed Extension state.
 

@@ -53,8 +53,14 @@ bun typecheck
 bun test
 bun test:integration
 bun test:e2e
-bun ci                  # complete repository gate
+bun ci                  # fast build/lint/typecheck/unit/verifier gate
 ```
+
+Pull requests run `ci`, `test:integration`, and `test:e2e` as three required
+jobs in parallel. Turbo fans each lane out to package-owned tasks and root
+`//#...` verifier tasks, with local and GitHub Actions caches for repeat runs.
+Test scripts set a workspace-local Keychain mock so automated lanes cannot
+touch the user's native Keychain.
 
 Use `bun clean` to remove workspace build output and caches while preserving
 installed dependencies and `bun.lock`. Use `bun fullclean` when dependency

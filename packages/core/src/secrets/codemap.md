@@ -24,5 +24,5 @@ Provides typed opaque secret references, encrypted-file and OS-Keychain backends
 
 - Uses `packages/core/src/config/` for backend persistence and passphrase/mock environment settings, `packages/core/src/paths/` for `secrets.box`/`secret.key`, and `CtxindexDatabase` for transactional Grant-ref rewrites.
 - `packages/core/src/oauth-app/` and `packages/core/src/auth/` consume `SecretVault`; `apps/cli/src/deps.ts` wires vault/manager instances, and `apps/cli/src/commands/secrets.ts` invokes status/switch behavior without accepting secret values.
-- `packages/core/src/testing/sandbox.ts` and `scripts/verify/full-test-suite.sh` install isolated file-backed Keychain mocks so automated tests cannot touch a user's native Keychain.
+- `packages/core/src/testing/sandbox.ts` and package-owned test scripts install isolated file-backed Keychain mocks so automated tests cannot touch a user's native Keychain.
 - `index.ts` is the sole capability Interface, exporting backend stores, vault, manager, initialization, and opaque ref/error types through `@ctxindex/core/secrets`.

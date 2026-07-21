@@ -6,7 +6,7 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 
 ## Design / patterns
 
-- Bun/Turborepo monorepo split into user-facing application workspaces (`apps/`), reusable runtime and contract packages (`packages/`), external authoring examples (`examples/`), and repository tooling (`scripts/`).
+- Bun/Turborepo monorepo split into user-facing application workspaces (`apps/`), reusable runtime and contract packages (`packages/`), external authoring examples (`examples/`), and repository tooling (`scripts/`). Package-owned unit, integration, and E2E tasks combine with root `//#...` verifier tasks; pull requests run the three cached lanes as parallel jobs.
 - Layered boundaries keep CLI presentation separate from provider-neutral core services and Profiles: calendar and communication Profiles own shared vocabulary and Draft Action contracts, while Adapters own provider-specific Google, Microsoft Graph, and filesystem I/O.
 - Extensions are versionless plain roots composing exact imported Providers, Profiles, Adapters, and OAuth Apps without a runtime dependency graph. Package-backed Catalog definitions curate literal Extensions and exact npm/Git/local package targets; trusted authoring resolves them into replay-locked schema-v2 snapshots. Core routes Catalog-curated and direct packages through one content-addressed installation pipeline, then collects exact exported roots/reachable leaves and validates one complete registry atomically. A detached local daemon prototype loads the unified records offline and composes those same core services behind a bounded Unix-socket RPC boundary without moving provider logic into transport.
 - Extension or secret-backed local OAuth Apps provide validated configuration. Host policy may select one exact provenance-matched bundled App when `--app` is omitted; explicit labels bypass that policy. Authorization snapshots the exact selected App config into one private stable Grant per Account so refresh is independent of current App inventory and policy.
@@ -14,7 +14,7 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 ## Entry points
 
 - `package.json` — private workspace manifest for `apps/*`, `packages/*`, and package-managed `examples/*`, plus the root command surface; Turbo dispatches package-owned tasks, `cli` routes through `scripts/cli.sh`, and package scripts build, pack, and smoke the public CLI artifact.
-- `.github/workflows/ci.yml` and `.github/workflows/release.yml` — least-privilege pull-request gates and guarded exact-artifact npm trusted publishing with Bun 1.3.14.
+- `.github/workflows/ci.yml` and `.github/workflows/release.yml` — least-privilege cached fast/integration/E2E lanes and guarded exact-artifact npm trusted publishing with Bun 1.3.14.
 - `.agents/skills/repo-development/SKILL.md` — triggered contributor doctrine, CLI workflow, and verification guidance.
 - `DESIGN.md` — project-wide visual doctrine for the adaptive ctxindex mark, semantic color roles, typography, component treatment, motion, and accessibility; the web app supplies its executable specimen.
 - `apps/cli/bin/ctxindex.mjs` — executable shim forwarding argv to `runCli` and assigning its exit code.

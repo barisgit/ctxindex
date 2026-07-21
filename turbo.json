@@ -29,6 +29,43 @@
       "dependsOn": ["^test"],
       "outputs": []
     },
+    "//#test:tooling": {
+      "outputs": []
+    },
+    "//#test:integration:tooling": {
+      "cache": false,
+      "outputs": []
+    },
+    "//#verify:lint": {
+      "outputs": []
+    },
+    "//#verify:typescript": {
+      "outputs": []
+    },
+    "//#verify:package-dependencies": {
+      "outputs": []
+    },
+    "//#verify:architecture": {
+      "outputs": []
+    },
+    "//#verify:cli-no-business-logic": {
+      "outputs": []
+    },
+    "//#verify:cli-framework": {
+      "outputs": []
+    },
+    "//#verify:cli-command-drift": {
+      "outputs": []
+    },
+    "//#verify:cli-thin-lines": {
+      "outputs": []
+    },
+    "//#verify:cli-reference": {
+      "outputs": []
+    },
+    "//#verify:exports-map": {
+      "outputs": []
+    },
     "test:integration": {
       "dependsOn": ["^test:integration"],
       "cache": false,

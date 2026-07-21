@@ -16,7 +16,7 @@
 - Work from GitHub issues and follow `CONTRIBUTING.md` for branch, OpenSpec, verification, and pull-request workflow.
 - Non-trivial behavior changes require an OpenSpec change; trivial fixes do not.
 - Bug fixes start with a failing reproduction test; new behavior lands with focused tests before or with implementation.
-- Pass each focused task and Slice gate before continuing. The final gates are `bun run ci` and `bunx openspec validate --all --strict`; run `openspec-verify-change` before archive.
+- Pass each focused task and Slice gate before continuing. The final gates are `bun run ci`, `bun run test:integration`, `bun run test:e2e`, and `bunx openspec validate --all --strict`; run `openspec-verify-change` before archive.
 - At Human checkpoints, prepare isolated state and pause for consent or UI verification without requesting secrets.
 - The repository is pre-alpha: do not add schema migrations, CLI compatibility, or deprecated aliases before a release creates that obligation.
 - The CLI is the only agent integration surface: external agents (Codex CLI, OpenClaw/Hermes, Claude Code) consume ctxindex by composing commands with `--format json`; do not add an MCP server or per-agent integration layers.
