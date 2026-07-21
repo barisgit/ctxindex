@@ -14,6 +14,46 @@ const config = {
   turbopack: {
     root: workspaceRoot,
   },
+  async redirects() {
+    return [
+      { source: '/docs/start', destination: '/docs', permanent: true },
+      {
+        source: '/docs/use/workflows',
+        destination: '/docs/use',
+        permanent: true,
+      },
+      {
+        source: '/docs/guides/agent-integration',
+        destination: '/docs/start/agent-usage',
+        permanent: true,
+      },
+      {
+        source: '/docs/guides/mail-workflows',
+        destination: '/docs/use/mail',
+        permanent: true,
+      },
+      {
+        source: '/docs/guides/calendar-workflows',
+        destination: '/docs/use/calendar',
+        permanent: true,
+      },
+      {
+        source: '/docs/examples/:path*',
+        destination: '/docs/use/extensions',
+        permanent: true,
+      },
+      {
+        source: '/docs/contribute/development',
+        destination: '/docs/contribute',
+        permanent: true,
+      },
+      {
+        source: '/docs/contribute/architecture-design',
+        destination: '/docs/contribute',
+        permanent: true,
+      },
+    ]
+  },
 }
 
 export default withMDX(config)

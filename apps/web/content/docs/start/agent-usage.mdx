@@ -1,38 +1,127 @@
 ---
 title: Use ctxindex from an agent
-description: Give any shell-capable agent deterministic, realm-scoped context through the CLI.
+description: Give any shell-capable agent deterministic context access through the CLI.
 ---
 
-There is no ctxindex MCP server or agent-specific SDK. Codex CLI, OpenClaw, Hermes-driven agents, Claude Code, and other code-executing agents use the same executable you do.
+ctxindex integrates with agents through its CLI. Claude Code, Codex, OpenClaw, and any other agent that can execute shell commands can use the same deterministic interface.
 
-Give the agent this operating rule:
+<Callout>
+Use `ctxindex` with an installed binary. From the repository root during development, replace it with `bun cli`.
+</Callout>
 
-```text
-Use ctxindex as the only interface to personal context. Start with `ctxindex
-describe --format json` when you need the loaded vocabulary. Search with exact Realm
-and Source filters where context matters. Treat returned ctx:// Refs as opaque,
-pass them to get/thread/export/action, and read stable exit codes and warnings.
-Never request secrets or send email; provider mutations stop at reversible Drafts.
+## Why the CLI is the integration surface
+
+There is no ctxindex MCP server. The CLI already provides the properties an agent integration needs:
+
+- deterministic commands, escaped low-token text, and compact `--format json` output;
+- stable exit codes for branching and recovery;
+- one provider-neutral vocabulary across mail, calendars, files, and extension-defined domains;
+- registry-derived descriptions of loaded Profiles, Source Adapters, fields, formats, and Actions.
+
+An MCP server or agent-specific adapter would duplicate that contract and introduce another surface that could drift. Keep agent policy, approval, and multi-step reasoning in the agent; use ctxindex for context access and typed provider Actions.
+
+## Start by discovering the loaded interface
+
+Do not hard-code kinds, Source options, formats, or Action schemas when the registry can report them.
+
+```bash
+ctxindex describe --full --format json
+ctxindex source list --format json
+ctxindex describe profile mail.message --format json
+ctxindex describe adapter google.calendar --format json
 ```
 
-The agent can then compose generic operations:
+`describe` is especially important when external Extensions are loaded: they can add Profiles and Source Adapters without adding provider-specific commands.
 
-```sh
-ctxindex search "Aurora kickoff" --realm work --format json
-ctxindex get 'ctx://…' --format json
-ctxindex thread 'ctx://…' --format json
-ctxindex describe action mail.message.draft.create \
-  --source work-mail \
+## Compose a read workflow
+
+<Steps>
+
+### Search with an explicit scope
+
+```bash
+ctxindex search "quarterly planning" \
+  --realm company \
+  --kind mail.message \
   --format json
 ```
 
-Use `--format json` for machine-readable command envelopes. Byte-stream exports use `--format json` when you want validated Profile JSON.
+An omitted `--realm` searches across all Realms. An explicit Realm is exact; there is no implicit global Realm.
 
-## Scope before retrieval
+### Select a Ref from the JSON result
 
-- Use `--realm company` when personal context must not be considered.
-- Use `--source work-mail` when one collection must answer.
-- Omit a Realm only when searching every eligible Realm is intentional.
-- Inspect a typed Action before invoking it; a Source Adapter only implements declared Profile Actions.
+Search results return stable `ctx://` Refs. Preserve the Ref rather than reconstructing provider identifiers.
 
-For a longer reusable prompt and failure handling, see the [agent integration guide](/docs/guides/agent-integration).
+### Retrieve the complete Resource
+
+```bash
+ctxindex get 'ctx://01J00000000000000000000000/message/stable-message-id' --format json
+```
+
+`get` returns locally materialized content when available and otherwise asks the owning Source Adapter to retrieve it.
+
+### Traverse related messages when needed
+
+```bash
+ctxindex thread 'ctx://01J00000000000000000000000/message/stable-message-id' --format json
+```
+
+Use the returned thread to summarize a conversation or establish reply context. Do not infer a thread by grouping subjects yourself.
+
+</Steps>
+
+## Compose a Draft workflow
+
+Inspect the Action before generating input:
+
+```bash
+ctxindex describe action mail.message.draft.create \
+  --source company-mail \
+  --format json
+```
+
+Then validate the agent's proposed content against the returned schema and invoke the Action through one explicit mailbox Source:
+
+```bash
+cat > /tmp/ctxindex-draft.json <<'JSON'
+{
+  "to": ["recipient@example.com"],
+  "subject": "Project update",
+  "bodyText": "The project is ready for review."
+}
+JSON
+
+ctxindex action run mail.message.draft.create \
+  --source company-mail \
+  --input /tmp/ctxindex-draft.json \
+  --format json
+```
+
+The result includes the normalized Draft Resource Ref. Text composed in an agent conversation is not a Draft until this provider-persisting Action succeeds. ctxindex does not send mail.
+
+For a threaded reply, first use `get` to materialize a complete parent in the same selected Source. Then use the strict reply branch; it accepts only the parent Ref and body text:
+
+```bash
+ctxindex get 'ctx://01J00000000000000000000000/message/stable-message-id' --format json
+
+ctxindex action run mail.message.draft.create \
+  --source company-mail \
+  --input '{"replyToRef":"ctx://01J00000000000000000000000/message/stable-message-id","bodyText":"Thanks for the update."}' \
+  --format json
+```
+
+Reply Draft updates require the complete local Draft and parent in that Source and must repeat the Draft's immutable `replyToRef`. The reply update branch accepts exactly `{ref, replyToRef, bodyText}`; it does not accept recipient or subject overrides. See [Mail workflows](/docs/use/mail#update-an-existing-draft) for both complete update shapes.
+
+## Choose output for the consumer
+
+Use `--format text` on search, get, thread, Artifact list, status, and Source, Realm, Account, OAuth App, and Extension inventories when an agent benefits from fewer repeated JSON keys: collections are escaped TSV and `get` is a complete labeled Resource envelope with compact nested payload JSON. TSV uses `\N` only for null and escapes literal backslashes. Use `--format json` (or `-f json`) when the caller needs typed structured fields. Omitted output selection is destination-aware: pretty on a TTY, text through a pipe.
+
+Pretty output is terminal-width-aware and switches long rows, including Microsoft message Refs, to vertical cards without ellipsizing values. Refs remain opaque and copyable in every mode.
+
+## Agent execution rules
+
+- Select `--format text` for deterministic low-token reads or `--format json` for typed envelopes; never scrape pretty output.
+- Check the process exit code before consuming output.
+- Keep Source selection explicit for Actions.
+- Preserve per-origin warnings from search; one provider failure can coexist with valid results from other origins.
+- Use `describe` output as the authority for loaded vocabulary and input schemas.

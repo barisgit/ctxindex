@@ -34,10 +34,14 @@ test('homepage proves the local agent workflow before secondary paths', async ()
     resolve(import.meta.dir, '../components/demo-video.tsx'),
     'utf8',
   )
+  const highlighter = await readFile(
+    resolve(import.meta.dir, '../components/code-highlight.tsx'),
+    'utf8',
+  )
   const css = await readFile(resolve(import.meta.dir, 'global.css'), 'utf8')
 
   expect(page).toContain('All your context. One command')
-  expect(page).toContain('grouped into Realms, indexed on your machine')
+  expect(page).toMatch(/grouped\s+into Realms, indexed on your machine/u)
   expect(page).toContain('Try the no-auth demo')
   expect(page).toContain('Providers stay canonical')
   expect(page).toContain('trusted in-process code')
@@ -50,6 +54,10 @@ test('homepage proves the local agent workflow before secondary paths', async ()
   expect(video).toContain('DEMO_VIDEO_CAPTIONS')
   expect(video).toContain('if (!DEMO_VIDEO_SRC || !DEMO_VIDEO_CAPTIONS)')
   expect(video).toContain('return null')
+  expect(highlighter).toContain("from 'fumadocs-ui/components/codeblock.rsc'")
+  expect(highlighter).toContain('ServerCodeBlock')
+  expect(highlighter).not.toContain("from 'shiki'")
+  expect(highlighter).not.toContain('dangerouslySetInnerHTML')
   expect(css).not.toContain('.ctx-hero-glow')
   expect(css).not.toContain('radial-gradient')
 })

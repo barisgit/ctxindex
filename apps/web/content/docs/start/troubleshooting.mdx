@@ -25,9 +25,13 @@ ctxindex init
 
 ## Provider authorization fails
 
+- The bundled Google and Microsoft OAuth Apps are not verified. The maintainer is an individual and cannot get them verified at the moment; provider review can also take several weeks. See the [provider notes](/docs/start/connect-provider#inspect-available-oauth-apps).
+- Microsoft should still work without verification, but an organizational tenant can require admin consent or block unverified Apps.
+- Google can show an unverified-app warning, limit access to named test users, or block requested scopes.
 - Confirm the OAuth App is listed and choose its exact Provider-scoped label when using BYOA.
 - Check provider tenant and administrator policy. A work or university tenant can block an app even when another desktop mail app is allowed.
 - Confirm the Provider's current requested scopes are permitted for that App and tenant.
+- If managed authorization is unavailable for your identity or tenant, configure local BYOA instead of bypassing the provider warning.
 - Do not remove local Grant or secret state blindly. Reauthorization updates the existing Grant in place.
 
 ## Source is unavailable

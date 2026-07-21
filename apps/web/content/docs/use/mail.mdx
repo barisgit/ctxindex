@@ -9,27 +9,27 @@ ctxindex presents Gmail and Outlook messages through the provider-neutral `mail.
 
 First inspect the configured Sources and their Account bindings:
 
-```sh
+```bash
 ctxindex account list --format json
 ctxindex source list --format json
 ```
 
 Search every configured mailbox by omitting `--realm` and `--source`:
 
-```sh
-ctxindex search "renewal notice" --kind mail --format json
+```bash
+ctxindex search "renewal notice" --kind mail.message --format json
 ```
 
 Restrict a search to one operating context or mailbox when the task requires it:
 
-```sh
+```bash
 ctxindex search "renewal notice" \
-  --kind mail \
+  --kind mail.message \
   --realm company \
   --format json
 
 ctxindex search "flight receipt" \
-  --kind mail \
+  --kind mail.message \
   --source personal-gmail \
   --format json
 ```
@@ -38,7 +38,7 @@ An omitted Realm spans all Realms. `--realm company` is exact and never includes
 
 To list recent unread mail without inventing query text, select one remote mailbox and use the Profile's exact boolean field. When the selected Adapter returns an opaque continuation, inspect `pagination.hasMore` and repeat the unchanged request. The current Microsoft mailbox Adapter supports this flow; Gmail returns no continuation and rejects a supplied token as `invalid_filter` before provider I/O:
 
-```sh
+```bash
 ctxindex search --remote \
   --source company-mail \
   --kind mail.message \
@@ -65,19 +65,19 @@ ctxindex search --remote \
 
 ### Search for the message
 
-```sh
-ctxindex search "deployment approval" --kind mail --format json
+```bash
+ctxindex search "deployment approval" --kind mail.message --format json
 ```
 
 ### Retrieve the complete message
 
-```sh
+```bash
 ctxindex get 'ctx://01J00000000000000000000000/message/stable-message-id' --format json
 ```
 
 ### Load the related conversation
 
-```sh
+```bash
 ctxindex thread 'ctx://01J00000000000000000000000/message/stable-message-id' --format json
 ```
 
@@ -89,7 +89,7 @@ ctxindex thread 'ctx://01J00000000000000000000000/message/stable-message-id' --f
 
 A Draft is reversible provider state, not text that exists only in an agent conversation. Inspect the live Action schema before constructing input:
 
-```sh
+```bash
 ctxindex describe action mail.message.draft.create \
   --source company-mail \
   --format json
@@ -97,7 +97,7 @@ ctxindex describe action mail.message.draft.create \
 
 Create the Draft through the mailbox Source that should own it:
 
-```sh
+```bash
 cat > /tmp/new-draft.json <<'JSON'
 {
   "to": ["recipient@example.com"],
@@ -119,13 +119,13 @@ Both Gmail and Outlook mailbox Adapters implement this Action. The result return
 
 A reply Action does not fetch missing parent data. First use `get` on the exact parent Ref so a complete, non-deleted message from the selected Source is available locally:
 
-```sh
+```bash
 ctxindex get 'ctx://01J00000000000000000000000/message/stable-message-id' --format json
 ```
 
 Then create the reply with the strict reply branch. It accepts only the local parent Ref and body text; ctxindex derives the single recipient, reply subject, and provider-native thread state from the parent:
 
-```sh
+```bash
 cat > /tmp/reply-draft.json <<'JSON'
 {
   "replyToRef": "ctx://01J00000000000000000000000/message/stable-message-id",
@@ -145,7 +145,7 @@ The parent must belong to `company-mail`, be locally complete, and contain the p
 
 Inspect the current update union before constructing input:
 
-```sh
+```bash
 ctxindex describe action mail.message.draft.update \
   --source company-mail \
   --format json
@@ -153,7 +153,7 @@ ctxindex describe action mail.message.draft.update \
 
 A standalone Draft update replaces the complete addressed content. Supply the Draft Ref returned by create or retrieval and the full desired recipient arrays, subject, and body. Empty `cc` and `bcc` arrays explicitly clear those recipients:
 
-```sh
+```bash
 cat > /tmp/updated-draft.json <<'JSON'
 {
   "ref": "ctx://01J00000000000000000000000/draft/stable-draft-id",
@@ -173,7 +173,7 @@ ctxindex action run mail.message.draft.update \
 
 Reply context is immutable. Before updating a reply Draft, ensure both its Draft Ref and its parent message are complete local Resources in the same selected Source (Action results are already materialized; otherwise use `get`). The update must repeat the exact stored `replyToRef` and may replace only `bodyText`:
 
-```sh
+```bash
 ctxindex get 'ctx://01J00000000000000000000000/draft/stable-draft-id' --format json
 ctxindex get 'ctx://01J00000000000000000000000/message/stable-message-id' --format json
 

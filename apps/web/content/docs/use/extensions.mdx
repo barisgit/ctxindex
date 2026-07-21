@@ -30,7 +30,7 @@ ctxindex extension catalog search mail --format json
 ctxindex extension install catalog community acme.mail --format json
 ```
 
-Catalog add acknowledges repository acquisition. Installation is the separate executable boundary: it replays packages and imports trusted Extension code. Catalog search and Catalog-backed install refresh the involved Catalog by default; `--no-refresh` deliberately uses stored snapshots and reports their age.
+Catalog add acknowledges repository acquisition. Installation is the separate executable boundary: it replays packages and imports trusted Extension code. To publish curated entries, [author a Catalog](/docs/extend/catalogs). Catalog search and Catalog-backed install refresh the involved Catalog by default; `--no-refresh` deliberately uses stored snapshots and reports their age.
 
 Startup is offline: it reads installed records and managed bytes without refreshing Catalogs, contacting npm or Git, or invoking a package manager.
 

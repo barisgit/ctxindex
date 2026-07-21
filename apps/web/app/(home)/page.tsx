@@ -71,7 +71,7 @@ export default function HomePage() {
                 example of the Extension SDK below.
               </p>
               <Link
-                href="/docs/start"
+                href="/docs"
                 className="ctx-inline-link mt-5 inline-flex min-h-11 items-center text-sm"
               >
                 Follow the guided quickstart →

@@ -1,42 +1,100 @@
 ---
-title: ctxindex documentation
-description: Start locally, use ctxindex from an agent, extend the typed context graph, or look up an exact contract.
+title: Start with ctxindex
+description: Install ctxindex, index one local file without an Account, and return a useful result.
 ---
 
-ctxindex gives shell-capable agents one local typed interface over mail, calendars, files, and Extension-defined context. The CLI is the integration surface: agents compose deterministic commands, read `--format json`, and act only through configured Sources.
-
-## Start
-
-Install ctxindex, index one local directory without an Account, then optionally connect Google or Microsoft.
-
-- [Installation and first success](/docs/start)
-- [Connect a provider](/docs/start/connect-provider)
-- [Use ctxindex from an agent](/docs/start/agent-usage)
-- [Troubleshooting](/docs/start/troubleshooting)
-
-## Use
-
-Organize Sources into exact Realms, materialize provider context locally, and compose search, retrieval, export, and reversible Draft workflows.
-
-- [Core workflow](/docs/use)
-- [Mail and calendar workflows](/docs/use/workflows)
-- [Extensions and the local Marketplace](/docs/use/extensions)
-- [Trust and local-state boundaries](/docs/use/trust)
-
-## Extend
-
-Author the same plain, type-safe Extension graph used by ctxindex's bundled Google, Microsoft, and local definitions.
-
-- [Extension SDK overview](/docs/extend)
-- [Providerless quickstart](/docs/extend/providerless)
-- [Provider-backed quickstart](/docs/extend/provider-backed)
-- [Package, test, and publish](/docs/extend/package-test-publish)
-
-## Reference and contribute
-
-- [Generated CLI and contract reference](/docs/reference)
-- [Contribute to ctxindex](/docs/contribute)
+ctxindex gives shell-capable agents one local, typed interface over mail, calendars, files, and Extension-defined context. The shortest trustworthy path starts with a local directory: no Account, OAuth flow, or provider traffic.
 
 <Callout>
-  Capability specs and `CONTEXT.md` own behavior and terminology. This website is a maintained public projection of those contracts.
+  ctxindex requires Bun 1.3.14. If the npm package is not available yet, use the source-checkout tab.
 </Callout>
+
+<Tabs items={["Released package", "Source checkout"]}>
+  <Tab value="Released package">
+    ```bash
+    bun add --global ctxindex
+    ctxindex --help
+    ```
+  </Tab>
+  <Tab value="Source checkout">
+    ```bash
+    git clone https://github.com/barisgit/ctxindex.git
+    cd ctxindex
+    bun install
+    bun cli --help
+    ```
+
+    Replace `ctxindex` with `bun cli` in the remaining commands.
+  </Tab>
+</Tabs>
+
+## Create local context
+
+<Steps>
+  <Step>
+    Create one file and initialize local state.
+
+    ```bash
+    mkdir -p "$HOME/context"
+    printf 'Project Aurora kickoff is Tuesday at 10:00.\nOwner: Maya Chen.\n' \
+      > "$HOME/context/aurora.txt"
+    ctxindex init
+    ```
+  </Step>
+  <Step>
+    Create a Realm, then connect the directory as one Source.
+
+    ```bash
+    ctxindex realm add work --name "Work"
+    ctxindex source add local.directory \
+      --realm work \
+      --label work-files \
+      --config-root-path "$HOME/context"
+    ```
+  </Step>
+  <Step>
+    Materialize the Source and search it.
+
+    ```bash
+    ctxindex sync --source work-files --format json
+    ctxindex search "Aurora kickoff" \
+      --realm work \
+      --kind file \
+      --local-only \
+      --format json
+    ```
+  </Step>
+</Steps>
+
+A successful search returns a stable Ref in a bounded result envelope:
+
+```json
+{
+  "results": [
+    {
+      "ref": "ctx://01J00000000000000000000000/file/aurora.txt",
+      "profile": { "id": "file", "version": 1 },
+      "sourceId": "01J00000000000000000000000",
+      "origin": "local",
+      "title": "aurora.txt"
+    }
+  ],
+  "pagination": { "offset": 0, "limit": 20, "hasMore": false },
+  "warnings": []
+}
+```
+
+Pass the returned Ref through unchanged:
+
+```bash
+ctxindex get 'ctx://01J00000000000000000000000/file/aurora.txt' --format json
+ctxindex export 'ctx://01J00000000000000000000000/file/aurora.txt' --format json
+```
+
+Do not reconstruct provider-owned Ref suffixes. Copy the Ref returned by ctxindex.
+
+## Next
+
+- [Connect Google or Microsoft](/docs/start/connect-provider)
+- [Use ctxindex from an agent](/docs/start/agent-usage)
+- [Understand the core workflow](/docs/use)

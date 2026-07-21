@@ -9,7 +9,7 @@ Google Calendar and Microsoft Calendar Sources normalize events into the provide
 
 Use registry output instead of assuming provider options:
 
-```sh
+```bash
 ctxindex describe adapter google.calendar --format json
 ctxindex describe adapter microsoft.calendar --format json
 ctxindex account list --format json
@@ -17,7 +17,7 @@ ctxindex account list --format json
 
 Each calendar Source selects one provider calendar. For example:
 
-```sh
+```bash
 ctxindex source add google.calendar \
   --realm company \
   --account work-google \
@@ -31,7 +31,7 @@ The generated calendar flags and defaults come from the loaded Adapter schema. A
 
 ## Sync before searching
 
-```sh
+```bash
 ctxindex sync --source work-calendar --format json
 ctxindex status --source work-calendar --format json
 ```
@@ -42,9 +42,9 @@ The configured past and future windows define indexed coverage. Incremental sync
 
 A query is optional when at least one filter is present, so an agent can enumerate an interval without inventing search text:
 
-```sh
+```bash
 ctxindex search \
-  --kind events \
+  --kind calendar.event \
   --realm company \
   --since '<START_DATE>' \
   --until '<END_DATE>' \
@@ -53,9 +53,9 @@ ctxindex search \
 
 Add text or typed fields to narrow the result set:
 
-```sh
+```bash
 ctxindex search "planning" \
-  --kind events \
+  --kind calendar.event \
   --realm company \
   --field allDay=false \
   --since '<START_DATE>' \
@@ -69,7 +69,7 @@ Replace `<START_DATE>` and `<END_DATE>` with the upcoming ISO date interval for 
 
 Use the Ref returned by search rather than reconstructing provider IDs:
 
-```sh
+```bash
 ctxindex get 'ctx://01J00000000000000000000000/event/stable-event-id' --format json
 ```
 

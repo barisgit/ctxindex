@@ -1,4 +1,4 @@
 {
   "title": "Start",
-  "pages": ["index", "connect-provider", "agent-usage", "troubleshooting"]
+  "pages": ["connect-provider", "agent-usage", "troubleshooting"]
 }
