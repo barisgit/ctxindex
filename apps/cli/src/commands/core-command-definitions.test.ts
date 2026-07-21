@@ -89,7 +89,7 @@ test('core command definitions own required arguments and bounded choices', asyn
   )
   expect([...commands.keys()]).toEqual(
     expect.arrayContaining([
-      'ctxindex daemon health',
+      'ctxindex daemon status',
       'ctxindex get',
       'ctxindex init',
       'ctxindex oauth-app add',

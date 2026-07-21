@@ -47,7 +47,7 @@ Package tests use temporary `BUN_INSTALL_GLOBAL_DIR`, `BUN_INSTALL_BIN`,
 `BUN_INSTALL_CACHE_DIR`, and `CTXINDEX_*_HOME` paths. They do not access the
 user's package installation, configuration, database, provider state, or
 credentials. The exact-tarball smoke runs outside the checkout and proves the
-installed bin, packaged daemon startup/health/shutdown on supported hosts and
+installed bin, packaged detached daemon start/status/stop on supported hosts and
 safe fail-closed startup on unsupported hosts, native `keytar` load when the
 host supplies its platform library, OAuth App help plus pre-init
 no-side-effect rejection, bundled skills, embedded SQLite migrations, and

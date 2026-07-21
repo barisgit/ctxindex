@@ -38,12 +38,12 @@ test('keeps cache removal with the other Artifact operations', () => {
   expect(rootCommand.subCommands).not.toHaveProperty('purge')
 })
 
-test('registers explicit foreground daemon lifecycle commands', () => {
+test('registers only background daemon lifecycle commands', () => {
   expect(rootSubCommands.daemon).toBeDefined()
   expect(Object.keys(rootSubCommands.daemon?.subCommands ?? {})).toEqual([
-    'serve',
-    'health',
-    'shutdown',
+    'start',
+    'status',
+    'stop',
   ])
 })
 

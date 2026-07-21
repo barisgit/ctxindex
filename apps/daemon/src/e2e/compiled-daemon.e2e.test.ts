@@ -400,6 +400,96 @@ async function expectStartFailure(runtime: TestRuntime, pattern: RegExp) {
 describe.skipIf(process.platform !== 'darwin')(
   'compiled local daemon multi-process workflow',
   () => {
+    test('background start survives its CLI, converges concurrently, stops idempotently, and recovers after SIGKILL', async () => {
+      const runtime = await createRuntime('ctxindex-daemon-background-')
+      try {
+        expect((await runCli(runtime, ['init'])).exitCode).toBe(0)
+
+        const direct = await runCli(runtime, ['realm', 'list', '--json'])
+        expect(direct.exitCode, direct.stderr).toBe(0)
+        expect(
+          JSON.parse(
+            (await runCli(runtime, ['daemon', 'status', '--json'])).stdout,
+          ),
+        ).toEqual({ status: 'stopped' })
+
+        const concurrent = await Promise.all([
+          runCli(runtime, ['daemon', 'start', '--json']),
+          runCli(runtime, ['daemon', 'start', '--json']),
+        ])
+        for (const result of concurrent) {
+          expect(result.exitCode, result.stderr).toBe(0)
+          expect(JSON.parse(result.stdout)).toMatchObject({
+            status: 'running',
+            health: { ready: true },
+          })
+        }
+        const instanceIds = concurrent.map(
+          (result) => JSON.parse(result.stdout).health.instanceId,
+        )
+        expect(new Set(instanceIds).size).toBe(1)
+
+        const reused = await runCli(runtime, ['daemon', 'start', '--json'])
+        expect(reused.exitCode, reused.stderr).toBe(0)
+        expect(JSON.parse(reused.stdout)).toMatchObject({
+          status: 'running',
+          started: false,
+          health: { instanceId: instanceIds[0] },
+        })
+
+        const status = await runCli(runtime, ['daemon', 'status', '--json'])
+        expect(status.exitCode, status.stderr).toBe(0)
+        const observed = JSON.parse(status.stdout)
+        expect(observed).toMatchObject({
+          status: 'running',
+          health: { instanceId: instanceIds[0], ready: true },
+        })
+
+        process.kill(observed.health.pid, 'SIGKILL')
+        await pollUntil('detached daemon process death', () => {
+          try {
+            process.kill(observed.health.pid, 0)
+            return null
+          } catch (error) {
+            if (
+              error instanceof Error &&
+              'code' in error &&
+              error.code === 'ESRCH'
+            ) {
+              return true
+            }
+            throw error
+          }
+        })
+
+        const restarted = await runCli(runtime, ['daemon', 'start', '--json'])
+        expect(restarted.exitCode, restarted.stderr).toBe(0)
+        expect(JSON.parse(restarted.stdout)).toMatchObject({
+          status: 'running',
+          started: true,
+          health: { ready: true },
+        })
+        expect(JSON.parse(restarted.stdout).health.instanceId).not.toBe(
+          instanceIds[0],
+        )
+
+        const stopped = await runCli(runtime, ['daemon', 'stop', '--json'])
+        expect(stopped.exitCode, stopped.stderr).toBe(0)
+        expect(JSON.parse(stopped.stdout)).toMatchObject({
+          status: 'stopped',
+          alreadyStopped: false,
+        })
+        expect(
+          JSON.parse(
+            (await runCli(runtime, ['daemon', 'stop', '--json'])).stdout,
+          ),
+        ).toEqual({ status: 'stopped', alreadyStopped: true })
+      } finally {
+        await runCli(runtime, ['daemon', 'stop', '--json']).catch(() => null)
+        await cleanupRuntime(runtime)
+      }
+    }, 45_000)
+
     test('canonical aliases contend, mismatched tuples are rejected, and distinct databases remain independent', async () => {
       const primary = await createRuntime('ctxindex-daemon-identity-')
       const children: RunningProcess[] = []
@@ -482,10 +572,10 @@ describe.skipIf(process.platform !== 'darwin')(
           expect(secondReady.instanceId).not.toBe(ready.instanceId)
           expect(secondReady.databaseDigest).not.toBe(ready.databaseDigest)
           expect(
-            (await runCli(primary, ['daemon', 'health', '--json'])).exitCode,
+            (await runCli(primary, ['daemon', 'status', '--json'])).exitCode,
           ).toBe(0)
           expect(
-            (await runCli(independent, ['daemon', 'health', '--json']))
+            (await runCli(independent, ['daemon', 'status', '--json']))
               .exitCode,
           ).toBe(0)
         } finally {
@@ -676,15 +766,18 @@ describe.skipIf(process.platform !== 'darwin')(
         expect(override.exitCode, override.stderr).toBe(0)
         expect(JSON.parse(override.stdout)).toEqual(JSON.parse(status.stdout))
 
-        const health = await runCli(runtime, ['daemon', 'health', '--json'])
+        const health = await runCli(runtime, ['daemon', 'status', '--json'])
         expect(health.exitCode, health.stderr).toBe(0)
         expect(health.stdout).not.toContain(runtime.dir)
         expect(health.stdout).not.toContain(runtime.runtimeRoot)
         expect(health.stdout).not.toContain(endpoint.path)
         expect(JSON.parse(health.stdout)).toMatchObject({
-          instanceId: metadata.instanceId,
-          ready: true,
-          extensionDiagnosticsCount: 0,
+          status: 'running',
+          health: {
+            instanceId: metadata.instanceId,
+            ready: true,
+            extensionDiagnosticsCount: 0,
+          },
         })
 
         await stopDaemon(daemon, 'SIGKILL')
@@ -794,9 +887,9 @@ describe.skipIf(process.platform !== 'darwin')(
         await pollUntil(
           'real local sync admission',
           async () => {
-            const health = await runCli(runtime, ['daemon', 'health', '--json'])
+            const health = await runCli(runtime, ['daemon', 'status', '--json'])
             if (health.exitCode !== 0) return null
-            return JSON.parse(health.stdout).activeRequestCount === 1
+            return JSON.parse(health.stdout).health.activeRequestCount === 1
               ? true
               : null
           },
@@ -812,9 +905,9 @@ describe.skipIf(process.platform !== 'darwin')(
         const healthy = await pollUntil(
           'daemon health after request cancellation',
           async () => {
-            const result = await runCli(runtime, ['daemon', 'health', '--json'])
+            const result = await runCli(runtime, ['daemon', 'status', '--json'])
             if (result.exitCode !== 0) return null
-            const value = JSON.parse(result.stdout)
+            const value = JSON.parse(result.stdout).health
             return value.ready === true && value.activeRequestCount === 0
               ? value
               : null
@@ -839,7 +932,7 @@ describe.skipIf(process.platform !== 'darwin')(
           }),
         ])
 
-        const shutdown = await runCli(runtime, ['daemon', 'shutdown', '--json'])
+        const shutdown = await runCli(runtime, ['daemon', 'stop', '--json'])
         expect(shutdown.exitCode, shutdown.stderr).toBe(0)
         await waitForExit(daemon, 'daemon exit after cancellation proof')
         daemon = undefined
@@ -875,9 +968,9 @@ describe.skipIf(process.platform !== 'darwin')(
         await pollUntil(
           'non-cooperative sync admission',
           async () => {
-            const health = await runCli(runtime, ['daemon', 'health', '--json'])
+            const health = await runCli(runtime, ['daemon', 'status', '--json'])
             if (health.exitCode !== 0) return null
-            return JSON.parse(health.stdout).activeRequestCount === 1
+            return JSON.parse(health.stdout).health.activeRequestCount === 1
               ? true
               : null
           },
@@ -886,11 +979,11 @@ describe.skipIf(process.platform !== 'darwin')(
 
         shutdowns.push(
           spawnProcess(
-            [cliExecutable, 'daemon', 'shutdown', '--json'],
+            [cliExecutable, 'daemon', 'stop', '--json'],
             runtime.env,
           ),
           spawnProcess(
-            [cliExecutable, 'daemon', 'shutdown', '--json'],
+            [cliExecutable, 'daemon', 'stop', '--json'],
             runtime.env,
           ),
         )
@@ -958,7 +1051,7 @@ describe.skipIf(process.platform !== 'darwin')(
 
         daemon = startDaemon(runtime)
         await waitForReady(runtime, daemon)
-        const stopped = await runCli(runtime, ['daemon', 'shutdown', '--json'])
+        const stopped = await runCli(runtime, ['daemon', 'stop', '--json'])
         expect(stopped.exitCode, stopped.stderr).toBe(0)
         await waitForExit(daemon, 'restarted daemon graceful exit')
         daemon = undefined

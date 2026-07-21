@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-Contains application-facing workspace packages: the public `ctxindex` CLI, the Next.js documentation/landing site, and the foreground local Bun daemon prototype.
+Contains application-facing workspace packages: the public `ctxindex` CLI, the Next.js documentation/landing site, and the background local Bun daemon prototype.
 
 ## Design / patterns
 
@@ -17,7 +17,7 @@ User argv enters `apps/cli/bin/ctxindex.mjs`, flows to `apps/cli/src/main.ts#run
 
 For the web workspace, Fumadocs compiles `content/docs/` into the generated `collections/server` source. Next.js routes load that source to render the documentation tree, provide search, produce per-page Markdown and aggregate LLM text, and generate Open Graph images; content negotiation rewrites Markdown-preferring `/docs` requests to the page representation route.
 
-The daemon foreground entry `apps/daemon/src/main.ts#main` derives ctxindex roots, calls `startDaemon()`, acquires retained lifecycle/database leases, loads unified direct and Catalog-curated installation records offline, composes core services, binds the Unix-socket RPC transport, publishes readiness, and drains/cleans up on shutdown.
+The daemon entry `apps/daemon/src/main.ts#main` derives ctxindex roots, calls `startDaemon()`, acquires retained lifecycle/database leases, loads unified direct and Catalog-curated installation records offline, composes core services, binds the Unix-socket RPC transport, publishes readiness, and drains/cleans up on shutdown. The CLI starts its exact source or packaged sibling as a detached process and monitors it through health-backed status.
 
 ## Integration points
 

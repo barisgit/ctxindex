@@ -8,7 +8,7 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 
 - Bun/Turborepo monorepo split into user-facing application workspaces (`apps/`), reusable runtime and contract packages (`packages/`), external authoring examples (`examples/`), and repository tooling (`scripts/`).
 - Layered boundaries keep CLI presentation separate from provider-neutral core services and Profiles: calendar and communication Profiles own shared vocabulary and Draft Action contracts, while Adapters own provider-specific Google, Microsoft Graph, and filesystem I/O.
-- Extensions are versionless plain roots composing exact imported Providers, Profiles, Adapters, and OAuth Apps without a runtime dependency graph. Package-backed Catalog definitions curate literal Extensions and exact npm/Git/local package targets; trusted authoring resolves them into replay-locked schema-v2 snapshots. Core routes Catalog-curated and direct packages through one content-addressed installation pipeline, then collects exact exported roots/reachable leaves and validates one complete registry atomically. A foreground local daemon prototype loads the unified records offline and composes those same core services behind a bounded Unix-socket RPC boundary without moving provider logic into transport.
+- Extensions are versionless plain roots composing exact imported Providers, Profiles, Adapters, and OAuth Apps without a runtime dependency graph. Package-backed Catalog definitions curate literal Extensions and exact npm/Git/local package targets; trusted authoring resolves them into replay-locked schema-v2 snapshots. Core routes Catalog-curated and direct packages through one content-addressed installation pipeline, then collects exact exported roots/reachable leaves and validates one complete registry atomically. A detached local daemon prototype loads the unified records offline and composes those same core services behind a bounded Unix-socket RPC boundary without moving provider logic into transport.
 - Extension or secret-backed local OAuth Apps provide validated configuration. Host policy may select one exact provenance-matched bundled App when `--app` is omitted; explicit labels bypass that policy. Authorization snapshots the exact selected App config into one private stable Grant per Account so refresh is independent of current App inventory and policy.
 
 ## Entry points
@@ -19,7 +19,7 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 - `DESIGN.md` — project-wide visual doctrine for the adaptive ctxindex mark, semantic color roles, typography, component treatment, motion, and accessibility; the web app supplies its executable specimen.
 - `apps/cli/bin/ctxindex.mjs` — executable shim forwarding argv to `runCli` and assigning its exit code.
 - `apps/web/app/(home)/page.tsx`, `apps/web/app/(home)/design/page.tsx`, and `apps/web/app/docs/[[...slug]]/page.tsx` — product-first command/result landing page, live visual-system specimen, and Fumadocs-backed task-oriented documentation routes.
-- `apps/daemon/src/main.ts` — foreground daemon process entry that composes retained ownership, core services, RPC transport, and graceful shutdown.
+- `apps/daemon/src/main.ts` — daemon process entry that composes retained ownership, core services, RPC transport, and graceful shutdown; the CLI launches its exact source or packaged sibling in the background.
 - `packages/core/src/index.ts` — core domain services and runtime infrastructure export surface.
 - `packages/rpc/src/index.ts` — composition-only local wire schemas, router contract, and generated client type.
 - `packages/local-daemon/src/index.ts` — process-independent runtime identity, discovery, endpoint, and retained lease primitives.
@@ -42,7 +42,7 @@ CLI input is parsed and dispatched by `apps/cli/` into core services. Realm, Sou
 | Directory | Responsibility | Detailed map |
 | --- | --- | --- |
 | `.github/` | GitHub pull-request gates and protected npm trusted-publishing automation. | Workflow-local configuration. |
-| `apps/` | Deployable application workspaces: the public CLI, documentation site, and foreground local-daemon prototype. | [`apps/codemap.md`](apps/codemap.md) |
+| `apps/` | Deployable application workspaces: the public CLI, documentation site, and background local-daemon prototype. | [`apps/codemap.md`](apps/codemap.md) |
 | `packages/` | Core/runtime libraries, local RPC and daemon infrastructure, extension contracts, Profiles, and built-in Adapters. | [`packages/codemap.md`](packages/codemap.md) |
 | `examples/` | External Extension examples using only the public authoring boundary. | [`examples/codemap.md`](examples/codemap.md) |
 | `scripts/` | Repository policy gates, helper-created worktree isolation, and bounded command tooling. | [`scripts/codemap.md`](scripts/codemap.md) |

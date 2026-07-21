@@ -223,7 +223,7 @@ test('a selected unreachable endpoint is unavailable and never becomes a direct 
     await expect(daemonHealth(selection)).rejects.toMatchObject({
       code: 'daemon_unavailable',
       message:
-        'The local daemon is unavailable. Start it with `ctxindex daemon serve`.',
+        'The local daemon is unavailable. Start it with `ctxindex daemon start`.',
     })
   } finally {
     await setup.close()

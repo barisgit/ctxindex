@@ -22,7 +22,7 @@ test('the exact packed CLI installs globally and runs outside the checkout', asy
         oauthAppHelpLoaded: true,
         preInitStatePreserved: true,
         packageExtensionLoaded: true,
-        daemonServeAvailable: true,
+        daemonLifecycleAvailable: true,
       }),
     )
   } finally {
