@@ -36,16 +36,27 @@ test('external GitHub Issues Extension syncs mocked data for local paged search 
   const preloadPath = join(sandbox.dir, 'github-fetch-preload.ts')
   try {
     await mkdir(join(extensionPath, 'dist'), { recursive: true })
-    const extensionBuild = await Bun.build({
-      entrypoints: [join(extensionSourcePath, 'extension.ts')],
-      outdir: join(extensionPath, 'dist'),
-      target: 'bun',
-      naming: 'extension.js',
-    })
+    const extensionBuild = Bun.spawn(
+      [
+        'bun',
+        'build',
+        join(extensionSourcePath, 'extension.ts'),
+        '--outfile',
+        join(extensionPath, 'dist', 'extension.js'),
+        '--target=bun',
+      ],
+      { cwd: repoRoot, stdout: 'pipe', stderr: 'pipe' },
+    )
+    const [extensionBuildExitCode, extensionBuildStdout, extensionBuildStderr] =
+      await Promise.all([
+        extensionBuild.exited,
+        new Response(extensionBuild.stdout).text(),
+        new Response(extensionBuild.stderr).text(),
+      ])
     expect(
-      extensionBuild.success,
-      extensionBuild.logs.map(String).join('\n'),
-    ).toBe(true)
+      extensionBuildExitCode,
+      `${extensionBuildStdout}\n${extensionBuildStderr}`,
+    ).toBe(0)
     await cp(
       join(extensionSourcePath, 'docs'),
       join(extensionPath, 'dist', 'docs'),

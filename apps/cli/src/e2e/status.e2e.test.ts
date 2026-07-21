@@ -141,7 +141,7 @@ test('text output includes a real unavailable-Adapter failure summary', async ()
     expect(result.stdout).toContain(sourceId)
     expect(result.stdout).toContain('missing.adapter')
     expect(result.stdout).toContain('extension_unavailable')
-    expect(result.stdout).toContain('\t0\t-\t1\t')
+    expect(result.stdout).toContain('\t0\t\\N\t1\t')
     expect(result.stdout).toContain('Source Adapter definition is unavailable')
   } finally {
     await sandbox.cleanup()
