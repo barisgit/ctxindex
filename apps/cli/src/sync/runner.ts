@@ -204,6 +204,9 @@ export function formatSyncOutput(
   json: boolean,
 ): string {
   if (json) return JSON.stringify(output)
+  if (output.results.length === 0 && output.warnings.length === 0) {
+    return format === 'events' ? '' : 'No sync-enabled Sources are available.'
+  }
   if (format === 'events') {
     return output.results
       .map((result) =>

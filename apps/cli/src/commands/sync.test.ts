@@ -281,6 +281,25 @@ describe('sync command', () => {
     )
   })
 
+  test('explains when no sync-enabled Sources are eligible', () => {
+    const output: SyncOutput = {
+      mode: 'sync',
+      results: [],
+      warnings: [],
+    }
+
+    expect(formatSyncOutput(output, 'summary', false)).toBe(
+      'No sync-enabled Sources are available.',
+    )
+    expect(formatSyncOutput(output, 'compact', false)).toBe(
+      'No sync-enabled Sources are available.',
+    )
+    expect(formatSyncOutput(output, 'events', false)).toBe('')
+    expect(JSON.parse(formatSyncOutput(output, 'summary', true))).toEqual(
+      output,
+    )
+  })
+
   test('renders warning-then-failure diagnostics in JSON, summary, compact, and events output', () => {
     const failed = {
       sourceId: 'source-a',
