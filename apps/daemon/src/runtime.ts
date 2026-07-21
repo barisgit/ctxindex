@@ -4,7 +4,11 @@ import { userInfo } from 'node:os'
 import { join } from 'node:path'
 import { describeAction, runAction } from '@ctxindex/core/action'
 import { type AuthService, createAuthService } from '@ctxindex/core/auth'
-import { type CtxindexConfig, readConfig } from '@ctxindex/core/config'
+import {
+  type CtxindexConfig,
+  readConfig,
+  writeConfig,
+} from '@ctxindex/core/config'
 import { DirectExtensionStore } from '@ctxindex/core/direct-extension'
 import {
   createDocumentationService,
@@ -23,9 +27,12 @@ import type {
 } from '@ctxindex/core/registry'
 import { SearchPlanner } from '@ctxindex/core/search'
 import {
+  createSecretBackendManager,
   createSecretVault,
   FileBackend,
   KeychainBackend,
+  type SecretBackendManager,
+  type SecretVault,
 } from '@ctxindex/core/secrets'
 import {
   createSourceService,
@@ -126,6 +133,7 @@ export interface DaemonServices {
   readonly realmService?: Pick<RealmService, 'createRealm' | 'listRealms'>
   readonly registry?: ExtensionRegistry
   readonly searchService?: Pick<SearchPlanner, 'search'>
+  readonly secretBackendManager?: SecretBackendManager
   readonly resourceService?: {
     get(input: {
       readonly ref: string
@@ -248,10 +256,40 @@ async function productionServices(input: {
     realmService,
     registry: input.registry,
   })
-  const secretVault = createSecretVault({
-    fileStore: new FileBackend(),
-    keychainStore: new KeychainBackend(),
+  const fileStore = new FileBackend()
+  const keychainStore = new KeychainBackend()
+  let selectedVault = createSecretVault({
+    fileStore,
+    keychainStore,
     backend: input.config.secrets.backend,
+  })
+  const secretVault: SecretVault = {
+    get backend() {
+      return selectedVault.backend
+    },
+    getSecret: (ref) => selectedVault.getSecret(ref),
+    setSecret: (scope, key, value) =>
+      selectedVault.setSecret(scope, key, value),
+    deleteSecret: (ref) => selectedVault.deleteSecret(ref),
+    listKeys: () => selectedVault.listKeys(),
+  }
+  const secretBackendManager = createSecretBackendManager({
+    db: input.database,
+    fileStore,
+    keychainStore,
+    logger,
+    backend: input.config.secrets.backend,
+    commitBackend: async (target) => {
+      await writeConfig(
+        { ...input.config, secrets: { backend: target } },
+        join(input.roots.configRoot, 'config.toml'),
+      )
+      selectedVault = createSecretVault({
+        fileStore,
+        keychainStore,
+        backend: target,
+      })
+    },
   })
   const authService: AuthService = createAuthService({
     db: input.database,
@@ -301,6 +339,7 @@ async function productionServices(input: {
           signal,
         }),
     },
+    secretBackendManager,
     threadService: createThreadService({
       db: input.database,
       profiles: input.registry.profiles,

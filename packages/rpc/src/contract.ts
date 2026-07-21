@@ -21,6 +21,10 @@ import {
   rpcResourceGetResultSchema,
   rpcSearchInputSchema,
   rpcSearchResultSchema,
+  rpcSecretsBackendSetInputSchema,
+  rpcSecretsBackendSetResultSchema,
+  rpcSecretsStatusInputSchema,
+  rpcSecretsStatusResultSchema,
   rpcShutdownAcceptedSchema,
   rpcShutdownInputSchema,
   rpcSourceAddInputSchema,
@@ -56,6 +60,16 @@ export const daemonContract = {
     list: procedure
       .input(rpcRealmListInputSchema)
       .output(rpcRealmListResultSchema),
+  },
+  secrets: {
+    status: procedure
+      .input(rpcSecretsStatusInputSchema)
+      .output(rpcSecretsStatusResultSchema),
+    backend: {
+      set: procedure
+        .input(rpcSecretsBackendSetInputSchema)
+        .output(rpcSecretsBackendSetResultSchema),
+    },
   },
   documentation: {
     list: procedure

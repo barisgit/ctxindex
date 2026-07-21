@@ -936,6 +936,44 @@ describe.skipIf(process.platform !== 'darwin')(
       }
     }, 30_000)
 
+    test('secret backend status and idempotent selection stay on the daemon route', async () => {
+      const runtime = await createRuntime('ctxindex-daemon-secrets-')
+      let daemon: RunningProcess | undefined
+      try {
+        await initializeLocalSource(runtime)
+        daemon = startDaemon(runtime)
+        await waitForReady(runtime, daemon)
+
+        const secretsStatus = await runCli(runtime, [
+          'secrets',
+          'status',
+          '--format',
+          'json',
+        ])
+        expect(secretsStatus.exitCode, secretsStatus.stderr).toBe(0)
+        expect(JSON.parse(secretsStatus.stdout)).toMatchObject({
+          backend: 'file',
+          backends: {
+            file: { available: true, referenceCount: 0 },
+            keychain: { referenceCount: 0 },
+          },
+        })
+        expect(secretsStatus.stdout).not.toContain(runtime.dir)
+
+        const selected = await runCli(runtime, [
+          'secrets',
+          'backend',
+          'set',
+          'file',
+        ])
+        expect(selected.exitCode, selected.stderr).toBe(0)
+        expect(selected.stdout).toContain('secrets backend set to file')
+      } finally {
+        if (daemon) await stopDaemon(daemon, 'SIGKILL')
+        await cleanupRuntime(runtime)
+      }
+    }, 30_000)
+
     test('every direct SQLite command is fenced, shared holders block exclusivity, and SIGKILL releases permanent locks', async () => {
       const runtime = await createRuntime('ctxindex-daemon-fence-')
       let daemon: RunningProcess | undefined
@@ -950,7 +988,6 @@ describe.skipIf(process.platform !== 'darwin')(
           ['account', 'add', 'google', '--app', 'unavailable'],
           ['account', 'list'],
           ['oauth-app', 'list'],
-          ['secrets', 'status'],
           ['artifact', 'list', `ctx://${sourceId}/file/one`],
           ['export', `ctx://${sourceId}/file/one`, '--format', 'text'],
           ['describe', 'action', 'missing.action', '--source', sourceId],

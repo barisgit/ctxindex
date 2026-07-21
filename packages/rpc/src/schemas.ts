@@ -699,6 +699,54 @@ export const rpcStatusResultSchema = z
   .readonly()
 export type RpcStatusResult = z.infer<typeof rpcStatusResultSchema>
 
+const rpcSecretBackendSchema = z.enum(['keychain', 'file'])
+const rpcSecretBackendStateSchema = z
+  .strictObject({
+    available: z.boolean(),
+    referenceCount: countSchema,
+  })
+  .readonly()
+
+export const rpcSecretsStatusInputSchema = z.strictObject({})
+export type RpcSecretsStatusInput = Readonly<
+  z.infer<typeof rpcSecretsStatusInputSchema>
+>
+
+export const rpcSecretsStatusResultSchema = z
+  .strictObject({
+    backend: rpcSecretBackendSchema,
+    backends: z
+      .strictObject({
+        file: rpcSecretBackendStateSchema,
+        keychain: rpcSecretBackendStateSchema,
+      })
+      .readonly(),
+  })
+  .readonly()
+export type RpcSecretsStatusResult = z.infer<
+  typeof rpcSecretsStatusResultSchema
+>
+
+export const rpcSecretsBackendSetInputSchema = z.strictObject({
+  target: rpcSecretBackendSchema,
+})
+export type RpcSecretsBackendSetInput = Readonly<
+  z.infer<typeof rpcSecretsBackendSetInputSchema>
+>
+
+export const rpcSecretsBackendSetResultSchema = z
+  .strictObject({
+    backend: rpcSecretBackendSchema,
+    copied: countSchema,
+    cleaned: countSchema,
+    cleanupPending: z.boolean(),
+    warnings: z.array(terminalSafeString(512)).max(16).readonly(),
+  })
+  .readonly()
+export type RpcSecretsBackendSetResult = z.infer<
+  typeof rpcSecretsBackendSetResultSchema
+>
+
 export const rpcRealmAddInputSchema = z.strictObject({
   slug: identifierSchema,
   displayName: optionalPublicStringSchema.optional(),

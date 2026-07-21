@@ -26,6 +26,9 @@ import {
   rpcSafeJsonSchema,
   rpcSearchInputSchema,
   rpcSearchResultSchema,
+  rpcSecretsBackendSetInputSchema,
+  rpcSecretsBackendSetResultSchema,
+  rpcSecretsStatusResultSchema,
   rpcShutdownAcceptedSchema,
   rpcSourceAddInputSchema,
   rpcSourceListResultSchema,
@@ -471,6 +474,54 @@ describe('sync/status and internal application results', () => {
 })
 
 describe('realm/source management envelopes', () => {
+  test('accepts only bounded secret backend status and switch projections', () => {
+    expect(
+      rpcSecretsStatusResultSchema.parse({
+        backend: 'file',
+        backends: {
+          file: { available: true, referenceCount: 2 },
+          keychain: { available: false, referenceCount: 1 },
+        },
+      }),
+    ).toEqual({
+      backend: 'file',
+      backends: {
+        file: { available: true, referenceCount: 2 },
+        keychain: { available: false, referenceCount: 1 },
+      },
+    })
+    expect(
+      rpcSecretsBackendSetInputSchema.parse({ target: 'keychain' }),
+    ).toEqual({ target: 'keychain' })
+    expect(
+      rpcSecretsBackendSetResultSchema.parse({
+        backend: 'keychain',
+        copied: 2,
+        cleaned: 1,
+        cleanupPending: true,
+        warnings: ['Secret backend cleanup remains pending.'],
+      }),
+    ).toEqual({
+      backend: 'keychain',
+      copied: 2,
+      cleaned: 1,
+      cleanupPending: true,
+      warnings: ['Secret backend cleanup remains pending.'],
+    })
+    expect(() =>
+      rpcSecretsBackendSetInputSchema.parse({ target: 'env' }),
+    ).toThrow()
+    expect(() =>
+      rpcSecretsBackendSetResultSchema.parse({
+        backend: 'file',
+        copied: 0,
+        cleaned: 0,
+        cleanupPending: true,
+        warnings: ['secret\nvalue'],
+      }),
+    ).toThrow()
+  })
+
   test('accepts strict bounded realm inputs and rows', () => {
     expect(
       rpcRealmAddInputSchema.parse({ slug: 'work', displayName: 'Work' }),

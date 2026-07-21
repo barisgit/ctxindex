@@ -24,6 +24,10 @@ import {
   type ExtensionRegistry,
 } from '@ctxindex/core/registry'
 import type { SearchPlanner } from '@ctxindex/core/search'
+import {
+  CtxindexSecretsError,
+  type SecretBackendManager,
+} from '@ctxindex/core/secrets'
 import type {
   SourceResourceResult,
   SourceService,
@@ -65,6 +69,10 @@ import type {
   RpcRuntimeIdentity,
   RpcSearchInput,
   RpcSearchResult,
+  RpcSecretsBackendSetInput,
+  RpcSecretsBackendSetResult,
+  RpcSecretsStatusInput,
+  RpcSecretsStatusResult,
   RpcShutdownAccepted,
   RpcShutdownInput,
   RpcSourceAddInput,
@@ -121,6 +129,7 @@ export interface DaemonApplicationOptions {
   readonly realmService?: Pick<RealmService, 'createRealm' | 'listRealms'>
   readonly registry?: ExtensionRegistry
   readonly searchService?: Pick<SearchPlanner, 'search'>
+  readonly secretBackendManager?: SecretBackendManager
   readonly resourceService?: {
     get(input: {
       readonly ref: string
@@ -157,6 +166,11 @@ export interface DaemonIdleTimer {
 interface ActiveRequest {
   readonly controller: AbortController
   readonly settled: Promise<void>
+}
+
+interface SecretAccessWaiter {
+  readonly mode: 'shared' | 'exclusive'
+  readonly resolve: (release: () => void) => void
 }
 
 interface RendezvousItem<T> {
@@ -267,6 +281,24 @@ function failure(error: unknown): RpcFailure {
       taxonomy: 'lookup',
       code: error.code,
       message: error.message,
+    }
+  }
+  if (error instanceof CtxindexSecretsError) {
+    const messages = {
+      backend_unavailable: 'The configured secret backend is unavailable.',
+      not_found: 'A required secret is unavailable.',
+      invalid_ref: 'Stored secret metadata is invalid.',
+      invalid_key: 'Secret metadata is invalid.',
+      decrypt_failed:
+        'The configured secret backend could not decrypt its data.',
+      io: 'The secret backend operation failed.',
+      unknown: 'The secret backend operation failed.',
+    } as const
+    return {
+      kind: 'ctxindex',
+      taxonomy: 'other',
+      code: error.code,
+      message: messages[error.code],
     }
   }
   return {
@@ -597,6 +629,9 @@ export class DaemonApplication implements DaemonRpcApplication {
   #idleGeneration = 0
   #idleTimerHandle: unknown
   #requestSequence = 0
+  readonly #secretAccessQueue: SecretAccessWaiter[] = []
+  #secretAccessReaders = 0
+  #secretAccessWriter = false
   #stoppingNotified = false
 
   readonly system: DaemonRpcApplication['system'] = {
@@ -606,6 +641,12 @@ export class DaemonApplication implements DaemonRpcApplication {
   readonly realm: DaemonRpcApplication['realm'] = {
     add: (input, context) => this.realmAdd(input, context),
     list: (input, context) => this.realmList(input, context),
+  }
+  readonly secrets: DaemonRpcApplication['secrets'] = {
+    status: (input, context) => this.secretsStatus(input, context),
+    backend: {
+      set: (input, context) => this.secretsBackendSet(input, context),
+    },
   }
   readonly documentation: DaemonRpcApplication['documentation'] = {
     list: (input, context) => this.documentationList(input, context),
@@ -739,6 +780,43 @@ export class DaemonApplication implements DaemonRpcApplication {
       if (!this.#options.realmService) throw new Error('Realm service missing')
       return { rows: this.#options.realmService.listRealms() }
     })
+  }
+
+  secretsStatus(
+    _input: RpcSecretsStatusInput,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcSecretsStatusResult>> {
+    return this.#business(context, async (signal) => {
+      signal.throwIfAborted()
+      if (!this.#options.secretBackendManager)
+        throw new Error('Secret backend manager missing')
+      return this.#options.secretBackendManager.getStatus()
+    })
+  }
+
+  secretsBackendSet(
+    input: RpcSecretsBackendSetInput,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcSecretsBackendSetResult>> {
+    return this.#business(
+      context,
+      async (signal) => {
+        signal.throwIfAborted()
+        if (!this.#options.secretBackendManager)
+          throw new Error('Secret backend manager missing')
+        const result = await this.#options.secretBackendManager.switchBackend(
+          input.target,
+        )
+        return {
+          ...result,
+          warnings: result.cleanupPending
+            ? ['Secret backend cleanup remains pending.']
+            : [],
+        }
+      },
+      true,
+      'exclusive',
+    )
   }
 
   documentationList(
@@ -1085,6 +1163,7 @@ export class DaemonApplication implements DaemonRpcApplication {
     context: RpcRequestContext,
     invoke: (signal: AbortSignal) => Promise<T>,
     resetsIdle = true,
+    secretAccess: 'shared' | 'exclusive' = 'shared',
   ): Promise<RpcResult<T>> {
     if (this.#lifecycle !== 'ready')
       return Promise.resolve(unavailable(this.#lifecycle))
@@ -1101,7 +1180,10 @@ export class DaemonApplication implements DaemonRpcApplication {
     this.#active.set(key, { controller, settled })
     this.#touchIdle(resetsIdle)
 
-    return invoke(controller.signal)
+    return this.#withSecretAccess(secretAccess, () => {
+      controller.signal.throwIfAborted()
+      return invoke(controller.signal)
+    })
       .then(
         (value): RpcResult<T> =>
           controller.signal.aborted
@@ -1136,6 +1218,56 @@ export class DaemonApplication implements DaemonRpcApplication {
       })
   }
 
+  async #withSecretAccess<T>(
+    mode: 'shared' | 'exclusive',
+    invoke: () => Promise<T>,
+  ): Promise<T> {
+    const release = await this.#acquireSecretAccess(mode)
+    try {
+      return await invoke()
+    } finally {
+      release()
+    }
+  }
+
+  #acquireSecretAccess(mode: 'shared' | 'exclusive'): Promise<() => void> {
+    return new Promise((resolve) => {
+      this.#secretAccessQueue.push({ mode, resolve })
+      this.#drainSecretAccess()
+    })
+  }
+
+  #drainSecretAccess(): void {
+    if (this.#secretAccessWriter) return
+    const next = this.#secretAccessQueue[0]
+    if (!next) return
+    if (next.mode === 'exclusive') {
+      if (this.#secretAccessReaders > 0) return
+      this.#secretAccessQueue.shift()
+      this.#secretAccessWriter = true
+      let released = false
+      next.resolve(() => {
+        if (released) return
+        released = true
+        this.#secretAccessWriter = false
+        this.#drainSecretAccess()
+      })
+      return
+    }
+    while (this.#secretAccessQueue[0]?.mode === 'shared') {
+      const reader = this.#secretAccessQueue.shift()
+      if (!reader) return
+      this.#secretAccessReaders += 1
+      let released = false
+      reader.resolve(() => {
+        if (released) return
+        released = true
+        this.#secretAccessReaders -= 1
+        this.#drainSecretAccess()
+      })
+    }
+  }
+
   #businessStream<TEvent, TResult>(
     context: RpcRequestContext,
     invoke: (
@@ -1163,9 +1295,10 @@ export class DaemonApplication implements DaemonRpcApplication {
     this.#active.set(key, { controller, settled })
     this.#touchIdle(true)
 
-    const producer = invoke(controller.signal, (event) =>
-      rendezvous.push(event),
-    )
+    const producer = this.#withSecretAccess('shared', () => {
+      controller.signal.throwIfAborted()
+      return invoke(controller.signal, (event) => rendezvous.push(event))
+    })
       .then((value) =>
         rendezvous.finish(
           controller.signal.aborted

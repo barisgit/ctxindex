@@ -27,6 +27,9 @@ import {
   type RpcResourceGetResult,
   type RpcSearchInput,
   type RpcSearchResult,
+  type RpcSecretsBackendSetInput,
+  type RpcSecretsBackendSetResult,
+  type RpcSecretsStatusResult,
   type RpcShutdownAccepted,
   type RpcSourceAddInput,
   type RpcSourceAddResult,
@@ -492,6 +495,29 @@ export async function daemonStatus(
   return invoke(
     signal,
     (client) => client.status.get(input, requestOptions(signal)),
+    selection,
+  )
+}
+
+export async function daemonSecretsStatus(
+  selection: DaemonSelection,
+  signal?: AbortSignal,
+): Promise<RpcSecretsStatusResult> {
+  return invoke(
+    signal,
+    (client) => client.secrets.status({}, requestOptions(signal)),
+    selection,
+  )
+}
+
+export async function daemonSecretsBackendSet(
+  selection: DaemonSelection,
+  input: RpcSecretsBackendSetInput,
+  signal?: AbortSignal,
+): Promise<RpcSecretsBackendSetResult> {
+  return invoke(
+    signal,
+    (client) => client.secrets.backend.set(input, requestOptions(signal)),
     selection,
   )
 }

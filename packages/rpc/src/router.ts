@@ -26,6 +26,8 @@ import {
   rpcResultSchema,
   rpcRuntimeIdentitySchema,
   rpcSearchResultSchema,
+  rpcSecretsBackendSetResultSchema,
+  rpcSecretsStatusResultSchema,
   rpcShutdownAcceptedSchema,
   rpcSourceAddResultSchema,
   rpcSourceDefinitionsResultSchema,
@@ -346,6 +348,36 @@ export function createDaemonRouter(
             errors,
           ),
         ),
+    },
+    secrets: {
+      status: os.secrets.status
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.secrets.status(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcSecretsStatusResultSchema,
+            errors,
+          ),
+        ),
+      backend: {
+        set: os.secrets.backend.set
+          .use(compatibility)
+          .handler(({ input, context, signal, errors }) =>
+            invokeApplication(
+              () =>
+                application.secrets.backend.set(
+                  input,
+                  applicationContext(context, signal),
+                ),
+              rpcSecretsBackendSetResultSchema,
+              errors,
+            ),
+          ),
+      },
     },
     documentation: {
       list: os.documentation.list

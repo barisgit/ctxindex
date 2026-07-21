@@ -12,6 +12,7 @@ import {
   CtxindexValidationError,
   type CtxindexValidationErrorCode,
 } from '@ctxindex/core/errors'
+import { CtxindexSecretsError } from '@ctxindex/core/secrets'
 import {
   createDaemonRouter,
   type RpcRequestContext,
@@ -237,6 +238,155 @@ test('tracks a business request and propagates request cancellation', async () =
   })
   expect(observed?.aborted).toBe(true)
   expect(app.activeRequestCount).toBe(0)
+})
+
+test('serves safe secret status and backend switching as serialized business work', async () => {
+  const calls: string[] = []
+  let releaseSwitch!: () => void
+  const switchBlocked = new Promise<void>((resolve) => {
+    releaseSwitch = resolve
+  })
+  const app = application({
+    secretBackendManager: {
+      async getStatus() {
+        calls.push('status')
+        return {
+          backend: 'keychain' as const,
+          backends: {
+            file: { available: true, referenceCount: 2 },
+            keychain: { available: true, referenceCount: 0 },
+          },
+        }
+      },
+      async switchBackend(target: 'keychain' | 'file') {
+        calls.push(`set:${target}`)
+        await switchBlocked
+        return {
+          backend: target,
+          copied: 2,
+          cleaned: 1,
+          cleanupPending: true,
+          warnings: ['secret-canary keychain:ctxindex/private/token'],
+        }
+      },
+    },
+  })
+  app.markReady()
+
+  const switching = app.secrets.backend.set(
+    { target: 'file' },
+    context('secrets-set'),
+  )
+  await Promise.resolve()
+  const status = app.secrets.status({}, context('secrets-status'))
+  await Promise.resolve()
+  expect(calls).toEqual(['set:file'])
+  expect(app.activeRequestCount).toBe(2)
+
+  releaseSwitch()
+  expect(await switching).toEqual({
+    ok: true,
+    value: {
+      backend: 'file',
+      copied: 2,
+      cleaned: 1,
+      cleanupPending: true,
+      warnings: ['Secret backend cleanup remains pending.'],
+    },
+  })
+  expect(await status).toEqual({
+    ok: true,
+    value: {
+      backend: 'keychain',
+      backends: {
+        file: { available: true, referenceCount: 2 },
+        keychain: { available: true, referenceCount: 0 },
+      },
+    },
+  })
+  expect(calls).toEqual(['set:file', 'status'])
+  expect(JSON.stringify(await switching)).not.toContain('secret-canary')
+})
+
+test('maps secret backend failures to bounded messages without references', async () => {
+  const app = application({
+    secretBackendManager: {
+      async getStatus() {
+        throw new CtxindexSecretsError(
+          'keychain:ctxindex/private/token secret-canary',
+          'backend_unavailable',
+        )
+      },
+      async switchBackend() {
+        throw new Error('unused')
+      },
+    },
+  })
+  app.markReady()
+  const result = await app.secrets.status({}, context('secrets-failure'))
+  expect(result).toEqual({
+    ok: false,
+    error: {
+      kind: 'ctxindex',
+      taxonomy: 'other',
+      code: 'backend_unavailable',
+      message: 'The configured secret backend is unavailable.',
+    },
+  })
+  expect(JSON.stringify(result)).not.toMatch(/secret-canary|keychain:ctxindex/)
+})
+
+test('backend migration waits for active secret-using business work', async () => {
+  const calls: string[] = []
+  let releaseSearch!: () => void
+  const searchBlocked = new Promise<void>((resolve) => {
+    releaseSearch = resolve
+  })
+  const app = application({
+    searchService: {
+      async search() {
+        calls.push('search')
+        await searchBlocked
+        return { results: [], warnings: [] }
+      },
+    },
+    secretBackendManager: {
+      async getStatus() {
+        throw new Error('unused')
+      },
+      async switchBackend(target: 'keychain' | 'file') {
+        calls.push(`set:${target}`)
+        return {
+          backend: target,
+          copied: 0,
+          cleaned: 0,
+          cleanupPending: false,
+          warnings: [],
+        }
+      },
+    },
+  })
+  app.markReady()
+
+  const search = app.search.query(
+    { text: 'fixture' },
+    context('search-before-secret-migration'),
+  )
+  await Promise.resolve()
+  const switching = app.secrets.backend.set(
+    { target: 'keychain' },
+    context('secret-migration-after-search'),
+  )
+  await Promise.resolve()
+  expect(calls).toEqual(['search'])
+
+  releaseSearch()
+  expect(await search).toMatchObject({ ok: true })
+  expect(await switching).toMatchObject({
+    ok: true,
+    value: { backend: 'keychain' },
+  })
+  expect(calls).toEqual(['search', 'set:keychain'])
 })
 
 test('streams bounded progress in order with one-item producer backpressure', async () => {

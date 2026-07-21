@@ -200,6 +200,22 @@ test('startup owns leases before one load/open and publishes ready last', async 
       composeServices: () => {
         events.push('compose')
         return {
+          secretBackendManager: {
+            getStatus: async () => ({
+              backend: 'file' as const,
+              backends: {
+                file: { available: true, referenceCount: 0 },
+                keychain: { available: false, referenceCount: 0 },
+              },
+            }),
+            switchBackend: async (target: 'keychain' | 'file') => ({
+              backend: target,
+              copied: 0,
+              cleaned: 0,
+              cleanupPending: false,
+              warnings: [],
+            }),
+          },
           syncService: {
             run: async () => ({ mode: 'sync', results: [], warnings: [] }),
           },
@@ -250,6 +266,12 @@ test('startup owns leases before one load/open and publishes ready last', async 
   expect(
     (await daemon.application.system.health({}, daemon.testContext())).ok,
   ).toBe(true)
+  expect(
+    await daemon.application.secrets.status({}, daemon.testContext()),
+  ).toMatchObject({
+    ok: true,
+    value: { backend: 'file' },
+  })
   expect(
     await daemon.application.documentation.get(
       { extensionId: 'fixture.docs', path: 'README.md' },

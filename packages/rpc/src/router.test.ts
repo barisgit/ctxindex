@@ -80,6 +80,8 @@ function createApplication() {
     health: 0,
     realmAdd: 0,
     realmList: 0,
+    secretsStatus: 0,
+    secretsBackendSet: 0,
     documentationList: 0,
     documentationGet: 0,
     documentationSearch: 0,
@@ -144,6 +146,36 @@ function createApplication() {
       async list(_input, context) {
         record('realmList', context)
         return { ok: true, value: { rows: [] } }
+      },
+    },
+    secrets: {
+      async status(_input, context) {
+        record('secretsStatus', context)
+        return {
+          ok: true,
+          value: {
+            backend: 'file',
+            backends: {
+              file: { available: true, referenceCount: 2 },
+              keychain: { available: false, referenceCount: 1 },
+            },
+          },
+        }
+      },
+      backend: {
+        async set(input, context) {
+          record('secretsBackendSet', context)
+          return {
+            ok: true,
+            value: {
+              backend: input.target,
+              copied: 2,
+              cleaned: 2,
+              cleanupPending: false,
+              warnings: [],
+            },
+          }
+        },
       },
     },
     documentation: {
@@ -284,6 +316,8 @@ describe('pure daemon contract', () => {
       ['system', 'shutdown'],
       ['realm', 'add'],
       ['realm', 'list'],
+      ['secrets', 'status'],
+      ['secrets', 'backend', 'set'],
       ['documentation', 'list'],
       ['documentation', 'get'],
       ['documentation', 'search'],
@@ -330,6 +364,10 @@ describe('pure daemon contract', () => {
     expectTypeOf<DaemonRpcApplication['system']>().toHaveProperty('shutdown')
     expectTypeOf<DaemonRpcApplication['realm']>().toHaveProperty('add')
     expectTypeOf<DaemonRpcApplication['realm']>().toHaveProperty('list')
+    expectTypeOf<DaemonRpcApplication['secrets']>().toHaveProperty('status')
+    expectTypeOf<DaemonRpcApplication['secrets']['backend']>().toHaveProperty(
+      'set',
+    )
     expectTypeOf<DaemonRpcApplication['documentation']>().toHaveProperty('list')
     expectTypeOf<DaemonRpcApplication['documentation']>().toHaveProperty('get')
     expectTypeOf<DaemonRpcApplication['documentation']>().toHaveProperty(
@@ -401,6 +439,8 @@ describe('contract implementation', () => {
     expect(await client.system.health({})).toMatchObject({ ready: true })
     await client.realm.add({ slug: 'work' })
     await client.realm.list({})
+    await client.secrets.status({})
+    await client.secrets.backend.set({ target: 'keychain' })
     await client.documentation.list({})
     await client.documentation.get({
       extensionId: 'fixture.docs',
@@ -439,6 +479,8 @@ describe('contract implementation', () => {
       health: 1,
       realmAdd: 1,
       realmList: 1,
+      secretsStatus: 1,
+      secretsBackendSet: 1,
       documentationList: 1,
       documentationGet: 1,
       documentationSearch: 1,

@@ -1,5 +1,14 @@
 import type { SecretBackend } from '@ctxindex/core/secrets'
 import { defineCtxCommand } from '../command-model'
+import {
+  daemonSecretsBackendSet,
+  daemonSecretsStatus,
+  selectDaemon,
+} from '../daemon/client'
+import {
+  ensureDaemonSelection,
+  selectEnsuredDaemonRoute,
+} from '../daemon/ensure'
 import { openSecretDeps } from '../deps'
 import { mapErrorToExit, runWithExit } from '../format/exit'
 import { outputFormatArg } from '../format/output'
@@ -12,23 +21,57 @@ export type SecretsCommandInput =
   | { readonly kind: 'status'; readonly json: boolean }
   | { readonly kind: 'set'; readonly target: SecretBackend }
 
+export interface SecretsCommandDeps {
+  readonly selectDaemon: typeof selectDaemon
+  readonly ensureDaemonSelection?: typeof ensureDaemonSelection
+  readonly secretsStatus: typeof daemonSecretsStatus
+  readonly secretsBackendSet: typeof daemonSecretsBackendSet
+  readonly open: typeof openSecretDeps
+}
+
+const defaultDeps: SecretsCommandDeps = {
+  selectDaemon,
+  ensureDaemonSelection,
+  secretsStatus: daemonSecretsStatus,
+  secretsBackendSet: daemonSecretsBackendSet,
+  open: openSecretDeps,
+}
+
 export async function handleSecretsCommand(
   parsed: SecretsCommandInput,
+  services: SecretsCommandDeps = defaultDeps,
 ): Promise<number> {
   let deps: Awaited<ReturnType<typeof openSecretDeps>> | undefined
+  const controller = new AbortController()
+  const cancel = () => controller.abort()
+  process.once('SIGINT', cancel)
   try {
-    deps = await openSecretDeps()
+    const daemon = await selectEnsuredDaemonRoute(services, controller.signal)
     if (parsed.kind === 'status') {
       console.log(
         formatSecretBackendStatus(
-          await deps.secretBackendManager.getStatus(),
+          daemon
+            ? await services.secretsStatus(daemon, controller.signal)
+            : await (async () => {
+                deps = await services.open()
+                return deps.secretBackendManager.getStatus()
+              })(),
           parsed.json,
         ),
       )
       return 0
     }
 
-    const result = await deps.secretBackendManager.switchBackend(parsed.target)
+    const result = daemon
+      ? await services.secretsBackendSet(
+          daemon,
+          { target: parsed.target },
+          controller.signal,
+        )
+      : await (async () => {
+          deps = await services.open()
+          return deps.secretBackendManager.switchBackend(parsed.target)
+        })()
     console.log(formatSecretBackendSwitch(result))
     for (const warning of result.warnings) console.error(`warning: ${warning}`)
     return 0
@@ -36,6 +79,7 @@ export async function handleSecretsCommand(
     console.error(err instanceof Error ? err.message : String(err))
     return mapErrorToExit(err)
   } finally {
+    process.removeListener('SIGINT', cancel)
     await deps?.close()
   }
 }
