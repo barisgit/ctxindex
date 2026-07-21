@@ -14,6 +14,14 @@ const definition = {
   archivePrefix: 'ctxindex-extension-sdk',
 } as const
 
+function integrityFor(value: string): string {
+  return `sha512-${new Bun.CryptoHasher('sha512')
+    .update(value)
+    .digest('base64')}`
+}
+
+const archiveIntegrity = integrityFor('archive')
+
 function input(overrides: Partial<LibraryGateInput> = {}): LibraryGateInput {
   return {
     definition,
@@ -47,7 +55,7 @@ describe('library release gate', () => {
     })
   })
 
-  test('skips a changed package whose exact version is already published', () => {
+  test('keeps a changed published package for artifact integrity verification', () => {
     expect(
       evaluateLibraryRelease(
         input({
@@ -55,10 +63,18 @@ describe('library release gate', () => {
             status: 200,
             name: '@ctxindex/extension-sdk',
             version: '0.1.1',
+            integrity: archiveIntegrity,
           },
         }),
       ),
-    ).toBeNull()
+    ).toEqual({
+      id: 'extension-sdk',
+      packageName: '@ctxindex/extension-sdk',
+      version: '0.1.1',
+      prepareScript: 'prepare:extension-sdk-release',
+      archive: 'dist/npm/artifacts/ctxindex-extension-sdk-0.1.1.tgz',
+      archiveName: 'ctxindex-extension-sdk-0.1.1.tgz',
+    })
   })
 
   test.each([
@@ -83,8 +99,38 @@ describe('library release gate', () => {
         status: 200,
         name: '@ctxindex/extension-sdk',
         version: '0.1.2',
+        integrity: archiveIntegrity,
       },
       error: 'did not confirm exact package version',
+    },
+    {
+      name: 'missing registry integrity',
+      registry: {
+        status: 200,
+        name: '@ctxindex/extension-sdk',
+        version: '0.1.1',
+      },
+      error: 'missing or malformed dist.integrity',
+    },
+    {
+      name: 'malformed registry integrity',
+      registry: {
+        status: 200,
+        name: '@ctxindex/extension-sdk',
+        version: '0.1.1',
+        integrity: 'sha512-not-base64',
+      },
+      error: 'missing or malformed dist.integrity',
+    },
+    {
+      name: 'non-canonical registry integrity',
+      registry: {
+        status: 200,
+        name: '@ctxindex/extension-sdk',
+        version: '0.1.1',
+        integrity: `sha512-${'A'.repeat(85)}B==`,
+      },
+      error: 'missing or malformed dist.integrity',
     },
   ])('fails closed for $name', ({ registry, error }) => {
     expect(() => evaluateLibraryRelease(input({ registry }))).toThrow(error)
@@ -145,13 +191,18 @@ describe('library release gate', () => {
             status: 200,
             name: extensionSdk.packageName,
             version: extensionSdk.version,
+            integrity: archiveIntegrity,
           },
         },
-        { candidate: profiles, registry: { status: 404 } },
+        {
+          candidate: profiles,
+          registry: { status: 404 },
+        },
       ].map(({ candidate, registry }) =>
         evaluateLibraryPublishPreflight({
           candidate,
           registry,
+          archiveIntegrity,
           runAttempt: 2,
         }),
       ),
@@ -169,9 +220,48 @@ describe('library release gate', () => {
           status: 200,
           name: candidate.packageName,
           version: candidate.version,
+          integrity: archiveIntegrity,
         },
+        archiveIntegrity,
         runAttempt: 1,
       }),
     ).toThrow('appeared before publication')
+  })
+
+  test('rejects a retry when the published and built archive integrity differ', () => {
+    const candidate = evaluateLibraryRelease(input())
+    if (candidate === null) throw new Error('expected SDK candidate')
+
+    expect(() =>
+      evaluateLibraryPublishPreflight({
+        candidate,
+        registry: {
+          status: 200,
+          name: candidate.packageName,
+          version: candidate.version,
+          integrity: archiveIntegrity,
+        },
+        archiveIntegrity: integrityFor('different archive'),
+        runAttempt: 2,
+      }),
+    ).toThrow('integrity does not match')
+  })
+
+  test.each([
+    ['missing', undefined],
+    ['malformed', 'sha512-not-base64'],
+    ['non-canonical', `sha512-${'A'.repeat(85)}B==`],
+  ])('rejects %s built archive integrity', (_name, integrity) => {
+    const candidate = evaluateLibraryRelease(input())
+    if (candidate === null) throw new Error('expected SDK candidate')
+
+    expect(() =>
+      evaluateLibraryPublishPreflight({
+        candidate,
+        registry: { status: 404 },
+        archiveIntegrity: integrity as string,
+        runAttempt: 1,
+      }),
+    ).toThrow('Built archive integrity is malformed')
   })
 })
