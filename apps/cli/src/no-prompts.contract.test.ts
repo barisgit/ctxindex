@@ -72,7 +72,13 @@ async function mkSandbox(): Promise<{
   await mkdir(join(dir, 'data'), { recursive: true })
   // bootstrap the DB
   await spawnCli(['init'], env, 'null')
-  return { env, cleanup: () => rm(dir, { recursive: true, force: true }) }
+  return {
+    env,
+    cleanup: async () => {
+      await spawnCli(['daemon', 'stop'], env, 'null').catch(() => {})
+      await rm(dir, { recursive: true, force: true })
+    },
+  }
 }
 
 describe('no-prompts contract', () => {

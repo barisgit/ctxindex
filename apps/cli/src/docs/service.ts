@@ -13,6 +13,10 @@ import {
   daemonDocumentationSearch,
   selectDaemon,
 } from '../daemon/client'
+import {
+  ensureDaemonSelection,
+  selectEnsuredDaemonRoute,
+} from '../daemon/ensure'
 import { loadCliDefinitions, printExtensionDiagnostics } from '../definitions'
 import { resolveBundledDocumentation } from './resolve'
 
@@ -37,6 +41,7 @@ export type DocsServiceLoader = () => Promise<DocsCommandService>
 
 export interface DocsRouteServices {
   readonly selectDaemon: typeof selectDaemon
+  readonly ensureDaemonSelection?: typeof ensureDaemonSelection
   readonly daemonDocumentationList: typeof daemonDocumentationList
   readonly daemonDocumentationGet: typeof daemonDocumentationGet
   readonly daemonDocumentationSearch: typeof daemonDocumentationSearch
@@ -175,6 +180,7 @@ function selectedDaemonService(
 
 const defaultRouteServices: DocsRouteServices = {
   selectDaemon,
+  ensureDaemonSelection,
   daemonDocumentationList,
   daemonDocumentationGet,
   daemonDocumentationSearch,
@@ -188,7 +194,7 @@ export async function loadDocsCommandService(
 ): Promise<DocsCommandService> {
   const bundledSource = services.resolveBundledDocumentation()
   const bundled = createDocumentationService([bundledSource])
-  const selection = services.selectDaemon()
+  const selection = await selectEnsuredDaemonRoute(services)
   if (selection !== null) {
     return selectedDaemonService(selection, bundled, services)
   }

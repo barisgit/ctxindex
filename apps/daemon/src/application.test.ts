@@ -121,6 +121,52 @@ function application(overrides: Record<string, unknown> = {}) {
   })
 }
 
+class TestIdleClock {
+  now = 0
+  #nextId = 0
+  readonly #timers = new Map<
+    number,
+    { readonly deadline: number; readonly callback: () => void }
+  >()
+
+  readonly hooks = {
+    now: () => this.now,
+    setTimeout: (callback: () => void, delayMs: number): number => {
+      const id = this.#nextId++
+      this.#timers.set(id, { deadline: this.now + delayMs, callback })
+      return id
+    },
+    clearTimeout: (id: unknown): void => {
+      if (typeof id === 'number') this.#timers.delete(id)
+    },
+  }
+
+  advance(milliseconds: number, run = true): void {
+    this.now += milliseconds
+    if (run) this.runDue()
+  }
+
+  runDue(): void {
+    while (true) {
+      const due = [...this.#timers.entries()]
+        .filter(([, timer]) => timer.deadline <= this.now)
+        .sort((left, right) => left[1].deadline - right[1].deadline)[0]
+      if (!due) return
+      this.#timers.delete(due[0])
+      due[1].callback()
+    }
+  }
+
+  takeDue(): () => void {
+    const due = [...this.#timers.entries()]
+      .filter(([, timer]) => timer.deadline <= this.now)
+      .sort((left, right) => left[1].deadline - right[1].deadline)[0]
+    if (!due) throw new Error('Expected a due timer')
+    this.#timers.delete(due[0])
+    return due[1].callback
+  }
+}
+
 async function consumeApplicationSync(
   promise: ReturnType<DaemonApplication['sync']['run']>,
 ): Promise<{
@@ -528,6 +574,84 @@ test('shutdown stops admission, cancels active work, and is idempotent', async (
   settle()
   await pending
   await app.whenDrained()
+})
+
+test('idle shutdown waits for active work and resets from admission and settlement', async () => {
+  const clock = new TestIdleClock()
+  const stopping: number[] = []
+  let settle!: () => void
+  const app = application({
+    idleTimeoutMs: 1_000,
+    idleTimer: clock.hooks,
+    onStopping: () => stopping.push(clock.now),
+    syncService: {
+      run: () =>
+        new Promise((resolve) => {
+          settle = () => resolve({ mode: 'sync', results: [], warnings: [] })
+        }),
+    },
+  })
+  app.markReady()
+  clock.advance(900)
+
+  const opened = await app.sync.run({ mode: 'sync' }, context('idle-active'))
+  if (!opened.ok) throw new Error('Expected stream admission')
+  const pending = opened.value.next()
+
+  clock.advance(1_100)
+  expect(app.lifecycle).toBe('ready')
+  settle()
+  await pending
+  await app.whenDrained()
+
+  clock.advance(999)
+  expect(app.lifecycle).toBe('ready')
+  clock.advance(1)
+  expect(app.lifecycle).toBe('stopping')
+  expect(stopping).toEqual([3_000])
+})
+
+test('health and status observation do not extend the idle deadline', async () => {
+  const clock = new TestIdleClock()
+  const app = application({
+    idleTimeoutMs: 1_000,
+    idleTimer: clock.hooks,
+  })
+  app.markReady()
+  clock.advance(900)
+
+  expect((await app.system.health({}, context('idle-health'))).ok).toBe(true)
+  expect((await app.status.get({}, context('idle-status'))).ok).toBe(true)
+  clock.advance(100)
+
+  expect(app.lifecycle).toBe('stopping')
+})
+
+test('business admission at the idle deadline wins atomically over shutdown', async () => {
+  const clock = new TestIdleClock()
+  let settle!: () => void
+  const app = application({
+    idleTimeoutMs: 1_000,
+    idleTimer: clock.hooks,
+    syncService: {
+      run: () =>
+        new Promise((resolve) => {
+          settle = () => resolve({ mode: 'sync', results: [], warnings: [] })
+        }),
+    },
+  })
+  app.markReady()
+  clock.advance(1_000, false)
+  const staleDeadline = clock.takeDue()
+
+  const opened = await app.sync.run({ mode: 'sync' }, context('idle-race'))
+  if (!opened.ok) throw new Error('Expected stream admission')
+  const pending = opened.value.next()
+  settle()
+  await pending
+  staleDeadline()
+
+  expect(app.lifecycle).toBe('ready')
 })
 
 test('maps core failures and diagnostics without leaking unsafe text', async () => {
@@ -1268,4 +1392,96 @@ test('Source add checks cancellation after asynchronous Grant resolution', async
     error: { code: 'cancelled' },
   })
   expect(adds).toBe(0)
+})
+
+test('Action describe and run resolve one Source and preserve cancellation and output', async () => {
+  const sourceId = '01ARZ3NDEKTSV4RRFFQ69G5FAV'
+  const actionId = 'example.item.create'
+  let described: unknown
+  let run: unknown
+  const app = application({
+    sourceService: {
+      resolveSourceId: (source: string) => {
+        expect(source).toBe('notes')
+        return sourceId
+      },
+      getStatus: () => [],
+    },
+    actionService: {
+      describe(input: unknown) {
+        described = input
+        return {
+          id: actionId,
+          profile: { id: 'example.item', version: 1 },
+          effect: 'reversible',
+          input: { type: 'object' },
+          output: { id: 'example.item', version: 1 },
+          adapters: [{ id: 'example.adapter' }],
+          sources: [
+            {
+              id: sourceId,
+              adapter: { id: 'example.adapter' },
+              available: true,
+            },
+          ],
+        }
+      },
+      async run(input: {
+        actionId: string
+        sourceId: string
+        actionInput: unknown
+        signal: AbortSignal
+        confirmIrreversible: boolean
+      }) {
+        run = input
+        return {
+          resource: {
+            id: 'resource-id',
+            ref: `ctx://${sourceId}/item/one`,
+            sourceId,
+            realmId: 'work',
+            profile: { id: 'example.item', version: 1 },
+            origin: 'adhoc',
+            title: 'One',
+            summary: null,
+            occurredAt: null,
+            providerUpdatedAt: null,
+            deletedAt: null,
+            hydratedAt: 1,
+            payload: { title: 'One' },
+            createdAt: 1,
+            updatedAt: 1,
+          },
+          warnings: [],
+        }
+      },
+    },
+  })
+  app.markReady()
+  const request = context('action-request')
+
+  expect(
+    await app.action.describe({ actionId, source: 'notes' }, request),
+  ).toMatchObject({ ok: true, value: { id: actionId } })
+  const result = await app.action.run(
+    {
+      actionId,
+      source: 'notes',
+      actionInput: { title: 'One' },
+      confirmIrreversible: false,
+    },
+    request,
+  )
+  expect(result).toMatchObject({
+    ok: true,
+    value: { resource: { ref: `ctx://${sourceId}/item/one` }, warnings: [] },
+  })
+  expect(described).toEqual({ actionId, sourceId })
+  expect(run).toMatchObject({
+    actionId,
+    sourceId,
+    actionInput: { title: 'One' },
+    confirmIrreversible: false,
+  })
+  expect((run as { signal: unknown }).signal).toBeInstanceOf(AbortSignal)
 })

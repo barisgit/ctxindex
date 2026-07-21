@@ -1,5 +1,9 @@
 import { type ContractRouterClient, eventIterator, oc } from '@orpc/contract'
 import {
+  rpcActionDescribeInputSchema,
+  rpcActionDescribeResultSchema,
+  rpcActionRunInputSchema,
+  rpcActionRunResultSchema,
   rpcDocumentationGetInputSchema,
   rpcDocumentationGetResultSchema,
   rpcDocumentationListInputSchema,
@@ -98,6 +102,14 @@ export const daemonContract = {
     get: procedure
       .input(rpcThreadGetInputSchema)
       .output(rpcThreadGetResultSchema),
+  },
+  action: {
+    describe: procedure
+      .input(rpcActionDescribeInputSchema)
+      .output(rpcActionDescribeResultSchema),
+    run: procedure
+      .input(rpcActionRunInputSchema)
+      .output(rpcActionRunResultSchema),
   },
 } as const
 

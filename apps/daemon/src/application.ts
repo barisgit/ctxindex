@@ -1,3 +1,7 @@
+import type {
+  DescribeActionResult,
+  RunActionResult,
+} from '@ctxindex/core/action'
 import {
   type AuthService,
   isGrantCompatible,
@@ -35,6 +39,9 @@ import type {
 import type { ThreadResult, ThreadService } from '@ctxindex/core/thread'
 import type {
   DaemonRpcApplication,
+  RpcActionDescribeInput,
+  RpcActionDescribeResult,
+  RpcActionRunResult,
   RpcDocumentationGetInput,
   RpcDocumentationGetResult,
   RpcDocumentationListInput,
@@ -80,6 +87,8 @@ import type {
   RpcWarning,
 } from '@ctxindex/rpc'
 import {
+  rpcActionDescribeResultSchema,
+  rpcActionRunResultSchema,
   rpcDocumentationGetResultSchema,
   rpcDocumentationListResultSchema,
   rpcDocumentationSearchResultSchema,
@@ -104,8 +113,11 @@ export interface DaemonApplicationOptions {
     DocumentationService,
     'list' | 'get' | 'search'
   >
+  readonly idleTimeoutMs?: number
+  readonly idleTimer?: DaemonIdleTimer
   readonly observationTimeoutMs: number
   readonly authService?: Pick<AuthService, 'listGrants'>
+  readonly actionService?: DaemonActionService
   readonly realmService?: Pick<RealmService, 'createRealm' | 'listRealms'>
   readonly registry?: ExtensionRegistry
   readonly searchService?: Pick<SearchPlanner, 'search'>
@@ -120,6 +132,26 @@ export interface DaemonApplicationOptions {
   readonly sourceService: Pick<SourceService, 'resolveSourceId' | 'getStatus'> &
     Partial<Pick<SourceService, 'addSource' | 'listSources' | 'removeSource'>>
   readonly onStopping?: () => void
+}
+
+export interface DaemonActionService {
+  readonly describe: (input: {
+    readonly actionId: string
+    readonly sourceId: string
+  }) => DescribeActionResult
+  readonly run: (input: {
+    readonly actionId: string
+    readonly sourceId: string
+    readonly actionInput: unknown
+    readonly signal: AbortSignal
+    readonly confirmIrreversible: boolean
+  }) => Promise<RunActionResult>
+}
+
+export interface DaemonIdleTimer {
+  now(): number
+  setTimeout(callback: () => void, delayMs: number): unknown
+  clearTimeout(handle: unknown): void
 }
 
 interface ActiveRequest {
@@ -475,7 +507,8 @@ function sourceRow(
 function presentResource(
   value:
     | SourceResourceResult['resource']
-    | ThreadResult['messages'][number]['resource'],
+    | ThreadResult['messages'][number]['resource']
+    | RunActionResult['resource'],
 ) {
   return {
     ...('id' in value ? { id: value.id } : {}),
@@ -560,6 +593,9 @@ export class DaemonApplication implements DaemonRpcApplication {
   readonly #active = new Map<string, ActiveRequest>()
   readonly #options: DaemonApplicationOptions
   #lifecycle: RpcHealthResult['lifecycle'] = 'starting'
+  #idleDeadline: number | undefined
+  #idleGeneration = 0
+  #idleTimerHandle: unknown
   #requestSequence = 0
   #stoppingNotified = false
 
@@ -597,6 +633,10 @@ export class DaemonApplication implements DaemonRpcApplication {
   readonly thread: DaemonRpcApplication['thread'] = {
     get: (input, context) => this.getThread(input, context),
   }
+  readonly action: DaemonRpcApplication['action'] = {
+    describe: (input, context) => this.describeAction(input, context),
+    run: (input, context) => this.runAction(input, context),
+  }
 
   constructor(options: DaemonApplicationOptions) {
     this.#options = options
@@ -614,11 +654,13 @@ export class DaemonApplication implements DaemonRpcApplication {
     if (this.#lifecycle !== 'starting')
       throw new Error('Daemon cannot become ready')
     this.#lifecycle = 'ready'
+    this.#touchIdle(true)
   }
 
   beginStopping(): boolean {
     const alreadyStopping = this.#lifecycle === 'stopping'
     this.#lifecycle = 'stopping'
+    this.#clearIdleTimer()
     for (const request of this.#active.values()) request.controller.abort()
     if (!this.#stoppingNotified) {
       this.#stoppingNotified = true
@@ -959,20 +1001,67 @@ export class DaemonApplication implements DaemonRpcApplication {
     })
   }
 
+  describeAction(
+    input: RpcActionDescribeInput,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcActionDescribeResult>> {
+    return this.#business(context, async () => {
+      if (!this.#options.actionService)
+        throw new Error('Action service missing')
+      const sourceId = this.#options.sourceService.resolveSourceId(input.source)
+      const parsed = rpcActionDescribeResultSchema.safeParse(
+        this.#options.actionService.describe({
+          actionId: input.actionId,
+          sourceId,
+        }),
+      )
+      if (!parsed.success) throw new ResultTooLargeError()
+      return parsed.data
+    })
+  }
+
+  runAction(
+    input: Parameters<DaemonRpcApplication['action']['run']>[0],
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcActionRunResult>> {
+    return this.#business(context, async (signal) => {
+      if (!this.#options.actionService)
+        throw new Error('Action service missing')
+      const sourceId = this.#options.sourceService.resolveSourceId(input.source)
+      const result = await this.#options.actionService.run({
+        actionId: input.actionId,
+        sourceId,
+        actionInput: input.actionInput,
+        signal,
+        confirmIrreversible: input.confirmIrreversible,
+      })
+      const parsed = rpcActionRunResultSchema.safeParse({
+        resource: presentResource(result.resource),
+        warnings: result.warnings,
+      })
+      if (!parsed.success) throw new ResultTooLargeError()
+      return parsed.data
+    })
+  }
+
   getStatus(
     input: RpcStatusInput,
     context: RpcRequestContext,
   ): Promise<RpcResult<RpcStatusResult>> {
-    return this.#business(context, async () => {
-      const sourceId = input.source
-        ? this.#options.sourceService.resolveSourceId(input.source)
-        : undefined
-      return {
-        rows: this.#options.sourceService
-          .getStatus(sourceId ? { sourceId } : {})
-          .map(statusRow),
-      }
-    })
+    return this.#business(
+      context,
+      async () => {
+        const sourceId = input.source
+          ? this.#options.sourceService.resolveSourceId(input.source)
+          : undefined
+        return {
+          rows: this.#options.sourceService
+            .getStatus(sourceId ? { sourceId } : {})
+            .map(statusRow),
+        }
+      },
+      false,
+    )
   }
 
   async shutdown(
@@ -995,6 +1084,7 @@ export class DaemonApplication implements DaemonRpcApplication {
   #business<T>(
     context: RpcRequestContext,
     invoke: (signal: AbortSignal) => Promise<T>,
+    resetsIdle = true,
   ): Promise<RpcResult<T>> {
     if (this.#lifecycle !== 'ready')
       return Promise.resolve(unavailable(this.#lifecycle))
@@ -1009,6 +1099,7 @@ export class DaemonApplication implements DaemonRpcApplication {
       settle = resolve
     })
     this.#active.set(key, { controller, settled })
+    this.#touchIdle(resetsIdle)
 
     return invoke(controller.signal)
       .then(
@@ -1041,6 +1132,7 @@ export class DaemonApplication implements DaemonRpcApplication {
         context.signal.removeEventListener('abort', cancel)
         this.#active.delete(key)
         settle()
+        this.#touchIdle(resetsIdle)
       })
   }
 
@@ -1069,6 +1161,7 @@ export class DaemonApplication implements DaemonRpcApplication {
       settle = resolve
     })
     this.#active.set(key, { controller, settled })
+    this.#touchIdle(true)
 
     const producer = invoke(controller.signal, (event) =>
       rendezvous.push(event),
@@ -1103,6 +1196,7 @@ export class DaemonApplication implements DaemonRpcApplication {
         context.signal.removeEventListener('abort', cancel)
         this.#active.delete(key)
         settle()
+        this.#touchIdle(true)
       })
 
     let completed = false
@@ -1146,5 +1240,38 @@ export class DaemonApplication implements DaemonRpcApplication {
       },
     }
     return Promise.resolve({ ok: true, value: iterator })
+  }
+
+  #touchIdle(resetDeadline: boolean): void {
+    const timeoutMs = this.#options.idleTimeoutMs
+    const timer = this.#options.idleTimer
+    if (timeoutMs === undefined || timer === undefined) return
+    if (this.#lifecycle !== 'ready') return
+    if (resetDeadline || this.#idleDeadline === undefined) {
+      this.#idleDeadline = timer.now() + timeoutMs
+    }
+    this.#clearIdleTimer()
+    const deadline = this.#idleDeadline
+    const generation = this.#idleGeneration
+    this.#idleTimerHandle = timer.setTimeout(
+      () => {
+        if (generation !== this.#idleGeneration) return
+        this.#idleTimerHandle = undefined
+        if (this.#lifecycle !== 'ready' || this.#active.size > 0) return
+        if (timer.now() < deadline) {
+          this.#touchIdle(false)
+          return
+        }
+        this.beginStopping()
+      },
+      Math.max(0, deadline - timer.now()),
+    )
+  }
+
+  #clearIdleTimer(): void {
+    this.#idleGeneration++
+    if (this.#idleTimerHandle === undefined) return
+    this.#options.idleTimer?.clearTimeout(this.#idleTimerHandle)
+    this.#idleTimerHandle = undefined
   }
 }

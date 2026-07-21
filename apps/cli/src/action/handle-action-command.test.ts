@@ -119,6 +119,173 @@ describe('Action output', () => {
 })
 
 describe('Action handler', () => {
+  test('routes valid Action input through one selected daemon without opening direct dependencies', async () => {
+    const log = spyOn(console, 'log').mockImplementation(() => {})
+    let opened = 0
+    let ensured = 0
+    let received: unknown
+    const selection = { endpoint: '/tmp/ctxindex-action.sock' } as never
+    const services: ActionServices = {
+      describe() {
+        throw new Error('direct describe must not run')
+      },
+      async run() {
+        throw new Error('direct run must not run')
+      },
+      ensureDaemonSelection: async () => {
+        ensured += 1
+        return {
+          status: 'selected',
+          selection,
+          started: true,
+        } as never
+      },
+      async daemonDescribe() {
+        throw new Error('daemon describe must not run')
+      },
+      async daemonRun(selected, input) {
+        expect(selected).toBe(selection)
+        received = input
+        return runResult as never
+      },
+    }
+
+    expect(
+      await handleActionCommand(
+        {
+          kind: 'run',
+          actionId,
+          sourceId,
+          input: '{"body":"hi"}',
+          json: true,
+        },
+        (async () => {
+          opened += 1
+          throw new Error('selected daemon must not open direct dependencies')
+        }) as () => Promise<ActionDeps>,
+        services,
+      ),
+    ).toBe(0)
+    expect(ensured).toBe(1)
+    expect(opened).toBe(0)
+    expect(received).toEqual({
+      actionId,
+      source: sourceId,
+      actionInput: { body: 'hi' },
+      confirmIrreversible: false,
+    })
+    expect(log).toHaveBeenCalledWith(JSON.stringify(runResult))
+  })
+
+  test('routes an exact source-aware description through the selected daemon', async () => {
+    const log = spyOn(console, 'log').mockImplementation(() => {})
+    let received: unknown
+    const services: ActionServices = {
+      describe() {
+        throw new Error('direct describe must not run')
+      },
+      async run() {
+        throw new Error('direct run must not run')
+      },
+      ensureDaemonSelection: async () =>
+        ({ status: 'selected', selection: {}, started: false }) as never,
+      async daemonDescribe(_selection, input) {
+        received = input
+        return described as never
+      },
+      async daemonRun() {
+        throw new Error('daemon run must not run')
+      },
+    }
+
+    expect(
+      await handleActionCommand(
+        { kind: 'describe', actionId, sourceId, json: false },
+        (async () => {
+          throw new Error('selected daemon must not open direct dependencies')
+        }) as () => Promise<ActionDeps>,
+        services,
+      ),
+    ).toBe(0)
+    expect(received).toEqual({ actionId, source: sourceId })
+    expect(log).toHaveBeenCalledWith(formatActionDescribeText(described))
+  })
+
+  test('never falls back after a selected daemon Action failure', async () => {
+    const error = spyOn(console, 'error').mockImplementation(() => {})
+    let opened = 0
+    const expected = new CtxindexAuthError('needs_auth', 'daemon auth failed')
+    const services: ActionServices = {
+      describe() {
+        return described
+      },
+      async run() {
+        return runResult
+      },
+      ensureDaemonSelection: async () =>
+        ({ status: 'selected', selection: {}, started: false }) as never,
+      async daemonDescribe() {
+        return described as never
+      },
+      async daemonRun() {
+        throw expected
+      },
+    }
+
+    expect(
+      await handleActionCommand(
+        {
+          kind: 'run',
+          actionId,
+          sourceId,
+          input: '{}',
+          json: false,
+        },
+        (async () => {
+          opened += 1
+          throw new Error('must not open')
+        }) as () => Promise<ActionDeps>,
+        services,
+      ),
+    ).toBe(10)
+    expect(opened).toBe(0)
+    expect(error).toHaveBeenCalledWith(expected.message)
+  })
+
+  test('rejects invalid Action input before ensuring a daemon', async () => {
+    spyOn(console, 'error').mockImplementation(() => {})
+    let ensured = 0
+    const services = {
+      describe() {
+        return described
+      },
+      async run() {
+        return runResult
+      },
+      ensureDaemonSelection: async () => {
+        ensured += 1
+        return { status: 'unsupported' as const }
+      },
+    }
+
+    expect(
+      await handleActionCommand(
+        {
+          kind: 'run',
+          actionId,
+          sourceId,
+          input: 'missing-input-file.json',
+          json: false,
+        },
+        async () => {
+          throw new Error('invalid input must not open direct dependencies')
+        },
+        services,
+      ),
+    ).toBe(2)
+    expect(ensured).toBe(0)
+  })
+
   test('passes exact describe arguments, prints the full JSON result, and closes', async () => {
     const log = spyOn(console, 'log').mockImplementation(() => {})
     let closed = false
@@ -182,6 +349,7 @@ describe('Action handler', () => {
         received = input
         return runResult
       },
+      ensureDaemonSelection: async () => ({ status: 'unsupported' }),
     }
 
     expect(

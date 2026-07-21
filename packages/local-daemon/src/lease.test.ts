@@ -3,6 +3,7 @@ import {
   chmodSync,
   closeSync,
   existsSync,
+  fstatSync,
   linkSync,
   lstatSync,
   mkdirSync,
@@ -505,9 +506,327 @@ describe.skipIf(process.platform !== 'darwin')(
   },
 )
 
+describe('Linux retained file lease backend', () => {
+  test.each([
+    ['exclusive', '-x'],
+    ['shared', '-s'],
+  ] as const)('invokes a trusted absolute flock once for a retained %s lease', (mode, modeFlag) => {
+    const target = join(temporaryDirectory(), 'ctxindex.sqlite')
+    const calls: Array<{
+      executable: string
+      args: readonly string[]
+      fd: number
+    }> = []
+    const backend = createFileLeaseBackend({
+      platform: 'linux',
+      resolveFlock: () => '/usr/bin/flock',
+      spawnFlock: (executable, args, fd) => {
+        expect(fstatSync(fd).isFile()).toBe(true)
+        calls.push({ executable, args, fd })
+        return { status: 0 }
+      },
+    })
+
+    const lease = backend.acquire({
+      canonicalTarget: target,
+      purpose: 'database',
+      mode,
+    })
+    const path = leasePath({
+      canonicalTarget: target,
+      purpose: 'database',
+      mode,
+    })
+    const stat = lstatSync(path)
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0]).toMatchObject({
+      executable: '/usr/bin/flock',
+      args: ['-n', '-E', '73', modeFlag, '3'],
+    })
+    expect(stat.isFile()).toBe(true)
+    expect(stat.uid).toBe(userInfo().uid)
+    expect(stat.mode & 0o777).toBe(0o600)
+    expect(stat.nlink).toBe(1)
+    const retainedFd = calls[0]?.fd
+    expect(retainedFd).toBeNumber()
+    expect(fstatSync(retainedFd as number).isFile()).toBe(true)
+
+    lease.release()
+    expect(() => fstatSync(retainedFd as number)).toThrow()
+    expect(existsSync(path)).toBe(true)
+    lease.release()
+  })
+
+  test('maps exit 73 to a holder-neutral conflict and closes the parent fd', () => {
+    const target = join(temporaryDirectory(), 'ctxindex.sqlite')
+    let inheritedFd: number | undefined
+    const backend = createFileLeaseBackend({
+      platform: 'linux',
+      resolveFlock: () => '/usr/bin/flock',
+      spawnFlock: (_executable, _args, fd) => {
+        inheritedFd = fd
+        return { status: 73 }
+      },
+    })
+
+    let conflict: unknown
+    try {
+      backend.acquire({
+        canonicalTarget: target,
+        purpose: 'database',
+        mode: 'exclusive',
+      })
+    } catch (error) {
+      conflict = error
+    }
+
+    expect(conflict).toBeInstanceOf(FileLeaseConflictError)
+    expect(conflict).not.toHaveProperty('ownerTupleDigest')
+    expect(() => fstatSync(inheritedFd as number)).toThrow()
+  })
+
+  test('closes a newly opened fd when private-mode enforcement fails', () => {
+    let openedFd: number | undefined
+    const capturingOpen: typeof openSync = (path, flags, mode) => {
+      openedFd = openSync(path, flags, mode)
+      return openedFd
+    }
+    const backend = createFileLeaseBackend({
+      platform: 'linux',
+      openFile: capturingOpen,
+      resolveFlock: () => '/usr/bin/flock',
+      setFileMode: () => {
+        throw new Error('mode enforcement failed')
+      },
+      spawnFlock: () => ({ status: 0 }),
+    })
+
+    expect(() =>
+      backend.acquire({
+        canonicalTarget: join(temporaryDirectory(), 'ctxindex.sqlite'),
+        purpose: 'database',
+        mode: 'exclusive',
+      }),
+    ).toThrow()
+    expect(() => fstatSync(openedFd as number)).toThrow()
+  })
+
+  test.each([
+    1,
+    null,
+  ] as const)('maps a non-conflict flock result %p to a redacted unsupported error', (status) => {
+    const backend = createFileLeaseBackend({
+      platform: 'linux',
+      resolveFlock: () => '/usr/bin/flock',
+      spawnFlock: () => ({ status }),
+    })
+
+    let failure: unknown
+    try {
+      backend.acquire({
+        canonicalTarget: join(temporaryDirectory(), 'ctxindex.sqlite'),
+        purpose: 'database',
+        mode: 'exclusive',
+      })
+    } catch (error) {
+      failure = error
+    }
+
+    expect(failure).toBeInstanceOf(FileLeaseUnsupportedError)
+    expect(failure).toMatchObject({ reason: 'filesystem' })
+    expect(String(failure)).not.toContain('stderr')
+  })
+
+  test('redacts spawn failures and rejects a non-absolute resolver result', () => {
+    const target = join(temporaryDirectory(), 'ctxindex.sqlite')
+    const throwingBackend = createFileLeaseBackend({
+      platform: 'linux',
+      resolveFlock: () => '/usr/bin/flock',
+      spawnFlock: () => {
+        throw new Error('secret child detail')
+      },
+    })
+
+    expect(() =>
+      throwingBackend.acquire({
+        canonicalTarget: target,
+        purpose: 'database',
+        mode: 'exclusive',
+      }),
+    ).toThrow(FileLeaseUnsupportedError)
+    try {
+      throwingBackend.acquire({
+        canonicalTarget: target,
+        purpose: 'database',
+        mode: 'exclusive',
+      })
+    } catch (error) {
+      expect(String(error)).not.toContain('secret child detail')
+    }
+
+    let spawned = false
+    const relativeBackend = createFileLeaseBackend({
+      platform: 'linux',
+      resolveFlock: () => 'flock',
+      spawnFlock: () => {
+        spawned = true
+        return { status: 0 }
+      },
+    })
+    expect(() =>
+      relativeBackend.acquire({
+        canonicalTarget: target,
+        purpose: 'database',
+        mode: 'exclusive',
+      }),
+    ).toThrow(FileLeaseUnsupportedError)
+    expect(spawned).toBe(false)
+  })
+
+  test('redacts resolver failures and rejects unsafe files before spawning flock', () => {
+    const target = join(temporaryDirectory(), 'ctxindex.sqlite')
+    const throwingBackend = createFileLeaseBackend({
+      platform: 'linux',
+      resolveFlock: () => {
+        throw new Error('secret resolver detail')
+      },
+      spawnFlock: () => ({ status: 0 }),
+    })
+    let failure: unknown
+    try {
+      throwingBackend.acquire({
+        canonicalTarget: target,
+        purpose: 'database',
+        mode: 'exclusive',
+      })
+    } catch (error) {
+      failure = error
+    }
+    expect(failure).toBeInstanceOf(FileLeaseUnsupportedError)
+    expect(String(failure)).not.toContain('secret resolver detail')
+
+    const path = leasePath({
+      canonicalTarget: target,
+      purpose: 'database',
+      mode: 'exclusive',
+    })
+    rmSync(path)
+    symlinkSync(join(temporaryDirectory(), 'elsewhere'), path)
+    let spawned = false
+    const unsafeBackend = createFileLeaseBackend({
+      platform: 'linux',
+      resolveFlock: () => '/usr/bin/flock',
+      spawnFlock: () => {
+        spawned = true
+        return { status: 0 }
+      },
+    })
+    expect(() =>
+      unsafeBackend.acquire({
+        canonicalTarget: target,
+        purpose: 'database',
+        mode: 'exclusive',
+      }),
+    ).toThrow(/symlink/i)
+    expect(spawned).toBe(false)
+  })
+})
+
+describe.skipIf(process.platform !== 'linux')(
+  'Linux multi-process retained file leases',
+  () => {
+    test('shared owners block exclusive and an exclusive owner blocks shared', async () => {
+      const target = join(temporaryDirectory(), 'ctxindex.sqlite')
+      const first = await holder(target, 'shared')
+      const second = await holder(target, 'shared')
+
+      expect(() =>
+        acquireFileLease({
+          canonicalTarget: target,
+          purpose: 'database',
+          mode: 'exclusive',
+        }),
+      ).toThrow(FileLeaseConflictError)
+      stopHolder(first)
+      await first.exited
+      expect(() =>
+        acquireFileLease({
+          canonicalTarget: target,
+          purpose: 'database',
+          mode: 'exclusive',
+        }),
+      ).toThrow(FileLeaseConflictError)
+      stopHolder(second)
+      await second.exited
+
+      const exclusive = await holder(target, 'exclusive')
+      expect(() =>
+        acquireFileLease({
+          canonicalTarget: target,
+          purpose: 'database',
+          mode: 'shared',
+        }),
+      ).toThrow(FileLeaseConflictError)
+      stopHolder(exclusive)
+      await exclusive.exited
+    })
+
+    test('SIGKILL releases ownership immediately and preserves the lease file', async () => {
+      const target = join(temporaryDirectory(), 'ctxindex.sqlite')
+      const child = await holder(target, 'exclusive')
+      const path = leasePath({
+        canonicalTarget: target,
+        purpose: 'database',
+        mode: 'exclusive',
+      })
+      child.kill('SIGKILL')
+      await child.exited
+
+      const reacquired = acquireFileLease({
+        canonicalTarget: target,
+        purpose: 'database',
+        mode: 'exclusive',
+      })
+      expect(existsSync(path)).toBe(true)
+      reacquired.release()
+    })
+
+    test('release unlocks immediately while the holder process remains alive', async () => {
+      const target = join(temporaryDirectory(), 'ctxindex.sqlite')
+      const child = await holder(target, 'exclusive')
+      if (typeof child.stdin !== 'object' || child.stdin === null) {
+        throw new Error('lease holder stdin is unavailable')
+      }
+      child.stdin.write('release\n')
+      await child.stdin.flush()
+      if (!(child.stdout instanceof ReadableStream)) {
+        throw new Error('lease holder stdout is unavailable')
+      }
+      const reader = child.stdout.getReader()
+      const result = await reader.read()
+      reader.releaseLock()
+      expect(
+        result.value ? new TextDecoder().decode(result.value).trim() : '',
+      ).toBe('released')
+      expect(child.exitCode).toBeNull()
+
+      const reacquired = acquireFileLease({
+        canonicalTarget: target,
+        purpose: 'database',
+        mode: 'exclusive',
+      })
+      reacquired.release()
+      expect(child.exitCode).toBeNull()
+      stopHolder(child)
+      await child.exited
+    })
+  },
+)
+
 test('unsupported platforms fail closed without exposing a boolean probe', () => {
   try {
-    createFileLeaseBackend({ platform: 'linux' })
+    createFileLeaseBackend({ platform: 'win32' })
     throw new Error('expected unsupported platform')
   } catch (error) {
     expect(error).toBeInstanceOf(FileLeaseUnsupportedError)

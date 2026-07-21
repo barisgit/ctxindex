@@ -1217,6 +1217,88 @@ export const rpcResourceGetResultSchema = z
   .readonly()
 export type RpcResourceGetResult = z.infer<typeof rpcResourceGetResultSchema>
 
+const rpcActionProfileSchema = z
+  .strictObject({
+    id: identifierSchema,
+    version: z.number().int().min(1).max(65_535),
+  })
+  .readonly()
+const rpcActionAdapterSchema = z
+  .strictObject({ id: identifierSchema })
+  .readonly()
+const rpcActionInputDescriptionSchema = z.custom<
+  Readonly<Record<string, RpcSafeJson>>
+>(
+  (value) =>
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    rpcSafeJsonSchema.safeParse(value).success,
+  { message: 'Must be a bounded safe JSON object' },
+)
+
+export const rpcActionDescribeInputSchema = z.strictObject({
+  actionId: identifierSchema,
+  source: identifierSchema,
+})
+export type RpcActionDescribeInput = Readonly<
+  z.infer<typeof rpcActionDescribeInputSchema>
+>
+
+export const rpcActionDescribeResultSchema = z
+  .strictObject({
+    id: identifierSchema,
+    profile: rpcActionProfileSchema,
+    effect: z.enum(['reversible', 'irreversible']),
+    input: rpcActionInputDescriptionSchema,
+    output: rpcActionProfileSchema,
+    adapters: z.array(rpcActionAdapterSchema).max(1_024).readonly(),
+    sources: z
+      .array(
+        z.union([
+          z
+            .strictObject({
+              id: identifierSchema,
+              adapter: rpcActionAdapterSchema,
+              available: z.literal(true),
+            })
+            .readonly(),
+          z
+            .strictObject({
+              id: identifierSchema,
+              adapter: rpcActionAdapterSchema,
+              available: z.literal(false),
+              reason: z.enum(['adapter_unavailable', 'action_unsupported']),
+            })
+            .readonly(),
+        ]),
+      )
+      .max(1_024)
+      .readonly(),
+  })
+  .readonly()
+export type RpcActionDescribeResult = z.infer<
+  typeof rpcActionDescribeResultSchema
+>
+
+export const rpcActionRunInputSchema = z.strictObject({
+  actionId: identifierSchema,
+  source: identifierSchema,
+  actionInput: rpcSafeJsonSchema,
+  confirmIrreversible: z.boolean(),
+})
+export type RpcActionRunInput = Readonly<
+  z.infer<typeof rpcActionRunInputSchema>
+>
+
+export const rpcActionRunResultSchema = z
+  .strictObject({
+    resource: rpcStoredResourceSchema,
+    warnings: z.array(rpcResourceWarningSchema).max(256).readonly(),
+  })
+  .readonly()
+export type RpcActionRunResult = z.infer<typeof rpcActionRunResultSchema>
+
 export const rpcThreadGetInputSchema = z.strictObject({ ref: refSchema })
 export type RpcThreadGetInput = Readonly<
   z.infer<typeof rpcThreadGetInputSchema>

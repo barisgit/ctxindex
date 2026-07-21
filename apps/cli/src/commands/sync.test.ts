@@ -95,6 +95,13 @@ function harness(input: {
   }
 }
 
+const directRoutes: SyncRouteServices = {
+  selectDaemon: () => null,
+  daemonSync: async () => {
+    throw new Error('daemon transport invoked')
+  },
+}
+
 afterEach(() => {
   spyOn(console, 'log').mockRestore()
   spyOn(console, 'error').mockRestore()
@@ -120,7 +127,14 @@ describe('sync command', () => {
     const log = spyOn(console, 'log').mockImplementation(() => {})
     let opened = false
     const routes: SyncRouteServices = {
-      selectDaemon: () => ({}) as DaemonSelection,
+      selectDaemon: () => {
+        throw new Error('legacy selection invoked')
+      },
+      ensureDaemonSelection: async () => ({
+        status: 'selected',
+        selection: {} as DaemonSelection,
+        started: true,
+      }),
       daemonSync: async (_daemon, _input, _signal, onEvent) => {
         await onEvent?.({
           type: 'source.started',
@@ -337,6 +351,7 @@ describe('sync command', () => {
         { sourceId: 'source-a', mode: 'diff', json: true, format: 'summary' },
         setup.open,
         setup.services,
+        directRoutes,
       ),
     ).toBe(0)
     expect(setup.calls).toEqual([{ sourceId: 'source-a', mode: 'diff' }])
@@ -369,6 +384,7 @@ describe('sync command', () => {
         { sourceId: 'missing', mode: 'sync', json: false, format: 'summary' },
         setup.open,
         setup.services,
+        directRoutes,
       ),
     ).toBe(2)
     expect(setup.calls).toEqual([])
@@ -392,6 +408,7 @@ describe('sync command', () => {
         },
         setup.open,
         setup.services,
+        directRoutes,
       ),
     ).toBe(2)
     expect(setup.calls).toEqual([])
@@ -416,6 +433,7 @@ describe('sync command', () => {
         { sourceId: 'source-a', mode: 'sync', json: true, format: 'summary' },
         setup.open,
         setup.services,
+        directRoutes,
       ),
     ).toBe(2)
     expect(JSON.parse(String(log.mock.calls[0]?.[0])).results[0]).toEqual({
@@ -465,6 +483,7 @@ describe('sync command', () => {
         { mode: 'sync', json: true, format: 'summary' },
         setup.open,
         setup.services,
+        directRoutes,
       ),
     ).toBe(50)
     expect(calls).toEqual(['source-b', 'source-c'])
@@ -505,6 +524,7 @@ describe('sync command', () => {
         { mode: 'sync', json: false, format: 'events' },
         setup.open,
         setup.services,
+        directRoutes,
       ),
     ).toBe(130)
     expect(log.mock.calls.map((call) => JSON.parse(String(call[0])))).toEqual([

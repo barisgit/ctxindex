@@ -10,6 +10,9 @@ import {
 } from '@ctxindex/local-daemon'
 import {
   type DaemonClient,
+  type RpcActionDescribeInput,
+  type RpcActionDescribeResult,
+  type RpcActionRunResult,
   type RpcDocumentationGetInput,
   type RpcDocumentationGetResult,
   type RpcDocumentationListInput,
@@ -448,6 +451,35 @@ export async function daemonThreadGet(
   return invoke(
     signal,
     (client) => client.thread.get({ ref }, requestOptions(signal)),
+    selection,
+  )
+}
+
+export async function daemonActionDescribe(
+  selection: DaemonSelection,
+  input: RpcActionDescribeInput,
+  signal?: AbortSignal,
+): Promise<RpcActionDescribeResult> {
+  return invoke(
+    signal,
+    (client) => client.action.describe(input, requestOptions(signal)),
+    selection,
+  )
+}
+
+export async function daemonActionRun(
+  selection: DaemonSelection,
+  input: {
+    readonly actionId: string
+    readonly source: string
+    readonly actionInput: unknown
+    readonly confirmIrreversible: boolean
+  },
+  signal?: AbortSignal,
+): Promise<RpcActionRunResult> {
+  return invoke(
+    signal,
+    (client) => client.action.run(input, requestOptions(signal)),
     selection,
   )
 }

@@ -25,6 +25,23 @@ import {
 const digest = 'a'.repeat(64)
 const sourceId = '01ARZ3NDEKTSV4RRFFQ69G5FAV'
 const ref = `ctx://${sourceId}/item/one`
+const resource = {
+  id: 'resource-id',
+  ref,
+  sourceId,
+  realmId: 'work',
+  profile: { id: 'example.item', version: 1 },
+  origin: 'synced' as const,
+  title: 'One',
+  summary: null,
+  occurredAt: null,
+  providerUpdatedAt: null,
+  deletedAt: null,
+  hydratedAt: 1,
+  payload: { body: 'safe' },
+  createdAt: 1,
+  updatedAt: 1,
+}
 const protocol = { id: 'ctxindex.local', version: 2 } as const
 const runtime = {
   tupleDigest: digest,
@@ -75,6 +92,8 @@ function createApplication() {
     search: 0,
     resourceGet: 0,
     threadGet: 0,
+    actionDescribe: 0,
+    actionRun: 0,
     shutdown: 0,
   }
   const contexts: RpcRequestContext[] = []
@@ -195,23 +214,7 @@ function createApplication() {
         return {
           ok: true,
           value: {
-            resource: {
-              id: 'resource-id',
-              ref,
-              sourceId,
-              realmId: 'work',
-              profile: { id: 'example.item', version: 1 },
-              origin: 'synced',
-              title: 'One',
-              summary: null,
-              occurredAt: null,
-              providerUpdatedAt: null,
-              deletedAt: null,
-              hydratedAt: 1,
-              payload: { body: 'safe' },
-              createdAt: 1,
-              updatedAt: 1,
-            },
+            resource,
             warnings: [],
           },
         }
@@ -221,6 +224,33 @@ function createApplication() {
       async get(_input, context) {
         record('threadGet', context)
         return { ok: true, value: { mode: 'flat', messages: [], warnings: [] } }
+      },
+    },
+    action: {
+      async describe(_input, context) {
+        record('actionDescribe', context)
+        return {
+          ok: true,
+          value: {
+            id: 'example.item.create',
+            profile: { id: 'example.item', version: 1 },
+            effect: 'reversible',
+            input: { type: 'object' },
+            output: { id: 'example.item', version: 1 },
+            adapters: [{ id: 'example.adapter' }],
+            sources: [
+              {
+                id: sourceId,
+                adapter: { id: 'example.adapter' },
+                available: true,
+              },
+            ],
+          },
+        }
+      },
+      async run(_input, context) {
+        record('actionRun', context)
+        return { ok: true, value: { resource, warnings: [] } }
       },
     },
   }
@@ -266,6 +296,8 @@ describe('pure daemon contract', () => {
       ['search', 'query'],
       ['resource', 'get'],
       ['thread', 'get'],
+      ['action', 'describe'],
+      ['action', 'run'],
     ] as const
     for (const path of paths) {
       expect(getContractRouter(daemonContract, path)).toBeDefined()
@@ -319,6 +351,8 @@ describe('pure daemon contract', () => {
     expectTypeOf<DaemonRpcApplication['search']>().toHaveProperty('query')
     expectTypeOf<DaemonRpcApplication['resource']>().toHaveProperty('get')
     expectTypeOf<DaemonRpcApplication['thread']>().toHaveProperty('get')
+    expectTypeOf<DaemonRpcApplication['action']>().toHaveProperty('describe')
+    expectTypeOf<DaemonRpcApplication['action']>().toHaveProperty('run')
   })
 
   test('infers every declared bounded failure variant', () => {
@@ -390,6 +424,16 @@ describe('contract implementation', () => {
     await client.search.query({ text: 'query' })
     await client.resource.get({ ref })
     await client.thread.get({ ref })
+    await client.action.describe({
+      actionId: 'example.item.create',
+      source: sourceId,
+    })
+    await client.action.run({
+      actionId: 'example.item.create',
+      source: sourceId,
+      actionInput: { title: 'One' },
+      confirmIrreversible: false,
+    })
     await client.system.shutdown({})
     expect(fixture.calls).toEqual({
       health: 1,
@@ -407,6 +451,8 @@ describe('contract implementation', () => {
       search: 1,
       resourceGet: 1,
       threadGet: 1,
+      actionDescribe: 1,
+      actionRun: 1,
       shutdown: 1,
     })
   })

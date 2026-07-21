@@ -166,14 +166,17 @@ test('runCli retains one selected daemon from Source argument construction throu
     output.push(String(value))
   })
   const selection = { endpoint: 'retained' } as never
-  let selections = 0
+  let ensures = 0
   let definitionRequests = 0
   let directLoads = 0
   let directOpens = 0
   const deps: SourceCommandDeps = {
     selectDaemon: () => {
-      selections += 1
-      return selections === 1 ? selection : null
+      throw new Error('legacy selection invoked')
+    },
+    ensureDaemonSelection: async () => {
+      ensures += 1
+      return { status: 'selected', selection, started: true }
     },
     sourceDefinitions: async (actual) => {
       expect(actual).toBe(selection)
@@ -223,7 +226,7 @@ test('runCli retains one selected daemon from Source argument construction throu
         { source: deps },
       ),
     ).toBe(0)
-    expect(selections).toBe(1)
+    expect(ensures).toBe(1)
     expect(definitionRequests).toBe(1)
     expect(directLoads).toBe(0)
     expect(directOpens).toBe(0)

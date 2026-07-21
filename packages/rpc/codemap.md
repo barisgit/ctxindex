@@ -14,7 +14,7 @@ Defines the private composition-only `@ctxindex/rpc` package: bounded local-daem
 ## Data & control flow
 
 1. A daemon composition root injects a `DaemonRpcApplication` and expected protocol/runtime identities into `createDaemonRouter()`.
-2. The pure contract independently exposes every procedure path, including Extension-documentation list/get/search, exact input, plain success output, and declared bounded error; transport context is validated before handlers run.
+2. The pure contract independently exposes every procedure path, including Extension-documentation list/get/search and source-aware Action describe/run, with exact input, plain success output, and declared bounded error; transport context is validated before handlers run.
 3. Compatibility middleware rejects incompatible protocol or runtime identity with its declared typed error before application delegation.
 4. Each handler forwards oRPC's native `AbortSignal` to exactly one injected application call. Its internal `RpcResult` is validated, then becomes either a plain success value or the matching declared typed error; throws and malformed results become the bounded internal error.
 5. `DaemonRouter` implements the contract, and `DaemonClient` derives from the contract for consumers without importing daemon application code.

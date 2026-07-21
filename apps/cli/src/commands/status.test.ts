@@ -47,7 +47,14 @@ test('selected RPC status preserves JSON shape and never opens direct deps', asy
     await handleStatusCommand(
       { format: 'json' },
       deps({
-        selectDaemon: () => selection,
+        selectDaemon: () => {
+          throw new Error('legacy selection invoked')
+        },
+        ensureDaemonSelection: async () => ({
+          status: 'selected',
+          selection,
+          started: true,
+        }),
         daemonStatus: async () => ({ rows }),
         open: async () => {
           throw new Error('selected RPC must not fall back')

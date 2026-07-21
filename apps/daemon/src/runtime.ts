@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { lstatSync, rmSync } from 'node:fs'
 import { userInfo } from 'node:os'
 import { join } from 'node:path'
+import { describeAction, runAction } from '@ctxindex/core/action'
 import { type AuthService, createAuthService } from '@ctxindex/core/auth'
 import { type CtxindexConfig, readConfig } from '@ctxindex/core/config'
 import { DirectExtensionStore } from '@ctxindex/core/direct-extension'
@@ -56,7 +57,11 @@ import {
 } from '@ctxindex/local-daemon'
 import * as CTXINDEX_BUILTIN_MODULE from '@ctxindex/official'
 import type { RpcFailure, RpcRequestContext } from '@ctxindex/rpc'
-import { DaemonApplication } from './application'
+import {
+  type DaemonActionService,
+  DaemonApplication,
+  type DaemonIdleTimer,
+} from './application'
 import {
   type BindDaemonTransportInput,
   bindDaemonTransport,
@@ -65,7 +70,20 @@ import {
 
 export const DAEMON_PROTOCOL = { id: 'ctxindex.local', version: 2 } as const
 const DEFAULT_OBSERVATION_TIMEOUT_MS = 5_000
+const DEFAULT_IDLE_TIMEOUT_MS = 5 * 60_000
 const PUBLIC_VERSION = /^[a-z0-9][a-z0-9.+_-]{0,63}$/i
+
+const productionIdleTimer: DaemonIdleTimer = {
+  now: Date.now,
+  setTimeout(callback, delayMs) {
+    const timer = setTimeout(callback, delayMs)
+    timer.unref?.()
+    return timer
+  },
+  clearTimeout(handle) {
+    clearTimeout(handle as ReturnType<typeof setTimeout>)
+  },
+}
 
 function buildVersion(): string {
   const candidate = process.env.CTXINDEX_BUILD_VERSION
@@ -103,6 +121,7 @@ export function removeOwnedDaemonEndpoint(path: string): void {
 }
 
 export interface DaemonServices {
+  readonly actionService?: DaemonActionService
   readonly authService?: Pick<AuthService, 'listGrants'>
   readonly realmService?: Pick<RealmService, 'createRealm' | 'listRealms'>
   readonly registry?: ExtensionRegistry
@@ -166,6 +185,8 @@ export interface DaemonRuntimeHooks {
 export interface StartDaemonOptions {
   readonly roots: RuntimePathInput
   readonly endpointRuntimeRoot?: string
+  readonly idleTimeoutMs?: number
+  readonly idleTimer?: DaemonIdleTimer
   readonly observationTimeoutMs?: number
   readonly leaseBackend?: FileLeaseBackend
   readonly hooks?: Partial<DaemonRuntimeHooks>
@@ -239,6 +260,27 @@ async function productionServices(input: {
     registry: input.completeRegistry,
   })
   return {
+    actionService: {
+      describe: ({ actionId, sourceId }) =>
+        describeAction({
+          db: input.database,
+          registry: input.registry,
+          actionId,
+          sourceId,
+        }),
+      run: ({ actionId, sourceId, actionInput, signal, confirmIrreversible }) =>
+        runAction({
+          db: input.database,
+          registry: input.registry,
+          authService,
+          logger,
+          actionId,
+          sourceId,
+          actionInput,
+          signal,
+          confirmIrreversible,
+        }),
+    },
     authService,
     realmService,
     registry: input.registry,
@@ -350,6 +392,10 @@ export async function startDaemon(
   const observationTimeoutMs = requireObservationTimeout(
     options.observationTimeoutMs ?? DEFAULT_OBSERVATION_TIMEOUT_MS,
   )
+  const idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS
+  if (!Number.isSafeInteger(idleTimeoutMs) || idleTimeoutMs < 1) {
+    throw new RangeError('Daemon idle timeout must be a positive integer')
+  }
   const hooks = { ...defaultHooks(roots), ...options.hooks }
   const leaseBackend = options.leaseBackend ?? createFileLeaseBackend()
   const instanceId = randomUUID()
@@ -466,6 +512,8 @@ export async function startDaemon(
       documentationService: createDocumentationService([
         createExtensionDocumentationSource(loaded.documentation),
       ]),
+      idleTimeoutMs,
+      idleTimer: options.idleTimer ?? productionIdleTimer,
       observationTimeoutMs,
       ...services,
       onStopping: () => {

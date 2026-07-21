@@ -2,6 +2,10 @@ import { describe, expect, test } from 'bun:test'
 import { z } from 'zod'
 import {
   defineRpcFailureRegistry,
+  rpcActionDescribeInputSchema,
+  rpcActionDescribeResultSchema,
+  rpcActionRunInputSchema,
+  rpcActionRunResultSchema,
   rpcDocumentationGetInputSchema,
   rpcDocumentationGetResultSchema,
   rpcDocumentationListInputSchema,
@@ -556,6 +560,77 @@ describe('realm/source management envelopes', () => {
     expect(() =>
       rpcSourceListResultSchema.parse({
         rows: [{ ...row, config_json: 'x'.repeat(65_537) }],
+      }),
+    ).toThrow()
+  })
+})
+
+describe('Action envelopes', () => {
+  const description = {
+    id: 'example.item.create',
+    profile: { id: 'example.item', version: 1 },
+    effect: 'reversible',
+    input: { type: 'object', additionalProperties: false },
+    output: { id: 'example.item', version: 1 },
+    adapters: [{ id: 'example.adapter' }],
+    sources: [
+      {
+        id: sourceId,
+        adapter: { id: 'example.adapter' },
+        available: true,
+      },
+    ],
+  } as const
+
+  test('accepts exact source-aware describe and arbitrary JSON run input', () => {
+    expect(
+      rpcActionDescribeInputSchema.parse({
+        actionId: description.id,
+        source: sourceId,
+      }),
+    ).toEqual({ actionId: description.id, source: sourceId })
+    expect(rpcActionDescribeResultSchema.parse(description)).toEqual(
+      description,
+    )
+    expect(
+      rpcActionRunInputSchema.parse({
+        actionId: description.id,
+        source: sourceId,
+        actionInput: [null, true, 1.5, 'text'],
+        confirmIrreversible: false,
+      }),
+    ).toMatchObject({ actionInput: [null, true, 1.5, 'text'] })
+    expect(rpcActionRunResultSchema.parse({ resource, warnings: [] })).toEqual({
+      resource,
+      warnings: [],
+    })
+  })
+
+  test('rejects ambiguous availability and unsafe or extra values', () => {
+    expect(() =>
+      rpcActionDescribeResultSchema.parse({
+        ...description,
+        sources: [
+          {
+            ...description.sources[0],
+            available: false,
+          },
+        ],
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcActionRunInputSchema.parse({
+        actionId: description.id,
+        source: sourceId,
+        actionInput: { body: undefined },
+        confirmIrreversible: false,
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcActionDescribeInputSchema.parse({
+        actionId: description.id,
+        source: sourceId,
+        extra: true,
       }),
     ).toThrow()
   })

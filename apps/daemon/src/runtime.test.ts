@@ -39,6 +39,39 @@ function lease(name: string, events: string[]): FileLease {
   }
 }
 
+class TestIdleClock {
+  now = 0
+  #nextId = 0
+  readonly #timers = new Map<
+    number,
+    { readonly deadline: number; readonly callback: () => void }
+  >()
+
+  readonly hooks = {
+    now: () => this.now,
+    setTimeout: (callback: () => void, delayMs: number): number => {
+      const id = this.#nextId++
+      this.#timers.set(id, { deadline: this.now + delayMs, callback })
+      return id
+    },
+    clearTimeout: (id: unknown): void => {
+      if (typeof id === 'number') this.#timers.delete(id)
+    },
+  }
+
+  advance(milliseconds: number): void {
+    this.now += milliseconds
+    while (true) {
+      const due = [...this.#timers.entries()]
+        .filter(([, timer]) => timer.deadline <= this.now)
+        .sort((left, right) => left[1].deadline - right[1].deadline)[0]
+      if (!due) return
+      this.#timers.delete(due[0])
+      due[1].callback()
+    }
+  }
+}
+
 test('database lease contention becomes a bounded structured startup failure', async () => {
   const events: string[] = []
   let caught: unknown
@@ -91,6 +124,7 @@ test('startup failure guard rejects owner-attributed lease conflicts', () => {
 
 test('startup owns leases before one load/open and publishes ready last', async () => {
   const events: string[] = []
+  const idleClock = new TestIdleClock()
   let lifecycleProof: FileLease | undefined
   const leases: FileLeaseBackend = {
     acquire(input) {
@@ -108,6 +142,7 @@ test('startup owns leases before one load/open and publishes ready last', async 
       cacheRoot: '/tmp/ctxd-cache',
     },
     leaseBackend: leases,
+    idleTimer: idleClock.hooks,
     endpointRuntimeRoot: '/tmp/ctxd-runtime',
     hooks: {
       readMatchingMetadata: () => {
@@ -224,7 +259,11 @@ test('startup owns leases before one load/open and publishes ready last', async 
     ok: true,
     value: { item: { content: '# Fixture' } },
   })
-  expect(await daemon.close(100)).toEqual({ status: 'complete' })
+  idleClock.advance(299_999)
+  expect(daemon.application.lifecycle).toBe('ready')
+  idleClock.advance(1)
+  expect(daemon.application.lifecycle).toBe('stopping')
+  await daemon.closed
   expect(events.slice(-7)).toEqual([
     'metadata:stopping',
     'close:db',

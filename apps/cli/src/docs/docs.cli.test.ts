@@ -179,7 +179,14 @@ test('selected daemon supplies only Extension docs while bundled docs stay local
   let directLoads = 0
   let daemonGets = 0
   const loaded = await loadDocsCommandService({
-    selectDaemon: () => selection,
+    selectDaemon: () => {
+      throw new Error('legacy selection invoked')
+    },
+    ensureDaemonSelection: async () => ({
+      status: 'selected',
+      selection,
+      started: true,
+    }),
     loadCliDefinitions: async () => {
       directLoads += 1
       throw new Error('direct loading must not run')

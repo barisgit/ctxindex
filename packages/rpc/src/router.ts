@@ -11,6 +11,8 @@ import {
   type RpcRequestContext,
   type RpcResult,
   type RpcTransportContext,
+  rpcActionDescribeResultSchema,
+  rpcActionRunResultSchema,
   rpcDocumentationGetResultSchema,
   rpcDocumentationListResultSchema,
   rpcDocumentationSearchResultSchema,
@@ -509,6 +511,34 @@ export function createDaemonRouter(
                 applicationContext(context, signal),
               ),
             rpcThreadGetResultSchema,
+            errors,
+          ),
+        ),
+    },
+    action: {
+      describe: os.action.describe
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.action.describe(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcActionDescribeResultSchema,
+            errors,
+          ),
+        ),
+      run: os.action.run
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.action.run(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcActionRunResultSchema,
             errors,
           ),
         ),

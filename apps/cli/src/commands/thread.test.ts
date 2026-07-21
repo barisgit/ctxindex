@@ -57,6 +57,13 @@ const result: ThreadResult = {
   warnings: [],
 }
 
+const directDaemon = {
+  select: () => null,
+  get: async () => {
+    throw new Error('daemon transport invoked')
+  },
+}
+
 describe('thread output', () => {
   test('formats complete deterministic text rows and narrow pretty cards', () => {
     const text = formatThreadText(result)
@@ -85,7 +92,9 @@ describe('thread output', () => {
       },
     })
 
-    expect(await handleThreadGetCommand({ ref, format: 'json' }, open)).toBe(0)
+    expect(
+      await handleThreadGetCommand({ ref, format: 'json' }, open, directDaemon),
+    ).toBe(0)
     expect(log).toHaveBeenCalledWith(formatThreadJson(result))
     expect(closed).toBe(true)
     log.mockRestore()
@@ -102,7 +111,14 @@ describe('thread output', () => {
           throw new Error('direct dependencies opened')
         },
         {
-          select: () => ({}) as never,
+          select: () => {
+            throw new Error('legacy selection invoked')
+          },
+          ensure: async () => ({
+            status: 'selected',
+            selection: {} as never,
+            started: true,
+          }),
           get: async () => result as never,
         },
       )
@@ -130,10 +146,16 @@ describe('thread output', () => {
     }
 
     expect(
-      await handleThreadGetCommand({ ref: 'bad-ref', format: 'text' }, open),
+      await handleThreadGetCommand(
+        { ref: 'bad-ref', format: 'text' },
+        open,
+        directDaemon,
+      ),
     ).toBe(2)
     expect(opens).toBe(0)
-    expect(await handleThreadGetCommand({ ref, format: 'text' }, open)).toBe(2)
+    expect(
+      await handleThreadGetCommand({ ref, format: 'text' }, open, directDaemon),
+    ).toBe(2)
     expect(opens).toBe(1)
     error.mockRestore()
   })
