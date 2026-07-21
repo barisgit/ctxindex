@@ -18,6 +18,8 @@ import {
   rpcAccountRespondResultSchema,
   rpcActionDescribeResultSchema,
   rpcActionRunResultSchema,
+  rpcArtifactListResultSchema,
+  rpcArtifactPurgeResultSchema,
   rpcDocumentationGetResultSchema,
   rpcDocumentationListResultSchema,
   rpcDocumentationSearchResultSchema,
@@ -705,6 +707,34 @@ export function createDaemonRouter(
                 applicationContext(context, signal),
               ),
             rpcActionRunResultSchema,
+            errors,
+          ),
+        ),
+    },
+    artifact: {
+      list: os.artifact.list
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.artifact.list(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcArtifactListResultSchema,
+            errors,
+          ),
+        ),
+      purge: os.artifact.purge
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.artifact.purge(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcArtifactPurgeResultSchema,
             errors,
           ),
         ),

@@ -585,6 +585,55 @@ test('backend migration waits for active secret-using business work', async () =
   expect(calls).toEqual(['search', 'set:keychain'])
 })
 
+test('routes Artifact listing and explicit purge through tracked daemon business work', async () => {
+  const calls: unknown[] = []
+  const listed = {
+    resourceRef: 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/one',
+    artifacts: [],
+    warnings: [],
+  }
+  const purged = {
+    artifactCountRemoved: 1,
+    objectCountRemoved: 1,
+    logicalBytesFreed: 14,
+    physicalBytesFreed: 14,
+    diskAccounting: {
+      artifactCount: 0,
+      objectCount: 0,
+      logicalBytes: 0,
+      physicalBytes: 0,
+    },
+  }
+  const app = application({
+    artifactService: {
+      async list(ref: string) {
+        calls.push(['list', ref])
+        return listed
+      },
+      async purge() {
+        calls.push(['purge'])
+        return purged
+      },
+    },
+  })
+
+  expect(
+    await app.artifact.purge({}, context('artifact-starting')),
+  ).toMatchObject({ ok: false, error: { kind: 'daemon_unavailable' } })
+  app.markReady()
+  expect(
+    await app.artifact.list(
+      { ref: listed.resourceRef },
+      context('artifact-list'),
+    ),
+  ).toEqual({ ok: true, value: listed })
+  expect(await app.artifact.purge({}, context('artifact-purge'))).toEqual({
+    ok: true,
+    value: purged,
+  })
+  expect(calls).toEqual([['list', listed.resourceRef], ['purge']])
+})
+
 test('streams bounded progress in order with one-item producer backpressure', async () => {
   let firstAccepted = false
   const app = application({

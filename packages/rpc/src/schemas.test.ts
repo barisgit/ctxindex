@@ -11,6 +11,10 @@ import {
   rpcActionRunInputSchema,
   rpcActionRunResultSchema,
   rpcByteTransferDescriptorSchema,
+  rpcArtifactListInputSchema,
+  rpcArtifactListResultSchema,
+  rpcArtifactPurgeInputSchema,
+  rpcArtifactPurgeResultSchema,
   rpcDocumentationGetInputSchema,
   rpcDocumentationGetResultSchema,
   rpcDocumentationListInputSchema,
@@ -728,6 +732,66 @@ describe('realm/source management envelopes', () => {
         rows: [{ ...row, config_json: 'x'.repeat(65_537) }],
       }),
     ).toThrow()
+  })
+})
+
+describe('Artifact envelopes', () => {
+  const artifactRef = `${ref}/attachment/file`
+  const listed = {
+    resourceRef: ref,
+    artifacts: [
+      {
+        ref: artifactRef,
+        filename: 'file.bin',
+        mediaType: 'application/octet-stream',
+        byteSize: 14,
+      },
+    ],
+    warnings: [],
+  } as const
+  const purged = {
+    artifactCountRemoved: 1,
+    objectCountRemoved: 1,
+    logicalBytesFreed: 14,
+    physicalBytesFreed: 14,
+    diskAccounting: {
+      artifactCount: 0,
+      objectCount: 0,
+      logicalBytes: 0,
+      physicalBytes: 0,
+    },
+  } as const
+
+  test('accepts strict descriptor listing and purge bookkeeping', () => {
+    expect(rpcArtifactListInputSchema.parse({ ref })).toEqual({ ref })
+    expect(rpcArtifactListResultSchema.parse(listed)).toEqual(listed)
+    expect(rpcArtifactPurgeInputSchema.parse({})).toEqual({})
+    expect(rpcArtifactPurgeResultSchema.parse(purged)).toEqual(purged)
+  })
+
+  test('rejects paths, unbounded arrays, malformed descriptors, and extra purge data', () => {
+    expect(() =>
+      rpcArtifactListResultSchema.parse({
+        ...listed,
+        artifacts: Array.from({ length: 1_025 }, () => listed.artifacts[0]),
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcArtifactListResultSchema.parse({
+        ...listed,
+        artifacts: [{ ...listed.artifacts[0], localPath: '/private/cache' }],
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcArtifactListResultSchema.parse({
+        ...listed,
+        artifacts: [{ ...listed.artifacts[0], byteSize: -1 }],
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcArtifactPurgeResultSchema.parse({ ...purged, path: '/private/cache' }),
+    ).toThrow()
+    expect(() => rpcArtifactPurgeInputSchema.parse({ confirm: true })).toThrow()
   })
 })
 

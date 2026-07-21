@@ -1489,6 +1489,65 @@ export const rpcResourceGetResultSchema = z
   .readonly()
 export type RpcResourceGetResult = z.infer<typeof rpcResourceGetResultSchema>
 
+export const rpcArtifactDescriptorSchema = z
+  .strictObject({
+    ref: refSchema,
+    filename: terminalSafeString(1_024, 0).optional(),
+    mediaType: terminalSafeString(256, 0).optional(),
+    byteSize: countSchema.optional(),
+  })
+  .readonly()
+export type RpcArtifactDescriptor = z.infer<typeof rpcArtifactDescriptorSchema>
+
+export const rpcArtifactWarningSchema = z
+  .strictObject({
+    code: publicCodeSchema,
+    message: publicMessageSchema,
+    ref: refSchema,
+  })
+  .readonly()
+
+export const rpcArtifactListInputSchema = z.strictObject({ ref: refSchema })
+export type RpcArtifactListInput = Readonly<
+  z.infer<typeof rpcArtifactListInputSchema>
+>
+
+export const rpcArtifactListResultSchema = z
+  .strictObject({
+    resourceRef: refSchema,
+    artifacts: z.array(rpcArtifactDescriptorSchema).max(1_024).readonly(),
+    warnings: z.array(rpcArtifactWarningSchema).max(256).readonly(),
+  })
+  .readonly()
+export type RpcArtifactListResult = z.infer<typeof rpcArtifactListResultSchema>
+
+export const rpcArtifactPurgeInputSchema = z.strictObject({})
+export type RpcArtifactPurgeInput = Readonly<
+  z.infer<typeof rpcArtifactPurgeInputSchema>
+>
+
+export const rpcArtifactDiskAccountingSchema = z
+  .strictObject({
+    artifactCount: countSchema,
+    objectCount: countSchema,
+    logicalBytes: countSchema,
+    physicalBytes: countSchema,
+  })
+  .readonly()
+
+export const rpcArtifactPurgeResultSchema = z
+  .strictObject({
+    artifactCountRemoved: countSchema,
+    objectCountRemoved: countSchema,
+    logicalBytesFreed: countSchema,
+    physicalBytesFreed: countSchema,
+    diskAccounting: rpcArtifactDiskAccountingSchema,
+  })
+  .readonly()
+export type RpcArtifactPurgeResult = z.infer<
+  typeof rpcArtifactPurgeResultSchema
+>
+
 const rpcActionProfileSchema = z
   .strictObject({
     id: identifierSchema,

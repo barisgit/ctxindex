@@ -21,6 +21,8 @@ import {
   type RpcActionDescribeResult,
   type RpcActionRunResult,
   type RpcByteTransferDescriptor,
+  type RpcArtifactListResult,
+  type RpcArtifactPurgeResult,
   type RpcDocumentationGetInput,
   type RpcDocumentationGetResult,
   type RpcDocumentationListInput,
@@ -832,6 +834,29 @@ export async function daemonActionRun(
   return invoke(
     signal,
     (client) => client.action.run(input, requestOptions(signal)),
+    selection,
+  )
+}
+
+export async function daemonArtifactList(
+  selection: DaemonSelection,
+  ref: string,
+  signal?: AbortSignal,
+): Promise<RpcArtifactListResult> {
+  return invoke(
+    signal,
+    (client) => client.artifact.list({ ref }, requestOptions(signal)),
+    selection,
+  )
+}
+
+export async function daemonArtifactPurge(
+  selection: DaemonSelection,
+  signal?: AbortSignal,
+): Promise<RpcArtifactPurgeResult> {
+  return invoke(
+    signal,
+    (client) => client.artifact.purge({}, requestOptions(signal)),
     selection,
   )
 }

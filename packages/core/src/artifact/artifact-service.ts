@@ -43,6 +43,11 @@ export interface ArtifactDownloadResult {
   readonly outputPath?: string | undefined
 }
 
+export interface CachedArtifactBytes {
+  readonly artifact: DownloadedArtifact
+  readonly bytes: Uint8Array
+}
+
 export interface ArtifactServiceInput {
   readonly db: CtxindexDatabase
   readonly registry: ExtensionRegistry
@@ -163,6 +168,33 @@ export class ArtifactService {
     const resource = this.resources.get(ref)
     if (!resource) throw new CtxindexNotFoundError(`Resource not found: ${ref}`)
     return descriptors(resource, this.input)
+  }
+
+  async readCached(
+    ref: string,
+    maxByteSize: number,
+  ): Promise<CachedArtifactBytes | null> {
+    parseRef(ref)
+    if (!Number.isSafeInteger(maxByteSize) || maxByteSize < 0) {
+      throw new CtxindexValidationError(
+        'invalid_artifact_ref',
+        'Artifact transfer limit must be a non-negative safe integer',
+      )
+    }
+    const artifact = await this.store.get(ref)
+    if (!artifact) return null
+    if (artifact.byteSize > maxByteSize) {
+      throw new CtxindexValidationError(
+        'invalid_artifact_ref',
+        `Artifact "${ref}" exceeds the ${maxByteSize}-byte transfer limit`,
+      )
+    }
+    const cached = await this.store.read(ref)
+    if (!cached) return null
+    return {
+      artifact: publicArtifact(cached.artifact),
+      bytes: cached.bytes,
+    }
   }
 
   async resolveCached(

@@ -13,6 +13,10 @@ import {
   rpcActionDescribeResultSchema,
   rpcActionRunInputSchema,
   rpcActionRunResultSchema,
+  rpcArtifactListInputSchema,
+  rpcArtifactListResultSchema,
+  rpcArtifactPurgeInputSchema,
+  rpcArtifactPurgeResultSchema,
   rpcDocumentationGetInputSchema,
   rpcDocumentationGetResultSchema,
   rpcDocumentationListInputSchema,
@@ -178,6 +182,14 @@ export const daemonContract = {
     run: procedure
       .input(rpcActionRunInputSchema)
       .output(rpcActionRunResultSchema),
+  },
+  artifact: {
+    list: procedure
+      .input(rpcArtifactListInputSchema)
+      .output(rpcArtifactListResultSchema),
+    purge: procedure
+      .input(rpcArtifactPurgeInputSchema)
+      .output(rpcArtifactPurgeResultSchema),
   },
 } as const
 

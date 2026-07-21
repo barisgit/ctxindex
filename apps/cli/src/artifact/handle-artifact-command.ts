@@ -3,6 +3,15 @@ import type {
   ArtifactPurgeResult,
   ArtifactService,
 } from '@ctxindex/core/artifact'
+import {
+  daemonArtifactList,
+  daemonArtifactPurge,
+  selectDaemon,
+} from '../daemon/client'
+import {
+  ensureDaemonSelection,
+  resolveEnsuredDaemonSelection,
+} from '../daemon/ensure'
 import { openDeps } from '../deps'
 import {
   formatArtifactDownloadJson,
@@ -18,6 +27,22 @@ type OpenArtifactDeps = () => Promise<{
   readonly artifactService: ArtifactService
   close(): Promise<void>
 }>
+
+export interface ArtifactCommandDeps {
+  readonly select: typeof selectDaemon
+  readonly ensure?: typeof ensureDaemonSelection
+  readonly list: typeof daemonArtifactList
+  readonly purge: typeof daemonArtifactPurge
+  readonly open: OpenArtifactDeps
+}
+
+const defaultDeps: ArtifactCommandDeps = {
+  select: selectDaemon,
+  ensure: ensureDaemonSelection,
+  list: daemonArtifactList,
+  purge: daemonArtifactPurge,
+  open: openDeps,
+}
 
 export type ArtifactCommandInput =
   | {
@@ -48,7 +73,7 @@ export function formatPurgeArtifactsText(result: ArtifactPurgeResult): string {
 
 export async function handleArtifactCommand(
   input: ArtifactCommandInput,
-  open: OpenArtifactDeps = openDeps,
+  services: ArtifactCommandDeps = defaultDeps,
 ): Promise<number> {
   if (input.kind !== 'purge') {
     try {
@@ -58,10 +83,23 @@ export async function handleArtifactCommand(
       return 2
     }
   }
-  const deps = await open()
+  const controller = new AbortController()
+  const cancel = () => controller.abort()
+  process.once('SIGINT', cancel)
+  let deps: Awaited<ReturnType<OpenArtifactDeps>> | undefined
   try {
+    const selection = await resolveEnsuredDaemonSelection(
+      services.ensure,
+      services.select,
+      controller.signal,
+    )
     if (input.kind === 'list') {
-      const result = await deps.artifactService.list(input.ref)
+      const result = selection
+        ? await services.list(selection, input.ref, controller.signal)
+        : await (async () => {
+            deps = await services.open()
+            return deps.artifactService.list(input.ref)
+          })()
       console.log(
         input.format === 'json'
           ? formatArtifactListJson(result)
@@ -77,7 +115,13 @@ export async function handleArtifactCommand(
     }
 
     if (input.kind === 'purge') {
-      const result = await deps.artifactService.purge()
+      const result = selection
+        ? await services.purge(selection, controller.signal)
+        : await (async () => {
+            deps = await services.open()
+            controller.signal.throwIfAborted()
+            return deps.artifactService.purge()
+          })()
       console.log(
         input.json
           ? formatPurgeArtifactsJson(result)
@@ -86,11 +130,12 @@ export async function handleArtifactCommand(
       return 0
     }
 
+    deps = await services.open()
     const result = await deps.artifactService.download(input.ref, {
       ...(input.outputPath === undefined
         ? {}
         : { outputPath: input.outputPath }),
-      signal: new AbortController().signal,
+      signal: controller.signal,
     })
     console.log(
       input.json
@@ -102,6 +147,7 @@ export async function handleArtifactCommand(
     console.error(error instanceof Error ? error.message : String(error))
     return mapErrorToExit(error)
   } finally {
-    await deps.close()
+    process.removeListener('SIGINT', cancel)
+    await deps?.close()
   }
 }

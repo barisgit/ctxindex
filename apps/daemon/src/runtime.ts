@@ -4,6 +4,7 @@ import { userInfo } from 'node:os'
 import { join } from 'node:path'
 import { createAccountService } from '@ctxindex/core/account'
 import { describeAction, runAction } from '@ctxindex/core/action'
+import { ArtifactService } from '@ctxindex/core/artifact'
 import {
   type AuthService,
   authorizeProvider,
@@ -154,6 +155,10 @@ export interface DaemonServices {
       readonly signal: AbortSignal
     }): ReturnType<typeof exportSourceResource>
   }
+  readonly artifactService?: Pick<
+    ArtifactService,
+    'list' | 'download' | 'readCached' | 'purge'
+  >
   readonly authService?: Pick<AuthService, 'listGrants'>
   readonly oauthAppService?: DaemonOAuthAppService
   readonly realmService?: Pick<RealmService, 'createRealm' | 'listRealms'>
@@ -501,6 +506,12 @@ async function productionServices(input: {
           confirmIrreversible,
         }),
     },
+    artifactService: new ArtifactService({
+      db: input.database,
+      registry: input.registry,
+      authService,
+      logger,
+    }),
     authService,
     exportService: {
       prepare: ({ ref, format, signal }) =>

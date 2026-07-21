@@ -5,6 +5,7 @@ import type {
   RunActionResult,
 } from '@ctxindex/core/action'
 import type { OAuthAuthorizationResponsePrompt } from '@ctxindex/core/auth'
+import type { ArtifactService } from '@ctxindex/core/artifact'
 import {
   type AuthService,
   isGrantCompatible,
@@ -58,6 +59,9 @@ import type {
   RpcActionDescribeInput,
   RpcActionDescribeResult,
   RpcActionRunResult,
+  RpcArtifactListInput,
+  RpcArtifactListResult,
+  RpcArtifactPurgeResult,
   RpcDocumentationGetInput,
   RpcDocumentationGetResult,
   RpcDocumentationListInput,
@@ -116,6 +120,8 @@ import type {
 import {
   rpcActionDescribeResultSchema,
   rpcActionRunResultSchema,
+  rpcArtifactListResultSchema,
+  rpcArtifactPurgeResultSchema,
   rpcDocumentationGetResultSchema,
   rpcDocumentationListResultSchema,
   rpcDocumentationSearchResultSchema,
@@ -155,6 +161,7 @@ export interface DaemonApplicationOptions {
   readonly actionService?: DaemonActionService
   readonly exportService?: DaemonExportService
   readonly transferStore?: ByteTransferRegistry
+  readonly artifactService?: Pick<ArtifactService, 'list' | 'purge'>
   readonly realmService?: Pick<RealmService, 'createRealm' | 'listRealms'>
   readonly registry?: ExtensionRegistry
   readonly searchService?: Pick<SearchPlanner, 'search'>
@@ -760,6 +767,10 @@ export class DaemonApplication implements DaemonRpcApplication {
   readonly action: DaemonRpcApplication['action'] = {
     describe: (input, context) => this.describeAction(input, context),
     run: (input, context) => this.runAction(input, context),
+  }
+  readonly artifact: DaemonRpcApplication['artifact'] = {
+    list: (input, context) => this.listArtifacts(input, context),
+    purge: (input, context) => this.purgeArtifacts(input, context),
   }
 
   constructor(options: DaemonApplicationOptions) {
@@ -1367,6 +1378,37 @@ export class DaemonApplication implements DaemonRpcApplication {
         resource: presentResource(result.resource),
         warnings: result.warnings,
       })
+      if (!parsed.success) throw new ResultTooLargeError()
+      return parsed.data
+    })
+  }
+
+  listArtifacts(
+    input: RpcArtifactListInput,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcArtifactListResult>> {
+    return this.#business(context, async () => {
+      if (!this.#options.artifactService)
+        throw new Error('Artifact service missing')
+      const parsed = rpcArtifactListResultSchema.safeParse(
+        await this.#options.artifactService.list(input.ref),
+      )
+      if (!parsed.success) throw new ResultTooLargeError()
+      return parsed.data
+    })
+  }
+
+  purgeArtifacts(
+    _input: Parameters<DaemonRpcApplication['artifact']['purge']>[0],
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcArtifactPurgeResult>> {
+    return this.#business(context, async (signal) => {
+      if (!this.#options.artifactService)
+        throw new Error('Artifact service missing')
+      signal.throwIfAborted()
+      const parsed = rpcArtifactPurgeResultSchema.safeParse(
+        await this.#options.artifactService.purge(),
+      )
       if (!parsed.success) throw new ResultTooLargeError()
       return parsed.data
     })

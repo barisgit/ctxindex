@@ -132,6 +132,33 @@ async function fixture(
 }
 
 describe('ArtifactService', () => {
+  test('reads only verified cached bytes within an explicit transfer bound', async () => {
+    const f = await fixture({ declaredSize: bytes.length })
+    expect(await f.service.readCached(artifactRef, bytes.length)).toBeNull()
+
+    await f.service.download(artifactRef)
+    const first = await f.service.readCached(artifactRef, bytes.length)
+    expect(first).toEqual({
+      artifact: expect.objectContaining({
+        ref: artifactRef,
+        originRef,
+        byteSize: bytes.length,
+      }),
+      bytes: new Uint8Array(bytes),
+    })
+    if (!first) throw new Error('expected cached Artifact bytes')
+    expect(first.artifact).not.toHaveProperty('localPath')
+    first.bytes[0] = 255
+    expect(
+      (await f.service.readCached(artifactRef, bytes.length))?.bytes,
+    ).toEqual(new Uint8Array(bytes))
+    expect(f.calls()).toBe(1)
+
+    await expect(
+      f.service.readCached(artifactRef, bytes.length - 1),
+    ).rejects.toMatchObject({ code: 'invalid_artifact_ref' })
+  })
+
   test('resolves only current same-Source verified cached bytes for Actions', async () => {
     const f = await fixture({ declaredSize: bytes.length })
     expect(await f.service.resolveCached(artifactRef, sourceId)).toBeNull()

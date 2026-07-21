@@ -114,6 +114,8 @@ function createApplication() {
     threadGet: 0,
     actionDescribe: 0,
     actionRun: 0,
+    artifactList: 0,
+    artifactPurge: 0,
     shutdown: 0,
   }
   const contexts: RpcRequestContext[] = []
@@ -367,6 +369,33 @@ function createApplication() {
         return { ok: true, value: { resource, warnings: [] } }
       },
     },
+    artifact: {
+      async list(_input, context) {
+        record('artifactList', context)
+        return {
+          ok: true,
+          value: { resourceRef: ref, artifacts: [], warnings: [] },
+        }
+      },
+      async purge(_input, context) {
+        record('artifactPurge', context)
+        return {
+          ok: true,
+          value: {
+            artifactCountRemoved: 0,
+            objectCountRemoved: 0,
+            logicalBytesFreed: 0,
+            physicalBytesFreed: 0,
+            diskAccounting: {
+              artifactCount: 0,
+              objectCount: 0,
+              logicalBytes: 0,
+              physicalBytes: 0,
+            },
+          },
+        }
+      },
+    },
   }
   return { application, calls, contexts }
 }
@@ -423,6 +452,8 @@ describe('pure daemon contract', () => {
       ['thread', 'get'],
       ['action', 'describe'],
       ['action', 'run'],
+      ['artifact', 'list'],
+      ['artifact', 'purge'],
     ] as const
     for (const path of paths) {
       expect(getContractRouter(daemonContract, path)).toBeDefined()
@@ -486,6 +517,8 @@ describe('pure daemon contract', () => {
     expectTypeOf<DaemonRpcApplication['thread']>().toHaveProperty('get')
     expectTypeOf<DaemonRpcApplication['action']>().toHaveProperty('describe')
     expectTypeOf<DaemonRpcApplication['action']>().toHaveProperty('run')
+    expectTypeOf<DaemonRpcApplication['artifact']>().toHaveProperty('list')
+    expectTypeOf<DaemonRpcApplication['artifact']>().toHaveProperty('purge')
   })
 
   test('infers every declared bounded failure variant', () => {
@@ -586,6 +619,8 @@ describe('contract implementation', () => {
       actionInput: { title: 'One' },
       confirmIrreversible: false,
     })
+    await client.artifact.list({ ref })
+    await client.artifact.purge({})
     await client.system.shutdown({})
     expect(fixture.calls).toEqual({
       health: 1,
@@ -616,6 +651,8 @@ describe('contract implementation', () => {
       threadGet: 1,
       actionDescribe: 1,
       actionRun: 1,
+      artifactList: 1,
+      artifactPurge: 1,
       shutdown: 1,
     })
   })
