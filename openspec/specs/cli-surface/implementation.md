@@ -101,6 +101,47 @@ The daemon client manually advances the typed iterator so its terminal return re
 
 The sync runner projects direct-core and daemon-RPC events into one CLI vocabulary. `--format events` writes each event as one JSON line when observed. Human summary and compact modes may write bounded live progress to stderr while preserving terminal stdout. `--json` suppresses all live writes and emits exactly one terminal JSON document. The terminal result remains the sole owner of stable exit selection.
 
+### @ctxindex/cli — background daemon lifecycle
+
+```ts
+export type DaemonStatusResult =
+  | { readonly status: 'unsupported' }
+  | { readonly status: 'stopped' }
+  | {
+      readonly status: 'starting' | 'stopping' | 'unavailable'
+      readonly instanceId: string
+      readonly pid: number
+      readonly startedAt: string
+    }
+  | { readonly status: 'running'; readonly health: RpcHealthResult }
+
+export interface DaemonStartResult {
+  readonly status: 'running'
+  readonly started: boolean
+  readonly health: RpcHealthResult
+}
+
+export type DaemonStopResult =
+  | {
+      readonly status: 'stopped'
+      readonly alreadyStopped: boolean
+      readonly instanceId?: string
+    }
+  | { readonly status: 'unsupported'; readonly alreadyStopped: true }
+
+export interface DaemonLifecycle {
+  start(signal?: AbortSignal): Promise<DaemonStartResult>
+  status(signal?: AbortSignal): Promise<DaemonStatusResult>
+  stop(signal?: AbortSignal): Promise<DaemonStopResult>
+}
+```
+
+The CLI lifecycle facade resolves only the pinned Bun source entrypoint or an exact packaged/compiled sibling, detaches it with ignored stdin and owner-private startup diagnostics, polls exact discovery plus compatible RPC health to a fixed deadline, and never treats discovery PID as ownership or a signal target. Stop uses typed graceful RPC shutdown for a live instance. Stale cleanup first acquires exclusive lifecycle ownership, then owner-checks discovery and validates the socket before removal.
+
+The lifecycle facade's outer action boundary preserves validated daemon failures, cancellation, and typed pre-init `invalid_args` guidance. Unexpected runtime canonicalization, discovery, or filesystem exceptions are converted to fixed action-specific `daemon_unavailable` messages before command rendering, so raw host paths and OS errors never cross the CLI boundary.
+
+Lifecycle commands are exactly `daemon start`, `daemon status`, and `daemon stop`; no foreground serve alias remains. Ordinary commands preserve the existing explicit discovery/test-override routing and do not autostart until the complete stateful inventory is daemon-routed or admitted to the tested bootstrap/filesystem-only exception allowlist. Once selected, transport loss never falls back to direct SQLite.
+
 ### @ctxindex/cli — shared flag contracts
 
 ```ts

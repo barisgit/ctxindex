@@ -214,6 +214,8 @@ Missing managed policy and exact managed-App resolution failures use `invalid_oa
 
 `@ctxindex/core` maps sync codes to run/status state and stable exits. The sync runner classifies validated warning emissions separately from thrown terminal errors; warning aggregation never changes the error-code mapping. `@ctxindex/cli` is the final error-translation boundary; command handlers do not invent independent mappings.
 
+Detached daemon startup and readiness failures reuse the bounded `daemon_unavailable` failure and stable exit `50`; lifecycle cancellation remains exit `130`, and explicit pre-init `invalid_args` guidance remains exit `2`. Already-running start and already-stopped stop are successful typed results. Unsupported-platform status is also a successful observational result, while explicit start fails through exit `50`. User-facing lifecycle errors never reflect raw endpoint/executable paths, child output, host errors, stacks, causes, environment contents, provider data, or secrets; unexpected runtime/discovery exceptions become fixed action-specific lifecycle messages.
+
 ## Verification
 
 Error and exit-mapping tests cover every code family, cause preservation, sync state mapping, warning-only success, redaction, unknown-error fallback, and storage-contention normalization across setup, migration, and Resource writes. CLI command tests assert stable managed and explicit-App exits, zero-effect invalid selection/import, static BYOA guidance without automatic retry, the persisted App-config code, absence of the removed Client code, and absence of raw SQLite contention details.

@@ -27,7 +27,7 @@ COMMANDS
   oauth-app    Manage available OAuth Apps.
    describe    Describe loaded Profiles, Adapters, and Actions.
        docs    Inspect bundled and loaded Extension documentation offline.
-     daemon    Manage the foreground local daemon.
+     daemon    Manage the background local daemon.
   extension    Inspect and manage Extensions.
      action    Run typed Actions.
    artifact    List, download, and purge managed Artifacts.
@@ -346,40 +346,30 @@ OPTIONS
 
 ## `ctxindex daemon`
 
-Manage the foreground local daemon.
+Manage the background local daemon.
 
 ```text
-Manage the foreground local daemon. (ctxindex daemon v0.0.0)
+Manage the background local daemon. (ctxindex daemon v0.0.0)
 
-USAGE ctxindex daemon serve|health|shutdown
+USAGE ctxindex daemon start|status|stop
 
 COMMANDS
 
-     serve    Serve in the foreground.
-    health    Inspect daemon health.
-  shutdown    Request graceful shutdown.
+   start    Start the background daemon.
+  status    Inspect daemon lifecycle and health.
+    stop    Stop the background daemon gracefully.
 
 Use ctxindex daemon <command> --help for more information about a command.
 ```
 
-## `ctxindex daemon serve`
+## `ctxindex daemon start`
 
-Serve in the foreground.
-
-```text
-Serve in the foreground. (ctxindex daemon serve v0.0.0)
-
-USAGE ctxindex daemon serve
-```
-
-## `ctxindex daemon health`
-
-Inspect daemon health.
+Start the background daemon.
 
 ```text
-Inspect daemon health. (ctxindex daemon health v0.0.0)
+Start the background daemon. (ctxindex daemon start v0.0.0)
 
-USAGE ctxindex daemon health [OPTIONS]
+USAGE ctxindex daemon start [OPTIONS]
 
 OPTIONS
 
@@ -390,14 +380,32 @@ OPTIONS
 | --- | --- | --- |
 | `--json` | Print JSON | Optional |
 
-## `ctxindex daemon shutdown`
+## `ctxindex daemon status`
 
-Request graceful shutdown.
+Inspect daemon lifecycle and health.
 
 ```text
-Request graceful shutdown. (ctxindex daemon shutdown v0.0.0)
+Inspect daemon lifecycle and health. (ctxindex daemon status v0.0.0)
 
-USAGE ctxindex daemon shutdown [OPTIONS]
+USAGE ctxindex daemon status [OPTIONS]
+
+OPTIONS
+
+  --json    Print JSON
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `--json` | Print JSON | Optional |
+
+## `ctxindex daemon stop`
+
+Stop the background daemon gracefully.
+
+```text
+Stop the background daemon gracefully. (ctxindex daemon stop v0.0.0)
+
+USAGE ctxindex daemon stop [OPTIONS]
 
 OPTIONS
 

@@ -87,7 +87,7 @@ export interface CliPackageSmokeResult {
   readonly oauthAppHelpLoaded: true
   readonly preInitStatePreserved: true
   readonly packageExtensionLoaded: true
-  readonly daemonServeAvailable: true
+  readonly daemonLifecycleAvailable: true
 }
 
 export type NativeKeytarProbeStatus = 'loaded' | 'host-libsecret-unavailable'
@@ -576,46 +576,79 @@ export async function smokeCliPackage(
   }
 
   if (process.platform === 'darwin') {
-    const daemon = Bun.spawn([executable, 'daemon', 'serve'], {
-      cwd: outsideDirectory,
-      env,
-      stdin: 'ignore',
-      stdout: 'pipe',
-      stderr: 'pipe',
-    })
+    let lifecycleFailure: unknown
+    let startedInstanceId: string | undefined
     try {
-      let ready = false
-      for (let attempt = 0; attempt < 100; attempt += 1) {
-        const probe = await runWithExit(
-          [executable, 'daemon', 'health', '--json'],
-          { cwd: outsideDirectory, env },
+      const started = await runWithExit(
+        [executable, 'daemon', 'start', '--json'],
+        { cwd: outsideDirectory, env },
+      )
+      if (started.exitCode !== 0) {
+        throw new Error(
+          `Installed CLI background daemon did not become ready: ${started.stderr || started.stdout}`,
         )
-        if (probe.exitCode === 0) {
-          ready = true
-          break
-        }
-        if (daemon.exitCode !== null) break
-        await Bun.sleep(20)
       }
-      if (!ready) {
-        throw new Error('Installed CLI daemon serve did not become ready')
+      const startedOutput = JSON.parse(started.stdout)
+      if (
+        startedOutput.status !== 'running' ||
+        typeof startedOutput.health?.instanceId !== 'string'
+      ) {
+        throw new Error(
+          `Installed CLI background daemon did not become ready: ${started.stderr || started.stdout}`,
+        )
       }
-      await cli(['daemon', 'shutdown', '--json'])
-      if ((await daemon.exited) !== 0) {
-        throw new Error('Installed CLI daemon serve did not exit cleanly')
+      startedInstanceId = startedOutput.health.instanceId
+      const observed = await cli(['daemon', 'status', '--json'])
+      const observedOutput = JSON.parse(observed.stdout)
+      if (
+        observedOutput.status !== 'running' ||
+        observedOutput.health?.instanceId !== startedInstanceId
+      ) {
+        throw new Error(
+          `Installed CLI background daemon did not survive detached startup: ${observed.stderr || observed.stdout}`,
+        )
       }
+    } catch (error) {
+      lifecycleFailure = error
     } finally {
-      if (daemon.exitCode === null) daemon.kill('SIGKILL')
+      const stopped = await runWithExit(
+        [executable, 'daemon', 'stop', '--json'],
+        { cwd: outsideDirectory, env },
+      )
+      let stopFailure: unknown
+      if (stopped.exitCode !== 0) {
+        stopFailure = new Error(
+          `Installed CLI background daemon did not stop cleanly: ${stopped.stderr || stopped.stdout}`,
+        )
+      } else {
+        try {
+          const stoppedOutput = JSON.parse(stopped.stdout)
+          if (
+            stoppedOutput.status !== 'stopped' ||
+            (startedInstanceId !== undefined &&
+              (stoppedOutput.alreadyStopped !== false ||
+                stoppedOutput.instanceId !== startedInstanceId))
+          ) {
+            stopFailure = new Error(
+              `Installed CLI background daemon did not stop cleanly: ${stopped.stderr || stopped.stdout}`,
+            )
+          }
+        } catch (error) {
+          stopFailure = error
+        }
+      }
+      lifecycleFailure ??= stopFailure
     }
+    if (lifecycleFailure) throw lifecycleFailure
   } else {
-    const unsupported = await runWithExit([executable, 'daemon', 'serve'], {
+    const unsupported = await runWithExit([executable, 'daemon', 'start'], {
       cwd: outsideDirectory,
       env,
     })
     if (
       unsupported.exitCode !== 50 ||
       unsupported.stderr.trim() !==
-        'The local daemon is unsupported on this platform or filesystem.'
+        'The local daemon is unsupported on this platform.'
     ) {
       throw new Error(
         `Installed CLI daemon did not fail closed on an unsupported host: ${unsupported.stderr || unsupported.stdout}`,
@@ -689,7 +722,7 @@ export async function smokeCliPackage(
     oauthAppHelpLoaded: true,
     preInitStatePreserved: true,
     packageExtensionLoaded: true,
-    daemonServeAvailable: true,
+    daemonLifecycleAvailable: true,
   }
 }
 

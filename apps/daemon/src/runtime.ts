@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { rmSync } from 'node:fs'
+import { lstatSync, rmSync } from 'node:fs'
+import { userInfo } from 'node:os'
 import { join } from 'node:path'
 import * as CTXINDEX_BUILTIN_MODULE from '@ctxindex/adapters'
 import { type AuthService, createAuthService } from '@ctxindex/core/auth'
@@ -78,6 +79,27 @@ function requireObservationTimeout(value: number): number {
     )
   }
   return value
+}
+
+export function removeOwnedDaemonEndpoint(path: string): void {
+  let stat: ReturnType<typeof lstatSync>
+  try {
+    stat = lstatSync(path)
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return
+    }
+    throw error
+  }
+  if (
+    stat.isSymbolicLink() ||
+    !stat.isSocket() ||
+    stat.nlink !== 1 ||
+    stat.uid !== userInfo().uid
+  ) {
+    throw new Error('Daemon endpoint is unsafe')
+  }
+  rmSync(path)
 }
 
 export interface DaemonServices {
@@ -272,7 +294,7 @@ function defaultHooks(
     assertDatabaseTarget: assertRetainedDatabaseLeaseTarget,
     writeMetadata: writeDiscoveryMetadata,
     cleanupMetadata: cleanupDiscoveryMetadata,
-    removeEndpoint: (path) => rmSync(path, { force: true }),
+    removeEndpoint: removeOwnedDaemonEndpoint,
   }
 }
 

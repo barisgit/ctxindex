@@ -76,7 +76,7 @@ function unavailable(selection?: DaemonSelection): DaemonCliError {
         ? 'The local daemon is starting and is not yet available.'
         : lifecycle === 'stopping'
           ? 'The local daemon is stopping and is no longer available.'
-          : 'The local daemon is unavailable. Start it with `ctxindex daemon serve`.',
+          : 'The local daemon is unavailable. Start it with `ctxindex daemon start`.',
   })
 }
 
