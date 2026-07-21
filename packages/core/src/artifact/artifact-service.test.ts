@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite'
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -156,6 +156,50 @@ describe('ArtifactService', () => {
 
     await expect(
       f.service.readCached(artifactRef, bytes.length - 1),
+    ).rejects.toMatchObject({ code: 'invalid_artifact_ref' })
+  })
+
+  test('keeps purge excluded through materialization and verified transfer-byte copying', async () => {
+    const f = await fixture({ declaredSize: bytes.length })
+    await f.service.download(artifactRef)
+    let enterRead = () => {}
+    const readStarted = new Promise<void>((resolve) => {
+      enterRead = resolve
+    })
+    let releaseRead = () => {}
+    const readReleased = new Promise<void>((resolve) => {
+      releaseRead = resolve
+    })
+    const originalRead = f.store.read.bind(f.store)
+    const read = spyOn(f.store, 'read').mockImplementation(async (...args) => {
+      enterRead()
+      await readReleased
+      return originalRead(...args)
+    })
+
+    const transfer = f.service.downloadForTransfer(
+      artifactRef,
+      bytes.length,
+      new AbortController().signal,
+    )
+    await readStarted
+    await expect(f.service.purge()).rejects.toMatchObject({ code: 'conflict' })
+    releaseRead()
+    const result = await transfer
+    expect(result.download).toMatchObject({ cache: 'hit' })
+    expect(result.bytes).toEqual(new Uint8Array(bytes))
+    result.bytes[0] = 255
+    expect((await f.store.read(artifactRef))?.bytes).toEqual(
+      new Uint8Array(bytes),
+    )
+    read.mockRestore()
+
+    await expect(
+      f.service.downloadForTransfer(
+        artifactRef,
+        bytes.length - 1,
+        new AbortController().signal,
+      ),
     ).rejects.toMatchObject({ code: 'invalid_artifact_ref' })
   })
 

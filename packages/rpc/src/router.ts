@@ -18,6 +18,7 @@ import {
   rpcAccountRespondResultSchema,
   rpcActionDescribeResultSchema,
   rpcActionRunResultSchema,
+  rpcArtifactDownloadResultSchema,
   rpcArtifactListResultSchema,
   rpcArtifactPurgeResultSchema,
   rpcDocumentationGetResultSchema,
@@ -722,6 +723,19 @@ export function createDaemonRouter(
                 applicationContext(context, signal),
               ),
             rpcArtifactListResultSchema,
+            errors,
+          ),
+        ),
+      download: os.artifact.download
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.artifact.download(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcArtifactDownloadResultSchema,
             errors,
           ),
         ),

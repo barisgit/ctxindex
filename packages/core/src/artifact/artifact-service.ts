@@ -48,6 +48,11 @@ export interface CachedArtifactBytes {
   readonly bytes: Uint8Array
 }
 
+export interface ArtifactTransferPreparation {
+  readonly download: ArtifactDownloadResult
+  readonly bytes: Uint8Array
+}
+
 export interface ArtifactServiceInput {
   readonly db: CtxindexDatabase
   readonly registry: ExtensionRegistry
@@ -268,22 +273,31 @@ export class ArtifactService {
       throw new CtxindexError('Artifact purge is in progress', 'conflict')
     this.activeDownloads += 1
     try {
-      parseRef(ref)
-      const cached = await this.store.get(ref)
-      if (cached) return this.finish(cached, 'hit', options.outputPath)
+      return await this.downloadTracked(ref, options)
+    } finally {
+      this.activeDownloads -= 1
+    }
+  }
 
-      let pending = this.inFlight.get(ref)
-      if (!pending) {
-        pending = this.materialize(
-          ref,
-          options.signal ?? new AbortController().signal,
+  async downloadForTransfer(
+    ref: string,
+    maxByteSize: number,
+    signal: AbortSignal,
+  ): Promise<ArtifactTransferPreparation> {
+    if (this.purging)
+      throw new CtxindexError('Artifact purge is in progress', 'conflict')
+    this.activeDownloads += 1
+    try {
+      const download = await this.downloadTracked(ref, { signal })
+      signal.throwIfAborted()
+      const cached = await this.readCached(ref, maxByteSize)
+      if (!cached)
+        throw new CtxindexError(
+          'Artifact cache state disappeared during transfer preparation',
+          'conflict',
         )
-        this.inFlight.set(ref, pending)
-        void pending
-          .finally(() => this.inFlight.delete(ref))
-          .catch(() => undefined)
-      }
-      return this.finish(await pending, 'miss', options.outputPath)
+      signal.throwIfAborted()
+      return { download, bytes: cached.bytes }
     } finally {
       this.activeDownloads -= 1
     }
@@ -374,6 +388,31 @@ export class ArtifactService {
           write: (chunk) => writer.write(chunk),
         }),
     )
+  }
+
+  private async downloadTracked(
+    ref: string,
+    options: {
+      readonly outputPath?: string
+      readonly signal?: AbortSignal
+    },
+  ): Promise<ArtifactDownloadResult> {
+    parseRef(ref)
+    const cached = await this.store.get(ref)
+    if (cached) return this.finish(cached, 'hit', options.outputPath)
+
+    let pending = this.inFlight.get(ref)
+    if (!pending) {
+      pending = this.materialize(
+        ref,
+        options.signal ?? new AbortController().signal,
+      )
+      this.inFlight.set(ref, pending)
+      void pending
+        .finally(() => this.inFlight.delete(ref))
+        .catch(() => undefined)
+    }
+    return this.finish(await pending, 'miss', options.outputPath)
   }
 
   private async finish(

@@ -115,6 +115,7 @@ function createApplication() {
     actionDescribe: 0,
     actionRun: 0,
     artifactList: 0,
+    artifactDownload: 0,
     artifactPurge: 0,
     shutdown: 0,
   }
@@ -377,6 +378,24 @@ function createApplication() {
           value: { resourceRef: ref, artifacts: [], warnings: [] },
         }
       },
+      async download(_input, context) {
+        record('artifactDownload', context)
+        return {
+          ok: true,
+          value: {
+            artifact: {
+              ref: `${ref}/attachment/file`,
+              originRef: ref,
+              contentHash: `sha256:${'a'.repeat(64)}`,
+              mediaType: 'application/octet-stream',
+              byteSize: 4,
+              retentionClass: 'cached',
+              createdAt: 1,
+            },
+            cache: 'hit',
+          },
+        }
+      },
       async purge(_input, context) {
         record('artifactPurge', context)
         return {
@@ -453,6 +472,7 @@ describe('pure daemon contract', () => {
       ['action', 'describe'],
       ['action', 'run'],
       ['artifact', 'list'],
+      ['artifact', 'download'],
       ['artifact', 'purge'],
     ] as const
     for (const path of paths) {
@@ -518,6 +538,7 @@ describe('pure daemon contract', () => {
     expectTypeOf<DaemonRpcApplication['action']>().toHaveProperty('describe')
     expectTypeOf<DaemonRpcApplication['action']>().toHaveProperty('run')
     expectTypeOf<DaemonRpcApplication['artifact']>().toHaveProperty('list')
+    expectTypeOf<DaemonRpcApplication['artifact']>().toHaveProperty('download')
     expectTypeOf<DaemonRpcApplication['artifact']>().toHaveProperty('purge')
   })
 
@@ -620,6 +641,10 @@ describe('contract implementation', () => {
       confirmIrreversible: false,
     })
     await client.artifact.list({ ref })
+    await client.artifact.download({
+      ref: `${ref}/attachment/file`,
+      transfer: false,
+    })
     await client.artifact.purge({})
     await client.system.shutdown({})
     expect(fixture.calls).toEqual({
@@ -652,6 +677,7 @@ describe('contract implementation', () => {
       actionDescribe: 1,
       actionRun: 1,
       artifactList: 1,
+      artifactDownload: 1,
       artifactPurge: 1,
       shutdown: 1,
     })

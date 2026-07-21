@@ -59,6 +59,8 @@ import type {
   RpcActionDescribeInput,
   RpcActionDescribeResult,
   RpcActionRunResult,
+  RpcArtifactDownloadInput,
+  RpcArtifactDownloadResult,
   RpcArtifactListInput,
   RpcArtifactListResult,
   RpcArtifactPurgeResult,
@@ -118,8 +120,10 @@ import type {
   RpcWarning,
 } from '@ctxindex/rpc'
 import {
+  RPC_BYTE_TRANSFER_MAX_BYTES,
   rpcActionDescribeResultSchema,
   rpcActionRunResultSchema,
+  rpcArtifactDownloadResultSchema,
   rpcArtifactListResultSchema,
   rpcArtifactPurgeResultSchema,
   rpcDocumentationGetResultSchema,
@@ -160,8 +164,11 @@ export interface DaemonApplicationOptions {
   readonly createAuthorizationRequestId?: () => string
   readonly actionService?: DaemonActionService
   readonly exportService?: DaemonExportService
+  readonly artifactService?: Pick<
+    ArtifactService,
+    'list' | 'download' | 'downloadForTransfer' | 'purge'
+  >
   readonly transferStore?: ByteTransferRegistry
-  readonly artifactService?: Pick<ArtifactService, 'list' | 'purge'>
   readonly realmService?: Pick<RealmService, 'createRealm' | 'listRealms'>
   readonly registry?: ExtensionRegistry
   readonly searchService?: Pick<SearchPlanner, 'search'>
@@ -770,6 +777,7 @@ export class DaemonApplication implements DaemonRpcApplication {
   }
   readonly artifact: DaemonRpcApplication['artifact'] = {
     list: (input, context) => this.listArtifacts(input, context),
+    download: (input, context) => this.downloadArtifact(input, context),
     purge: (input, context) => this.purgeArtifacts(input, context),
   }
 
@@ -1393,6 +1401,43 @@ export class DaemonApplication implements DaemonRpcApplication {
       const parsed = rpcArtifactListResultSchema.safeParse(
         await this.#options.artifactService.list(input.ref),
       )
+      if (!parsed.success) throw new ResultTooLargeError()
+      return parsed.data
+    })
+  }
+
+  downloadArtifact(
+    input: RpcArtifactDownloadInput,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcArtifactDownloadResult>> {
+    return this.#business(context, async (signal) => {
+      if (!this.#options.artifactService)
+        throw new Error('Artifact service missing')
+      let output: RpcArtifactDownloadResult
+      if (input.transfer) {
+        if (!this.#options.transferStore)
+          throw new Error('Byte transfer store missing')
+        const prepared =
+          await this.#options.artifactService.downloadForTransfer(
+            input.ref,
+            RPC_BYTE_TRANSFER_MAX_BYTES,
+            signal,
+          )
+        let transfer: ReturnType<ByteTransferRegistry['create']>
+        try {
+          transfer = this.#options.transferStore.create(prepared.bytes)
+        } catch (error) {
+          if (error instanceof ByteTransferTooLargeError)
+            throw new ResultTooLargeError()
+          throw error
+        }
+        output = { ...prepared.download, transfer }
+      } else {
+        output = await this.#options.artifactService.download(input.ref, {
+          signal,
+        })
+      }
+      const parsed = rpcArtifactDownloadResultSchema.safeParse(output)
       if (!parsed.success) throw new ResultTooLargeError()
       return parsed.data
     })

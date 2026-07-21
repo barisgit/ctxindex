@@ -614,6 +614,45 @@ test('routes Artifact listing and explicit purge through tracked daemon business
         calls.push(['purge'])
         return purged
       },
+      async download(ref: string, options: unknown) {
+        calls.push(['download', ref, options])
+        return {
+          artifact: {
+            ref,
+            originRef: listed.resourceRef,
+            contentHash: `sha256:${'a'.repeat(64)}`,
+            mediaType: 'application/octet-stream',
+            byteSize: 4,
+            retentionClass: 'cached' as const,
+            createdAt: 1,
+          },
+          cache: 'hit' as const,
+        }
+      },
+      async downloadForTransfer(ref: string, max: number, signal: AbortSignal) {
+        calls.push(['downloadForTransfer', ref, max, signal])
+        return {
+          download: {
+            artifact: {
+              ref,
+              originRef: listed.resourceRef,
+              contentHash: `sha256:${'a'.repeat(64)}`,
+              mediaType: 'application/octet-stream',
+              byteSize: 4,
+              retentionClass: 'cached' as const,
+              createdAt: 1,
+            },
+            cache: 'miss' as const,
+          },
+          bytes: new Uint8Array([1, 2, 3, 4]),
+        }
+      },
+    },
+    transferStore: {
+      create(bytes: Uint8Array) {
+        calls.push(['transfer', bytes])
+        return { ticket: 'b'.repeat(64), byteSize: 4, expiresAt: 10 }
+      },
     },
   })
 
@@ -631,7 +670,32 @@ test('routes Artifact listing and explicit purge through tracked daemon business
     ok: true,
     value: purged,
   })
-  expect(calls).toEqual([['list', listed.resourceRef], ['purge']])
+  const artifactRef = `${listed.resourceRef}/attachment/file`
+  expect(
+    await app.artifact.download(
+      { ref: artifactRef, transfer: false },
+      context('artifact-download-cache'),
+    ),
+  ).toMatchObject({ ok: true, value: { cache: 'hit' } })
+  expect(
+    await app.artifact.download(
+      { ref: artifactRef, transfer: true },
+      context('artifact-download-transfer'),
+    ),
+  ).toMatchObject({
+    ok: true,
+    value: {
+      cache: 'miss',
+      transfer: { ticket: 'b'.repeat(64), byteSize: 4, expiresAt: 10 },
+    },
+  })
+  expect(calls.map((call) => (call as unknown[])[0])).toEqual([
+    'list',
+    'purge',
+    'download',
+    'downloadForTransfer',
+    'transfer',
+  ])
 })
 
 test('streams bounded progress in order with one-item producer backpressure', async () => {

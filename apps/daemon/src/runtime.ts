@@ -157,7 +157,7 @@ export interface DaemonServices {
   }
   readonly artifactService?: Pick<
     ArtifactService,
-    'list' | 'download' | 'readCached' | 'purge'
+    'list' | 'download' | 'downloadForTransfer' | 'purge'
   >
   readonly authService?: Pick<AuthService, 'listGrants'>
   readonly oauthAppService?: DaemonOAuthAppService

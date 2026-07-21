@@ -13,6 +13,8 @@ import {
   rpcActionDescribeResultSchema,
   rpcActionRunInputSchema,
   rpcActionRunResultSchema,
+  rpcArtifactDownloadInputSchema,
+  rpcArtifactDownloadResultSchema,
   rpcArtifactListInputSchema,
   rpcArtifactListResultSchema,
   rpcArtifactPurgeInputSchema,
@@ -187,6 +189,9 @@ export const daemonContract = {
     list: procedure
       .input(rpcArtifactListInputSchema)
       .output(rpcArtifactListResultSchema),
+    download: procedure
+      .input(rpcArtifactDownloadInputSchema)
+      .output(rpcArtifactDownloadResultSchema),
     purge: procedure
       .input(rpcArtifactPurgeInputSchema)
       .output(rpcArtifactPurgeResultSchema),

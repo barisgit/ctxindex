@@ -1521,6 +1521,37 @@ export const rpcArtifactListResultSchema = z
   .readonly()
 export type RpcArtifactListResult = z.infer<typeof rpcArtifactListResultSchema>
 
+export const rpcArtifactDownloadInputSchema = z.strictObject({
+  ref: refSchema,
+  transfer: z.boolean(),
+})
+export type RpcArtifactDownloadInput = Readonly<
+  z.infer<typeof rpcArtifactDownloadInputSchema>
+>
+
+export const rpcDownloadedArtifactSchema = z
+  .strictObject({
+    ref: refSchema,
+    originRef: refSchema,
+    contentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+    mediaType: terminalSafeString(256),
+    byteSize: countSchema,
+    retentionClass: z.literal('cached'),
+    createdAt: countSchema,
+  })
+  .readonly()
+
+export const rpcArtifactDownloadResultSchema = z
+  .strictObject({
+    artifact: rpcDownloadedArtifactSchema,
+    cache: z.enum(['hit', 'miss']),
+    transfer: rpcByteTransferDescriptorSchema.optional(),
+  })
+  .readonly()
+export type RpcArtifactDownloadResult = z.infer<
+  typeof rpcArtifactDownloadResultSchema
+>
+
 export const rpcArtifactPurgeInputSchema = z.strictObject({})
 export type RpcArtifactPurgeInput = Readonly<
   z.infer<typeof rpcArtifactPurgeInputSchema>

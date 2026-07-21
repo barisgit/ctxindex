@@ -11,6 +11,8 @@ import {
   rpcActionRunInputSchema,
   rpcActionRunResultSchema,
   rpcByteTransferDescriptorSchema,
+  rpcArtifactDownloadInputSchema,
+  rpcArtifactDownloadResultSchema,
   rpcArtifactListInputSchema,
   rpcArtifactListResultSchema,
   rpcArtifactPurgeInputSchema,
@@ -767,6 +769,36 @@ describe('Artifact envelopes', () => {
     expect(rpcArtifactListResultSchema.parse(listed)).toEqual(listed)
     expect(rpcArtifactPurgeInputSchema.parse({})).toEqual({})
     expect(rpcArtifactPurgeResultSchema.parse(purged)).toEqual(purged)
+    const download = {
+      artifact: {
+        ref: artifactRef,
+        originRef: ref,
+        contentHash: `sha256:${'a'.repeat(64)}`,
+        mediaType: 'application/octet-stream',
+        byteSize: 14,
+        retentionClass: 'cached',
+        createdAt: 1,
+      },
+      cache: 'miss',
+      transfer: {
+        ticket: 'b'.repeat(64),
+        byteSize: 14,
+        expiresAt: 2,
+      },
+    } as const
+    expect(
+      rpcArtifactDownloadInputSchema.parse({
+        ref: artifactRef,
+        transfer: true,
+      }),
+    ).toEqual({ ref: artifactRef, transfer: true })
+    expect(rpcArtifactDownloadResultSchema.parse(download)).toEqual(download)
+    expect(
+      rpcArtifactDownloadResultSchema.parse({
+        artifact: download.artifact,
+        cache: 'hit',
+      }),
+    ).toEqual({ artifact: download.artifact, cache: 'hit' })
   })
 
   test('rejects paths, unbounded arrays, malformed descriptors, and extra purge data', () => {
@@ -792,6 +824,21 @@ describe('Artifact envelopes', () => {
       rpcArtifactPurgeResultSchema.parse({ ...purged, path: '/private/cache' }),
     ).toThrow()
     expect(() => rpcArtifactPurgeInputSchema.parse({ confirm: true })).toThrow()
+    expect(() =>
+      rpcArtifactDownloadResultSchema.parse({
+        artifact: {
+          ref: artifactRef,
+          originRef: ref,
+          contentHash: `sha256:${'a'.repeat(64)}`,
+          mediaType: 'application/octet-stream',
+          byteSize: 14,
+          retentionClass: 'cached',
+          createdAt: 1,
+          localPath: '/private/cache',
+        },
+        cache: 'hit',
+      }),
+    ).toThrow()
   })
 })
 
