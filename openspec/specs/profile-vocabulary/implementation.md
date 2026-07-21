@@ -146,6 +146,17 @@ export function deriveMailMessageReplyReferences(
 ): string[];
 ```
 
+### @ctxindex/profiles — chat message vocabulary
+
+```ts
+export type ChatMessage = z.infer<typeof chatMessageSchema>
+
+export function chatMessageNaturalKey(
+  conversationKey: string,
+  providerMessageId: string,
+): string;
+```
+
 ### @ctxindex/profiles — calendar event vocabulary
 
 ```ts
@@ -177,6 +188,8 @@ export function isNormalizedRelativeFilePath(path: string): boolean;
 The canonical email contract is exported from both `@ctxindex/profiles` and `@ctxindex/profiles/mail-message` through the `MailMessage`, `mailMessageSchema`, `mailMessageProfile`, `mailMessageDraft*`, and `deriveMailMessageReply*` symbols. No compatibility subpath, symbol, Profile id, Action id, or alias is retained for the former broad message vocabulary.
 
 Profiles own validation, titles/summaries, chunks, typed fields, Relations, Artifact descriptors, exports, docs/aliases/examples, and Action declarations. Adapters own provider I/O. Loaded registry metadata drives describe, kind aliases, field parsing, Source config, exports, and Action discovery.
+
+The chat-message module owns an independent strict schema and pure projections rather than inheriting from or forming a union with the mail-message schema. Its compound natural-key helper is the single implementation used by both the indexed `messageKey` field and provider-id reply Relations. Core consumes its ordinary Profile hooks without chat-specific storage or traversal branches.
 
 ## Verification
 

@@ -195,7 +195,7 @@ Rules:
 4. **No speculative migration (D22)** — V1 records version `1`, but no payload
    migration mechanism exists until a second real Profile version requires one.
 
-Canonical Profiles bundled with the binary: `mail.message@1`, `calendar.event@1`, and `file@1`.
+Canonical Profiles bundled with the binary: `mail.message@1`, `chat.message@1`, `calendar.event@1`, and `file@1`.
 External Extensions may define additional Profiles through the same public API;
 V1 does not pre-select future task or conversation Profile domains or additional
 export formats. Conversation behavior uses message Relations, and Artifacts are
