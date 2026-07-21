@@ -13,8 +13,10 @@ test('release workflow is a protected tokenless exact-artifact pipeline', async 
   expect(workflow).toContain('name: Pack')
   expect(workflow).toContain('name: Smoke')
   expect(workflow).toContain('name: Publish')
+  expect(workflow).toContain('name: Tag and GitHub Release')
   expect(workflow).toContain('environment: npm-production')
   expect(workflow).toContain('id-token: write')
+  expect(workflow).toContain('contents: write')
   expect(workflow).toContain('npm publish')
   expect(workflow).toContain('release-gate.ts')
   expect(workflow).toContain('bun run smoke:cli-package')
@@ -36,4 +38,24 @@ test('release workflow is a protected tokenless exact-artifact pipeline', async 
   }
   expect(workflow).not.toMatch(/NODE_AUTH_TOKEN|NPM_TOKEN|npm-token/)
   expect(workflow).not.toMatch(/uses:\s+[^\n]+@(v|main|master)\b/)
+
+  const publish = workflow.slice(
+    workflow.indexOf('  publish:'),
+    workflow.indexOf('  github-release:'),
+  )
+  expect(publish).toContain('id-token: write')
+  expect(publish).not.toContain('contents: write')
+
+  const githubRelease = workflow.slice(workflow.indexOf('  github-release:'))
+  expect(githubRelease).toContain('needs: [gate, publish]')
+  expect(githubRelease).toContain('contents: write')
+  expect(githubRelease).not.toContain('id-token: write')
+  expect(githubRelease).toContain('sha256sum --check')
+  expect(githubRelease).toContain('git ls-remote --refs origin')
+  expect(githubRelease).toContain('existing%%[[:space:]]*')
+  expect(githubRelease).toContain('= "$GITHUB_SHA"')
+  expect(githubRelease).toContain('gh release create')
+  expect(githubRelease).toContain('gh release upload')
+  expect(githubRelease).toContain('--verify-tag')
+  expect(githubRelease).toContain('--clobber')
 })

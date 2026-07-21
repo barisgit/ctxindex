@@ -148,3 +148,56 @@ jobs:
         run: bun scripts/release/release-gate.ts assert-absent "${{ needs.gate.outputs.version }}"
       - name: Publish
         run: npm publish "dist/npm/artifacts/ctxindex-${{ needs.gate.outputs.version }}.tgz" --access public
+
+  github-release:
+    name: Tag and GitHub Release
+    needs: [gate, publish]
+    if: needs.gate.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: v${{ needs.gate.outputs.version }}
+      RELEASE_VERSION: ${{ needs.gate.outputs.version }}
+      ARCHIVE: dist/npm/artifacts/ctxindex-${{ needs.gate.outputs.version }}.tgz
+    steps:
+      - name: Check out published commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Download exact artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ctxindex-${{ needs.gate.outputs.version }}
+          path: dist/npm/artifacts
+      - name: Verify transferred artifact
+        run: sha256sum --check "$ARCHIVE.sha256"
+      - name: Create or verify exact tag
+        run: |
+          existing="$(git ls-remote --refs origin "refs/tags/$RELEASE_TAG")"
+          if test -n "$existing"; then
+            test "${existing%%[[:space:]]*}" = "$GITHUB_SHA"
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+              -f "ref=refs/tags/$RELEASE_TAG" \
+              -f "sha=$GITHUB_SHA"
+          fi
+      - name: Create or refresh GitHub Release
+        run: |
+          prerelease=()
+          if [[ "$RELEASE_VERSION" == *-* ]]; then
+            prerelease=(--prerelease)
+          fi
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$ARCHIVE" "$ARCHIVE.sha256" --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              "$ARCHIVE" "$ARCHIVE.sha256" \
+              --verify-tag \
+              --title "ctxindex $RELEASE_TAG" \
+              --generate-notes \
+              "${prerelease[@]}"
+          fi

@@ -35,6 +35,9 @@ artifact without publishing from local development or touching user state.
 3. Archive inventory and content are verified before an isolated global install.
 4. `.github/workflows/release.yml` transfers that exact archive plus checksum to
    the protected publish job, which repeats registry absence before publication.
+5. Only after npm publication succeeds, an isolated `contents: write` job
+   verifies the transferred archive again, creates or confirms the exact
+   commit-bound version tag, and creates or refreshes its GitHub Release assets.
 
 ## Integration points
 
