@@ -109,6 +109,7 @@ done < <(
 # accepts loopback hosts only.
 expected_mock_owners="$(cat <<'EOF'
 apps/cli/src/account/handle-account-command.ts
+apps/cli/src/daemon/lifecycle.ts
 apps/daemon/src/runtime.ts
 packages/core/src/auth/oauth-endpoints.ts
 packages/core/src/config/env-loader.ts
