@@ -1,16 +1,10 @@
 import { Database } from 'bun:sqlite'
 import { expect, test } from 'bun:test'
-import {
-  chmod,
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  writeFile,
-} from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Sandbox } from '@ctxindex/core/testing'
+import { buildCompiledCliHarness } from './_compiled-cli-harness'
 import { type MockGmailMessage, startMockGmail } from './_mock-gmail'
 import {
   type MockGoogleCalendarEvent,
@@ -23,7 +17,6 @@ import {
 } from './_mock-graph'
 import { installLoopbackBrowser } from './_oauth-account'
 
-const repoRoot = new URL('../../../../', import.meta.url).pathname
 const createDraft = 'mail.message.draft.create'
 const updateDraft = 'mail.message.draft.update'
 
@@ -136,8 +129,7 @@ const graphMessages: readonly MockGraphMessage[] = [
 
 test('relocated compiled CLI runs the complete multi-Realm provider workflow', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'ctxindex-relocated-workflow-'))
-  const buildPath = join(dir, 'build', 'ctxindex')
-  const relocatedPath = join(dir, 'relocated', 'ctxindex')
+  const harness = await buildCompiledCliHarness()
   const sandbox = { dir } as Sandbox
   const personalGmail = startMockGmail({
     identitySubject: 'google-personal-subject-canary',
@@ -165,29 +157,9 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
     calendarEvents: { 'work/calendar': [graphEvent] },
     tokenScopes: 'Calendars.Read Mail.ReadWrite User.Read',
   })
+  let daemonEnv: Readonly<Record<string, string | undefined>> | undefined
 
   try {
-    const build = Bun.spawn(
-      [
-        'bun',
-        'build',
-        '--compile',
-        'apps/cli/bin/ctxindex.mjs',
-        '--outfile',
-        buildPath,
-      ],
-      { cwd: repoRoot, stdout: 'pipe', stderr: 'pipe' },
-    )
-    const [buildStdout, buildStderr, buildExitCode] = await Promise.all([
-      new Response(build.stdout).text(),
-      new Response(build.stderr).text(),
-      build.exited,
-    ])
-    expect(buildExitCode, `${buildStdout}\n${buildStderr}`).toBe(0)
-    await Bun.write(relocatedPath, Bun.file(buildPath))
-    await chmod(relocatedPath, 0o755)
-    await rm(join(dir, 'build'), { recursive: true })
-
     const bin = await installLoopbackBrowser(dir)
     const baseEnv = {
       ...graph.env(
@@ -207,23 +179,12 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
       CTXINDEX_LOOPBACK_TIMEOUT_SECS: '5',
       PATH: `${bin}:${process.env.PATH ?? ''}`,
     }
+    daemonEnv = { ...process.env, ...baseEnv }
     const run = async (
       args: string[],
       env: Record<string, string | undefined> = baseEnv,
     ) => {
-      const child = Bun.spawn([relocatedPath, ...args], {
-        cwd: '/',
-        env: { ...process.env, ...env },
-        stdin: null,
-        stdout: 'pipe',
-        stderr: 'pipe',
-      })
-      const [stdout, stderr, exitCode] = await Promise.all([
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
-        child.exited,
-      ])
-      return { stdout, stderr, exitCode }
+      return harness.run(args, { ...process.env, ...env })
     }
     const ok = async (
       args: string[],
@@ -785,6 +746,12 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
       grants.flatMap(({ scopes_json }) => JSON.parse(scopes_json)),
     ).not.toContain('Mail.Send')
   } finally {
+    if (daemonEnv) {
+      await harness
+        .run(['daemon', 'stop', '--format', 'json'], daemonEnv)
+        .catch(() => undefined)
+    }
+    await harness.cleanup()
     personalGmail.stop()
     workGmail.stop()
     googleCalendar.stop()

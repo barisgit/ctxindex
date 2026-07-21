@@ -1,16 +1,16 @@
 import { Database } from 'bun:sqlite'
 import { expect, test } from 'bun:test'
-import { copyFile, cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { buildCompiledCliHarness } from './_compiled-cli-harness'
 
 const repoRoot = resolve(import.meta.dir, '../../../..')
 const extensionSourceRoot = join(repoRoot, 'examples/tenders-extension')
 
 test('relocated compiled CLI syncs external tenders through generic verbs', async () => {
   const root = await mkdtemp(join(tmpdir(), 'ctxindex-tenders-e2e-'))
-  const buildOutput = join(root, 'build', 'ctxindex')
-  const relocatedBinary = join(root, 'relocated', 'ctxindex')
+  const harness = await buildCompiledCliHarness()
   const extensionPath = join(root, 'extension-package')
   const xdgConfig = join(root, 'xdg', 'config')
   const xdgData = join(root, 'xdg', 'data')
@@ -31,41 +31,10 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
   }
 
   async function run(args: string[]) {
-    const proc = Bun.spawn([relocatedBinary, ...args], {
-      cwd: '/',
-      env,
-      stdin: 'ignore',
-      stdout: 'pipe',
-      stderr: 'pipe',
-    })
-    const [exitCode, stdout, stderr] = await Promise.all([
-      proc.exited,
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-    ])
-    return { exitCode, stdout, stderr }
+    return harness.run(args, env)
   }
 
   try {
-    await mkdir(join(root, 'build'), { recursive: true })
-    const build = Bun.spawn(
-      [
-        'bun',
-        'build',
-        '--compile',
-        'apps/cli/bin/ctxindex.mjs',
-        '--outfile',
-        buildOutput,
-      ],
-      { cwd: repoRoot, stdout: 'pipe', stderr: 'pipe' },
-    )
-    const [buildExitCode, buildStdout, buildStderr] = await Promise.all([
-      build.exited,
-      new Response(build.stdout).text(),
-      new Response(build.stderr).text(),
-    ])
-    expect(buildExitCode, `${buildStdout}\n${buildStderr}`).toBe(0)
-
     await mkdir(join(extensionPath, 'dist'), { recursive: true })
     const extensionBuild = Bun.spawn(
       [
@@ -105,9 +74,6 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
       }),
     )
 
-    await mkdir(join(root, 'relocated'), { recursive: true })
-    await copyFile(buildOutput, relocatedBinary)
-    expect(relocatedBinary).not.toBe(buildOutput)
     expect(extensionSourceRoot.startsWith(join(repoRoot, 'examples'))).toBe(
       true,
     )
@@ -312,6 +278,16 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
     expect(syncedResources).toHaveLength(8)
 
     await writeFile(configPath, configText([]))
+    const stoppedWithoutExtension = await run([
+      'daemon',
+      'stop',
+      '--format',
+      'json',
+    ])
+    expect(
+      stoppedWithoutExtension.exitCode,
+      stoppedWithoutExtension.stderr,
+    ).toBe(0)
 
     const unavailableSources = await run(['source', 'list', '--format', 'json'])
     expect(unavailableSources.exitCode, unavailableSources.stderr).toBe(0)
@@ -372,6 +348,13 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
     expect(resourceSnapshot()).toEqual(syncedResources)
 
     await writeFile(configPath, configText([extensionPath]))
+    const stoppedWithExtension = await run([
+      'daemon',
+      'stop',
+      '--format',
+      'json',
+    ])
+    expect(stoppedWithExtension.exitCode, stoppedWithExtension.stderr).toBe(0)
 
     const restoredSources = await run(['source', 'list', '--format', 'json'])
     expect(restoredSources.exitCode, restoredSources.stderr).toBe(0)
@@ -442,6 +425,10 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
       ),
     ).toEqual([])
   } finally {
+    await harness
+      .run(['daemon', 'stop', '--format', 'json'], env)
+      .catch(() => undefined)
+    await harness.cleanup()
     await rm(root, { recursive: true, force: true })
   }
 }, 120_000)

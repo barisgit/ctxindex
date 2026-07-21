@@ -29,9 +29,21 @@ export function isolatedChildEnvironment(
   )
 }
 
-async function buildExecutable(entrypoint: string, output: string) {
+async function buildExecutable(
+  entrypoint: string,
+  output: string,
+  buildArgs: readonly string[] = [],
+) {
   const build = Bun.spawn(
-    ['bun', 'build', '--compile', entrypoint, '--outfile', output],
+    [
+      'bun',
+      'build',
+      '--compile',
+      ...buildArgs,
+      entrypoint,
+      '--outfile',
+      output,
+    ],
     { cwd: repoRoot, stdout: 'pipe', stderr: 'pipe' },
   )
   const [stdout, stderr, exitCode] = await Promise.all([
@@ -45,7 +57,14 @@ async function buildExecutable(entrypoint: string, output: string) {
   await chmod(output, 0o755)
 }
 
-export async function buildCompiledCliHarness(): Promise<CompiledCliHarness> {
+export interface CompiledCliHarnessOptions {
+  readonly cliBuildArgs?: readonly string[]
+  readonly daemonBuildArgs?: readonly string[]
+}
+
+export async function buildCompiledCliHarness(
+  options: CompiledCliHarnessOptions = {},
+): Promise<CompiledCliHarness> {
   const dir = await mkdtemp(join(tmpdir(), 'ctxindex-compiled-cli-'))
   const buildDir = join(dir, 'build')
   const relocatedDir = join(dir, 'relocated')
@@ -59,8 +78,16 @@ export async function buildCompiledCliHarness(): Promise<CompiledCliHarness> {
       mkdir(relocatedDir, { recursive: true }),
     ])
     await Promise.all([
-      buildExecutable('apps/cli/bin/ctxindex.mjs', builtCliPath),
-      buildExecutable('apps/daemon/src/main.ts', builtDaemonPath),
+      buildExecutable(
+        'apps/cli/bin/ctxindex.mjs',
+        builtCliPath,
+        options.cliBuildArgs,
+      ),
+      buildExecutable(
+        'apps/daemon/src/main.ts',
+        builtDaemonPath,
+        options.daemonBuildArgs,
+      ),
     ])
     await Promise.all([
       Bun.write(cliPath, Bun.file(builtCliPath)),
