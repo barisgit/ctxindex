@@ -6,7 +6,7 @@
 
 These listings prioritize interfaces, type aliases, discriminated unions, and full generic contracts trimmed from the current source. Exported functions appear only where they clarify a module boundary; imports and implementation bodies are omitted.
 
-### @ctxindex/adapters — Microsoft Calendar configuration
+### @ctxindex/official — Microsoft Calendar configuration
 
 ```ts
 export type MicrosoftCalendarSourceConfig = z.infer<
@@ -14,7 +14,7 @@ export type MicrosoftCalendarSourceConfig = z.infer<
 >
 ```
 
-### @ctxindex/adapters — Microsoft Calendar normalization
+### @ctxindex/official — Microsoft Calendar normalization
 
 ```ts
 export interface MicrosoftCalendarWarning {
@@ -33,7 +33,7 @@ export interface NormalizedMicrosoftCalendarEvent {
 
 ```
 
-### @ctxindex/adapters — Microsoft Calendar response contracts
+### @ctxindex/official — Microsoft Calendar response contracts
 
 ```ts
 export class MicrosoftCalendarDeltaExpiredError extends Error {
@@ -50,7 +50,7 @@ export interface MicrosoftCalendarPage {
 
 ```
 
-### @ctxindex/adapters — Microsoft Calendar sync
+### @ctxindex/official — Microsoft Calendar sync
 
 ```ts
 export async function microsoftCalendarSync(
@@ -58,7 +58,7 @@ export async function microsoftCalendarSync(
 ): Promise<void>;
 ```
 
-### @ctxindex/adapters — Microsoft Calendar retrieval
+### @ctxindex/official — Microsoft Calendar retrieval
 
 ```ts
 export async function microsoftCalendarRetrieve(
@@ -66,14 +66,14 @@ export async function microsoftCalendarRetrieve(
 ): Promise<void>;
 ```
 
-### @ctxindex/adapters — Microsoft mailbox messages
+### @ctxindex/official — Microsoft mailbox messages
 
 ```ts
 export type GraphMessage = z.infer<typeof graphMessageSchema>
 
 ```
 
-### @ctxindex/adapters — Microsoft Draft Actions
+### @ctxindex/official — Microsoft Draft Actions
 
 ```ts
 export type MicrosoftDraftCreateInput = z.infer<
@@ -93,7 +93,7 @@ export async function microsoftDraftUpdate(
 ): Promise<RetrievedResource>;
 ```
 
-### @ctxindex/adapters — Microsoft mailbox remote search
+### @ctxindex/official — Microsoft mailbox remote search
 
 ```ts
 export async function microsoftMailboxSearchRemote(
@@ -101,7 +101,7 @@ export async function microsoftMailboxSearchRemote(
 ): Promise<SearchRemoteResult>;
 ```
 
-### @ctxindex/adapters — Microsoft mailbox retrieval
+### @ctxindex/official — Microsoft mailbox retrieval
 
 ```ts
 export async function microsoftMailboxRetrieve(
@@ -109,7 +109,7 @@ export async function microsoftMailboxRetrieve(
 ): Promise<void>;
 ```
 
-### @ctxindex/adapters — Microsoft mailbox downloads
+### @ctxindex/official — Microsoft mailbox downloads
 
 ```ts
 export async function microsoftMailboxDownload(
@@ -119,7 +119,7 @@ export async function microsoftMailboxDownload(
 
 ## Implementation doctrine
 
-The Microsoft modules in `@ctxindex/adapters` own declarative OAuth metadata, provider DTOs, normalization, and operations. Calendar and mailbox operations depend on the provider-root Graph transport for request construction, continuation validation, response decoding, and normalized errors. Mailbox retrieval orchestrates message and attachment DTOs into generic Resources and Artifacts; Draft handlers map schema-inferred standalone or reply inputs and local Resource resolution into Graph requests, then normalize `RetrievedResource` results. Core sees only generic Resources, warnings, checkpoints, Artifacts, and Action results. Exact paging, sizing, retry, mutation, and diagnostic behavior lives in the capability spec and applicable delta specs.
+The Microsoft modules in `@ctxindex/official` own declarative OAuth metadata, provider DTOs, normalization, and operations. Calendar and mailbox operations depend on the provider-root Graph transport for request construction, continuation validation, response decoding, and normalized errors. Mailbox retrieval orchestrates message and attachment DTOs into generic Resources and Artifacts; Draft handlers map schema-inferred standalone or reply inputs and local Resource resolution into Graph requests, then normalize `RetrievedResource` results. Core sees only generic Resources, warnings, checkpoints, Artifacts, and Action results. Exact paging, sizing, retry, mutation, and diagnostic behavior lives in the capability spec and applicable delta specs.
 
 Attachment-bearing standalone and native-reply Draft creation normalizes and validates every To/Cc/Bcc value through the same Graph recipient seam, quotes display names where MIME requires it, renders one validated MIME message containing exact managed bytes, and performs one immutable-id POST without follow-up attachment mutations. Attachment-free standalone create retains the JSON request. Update always uses one JSON PATCH that omits the attachment collection, preserving existing provider attachments and immutable reply context without a provider read, retry, add/delete route, or send route.
 

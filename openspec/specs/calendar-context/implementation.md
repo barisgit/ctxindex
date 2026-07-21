@@ -17,7 +17,7 @@ export function calendarEventRef(
 ): string;
 ```
 
-### @ctxindex/adapters — Google Calendar normalization
+### @ctxindex/official — Google Calendar normalization
 
 ```ts
 export interface GoogleCalendarWarning {
@@ -39,7 +39,7 @@ export function normalizeGoogleCalendarEvent(
 ): NormalizedGoogleCalendarEvent;
 ```
 
-### @ctxindex/adapters — Microsoft Calendar normalization
+### @ctxindex/official — Microsoft Calendar normalization
 
 ```ts
 export interface MicrosoftCalendarWarning {
@@ -65,7 +65,7 @@ export function normalizeMicrosoftCalendarEvent(
 
 ## Implementation doctrine
 
-`@ctxindex/profiles` owns provider-neutral event validation and pure projections. Google and Microsoft modules in `@ctxindex/adapters` normalize provider responses and construct Source-scoped Refs; core storage, search, retrieval, and CLI code stay provider-neutral.
+`@ctxindex/profiles` owns provider-neutral event validation and pure projections. Google and Microsoft modules in `@ctxindex/official` normalize provider responses and construct Source-scoped Refs; core storage, search, retrieval, and CLI code stay provider-neutral.
 
 Calendar sync uses generic operation contexts. Adapter cursors retain an anchored window, provider cursor, and Source-local manifest; changing the window requires complete reconciliation before cursor replacement or removal emission. Calendar definitions bind no Actions.
 

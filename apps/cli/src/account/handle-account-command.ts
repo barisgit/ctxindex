@@ -1,4 +1,3 @@
-import { CTXINDEX_MANAGED_OAUTH_APP_POLICIES } from '@ctxindex/adapters'
 import { authorizeProvider, resolveOAuthSelection } from '@ctxindex/core/auth'
 import { CtxindexValidationError } from '@ctxindex/core/errors'
 import {
@@ -8,6 +7,7 @@ import {
   resolveManagedOAuthApp,
 } from '@ctxindex/core/oauth-app'
 import type { CompleteRegistry } from '@ctxindex/core/registry'
+import { CTXINDEX_MANAGED_OAUTH_APP_POLICIES } from '@ctxindex/official'
 import { assertInitialized } from '../commands/db'
 import { loadAuthDefinitionDeps, openAccountDeps, openDeps } from '../deps'
 import {

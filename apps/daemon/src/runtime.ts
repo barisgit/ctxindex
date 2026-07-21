@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 import { lstatSync, rmSync } from 'node:fs'
 import { userInfo } from 'node:os'
 import { join } from 'node:path'
-import * as CTXINDEX_BUILTIN_MODULE from '@ctxindex/adapters'
 import { type AuthService, createAuthService } from '@ctxindex/core/auth'
 import { type CtxindexConfig, readConfig } from '@ctxindex/core/config'
 import { DirectExtensionStore } from '@ctxindex/core/direct-extension'
@@ -55,6 +54,7 @@ import {
   resolveRuntimeIdentity,
   writeDiscoveryMetadata,
 } from '@ctxindex/local-daemon'
+import * as CTXINDEX_BUILTIN_MODULE from '@ctxindex/official'
 import type { RpcFailure, RpcRequestContext } from '@ctxindex/rpc'
 import { DaemonApplication } from './application'
 import {

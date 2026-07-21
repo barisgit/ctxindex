@@ -26,4 +26,4 @@ None.
 
 ## Impact
 
-The change affects `@ctxindex/profiles`, the public `ActionContext` seam in `@ctxindex/extension-sdk`, generic Action orchestration and storage in `@ctxindex/core`, Gmail and Microsoft mailbox adapters in `@ctxindex/adapters`, generated registry documentation, and mocked CLI workflows. It adds no provider permissions, no new persistence tables or migrations, no provider reads before mutations, and no irreversible effects.
+The change affects `@ctxindex/profiles`, the public `ActionContext` seam in `@ctxindex/extension-sdk`, generic Action orchestration and storage in `@ctxindex/core`, Gmail and Microsoft mailbox adapters in `@ctxindex/official`, generated registry documentation, and mocked CLI workflows. It adds no provider permissions, no new persistence tables or migrations, no provider reads before mutations, and no irreversible effects.

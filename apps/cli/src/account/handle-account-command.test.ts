@@ -1,5 +1,4 @@
 import { afterEach, expect, spyOn, test } from 'bun:test'
-import * as builtinModule from '@ctxindex/adapters'
 import { defaultConfig } from '@ctxindex/core/config'
 import {
   CtxindexAuthError,
@@ -11,6 +10,7 @@ import type {
   ManagedOAuthAppResolution,
 } from '@ctxindex/core/oauth-app'
 import type { CompleteRegistry } from '@ctxindex/core/registry'
+import * as builtinModule from '@ctxindex/official'
 import {
   type AccountCommandRuntime,
   formatAccountCommandError,

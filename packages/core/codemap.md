@@ -22,5 +22,5 @@ Defines the private `@ctxindex/core` workspace package, exposing provider-neutra
 ## Integration points
 
 - Implementation and aggregate map: `packages/core/src/index.ts` and `packages/core/src/codemap.md`; offline query composition is mapped under `packages/core/src/documentation/codemap.md`, while package-backed authoring, trusted Git distribution, marketplace projection, and curated installation are mapped under `packages/core/src/catalog/codemap.md`.
-- Contracts and definitions: `packages/extension-sdk/`, `packages/profiles/`, and built-in Adapters including Microsoft identity/mailbox under `packages/adapters/src/microsoft/`.
+- Contracts and definitions: `packages/extension-sdk/`, `packages/profiles/`, and built-in Adapters including Microsoft identity/mailbox under `packages/official/src/microsoft/`.
 - Primary consumers/composition roots: `apps/cli/src/deps.ts` and `apps/daemon/src/runtime.ts`; storage initialization consumes core migrations, while both sync routes construct the same core application service.

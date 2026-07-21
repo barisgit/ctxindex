@@ -25,4 +25,4 @@ None.
 
 ## Impact
 
-The change affects `@ctxindex/profiles`, the public `ActionContext` seam in `@ctxindex/extension-sdk`, generic Action orchestration and managed Artifact storage in `@ctxindex/core`, Gmail and Microsoft mailbox Draft handlers in `@ctxindex/adapters`, generated registry documentation, and mocked CLI workflows. It adds no provider scopes, tables, migrations, provider-specific CLI paths, real-provider automated tests, or irreversible effects.
+The change affects `@ctxindex/profiles`, the public `ActionContext` seam in `@ctxindex/extension-sdk`, generic Action orchestration and managed Artifact storage in `@ctxindex/core`, Gmail and Microsoft mailbox Draft handlers in `@ctxindex/official`, generated registry documentation, and mocked CLI workflows. It adds no provider scopes, tables, migrations, provider-specific CLI paths, real-provider automated tests, or irreversible effects.

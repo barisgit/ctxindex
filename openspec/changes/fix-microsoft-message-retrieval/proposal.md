@@ -23,7 +23,7 @@ None.
 
 ## Impact
 
-- Microsoft adapter transport and mailbox retrieval behavior in `@ctxindex/adapters`.
+- Microsoft adapter transport and mailbox retrieval behavior in `@ctxindex/official`.
 - Synthetic Microsoft Graph mocks and compiled CLI end-to-end coverage.
 - Existing CLI exit meanings remain unchanged; no provider mutation or additional egress path is introduced.
 - No schema migration or compatibility alias is required in this pre-alpha repository.

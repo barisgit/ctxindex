@@ -32,7 +32,7 @@
     "test": "NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-unit.json bun test --path-ignore-patterns '**/*.integration.test.ts' --path-ignore-patterns '**/*.e2e.test.ts'"
   },
   "devDependencies": {
-    "@ctxindex/adapters": "0.0.0",
+    "@ctxindex/official": "0.0.0",
     "@ctxindex/core": "0.0.0",
     "@ctxindex/extension-sdk": "0.0.0"
   }

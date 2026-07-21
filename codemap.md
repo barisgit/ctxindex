@@ -24,7 +24,7 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 - `packages/rpc/src/index.ts` — composition-only local wire schemas, router contract, and generated client type.
 - `packages/local-daemon/src/index.ts` — process-independent runtime identity, discovery, endpoint, and retained lease primitives.
 - `packages/extension-sdk/src/index.ts` — public Profile, Adapter, Extension, OAuth, and operation contracts.
-- `packages/profiles/src/index.ts` and `packages/adapters/src/index.ts` — built-in semantic definitions and Google/Microsoft/filesystem integrations.
+- `packages/profiles/src/index.ts` and `packages/official/src/index.ts` — built-in semantic definitions and Google/Microsoft/filesystem integrations.
 
 ## Data & control flow
 
@@ -34,7 +34,7 @@ CLI input is parsed and dispatched by `apps/cli/` into core services. Realm, Sou
 
 - Root orchestration: Bun workspaces and Turbo tasks in `package.json`; repository gates enforce dependency and architecture boundaries.
 - Runtime: core storage, schema, configuration, secrets, logging, networking, auth, and operation services under `packages/core/src/`.
-- External systems: Google OAuth/Gmail/Calendar, Microsoft OAuth/Graph Calendar and Outlook mailbox, and filesystem access under `packages/adapters/src/`.
+- External systems: Google OAuth/Gmail/Calendar, Microsoft OAuth/Graph Calendar and Outlook mailbox, and filesystem access under `packages/official/src/`.
 - Public extension boundary: `packages/extension-sdk/src/index.ts`, demonstrated by the separately publishable providerless `examples/tenders-extension/` instant demo and provider-backed `examples/issues-extension/` package.
 
 ## Directory map

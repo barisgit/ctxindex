@@ -32,7 +32,7 @@ function isFile(path: string): boolean {
 
 async function deepImportHits(): Promise<string[]> {
   const glob = new Bun.Glob('**/*')
-  const roots = ['apps/cli/src', 'packages/adapters/src']
+  const roots = ['apps/cli/src', 'packages/official/src']
   const hits: string[] = []
 
   for (const root of roots) {

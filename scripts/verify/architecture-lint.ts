@@ -291,8 +291,8 @@ function isAllowedCommandImport(specifier: string): boolean {
     return true
   }
   if (
-    specifier === '@ctxindex/adapters' ||
-    specifier.startsWith('@ctxindex/adapters/')
+    specifier === '@ctxindex/official' ||
+    specifier.startsWith('@ctxindex/official/')
   ) {
     return true
   }

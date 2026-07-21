@@ -50,7 +50,7 @@ test('the private monorepo builds one public installable ctxindex package', asyn
   expect(Object.values(cli.dependencies ?? {})).not.toContain('workspace:*')
 
   for (const dependency of [
-    '@ctxindex/adapters',
+    '@ctxindex/official',
     '@ctxindex/core',
     '@ctxindex/extension-sdk',
     'citty',

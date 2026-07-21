@@ -18,7 +18,7 @@ import {
   type MockGraphServer,
   startMockGraph,
 } from '../../apps/cli/src/e2e/_mock-graph'
-import { microsoftOAuthProvider } from '../../packages/adapters/src/microsoft/provider'
+import { microsoftOAuthProvider } from '../../packages/official/src/microsoft/provider'
 
 class MemorySecretsStore implements SecretsStore {
   readonly values = new Map<string, string>()

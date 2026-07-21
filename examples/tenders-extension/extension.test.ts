@@ -127,7 +127,7 @@ test('uses ordinary public SDK imports and is not bundled', async () => {
   }
   expect(sdkImportCount).toBe(1)
 
-  const { CTXINDEX_BUILTIN_EXTENSIONS } = await import('@ctxindex/adapters')
+  const { CTXINDEX_BUILTIN_EXTENSIONS } = await import('@ctxindex/official')
   expect(
     CTXINDEX_BUILTIN_EXTENSIONS.some(
       (extension) => String(extension.id) === 'ctxindex.demo',

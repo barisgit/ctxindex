@@ -7,7 +7,7 @@
 
 ## Module Ownership
 
-`@ctxindex/profiles` owns the strict portable `{ ref }` attachment input schema and optional Draft payload provenance. `@ctxindex/extension-sdk` owns the provider-neutral resolved Action Artifact shape and resolver callback. `@ctxindex/core` owns current-descriptor lookup, Source scoping, cache integrity verification, byte reads, and resolver construction. `@ctxindex/adapters` owns safe MIME validation/rendering, provider request construction, provider response attestation, and Draft-specific preservation decisions. The CLI remains a registry-derived thin Action consumer.
+`@ctxindex/profiles` owns the strict portable `{ ref }` attachment input schema and optional Draft payload provenance. `@ctxindex/extension-sdk` owns the provider-neutral resolved Action Artifact shape and resolver callback. `@ctxindex/core` owns current-descriptor lookup, Source scoping, cache integrity verification, byte reads, and resolver construction. `@ctxindex/official` owns safe MIME validation/rendering, provider request construction, provider response attestation, and Draft-specific preservation decisions. The CLI remains a registry-derived thin Action consumer.
 
 ## Interfaces and Data Flow
 

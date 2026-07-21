@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test'
 import { readdir } from 'node:fs/promises'
-import { CTXINDEX_BUILTIN_EXTENSIONS } from '@ctxindex/adapters'
+import { CTXINDEX_BUILTIN_EXTENSIONS } from '@ctxindex/official'
 
-const adapterRoot = new URL('../../packages/adapters/src/', import.meta.url)
+const adapterRoot = new URL('../../packages/official/src/', import.meta.url)
 const coreSourceRoot = new URL('../../packages/core/src/', import.meta.url)
 const cliRoot = new URL('../../apps/cli/src/', import.meta.url)
 const profileRoot = new URL('../../packages/profiles/src/', import.meta.url)

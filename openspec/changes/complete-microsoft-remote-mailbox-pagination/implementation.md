@@ -7,7 +7,7 @@
 
 `@ctxindex/extension-sdk` owns the provider-neutral optional continuation fields on remote search query/result contracts. `@ctxindex/core` owns validation of generic execution modes, exact Source selection, passing one opaque token to the Adapter, remote JSON pagination projection, Profile-backed post-filter verification, and ad-hoc Resource caching. The CLI remains a thin parser/help/output adapter and never recognizes Microsoft token contents.
 
-`@ctxindex/adapters` remains the sole owner of Microsoft KQL construction, continuation serialization/validation, Graph next-link replay, immutable-id request preferences, Draft exclusion, and Graph message normalization. The Microsoft mailbox module may depend on core error classes through the existing Adapter pattern; core and CLI MUST NOT import Microsoft implementation modules or branch on `microsoft.mailbox`.
+`@ctxindex/official` remains the sole owner of Microsoft KQL construction, continuation serialization/validation, Graph next-link replay, immutable-id request preferences, Draft exclusion, and Graph message normalization. The Microsoft mailbox module may depend on core error classes through the existing Adapter pattern; core and CLI MUST NOT import Microsoft implementation modules or branch on `microsoft.mailbox`.
 
 ## Interfaces and Data Flow
 

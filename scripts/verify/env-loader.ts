@@ -7,7 +7,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 process.chdir(repoRoot)
 
 const auditPattern = /process\.env\.(CTXINDEX_|XDG_)/
-const scanRoots = ['apps/cli', 'packages/core', 'packages/adapters', 'scripts']
+const scanRoots = ['apps/cli', 'packages/core', 'packages/official', 'scripts']
 const excludedEnvLoader = 'packages/core/src/config/env-loader.ts'
 const tmpDir = 'packages/core/src/config/env-loader-verify-tmp'
 const stub = `${tmpDir}/direct-read.ts`

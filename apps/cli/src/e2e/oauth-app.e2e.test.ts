@@ -131,7 +131,7 @@ test('oauth-app validates providers and manages safe labeled inventory', async (
         provenance: {
           kind: 'extension',
           source: 'builtin',
-          packageName: '@ctxindex/adapters',
+          packageName: '@ctxindex/official',
         },
       },
       {
@@ -141,7 +141,7 @@ test('oauth-app validates providers and manages safe labeled inventory', async (
         provenance: {
           kind: 'extension',
           source: 'builtin',
-          packageName: '@ctxindex/adapters',
+          packageName: '@ctxindex/official',
         },
       },
     ])
@@ -214,7 +214,7 @@ test('oauth-app validates providers and manages safe labeled inventory', async (
         provenance: {
           kind: 'extension',
           source: 'builtin',
-          packageName: '@ctxindex/adapters',
+          packageName: '@ctxindex/official',
         },
       },
       {
@@ -236,7 +236,7 @@ test('oauth-app validates providers and manages safe labeled inventory', async (
         provenance: {
           kind: 'extension',
           source: 'builtin',
-          packageName: '@ctxindex/adapters',
+          packageName: '@ctxindex/official',
         },
       },
       {

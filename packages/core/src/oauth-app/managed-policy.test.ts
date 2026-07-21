@@ -81,7 +81,7 @@ function registry(
       collected(
         extension,
         options.origin ?? 'builtin',
-        options.packageName ?? '@ctxindex/adapters',
+        options.packageName ?? '@ctxindex/official',
       ),
     ],
     localOAuthAppIdentities: [],
@@ -95,7 +95,7 @@ function policy(
     providerId: 'fixture.oauth',
     label: 'desktop',
     extensionId: 'fixture.official',
-    distributions: [{ kind: 'bundled', packageName: '@ctxindex/adapters' }],
+    distributions: [{ kind: 'bundled', packageName: '@ctxindex/official' }],
     ...overrides,
   }
 }
@@ -263,7 +263,7 @@ describe('managed Apps use the ordinary Extension graph', () => {
             oauthApps: [bundledApp],
           }),
           'builtin',
-          '@ctxindex/adapters',
+          '@ctxindex/official',
         ),
         collected(
           defineExtension({
@@ -338,7 +338,7 @@ describe('managed Apps use the ordinary Extension graph', () => {
           collected(
             defineExtension({ id: 'fixture.first', oauthApps: [app] }),
             'builtin',
-            '@ctxindex/adapters',
+            '@ctxindex/official',
           ),
           collected(
             defineExtension({ id: 'fixture.second', oauthApps: [app] }),

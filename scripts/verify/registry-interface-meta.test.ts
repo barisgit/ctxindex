@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { exists } from 'node:fs/promises'
-import { CTXINDEX_BUILTIN_EXTENSIONS } from '@ctxindex/adapters'
+import { CTXINDEX_BUILTIN_EXTENSIONS } from '@ctxindex/official'
 
 const requiredDiscoverySnippets = [
   'ctxindex --help',

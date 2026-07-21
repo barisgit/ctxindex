@@ -15,7 +15,7 @@
     "@ctxindex/extension-sdk": "workspace:*"
   },
   "devDependencies": {
-    "@ctxindex/adapters": "workspace:*",
+    "@ctxindex/official": "workspace:*",
     "@ctxindex/core": "workspace:*"
   }
 }
