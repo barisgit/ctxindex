@@ -22,12 +22,15 @@ compact `--json` output, and stable exit codes are the contract. ctxindex was or
 personal OpenClaw agent governed, realm-scoped access to mail and calendar
 across multiple accounts.
 
-Structured reads accept `--format pretty|text|json`. With no format flag, an
-interactive terminal gets width-aware pretty output and a pipe gets escaped
-TSV or labeled complete text. `--json` remains shorthand for `--format json`;
-do not combine the two. `get` includes the complete Resource envelope and
-payload in every structured mode. Profile-defined `export --format` and
-reference-oriented `describe --format` are separate format domains.
+Search, get, thread, Artifact list, status, and Source, Realm, Account, OAuth
+App, and Extension inventories accept `--format pretty|text|json`. With no
+format flag, an interactive terminal gets width-aware pretty output and a pipe
+gets escaped TSV or labeled complete text. TSV reserves `\N` for null and
+escapes a literal backslash first. `--json` remains shorthand for
+`--format json`; do not combine the two. `get` includes the complete Resource
+envelope and payload in every structured mode. Profile-defined
+`export --format`, reference-oriented `describe --format`, sync streaming, and
+daemon lifecycle output are separate format domains.
 
 V1 and V1.1 are shipped. The project remains pre-alpha but functional: it provides multi-provider mail and calendar workflows through `search`, `sync`, `get`, `thread`, and `export`, plus reversible Draft actions. The implementation receives no schema or CLI compatibility treatment until a released version creates that obligation. Current behavior is owned by the capability specs under `openspec/specs/`; use `openspec list` for the authoritative active-change inventory.
 

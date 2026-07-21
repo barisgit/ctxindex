@@ -9,6 +9,20 @@ import {
 
 const longRef = `ctx://source/message/${'immutable-id'.repeat(20)}`
 
+function cardValue(output: string, label: string): string {
+  const chunks: string[] = []
+  let collecting = false
+  for (const line of output.split('\n')) {
+    const cells = line.split('│')
+    if (cells.length !== 4) continue
+    const currentLabel = cells[1]?.trim()
+    if (currentLabel === label) collecting = true
+    else if (currentLabel) collecting = false
+    if (collecting) chunks.push(cells[2]?.trim() ?? '')
+  }
+  return chunks.join('')
+}
+
 describe('search JSON output', () => {
   test('uses the unified deterministic result envelope', () => {
     expect(
@@ -63,8 +77,10 @@ describe('search JSON output', () => {
       warnings: [],
     }
     expect(formatSearchText(result)).toContain(longRef)
-    expect(formatSearchPretty(result, { columns: 40 })).toContain(longRef)
-    expect(formatSearchPretty(result, { columns: 40 })).not.toContain('…')
+    expect(formatSearchText(result)).toContain('\tFedEx\t\\N\t\\N\t[]')
+    const pretty = formatSearchPretty(result, { columns: 40 })
+    expect(cardValue(pretty, 'Ref')).toBe(longRef)
+    expect(pretty).not.toContain('…')
   })
 
   test('selected daemon search preserves output without opening direct dependencies', async () => {

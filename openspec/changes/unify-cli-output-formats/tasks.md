@@ -29,3 +29,11 @@
 - [x] 5.2 Run CLI lint/typecheck/tests, CLI architecture gates, and the strongest affected end-to-end workflows.
 - [x] 5.3 Run `bun run ci`, `bunx openspec validate --all --strict`, and the OpenSpec change verification workflow.
 - [x] 5.4 Obtain independent review when a reviewer slot is available; otherwise complete a local launch-critical review, then commit without pushing, merging, archiving, live auth, or user-state access.
+
+## 6. Independent-review hardening
+
+- [x] 6.1 Add failing tests and migrate primary `thread` and `artifact list` reads to the shared formats; narrow documentation and daemon lifecycle claims to the exact migrated set.
+- [x] 6.2 Add a failing zero-effects test and reject `search --refs` with explicit pretty/JSON selectors while retaining omitted/default text projection.
+- [x] 6.3 Add failing display-width tests and constrain vertical cards to the available terminal width with lossless wrapping.
+- [x] 6.4 Add failing TSV round-trip tests, define unambiguous null encoding, and remove Search sentinel coercions.
+- [x] 6.5 Run focused tests, CLI typecheck/lint, strict OpenSpec validation, obtain re-review when available, and commit without full CI, push, merge, archive, or user-state access.

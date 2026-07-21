@@ -56,7 +56,7 @@ export function formatGetText(result: FormattableGetResult): string {
       const text =
         value !== null && typeof value === 'object'
           ? compactJson(value)
-          : escapeTsv(value === null ? 'null' : value)
+          : escapeTsv(value)
       return `${key}\t${text}`
     })
     .join('\n')

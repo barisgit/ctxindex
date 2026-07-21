@@ -108,6 +108,15 @@ function parseField(raw: string): {
 }
 
 export function resolveSearchArgs(args: SearchCommandArgs): ResolvedSearchArgs {
+  if (
+    args.refs === true &&
+    (args.json === true ||
+      (args.format !== undefined && args.format !== 'text'))
+  ) {
+    invalid(
+      'search: --refs supports only omitted/default text or --format text',
+    )
+  }
   const text = args.query?.trim()
   const since = parseDate('since', args.since)
   const until = parseDate('until', args.until)
@@ -174,7 +183,10 @@ export function resolveSearchArgs(args: SearchCommandArgs): ResolvedSearchArgs {
   }
 
   return {
-    format: resolveOutputFormat(args),
+    format:
+      args.refs === true && args.format === undefined
+        ? 'text'
+        : resolveOutputFormat(args),
     refs: args.refs === true,
     input: {
       ...(text ? { text } : {}),

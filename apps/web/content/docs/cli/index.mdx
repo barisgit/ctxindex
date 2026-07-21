@@ -807,13 +807,15 @@ ARGUMENTS
 
 OPTIONS
 
-  --json    Print deterministic JSON
+  --format=<pretty|text|json>    Output format: pretty, text, or json
+                       --json    Shorthand for --format json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<ref>` | Resource Ref | Required |
-| `--json` | Print deterministic JSON | Optional |
+| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
+| `--json` | Shorthand for --format json | Optional |
 
 ## `ctxindex artifact download`
 
@@ -1098,13 +1100,15 @@ ARGUMENTS
 
 OPTIONS
 
-  --json    Print deterministic JSON
+  --format=<pretty|text|json>    Output format: pretty, text, or json
+                       --json    Shorthand for --format json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<ref>` | Resource Ref | Required |
-| `--json` | Print deterministic JSON | Optional |
+| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
+| `--json` | Shorthand for --format json | Optional |
 
 ## `ctxindex search`
 

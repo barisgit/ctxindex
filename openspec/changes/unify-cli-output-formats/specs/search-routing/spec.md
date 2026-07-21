@@ -3,6 +3,8 @@
 ### Requirement: Search output preserves exact references and actionable paging guidance
 Search pretty and text output MUST preserve each complete Resource Ref without truncation or ellipsis. Text output MUST encode every result as deterministic escaped TSV. Pretty output MUST remain usable when Microsoft immutable ids or other Ref suffixes exceed the terminal width by switching to complete vertical records when needed.
 
+`--refs` is itself a text-only projection. It MAY be combined with omitted format selection or explicit `--format text`; combining it with `--json`, `--format json`, or `--format pretty` MUST fail as invalid usage before application dependencies open.
+
 An exact one-Source remote result MAY expose the Adapter continuation through the result pagination envelope. A multi-Source remote result MUST NOT claim that it returned a continuation when its merged pagination contract exposes none. If one Source reports truncation in a multi-Source search, the warning MUST name that exact Source and instruct the caller to rerun the unchanged search with that exact Source selection; it MUST NOT instruct the caller to resume with a returned continuation.
 
 #### Scenario: Long Microsoft Ref remains copyable
@@ -12,6 +14,10 @@ An exact one-Source remote result MAY expose the Adapter continuation through th
 #### Scenario: Text search never ellipsizes
 - **WHEN** search runs with `--format text`
 - **THEN** each result is one escaped TSV row containing the complete Ref and deterministic result fields
+
+#### Scenario: Refs cannot conflict with a structured projection
+- **WHEN** a caller combines `--refs` with `--json`, `--format json`, or `--format pretty`
+- **THEN** search exits `2` before opening application dependencies and explains that refs support only omitted/default text or explicit text
 
 #### Scenario: Multi-Source truncation does not promise an absent cursor
 - **WHEN** a multi-Source remote search receives a truncation warning from one Source and returns no merged continuation

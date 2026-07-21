@@ -166,7 +166,7 @@ export function parseActionArgs(args: string[]): ActionArgs;
 
 ```ts
 export type ArtifactListArgs =
-  | { readonly kind: 'list'; readonly ref: string; readonly json: boolean }
+  | { readonly kind: 'list'; readonly ref: string; readonly format: OutputFormat }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
 
@@ -470,7 +470,7 @@ Sync, status, and Source inventory formatters project core-owned `warningsCount`
 
 ```ts
 export type ThreadGetArgs =
-  | { readonly kind: 'get'; readonly ref: string; readonly json: boolean }
+  | { readonly kind: 'get'; readonly ref: string; readonly format: OutputFormat }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
 
@@ -496,7 +496,7 @@ Database-backed command dependency setup requires both the persisted config and 
 
 Parser unions are the command boundary. Registry-derived Source config, fields, kinds, exports, and Actions are resolved before service calls rather than duplicated as provider branches. The OAuth surface contains only `oauth-app` and `account` commands: App add requires exact Provider and label plus `--from-env`; Account add accepts an optional `--app`. An explicit label bypasses managed selection, while omission delegates to core's host-policy resolver and feeds the returned exact label through the same OAuth App service resolver. The CLI owns only this branch and static BYOA formatting; it does not infer Apps or reproduce policy, provenance, scope, or Provider logic. No `client` route or alias is parsed. Structured output writes safe projections to stdout and human diagnostics to stderr; App config, credential values, tokens, authorization codes, and secret-store passphrases never enter argv or output.
 
-Launch-critical structured reads resolve `OutputFormat` before opening services. The shared resolver rejects simultaneous `--json` and `--format`, chooses pretty only for TTY stdout, and otherwise chooses text. One presentation module owns compact JSON, deterministic TSV escaping (`\\`, tab, carriage return, and newline), and `cli-table3` layout. Pretty collections use a horizontal table only when complete values fit the detected terminal width and otherwise use vertical cards; renderers never slice or ellipsize values. Domain formatters continue to own ordered safe projections. Search and get handlers keep JSON warnings in their result envelope and write warnings to stderr only for pretty/text. Get formats the complete existing Resource envelope and payload; search formats complete Refs. Profile export and describe retain independent format domains.
+The exact launch-critical reads search, get, thread, Artifact list, status, and Source, Realm, Account, OAuth App, and Extension inventories resolve `OutputFormat` before opening services. The shared resolver rejects simultaneous `--json` and `--format`, chooses pretty only for TTY stdout, and otherwise chooses text. One presentation module owns compact JSON, deterministic TSV escaping with reserved `\N` nulls, and width-aware presentation. Pretty collections use a horizontal `cli-table3` table only when complete values fit the detected display width; narrow output grapheme-wraps before bounded vertical tables and uses plain labeled cards below the table's structural minimum. Both paths preserve characters and never ellipsize values. Domain formatters continue to own ordered safe projections. Search, get, thread, and Artifact list handlers keep JSON warnings in their result envelope and write warnings to stderr only for pretty/text. Get formats the complete existing Resource envelope and payload; search formats complete Refs; thread emits complete ordered Resource rows with tree depth. Search `--refs` is text-only and rejects explicit pretty/JSON selectors before dependencies. Profile export, describe, sync, and daemon lifecycle retain independent format domains.
 
 The Extension command adapter keeps the Catalog lifecycle, Marketplace projection,
 and trusted installation seams distinct: inert repository/manifest reads delegate

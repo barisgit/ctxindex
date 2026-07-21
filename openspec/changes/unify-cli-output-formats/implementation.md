@@ -32,13 +32,15 @@ export function resolveOutputFormat(
 ): OutputFormat;
 ```
 
-Command definitions reuse one `structuredOutputArgs` declaration. The generic command-model validation continues to reject unknown and duplicate options; each command resolves the two semantically conflicting selectors before opening services. `--refs` remains a Search-specific projection and is incompatible with explicit structured formats other than text.
+Command definitions reuse one `structuredOutputArgs` declaration. The generic command-model validation continues to reject unknown and duplicate options; each command resolves the two semantically conflicting selectors before opening services. `--refs` remains a Search-specific text projection. Argument resolution forces omitted selection to text and rejects `--json`, explicit JSON, or explicit pretty before dependencies open.
 
-The shared presentation module accepts ordered column/field descriptions rather than domain service objects. Its TSV serializer escapes `\\`, tab, carriage return, and newline in that order and emits a stable header plus one physical line per row. Its pretty collection renderer accepts the detected terminal columns, uses `cli-table3` for both horizontal and vertical layouts, wraps full strings, and never slices values. Domain formatters remain responsible for safe field selection and ordering.
+The shared presentation module accepts ordered column/field descriptions rather than domain service objects. Its TSV serializer reserves `\N` for null, escapes literal backslashes before tab, carriage return, and newline, and emits a stable header plus one physical line per row. Its pretty collection renderer measures display width, grapheme-wraps labels and values before `cli-table3`, uses explicit bounded columns with `wordWrap` above the table's structural minimum, and falls back to plain labeled cards below it. Both paths preserve every character across wrapped chunks. Domain formatters remain responsible for safe field selection and ordering.
 
 Singular Resource formatting consumes the existing complete `SourceResourceResult` / RPC equivalent. JSON serializes the whole result envelope compactly. Text emits every Resource envelope key in a stable order and compact JSON for `profile`, `payload`, and any other nested value. Pretty emits the same information as a vertical table plus a full payload section. Handlers print warnings to stderr only when the resolved mode is not JSON.
 
 Search JSON continues to serialize the complete planner result. Text emits stable ordered result fields as escaped TSV. Pretty uses a width-aware result schema that always includes complete Ref; warnings and explain diagnostics stay on stderr outside JSON. The core planner rewrites only `truncated` warning text for multi-Source executions, retaining the normalized Source id/code and leaving exact-Source continuation envelopes unchanged.
+
+Thread flattens its ordered tree into complete Resource rows with explicit depth for pretty/text while JSON retains the typed tree envelope. Artifact list projects descriptor rows through the same collection renderer. Sync, daemon lifecycle, export, and describe remain separate format domains.
 
 ## Storage and State
 
@@ -46,7 +48,7 @@ Not applicable. Format selection and width are per-process ephemeral facts. No d
 
 ## Security and Compatibility
 
-Safe inventory projections remain domain-formatter responsibilities and must not grow secret or Grant fields. Escaping is presentation-only and must not reinterpret values. `--json` remains source-compatible, compact JSON remains one stdout document, and warning routing preserves clean machine output. `export` and `describe` retain their independent format domains. Sync command files remain untouched until the streaming change integrates.
+Safe inventory projections remain domain-formatter responsibilities and must not grow secret or Grant fields. Escaping is presentation-only and must not reinterpret values. `--json` remains source-compatible, compact JSON remains one stdout document, and warning routing preserves clean machine output. Sync, daemon lifecycle, export, and describe retain their independent format domains.
 
 ## Verification
 

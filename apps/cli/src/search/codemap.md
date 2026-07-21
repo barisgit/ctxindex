@@ -9,7 +9,7 @@ Executes normalized Search requests across selected-daemon and direct `SearchPla
 - `commands/search.ts` binds the reusable Citty definition from `args/search.ts`, normalizes typed parsed values, and passes one `ResolvedSearchArgs` value to `handleSearchCommand`.
 - `handleSearchCommand` consumes semantic input rather than raw argv. It resolves direct Source labels only in direct mode; selected-daemon mode forwards the normalized filters without opening SQLite.
 - Realm, Source, and field repetition is resolved before the handler, preserving caller order. Local offsets and exact-Source remote continuations retain their distinct planner semantics.
-- Compact JSON, escaped-TSV text, width-aware pretty, Ref-only, warning, pagination, and explain output remain presentation concerns here. Complete Refs are never ellipsized, and `SIGINT` propagates through the request abort signal.
+- Compact JSON, escaped-TSV text, width-aware pretty, Ref-only, warning, pagination, and explain output remain presentation concerns here. Ref-only is a text projection that rejects explicit pretty/JSON selection before dependencies. Complete Refs are losslessly wrapped rather than ellipsized, and `SIGINT` propagates through the request abort signal.
 
 ## Data & control flow
 

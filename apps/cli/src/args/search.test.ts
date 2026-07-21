@@ -107,11 +107,25 @@ describe('search CLI arguments', () => {
         'next',
       ],
       ['x', '--offset', '5'],
+      ['x', '--refs', '--json'],
+      ['x', '--refs', '--format', 'json'],
+      ['x', '--refs', '--format', 'pretty'],
     ]) {
       await expect(resolve(rawArgs)).rejects.toMatchObject({
         code: 'invalid_args',
       })
     }
+  })
+
+  test('keeps refs as a text projection with omitted or explicit text format', async () => {
+    expect(await resolve(['x', '--refs'])).toMatchObject({
+      format: 'text',
+      refs: true,
+    })
+    expect(await resolve(['x', '--refs', '--format', 'text'])).toMatchObject({
+      format: 'text',
+      refs: true,
+    })
   })
 
   test('rejects invalid dates and counts before execution', async () => {

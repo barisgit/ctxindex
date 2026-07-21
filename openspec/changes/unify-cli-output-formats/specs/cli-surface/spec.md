@@ -22,11 +22,11 @@ The CLI MUST NOT expose a `client` command, alias, flag, inventory entity, or co
 
 `account add` MUST require `--app <label>`, resolve exact `(providerId,label)`, and fail before secret/database/browser/network effects when the Provider or App is unknown. Authorization MUST use the selected active or persisted local App config and snapshot it into the private Grant. Authorization and refresh MUST NOT reread App config from environment variables.
 
-Structured read commands MUST accept `--format pretty|text|json`. If neither format flag is present, stdout attached to a TTY MUST select `pretty` and non-TTY stdout MUST select `text`. `--json` MUST remain an exact shorthand for `--format json`, and combining `--json` with any `--format` value MUST fail as invalid usage before command effects. Pretty output MUST adapt to terminal width, MUST use vertical records when a complete table is not usable, and MUST NOT truncate, ellipsize, or omit semantic values. Text collection output MUST be deterministic escaped TSV; text singular-Resource output MUST include every envelope field and the complete payload, using compact JSON for nested values. JSON MUST be compact canonical structured output. Successful mutation receipts SHOULD remain terse.
+The launch-critical structured reads `search`, `get`, `thread`, `artifact list`, `status`, `source list`, `realm list`, `account list`, `oauth-app list`, and `extension list` MUST accept `--format pretty|text|json`. This requirement makes no shared-format claim for any other command. If neither format flag is present, stdout attached to a TTY MUST select `pretty` and non-TTY stdout MUST select `text`. `--json` MUST remain an exact shorthand for `--format json`, and combining `--json` with any `--format` value MUST fail as invalid usage before command effects. Pretty output MUST adapt to terminal display width, MUST use vertical records when a complete table is not usable, MUST constrain every physical rendered line to the available display columns, and MUST losslessly wrap rather than truncate, ellipsize, or omit semantic values. Text collection output MUST be deterministic escaped TSV: null MUST encode as reserved `\N`, while literal backslash, tab, carriage return, and newline MUST be escaped so every string remains distinct from null. Text singular-Resource output MUST include every envelope field and the complete payload, using compact JSON for nested values. JSON MUST be compact canonical structured output. Successful mutation receipts SHOULD remain terse.
 
-Warnings from structured reads MUST be written only to stderr in pretty and text modes. In JSON mode warnings MUST remain only in the JSON stdout envelope where that envelope owns warnings. Format selection MUST NOT leak warnings or diagnostics into the opposite stream.
+Warnings from those structured reads MUST be written only to stderr in pretty and text modes. In JSON mode warnings MUST remain only in the JSON stdout envelope where that envelope owns warnings. Format selection MUST NOT leak warnings or diagnostics into the opposite stream.
 
-`export --format <profile-format>` MUST retain Profile-declared payload format semantics and `describe --format text|markdown|json` MUST retain reference-document semantics as explicit exceptions. `sync` MAY retain its existing output arguments until streaming response output is specified, but its streaming follow-up MUST define an intentional mapping to the shared modes.
+`export --format <profile-format>` MUST retain Profile-declared payload format semantics and `describe --format text|markdown|json` MUST retain reference-document semantics as explicit exceptions. Sync and daemon lifecycle commands retain their separately specified output contracts and MUST NOT be presented as implementing this shared batch-read format contract.
 
 User-facing configuration SHOULD be reachable through CLI commands, while direct TOML MAY remain a power-user path.
 
@@ -60,7 +60,11 @@ Unknown Realm, OAuth App, Account, Source, or Adapter references MUST fail fast 
 
 #### Scenario: Narrow pretty output preserves complete values
 - **WHEN** pretty collection output contains a Ref longer than the available terminal width
-- **THEN** it renders a vertical record with the complete copyable Ref and no ellipsis or semantic truncation
+- **THEN** it renders a vertical record whose physical lines fit the available display width and whose wrapped cell chunks preserve every Ref character in order without ellipsis or semantic truncation
+
+#### Scenario: Text null is lossless
+- **WHEN** a text collection contains null, the strings `-` and `null`, a literal `\N`, and other backslash-bearing strings
+- **THEN** null is `\N`, literal backslashes are escaped, and every value has a distinct deterministic encoding
 
 #### Scenario: Get text is complete
 - **WHEN** a caller runs `get <ref> --format text`
@@ -69,3 +73,7 @@ Unknown Realm, OAuth App, Account, Source, or Adapter references MUST fail fast 
 #### Scenario: JSON remains one compact document
 - **WHEN** a structured read runs with `--format json` or `--json`
 - **THEN** stdout is one compact canonical JSON document and no warning from its result envelope is duplicated to stderr
+
+#### Scenario: Primary thread and Artifact reads share formats
+- **WHEN** a caller invokes `thread <ref>` or `artifact list <ref>`
+- **THEN** the command supports the same destination-aware pretty, escaped text, compact JSON, shorthand, conflict, and warning-stream rules

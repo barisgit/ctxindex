@@ -8,9 +8,11 @@ import {
   formatArtifactDownloadJson,
   formatArtifactDownloadText,
   formatArtifactListJson,
+  formatArtifactListPretty,
   formatArtifactListText,
 } from '../format/artifact'
 import { mapErrorToExit } from '../format/exit'
+import type { OutputFormat } from '../format/output'
 
 type OpenArtifactDeps = () => Promise<{
   readonly artifactService: ArtifactService
@@ -18,7 +20,11 @@ type OpenArtifactDeps = () => Promise<{
 }>
 
 export type ArtifactCommandInput =
-  | { readonly kind: 'list'; readonly ref: string; readonly json: boolean }
+  | {
+      readonly kind: 'list'
+      readonly ref: string
+      readonly format: OutputFormat
+    }
   | {
       readonly kind: 'download'
       readonly ref: string
@@ -57,11 +63,13 @@ export async function handleArtifactCommand(
     if (input.kind === 'list') {
       const result = await deps.artifactService.list(input.ref)
       console.log(
-        input.json
+        input.format === 'json'
           ? formatArtifactListJson(result)
-          : formatArtifactListText(result),
+          : input.format === 'pretty'
+            ? formatArtifactListPretty(result)
+            : formatArtifactListText(result),
       )
-      if (!input.json) {
+      if (input.format !== 'json') {
         for (const warning of result.warnings)
           console.error(`${warning.code}\t${warning.message}`)
       }

@@ -37,9 +37,6 @@ function searchRows(result: SearchResult): readonly Record<string, unknown>[] {
   return result.results.map((item) => ({
     ...item,
     profile: compactJson(item.profile),
-    title: item.title ?? 'null',
-    summary: item.summary ?? 'null',
-    occurredAt: item.occurredAt ?? 'null',
     chunks: compactJson(item.chunks),
   }))
 }

@@ -52,7 +52,7 @@ To exercise the prototype, initialize before starting it, then run `bun cli daem
 
 Expected output shapes, omitting generated ids and timestamps:
 
-Structured reads accept `--format pretty|text|json`: omission selects width-aware pretty output on an interactive terminal and deterministic escaped text through a pipe. `--json` is shorthand for compact JSON. Long Refs remain complete, and `get` carries the full Resource envelope and payload in every mode.
+Search, get, thread, Artifact list, status, and Source, Realm, Account, OAuth App, and Extension inventories accept `--format pretty|text|json`: omission selects width-aware pretty output on an interactive terminal and deterministic escaped text through a pipe. `--json` is shorthand for compact JSON. Long Refs remain complete, and `get` carries the full Resource envelope and payload in every mode. Daemon lifecycle output remains a separate contract.
 
 | Command | Shape and meaning |
 | --- | --- |
@@ -296,9 +296,9 @@ Managed runnable bytes are content-addressed beneath the data directory, and abs
 
 The CLI is deterministic and non-interactive. Input comes from non-secret flags, declared environments, typed references, files, or declared stdin. Missing input fails instead of prompting. The only interactive surface is a browser in an explicitly requested OAuth loopback.
 
-The launch-critical structured reads—search, get, status, and Source, Realm, Account, OAuth App, and Extension inventories—share `--format pretty|text|json`. Omission selects width-aware `cli-table3` tables or vertical cards on a TTY and deterministic escaped TSV or labeled complete Resource text otherwise. Values are not ellipsized; this keeps long provider Refs copyable. `--json` is shorthand for compact JSON and conflicts with explicit `--format`. Pretty/text warnings go only to stderr, while JSON result envelopes retain their warnings on stdout.
+The launch-critical structured reads—search, get, thread, Artifact list, status, and Source, Realm, Account, OAuth App, and Extension inventories—share `--format pretty|text|json`. Omission selects width-aware `cli-table3` tables or vertical cards on a TTY and deterministic escaped TSV or labeled complete Resource text otherwise. TSV reserves `\N` for null after escaping literal backslashes. Values are losslessly wrapped rather than ellipsized. `--json` is shorthand for compact JSON and conflicts with explicit `--format`. Pretty/text warnings go only to stderr, while JSON result envelopes retain their warnings on stdout.
 
-Profile `export --format` and reference-oriented `describe --format` retain separate format semantics. Sync still uses summary/events/compact/JSON while streaming responses are integrated; that follow-up is expected to map human progress to pretty, deterministic line-oriented events to text, and structured events plus a terminal result to JSON. Registry-backed `describe` owns fields, formats, config flags, OAuth declarations, and Action schemas, avoiding duplicated help. The same Citty definitions own parsing, complete-path `--help`, constrained values, and the generated web CLI reference.
+Profile `export --format` and reference-oriented `describe --format` retain separate format semantics. Sync and daemon lifecycle commands retain their own output contracts; this shared read contract makes no claim about their formatting. Registry-backed `describe` owns fields, formats, config flags, OAuth declarations, and Action schemas, avoiding duplicated help. The same Citty definitions own parsing, complete-path `--help`, constrained values, and the generated web CLI reference.
 
 `docs list|get|search` reads a bounded build-time product documentation bundle plus loaded Extension documentation without the web runtime or network. Markdown remains inert text, binary assets require an explicit output path, and loaded schema truth still comes from `describe`.
 
@@ -333,7 +333,7 @@ Sync Run history records `completed`, `cancelled` for cancellation, and `failed`
 - Profile expressibility does not equal complete bundled provider coverage for tasks, files, communication, or arbitrary Extension domains.
 - Full-text search is baseline; semantic/vector search, watch/notifications, and mature quota policy are optional or deferred.
 - Multi-Source remote continuation and mixed-search offset pagination are unsupported; resumable remote pagination requires one exact Source.
-- Sync output has not yet joined the shared structured read modes; streaming integration owns that mapping.
+- Sync output remains a separate streaming contract rather than a shared batch-read mode.
 - `resync` and `diff` depend on Adapter support; `sync` is baseline.
 - Cached Artifact bytes have one retention class and no automatic eviction. Raw provider payloads are optional and off by default.
 - External Extensions are trusted in-process bundled, explicit-path, or generically installed npm/Git/local package code; a Catalog may curate either literal roots from its author package or exact package descriptors. Sandboxing, ambient/undeclared discovery, startup refresh or repair, arbitrary commands, private/credentialed or SSH Catalog repositories, nested Catalog values, submodules, Git LFS, lifecycle scripts, unsafe/unsupported lock protocols, polling, and non-TypeScript/out-of-process Adapters are unsupported. Versioned Catalog selectors are invalid. Package dependencies used by an acquired package remain ordinary imports; ctxindex has no Extension dependency graph.

@@ -114,7 +114,7 @@ Reply Draft updates require the complete local Draft and parent in that Source a
 
 ## Choose output for the consumer
 
-Use `--format text` when an agent benefits from fewer repeated JSON keys: collections are escaped TSV and `get` is a complete labeled Resource envelope with compact nested payload JSON. Use `--json` (shorthand for `--format json`) when the caller needs typed structured fields. Omitted output selection is destination-aware: pretty on a TTY, text through a pipe. Never combine `--json` and `--format`.
+Use `--format text` on search, get, thread, Artifact list, status, and Source, Realm, Account, OAuth App, and Extension inventories when an agent benefits from fewer repeated JSON keys: collections are escaped TSV and `get` is a complete labeled Resource envelope with compact nested payload JSON. TSV uses `\N` only for null and escapes literal backslashes. Use `--json` (shorthand for `--format json`) when the caller needs typed structured fields. Omitted output selection is destination-aware: pretty on a TTY, text through a pipe. Never combine `--json` and `--format`.
 
 Pretty output is terminal-width-aware and switches long rows, including Microsoft message Refs, to vertical cards without ellipsizing values. Refs remain opaque and copyable in every mode.
 

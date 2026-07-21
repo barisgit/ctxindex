@@ -7,7 +7,7 @@ Owns CLI workflows for listing Resource Artifact descriptors, downloading bytes 
 ## Design / patterns
 
 - `handle-artifact-command.ts` consumes a typed list/download/purge input, validates list/download Refs before dependency loading, and delegates exclusively to `ArtifactService`.
-- List and download use `format/artifact.ts`; purge emits deterministic byte/object accounting. All branches map errors and close dependencies, while readable list output preserves warnings.
+- List uses the shared pretty/text/json collection contract through `format/artifact.ts`; download and purge retain their operation-specific readable/JSON receipts. All branches map errors and close dependencies, while readable list output preserves warnings.
 - An injectable dependency factory keeps focused tests independent of storage and provider I/O.
 
 ## Integration points
