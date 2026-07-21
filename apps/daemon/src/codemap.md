@@ -22,5 +22,5 @@ Implements the local daemon's application layer: process startup, production dep
 ## Integration points
 
 - `index.ts` exposes the reusable application, runtime, signal, and transport APIs.
-- `main.ts` is compiled/executed directly as the daemon sibling; `e2e/compiled-daemon.e2e.test.ts` verifies detached start/status/stop, crash recovery, and direct process ownership paths.
+- `main.ts` is compiled/executed directly as the daemon sibling; `e2e/compiled-daemon.e2e.test.ts` verifies Darwin multi-process behavior plus a Linux packaged journey covering on-demand start, compatible reuse, retained `flock(2)` ownership, clean stop, and reacquisition.
 - Depends on public `@ctxindex/core/*`, `@ctxindex/local-daemon`, `@ctxindex/rpc`, `@ctxindex/official`, and `@orpc/server` seams only.

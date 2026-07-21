@@ -7,6 +7,7 @@ import {
   readFile,
   rename,
   rm,
+  stat,
   symlink,
   writeFile,
 } from 'node:fs/promises'
@@ -327,6 +328,8 @@ async function initializeLocalSource(runtime: TestRuntime, fileCount = 1) {
     files,
   ])
   expect(added.exitCode, added.stderr).toBe(0)
+  const stopped = await runCli(runtime, ['daemon', 'stop', '--format', 'json'])
+  expect(stopped.exitCode, stopped.stderr).toBe(0)
   return { files, sourceId: parseSourceId(added.stdout) }
 }
 
@@ -387,6 +390,8 @@ export default defineExtension({
     JSON.stringify({ gate_path: gate }),
   ])
   expect(added.exitCode, added.stderr).toBe(0)
+  const stopped = await runCli(runtime, ['daemon', 'stop', '--format', 'json'])
+  expect(stopped.exitCode, stopped.stderr).toBe(0)
   return { gate, sourceId: parseSourceId(added.stdout) }
 }
 
@@ -405,13 +410,6 @@ describe.skipIf(process.platform !== 'darwin')(
       try {
         expect((await runCli(runtime, ['init'])).exitCode).toBe(0)
 
-        const direct = await runCli(runtime, [
-          'realm',
-          'list',
-          '--format',
-          'json',
-        ])
-        expect(direct.exitCode, direct.stderr).toBe(0)
         expect(
           JSON.parse(
             (await runCli(runtime, ['daemon', 'status', '--format', 'json']))
@@ -420,20 +418,24 @@ describe.skipIf(process.platform !== 'darwin')(
         ).toEqual({ status: 'stopped' })
 
         const concurrent = await Promise.all([
-          runCli(runtime, ['daemon', 'start', '--format', 'json']),
-          runCli(runtime, ['daemon', 'start', '--format', 'json']),
+          runCli(runtime, ['realm', 'list', '--format', 'json']),
+          runCli(runtime, ['realm', 'list', '--format', 'json']),
         ])
         for (const result of concurrent) {
           expect(result.exitCode, result.stderr).toBe(0)
-          expect(JSON.parse(result.stdout)).toMatchObject({
-            status: 'running',
-            health: { ready: true },
-          })
+          expect(JSON.parse(result.stdout)).toEqual([])
         }
-        const instanceIds = concurrent.map(
-          (result) => JSON.parse(result.stdout).health.instanceId,
+        const automaticallyStarted = await runCli(runtime, [
+          'daemon',
+          'status',
+          '--format',
+          'json',
+        ])
+        expect(automaticallyStarted.exitCode, automaticallyStarted.stderr).toBe(
+          0,
         )
-        expect(new Set(instanceIds).size).toBe(1)
+        const instanceId = JSON.parse(automaticallyStarted.stdout).health
+          .instanceId
 
         const reused = await runCli(runtime, [
           'daemon',
@@ -445,7 +447,7 @@ describe.skipIf(process.platform !== 'darwin')(
         expect(JSON.parse(reused.stdout)).toMatchObject({
           status: 'running',
           started: false,
-          health: { instanceId: instanceIds[0] },
+          health: { instanceId },
         })
 
         const status = await runCli(runtime, [
@@ -458,7 +460,7 @@ describe.skipIf(process.platform !== 'darwin')(
         const observed = JSON.parse(status.stdout)
         expect(observed).toMatchObject({
           status: 'running',
-          health: { instanceId: instanceIds[0], ready: true },
+          health: { instanceId, ready: true },
         })
 
         process.kill(observed.health.pid, 'SIGKILL')
@@ -491,7 +493,7 @@ describe.skipIf(process.platform !== 'darwin')(
           health: { ready: true },
         })
         expect(JSON.parse(restarted.stdout).health.instanceId).not.toBe(
-          instanceIds[0],
+          instanceId,
         )
 
         const stopped = await runCli(runtime, [
@@ -623,7 +625,7 @@ describe.skipIf(process.platform !== 'darwin')(
       }
     }, 30_000)
 
-    test('metadata and override route separate CLI processes while unavailable selectors never fall back', async () => {
+    test('metadata and override route separate CLI processes while a crashed daemon restarts without direct fallback', async () => {
       const runtime = await createRuntime('ctxindex-daemon-routing-')
       let daemon: RunningProcess | undefined
       try {
@@ -639,6 +641,10 @@ describe.skipIf(process.platform !== 'darwin')(
         expect(JSON.parse(direct.stdout)).toEqual([
           expect.objectContaining({ sourceId, adapterId: 'local.directory' }),
         ])
+        expect(
+          (await runCli(runtime, ['daemon', 'stop', '--format', 'json']))
+            .exitCode,
+        ).toBe(0)
 
         const missingEndpoint = join(runtime.runtimeRoot, 'missing.sock')
         const unavailable = await runCli(
@@ -648,7 +654,9 @@ describe.skipIf(process.platform !== 'darwin')(
         )
         expect(unavailable.exitCode).toBe(50)
         expect(unavailable.stdout).toBe('')
-        expect(unavailable.stderr).toContain('local daemon is unavailable')
+        expect(unavailable.stderr).toContain(
+          'selected daemon test endpoint is unavailable',
+        )
 
         daemon = startDaemon(runtime)
         const metadata = await waitForReady(runtime, daemon)
@@ -920,16 +928,30 @@ describe.skipIf(process.platform !== 'darwin')(
         daemon = undefined
         const database = resolved.databasePath
         const databaseBefore = await readFile(database)
-        const lost = await runCli(runtime, [
+        const recovered = await runCli(runtime, [
           'status',
           '--source',
           sourceId,
           '--format',
           'json',
         ])
-        expect(lost.exitCode).toBe(50)
-        expect(lost.stdout).toBe('')
+        expect(recovered.exitCode, recovered.stderr).toBe(0)
+        expect(JSON.parse(recovered.stdout)).toEqual(JSON.parse(status.stdout))
         expect(await readFile(database)).toEqual(databaseBefore)
+        const recoveredHealth = await runCli(runtime, [
+          'daemon',
+          'status',
+          '--format',
+          'json',
+        ])
+        expect(recoveredHealth.exitCode, recoveredHealth.stderr).toBe(0)
+        expect(JSON.parse(recoveredHealth.stdout).health.instanceId).not.toBe(
+          metadata.instanceId,
+        )
+        expect(
+          (await runCli(runtime, ['daemon', 'stop', '--format', 'json']))
+            .exitCode,
+        ).toBe(0)
       } finally {
         if (daemon) await stopDaemon(daemon, 'SIGKILL')
         await cleanupRuntime(runtime)
@@ -990,7 +1012,6 @@ describe.skipIf(process.platform !== 'darwin')(
           ['oauth-app', 'list'],
           ['artifact', 'list', `ctx://${sourceId}/file/one`],
           ['export', `ctx://${sourceId}/file/one`, '--format', 'text'],
-          ['describe', 'action', 'missing.action', '--source', sourceId],
           ['artifact', 'purge'],
         ]
         for (const args of statefulCommands) {
@@ -1003,6 +1024,20 @@ describe.skipIf(process.platform !== 'darwin')(
             'unavailable while the local daemon owns the database',
           )
         }
+
+        const described = await runCli(runtime, [
+          'describe',
+          'action',
+          'missing.action',
+          '--source',
+          sourceId,
+        ])
+        expect(described.exitCode).toBe(2)
+        expect(described.stdout).toBe('')
+        expect(described.stderr).toContain('Unknown Action: missing.action')
+        expect(described.stderr).not.toContain(
+          'unavailable while the local daemon owns the database',
+        )
 
         const resolved = resolveRuntimeIdentity(runtime.roots)
         const lock = leasePath({
@@ -1281,11 +1316,11 @@ describe.skipIf(process.platform !== 'darwin')(
         ])
         expect(rejected.exitCode).toBe(50)
         expect(rejected.stdout).toBe('')
-        expect(rejected.stderr).toContain('not accepting new work')
+        expect(rejected.stderr).toContain('did not become ready')
 
         const direct = await runCli(runtime, ['realm', 'list'])
         expect(direct.exitCode).toBe(50)
-        expect(direct.stderr).toContain('not accepting new work')
+        expect(direct.stderr).toContain('did not become ready')
         await expectStartFailure(runtime, /lease|owner|held|conflict/i)
 
         const timedOut = await Promise.all(
@@ -1346,6 +1381,103 @@ describe.skipIf(process.platform !== 'darwin')(
         if (sync?.process.exitCode === null) sync.process.kill('SIGKILL')
         if (sync) await waitForExit(sync, 'blocking sync cleanup')
         if (daemon) await stopDaemon(daemon, 'SIGKILL')
+        await cleanupRuntime(runtime)
+      }
+    }, 45_000)
+  },
+)
+
+describe.skipIf(process.platform !== 'linux')(
+  'compiled Linux on-demand daemon lifecycle',
+  () => {
+    test('starts on first stateful command, reuses the packaged daemon, retains flock ownership, and stops cleanly', async () => {
+      const runtime = await createRuntime('ctxindex-daemon-linux-lifecycle-')
+      try {
+        expect((await runCli(runtime, ['init'])).exitCode).toBe(0)
+        expect(
+          JSON.parse(
+            (await runCli(runtime, ['daemon', 'status', '--format', 'json']))
+              .stdout,
+          ),
+        ).toEqual({ status: 'stopped' })
+
+        const first = await runCli(runtime, [
+          'realm',
+          'list',
+          '--format',
+          'json',
+        ])
+        expect(first.exitCode, first.stderr).toBe(0)
+        expect(JSON.parse(first.stdout)).toEqual([])
+
+        const running = await runCli(runtime, [
+          'daemon',
+          'status',
+          '--format',
+          'json',
+        ])
+        expect(running.exitCode, running.stderr).toBe(0)
+        const firstHealth = JSON.parse(running.stdout).health
+        expect(firstHealth).toMatchObject({ ready: true })
+
+        const reused = await runCli(runtime, [
+          'daemon',
+          'start',
+          '--format',
+          'json',
+        ])
+        expect(reused.exitCode, reused.stderr).toBe(0)
+        expect(JSON.parse(reused.stdout)).toMatchObject({
+          status: 'running',
+          started: false,
+          health: { instanceId: firstHealth.instanceId, ready: true },
+        })
+
+        const resolved = resolveRuntimeIdentity(runtime.roots)
+        for (const [canonicalTarget, purpose] of [
+          [resolved.stateRoot, 'lifecycle'],
+          [resolved.databasePath, 'database'],
+        ] as const) {
+          const path = leasePath({
+            canonicalTarget,
+            purpose,
+            mode: 'exclusive',
+          })
+          expect((await stat(path)).mode & 0o777).toBe(0o600)
+        }
+        await expectStartFailure(runtime, /lease|owner|held|conflict/i)
+
+        const stopped = await runCli(runtime, [
+          'daemon',
+          'stop',
+          '--format',
+          'json',
+        ])
+        expect(stopped.exitCode, stopped.stderr).toBe(0)
+        expect(JSON.parse(stopped.stdout)).toMatchObject({
+          status: 'stopped',
+          alreadyStopped: false,
+        })
+
+        const restarted = await runCli(runtime, [
+          'daemon',
+          'start',
+          '--format',
+          'json',
+        ])
+        expect(restarted.exitCode, restarted.stderr).toBe(0)
+        expect(JSON.parse(restarted.stdout)).toMatchObject({
+          status: 'running',
+          started: true,
+          health: { ready: true },
+        })
+        expect(JSON.parse(restarted.stdout).health.instanceId).not.toBe(
+          firstHealth.instanceId,
+        )
+      } finally {
+        await runCli(runtime, ['daemon', 'stop', '--format', 'json']).catch(
+          () => null,
+        )
         await cleanupRuntime(runtime)
       }
     }, 45_000)

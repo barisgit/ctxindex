@@ -33,7 +33,7 @@ export type ActionCommandInput =
   | {
       readonly kind: 'describe'
       readonly actionId: string
-      readonly sourceId?: string
+      readonly sourceId: string
       readonly json: boolean
     }
   | {
@@ -70,6 +70,10 @@ export async function handleActionCommand(
   open: OpenActionDeps = openDeps,
   services: ActionServices = actionServices,
 ): Promise<number> {
+  if (input.kind === 'describe' && !input.sourceId) {
+    console.error('Action availability describe requires an exact Source')
+    return 2
+  }
   let actionInput: unknown
   if (input.kind === 'run') {
     try {
@@ -96,7 +100,7 @@ export async function handleActionCommand(
           throw new Error('Selected daemon Action service missing')
         const result = await services.daemonDescribe(
           ensured.selection,
-          { actionId: input.actionId, source: input.sourceId as string },
+          { actionId: input.actionId, source: input.sourceId },
           controller.signal,
         )
         console.log(
@@ -129,14 +133,12 @@ export async function handleActionCommand(
 
     deps = await open()
     if (input.kind === 'describe') {
-      const sourceId = input.sourceId
-        ? deps.sourceService.resolveSourceId(input.sourceId)
-        : undefined
+      const sourceId = deps.sourceService.resolveSourceId(input.sourceId)
       const result = services.describe({
         db: deps.db,
         registry: deps.registry,
         actionId: input.actionId,
-        ...(sourceId ? { sourceId } : {}),
+        sourceId,
       })
       console.log(
         input.json ? JSON.stringify(result) : formatActionDescribeText(result),

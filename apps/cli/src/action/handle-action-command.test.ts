@@ -14,6 +14,7 @@ import {
 } from '@ctxindex/core/errors'
 import { formatActionDescribeText, formatActionRunText } from '../format/action'
 import {
+  type ActionCommandInput,
   type ActionDeps,
   type ActionServices,
   handleActionCommand,
@@ -286,6 +287,25 @@ describe('Action handler', () => {
     expect(ensured).toBe(0)
   })
 
+  test('rejects a source-less internal Action describe before opening state', async () => {
+    const error = spyOn(console, 'error').mockImplementation(() => {})
+    let opens = 0
+
+    expect(
+      await handleActionCommand(
+        { kind: 'describe', actionId, json: false } as ActionCommandInput,
+        async () => {
+          opens += 1
+          throw new Error('source-less describe must not open direct state')
+        },
+      ),
+    ).toBe(2)
+    expect(opens).toBe(0)
+    expect(error).toHaveBeenCalledWith(
+      'Action availability describe requires an exact Source',
+    )
+  })
+
   test('passes exact describe arguments, prints the full JSON result, and closes', async () => {
     const log = spyOn(console, 'log').mockImplementation(() => {})
     let closed = false
@@ -481,7 +501,7 @@ describe('Action handler', () => {
     }
     expect(
       await handleActionCommand(
-        { kind: 'describe', actionId, json: false },
+        { kind: 'describe', actionId, sourceId, json: false },
         open as () => Promise<ActionDeps>,
         services as ActionServices,
       ),
