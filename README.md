@@ -57,9 +57,9 @@ Provider mutations currently stop at reversible email Draft creation and update.
 
 Built-in functionality uses the same SDK as external Extensions. Start with the public examples and demo Extensions in [`barisgit/ctxindex-extensions`](https://github.com/barisgit/ctxindex-extensions), then see the [Extension SDK guide](https://ctxindex.com/docs/extend) for provider-backed and providerless designs, Profiles, Adapters, Actions, documentation, packaging, and publishing.
 
-## How I used Codex and GPT-5.6
+## How I used Codex and GPT-5.6 for OpenAI Build Week
 
-I built most of ctxindex with GPT-5.6, first in Pi and later in Codex. I want to keep that distinction clear rather than describing the earlier Pi work as Codex work.
+For OpenAI Build Week, I used GPT-5.6 first in Pi and later in Codex to build and harden the submitted version of ctxindex. I want to keep that distinction clear rather than describing the earlier Pi work as Codex work.
 
 In Codex, I kept one large thread open as a meta-session. I used the root agent to plan the work, make product and architecture decisions, and review what came back. Focused subagents handled specific implementation, testing, research, and review tasks in parallel. This was especially useful for changes that crossed the CLI, daemon, core, provider adapters, and Extension SDK.
 
