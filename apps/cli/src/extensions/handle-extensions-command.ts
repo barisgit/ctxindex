@@ -229,12 +229,16 @@ export async function handleExtensionsCommand(
         )
         if (parsed.sourceKind === 'catalog') {
           const installed = await runWithSigintCancellation((signal) =>
-            services.catalogInstallation.install({
-              catalog: parsed.target,
-              extensionId: parsed.extensionId,
-              noRefresh: parsed.noRefresh,
+            services.coordinateMutation(
+              () =>
+                services.catalogInstallation.install({
+                  catalog: parsed.target,
+                  extensionId: parsed.extensionId,
+                  noRefresh: parsed.noRefresh,
+                  signal,
+                }),
               signal,
-            }),
+            ),
           )
           console.log(
             formatExtensionLifecycle('Installed', installed, parsed.json),
@@ -251,23 +255,27 @@ export async function handleExtensionsCommand(
         )
         validateDirectExtensionId(parsed.extensionId)
         const installed = await runWithSigintCancellation((signal) =>
-          services.direct.install({
-            target,
-            extensionId: parsed.extensionId,
-            loadValidationContext: async () => {
-              const localOAuthAppIdentities =
-                await services.readOAuthAppIdentities()
-              const fresh = await services.loadDefinitions({
-                localOAuthAppIdentities,
-              })
-              return {
-                registry: fresh.registry,
-                roots: fresh.roots,
-                localOAuthAppIdentities,
-              }
-            },
+          services.coordinateMutation(
+            () =>
+              services.direct.install({
+                target,
+                extensionId: parsed.extensionId,
+                loadValidationContext: async () => {
+                  const localOAuthAppIdentities =
+                    await services.readOAuthAppIdentities()
+                  const fresh = await services.loadDefinitions({
+                    localOAuthAppIdentities,
+                  })
+                  return {
+                    registry: fresh.registry,
+                    roots: fresh.roots,
+                    localOAuthAppIdentities,
+                  }
+                },
+                signal,
+              }),
             signal,
-          }),
+          ),
         )
         console.log(
           formatExtensionLifecycle('Installed', installed, parsed.json),
@@ -280,10 +288,14 @@ export async function handleExtensionsCommand(
           'Trust notice: this command acquires and executes third-party Extension code in-process; validation is not a sandbox.',
         )
         const updated = await runWithSigintCancellation((signal) =>
-          services.lifecycle.update({
-            extensionId: parsed.extensionId,
+          services.coordinateMutation(
+            () =>
+              services.lifecycle.update({
+                extensionId: parsed.extensionId,
+                signal,
+              }),
             signal,
-          }),
+          ),
         )
         console.log(formatExtensionLifecycle('Updated', updated, parsed.json))
         return 0
@@ -292,28 +304,30 @@ export async function handleExtensionsCommand(
         validateDirectExtensionId(parsed.extensionId)
         console.log(
           formatDirectExtensionUninstall(
-            await services.direct.uninstall({
-              extensionId: parsed.extensionId,
-              loadValidationContext: async () => {
-                const localOAuthAppIdentities =
-                  await services.readOAuthAppIdentities()
-                const fresh = await services.loadDefinitions({
-                  localOAuthAppIdentities,
-                })
-                return {
-                  registry: fresh.registry,
-                  roots: fresh.roots,
-                  localOAuthAppIdentities,
-                  alternateOriginAvailable: fresh.provenance.some(
-                    (entry) =>
-                      entry.id === parsed.extensionId &&
-                      entry.kind !== 'direct',
-                  ),
-                  sources: await services.readSourceBindings(),
-                }
-              },
-              force: parsed.force,
-            }),
+            await services.coordinateMutation(() =>
+              services.direct.uninstall({
+                extensionId: parsed.extensionId,
+                loadValidationContext: async () => {
+                  const localOAuthAppIdentities =
+                    await services.readOAuthAppIdentities()
+                  const fresh = await services.loadDefinitions({
+                    localOAuthAppIdentities,
+                  })
+                  return {
+                    registry: fresh.registry,
+                    roots: fresh.roots,
+                    localOAuthAppIdentities,
+                    alternateOriginAvailable: fresh.provenance.some(
+                      (entry) =>
+                        entry.id === parsed.extensionId &&
+                        entry.kind !== 'direct',
+                    ),
+                    sources: await services.readSourceBindings(),
+                  }
+                },
+                force: parsed.force,
+              }),
+            ),
             parsed.json,
           ),
         )
