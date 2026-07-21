@@ -1,34 +1,36 @@
 import { CodeHighlight } from '@/components/code-highlight'
 import { CopyButton } from '@/components/copy-button'
 
-// Launch handoff: replace only these constants when the demo Extension is
-// published to npm. The source-checkout path below is runnable today.
-export const DEMO_EXTENSION_TARGET = './examples/tenders-extension'
-export const DEMO_EXTENSION_ID = 'ctxindex.demo'
+export const DEMO_EXTENSION_TARGET =
+  'git+https://github.com:443/barisgit/ctxindex-extensions.git#main'
+export const DEMO_EXTENSION_ID = 'barisgit.github-issues'
 
 const DEMO_STEPS = [
   {
     title: 'Get the code',
-    detail: 'Bun 1.3.14 · one checkout, no other setup',
-    commands: `git clone https://github.com/barisgit/ctxindex.git
-cd ctxindex && bun install && bun cli init`,
+    detail: 'Bun 1.3.14 · published CLI, no checkout',
+    commands: `bun add --global ctxindex
+ctxindex init`,
   },
   {
     title: 'Install the demo Extension',
-    detail: 'checked into the repo · deterministic fixture data',
-    commands: `bun cli extension install local ${DEMO_EXTENSION_TARGET} ${DEMO_EXTENSION_ID}`,
+    detail: 'standalone public repo · pinned Git commit',
+    commands: `ctxindex extension install git \\
+  '${DEMO_EXTENSION_TARGET}' \\
+  ${DEMO_EXTENSION_ID}`,
   },
   {
     title: 'Create a Realm, add the Source, sync',
-    detail: 'the same motions as a real account — minus OAuth',
-    commands: `bun cli realm add demo --name "Demo"
-bun cli source add ctxindex.demo.tenders --realm demo --label demo-tenders
-bun cli sync --source demo-tenders`,
+    detail: 'public GitHub data · no OAuth or secrets',
+    commands: `ctxindex realm add demo --name "Demo"
+ctxindex source add github.issues --realm demo --label gh-issues \\
+  --config-owner barisgit --config-repository ctxindex
+ctxindex sync --source gh-issues`,
   },
   {
     title: 'Search it like an agent would',
-    detail: 'typed Refs, filters, deterministic output',
-    commands: `bun cli search "bridge inspection" --realm demo`,
+    detail: 'typed Refs, filters, agent-efficient JSON',
+    commands: `ctxindex search issue --source gh-issues --local-only --format json`,
   },
 ] as const
 
@@ -36,9 +38,9 @@ export const DEMO_COMMANDS = DEMO_STEPS.map((step) => step.commands).join('\n')
 
 export const DEMO_RESULT = `{
   "results": [{
-    "ref": "ctx://<source-id>/tender/DEMO-2026-006",
-    "profile": { "id": "ctxindex.demo.tender", "version": 1 },
-    "title": "Wireless structural monitoring for river bridges",
+    "ref": "ctx://<source-id>/issue/84",
+    "profile": { "id": "software.issue", "version": 1 },
+    "title": "Ship the portable Agent Skill",
     "origin": "local"
   }],
   "warnings": []

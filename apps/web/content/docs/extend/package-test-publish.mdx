@@ -35,11 +35,13 @@ At minimum, verify:
 5. Operation fixtures validate provider or file input and normalize complete SDK result shapes.
 6. Documentation resolves, contains required routes, and rejects unsafe assets/links.
 
-The repository examples demonstrate both lanes:
+The standalone reference repository exercises the public packages exactly as an external author does:
 
 ```sh
-bun test examples/tenders-extension/extension.test.ts
-bun test examples/issues-extension/extension.test.ts
+git clone https://github.com/barisgit/ctxindex-extensions.git
+cd ctxindex-extensions
+bun install --frozen-lockfile
+bun run check
 ```
 
 ## Install without publishing

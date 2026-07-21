@@ -38,11 +38,6 @@ const config = {
         permanent: true,
       },
       {
-        source: '/docs/examples/:path*',
-        destination: '/docs/use/extensions',
-        permanent: true,
-      },
-      {
         source: '/docs/contribute/development',
         destination: '/docs/contribute',
         permanent: true,

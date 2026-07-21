@@ -3,7 +3,7 @@ title: Providerless Extension quickstart
 description: Define a Profile, local Source Adapter, Extension root, documentation sidecar, and package entry without authentication or provider egress.
 ---
 
-The repository's tested [`examples/tenders-extension`](https://github.com/barisgit/ctxindex/tree/main/examples/tenders-extension) package is the complete reference. A providerless Adapter simply omits `provider`, `access`, and `providerApiHosts`.
+The standalone [`barisgit/ctxindex-extensions`](https://github.com/barisgit/ctxindex-extensions) repository is the complete checked public-SDK reference. A providerless Adapter simply omits `provider`, `access`, and `providerApiHosts`.
 
 ## `extension.ts`
 
@@ -16,45 +16,45 @@ import {
   z,
 } from '@ctxindex/extension-sdk'
 
-export const tenderProfile = defineProfile({
-  id: 'ctxindex.demo.tender',
+export const noteProfile = defineProfile({
+  id: 'acme.note',
   version: 1,
   schema: z.object({
-    reference: z.string(),
+    path: z.string(),
     title: z.string(),
-    description: z.string(),
-    publishedAt: z.string().datetime(),
+    body: z.string(),
+    modifiedAt: z.string().datetime(),
   }).strict(),
   search: {
-    title: (tender) => tender.title,
-    occurredAt: (tender) => new Date(tender.publishedAt),
-    chunks: (tender) => [tender.description],
+    title: (note) => note.title,
+    occurredAt: (note) => new Date(note.modifiedAt),
+    chunks: (note) => [note.body],
     fields: {
-      reference: {
+      path: {
         type: 'string',
-        extract: (tender) => tender.reference,
+        extract: (note) => note.path,
       },
     },
   },
 })
 
-export const tenderAdapter = defineAdapter({
-  id: 'ctxindex.demo.tenders',
-  configSchema: z.object({}).strict(),
-  profiles: [tenderProfile],
+export const notesAdapter = defineAdapter({
+  id: 'acme.notes',
+  configSchema: z.object({ directory: z.string().min(1) }).strict(),
+  profiles: [noteProfile],
   routing: 'indexed',
   capabilities: ['sync'],
   operations: {
     sync: async (context) => {
-      for (const payload of loadTenders()) {
+      for (const payload of await loadNotes(context.source.config.directory)) {
         await context.emit({
           type: 'upsertResource',
           resource: {
-            ref: `ctx://${context.source.id}/tender/${encodeURIComponent(payload.reference)}`,
-            profile: { id: tenderProfile.id, version: tenderProfile.version },
+            ref: `ctx://${context.source.id}/note/${encodeURIComponent(payload.path)}`,
+            profile: { id: noteProfile.id, version: noteProfile.version },
             completeness: 'complete',
             title: payload.title,
-            occurredAt: Date.parse(payload.publishedAt),
+            occurredAt: Date.parse(payload.modifiedAt),
             payload,
           },
         })
@@ -66,19 +66,19 @@ export const tenderAdapter = defineAdapter({
 })
 
 export default defineExtension({
-  id: 'ctxindex.demo',
-  adapters: [tenderAdapter],
+  id: 'acme.notes',
+  adapters: [notesAdapter],
   docs: docs('./docs'),
 })
 ```
 
-`loadTenders()` is ordinary package code; the [checked repository example](https://github.com/barisgit/ctxindex/blob/main/examples/tenders-extension/extension.ts) supplies deterministic fixtures. Operation contexts expose only the facilities for that capability.
+`loadNotes()` is ordinary package code. The external reference repository demonstrates the same authoring boundary with a credential-free GitHub Adapter and synthetic HTTP tests. Operation contexts expose only the facilities for that capability.
 
 ## `package.json`
 
 ```json
 {
-  "name": "@acme/ctxindex-tenders",
+  "name": "@acme/ctxindex-notes",
   "type": "module",
   "ctxindex": {
     "extensions": ["./extension.ts"]

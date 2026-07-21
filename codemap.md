@@ -6,14 +6,14 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 
 ## Design / patterns
 
-- Bun/Turborepo monorepo split into user-facing application workspaces (`apps/`), reusable runtime and contract packages (`packages/`), external authoring examples (`examples/`), executable repository tooling (`scripts/`), and repository contract tests (`tests/tooling/`). Package-owned unit, integration, and E2E tasks combine with narrowly hashed root `//#...` verifier tasks; pull requests run the three cached lanes as parallel jobs.
+- Bun/Turborepo monorepo split into user-facing application workspaces (`apps/`), reusable runtime and contract packages (`packages/`), executable repository tooling (`scripts/`), and repository contract tests (`tests/tooling/`). The standalone `barisgit/ctxindex-extensions` repository owns public Extension and Catalog examples. Package-owned unit, integration, and E2E tasks combine with narrowly hashed root `//#...` verifier tasks; pull requests run the three cached lanes as parallel jobs.
 - Layered boundaries keep CLI presentation separate from provider-neutral core services and Profiles: calendar, mail, chat, and file Profiles own shared vocabulary and Draft Action contracts, while Adapters own provider-specific Google, Microsoft Graph, and filesystem I/O.
 - Extensions are versionless plain roots composing exact imported Providers, Profiles, Adapters, and OAuth Apps without a runtime dependency graph. Package-backed Catalog definitions curate literal Extensions and exact npm/Git/local package targets; trusted authoring resolves them into replay-locked schema-v2 snapshots. Core routes Catalog-curated and direct packages through one content-addressed installation pipeline, then collects exact exported roots/reachable leaves and validates one complete registry atomically. A detached local daemon prototype loads the unified records offline and composes those same core services behind a bounded Unix-socket RPC boundary without moving provider logic into transport.
 - Extension or secret-backed local OAuth Apps provide validated configuration. Host policy may select one exact provenance-matched bundled App when `--app` is omitted; explicit labels bypass that policy. Authorization snapshots the exact selected App config into one private stable Grant per Account so refresh is independent of current App inventory and policy.
 
 ## Entry points
 
-- `package.json` — private workspace manifest for `apps/*`, `packages/*`, and package-managed `examples/*`, plus the root command surface; Turbo dispatches package-owned tasks, `cli` routes through `scripts/cli.sh`, and package scripts build, pack, verify, and smoke the public CLI, Extension SDK, and Profiles artifacts.
+- `package.json` — private workspace manifest for `apps/*` and `packages/*`, plus the root command surface; Turbo dispatches package-owned tasks, `cli` routes through `scripts/cli.sh`, and package scripts build, pack, verify, and smoke the public CLI, Extension SDK, and Profiles artifacts.
 - `.github/workflows/ci.yml`, `release.yml`, and `publish-packages.yml` — least-privilege cached fast/integration/E2E lanes, the CLI binary release, and independently version-gated SDK/Profiles trusted publishing with Bun 1.3.14.
 - `.agents/skills/repo-development/SKILL.md` — triggered contributor doctrine, CLI workflow, and verification guidance.
 - `DESIGN.md` — project-wide visual doctrine for the adaptive ctxindex mark, semantic color roles, typography, component treatment, motion, and accessibility; the web app supplies its executable specimen.
@@ -35,7 +35,7 @@ CLI input is parsed and dispatched by `apps/cli/` into core services. Realm, Sou
 - Root orchestration: Bun workspaces and Turbo tasks in `package.json`; repository gates enforce dependency and architecture boundaries.
 - Runtime: core storage, schema, configuration, secrets, logging, networking, auth, and operation services under `packages/core/src/`.
 - External systems: Google OAuth/Gmail/Calendar, Microsoft OAuth/Graph Calendar and Outlook mailbox, and filesystem access under `packages/official/src/`.
-- Public extension boundary: `packages/extension-sdk/src/index.ts`, demonstrated by the separately publishable providerless `examples/tenders-extension/` instant demo and provider-backed `examples/issues-extension/` package.
+- Public extension boundary: `packages/extension-sdk/src/index.ts`, demonstrated externally by [`barisgit/ctxindex-extensions`](https://github.com/barisgit/ctxindex-extensions) using only published packages.
 
 ## Directory map
 
@@ -44,6 +44,5 @@ CLI input is parsed and dispatched by `apps/cli/` into core services. Realm, Sou
 | `.github/` | GitHub pull-request gates and protected npm trusted-publishing automation. | Workflow-local configuration. |
 | `apps/` | Deployable application workspaces: the public CLI, documentation site, and background local-daemon prototype. | [`apps/codemap.md`](apps/codemap.md) |
 | `packages/` | Core/runtime libraries, local RPC and daemon infrastructure, extension contracts, Profiles, and built-in Adapters. | [`packages/codemap.md`](packages/codemap.md) |
-| `examples/` | External Extension examples using only the public authoring boundary. | [`examples/codemap.md`](examples/codemap.md) |
 | `scripts/` | Repository policy gates, helper-created worktree isolation, and bounded command tooling. | [`scripts/codemap.md`](scripts/codemap.md) |
 | `tests/tooling/` | Repository-level CI, release, architecture, and developer-tooling contract tests. | [`tests/tooling/codemap.md`](tests/tooling/codemap.md) |

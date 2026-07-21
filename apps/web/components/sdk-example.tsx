@@ -1,37 +1,39 @@
 import { CodeHighlight } from '@/components/code-highlight'
 
-// Condensed from examples/tenders-extension/extension.ts — real, runnable SDK
-// surface, not pseudocode.
-const SDK_CODE = `import { defineAdapter, defineExtension, defineProfile, docs, z } from '@ctxindex/extension-sdk'
+// Condensed from barisgit/ctxindex-extensions — real public-SDK code, not
+// pseudocode or a privileged monorepo fixture.
+const SDK_CODE = `import { auth, defineAdapter, defineExtension, defineProfile, defineProvider, z } from '@ctxindex/extension-sdk'
 
-const tenderProfile = defineProfile({
-  id: 'ctxindex.demo.tender',
+const issueProfile = defineProfile({
+  id: 'software.issue',
   version: 1,
   schema: z.object({
-    reference: z.string().min(1),
+    number: z.number().int().positive(),
     title: z.string().min(1),
-    buyer: z.string().min(1),
-    deadline: z.string().datetime(),
-    status: z.enum(['open', 'planned', 'awarded', 'cancelled']),
-    estimatedValue: z.number().nonnegative(),
+    state: z.enum(['open', 'closed']),
+    updatedAt: z.string().datetime(),
   }),
   search: {
     title: (payload) => payload.title,
     fields: {
-      status: { type: 'string', extract: (payload) => payload.status },
-      deadline: { type: 'datetime', extract: (payload) => new Date(payload.deadline) },
+      state: { type: 'string', extract: (payload) => payload.state },
+      updatedAt: { type: 'datetime', extract: (payload) => new Date(payload.updatedAt) },
     },
   },
 })
 
-const tenderAdapter = defineAdapter({
-  id: 'ctxindex.demo.tenders',
-  profiles: [tenderProfile],
+const github = defineProvider({ id: 'github.public', auth: auth.none() })
+
+const issues = defineAdapter({
+  id: 'github.issues',
+  provider: github,
+  providerApiHosts: ['api.github.com'],
+  profiles: [issueProfile],
   routing: 'indexed',
   capabilities: ['sync'],
   operations: {
     sync: async (context) => {
-      for (const payload of await fetchTenders()) {
+      for (const payload of await fetchIssues(context)) {
         await context.emit({ type: 'upsertResource', resource: toResource(context, payload) })
       }
     },
@@ -39,9 +41,9 @@ const tenderAdapter = defineAdapter({
 })
 
 export default defineExtension({
-  id: 'ctxindex.demo',
-  adapters: [tenderAdapter],
-  docs: docs('./docs'),
+  id: 'barisgit.github-issues',
+  providers: [github],
+  adapters: [issues],
 })`
 
 export function SdkExample() {
@@ -49,7 +51,7 @@ export function SdkExample() {
     <div className="overflow-hidden rounded-ctx-panel border border-[var(--ctx-terminal-muted)] bg-[var(--ctx-terminal)]">
       <div className="flex min-h-10 items-center border-b border-[var(--ctx-terminal-muted)] px-4 py-2 sm:px-6">
         <span className="font-mono text-[0.6875rem] text-[var(--ctx-terminal-muted-foreground)]">
-          extension.ts · condensed from the demo Extension in this repo
+          index.ts · condensed from github.com/barisgit/ctxindex-extensions
         </span>
       </div>
       <CodeHighlight code={SDK_CODE} lang="ts" className="px-5 py-5 sm:px-6" />

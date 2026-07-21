@@ -3,7 +3,7 @@ title: Provider-backed Extension quickstart
 description: Define OAuth policy, a public App, scoped provider access, and a remote-search Adapter through exact imports.
 ---
 
-The tested [`examples/issues-extension`](https://github.com/barisgit/ctxindex/tree/main/examples/issues-extension) package is a compact complete graph. Its endpoints use the reserved `.invalid` domain and its public client id is a non-secret fixture.
+The standalone [`barisgit/ctxindex-extensions`](https://github.com/barisgit/ctxindex-extensions) repository is the checked provider-backed reference: it defines a credential-free public GitHub Provider, Profile, indexed Adapter, Extension, Catalog, documentation, and synthetic HTTP tests using only published ctxindex packages. The OAuth example below adds registration policy to the same graph shape.
 
 ## Provider and Profile
 
@@ -108,6 +108,6 @@ export default defineExtension({
 })
 ```
 
-Use the [complete checked source](https://github.com/barisgit/ctxindex/blob/main/examples/issues-extension/extension.ts) when copying: it validates Source config and provider JSON, propagates cancellation, encodes paths, and returns typed result envelopes.
+Use the [complete checked source](https://github.com/barisgit/ctxindex-extensions/blob/main/index.ts) when copying the production details: it validates Source config and provider JSON, propagates cancellation, encodes paths, bounds pagination, and returns typed result envelopes.
 
 Adapter scopes are the access required by this Source behavior. Core computes the effective authorization union from the Provider's base scopes and the selected compatible Source Adapters. OAuth App config remains public registration metadata; local Accounts and Grants are private runtime state.

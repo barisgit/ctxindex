@@ -18,6 +18,6 @@
     "resolveJsonModule": true,
     "isolatedModules": true
   },
-  "include": ["apps/**/*.ts", "packages/**/*.ts", "examples/**/*.ts"],
+  "include": ["apps/**/*.ts", "packages/**/*.ts"],
   "exclude": ["**/migrations/**", "**/node_modules/**", "apps/web/**"]
 }

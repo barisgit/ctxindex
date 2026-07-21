@@ -155,10 +155,10 @@ describe('public documentation information architecture', () => {
       'utf8',
     )
 
-    expect(providerless).toContain('examples/tenders-extension')
+    expect(providerless).toContain('barisgit/ctxindex-extensions')
     expect(providerless).toContain('defineAdapter')
     expect(providerless).toContain("docs: docs('./docs')")
-    expect(providerBacked).toContain('examples/issues-extension')
+    expect(providerBacked).toContain('barisgit/ctxindex-extensions')
     expect(providerBacked).toContain('defineOAuthApp')
     expect(providerBacked).toContain("access: { scopes: ['issues.read'] }")
   })

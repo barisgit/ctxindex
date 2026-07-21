@@ -9,16 +9,14 @@ import {
 } from '../components/demo-quickstart'
 
 test('homepage demo keeps commands and result in one replaceable component', () => {
-  expect(DEMO_EXTENSION_TARGET).toBe('./examples/tenders-extension')
-  expect(DEMO_EXTENSION_ID).toBe('ctxindex.demo')
-  expect(DEMO_COMMANDS).toContain('git clone')
-  expect(DEMO_COMMANDS).toContain('bun cli extension install local')
-  expect(DEMO_COMMANDS).toContain('bun cli sync --source demo-tenders')
-  expect(DEMO_COMMANDS).toContain('"bridge inspection" --realm demo')
-  expect(DEMO_RESULT).toContain('ctx://<source-id>/tender/DEMO-2026-006')
-  expect(DEMO_RESULT).toContain(
-    'Wireless structural monitoring for river bridges',
-  )
+  expect(DEMO_EXTENSION_TARGET).toContain('barisgit/ctxindex-extensions')
+  expect(DEMO_EXTENSION_ID).toBe('barisgit.github-issues')
+  expect(DEMO_COMMANDS).toContain('bun add --global ctxindex')
+  expect(DEMO_COMMANDS).toContain('ctxindex extension install git')
+  expect(DEMO_COMMANDS).toContain('ctxindex sync --source gh-issues')
+  expect(DEMO_COMMANDS).toContain('issue --source gh-issues --local-only')
+  expect(DEMO_RESULT).toContain('ctx://<source-id>/issue/84')
+  expect(DEMO_RESULT).toContain('Ship the portable Agent Skill')
 })
 
 test('homepage proves the local agent workflow before secondary paths', async () => {
