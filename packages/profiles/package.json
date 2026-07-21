@@ -1,6 +1,8 @@
 {
   "name": "@ctxindex/profiles",
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "Portable domain Profiles for ctxindex Resources.",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "exports": {
@@ -11,7 +13,7 @@
     "./file": "./src/file.ts"
   },
   "scripts": {
-    "build": "tsgo --noEmit -p tsconfig.json",
+    "build": "bun ../../scripts/release/profiles-package.ts build",
     "lint": "biome check .",
     "typecheck": "tsgo --noEmit -p tsconfig.json",
     "test": "NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-unit.json bun test --path-ignore-patterns '**/*.integration.test.ts' --path-ignore-patterns '**/*.e2e.test.ts'",
@@ -20,7 +22,7 @@
     "fullclean": "rm -rf .turbo dist coverage node_modules"
   },
   "dependencies": {
-    "@ctxindex/extension-sdk": "workspace:*",
-    "zod": "latest"
+    "@ctxindex/extension-sdk": "0.1.0",
+    "zod": "^4.4.3"
   }
 }

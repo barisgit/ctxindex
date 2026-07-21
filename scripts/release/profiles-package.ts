@@ -9,16 +9,28 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, join, posix, resolve } from 'node:path'
+import { basename, dirname, join, posix, resolve } from 'node:path'
+import {
+  assertSafeExtensionSdkPackageFiles,
+  extensionSdkPackageArchiveName,
+  readExtensionSdkPackageFiles,
+} from './extension-sdk-package'
 
 const repoRoot = resolve(import.meta.dir, '../..')
-const sdkRoot = join(repoRoot, 'packages/extension-sdk')
-const stagingRoot = join(repoRoot, 'dist/npm/extension-sdk-package')
+const profilesRoot = join(repoRoot, 'packages/profiles')
+const stagingRoot = join(repoRoot, 'dist/npm/profiles-package')
 const tsc = join(repoRoot, 'node_modules/.bin/tsc')
 const semverPattern =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/
+const entryNames = [
+  'index',
+  'calendar-event',
+  'chat-message',
+  'mail-message',
+  'file',
+] as const
 
-export interface ExtensionSdkSourceManifest {
+export interface ProfilesSourceManifest {
   readonly name: string
   readonly version: string
   readonly description: string
@@ -28,37 +40,45 @@ export interface ExtensionSdkSourceManifest {
   readonly dependencies: Readonly<Record<string, string>>
 }
 
-export interface ExtensionSdkPublishManifest {
-  readonly name: '@ctxindex/extension-sdk'
+type ProfilesExport = {
+  readonly types: string
+  readonly import: string
+}
+
+export interface ProfilesPublishManifest {
+  readonly name: '@ctxindex/profiles'
   readonly version: string
   readonly description: string
   readonly license: 'MIT'
   readonly homepage: 'https://ctxindex.com'
-  readonly bugs: {
-    readonly url: 'https://github.com/barisgit/ctxindex/issues'
-  }
+  readonly bugs: { readonly url: 'https://github.com/barisgit/ctxindex/issues' }
   readonly type: 'module'
-  readonly exports: {
-    readonly '.': {
-      readonly types: './dist/index.d.ts'
-      readonly import: './dist/index.js'
-    }
-  }
+  readonly exports: Readonly<{
+    '.': ProfilesExport
+    './calendar-event': ProfilesExport
+    './chat-message': ProfilesExport
+    './mail-message': ProfilesExport
+    './file': ProfilesExport
+  }>
   readonly files: readonly ['dist', 'README.md', 'LICENSE']
   readonly engines: { readonly bun: '1.3.14' }
   readonly repository: {
     readonly type: 'git'
     readonly url: 'git+https://github.com/barisgit/ctxindex.git'
-    readonly directory: 'packages/extension-sdk'
+    readonly directory: 'packages/profiles'
   }
   readonly publishConfig: {
     readonly access: 'public'
     readonly registry: 'https://registry.npmjs.org/'
   }
-  readonly dependencies: { readonly zod: '^4.4.3' }
+  readonly dependencies: {
+    readonly '@ctxindex/extension-sdk': string
+    readonly zod: '^4.4.3'
+  }
+  readonly private?: never
 }
 
-export interface ExtensionSdkPackageFile {
+export interface ProfilesPackageFile {
   readonly path: string
   readonly content: string | Uint8Array
 }
@@ -77,7 +97,74 @@ const sensitiveContentPatterns = [
   /\bAKIA[0-9A-Z]{16}\b/,
 ] as const
 
-function text(content: ExtensionSdkPackageFile['content']): string {
+function packageExport(name: (typeof entryNames)[number]): ProfilesExport {
+  return {
+    types: `./dist/${name}.d.ts`,
+    import: `./dist/${name}.js`,
+  }
+}
+
+export function createProfilesPublishManifest(
+  source: ProfilesSourceManifest,
+): ProfilesPublishManifest {
+  if (!semverPattern.test(source.version)) {
+    throw new TypeError(`${source.version} is not a valid semantic version`)
+  }
+  const sdkVersion = source.dependencies['@ctxindex/extension-sdk'] ?? ''
+  if (!semverPattern.test(sdkVersion)) {
+    throw new TypeError(`${sdkVersion} is not a valid semantic version`)
+  }
+  if (
+    source.name !== '@ctxindex/profiles' ||
+    source.license !== 'MIT' ||
+    source.private !== true ||
+    source.type !== 'module' ||
+    source.dependencies.zod !== '^4.4.3'
+  ) {
+    throw new TypeError('Profiles source manifest is not publishable')
+  }
+
+  return {
+    name: '@ctxindex/profiles',
+    version: source.version,
+    description: source.description,
+    license: 'MIT',
+    homepage: 'https://ctxindex.com',
+    bugs: { url: 'https://github.com/barisgit/ctxindex/issues' },
+    type: 'module',
+    exports: {
+      '.': packageExport('index'),
+      './calendar-event': packageExport('calendar-event'),
+      './chat-message': packageExport('chat-message'),
+      './mail-message': packageExport('mail-message'),
+      './file': packageExport('file'),
+    },
+    files: ['dist', 'README.md', 'LICENSE'],
+    engines: { bun: '1.3.14' },
+    repository: {
+      type: 'git',
+      url: 'git+https://github.com/barisgit/ctxindex.git',
+      directory: 'packages/profiles',
+    },
+    publishConfig: {
+      access: 'public',
+      registry: 'https://registry.npmjs.org/',
+    },
+    dependencies: {
+      '@ctxindex/extension-sdk': sdkVersion,
+      zod: '^4.4.3',
+    },
+  }
+}
+
+export function profilesPackageArchiveName(version: string): string {
+  if (!semverPattern.test(version)) {
+    throw new TypeError(`${version} is not a valid semantic version`)
+  }
+  return `ctxindex-profiles-${version}.tgz`
+}
+
+function text(content: ProfilesPackageFile['content']): string {
   return typeof content === 'string'
     ? content
     : new TextDecoder('utf-8', { fatal: true }).decode(content)
@@ -88,64 +175,23 @@ function isAllowedPackagePath(path: string): boolean {
     path === 'package/LICENSE' ||
     path === 'package/README.md' ||
     path === 'package/package.json' ||
-    path === 'package/dist/index.js' ||
-    /^package\/dist\/[a-z][a-z-]*\.d\.ts$/.test(path)
+    /^package\/dist\/chunks\/[a-z0-9-]+\.js$/.test(path) ||
+    entryNames.some(
+      (name) =>
+        path === `package/dist/${name}.js` ||
+        path === `package/dist/${name}.d.ts`,
+    )
   )
 }
 
-export function createExtensionSdkPublishManifest(
-  source: ExtensionSdkSourceManifest,
-): ExtensionSdkPublishManifest {
-  if (!semverPattern.test(source.version)) {
-    throw new TypeError(`${source.version} is not a valid semantic version`)
-  }
-  if (
-    source.name !== '@ctxindex/extension-sdk' ||
-    source.license !== 'MIT' ||
-    source.private !== true ||
-    source.type !== 'module' ||
-    source.dependencies.zod !== '^4.4.3'
-  ) {
-    throw new TypeError('Extension SDK source manifest is not publishable')
-  }
-  return {
-    name: '@ctxindex/extension-sdk',
-    version: source.version,
-    description: source.description,
-    license: 'MIT',
-    homepage: 'https://ctxindex.com',
-    bugs: { url: 'https://github.com/barisgit/ctxindex/issues' },
-    type: 'module',
-    exports: {
-      '.': {
-        types: './dist/index.d.ts',
-        import: './dist/index.js',
-      },
-    },
-    files: ['dist', 'README.md', 'LICENSE'],
-    engines: { bun: '1.3.14' },
-    repository: {
-      type: 'git',
-      url: 'git+https://github.com/barisgit/ctxindex.git',
-      directory: 'packages/extension-sdk',
-    },
-    publishConfig: {
-      access: 'public',
-      registry: 'https://registry.npmjs.org/',
-    },
-    dependencies: { zod: '^4.4.3' },
-  }
+function importedSpecifiers(content: string): readonly string[] {
+  return [
+    ...content.matchAll(/(?:from\s+|import\s*(?:\(\s*)?)['"]([^'"]+)['"]/g),
+  ].flatMap((match) => (match[1] === undefined ? [] : [match[1]]))
 }
 
-export function extensionSdkPackageArchiveName(version: string): string {
-  if (!semverPattern.test(version)) {
-    throw new TypeError(`${version} is not a valid semantic version`)
-  }
-  return `ctxindex-extension-sdk-${version}.tgz`
-}
-
-export function assertSafeExtensionSdkPackageFiles(
-  files: readonly ExtensionSdkPackageFile[],
+export function assertSafeProfilesPackageFiles(
+  files: readonly ProfilesPackageFile[],
 ): void {
   const paths = files.map(({ path }) => path).sort()
   for (const path of paths) {
@@ -155,18 +201,21 @@ export function assertSafeExtensionSdkPackageFiles(
       path.includes('\\') ||
       path.split('/').includes('..')
     ) {
-      throw new TypeError(`Unexpected Extension SDK package file: ${path}`)
+      throw new TypeError(`Unexpected Profiles package file: ${path}`)
     }
   }
+
   for (const required of [
     'package/LICENSE',
     'package/README.md',
     'package/package.json',
-    'package/dist/index.d.ts',
-    'package/dist/index.js',
+    ...entryNames.flatMap((name) => [
+      `package/dist/${name}.d.ts`,
+      `package/dist/${name}.js`,
+    ]),
   ]) {
     if (!paths.includes(required)) {
-      throw new TypeError(`Missing Extension SDK package file: ${required}`)
+      throw new TypeError(`Missing Profiles package file: ${required}`)
     }
   }
 
@@ -181,14 +230,17 @@ export function assertSafeExtensionSdkPackageFiles(
     if (content.includes(repoRoot)) {
       throw new TypeError(`Checkout path in package file: ${file.path}`)
     }
-    if (
-      file.path.startsWith('package/dist/') &&
-      (/from\s+['"]@ctxindex\//.test(content) ||
-        /import\s*(?:\(\s*)?['"]@ctxindex\//.test(content))
-    ) {
-      throw new TypeError(
-        `Private ctxindex import in package file: ${file.path}`,
-      )
+    if (file.path.startsWith('package/dist/')) {
+      for (const specifier of importedSpecifiers(content)) {
+        if (
+          specifier.startsWith('@ctxindex/') &&
+          specifier !== '@ctxindex/extension-sdk'
+        ) {
+          throw new TypeError(
+            `Private ctxindex import in package file: ${file.path}`,
+          )
+        }
+      }
     }
   }
 
@@ -198,9 +250,9 @@ export function assertSafeExtensionSdkPackageFiles(
     unknown
   >
   if ('scripts' in manifest || 'devDependencies' in manifest) {
-    throw new TypeError('Extension SDK publish manifest contains tooling')
+    throw new TypeError('Profiles publish manifest contains tooling')
   }
-  const expected = createExtensionSdkPublishManifest({
+  const expected = createProfilesPublishManifest({
     name: String(manifest.name ?? ''),
     version: String(manifest.version ?? ''),
     description: String(manifest.description ?? ''),
@@ -214,37 +266,38 @@ export function assertSafeExtensionSdkPackageFiles(
         : {},
   })
   if (JSON.stringify(manifest) !== JSON.stringify(expected)) {
-    throw new TypeError(
-      'Extension SDK publish manifest does not match contract',
-    )
+    throw new TypeError('Profiles publish manifest does not match contract')
   }
 
-  const runtime = text(
-    files.find(({ path }) => path === 'package/dist/index.js')?.content ?? '',
-  )
-  const runtimeImports = [
-    ...runtime.matchAll(/(?:from\s+|import\s*\()\s*['"]([^'"]+)['"]/g),
-  ].map((match) => match[1])
-  if (runtimeImports.some((specifier) => specifier !== 'zod')) {
-    throw new TypeError(
-      `Extension SDK runtime has undeclared imports: ${runtimeImports.join(', ')}`,
+  const allowedRuntimeImports = new Set(['@ctxindex/extension-sdk', 'zod'])
+  const runtimePaths = new Set(paths.filter((path) => path.endsWith('.js')))
+  for (const file of files.filter(({ path }) => path.endsWith('.js'))) {
+    const unexpected = importedSpecifiers(text(file.content)).filter(
+      (specifier) => {
+        if (allowedRuntimeImports.has(specifier)) return false
+        if (!specifier.startsWith('.')) return true
+        const target = posix.normalize(
+          posix.join(posix.dirname(file.path), specifier),
+        )
+        return !runtimePaths.has(target)
+      },
     )
+    if (unexpected.length > 0) {
+      throw new TypeError(
+        `Profiles runtime has undeclared imports: ${unexpected.join(', ')}`,
+      )
+    }
   }
 
   const declarationPaths = new Set(
-    files.map(({ path }) => path).filter((path) => path.endsWith('.d.ts')),
+    paths.filter((path) => path.endsWith('.d.ts')),
   )
   for (const file of files.filter(({ path }) => path.endsWith('.d.ts'))) {
-    const imports = [
-      ...text(file.content).matchAll(
-        /(?:from\s+|import\s*\()\s*['"]([^'"]+)['"]/g,
-      ),
-    ].flatMap((match) => (match[1] === undefined ? [] : [match[1]]))
-    for (const specifier of imports) {
+    for (const specifier of importedSpecifiers(text(file.content))) {
       if (!specifier.startsWith('.')) continue
       if (!specifier.endsWith('.js')) {
         throw new TypeError(
-          `Extension SDK declaration has a non-ESM relative import: ${file.path} -> ${specifier}`,
+          `Profiles declaration has a non-ESM relative import: ${file.path} -> ${specifier}`,
         )
       }
       const target = posix.normalize(
@@ -252,7 +305,7 @@ export function assertSafeExtensionSdkPackageFiles(
       )
       if (!declarationPaths.has(target)) {
         throw new TypeError(
-          `Extension SDK declaration import is missing: ${file.path} -> ${specifier}`,
+          `Profiles declaration import is missing: ${file.path} -> ${specifier}`,
         )
       }
     }
@@ -294,25 +347,7 @@ async function runRequired(
   return result
 }
 
-export async function buildExtensionSdkPackage(): Promise<void> {
-  const outputRoot = join(sdkRoot, 'dist')
-  await rm(outputRoot, { recursive: true, force: true })
-  await mkdir(outputRoot, { recursive: true, mode: 0o755 })
-
-  const result = await Bun.build({
-    entrypoints: [join(sdkRoot, 'src/index.ts')],
-    outdir: outputRoot,
-    target: 'bun',
-    format: 'esm',
-    external: ['zod'],
-    naming: 'index.js',
-  })
-  if (!result.success) {
-    throw new Error(result.logs.map((log) => log.message).join('\n'))
-  }
-  await runRequired([tsc, '--project', join(sdkRoot, 'tsconfig.build.json')], {
-    cwd: sdkRoot,
-  })
+async function rewriteDeclarationSpecifiers(outputRoot: string): Promise<void> {
   for (const entry of await readdir(outputRoot)) {
     if (!entry.endsWith('.d.ts')) continue
     const path = join(outputRoot, entry)
@@ -340,19 +375,51 @@ export async function buildExtensionSdkPackage(): Promise<void> {
   }
 }
 
-async function prepareExtensionSdkPackage(): Promise<ExtensionSdkPublishManifest> {
-  await buildExtensionSdkPackage()
+export async function buildProfilesPackage(): Promise<void> {
+  const outputRoot = join(profilesRoot, 'dist')
+  await rm(outputRoot, { recursive: true, force: true })
+  await mkdir(outputRoot, { recursive: true, mode: 0o755 })
+
+  const result = await Bun.build({
+    entrypoints: entryNames.map((name) => join(profilesRoot, `src/${name}.ts`)),
+    outdir: outputRoot,
+    target: 'bun',
+    format: 'esm',
+    external: ['@ctxindex/extension-sdk', 'zod'],
+    splitting: true,
+    naming: {
+      entry: '[name].js',
+      chunk: 'chunks/[name]-[hash].js',
+    },
+  })
+  if (!result.success) {
+    throw new Error(result.logs.map((log) => log.message).join('\n'))
+  }
+  await runRequired(
+    [tsc, '--project', join(profilesRoot, 'tsconfig.build.json')],
+    {
+      cwd: profilesRoot,
+    },
+  )
+  await rewriteDeclarationSpecifiers(outputRoot)
+}
+
+async function prepareProfilesPackage(): Promise<ProfilesPublishManifest> {
+  await buildProfilesPackage()
   const source = JSON.parse(
-    await readFile(join(sdkRoot, 'package.json'), 'utf8'),
-  ) as ExtensionSdkSourceManifest
-  const manifest = createExtensionSdkPublishManifest(source)
+    await readFile(join(profilesRoot, 'package.json'), 'utf8'),
+  ) as ProfilesSourceManifest
+  const manifest = createProfilesPublishManifest(source)
 
   await rm(stagingRoot, { recursive: true, force: true })
   await mkdir(stagingRoot, { recursive: true, mode: 0o755 })
-  await cp(join(sdkRoot, 'dist'), join(stagingRoot, 'dist'), {
+  await cp(join(profilesRoot, 'dist'), join(stagingRoot, 'dist'), {
     recursive: true,
   })
-  await copyFile(join(sdkRoot, 'README.md'), join(stagingRoot, 'README.md'))
+  await copyFile(
+    join(profilesRoot, 'README.md'),
+    join(stagingRoot, 'README.md'),
+  )
   await copyFile(join(repoRoot, 'LICENSE'), join(stagingRoot, 'LICENSE'))
   await writeFile(
     join(stagingRoot, 'package.json'),
@@ -362,14 +429,14 @@ async function prepareExtensionSdkPackage(): Promise<ExtensionSdkPublishManifest
   return manifest
 }
 
-export async function packExtensionSdkPackage(
+export async function packProfilesPackage(
   destination = join(repoRoot, 'dist/npm/artifacts'),
 ): Promise<string> {
-  const manifest = await prepareExtensionSdkPackage()
+  const manifest = await prepareProfilesPackage()
   const resolvedDestination = resolve(destination)
   const archive = join(
     resolvedDestination,
-    extensionSdkPackageArchiveName(manifest.version),
+    profilesPackageArchiveName(manifest.version),
   )
   await mkdir(resolvedDestination, { recursive: true, mode: 0o755 })
   await rm(archive, { force: true })
@@ -402,15 +469,13 @@ async function readArchiveMember(
     new Response(result.stdout).arrayBuffer(),
     new Response(result.stderr).text(),
   ])
-  if (exitCode !== 0) {
-    throw new Error(`Could not read ${member}: ${stderr}`)
-  }
+  if (exitCode !== 0) throw new Error(`Could not read ${member}: ${stderr}`)
   return new Uint8Array(content)
 }
 
-export async function readExtensionSdkPackageFiles(
+export async function readProfilesPackageFiles(
   archive: string,
-): Promise<readonly ExtensionSdkPackageFile[]> {
+): Promise<readonly ProfilesPackageFile[]> {
   const listed = await runRequired(['tar', '-tzf', resolve(archive)])
   const members = listed.stdout
     .split('\n')
@@ -424,7 +489,7 @@ export async function readExtensionSdkPackageFiles(
   )
 }
 
-export async function checksumExtensionSdkPackage(
+export async function checksumProfilesPackage(
   archive: string,
 ): Promise<string> {
   const resolvedArchive = resolve(archive)
@@ -436,17 +501,52 @@ export async function checksumExtensionSdkPackage(
   return checksum
 }
 
-export async function smokeExtensionSdkPackage(archive: string): Promise<void> {
+export async function smokeProfilesPackage(archive: string): Promise<void> {
   const resolvedArchive = resolve(archive)
-  const root = await mkdtemp(join(tmpdir(), 'ctxindex-extension-sdk-smoke-'))
+  const root = await mkdtemp(join(tmpdir(), 'ctxindex-profiles-smoke-'))
   try {
-    await cp(join(import.meta.dir, 'fixtures/extension-sdk-consumer'), root, {
+    const files = await readProfilesPackageFiles(resolvedArchive)
+    const packageManifest = JSON.parse(
+      text(
+        files.find(({ path }) => path === 'package/package.json')?.content ??
+          '',
+      ),
+    ) as ProfilesPublishManifest
+    const sdkVersion = packageManifest.dependencies['@ctxindex/extension-sdk']
+    const sdkArchive = join(
+      dirname(resolvedArchive),
+      extensionSdkPackageArchiveName(sdkVersion),
+    )
+    const localSdkArchive = (await Bun.file(sdkArchive).exists())
+      ? sdkArchive
+      : undefined
+    if (localSdkArchive !== undefined) {
+      const sdkFiles = await readExtensionSdkPackageFiles(localSdkArchive)
+      assertSafeExtensionSdkPackageFiles(sdkFiles)
+      const sdkManifest = JSON.parse(
+        text(
+          sdkFiles.find(({ path }) => path === 'package/package.json')
+            ?.content ?? '',
+        ),
+      ) as { readonly name?: unknown; readonly version?: unknown }
+      if (
+        sdkManifest.name !== '@ctxindex/extension-sdk' ||
+        sdkManifest.version !== sdkVersion
+      ) {
+        throw new TypeError(
+          'Local Extension SDK artifact does not match Profiles dependency',
+        )
+      }
+    }
+    await cp(join(import.meta.dir, 'fixtures/profiles-consumer'), root, {
       recursive: true,
     })
     const manifest = JSON.parse(
       await readFile(join(root, 'package.json'), 'utf8'),
     ) as { dependencies: Record<string, string> }
-    manifest.dependencies['@ctxindex/extension-sdk'] = `file:${resolvedArchive}`
+    manifest.dependencies['@ctxindex/extension-sdk'] =
+      localSdkArchive === undefined ? sdkVersion : `file:${localSdkArchive}`
+    manifest.dependencies['@ctxindex/profiles'] = `file:${resolvedArchive}`
     await writeFile(
       join(root, 'package.json'),
       `${JSON.stringify(manifest, null, 2)}\n`,
@@ -464,78 +564,71 @@ export async function smokeExtensionSdkPackage(archive: string): Promise<void> {
       cwd: root,
     })
     const result = JSON.parse(runtime.stdout) as {
-      readonly extension?: string
-      readonly catalog?: string
-      readonly zod?: boolean
-      readonly runtimeExports?: readonly string[]
+      readonly root?: readonly string[]
+      readonly subpaths?: readonly string[]
+      readonly identical?: Readonly<Record<string, boolean>>
     }
+    const expected = ['calendar.event', 'chat.message', 'mail.message', 'file']
     if (
-      result.extension !== 'fixture.consumer' ||
-      result.catalog !== 'fixture.catalog' ||
-      result.zod !== true ||
-      JSON.stringify(result.runtimeExports) !==
-        JSON.stringify([
-          'auth',
-          'defineAdapter',
-          'defineCatalog',
-          'defineExtension',
-          'defineOAuthApp',
-          'defineProfile',
-          'defineProvider',
-          'docs',
-          'packageExtension',
-          'z',
-        ])
+      JSON.stringify(result.root) !== JSON.stringify(expected) ||
+      JSON.stringify(result.subpaths) !== JSON.stringify(expected) ||
+      JSON.stringify(result.identical) !==
+        JSON.stringify({
+          calendarEvent: true,
+          chatMessage: true,
+          mailMessage: true,
+          file: true,
+        })
     ) {
-      throw new Error(`Unexpected SDK smoke output: ${runtime.stdout}`)
+      throw new Error(`Unexpected Profiles smoke output: ${runtime.stdout}`)
     }
   } finally {
     await rm(root, { recursive: true, force: true })
   }
 }
 
-export async function verifyExtensionSdkPackage(
+export async function verifyProfilesPackage(
   archive: string,
   smoke = false,
 ): Promise<string> {
-  const files = await readExtensionSdkPackageFiles(archive)
-  assertSafeExtensionSdkPackageFiles(files)
-  if (smoke) await smokeExtensionSdkPackage(archive)
-  return checksumExtensionSdkPackage(archive)
+  const files = await readProfilesPackageFiles(archive)
+  assertSafeProfilesPackageFiles(files)
+  if (smoke) await smokeProfilesPackage(archive)
+  return checksumProfilesPackage(archive)
 }
 
 async function main(args: readonly string[]): Promise<number> {
   const [command, argument] = args
   if (command === 'build') {
-    await buildExtensionSdkPackage()
+    await buildProfilesPackage()
     return 0
   }
   if (command === 'pack') {
     console.log(
-      await packExtensionSdkPackage(
+      await packProfilesPackage(
         argument ?? join(repoRoot, 'dist/npm/artifacts'),
       ),
     )
     return 0
   }
   if (command === 'verify' && argument !== undefined) {
-    console.log((await verifyExtensionSdkPackage(argument)).trimEnd())
+    console.log((await verifyProfilesPackage(argument)).trimEnd())
     return 0
   }
   if (command === 'smoke' && argument !== undefined) {
-    await smokeExtensionSdkPackage(argument)
+    await smokeProfilesPackage(argument)
     return 0
   }
   if (command === 'prepare') {
-    const archive = await packExtensionSdkPackage(
+    const archive = await packProfilesPackage(
       argument ?? join(repoRoot, 'dist/npm/artifacts'),
     )
-    console.log((await verifyExtensionSdkPackage(archive, true)).trimEnd())
+    console.log((await verifyProfilesPackage(archive, true)).trimEnd())
     console.log(archive)
     return 0
   }
   console.error(
-    'usage: extension-sdk-package.ts build | pack [destination] | verify <archive> | smoke <archive> | prepare [destination]',
+    'usage: profiles-package.ts build | pack [destination] | verify <archive> | smoke <archive> | prepare [destination]',
   )
   return 2
 }

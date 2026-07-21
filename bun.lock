@@ -142,10 +142,10 @@
     },
     "packages/profiles": {
       "name": "@ctxindex/profiles",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
-        "@ctxindex/extension-sdk": "workspace:*",
-        "zod": "latest",
+        "@ctxindex/extension-sdk": "0.1.0",
+        "zod": "^4.4.3",
       },
     },
     "packages/rpc": {
