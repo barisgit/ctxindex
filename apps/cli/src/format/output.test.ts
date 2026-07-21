@@ -80,6 +80,25 @@ test('narrow pretty collections use vertical cards without truncating refs', () 
   expect(output).not.toContain('...')
 })
 
+test('pretty cards neutralize provider terminal controls without losing text', () => {
+  const output = formatPrettyCollection(
+    [{ key: 'summary', label: 'Summary' }],
+    [
+      {
+        summary: 'first line\rsecond\tvalue\u001b[31mred\u001b[0m',
+      },
+    ],
+    { columns: 40 },
+  )
+
+  expect(output).not.toContain('\r')
+  expect(output).not.toContain('\t')
+  expect(output).not.toContain('\u001b')
+  expect(output).toContain('first line')
+  expect(output).toContain('second  value')
+  expect(output).toContain(String.raw`\u001b[31mred\u001b[0m`)
+})
+
 test('narrow cards preserve wide Unicode below and above table width', () => {
   for (const [value, reconstructTable] of [
     ['abc def  ghi 末尾', false],
