@@ -8,11 +8,11 @@ export const DEMO_EXTENSION_ID = 'enarocanje.proof'
 export const DEMO_COMMANDS = `git clone https://github.com/barisgit/ctxindex.git
 cd ctxindex && bun install
 bun cli init
-bun cli extension install local ${DEMO_EXTENSION_TARGET} ${DEMO_EXTENSION_ID} --json
+bun cli extension install local ${DEMO_EXTENSION_TARGET} ${DEMO_EXTENSION_ID} --format json
 bun cli realm add demo --name "Demo"
 bun cli source add enarocanje.fixture --realm demo --label demo-tenders
-bun cli sync --source demo-tenders --json
-bun cli search "bridge inspection" --realm demo --json`
+bun cli sync --source demo-tenders --format json
+bun cli search "bridge inspection" --realm demo --format json`
 
 export const DEMO_RESULT = `{
   "results": [{

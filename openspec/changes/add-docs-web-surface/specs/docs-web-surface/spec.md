@@ -64,7 +64,7 @@ Commands, identifiers, input objects, and JSON result shapes published by the we
 - **THEN** the guide identifies immutable update prerequisites and supplies the complete replacement input required by the current Action schema
 
 #### Scenario: Reader requests describe JSON
-- **WHEN** a reader compares bare `describe --json` with `describe --full --json`
+- **WHEN** a reader compares bare `describe --format json` with `describe --full --format json`
 - **THEN** the site identifies the bare form as compact and the full form as the complete registry snapshot
 
 ### Requirement: Web dependency verification

@@ -154,7 +154,8 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       '--catalog',
       'fixture.catalog',
       '--trust',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(built.exitCode, built.stderr).toBe(0)
     expect(JSON.parse(built.stdout)).toMatchObject({
@@ -222,7 +223,8 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       '--ref',
       'refs/heads/main',
       '--trust',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(added.exitCode, added.stderr).toBe(0)
     const initialCatalog = JSON.parse(added.stdout) as CatalogRecord
@@ -233,7 +235,8 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       'search',
       'fixture.catalog',
       '--no-refresh',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(initialSearch.exitCode, initialSearch.stderr).toBe(0)
     expect(
@@ -259,7 +262,8 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
         'fixture',
         extensionId,
         '--no-refresh',
-        '--json',
+        '--format',
+        'json',
       ])
       expect(installed.exitCode, installed.stderr).toBe(0)
       const value = JSON.parse(installed.stdout) as InstalledOutput
@@ -290,7 +294,8 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       '--catalog',
       'fixture.catalog',
       '--trust',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(rebuilt.exitCode, rebuilt.stderr).toBe(0)
     const replacementManifest = JSON.parse(
@@ -305,7 +310,8 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       'catalog',
       'refresh',
       'fixture',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(refreshed.exitCode, refreshed.stderr).toBe(0)
     const replacementCatalog = JSON.parse(refreshed.stdout) as CatalogRecord
@@ -316,7 +322,8 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       'search',
       'fixture.catalog',
       '--no-refresh',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(refreshedSearch.exitCode, refreshedSearch.stderr).toBe(0)
     expect(
@@ -335,7 +342,8 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       'fixture',
       'fixture.catalog.literal',
       '--no-refresh',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(replacement.exitCode, replacement.stderr).toBe(0)
     const replacementValue = JSON.parse(replacement.stdout) as InstalledOutput
@@ -360,7 +368,8 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       'extension',
       'uninstall',
       'fixture.catalog.local',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(removedCuratedLocal.exitCode, removedCuratedLocal.stderr).toBe(0)
     const directLocal = await run([
@@ -369,7 +378,8 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       'local',
       join(repository, 'packages', 'local'),
       'fixture.catalog.local',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(directLocal.exitCode, directLocal.stderr).toBe(0)
     const otherOriginCollision = await run([
@@ -379,7 +389,8 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       'fixture',
       'fixture.catalog.local',
       '--no-refresh',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(otherOriginCollision.exitCode).toBe(50)
     expect(otherOriginCollision.stderr).toContain('another origin')
@@ -387,7 +398,8 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       'extension',
       'uninstall',
       'fixture.catalog.local',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(removedDirectLocal.exitCode, removedDirectLocal.stderr).toBe(0)
     const restoredCuratedLocal = await run([
@@ -397,7 +409,8 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       'fixture',
       'fixture.catalog.local',
       '--no-refresh',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(restoredCuratedLocal.exitCode, restoredCuratedLocal.stderr).toBe(0)
     const restoredLocalValue = JSON.parse(
@@ -454,7 +467,10 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       PATH: offlineBin,
       BUN_CONFIG_REGISTRY: 'http://127.0.0.1:1',
     }
-    const loaded = await run(['extension', 'list', '--json'], offlineEnv)
+    const loaded = await run(
+      ['extension', 'list', '--format', 'json'],
+      offlineEnv,
+    )
     expect(loaded.exitCode, loaded.stderr).toBe(0)
     for (const extensionId of [
       'fixture.catalog.literal',
@@ -508,7 +524,15 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       })
     }
     const storedCatalog = await run(
-      ['extension', 'catalog', 'show', 'fixture', '--no-refresh', '--json'],
+      [
+        'extension',
+        'catalog',
+        'show',
+        'fixture',
+        '--no-refresh',
+        '--format',
+        'json',
+      ],
       offlineEnv,
     )
     expect(storedCatalog.exitCode, storedCatalog.stderr).toBe(0)
@@ -520,7 +544,7 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       'fixture.catalog.local',
     ]) {
       const uninstalled = await run(
-        ['extension', 'uninstall', extensionId, '--json'],
+        ['extension', 'uninstall', extensionId, '--format', 'json'],
         offlineEnv,
       )
       expect(uninstalled.exitCode, uninstalled.stderr).toBe(0)
@@ -531,7 +555,7 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       })
     }
     const removed = await run(
-      ['extension', 'catalog', 'remove', 'fixture', '--json'],
+      ['extension', 'catalog', 'remove', 'fixture', '--format', 'json'],
       offlineEnv,
     )
     expect(removed.exitCode, removed.stderr).toBe(0)

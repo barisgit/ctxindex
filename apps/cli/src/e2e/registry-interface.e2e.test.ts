@@ -40,7 +40,7 @@ test('interpreted registry interface follows an explicit external Extension', as
       `[extensions]\npaths = ${JSON.stringify([extensionPath])}\n\n[secrets]\nbackend = "keychain"\n\n[log]\nlevel = "info"\n\n[log.file]\nrotate = "daily"\nretain_days = 14\ncompress = true\n`,
     )
 
-    const described = await run(['describe', '--json'])
+    const described = await run(['describe', '--format', 'json'])
     expect(described.exitCode, described.stderr).toBe(0)
     expect(described.stderr).toBe('')
     const registry = JSON.parse(described.stdout)
@@ -56,7 +56,7 @@ test('interpreted registry interface follows an explicit external Extension', as
     expect(registry.sources[0]).not.toHaveProperty('config')
     expect(registry.actions[0]).not.toHaveProperty('input')
 
-    const fullRegistry = await run(['describe', '--full', '--json'])
+    const fullRegistry = await run(['describe', '--full', '--format', 'json'])
     expect(fullRegistry.exitCode, fullRegistry.stderr).toBe(0)
     expect(JSON.parse(fullRegistry.stdout).kinds).toContainEqual(
       expect.objectContaining({
@@ -69,7 +69,8 @@ test('interpreted registry interface follows an explicit external Extension', as
       'describe',
       'profile',
       'ctxindex.demo.tender',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(JSON.parse(selectedProfile.stdout)).toEqual(
       expect.objectContaining({
@@ -113,7 +114,8 @@ test('interpreted registry interface follows an explicit external Extension', as
       'describe',
       'action',
       'communication.message.draft.create',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(actionJson.exitCode, actionJson.stderr).toBe(0)
     expect(JSON.parse(actionJson.stdout)).toMatchObject({
@@ -175,7 +177,8 @@ test('interpreted registry interface follows an explicit external Extension', as
       'describe',
       'adapter',
       'google.mailbox',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(JSON.parse(googleAuthJson.stdout)).toMatchObject({
       id: 'google.mailbox',
@@ -197,7 +200,8 @@ test('interpreted registry interface follows an explicit external Extension', as
       'describe',
       'adapter',
       'microsoft.mailbox',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(microsoftMailbox.exitCode, microsoftMailbox.stderr).toBe(0)
     expect(JSON.parse(microsoftMailbox.stdout)).toMatchObject({
@@ -229,7 +233,8 @@ test('interpreted registry interface follows an explicit external Extension', as
       'describe',
       'adapter',
       'microsoft.calendar',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(microsoftCalendar.exitCode, microsoftCalendar.stderr).toBe(0)
     expect(JSON.parse(microsoftCalendar.stdout)).toMatchObject({
@@ -292,7 +297,7 @@ test('interpreted registry interface follows an explicit external Extension', as
     expect(removedClientAlias.exitCode).toBe(2)
     expect(removedClientAlias.stderr).toContain('unknown command client')
 
-    const extensions = await run(['extension', 'list', '--json'])
+    const extensions = await run(['extension', 'list', '--format', 'json'])
     expect(extensions.exitCode, extensions.stderr).toBe(0)
     expect(JSON.parse(extensions.stdout)).toContainEqual({
       id: 'ctxindex.demo',

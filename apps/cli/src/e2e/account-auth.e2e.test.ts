@@ -224,7 +224,9 @@ test('account add authorizes with a persisted OAuth App, lists its label, and re
     expect(added.stdout).toContain('account added:')
     expect(added.stdout).not.toMatch(/grant/i)
 
-    const listed = await sandbox.run(['account', 'list', '--json'], { env })
+    const listed = await sandbox.run(['account', 'list', '--format', 'json'], {
+      env,
+    })
     expect(listed.exitCode, listed.stderr).toBe(0)
     expect(listed.stdout).not.toMatch(/grant|scope/i)
     expect(JSON.parse(listed.stdout)).toMatchObject([
@@ -268,7 +270,7 @@ test('account add authorizes with a persisted OAuth App, lists its label, and re
     )
 
     const synced = await sandbox.run(
-      ['sync', '--source', 'calendar', '--json'],
+      ['sync', '--source', 'calendar', '--format', 'json'],
       {
         env,
       },
@@ -280,10 +282,12 @@ test('account add authorizes with a persisted OAuth App, lists its label, and re
     expect(removed.exitCode, removed.stderr).toBe(0)
     expect(removed.stdout).toContain('account removed: "work"')
     expect(
-      JSON.parse((await sandbox.run(['account', 'list', '--json'])).stdout),
+      JSON.parse(
+        (await sandbox.run(['account', 'list', '--format', 'json'])).stdout,
+      ),
     ).toEqual([])
     const needsAuth = await sandbox.run(
-      ['sync', '--source', 'calendar', '--json'],
+      ['sync', '--source', 'calendar', '--format', 'json'],
       {
         env,
       },

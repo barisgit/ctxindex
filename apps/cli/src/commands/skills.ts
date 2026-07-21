@@ -1,5 +1,6 @@
 import { defineCtxCommand } from '../command-model'
 import { mapErrorToExit, runWithExit } from '../format/exit'
+import { outputFormatArg } from '../format/output'
 import { formatSkill, formatSkillsList } from '../format/skills'
 import { getSkillContent, listSkills } from '../skills/loader'
 import { resolveBundledSkills } from '../skills/resolve'
@@ -44,10 +45,13 @@ export const skillsCommand = defineCtxCommand({
   subCommands: {
     list: defineCtxCommand({
       meta: { name: 'list', description: 'List bundled skills.' },
-      args: { json: { type: 'boolean', description: 'Print JSON' } },
+      args: { format: outputFormatArg },
       run: ({ args }) =>
         runWithExit(() =>
-          handleSkillsCommand({ kind: 'list', json: args.json ?? false }),
+          handleSkillsCommand({
+            kind: 'list',
+            json: args.format === 'json',
+          }),
         ),
     }),
     get: defineCtxCommand({
@@ -55,7 +59,7 @@ export const skillsCommand = defineCtxCommand({
       args: {
         name: { type: 'positional', required: true },
         inline: { type: 'boolean', description: 'Inline file references' },
-        json: { type: 'boolean', description: 'Print JSON' },
+        format: outputFormatArg,
       },
       run: ({ args }) =>
         runWithExit(() =>
@@ -63,7 +67,7 @@ export const skillsCommand = defineCtxCommand({
             kind: 'get',
             name: args.name,
             inline: args.inline ?? false,
-            json: args.json ?? false,
+            json: args.format === 'json',
           }),
         ),
     }),

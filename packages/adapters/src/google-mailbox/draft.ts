@@ -76,7 +76,7 @@ function localMessage(
   expectedDraft: boolean,
 ): CommunicationMessage {
   const resource = context.resolveResource(ref)
-  const guidance = `Retrieve it first with: ctxindex get ${ref} --json`
+  const guidance = `Retrieve it first with: ctxindex get ${ref} --format json`
   if (!resource) {
     throw new CtxindexValidationError(
       'invalid_action_input',
@@ -126,7 +126,7 @@ function replyDetails(
   if (!recipient || !parent.rfcMessageId || !parent.threadId) {
     throw new CtxindexValidationError(
       'invalid_action_input',
-      `Reply parent "${replyToRef}" lacks recipient or Gmail threading fields. Retrieve it first with: ctxindex get ${replyToRef} --json`,
+      `Reply parent "${replyToRef}" lacks recipient or Gmail threading fields. Retrieve it first with: ctxindex get ${replyToRef} --format json`,
     )
   }
   const subject = deriveCommunicationMessageReplySubject(parent.subject)
@@ -177,7 +177,7 @@ function validateReplyUpdate(
   ) {
     throw new CtxindexValidationError(
       'invalid_action_input',
-      `Reply Draft "${input.ref}" lacks stored Gmail reply context. Retrieve it first with: ctxindex get ${input.ref} --json`,
+      `Reply Draft "${input.ref}" lacks stored Gmail reply context. Retrieve it first with: ctxindex get ${input.ref} --format json`,
     )
   }
   if (

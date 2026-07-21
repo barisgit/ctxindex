@@ -117,14 +117,12 @@ USAGE ctxindex account list [OPTIONS]
 
 OPTIONS
 
-  --format=<pretty|text|json>    Output format: pretty, text, or json
-                       --json    Shorthand for --format json
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
-| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
-| `--json` | Shorthand for --format json | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex account remove`
 
@@ -198,14 +196,12 @@ USAGE ctxindex oauth-app list [OPTIONS]
 
 OPTIONS
 
-  --format=<pretty|text|json>    Output format: pretty, text, or json
-                       --json    Shorthand for --format json
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
-| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
-| `--json` | Shorthand for --format json | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex oauth-app remove`
 
@@ -243,20 +239,18 @@ ARGUMENTS
 
 OPTIONS
 
-  --format=<text|markdown|json>    Output format (Default: text)
-                         --json    Print pure JSON
-                         --full    Show every matched definition
-              --source=<source>    Exact Source label or ID
+  -f, --format=<text|markdown|json>    Output format (Default: text)
+                             --full    Show every matched definition
+              -s, --source=<source>    Exact Source label or ID
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<selector>` | Definition kind: profile, adapter, or action | Optional. Choices: `profile`, `adapter`, `action` |
 | `<id>` | Definition id | Optional |
-| `--format` | Output format | Optional. Choices: `text`, `markdown`, `json`. Default: `text` |
-| `--json` | Print pure JSON | Optional |
+| `--format`, `-f` | Output format | Optional. Choices: `text`, `markdown`, `json`. Default: `text` |
 | `--full` | Show every matched definition | Optional |
-| `--source` | Exact Source label or ID | Optional |
+| `--source`, `-s` | Exact Source label or ID | Optional |
 
 ## `ctxindex docs`
 
@@ -287,14 +281,14 @@ USAGE ctxindex docs list [OPTIONS]
 
 OPTIONS
 
-  --extension=<extension>    Filter by one exact loaded Extension id
-                   --json    Print JSON
+          --extension=<extension>    Filter by one exact loaded Extension id
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `--extension` | Filter by one exact loaded Extension id | Optional |
-| `--json` | Print JSON | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex docs get`
 
@@ -311,17 +305,17 @@ ARGUMENTS
 
 OPTIONS
 
-  --extension=<extension>    Filter by one exact loaded Extension id
-        --output=<output>    Copy content to this explicit output path
-                   --json    Print JSON
+          --extension=<extension>    Filter by one exact loaded Extension id
+            -o, --output=<output>    Copy content to this explicit output path
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<path>` | Normalized logical POSIX path | Required |
 | `--extension` | Filter by one exact loaded Extension id | Optional |
-| `--output` | Copy content to this explicit output path | Optional |
-| `--json` | Print JSON | Optional |
+| `--output`, `-o` | Copy content to this explicit output path | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex docs search`
 
@@ -338,15 +332,15 @@ ARGUMENTS
 
 OPTIONS
 
-  --extension=<extension>    Filter by one exact loaded Extension id
-                   --json    Print JSON
+          --extension=<extension>    Filter by one exact loaded Extension id
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<query>` | Case-insensitive text query | Required |
 | `--extension` | Filter by one exact loaded Extension id | Optional |
-| `--json` | Print JSON | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex daemon`
 
@@ -377,12 +371,12 @@ USAGE ctxindex daemon start [OPTIONS]
 
 OPTIONS
 
-  --json    Print JSON
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
-| `--json` | Print JSON | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex daemon status`
 
@@ -395,12 +389,12 @@ USAGE ctxindex daemon status [OPTIONS]
 
 OPTIONS
 
-  --json    Print JSON
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
-| `--json` | Print JSON | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex daemon stop`
 
@@ -413,12 +407,12 @@ USAGE ctxindex daemon stop [OPTIONS]
 
 OPTIONS
 
-  --json    Print JSON
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
-| `--json` | Print JSON | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex extension`
 
@@ -451,14 +445,12 @@ USAGE ctxindex extension list [OPTIONS]
 
 OPTIONS
 
-  --format=<pretty|text|json>    Output format: pretty, text, or json
-                       --json    Shorthand for --format json
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
-| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
-| `--json` | Shorthand for --format json | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex extension catalog`
 
@@ -497,19 +489,19 @@ ARGUMENTS
 
 OPTIONS
 
-  --catalog=<catalog>    Exact Catalog id
-    --output=<output>    Write the generated ctxindex-catalog.json manifest to this file path
-              --trust    Acknowledge the explicit trust boundary (Required)
-               --json    Print JSON (Default: false)
+              --catalog=<catalog>    Exact Catalog id
+            -o, --output=<output>    Write the generated ctxindex-catalog.json manifest to this file path
+                          --trust    Acknowledge the explicit trust boundary (Required)
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<package-root>` | Catalog author package root | Required |
 | `--catalog` | Exact Catalog id | Optional |
-| `--output` | Write the generated ctxindex-catalog.json manifest to this file path | Optional |
+| `--output`, `-o` | Write the generated ctxindex-catalog.json manifest to this file path | Optional |
 | `--trust` | Acknowledge the explicit trust boundary | Required |
-| `--json` | Print JSON | Optional. Default: `false` |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex extension catalog add`
 
@@ -527,9 +519,9 @@ ARGUMENTS
 
 OPTIONS
 
-  --ref=<ref>    (Required)
-      --trust    Acknowledge the explicit trust boundary (Required)
-       --json    Print JSON (Default: false)
+                      --ref=<ref>    (Required)
+                          --trust    Acknowledge the explicit trust boundary (Required)
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
@@ -538,7 +530,7 @@ OPTIONS
 | `<repository>` |  | Required |
 | `--ref` |  | Required |
 | `--trust` | Acknowledge the explicit trust boundary | Required |
-| `--json` | Print JSON | Optional. Default: `false` |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex extension catalog list`
 
@@ -551,15 +543,15 @@ USAGE ctxindex extension catalog list [OPTIONS]
 
 OPTIONS
 
-     --refresh    Refresh Catalog state before reading (Default: true)
-  --no-refresh    Use the stored Catalog snapshot without refreshing
-        --json    Print JSON (Default: false)
+                        --refresh    Refresh Catalog state before reading (Default: true)
+                     --no-refresh    Use the stored Catalog snapshot without refreshing
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `--refresh` | Refresh Catalog state before reading | Optional. Default: `true` |
-| `--json` | Print JSON | Optional. Default: `false` |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex extension catalog show`
 
@@ -577,9 +569,9 @@ ARGUMENTS
 
 OPTIONS
 
-     --refresh    Refresh Catalog state before reading (Default: true)
-  --no-refresh    Use the stored Catalog snapshot without refreshing
-        --json    Print JSON (Default: false)
+                        --refresh    Refresh Catalog state before reading (Default: true)
+                     --no-refresh    Use the stored Catalog snapshot without refreshing
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
@@ -587,7 +579,7 @@ OPTIONS
 | `<name>` |  | Required |
 | `<extension-id>` |  | Optional |
 | `--refresh` | Refresh Catalog state before reading | Optional. Default: `true` |
-| `--json` | Print JSON | Optional. Default: `false` |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex extension catalog search`
 
@@ -604,16 +596,16 @@ ARGUMENTS
 
 OPTIONS
 
-     --refresh    Refresh Catalog state before reading (Default: true)
-  --no-refresh    Use the stored Catalog snapshot without refreshing
-        --json    Print JSON (Default: false)
+                        --refresh    Refresh Catalog state before reading (Default: true)
+                     --no-refresh    Use the stored Catalog snapshot without refreshing
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<query>` |  | Optional |
 | `--refresh` | Refresh Catalog state before reading | Optional. Default: `true` |
-| `--json` | Print JSON | Optional. Default: `false` |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex extension catalog refresh`
 
@@ -630,13 +622,13 @@ ARGUMENTS
 
 OPTIONS
 
-  --json    Print JSON (Default: false)
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<name>` |  | Required |
-| `--json` | Print JSON | Optional. Default: `false` |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex extension catalog remove`
 
@@ -653,13 +645,13 @@ ARGUMENTS
 
 OPTIONS
 
-  --json    Print JSON (Default: false)
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<name>` |  | Required |
-| `--json` | Print JSON | Optional. Default: `false` |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex extension install`
 
@@ -678,9 +670,9 @@ ARGUMENTS
 
 OPTIONS
 
-     --refresh    Refresh Catalog state before reading (Default: true)
-  --no-refresh    Use the stored Catalog snapshot without refreshing
-        --json    Print JSON (Default: false)
+                        --refresh    Refresh Catalog state before reading (Default: true)
+                     --no-refresh    Use the stored Catalog snapshot without refreshing
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
@@ -689,7 +681,7 @@ OPTIONS
 | `<target>` | Catalog name or direct package target | Required |
 | `<extension-id>` | Stable Extension id | Required |
 | `--refresh` | Refresh Catalog state before reading | Optional. Default: `true` |
-| `--json` | Print JSON | Optional. Default: `false` |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex extension update`
 
@@ -706,13 +698,13 @@ ARGUMENTS
 
 OPTIONS
 
-  --json    Print JSON (Default: false)
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<extension-id>` |  | Required |
-| `--json` | Print JSON | Optional. Default: `false` |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex extension uninstall`
 
@@ -729,15 +721,15 @@ ARGUMENTS
 
 OPTIONS
 
-  --force    Remove activation while preserving dependent Sources and data (Default: false)
-   --json    Print JSON (Default: false)
+                          --force    Remove activation while preserving dependent Sources and data (Default: false)
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<extension-id>` |  | Required |
 | `--force` | Remove activation while preserving dependent Sources and data | Optional. Default: `false` |
-| `--json` | Print JSON | Optional. Default: `false` |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex action`
 
@@ -770,17 +762,17 @@ ARGUMENTS
 
 OPTIONS
 
-  --source=<source>    Exact Source label or ID (Required)
-    --input=<input>    Inline JSON object or UTF-8 JSON file path (Required)
-             --json    Print deterministic JSON
+            -s, --source=<source>    Exact Source label or ID (Required)
+                  --input=<input>    Inline JSON object or UTF-8 JSON file path (Required)
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<action-id>` |  | Required |
-| `--source` | Exact Source label or ID | Required |
+| `--source`, `-s` | Exact Source label or ID | Required |
 | `--input` | Inline JSON object or UTF-8 JSON file path | Required |
-| `--json` | Print deterministic JSON | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex artifact`
 
@@ -815,15 +807,13 @@ ARGUMENTS
 
 OPTIONS
 
-  --format=<pretty|text|json>    Output format: pretty, text, or json
-                       --json    Shorthand for --format json
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<ref>` | Resource Ref | Required |
-| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
-| `--json` | Shorthand for --format json | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex artifact download`
 
@@ -840,15 +830,15 @@ ARGUMENTS
 
 OPTIONS
 
-  --output=<output>    Copy cached bytes to this path
-             --json    Print deterministic JSON
+            -o, --output=<output>    Copy cached bytes to this path
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<ref>` | Artifact Ref | Required |
-| `--output` | Copy cached bytes to this path | Optional |
-| `--json` | Print deterministic JSON | Optional |
+| `--output`, `-o` | Copy cached bytes to this path | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex artifact purge`
 
@@ -861,12 +851,12 @@ USAGE ctxindex artifact purge [OPTIONS]
 
 OPTIONS
 
-  --json    Print deterministic JSON
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
-| `--json` | Print deterministic JSON | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex realm`
 
@@ -919,14 +909,12 @@ USAGE ctxindex realm list [OPTIONS]
 
 OPTIONS
 
-  --format=<pretty|text|json>    Output format: pretty, text, or json
-                       --json    Shorthand for --format json
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
-| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
-| `--json` | Shorthand for --format json | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex source`
 
@@ -967,7 +955,7 @@ OPTIONS
                   --config-json=<config_json>    Adapter config JSON
   --search-routing=<indexed|federated|hybrid>    Source search routing override
                                     --no-sync    Disable synchronization for this Source
-                              --realm=<realm>    Realm slug
+                          -r, --realm=<realm>    Realm slug
 ```
 
 | Argument | Description | Contract |
@@ -979,7 +967,7 @@ OPTIONS
 | `--search-routing` | Source search routing override | Optional. Choices: `indexed`, `federated`, `hybrid` |
 | `--no-sync` | Disable synchronization for this Source | Optional |
 | `<adapter-id>` | Adapter ID | Optional |
-| `--realm` | Realm slug | Optional |
+| `--realm`, `-r` | Realm slug | Optional |
 
 ## `ctxindex source list`
 
@@ -992,16 +980,14 @@ USAGE ctxindex source list [OPTIONS]
 
 OPTIONS
 
-              --realm=<realm>    Realm slug
-  --format=<pretty|text|json>    Output format: pretty, text, or json
-                       --json    Shorthand for --format json
+              -r, --realm=<realm>    Realm slug
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
-| `--realm` | Realm slug | Optional |
-| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
-| `--json` | Shorthand for --format json | Optional |
+| `--realm`, `-r` | Realm slug | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex source remove`
 
@@ -1032,18 +1018,16 @@ USAGE ctxindex sync [OPTIONS]
 
 OPTIONS
 
-                  --source=<source>    Source label or ID
-          --mode=<sync|resync|diff>    Sync mode (sync|resync|diff) (Default: sync)
-                             --json    Print JSON
-  --format=<summary|events|compact>    Output format (Default: summary)
+                       -s, --source=<source>    Source label or ID
+                   --mode=<sync|resync|diff>    Sync mode (sync|resync|diff) (Default: sync)
+  -f, --format=<summary|events|compact|json>    Output format (Default: summary)
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
-| `--source` | Source label or ID | Optional |
+| `--source`, `-s` | Source label or ID | Optional |
 | `--mode` | Sync mode (sync\|resync\|diff) | Optional. Choices: `sync`, `resync`, `diff`. Default: `sync` |
-| `--json` | Print JSON | Optional |
-| `--format` | Output format | Optional. Choices: `summary`, `events`, `compact`. Default: `summary` |
+| `--format`, `-f` | Output format | Optional. Choices: `summary`, `events`, `compact`, `json`. Default: `summary` |
 
 ## `ctxindex get`
 
@@ -1060,15 +1044,13 @@ ARGUMENTS
 
 OPTIONS
 
-  --format=<pretty|text|json>    Output format: pretty, text, or json
-                       --json    Shorthand for --format json
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<ref>` | Resource Ref | Required |
-| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
-| `--json` | Shorthand for --format json | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex export`
 
@@ -1085,13 +1067,13 @@ ARGUMENTS
 
 OPTIONS
 
-  --format=<format>    Export format (Required)
+  -f, --format=<format>    Export format (Required)
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<ref>` | Resource Ref | Required |
-| `--format` | Export format | Required |
+| `--format`, `-f` | Export format | Required |
 
 ## `ctxindex thread`
 
@@ -1108,15 +1090,13 @@ ARGUMENTS
 
 OPTIONS
 
-  --format=<pretty|text|json>    Output format: pretty, text, or json
-                       --json    Shorthand for --format json
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<ref>` | Resource Ref | Required |
-| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
-| `--json` | Shorthand for --format json | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex search`
 
@@ -1133,36 +1113,35 @@ ARGUMENTS
 
 OPTIONS
 
-                --realm=<realm>    Exact Realm slug (repeatable)
-            --adapter=<adapter>    Adapter ID
-              --source=<source>    Exact Source label or ID (repeatable)
-                  --kind=<kind>    Profile kind or alias
-                --field=<field>    Typed equality filter name=value (repeatable)
-                --since=<since>    Start ISO date
-                --until=<until>    End ISO date
-                --limit=<limit>    Result limit
-              --offset=<offset>    Local pagination offset
-  --continuation=<continuation>    Opaque continuation for one exact remote Source
-              --include-deleted    Include deleted local Resources
-                         --refs    Print Resource Refs only
-                   --local-only    Search local only
-                       --remote    Search remote Sources only
-                      --explain    Explain per-Source routing
-    --format=<pretty|text|json>    Output format: pretty, text, or json
-                         --json    Shorthand for --format json
+              -r, --realm=<realm>    Exact Realm slug (repeatable)
+              --adapter=<adapter>    Adapter ID
+            -s, --source=<source>    Exact Source label or ID (repeatable)
+                    --kind=<kind>    Profile kind or alias
+                  --field=<field>    Typed equality filter name=value (repeatable)
+                  --since=<since>    Start ISO date
+                  --until=<until>    End ISO date
+              -l, --limit=<limit>    Result limit
+                --offset=<offset>    Local pagination offset
+    --continuation=<continuation>    Opaque continuation for one exact remote Source
+                --include-deleted    Include deleted local Resources
+                           --refs    Print Resource Refs only
+                     --local-only    Search local only
+                         --remote    Search remote Sources only
+                        --explain    Explain per-Source routing
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<query>` | Query text | Optional |
-| `--realm` | Exact Realm slug (repeatable) | Optional. Repeatable |
+| `--realm`, `-r` | Exact Realm slug (repeatable) | Optional. Repeatable |
 | `--adapter` | Adapter ID | Optional |
-| `--source` | Exact Source label or ID (repeatable) | Optional. Repeatable |
+| `--source`, `-s` | Exact Source label or ID (repeatable) | Optional. Repeatable |
 | `--kind` | Profile kind or alias | Optional |
 | `--field` | Typed equality filter name=value (repeatable) | Optional. Repeatable |
 | `--since` | Start ISO date | Optional |
 | `--until` | End ISO date | Optional |
-| `--limit` | Result limit | Optional |
+| `--limit`, `-l` | Result limit | Optional |
 | `--offset` | Local pagination offset | Optional |
 | `--continuation` | Opaque continuation for one exact remote Source | Optional |
 | `--include-deleted` | Include deleted local Resources | Optional |
@@ -1170,8 +1149,7 @@ OPTIONS
 | `--local-only` | Search local only | Optional |
 | `--remote` | Search remote Sources only | Optional |
 | `--explain` | Explain per-Source routing | Optional |
-| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
-| `--json` | Shorthand for --format json | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex status`
 
@@ -1184,16 +1162,14 @@ USAGE ctxindex status [OPTIONS]
 
 OPTIONS
 
-            --source=<source>    Source label or ID
-  --format=<pretty|text|json>    Output format: pretty, text, or json
-                       --json    Shorthand for --format json
+            -s, --source=<source>    Source label or ID
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
-| `--source` | Source label or ID | Optional |
-| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
-| `--json` | Shorthand for --format json | Optional |
+| `--source`, `-s` | Source label or ID | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex secrets`
 
@@ -1223,12 +1199,12 @@ USAGE ctxindex secrets status [OPTIONS]
 
 OPTIONS
 
-  --json    Print JSON
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
-| `--json` | Print JSON | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex secrets backend`
 
@@ -1293,12 +1269,12 @@ USAGE ctxindex skills list [OPTIONS]
 
 OPTIONS
 
-  --json    Print JSON
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
-| `--json` | Print JSON | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex skills get`
 
@@ -1315,15 +1291,15 @@ ARGUMENTS
 
 OPTIONS
 
-  --inline    Inline file references
-    --json    Print JSON
+                         --inline    Inline file references
+  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<name>` |  | Required |
 | `--inline` | Inline file references | Optional |
-| `--json` | Print JSON | Optional |
+| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex skills path`
 

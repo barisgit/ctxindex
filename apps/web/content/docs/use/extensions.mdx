@@ -8,12 +8,12 @@ An Extension is trusted in-process TypeScript or JavaScript. It can be installed
 ## Install directly
 
 ```sh
-ctxindex extension install npm @acme/ctxindex-mail@1.2.0 acme.mail --json
+ctxindex extension install npm @acme/ctxindex-mail@1.2.0 acme.mail --format json
 ctxindex extension install git \
   'git+https://github.com/acme/ctxindex-mail.git#4f3c2b1' \
   acme.mail \
-  --json
-ctxindex extension install local ./extensions/mail acme.mail --json
+  --format json
+ctxindex extension install local ./extensions/mail acme.mail --format json
 ```
 
 Package tooling resolves ordinary package dependencies. ctxindex selects one exact exported Extension root, validates the complete candidate registry, and publishes immutable managed bytes.
@@ -26,8 +26,8 @@ A local Marketplace is the merged search projection of explicitly configured Git
 ctxindex extension catalog add community https://example.com/catalog.git \
   --ref refs/heads/main \
   --trust
-ctxindex extension catalog search mail --json
-ctxindex extension install catalog community acme.mail --json
+ctxindex extension catalog search mail --format json
+ctxindex extension install catalog community acme.mail --format json
 ```
 
 Catalog add acknowledges repository acquisition. Installation is the separate executable boundary: it replays packages and imports trusted Extension code. Catalog search and Catalog-backed install refresh the involved Catalog by default; `--no-refresh` deliberately uses stored snapshots and reports their age.
@@ -37,8 +37,8 @@ Startup is offline: it reads installed records and managed bytes without refresh
 ## Update and uninstall
 
 ```sh
-ctxindex extension update acme.mail --json
-ctxindex extension uninstall acme.mail --json
+ctxindex extension update acme.mail --format json
+ctxindex extension uninstall acme.mail --format json
 ```
 
 Updates explicitly re-pin installed code. Uninstall is blocked while configured Sources require the Extension unless `--force` preserves those Sources and data in an unavailable state.
@@ -48,7 +48,7 @@ Updates explicitly re-pin installed code. Uninstall is blocked while configured 
 Installed Documentation Trees remain available offline through the CLI:
 
 ```sh
-ctxindex docs list --json
-ctxindex docs search "first sync" --json
+ctxindex docs list --format json
+ctxindex docs search "first sync" --format json
 ctxindex docs get acme.mail README.md
 ```

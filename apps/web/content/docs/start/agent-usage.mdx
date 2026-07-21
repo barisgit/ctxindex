@@ -9,7 +9,7 @@ Give the agent this operating rule:
 
 ```text
 Use ctxindex as the only interface to personal context. Start with `ctxindex
-describe --json` when you need the loaded vocabulary. Search with exact Realm
+describe --format json` when you need the loaded vocabulary. Search with exact Realm
 and Source filters where context matters. Treat returned ctx:// Refs as opaque,
 pass them to get/thread/export/action, and read stable exit codes and warnings.
 Never request secrets or send email; provider mutations stop at reversible Drafts.
@@ -18,15 +18,15 @@ Never request secrets or send email; provider mutations stop at reversible Draft
 The agent can then compose generic operations:
 
 ```sh
-ctxindex search "Aurora kickoff" --realm work --json
-ctxindex get 'ctx://…' --json
-ctxindex thread 'ctx://…' --json
+ctxindex search "Aurora kickoff" --realm work --format json
+ctxindex get 'ctx://…' --format json
+ctxindex thread 'ctx://…' --format json
 ctxindex describe action communication.message.draft.create \
   --source work-mail \
-  --json
+  --format json
 ```
 
-Use `--json` for machine-readable command envelopes. Byte-stream exports use `--format json` when you want validated Profile JSON.
+Use `--format json` for machine-readable command envelopes. Byte-stream exports use `--format json` when you want validated Profile JSON.
 
 ## Scope before retrieval
 

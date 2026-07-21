@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Strict sync command grammar
-The `sync` command MUST accept only the documented `--source <id>`, `--mode sync|resync|diff`, `--format summary|events|compact`, and presence-only `--json` options. It MUST reject unknown flags, unexpected positional arguments, duplicate scalar or boolean flags, assignments to boolean flags, and scalar flags without values as invalid usage with exit `2`.
+The `sync` command MUST accept only the documented `--source <id>`, `--mode sync|resync|diff`, `--format summary|events|compact`, and presence-only `--format json` options. It MUST reject unknown flags, unexpected positional arguments, duplicate scalar or boolean flags, assignments to boolean flags, and scalar flags without values as invalid usage with exit `2`.
 
 Sync options MUST occur after the selected `sync` command. Option-like tokens before `sync` MUST be rejected with exit `2` rather than discarded by root-command selection. Explicit help and valid global options MUST retain their existing behavior.
 

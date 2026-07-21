@@ -2,6 +2,7 @@ import type { SecretBackend } from '@ctxindex/core/secrets'
 import { defineCtxCommand } from '../command-model'
 import { openSecretDeps } from '../deps'
 import { mapErrorToExit, runWithExit } from '../format/exit'
+import { outputFormatArg } from '../format/output'
 import {
   formatSecretBackendStatus,
   formatSecretBackendSwitch,
@@ -44,10 +45,13 @@ export const secretsCommand = defineCtxCommand({
   subCommands: {
     status: defineCtxCommand({
       meta: { name: 'status', description: 'Show safe backend status.' },
-      args: { json: { type: 'boolean', description: 'Print JSON' } },
+      args: { format: outputFormatArg },
       run: ({ args }) =>
         runWithExit(() =>
-          handleSecretsCommand({ kind: 'status', json: args.json ?? false }),
+          handleSecretsCommand({
+            kind: 'status',
+            json: args.format === 'json',
+          }),
         ),
     }),
     backend: defineCtxCommand({

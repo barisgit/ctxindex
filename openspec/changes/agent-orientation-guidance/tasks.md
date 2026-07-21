@@ -1,6 +1,6 @@
 ## 1. Orientation contract
 
-- [x] 1.1 Update focused repository, skills CLI, sandbox e2e, and compiled-skills tests first so they require standalone orientation, required live discovery routes, absence of static inventories/setup/schema prose, and preserved `list/get/path`, `--json`, and `--inline` behavior.
+- [x] 1.1 Update focused repository, skills CLI, sandbox e2e, and compiled-skills tests first so they require standalone orientation, required live discovery routes, absence of static inventories/setup/schema prose, and preserved `list/get/path`, `--format json`, and `--inline` behavior.
 - [x] 1.2 Replace the bundled `getting-started` workflow guide with concise orientation, remove `skills/reference/cli-overview.md`, and update `skills/README.md` to identify live discovery as authoritative.
 - [x] 1.3 Run the focused repository, skills CLI, sandbox e2e, registry-interface, and compiled-skills verification.
 

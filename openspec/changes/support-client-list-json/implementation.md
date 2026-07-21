@@ -4,7 +4,7 @@
 
 ## Module Ownership
 
-`@ctxindex/core` continues to own deterministic Client inventory retrieval and its non-sensitive `OAuthClientRecord` boundary. The thin CLI owns `--json` parsing, generated command metadata, and rendering that record through an explicit safe-field projection. No storage or Client service behavior moves into the CLI.
+`@ctxindex/core` continues to own deterministic Client inventory retrieval and its non-sensitive `OAuthClientRecord` boundary. The thin CLI owns `--format json` parsing, generated command metadata, and rendering that record through an explicit safe-field projection. No storage or Client service behavior moves into the CLI.
 
 ## Interfaces and Data Flow
 
@@ -20,7 +20,7 @@ The JSON formatter must enumerate safe metadata fields explicitly and must never
 
 ## Verification
 
-Argument tests cover `--json` acceptance and rejection of unsupported list options. Formatter or CLI e2e tests cover the exact output shape, empty array, deterministic provider-then-label ordering, secret redaction, and unchanged text output. Repository CLI-boundary gates, full CI, and strict OpenSpec validation cover cross-cutting regressions.
+Argument tests cover `--format json` acceptance and rejection of unsupported list options. Formatter or CLI e2e tests cover the exact output shape, empty array, deterministic provider-then-label ordering, secret redaction, and unchanged text output. Repository CLI-boundary gates, full CI, and strict OpenSpec validation cover cross-cutting regressions.
 
 ## Promotion Notes
 

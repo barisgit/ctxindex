@@ -38,11 +38,23 @@ test('Source labels work everywhere Source ids are accepted', async () => {
     expect(collision.exitCode).toBe(2)
     expect(collision.stderr).toContain('Source label "notes" is already taken')
 
-    const synced = await sandbox.run(['sync', '--source', 'notes', '--json'])
+    const synced = await sandbox.run([
+      'sync',
+      '--source',
+      'notes',
+      '--format',
+      'json',
+    ])
     expect(synced.exitCode, synced.stderr).toBe(0)
     expect(JSON.parse(synced.stdout).results).toHaveLength(1)
 
-    const status = await sandbox.run(['status', '--source', 'notes', '--json'])
+    const status = await sandbox.run([
+      'status',
+      '--source',
+      'notes',
+      '--format',
+      'json',
+    ])
     expect(status.exitCode, status.stderr).toBe(0)
     expect(JSON.parse(status.stdout)).toHaveLength(1)
 
@@ -51,7 +63,8 @@ test('Source labels work everywhere Source ids are accepted', async () => {
       'label routed',
       '--source',
       'notes',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(searched.exitCode, searched.stderr).toBe(0)
     expect(JSON.parse(searched.stdout).results).toHaveLength(1)

@@ -11,7 +11,7 @@ const cliMainPath = join(repoRoot, 'apps/cli/src/main.ts')
 const requiredDiscoverySnippets = [
   'ctxindex --help',
   'ctxindex describe',
-  'ctxindex describe <profile|adapter|action> <id> --json',
+  'ctxindex describe <profile|adapter|action> <id> --format json',
   'ctxindex extension list',
   'ctxindex skills list',
   'ctxindex skills get <name>',
@@ -265,7 +265,7 @@ test('OAuth guidance derives provider vocabulary from describe output', async ()
     'bun cli oauth-app add <provider> <app-label> --from-env',
   )
   expect(skill).toContain('bun cli account add <provider> --app <app-label>')
-  expect(skill).toContain('bun cli account list --json')
+  expect(skill).toContain('bun cli account list --format json')
   expect(skill).not.toMatch(
     /\bauth add\b|--client(?:-id|-secret)?\b|--auth-code|--refresh-token/,
   )

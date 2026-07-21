@@ -285,7 +285,8 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       'npm',
       'fixture@../local',
       'fixture.invalid',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(invalid.exitCode).toBe(2)
     expect(registryRequests).toBe(0)
@@ -295,7 +296,8 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       'git',
       'git+https://user:secret@example.invalid/repository.git',
       'fixture.invalid',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(credentialed.exitCode).toBe(2)
     expect(registryRequests).toBe(0)
@@ -307,7 +309,8 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       'npm',
       'fixture-direct-npm@^1',
       'fixture.direct.npm',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(npmInstalled.exitCode, npmInstalled.stderr).toBe(0)
     const npmV1 = JSON.parse(npmInstalled.stdout)
@@ -337,7 +340,8 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       'git',
       `git+${registry}/repo.git#main`,
       'fixture.direct.git',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(gitInstalled.exitCode, gitInstalled.stderr).toBe(0)
     const gitV1 = JSON.parse(gitInstalled.stdout)
@@ -353,7 +357,8 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       'local',
       localPackage,
       'fixture.direct.local',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(localInstalled.exitCode, localInstalled.stderr).toBe(0)
     const localV1 = JSON.parse(localInstalled.stdout)
@@ -424,7 +429,8 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       'extension',
       'update',
       'fixture.direct.npm',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(npmUpdated.exitCode, npmUpdated.stderr).toBe(0)
     expect(JSON.parse(npmUpdated.stdout)).toMatchObject({
@@ -435,7 +441,8 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       'extension',
       'update',
       'fixture.direct.git',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(gitUpdated.exitCode, gitUpdated.stderr).toBe(0)
     expect(JSON.parse(gitUpdated.stdout).source.commit).not.toBe(
@@ -445,7 +452,8 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       'extension',
       'update',
       'fixture.direct.local',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(localUpdated.exitCode, localUpdated.stderr).toBe(0)
     expect(JSON.parse(localUpdated.stdout).materialization_digest).not.toBe(
@@ -528,20 +536,27 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
     ).sort()
     const resourceRef = 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/file/offline-note'
     for (const args of [
-      ['extension', 'list', '--json'],
-      ['describe', 'adapter', 'fixture.direct.local-adapter', '--json'],
-      ['oauth-app', 'list', '--json'],
-      ['account', 'list', '--json'],
-      ['realm', 'list', '--json'],
-      ['source', 'list', '--json'],
-      ['status', '--source', 'fixture-source', '--json'],
+      ['extension', 'list', '--format', 'json'],
+      [
+        'describe',
+        'adapter',
+        'fixture.direct.local-adapter',
+        '--format',
+        'json',
+      ],
+      ['oauth-app', 'list', '--format', 'json'],
+      ['account', 'list', '--format', 'json'],
+      ['realm', 'list', '--format', 'json'],
+      ['source', 'list', '--format', 'json'],
+      ['status', '--source', 'fixture-source', '--format', 'json'],
       [
         'search',
         'offline',
         '--source',
         'fixture-source',
         '--local-only',
-        '--json',
+        '--format',
+        'json',
       ],
       [
         'describe',
@@ -549,15 +564,16 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
         'communication.message.draft.create',
         '--source',
         'fixture-source',
-        '--json',
+        '--format',
+        'json',
       ],
-      ['sync', '--json'],
-      ['get', '--json', resourceRef],
+      ['sync', '--format', 'json'],
+      ['get', '--format', 'json', resourceRef],
       ['export', '--format', 'json', resourceRef],
-      ['thread', '--json', resourceRef],
-      ['artifact', 'list', '--json', resourceRef],
-      ['extension', 'catalog', 'list', '--no-refresh', '--json'],
-      ['skills', 'list', '--json'],
+      ['thread', '--format', 'json', resourceRef],
+      ['artifact', 'list', '--format', 'json', resourceRef],
+      ['extension', 'catalog', 'list', '--no-refresh', '--format', 'json'],
+      ['skills', 'list', '--format', 'json'],
     ]) {
       const result = await run(args, offlineEnv)
       expect(result.exitCode, `${args.join(' ')}\n${result.stderr}`).toBe(0)
@@ -570,20 +586,30 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
     expect(registryRequests).toBe(requestsBeforeOffline)
 
     const blocked = await run(
-      ['extension', 'uninstall', 'fixture.direct.local', '--json'],
+      ['extension', 'uninstall', 'fixture.direct.local', '--format', 'json'],
       offlineEnv,
     )
     expect(blocked.exitCode).toBe(2)
     expect(blocked.stderr).toContain('fixture-source')
     const forced = await run(
-      ['extension', 'uninstall', 'fixture.direct.local', '--force', '--json'],
+      [
+        'extension',
+        'uninstall',
+        'fixture.direct.local',
+        '--force',
+        '--format',
+        'json',
+      ],
       offlineEnv,
     )
     expect(forced.exitCode, forced.stderr).toBe(0)
     expect(JSON.parse(forced.stdout).blockingSources).toEqual([
       expect.objectContaining({ label: 'fixture-source' }),
     ])
-    const unavailable = await run(['source', 'list', '--json'], offlineEnv)
+    const unavailable = await run(
+      ['source', 'list', '--format', 'json'],
+      offlineEnv,
+    )
     expect(JSON.parse(unavailable.stdout)).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

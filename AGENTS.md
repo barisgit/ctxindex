@@ -19,7 +19,7 @@
 - Pass each focused task and Slice gate before continuing. The final gates are `bun run ci` and `bunx openspec validate --all --strict`; run `openspec-verify-change` before archive.
 - At Human checkpoints, prepare isolated state and pause for consent or UI verification without requesting secrets.
 - The repository is pre-alpha: do not add schema migrations, CLI compatibility, or deprecated aliases before a release creates that obligation.
-- The CLI is the only agent integration surface: external agents (Codex CLI, OpenClaw/Hermes, Claude Code) consume ctxindex by composing commands with `--json`; do not add an MCP server or per-agent integration layers.
+- The CLI is the only agent integration surface: external agents (Codex CLI, OpenClaw/Hermes, Claude Code) consume ctxindex by composing commands with `--format json`; do not add an MCP server or per-agent integration layers.
 - Every Source belongs to one user-created Realm; there is no `global` Realm, and explicit Realm filters are exact.
 - Provider mutations stop at reversible email Draft create/update. Never send email or add other provider mutations.
 - Exit codes are stable API; see `openspec/specs/error-taxonomy/spec.md`.

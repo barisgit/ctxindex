@@ -356,13 +356,13 @@ export default defineExtension({
       } finally {
         db.close()
       }
-      const list = await sandbox.run(['source', 'list', '--json'])
+      const list = await sandbox.run(['source', 'list', '--format', 'json'])
       expect(list.exitCode).toBe(0)
       expect(JSON.parse(list.stdout)).toMatchObject([
         { id: sourceId, syncEnabled: false },
       ])
 
-      const allSync = await sandbox.run(['sync', '--json'])
+      const allSync = await sandbox.run(['sync', '--format', 'json'])
       expect(allSync.exitCode).toBe(0)
       expect(JSON.parse(allSync.stdout)).toMatchObject({ results: [] })
 
@@ -411,9 +411,9 @@ export default defineExtension({
       expect(list.stdout).toContain(sourceId)
       expect(list.stdout).toContain('repo-under-test')
       expect(list.stdout).toContain('local.directory')
-      // Ref path is asserted exactly via --json below.
+      // Ref path is asserted exactly via --format json below.
 
-      const json = await sandbox.run(['source', 'list', '--json'])
+      const json = await sandbox.run(['source', 'list', '--format', 'json'])
       expect(json.stderr).toBe('')
       expect(json.exitCode).toBe(0)
       const rows = JSON.parse(json.stdout) as Array<{

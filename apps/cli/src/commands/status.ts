@@ -12,7 +12,7 @@ export {
 export const statusCommand = defineCtxCommand({
   meta: { name: 'status', description: 'Show last sync status.' },
   args: {
-    source: { type: 'string', description: 'Source label or ID' },
+    source: { type: 'string', alias: 's', description: 'Source label or ID' },
     ...structuredOutputArgs,
   },
   run: ({ args }) =>

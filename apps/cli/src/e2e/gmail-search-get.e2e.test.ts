@@ -66,7 +66,7 @@ test('mocked Gmail remote search and cached get use stable canonical Refs', asyn
     mock.resetRequests()
 
     const searched = await sandbox.run(
-      ['search', '--remote', '--json', 'ctxindex mock'],
+      ['search', '--remote', '--format', 'json', 'ctxindex mock'],
       { env },
     )
     expect(searched.exitCode, searched.stderr).toBe(0)
@@ -104,7 +104,9 @@ test('mocked Gmail remote search and cached get use stable canonical Refs', asyn
       },
     ])
 
-    const firstGet = await sandbox.run(['get', '--json', ref], { env })
+    const firstGet = await sandbox.run(['get', '--format', 'json', ref], {
+      env,
+    })
     expect(firstGet.exitCode, firstGet.stderr).toBe(0)
     expect(firstGet.stderr).toBe('')
     expect(JSON.parse(firstGet.stdout)).toMatchObject({
@@ -131,7 +133,9 @@ test('mocked Gmail remote search and cached get use stable canonical Refs', asyn
         )
     expect(fullRequests()).toHaveLength(1)
 
-    const secondGet = await sandbox.run(['get', '--json', ref], { env })
+    const secondGet = await sandbox.run(['get', '--format', 'json', ref], {
+      env,
+    })
     expect(secondGet.exitCode, secondGet.stderr).toBe(0)
     expect(secondGet.stdout).toBe(firstGet.stdout)
     expect(fullRequests()).toHaveLength(1)
@@ -148,14 +152,17 @@ test('Gmail get rejects malformed and nonexistent provider Refs', async () => {
     const { env, sourceId } = await initialize(sandbox, mock)
     mock.resetRequests()
 
-    const malformed = await sandbox.run(['get', '--json', 'not-a-ref'], {
-      env,
-    })
+    const malformed = await sandbox.run(
+      ['get', '--format', 'json', 'not-a-ref'],
+      {
+        env,
+      },
+    )
     expect(malformed.exitCode).toBe(2)
     expect(mock.readRequests()).toEqual([])
 
     const missing = await sandbox.run(
-      ['get', '--json', `ctx://${sourceId}/message/does-not-exist`],
+      ['get', '--format', 'json', `ctx://${sourceId}/message/does-not-exist`],
       { env },
     )
     expect(missing.exitCode).toBe(50)

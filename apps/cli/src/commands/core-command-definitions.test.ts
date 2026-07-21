@@ -78,10 +78,17 @@ test('core command definitions own required arguments and bounded choices', asyn
   expect(commands.get('ctxindex status')?.arguments).toContainEqual(
     expect.objectContaining({
       name: 'format',
+      aliases: ['f'],
       type: 'enum',
       choices: ['pretty', 'text', 'json'],
       required: false,
     }),
+  )
+  expect(commands.get('ctxindex status')?.arguments).toContainEqual(
+    expect.objectContaining({ name: 'source', aliases: ['s'] }),
+  )
+  expect(commands.get('ctxindex artifact download')?.arguments).toContainEqual(
+    expect.objectContaining({ name: 'output', aliases: ['o'] }),
   )
   for (const path of ['ctxindex artifact list', 'ctxindex thread']) {
     expect(commands.get(path)?.arguments).toContainEqual(

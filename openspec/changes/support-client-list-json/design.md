@@ -1,4 +1,4 @@
-> **SUPERSEDED — DO NOT SYNC.** This completed Client-era change is retained only as historical evidence. `redesign-extension-sdk` removes the Client surface and replaces it with `oauth-app list --json`. Its delta spec MUST NOT be synced into canonical specs. Archive only with explicit user approval.
+> **SUPERSEDED — DO NOT SYNC.** This completed Client-era change is retained only as historical evidence. `redesign-extension-sdk` removes the Client surface and replaces it with `oauth-app list --format json`. Its delta spec MUST NOT be synced into canonical specs. Archive only with explicit user approval.
 
 ## Context
 
@@ -8,7 +8,7 @@ The core Client service already returns deterministic, non-sensitive `OAuthClien
 
 **Goals:**
 
-- Expose the existing safe Client records through `client list --json`.
+- Expose the existing safe Client records through `client list --format json`.
 - Keep the JSON shape and order deterministic.
 - Preserve byte-for-byte behavior of the existing text path.
 
@@ -20,7 +20,7 @@ The core Client service already returns deterministic, non-sensitive `OAuthClien
 
 ## Decisions
 
-`--json` uses an explicit CLI projection from the `OAuthClientRecord[]` returned by the core service. That type is already the intentional non-sensitive service boundary and contains `provider`, `label`, `createdAt`, and `updatedAt`; naming those fields in the formatter prevents future service-record expansion from exposing new metadata unintentionally.
+`--format json` uses an explicit CLI projection from the `OAuthClientRecord[]` returned by the core service. That type is already the intentional non-sensitive service boundary and contains `provider`, `label`, `createdAt`, and `updatedAt`; naming those fields in the formatter prevents future service-record expansion from exposing new metadata unintentionally.
 
 The handler selects JSON or the existing formatter after a single `listClients()` call. This preserves the established text output and the service's `ORDER BY provider, label` ordering in both forms.
 

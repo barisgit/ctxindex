@@ -1,6 +1,6 @@
 # Captured demo output
 
-These documents preserve the actual `--json` CLI shapes from the packed-artifact walkthrough. Only generated ids and timestamps are replaced with explicit `<placeholders>`; fixture content is exact. Use the final CLI renderer itself, not hand-authored tables, for pretty screenshots.
+These documents preserve the actual `--format json` CLI shapes from the packed-artifact walkthrough. Only generated ids and timestamps are replaced with explicit `<placeholders>`; fixture content is exact. Use the final CLI renderer itself, not hand-authored tables, for pretty screenshots.
 
 ## Sync
 
@@ -37,7 +37,7 @@ Command:
 ctxindex search cybersecurity --realm demo \
   --kind ctxindex.demo.tender \
   --field status=open \
-  --json
+  --format json
 ```
 
 Output:

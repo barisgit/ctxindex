@@ -7,13 +7,13 @@ Define deterministic offline product and Extension documentation discovery, exac
 
 ### Requirement: Deterministic offline documentation inventory
 
-The CLI SHALL expose `docs list [--extension <id>] [--json]` over a bounded build-time bundle of product documentation and the loaded Extension documentation projection. An omitted Extension selector SHALL list both origins. Every row MUST identify origin, logical path, content kind, media type, byte size, and any available title, summary, and Extension id without exposing source filesystem, module, checkout, or managed materialization paths.
+The CLI SHALL expose `docs list [--extension <id>] [--format json]` over a bounded build-time bundle of product documentation and the loaded Extension documentation projection. An omitted Extension selector SHALL list both origins. Every row MUST identify origin, logical path, content kind, media type, byte size, and any available title, summary, and Extension id without exposing source filesystem, module, checkout, or managed materialization paths.
 
 Listing MUST perform no network access, package acquisition, Extension update, provider I/O, browser launch, or documentation rendering.
 
 #### Scenario: Agent inventories all offline documentation
 
-- **WHEN** an agent invokes `ctxindex docs list --json`
+- **WHEN** an agent invokes `ctxindex docs list --format json`
 - **THEN** it receives deterministic bundled and loaded Extension rows using only local validated state
 
 #### Scenario: Exact Extension filter is unknown
@@ -23,7 +23,7 @@ Listing MUST perform no network access, package acquisition, Extension update, p
 
 ### Requirement: Exact documentation retrieval
 
-The CLI SHALL expose `docs get <path> [--extension <id>] [--output <path>] [--json]`. Without `--extension`, the path SHALL resolve only within bundled product documentation. With `--extension`, it SHALL resolve only within that exact loaded Extension's authored or generated projection. Paths MUST use the projection's normalized logical POSIX form and MUST NOT accept absolute paths, traversal, aliases that are ambiguous, or filesystem locations.
+The CLI SHALL expose `docs get <path> [--extension <id>] [--output <path>] [--format json]`. Without `--extension`, the path SHALL resolve only within bundled product documentation. With `--extension`, it SHALL resolve only within that exact loaded Extension's authored or generated projection. Paths MUST use the projection's normalized logical POSIX form and MUST NOT accept absolute paths, traversal, aliases that are ambiguous, or filesystem locations.
 
 Markdown retrieval SHALL write authored text to stdout by default. JSON Markdown retrieval SHALL return one deterministic metadata object containing the text. Binary assets MUST require `--output`, MUST be copied exactly to that explicit path, and MUST return only safe metadata on stdout. A command MUST NOT write binary bytes to a terminal.
 
@@ -39,7 +39,7 @@ Markdown retrieval SHALL write authored text to stdout by default. JSON Markdown
 
 ### Requirement: Bounded deterministic documentation search
 
-The CLI SHALL expose `docs search <query> [--extension <id>] [--json]`. Search SHALL consider Markdown title, summary, logical path, and content using case-insensitive textual matching, SHALL return deterministic ordering and bounded snippets, and SHALL never search or decode image bytes. It MUST use only the bundled documentation and currently loaded Extension documentation projection.
+The CLI SHALL expose `docs search <query> [--extension <id>] [--format json]`. Search SHALL consider Markdown title, summary, logical path, and content using case-insensitive textual matching, SHALL return deterministic ordering and bounded snippets, and SHALL never search or decode image bytes. It MUST use only the bundled documentation and currently loaded Extension documentation projection.
 
 An empty query, unknown Extension selector, or unsupported option MUST fail before provider, package-manager, browser, or network activity.
 

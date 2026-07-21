@@ -6,7 +6,7 @@ Bundled skills currently repeat command inventories, provider setup, and workflo
 
 - Limit bundled skill prose to what ctxindex is, when an agent should use it, and how to enter the live discovery surfaces.
 - Direct agents to root help, the generated definition index and exact JSON definition detail, loaded Extension inventory, and bundled skill discovery.
-- Remove the static `skills/reference/cli-overview.md` command inventory while preserving `skills list/get/path`, `--json`, and `--inline` behavior.
+- Remove the static `skills/reference/cli-overview.md` command inventory while preserving `skills list/get/path`, `--format json`, and `--inline` behavior.
 - Require tests to reject static command trees, provider credentials, Profile fields, and Action schemas in shipped orientation.
 
 ## Capabilities

@@ -49,7 +49,7 @@
 
 ## 7. Public vocabulary and obsolete seam removal
 
-- [x] 7.1 Replace Client commands/descriptions/skills/formatters/tests with `oauth-app add <provider> <label> --from-env`, `oauth-app list [--json]`, `oauth-app remove <provider> <label>`, and `account add <provider> --app <label> [--label <label>]`; require exact App selection and keep Grant private.
+- [x] 7.1 Replace Client commands/descriptions/skills/formatters/tests with `oauth-app add <provider> <label> --from-env`, `oauth-app list [--format json]`, `oauth-app remove <provider> <label>`, and `account add <provider> --app <label> [--label <label>]`; require exact App selection and keep Grant private.
 - [x] 7.1a Remove the `client` command and aliases, reject literal App config/secret argv, and prove inventory exposes only Provider id, App label, origin, and safe provenance.
 - [x] 7.1b Rename `missing_oauth_client_creds` to `missing_oauth_app_config` across public/internal errors and guards without an alias; prove unchanged stable exit mapping and add-time invalid usage exit `2`.
 - [x] 7.2 Remove `ExtensionAuthoringHost`, callback diagnostics, embedded Adapter auth, reference/dependency APIs, alternate built-in registry paths, Client storage/API aliases, and embedded definition docs without unrelated cleanup.

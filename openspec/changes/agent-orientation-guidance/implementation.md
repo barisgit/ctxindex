@@ -9,7 +9,7 @@ No new durable module ownership or dependency direction is introduced. Bundled M
 
 ## Interfaces and Data Flow
 
-The public `skills list/get/path` interface and the existing `--json` and `--inline` parsing and formatting flow remain stable. Removing one referenced Markdown asset changes only manifest input: the manifest continues to discover top-level skill files, `get` resolves the same `getting-started` name, and inlining traverses zero references for that document.
+The public `skills list/get/path` interface and the existing `--format json` and `--inline` parsing and formatting flow remain stable. Removing one referenced Markdown asset changes only manifest input: the manifest continues to discover top-level skill files, `get` resolves the same `getting-started` name, and inlining traverses zero references for that document.
 
 ## Storage and State
 

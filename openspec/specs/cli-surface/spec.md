@@ -12,10 +12,10 @@ OAuth lifecycle commands MUST include exactly these public forms:
 
 ```text
 oauth-app add <provider> <label> --from-env
-oauth-app list [--json]
+oauth-app list [--format json]
 oauth-app remove <provider> <label>
 account add <provider> --app <label> [--label <label>]
-account list [--json]
+account list [--format json]
 account remove <label>
 ```
 
@@ -27,7 +27,7 @@ The CLI MUST NOT expose a `client` command, alias, flag, inventory entity, or co
 
 `account add` MUST require `--app <label>`, resolve exact `(providerId,label)`, and fail before secret/database/browser/network effects when the Provider or App is unknown. Authorization MUST use the selected active or persisted local App config and snapshot it into the private Grant. Authorization and refresh MUST NOT reread App config from environment variables.
 
-CLI output SHOULD be compact human-readable text by default, with verbose output and JSON opt-in. Every read command SHOULD support JSON. User-facing configuration SHOULD be reachable through CLI commands, while direct TOML MAY remain a power-user path.
+CLI output SHOULD be compact human-readable text by default, with verbose output and JSON opt-in. Every read command SHOULD support JSON. `--format` MUST be the sole output selector, `-f` MUST be its exact short alias, and the CLI MUST NOT expose a `--json` compatibility flag. Frequent unambiguous options MUST expose `-s` for `--source`, `-r` for `--realm`, `-l` for `--limit`, and `-o` for file `--output` wherever those long options exist. Generated Adapter configuration flags and ambiguous domain selectors MUST remain long-only. User-facing configuration SHOULD be reachable through CLI commands, while direct TOML MAY remain a power-user path.
 
 The CLI MUST NOT use interactive TTY prompts for required input. Required input MUST come from non-secret flags, Provider-declared environment names, typed secret references, or explicitly declared stdin. Missing input MUST fail clearly with a non-zero stable exit. The only permitted interactive surface is the browser during explicitly requested OAuth authorization. Long-lived tokens, App configuration secrets, and authorization codes MUST NOT be literal process arguments.
 
@@ -46,7 +46,7 @@ Unknown Realm, OAuth App, Account, Source, or Adapter references MUST fail fast 
 - **THEN** parsing rejects it as invalid usage and creates no state
 
 #### Scenario: OAuth App JSON inventory is safe
-- **WHEN** an agent runs `oauth-app list --json`
+- **WHEN** an agent runs `oauth-app list --format json`
 - **THEN** every row contains only Provider id, label, origin, and safe provenance
 
 ### Requirement: Bundled skills surface
@@ -72,10 +72,10 @@ Bundled workflow guidance MUST use OAuth App and Account vocabulary, the exact c
 The CLI SHALL expose one singular Extension group with exact source selection for direct and Catalog-curated installation:
 
 ```text
-extension install <catalog|npm|git|local> <target> <extension-id> [--no-refresh] [--json]
-extension update <extension-id> [--json]
-extension list [--json]
-extension uninstall <extension-id> [--force] [--json]
+extension install <catalog|npm|git|local> <target> <extension-id> [--no-refresh] [--format json]
+extension update <extension-id> [--format json]
+extension list [--format json]
+extension uninstall <extension-id> [--force] [--format json]
 ```
 
 The source-kind positional MUST be exact and MUST prevent target-kind guessing. For `catalog`, target SHALL be one configured Catalog name and `--no-refresh` MAY select its stored snapshot. For `npm`, `git`, or `local`, target SHALL be the requested direct package target and `--no-refresh` MUST be rejected. The stable Extension id MUST be a required positional for every install even when a package exports one root.
@@ -87,11 +87,11 @@ Direct and Catalog-backed commands SHALL share the canonical installer and gener
 Text and JSON output MUST be deterministic. Inventory and successful mutation output MUST include stable Extension id, source kind, sanitized requested target, exact resolved identity, materialization digest, installation/update time, and optional Catalog curation, and MUST NOT include credentials, package-manager authentication, or absolute managed paths. Failure output MUST identify the failed lifecycle stage without leaking target credentials.
 
 #### Scenario: Direct npm install is selected exactly
-- **WHEN** an agent runs `extension install npm @example/mail@^2 example.mail --json`
+- **WHEN** an agent runs `extension install npm @example/mail@^2 example.mail --format json`
 - **THEN** the CLI grants execution trust, delegates one npm candidate for exact `example.mail`, and emits deterministic resolved provenance on success
 
 #### Scenario: Catalog install is selected exactly
-- **WHEN** an agent runs `extension install catalog community example.mail --json`
+- **WHEN** an agent runs `extension install catalog community example.mail --format json`
 - **THEN** only configured Catalog `community` refreshes before exact replay and successful output retains Catalog curation
 
 #### Scenario: Source kind is omitted or guessed
@@ -152,7 +152,7 @@ SHALL write no partial output when any candidate fails.
 
 ### Requirement: Deterministic aggregate Extension search
 
-The CLI SHALL provide `extension catalog search [query]` over configured Catalog snapshots with human and `--json` output. It SHALL match id and summary case-insensitively, retain duplicate curation rows across Catalogs, and use deterministic ordering.
+The CLI SHALL provide `extension catalog search [query]` over configured Catalog snapshots with human and `--format json` output. It SHALL match id and summary case-insensitively, retain duplicate curation rows across Catalogs, and use deterministic ordering.
 
 Default search SHALL refresh configured Catalogs. `--no-refresh` SHALL use only stored state, perform no network or execution, and report snapshot age.
 
@@ -211,7 +211,7 @@ Catalog lifecycle and Marketplace read commands SHALL operate on inert stored da
 - **THEN** parsing or validation rejects it
 
 #### Scenario: Catalog lifecycle is requested as JSON
-- **WHEN** add, refresh, list, show, remove, search, install, or update is requested with `--json`
+- **WHEN** add, refresh, list, show, remove, search, install, or update is requested with `--format json`
 - **THEN** the CLI returns deterministic structured output without prompts
 
 #### Scenario: Catalog package install succeeds
@@ -282,22 +282,22 @@ The repository SHALL generate one compact web CLI reference projection from the 
 The public command surface SHALL use these forms and SHALL expose no removed pre-alpha aliases:
 
 ```text
-ctxindex thread <ref> [--json]
-ctxindex artifact list <ref> [--json]
-ctxindex artifact download <artifact-ref> [--output <path>] [--json]
-ctxindex artifact purge [--json]
-ctxindex describe action <id> [--source <source>] [--json]
-ctxindex action run <id> --source <source> --input <json-or-path> [--json]
+ctxindex thread <ref> [--format json]
+ctxindex artifact list <ref> [--format json]
+ctxindex artifact download <artifact-ref> [--output <path>] [--format json]
+ctxindex artifact purge [--format json]
+ctxindex describe action <id> [--source <source>] [--format json]
+ctxindex action run <id> --source <source> --input <json-or-path> [--format json]
 ```
 
 `describe action --source` SHALL report exact Source availability while an omitted Source SHALL report registry definition truth. `action` SHALL contain no duplicate describe route. The removed `thread get`, `purge artifacts`, and `action describe` forms MUST fail as invalid usage before opening application state.
 
 #### Scenario: Related Resource thread is retrieved
 
-- **WHEN** an agent invokes `ctxindex thread <ref> --json`
+- **WHEN** an agent invokes `ctxindex thread <ref> --format json`
 - **THEN** it receives the same deterministic local Relation traversal without a redundant subcommand
 
 #### Scenario: Action is inspected for one Source
 
-- **WHEN** an agent invokes `ctxindex describe action <id> --source <source> --json`
+- **WHEN** an agent invokes `ctxindex describe action <id> --source <source> --format json`
 - **THEN** output combines the authoritative Action schema with exact Source availability and performs no Action

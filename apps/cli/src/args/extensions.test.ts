@@ -48,7 +48,12 @@ test('declares the singular Extension command tree and uniform install grammar',
       expect.objectContaining({ name: 'target', required: true }),
       expect.objectContaining({ name: 'extension-id', required: true }),
       expect.objectContaining({ name: 'refresh', required: false }),
-      expect.objectContaining({ name: 'json', required: false }),
+      expect.objectContaining({
+        name: 'format',
+        aliases: ['f'],
+        required: false,
+        choices: ['pretty', 'text', 'json'],
+      }),
     ]),
   )
   expect(install?.arguments.map(({ name }) => name)).not.toContain('trust')

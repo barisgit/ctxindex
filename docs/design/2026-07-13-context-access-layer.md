@@ -448,10 +448,10 @@ manifest-entry/collector boundary.
 ```text
 ctxindex init
 ctxindex oauth-app add <provider> <label> --from-env
-ctxindex oauth-app list [--json]
+ctxindex oauth-app list [--format json]
 ctxindex oauth-app remove <provider> <label>
 ctxindex account add <provider> --app <label> [--label <label>]
-ctxindex account list [--json]
+ctxindex account list [--format json]
 ctxindex account remove <label>
 ctxindex realm add|list|remove
 ctxindex source add <adapter-id> --realm <slug> [--account <label|id>] [--label <label>] [--no-sync] [adapter flags]
@@ -459,21 +459,21 @@ ctxindex source list|remove
 ctxindex sync [--source <label|id>] [--mode sync|resync|diff]
 ctxindex search <query> [--realm|--source|--adapter|--kind|--field k=v ...]
                         [--since|--until] [--local-only|--remote]
-                        [--include-deleted] [--explain] [--json]
-ctxindex aggregate --field <name> [same filters] [--top N] [--json]
-ctxindex get <ref> [--json]
-ctxindex thread <ref> [--json]
-ctxindex artifact list <ref> [--json]
+                        [--include-deleted] [--explain] [--format json]
+ctxindex aggregate --field <name> [same filters] [--top N] [--format json]
+ctxindex get <ref> [--format json]
+ctxindex thread <ref> [--format json]
+ctxindex artifact list <ref> [--format json]
 ctxindex artifact download <artifact-ref> [--output <path>]
 ctxindex export <ref> --format <fmt> [--output <path>]
-ctxindex action describe <action-id> [--source <label|id>] [--json]
-ctxindex action run <action-id> --source <label|id> --input <json-or-file> [--json]
-ctxindex status [--source <label|id>] [--json]
+ctxindex action describe <action-id> [--source <label|id>] [--format json]
+ctxindex action run <action-id> --source <label|id> --input <json-or-file> [--format json]
+ctxindex status [--source <label|id>] [--format json]
 ctxindex purge index|raw|artifacts|adhoc|source <label|id>
 ctxindex extensions list
-ctxindex describe [profile|adapter|action] [id] [--json]
+ctxindex describe [profile|adapter|action] [id] [--format json]
 ctxindex skills list|get|path      # retained; ACF may supersede
-ctxindex secrets status [--json]
+ctxindex secrets status [--format json]
 ctxindex secrets backend set <keychain|file>
 ```
 
@@ -483,7 +483,7 @@ operations/Actions derived from Adapter capabilities + Profile vocabulary
 (`get`, `export:eml`, `download`, `communication.message.draft.create`).
 
 Example verb collapse: the Hermes CLI's bespoke `mail senders` becomes
-`ctxindex aggregate --field sender --kind communication.message --since 365d --top 50 --json`.
+`ctxindex aggregate --field sender --kind communication.message --since 365d --top 50 --format json`.
 
 ## 11. Documentation ownership
 

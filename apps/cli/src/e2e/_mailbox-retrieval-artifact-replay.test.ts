@@ -384,7 +384,8 @@ export async function runMailboxRetrievalArtifactReplay(
       '--source',
       sourceLabel,
       '--remote',
-      '--json',
+      '--format',
+      'json',
     ])
     const searchJson = JSON.parse(searched.stdout) as {
       results: Array<{ ref: string }>
@@ -401,7 +402,8 @@ export async function runMailboxRetrievalArtifactReplay(
     const firstGet = await runOk(harness, active.env, [
       'get',
       replyRef,
-      '--json',
+      '--format',
+      'json',
     ])
     const getJson = JSON.parse(firstGet.stdout) as {
       resource: {
@@ -453,7 +455,8 @@ export async function runMailboxRetrievalArtifactReplay(
     const secondGet = await runOk(harness, active.env, [
       'get',
       replyRef,
-      '--json',
+      '--format',
+      'json',
     ])
     expect(secondGet.stdout).toBe(firstGet.stdout)
     expect(providerRequests(driver, active)).toEqual([])
@@ -461,7 +464,8 @@ export async function runMailboxRetrievalArtifactReplay(
     const thread = await runOk(harness, active.env, [
       'thread',
       replyRef,
-      '--json',
+      '--format',
+      'json',
     ])
     expect(flattenThreadRefs(JSON.parse(thread.stdout))).toEqual([
       rootRef,
@@ -477,7 +481,8 @@ export async function runMailboxRetrievalArtifactReplay(
       artifactRef,
       '--output',
       firstOutput,
-      '--json',
+      '--format',
+      'json',
     ])
     expect(JSON.parse(firstDownload.stdout)).toMatchObject({ cache: 'miss' })
     expect(await readFile(firstOutput, 'utf8')).toBe(
@@ -495,7 +500,8 @@ export async function runMailboxRetrievalArtifactReplay(
       artifactRef,
       '--output',
       secondOutput,
-      '--json',
+      '--format',
+      'json',
     ])
     expect(JSON.parse(secondDownload.stdout)).toMatchObject({ cache: 'hit' })
     expect(await readFile(secondOutput, 'utf8')).toBe(
@@ -506,7 +512,8 @@ export async function runMailboxRetrievalArtifactReplay(
     const purged = await runOk(harness, active.env, [
       'artifact',
       'purge',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(JSON.parse(purged.stdout)).toMatchObject({
       artifactCountRemoved: 1,
@@ -515,14 +522,16 @@ export async function runMailboxRetrievalArtifactReplay(
     const afterPurge = await runOk(harness, active.offlineEnv(), [
       'get',
       replyRef,
-      '--json',
+      '--format',
+      'json',
     ])
     expect(afterPurge.stdout).toBe(firstGet.stdout)
     const listed = await runOk(harness, active.offlineEnv(), [
       'artifact',
       'list',
       replyRef,
-      '--json',
+      '--format',
+      'json',
     ])
     expect(JSON.parse(listed.stdout)).toMatchObject({
       resourceRef: replyRef,
@@ -537,7 +546,8 @@ export async function runMailboxRetrievalArtifactReplay(
       artifactRef,
       '--output',
       thirdOutput,
-      '--json',
+      '--format',
+      'json',
     ])
     expect(JSON.parse(thirdDownload.stdout)).toMatchObject({ cache: 'miss' })
     expect(await readFile(thirdOutput, 'utf8')).toBe(
@@ -585,18 +595,20 @@ export async function runMailboxRetrievalArtifactReplay(
     expect(providerRequests(driver, active)).toEqual([])
 
     const invalidCases = [
-      ['get', 'not-a-ref', '--json'],
+      ['get', 'not-a-ref', '--format', 'json'],
       [
         'get',
         `ctx://${foreignSourceId}/message/${mailboxReplayFixture.replyProviderId}`,
-        '--json',
+        '--format',
+        'json',
       ],
-      ['artifact', 'download', 'not-a-ref', '--json'],
+      ['artifact', 'download', 'not-a-ref', '--format', 'json'],
       [
         'artifact',
         'download',
         `ctx://${foreignSourceId}/message/${mailboxReplayFixture.replyProviderId}/attachment/foreign`,
-        '--json',
+        '--format',
+        'json',
       ],
     ] as const
     active.resetRequests()

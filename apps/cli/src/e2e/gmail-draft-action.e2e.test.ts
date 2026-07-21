@@ -129,7 +129,15 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
       ],
     ] as const) {
       const described = await sandbox.run(
-        ['describe', 'action', actionId, '--source', sourceLabel, '--json'],
+        [
+          'describe',
+          'action',
+          actionId,
+          '--source',
+          sourceLabel,
+          '--format',
+          'json',
+        ],
         { env },
       )
       expect(described.exitCode, described.stderr).toBe(0)
@@ -174,7 +182,8 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
           subject: 'Invalid',
           bodyText: 'Must not persist',
         }),
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -190,7 +199,8 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
         sourceLabel,
         '--input',
         '{not-json',
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -216,7 +226,8 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
         sourceLabel,
         '--input',
         JSON.stringify(createInput),
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -280,7 +291,8 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
         sourceLabel,
         '--input',
         JSON.stringify(updateInput),
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -334,7 +346,7 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
     mutationRequests.push(...mock.readRecordedRequests())
 
     mock.resetRequests()
-    const cached = await sandbox.run(['get', ref, '--json'], { env })
+    const cached = await sandbox.run(['get', ref, '--format', 'json'], { env })
     expect(cached.exitCode, cached.stderr).toBe(0)
     expect(cached.stderr).toBe('')
     expect(JSON.parse(cached.stdout)).toMatchObject({
@@ -355,9 +367,12 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
     expect(mock.readRecordedRequests()).toEqual([])
 
     const parentRef = `ctx://${sourceId}/message/msg-1`
-    const completeParent = await sandbox.run(['get', parentRef, '--json'], {
-      env,
-    })
+    const completeParent = await sandbox.run(
+      ['get', parentRef, '--format', 'json'],
+      {
+        env,
+      },
+    )
     expect(completeParent.exitCode, completeParent.stderr).toBe(0)
     mock.resetRequests()
     mock.resetDraftState()
@@ -370,7 +385,8 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
         sourceLabel,
         '--input',
         JSON.stringify({ replyToRef: parentRef, bodyText: 'Reply body' }),
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -407,7 +423,8 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
         'communication.message.draft.send',
         '--source',
         sourceLabel,
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )

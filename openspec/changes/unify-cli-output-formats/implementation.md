@@ -32,7 +32,7 @@ export function resolveOutputFormat(
 ): OutputFormat;
 ```
 
-Command definitions reuse one `structuredOutputArgs` declaration. The generic command-model validation continues to reject unknown and duplicate options; each command resolves the two semantically conflicting selectors before opening services. `--refs` remains a Search-specific text projection. Argument resolution forces omitted selection to text and rejects `--json`, explicit JSON, or explicit pretty before dependencies open.
+Command definitions reuse one `outputFormatArg` declaration and structured reads reuse `structuredOutputArgs`. The generic command-model validation continues to reject unknown and duplicate options. `--format` is the sole selector and carries the Citty alias `-f`; the removed `--json` token is rejected by ordinary unknown-option validation. `--refs` remains a Search-specific text projection. Argument resolution forces omitted selection to text and rejects explicit JSON or pretty before dependencies open.
 
 The shared presentation module accepts ordered column/field descriptions rather than domain service objects. Its TSV serializer reserves `\N` for null, escapes literal backslashes before tab, carriage return, and newline, and emits a stable header plus one physical line per row. Its pretty collection renderer measures display width, grapheme-wraps labels and values before `cli-table3`, uses explicit bounded columns with `wordWrap` above the table's structural minimum, and falls back to plain labeled cards below it. Both paths preserve every character across wrapped chunks. Domain formatters remain responsible for safe field selection and ordering.
 
@@ -48,11 +48,11 @@ Not applicable. Format selection and width are per-process ephemeral facts. No d
 
 ## Security and Compatibility
 
-Safe inventory projections remain domain-formatter responsibilities and must not grow secret or Grant fields. Escaping is presentation-only and must not reinterpret values. `--json` remains source-compatible, compact JSON remains one stdout document, and warning routing preserves clean machine output. Sync, daemon lifecycle, export, and describe retain their independent format domains.
+Safe inventory projections remain domain-formatter responsibilities and must not grow secret or Grant fields. Escaping is presentation-only and must not reinterpret values. Compact JSON remains one stdout document, and warning routing preserves clean machine output. Sync, daemon lifecycle, export, and describe retain their independent format domains but share `--format`/`-f`; sync maps `json` to its atomic terminal result and keeps `events` for streaming.
 
 ## Verification
 
-Pure formatter tests cover format resolution, conflicts, compact JSON, TSV escaping, complete Resource fields/payload, width breakpoints, vertical cards, and long Ref preservation. Command tests prove conflicting selectors fail before dependency effects and verify warning stream ownership. Existing inventory tests are migrated to the shared modes without weakening their safe-field assertions. Search planner tests prove multi-Source truncation guidance and exact-Source continuation preservation. Help/reference tests cover the common enum and exceptions. Repository typecheck, lint, CLI thinness gates, full CI, and strict OpenSpec validation remain required.
+Pure formatter tests cover format resolution, compact JSON, TSV escaping, complete Resource fields/payload, width breakpoints, vertical cards, and long Ref preservation. Command tests prove removed `--json` is rejected before dependency effects, aliases resolve through Citty, and verify warning stream ownership. Existing inventory tests are migrated to the shared modes without weakening their safe-field assertions. Search planner tests prove multi-Source truncation guidance and exact-Source continuation preservation. Help/reference tests cover the common enum and exceptions. Repository typecheck, lint, CLI thinness gates, full CI, and strict OpenSpec validation remain required.
 
 ## Promotion Notes
 

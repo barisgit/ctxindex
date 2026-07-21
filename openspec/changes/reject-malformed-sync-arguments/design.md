@@ -19,7 +19,7 @@ The sync command accepts a small documented option set, but its current parsing 
 ## Decisions
 
 1. Treat every documented sync flag as single-occurrence. This avoids ambiguous precedence and matches the command's scalar and toggle semantics. Choosing first-wins or last-wins was rejected because either silently hides caller mistakes.
-2. Treat boolean flags as presence-only. Assignment forms such as `--json=false` are rejected rather than coerced because the documented grammar exposes no boolean values.
+2. Treat boolean flags as presence-only. Assignment forms such as `--format json=false` are rejected rather than coerced because the documented grammar exposes no boolean values.
 3. Preserve help precedence. An explicit help request continues to return help without requiring the rest of the token stream to form an executable sync request.
 4. Reject malformed input before execution begins. Invalid syntax is usage failure, not a failed Sync Run, so it must leave run history and Source sync state unchanged.
 

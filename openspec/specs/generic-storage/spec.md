@@ -120,7 +120,7 @@ The system MUST preserve the following contract without changing the normative f
 
 All timestamp columns in core bookkeeping and index tables MUST be `INTEGER` milliseconds since the Unix epoch in UTC. SQLite has no first-class datetime type; integer ms gives stable sort, cheap range queries, and trivial arithmetic. Profile payload fields MAY use schema-defined representations such as RFC 3339 instants or ISO local dates.
 
-Conversion of core timestamp columns to RFC 3339 happens only at output boundaries (`--json`, log records). Adapters MUST normalize provider time values into Profile payload schemas and MUST NOT persist provider-formatted strings into core bookkeeping or index columns.
+Conversion of core timestamp columns to RFC 3339 happens only at output boundaries (`--format json`, log records). Adapters MUST normalize provider time values into Profile payload schemas and MUST NOT persist provider-formatted strings into core bookkeeping or index columns.
 
 #### Scenario: Persisted and output timestamps use their required representations
 - **WHEN** a conforming implementation exercises this contract

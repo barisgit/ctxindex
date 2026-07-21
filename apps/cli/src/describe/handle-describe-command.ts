@@ -15,7 +15,6 @@ export interface DescribeCommandInput {
   readonly selector?: DescribeSelector
   readonly id?: string
   readonly format: DescribeFormat
-  readonly json: boolean
   readonly full: boolean
   readonly sourceId?: string
 }
@@ -36,11 +35,7 @@ export async function handleDescribeCommand(
     console.error('describe: --source requires an exact Action id')
     return 2
   }
-  if (input.json && input.format !== 'text' && input.format !== 'json') {
-    console.error('describe: --json conflicts with --format')
-    return 2
-  }
-  const format = input.json ? 'json' : input.format
+  const format = input.format
   if (
     selector === 'action' &&
     input.id !== undefined &&

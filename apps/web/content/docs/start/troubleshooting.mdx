@@ -6,9 +6,9 @@ description: Recover from initialization, authentication, Source, Extension, syn
 ## Start with local status
 
 ```sh
-ctxindex status --json
-ctxindex source list --json
-ctxindex oauth-app list --json
+ctxindex status --format json
+ctxindex source list --format json
+ctxindex oauth-app list --format json
 ```
 
 Read the command's stable exit code and structured warning/error fields before retrying.
@@ -35,14 +35,14 @@ ctxindex init
 The Source Adapter's Extension may be absent or invalid. Locally materialized Resource envelopes are preserved; provider operations remain unavailable until the Extension loads again.
 
 ```sh
-ctxindex extension list --json
-ctxindex describe adapter <adapter-id> --json
+ctxindex extension list --format json
+ctxindex describe adapter <adapter-id> --format json
 ```
 
 ## Search returns nothing
 
 - Confirm the Source belongs to the Realm you filtered.
-- Run `sync --source <label> --json` for indexed Sources.
+- Run `sync --source <label> --format json` for indexed Sources.
 - Use `--remote` only when exactly one eligible remote-search Source is selected.
 - Remove `--local-only` only when provider traffic is intentional.
 

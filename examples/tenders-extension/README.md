@@ -46,7 +46,7 @@ Copy a returned `ctx://...` Ref and retrieve the complete Resource:
 ctxindex get 'ctx://<source-id>/tender/DEMO-2026-001'
 ```
 
-For an agent-safe deterministic document, add `--json` to any command. See [expected-output.md](expected-output.md) for website-ready representative output and [the Extension documentation](docs/README.md) for the data contract and troubleshooting.
+For an agent-safe deterministic document, add `--format json` to any command. See [expected-output.md](expected-output.md) for website-ready representative output and [the Extension documentation](docs/README.md) for the data contract and troubleshooting.
 
 ## Reset
 

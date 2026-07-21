@@ -61,7 +61,12 @@ export const exportCommand = defineCtxCommand({
   },
   args: {
     ref: { type: 'positional', required: true, description: 'Resource Ref' },
-    format: { type: 'string', required: true, description: 'Export format' },
+    format: {
+      type: 'string',
+      required: true,
+      alias: 'f',
+      description: 'Export format',
+    },
   },
   run: ({ args }) =>
     runWithExit(() =>

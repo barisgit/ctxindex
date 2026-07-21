@@ -58,7 +58,7 @@ operation and settles the producer before request tracking is released.
 
 ### 4. CLI machine output stays atomic
 
-`sync --json` consumes progress silently and emits exactly one existing final JSON
+`sync --format json` consumes progress silently and emits exactly one existing final JSON
 document. `--format events` emits each progress event immediately and retains the
 existing Source terminal event shapes. Human summary/compact modes report bounded
 progress on stderr and retain their terminal stdout forms. Exit selection remains

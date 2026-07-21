@@ -405,17 +405,23 @@ describe.skipIf(process.platform !== 'darwin')(
       try {
         expect((await runCli(runtime, ['init'])).exitCode).toBe(0)
 
-        const direct = await runCli(runtime, ['realm', 'list', '--json'])
+        const direct = await runCli(runtime, [
+          'realm',
+          'list',
+          '--format',
+          'json',
+        ])
         expect(direct.exitCode, direct.stderr).toBe(0)
         expect(
           JSON.parse(
-            (await runCli(runtime, ['daemon', 'status', '--json'])).stdout,
+            (await runCli(runtime, ['daemon', 'status', '--format', 'json']))
+              .stdout,
           ),
         ).toEqual({ status: 'stopped' })
 
         const concurrent = await Promise.all([
-          runCli(runtime, ['daemon', 'start', '--json']),
-          runCli(runtime, ['daemon', 'start', '--json']),
+          runCli(runtime, ['daemon', 'start', '--format', 'json']),
+          runCli(runtime, ['daemon', 'start', '--format', 'json']),
         ])
         for (const result of concurrent) {
           expect(result.exitCode, result.stderr).toBe(0)
@@ -429,7 +435,12 @@ describe.skipIf(process.platform !== 'darwin')(
         )
         expect(new Set(instanceIds).size).toBe(1)
 
-        const reused = await runCli(runtime, ['daemon', 'start', '--json'])
+        const reused = await runCli(runtime, [
+          'daemon',
+          'start',
+          '--format',
+          'json',
+        ])
         expect(reused.exitCode, reused.stderr).toBe(0)
         expect(JSON.parse(reused.stdout)).toMatchObject({
           status: 'running',
@@ -437,7 +448,12 @@ describe.skipIf(process.platform !== 'darwin')(
           health: { instanceId: instanceIds[0] },
         })
 
-        const status = await runCli(runtime, ['daemon', 'status', '--json'])
+        const status = await runCli(runtime, [
+          'daemon',
+          'status',
+          '--format',
+          'json',
+        ])
         expect(status.exitCode, status.stderr).toBe(0)
         const observed = JSON.parse(status.stdout)
         expect(observed).toMatchObject({
@@ -462,7 +478,12 @@ describe.skipIf(process.platform !== 'darwin')(
           }
         })
 
-        const restarted = await runCli(runtime, ['daemon', 'start', '--json'])
+        const restarted = await runCli(runtime, [
+          'daemon',
+          'start',
+          '--format',
+          'json',
+        ])
         expect(restarted.exitCode, restarted.stderr).toBe(0)
         expect(JSON.parse(restarted.stdout)).toMatchObject({
           status: 'running',
@@ -473,7 +494,12 @@ describe.skipIf(process.platform !== 'darwin')(
           instanceIds[0],
         )
 
-        const stopped = await runCli(runtime, ['daemon', 'stop', '--json'])
+        const stopped = await runCli(runtime, [
+          'daemon',
+          'stop',
+          '--format',
+          'json',
+        ])
         expect(stopped.exitCode, stopped.stderr).toBe(0)
         expect(JSON.parse(stopped.stdout)).toMatchObject({
           status: 'stopped',
@@ -481,11 +507,14 @@ describe.skipIf(process.platform !== 'darwin')(
         })
         expect(
           JSON.parse(
-            (await runCli(runtime, ['daemon', 'stop', '--json'])).stdout,
+            (await runCli(runtime, ['daemon', 'stop', '--format', 'json']))
+              .stdout,
           ),
         ).toEqual({ status: 'stopped', alreadyStopped: true })
       } finally {
-        await runCli(runtime, ['daemon', 'stop', '--json']).catch(() => null)
+        await runCli(runtime, ['daemon', 'stop', '--format', 'json']).catch(
+          () => null,
+        )
         await cleanupRuntime(runtime)
       }
     }, 45_000)
@@ -572,11 +601,18 @@ describe.skipIf(process.platform !== 'darwin')(
           expect(secondReady.instanceId).not.toBe(ready.instanceId)
           expect(secondReady.databaseDigest).not.toBe(ready.databaseDigest)
           expect(
-            (await runCli(primary, ['daemon', 'status', '--json'])).exitCode,
+            (await runCli(primary, ['daemon', 'status', '--format', 'json']))
+              .exitCode,
           ).toBe(0)
           expect(
-            (await runCli(independent, ['daemon', 'status', '--json']))
-              .exitCode,
+            (
+              await runCli(independent, [
+                'daemon',
+                'status',
+                '--format',
+                'json',
+              ])
+            ).exitCode,
           ).toBe(0)
         } finally {
           await cleanupRuntime(independent)
@@ -596,7 +632,8 @@ describe.skipIf(process.platform !== 'darwin')(
           'status',
           '--source',
           sourceId,
-          '--json',
+          '--format',
+          'json',
         ])
         expect(direct.exitCode, direct.stderr).toBe(0)
         expect(JSON.parse(direct.stdout)).toEqual([
@@ -606,7 +643,7 @@ describe.skipIf(process.platform !== 'darwin')(
         const missingEndpoint = join(runtime.runtimeRoot, 'missing.sock')
         const unavailable = await runCli(
           runtime,
-          ['status', '--source', sourceId, '--json'],
+          ['status', '--source', sourceId, '--format', 'json'],
           { CTXINDEX_DAEMON_TEST_ENDPOINT: missingEndpoint },
         )
         expect(unavailable.exitCode).toBe(50)
@@ -615,7 +652,12 @@ describe.skipIf(process.platform !== 'darwin')(
 
         daemon = startDaemon(runtime)
         const metadata = await waitForReady(runtime, daemon)
-        const documentation = await runCli(runtime, ['docs', 'list', '--json'])
+        const documentation = await runCli(runtime, [
+          'docs',
+          'list',
+          '--format',
+          'json',
+        ])
         expect(documentation.exitCode, documentation.stderr).toBe(0)
         expect(JSON.parse(documentation.stdout)).toEqual(
           expect.arrayContaining([
@@ -650,7 +692,12 @@ describe.skipIf(process.platform !== 'darwin')(
           'Daemon Work',
         ])
         expect(daemonRealm.exitCode, daemonRealm.stderr).toBe(0)
-        const realms = await runCli(runtime, ['realm', 'list', '--json'])
+        const realms = await runCli(runtime, [
+          'realm',
+          'list',
+          '--format',
+          'json',
+        ])
         expect(realms.exitCode, realms.stderr).toBe(0)
         expect(JSON.parse(realms.stdout)).toEqual(
           expect.arrayContaining([
@@ -671,7 +718,12 @@ describe.skipIf(process.platform !== 'darwin')(
         ])
         expect(daemonSource.exitCode, daemonSource.stderr).toBe(0)
         const daemonSourceId = parseSourceId(daemonSource.stdout)
-        const sources = await runCli(runtime, ['source', 'list', '--json'])
+        const sources = await runCli(runtime, [
+          'source',
+          'list',
+          '--format',
+          'json',
+        ])
         expect(sources.exitCode, sources.stderr).toBe(0)
         expect(JSON.parse(sources.stdout)).toEqual(
           expect.arrayContaining([
@@ -687,7 +739,8 @@ describe.skipIf(process.platform !== 'darwin')(
           'sync',
           '--source',
           sourceId,
-          '--json',
+          '--format',
+          'json',
         ])
         expect(synced.exitCode, synced.stderr).toBe(0)
         expect(JSON.parse(synced.stdout)).toEqual({
@@ -758,7 +811,8 @@ describe.skipIf(process.platform !== 'darwin')(
           '--source',
           'files',
           '--local-only',
-          '--json',
+          '--format',
+          'json',
         ])
         expect(searched.exitCode, searched.stderr).toBe(0)
         const searchResult = JSON.parse(searched.stdout)
@@ -766,7 +820,12 @@ describe.skipIf(process.platform !== 'darwin')(
         const resourceRef = searchResult.results[0]?.ref as string
         expect(resourceRef).toContain(sourceId)
 
-        const retrieved = await runCli(runtime, ['get', resourceRef, '--json'])
+        const retrieved = await runCli(runtime, [
+          'get',
+          resourceRef,
+          '--format',
+          'json',
+        ])
         expect(retrieved.exitCode, retrieved.stderr).toBe(0)
         expect(JSON.parse(retrieved.stdout)).toEqual(
           expect.objectContaining({
@@ -778,7 +837,12 @@ describe.skipIf(process.platform !== 'darwin')(
           }),
         )
 
-        const thread = await runCli(runtime, ['thread', resourceRef, '--json'])
+        const thread = await runCli(runtime, [
+          'thread',
+          resourceRef,
+          '--format',
+          'json',
+        ])
         expect(thread.exitCode, thread.stderr).toBe(0)
         expect(JSON.parse(thread.stdout)).toEqual(
           expect.objectContaining({
@@ -801,7 +865,8 @@ describe.skipIf(process.platform !== 'darwin')(
           'status',
           '--source',
           sourceId,
-          '--json',
+          '--format',
+          'json',
         ])
         expect(status.exitCode, status.stderr).toBe(0)
         expect(JSON.parse(status.stdout)).toEqual([
@@ -825,14 +890,19 @@ describe.skipIf(process.platform !== 'darwin')(
         await rename(discovery, hiddenDiscovery)
         const override = await runCli(
           runtime,
-          ['status', '--source', sourceId, '--json'],
+          ['status', '--source', sourceId, '--format', 'json'],
           { CTXINDEX_DAEMON_TEST_ENDPOINT: endpoint.path },
         )
         await rename(hiddenDiscovery, discovery)
         expect(override.exitCode, override.stderr).toBe(0)
         expect(JSON.parse(override.stdout)).toEqual(JSON.parse(status.stdout))
 
-        const health = await runCli(runtime, ['daemon', 'status', '--json'])
+        const health = await runCli(runtime, [
+          'daemon',
+          'status',
+          '--format',
+          'json',
+        ])
         expect(health.exitCode, health.stderr).toBe(0)
         expect(health.stdout).not.toContain(runtime.dir)
         expect(health.stdout).not.toContain(runtime.runtimeRoot)
@@ -854,7 +924,8 @@ describe.skipIf(process.platform !== 'darwin')(
           'status',
           '--source',
           sourceId,
-          '--json',
+          '--format',
+          'json',
         ])
         expect(lost.exitCode).toBe(50)
         expect(lost.stdout).toBe('')
@@ -946,14 +1017,19 @@ describe.skipIf(process.platform !== 'darwin')(
         daemon = startDaemon(runtime)
         await waitForReady(runtime, daemon)
         sync = spawnProcess(
-          [cliExecutable, 'sync', '--source', sourceId, '--json'],
+          [cliExecutable, 'sync', '--source', sourceId, '--format', 'json'],
           runtime.env,
         )
 
         await pollUntil(
           'real local sync admission',
           async () => {
-            const health = await runCli(runtime, ['daemon', 'status', '--json'])
+            const health = await runCli(runtime, [
+              'daemon',
+              'status',
+              '--format',
+              'json',
+            ])
             if (health.exitCode !== 0) return null
             return JSON.parse(health.stdout).health.activeRequestCount === 1
               ? true
@@ -971,7 +1047,12 @@ describe.skipIf(process.platform !== 'darwin')(
         const healthy = await pollUntil(
           'daemon health after request cancellation',
           async () => {
-            const result = await runCli(runtime, ['daemon', 'status', '--json'])
+            const result = await runCli(runtime, [
+              'daemon',
+              'status',
+              '--format',
+              'json',
+            ])
             if (result.exitCode !== 0) return null
             const value = JSON.parse(result.stdout).health
             return value.ready === true && value.activeRequestCount === 0
@@ -986,7 +1067,8 @@ describe.skipIf(process.platform !== 'darwin')(
           'status',
           '--source',
           sourceId,
-          '--json',
+          '--format',
+          'json',
         ])
         expect(status.exitCode, status.stderr).toBe(0)
         expect(JSON.parse(status.stdout)).toEqual([
@@ -998,7 +1080,12 @@ describe.skipIf(process.platform !== 'darwin')(
           }),
         ])
 
-        const shutdown = await runCli(runtime, ['daemon', 'stop', '--json'])
+        const shutdown = await runCli(runtime, [
+          'daemon',
+          'stop',
+          '--format',
+          'json',
+        ])
         expect(shutdown.exitCode, shutdown.stderr).toBe(0)
         await waitForExit(daemon, 'daemon exit after cancellation proof')
         daemon = undefined
@@ -1006,7 +1093,8 @@ describe.skipIf(process.platform !== 'darwin')(
           'search',
           'local daemon proof',
           '--local-only',
-          '--json',
+          '--format',
+          'json',
         ])
         expect(searched.exitCode, searched.stderr).toBe(0)
         expect(JSON.parse(searched.stdout).results).toEqual([])
@@ -1034,7 +1122,12 @@ describe.skipIf(process.platform !== 'darwin')(
         await pollUntil(
           'streamed sync admission before disconnect',
           async () => {
-            const health = await runCli(runtime, ['daemon', 'status', '--json'])
+            const health = await runCli(runtime, [
+              'daemon',
+              'status',
+              '--format',
+              'json',
+            ])
             if (health.exitCode !== 0) return null
             return JSON.parse(health.stdout).health.activeRequestCount === 1
               ? true
@@ -1049,7 +1142,12 @@ describe.skipIf(process.platform !== 'darwin')(
         const healthy = await pollUntil(
           'daemon health after abrupt client disconnect',
           async () => {
-            const result = await runCli(runtime, ['daemon', 'status', '--json'])
+            const result = await runCli(runtime, [
+              'daemon',
+              'status',
+              '--format',
+              'json',
+            ])
             if (result.exitCode !== 0) return null
             const value = JSON.parse(result.stdout).health
             return value.ready === true && value.activeRequestCount === 0
@@ -1064,7 +1162,8 @@ describe.skipIf(process.platform !== 'darwin')(
           'status',
           '--source',
           sourceId,
-          '--json',
+          '--format',
+          'json',
         ])
         expect(status.exitCode, status.stderr).toBe(0)
         expect(JSON.parse(status.stdout)).toEqual([
@@ -1093,13 +1192,18 @@ describe.skipIf(process.platform !== 'darwin')(
         daemon = startDaemon(runtime)
         await waitForReady(runtime, daemon)
         sync = spawnProcess(
-          [cliExecutable, 'sync', '--source', sourceId, '--json'],
+          [cliExecutable, 'sync', '--source', sourceId, '--format', 'json'],
           runtime.env,
         )
         await pollUntil(
           'non-cooperative sync admission',
           async () => {
-            const health = await runCli(runtime, ['daemon', 'status', '--json'])
+            const health = await runCli(runtime, [
+              'daemon',
+              'status',
+              '--format',
+              'json',
+            ])
             if (health.exitCode !== 0) return null
             return JSON.parse(health.stdout).health.activeRequestCount === 1
               ? true
@@ -1110,11 +1214,11 @@ describe.skipIf(process.platform !== 'darwin')(
 
         shutdowns.push(
           spawnProcess(
-            [cliExecutable, 'daemon', 'stop', '--json'],
+            [cliExecutable, 'daemon', 'stop', '--format', 'json'],
             runtime.env,
           ),
           spawnProcess(
-            [cliExecutable, 'daemon', 'stop', '--json'],
+            [cliExecutable, 'daemon', 'stop', '--format', 'json'],
             runtime.env,
           ),
         )
@@ -1135,7 +1239,8 @@ describe.skipIf(process.platform !== 'darwin')(
           'status',
           '--source',
           sourceId,
-          '--json',
+          '--format',
+          'json',
         ])
         expect(rejected.exitCode).toBe(50)
         expect(rejected.stdout).toBe('')
@@ -1182,7 +1287,12 @@ describe.skipIf(process.platform !== 'darwin')(
 
         daemon = startDaemon(runtime)
         await waitForReady(runtime, daemon)
-        const stopped = await runCli(runtime, ['daemon', 'stop', '--json'])
+        const stopped = await runCli(runtime, [
+          'daemon',
+          'stop',
+          '--format',
+          'json',
+        ])
         expect(stopped.exitCode, stopped.stderr).toBe(0)
         await waitForExit(daemon, 'restarted daemon graceful exit')
         daemon = undefined

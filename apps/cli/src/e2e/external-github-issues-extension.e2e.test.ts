@@ -124,7 +124,8 @@ globalThis.fetch = async (input, init = {}) => {
         'sync',
         '--source',
         'github-demo',
-        '--json',
+        '--format',
+        'json',
       ],
       {
         cwd: repoRoot,
@@ -168,7 +169,8 @@ globalThis.fetch = async (input, init = {}) => {
       '1',
       '--offset',
       '0',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(firstPage.exitCode, firstPage.stderr).toBe(0)
     const firstJson = JSON.parse(firstPage.stdout)
@@ -184,14 +186,20 @@ globalThis.fetch = async (input, init = {}) => {
       '1',
       '--offset',
       '1',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(secondPage.exitCode, secondPage.stderr).toBe(0)
     const secondJson = JSON.parse(secondPage.stdout)
     expect(secondJson.results).toHaveLength(1)
     expect(secondJson.results[0].ref).not.toBe(firstJson.results[0].ref)
 
-    const got = await sandbox.run(['get', firstJson.results[0].ref, '--json'])
+    const got = await sandbox.run([
+      'get',
+      firstJson.results[0].ref,
+      '--format',
+      'json',
+    ])
     expect(got.exitCode, got.stderr).toBe(0)
     expect(JSON.parse(got.stdout)).toMatchObject({
       resource: {

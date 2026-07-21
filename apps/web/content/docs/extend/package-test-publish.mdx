@@ -45,11 +45,11 @@ bun test examples/issues-extension/extension.test.ts
 ## Install without publishing
 
 ```sh
-ctxindex extension install local ./acme-notes acme.notes --json
+ctxindex extension install local ./acme-notes acme.notes --format json
 ctxindex extension install git \
   'git+https://github.com/acme/ctxindex-notes.git#<commit>' \
   acme.notes \
-  --json
+  --format json
 ```
 
 Git and local packages can carry normal dependencies, so npm publication is optional.
@@ -59,7 +59,7 @@ Git and local packages can carry normal dependencies, so npm publication is opti
 Publish the package through your normal registry workflow, then install an exact version or deliberately resolved target:
 
 ```sh
-ctxindex extension install npm @acme/ctxindex-notes@1.0.0 acme.notes --json
+ctxindex extension install npm @acme/ctxindex-notes@1.0.0 acme.notes --format json
 ```
 
 Installed execution is pinned to immutable managed bytes. Updates are explicit and re-pin the package; startup never re-resolves the mutable target.

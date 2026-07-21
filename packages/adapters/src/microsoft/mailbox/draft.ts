@@ -169,7 +169,7 @@ function localMessage(
   expectedDraft: boolean,
 ): CommunicationMessage {
   const resource = context.resolveResource(ref)
-  const guidance = `Retrieve it first with: ctxindex get ${ref} --json`
+  const guidance = `Retrieve it first with: ctxindex get ${ref} --format json`
   if (!resource)
     throw new CtxindexValidationError(
       'invalid_action_input',
@@ -214,7 +214,7 @@ function replyDetails(
   if (!replyRecipient || !parent.threadId) {
     throw new CtxindexValidationError(
       'invalid_action_input',
-      `Reply parent "${replyToRef}" lacks a Reply-To or From recipient or Microsoft conversation identity. Retrieve it first with: ctxindex get ${replyToRef} --json`,
+      `Reply parent "${replyToRef}" lacks a Reply-To or From recipient or Microsoft conversation identity. Retrieve it first with: ctxindex get ${replyToRef} --format json`,
     )
   }
   recipient(replyRecipient)

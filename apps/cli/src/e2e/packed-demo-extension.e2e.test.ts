@@ -138,7 +138,8 @@ test('relocated compiled CLI installs and uses the exact packed demo artifact', 
       'npm',
       '@ctxindex/demo-tenders@0.1.0',
       'ctxindex.demo',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(installed.exitCode, installed.stderr).toBe(0)
     expect(JSON.parse(installed.stdout)).toMatchObject({
@@ -163,7 +164,13 @@ test('relocated compiled CLI installs and uses the exact packed demo artifact', 
     const sourceId = /^source added: (.+)$/m.exec(added.stdout)?.[1]
     expect(sourceId).toBeDefined()
 
-    const synced = await run(['sync', '--source', 'demo-tenders', '--json'])
+    const synced = await run([
+      'sync',
+      '--source',
+      'demo-tenders',
+      '--format',
+      'json',
+    ])
     expect(synced.exitCode, synced.stderr).toBe(0)
     expect(JSON.parse(synced.stdout)).toMatchObject({
       results: [
@@ -185,7 +192,8 @@ test('relocated compiled CLI installs and uses the exact packed demo artifact', 
       'ctxindex.demo.tender',
       '--field',
       'status=open',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(searched.exitCode, searched.stderr).toBe(0)
     const ref = `ctx://${sourceId}/tender/DEMO-2026-001`
@@ -200,7 +208,7 @@ test('relocated compiled CLI installs and uses the exact packed demo artifact', 
       warnings: [],
     })
 
-    const got = await run(['get', ref, '--json'])
+    const got = await run(['get', ref, '--format', 'json'])
     expect(got.exitCode, got.stderr).toBe(0)
     expect(JSON.parse(got.stdout)).toMatchObject({
       resource: {

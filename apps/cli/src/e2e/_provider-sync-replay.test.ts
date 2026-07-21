@@ -178,7 +178,7 @@ export async function runProviderSyncReplay<TRequest>(
   ): Promise<SyncRunOutput> => {
     driver.resetRequests()
     const result = await sandbox.run(
-      ['sync', '--source', driver.sourceLabel, '--json'],
+      ['sync', '--source', driver.sourceLabel, '--format', 'json'],
       { env: driver.env },
     )
     expect(result.exitCode, `${phase}: ${result.stderr}`).toBe(0)

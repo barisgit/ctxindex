@@ -53,7 +53,7 @@ test('relocated compiled CLI serves product documentation offline', async () => 
       return { stdout: commandOut, stderr: commandErr, exitCode: commandExit }
     }
 
-    const list = await run(['docs', 'list', '--json'])
+    const list = await run(['docs', 'list', '--format', 'json'])
     expect(list.exitCode, list.stderr).toBe(0)
     expect(JSON.parse(list.stdout)).toEqual(
       expect.arrayContaining([
@@ -75,7 +75,7 @@ test('relocated compiled CLI serves product documentation offline', async () => 
     ])
     expect(extensionGet.exitCode, extensionGet.stderr).toBe(0)
     expect(extensionGet.stdout).toContain('# Local directory')
-    const search = await run(['docs', 'search', 'Realm', '--json'])
+    const search = await run(['docs', 'search', 'Realm', '--format', 'json'])
     expect(search.exitCode, search.stderr).toBe(0)
     expect(JSON.parse(search.stdout).length).toBeGreaterThan(0)
   } finally {

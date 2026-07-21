@@ -43,7 +43,7 @@ test('binary CLI enumerates filter-only searches locally and paginates determini
     const refOf = (name: string) => `ctx://${sourceId}/file/${name}`
 
     const enumerate = await sandbox.run(
-      ['search', '--kind', 'file', '--source', sourceId, '--json'],
+      ['search', '--kind', 'file', '--source', sourceId, '--format', 'json'],
       { env },
     )
     expect(enumerate.exitCode, enumerate.stderr).toBe(0)
@@ -68,7 +68,7 @@ test('binary CLI enumerates filter-only searches locally and paginates determini
     ])
 
     const rerun = await sandbox.run(
-      ['search', '--kind', 'file', '--source', sourceId, '--json'],
+      ['search', '--kind', 'file', '--source', sourceId, '--format', 'json'],
       { env },
     )
     expect(rerun.stdout).toBe(enumerate.stdout)
@@ -84,7 +84,8 @@ test('binary CLI enumerates filter-only searches locally and paginates determini
             sourceId,
             '--limit',
             '2',
-            '--json',
+            '--format',
+            'json',
           ],
           { env },
         )
@@ -103,7 +104,8 @@ test('binary CLI enumerates filter-only searches locally and paginates determini
             '2',
             '--offset',
             '2',
-            '--json',
+            '--format',
+            'json',
           ],
           { env },
         )
@@ -118,12 +120,12 @@ test('binary CLI enumerates filter-only searches locally and paginates determini
 
     await rename(join(root, 'a.txt'), join(root, 'renamed-a.txt'))
     const resynced = await sandbox.run(
-      ['sync', '--source', sourceId, '--json'],
+      ['sync', '--source', sourceId, '--format', 'json'],
       { env },
     )
     expect(resynced.exitCode, resynced.stderr).toBe(0)
     const withDeleted = await sandbox.run(
-      ['search', '--include-deleted', '--json'],
+      ['search', '--include-deleted', '--format', 'json'],
       { env },
     )
     expect(withDeleted.exitCode, withDeleted.stderr).toBe(0)

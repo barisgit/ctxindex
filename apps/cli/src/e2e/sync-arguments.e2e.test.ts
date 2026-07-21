@@ -117,7 +117,7 @@ test('malformed sync arguments leave configured sync state unchanged', async () 
       ['--mode=wat', 'sync', '--source', 'notes'],
       ['sync', 'unexpected', '--source', 'notes'],
       ['sync', '--source', 'notes', '--source', 'notes'],
-      ['sync', '--source', 'notes', '--json', '--json'],
+      ['sync', '--source', 'notes', '--format', 'json', '--format', 'json'],
       ['sync', '--source', 'notes', '--json=false'],
       ['sync', '--source='],
       ['sync', '--source', 'notes', '--mode'],

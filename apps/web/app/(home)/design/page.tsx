@@ -94,7 +94,8 @@ function ThemeSpecimen({
             layer.
           </p>
           <code className="mt-4 block overflow-x-auto rounded-lg bg-background-muted px-4 py-3 font-mono text-xs text-text-primary">
-            ctxindex search &quot;invoice acme&quot; --realm company --json
+            ctxindex search &quot;invoice acme&quot; --realm company --format
+            json
           </code>
         </div>
       </div>
@@ -238,7 +239,7 @@ export default function DesignPage() {
               </p>
             </div>
             <code className="block overflow-x-auto rounded-xl border border-border-default bg-background-secondary p-5 font-mono text-sm">
-              ctxindex get ctx://realm/source/resource --json
+              ctxindex get ctx://realm/source/resource --format json
             </code>
           </div>
         </div>

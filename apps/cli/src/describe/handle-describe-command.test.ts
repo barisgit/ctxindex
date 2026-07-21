@@ -16,7 +16,6 @@ describe('describe command validation', () => {
           selector: 'action',
           id: 'mail.draft.create',
           format: 'json',
-          json: false,
           full: false,
           sourceId: 'work-mail',
         },
@@ -46,7 +45,6 @@ describe('describe command validation', () => {
           selector: 'action',
           id: 'communication.message.draft.create',
           format: 'json',
-          json: false,
           full: false,
         },
         async () => {
@@ -67,7 +65,6 @@ describe('describe command validation', () => {
       selector: 'profile',
       id: 'mail.message',
       format: 'text' as const,
-      json: false,
       full: false,
       sourceId: 'mail',
     },
@@ -75,14 +72,12 @@ describe('describe command validation', () => {
       selector: 'action',
       id: 'mail.draft.create',
       format: 'markdown' as const,
-      json: true,
       full: false,
     },
     {
       selector: 'adapter',
       id: 'mail.adapter',
       format: 'text' as const,
-      json: false,
       full: true,
     },
   ])('rejects semantic misuse before loading definitions: %j', async (input) => {

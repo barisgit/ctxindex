@@ -134,9 +134,12 @@ test('real binary proves the isolated complete V1 workflow', async () => {
     expect(gmailSource).not.toBe(localSource)
 
     const synced = jsonOutput(
-      await sandbox.run(['sync', '--source', 'workflow-files', '--json'], {
-        env,
-      }),
+      await sandbox.run(
+        ['sync', '--source', 'workflow-files', '--format', 'json'],
+        {
+          env,
+        },
+      ),
     ) as { results: { sourceId: string; status: string }[] }
     expect(synced.results).toEqual([
       expect.objectContaining({ sourceId: localSource, status: 'completed' }),
@@ -153,7 +156,8 @@ test('real binary proves the isolated complete V1 workflow', async () => {
           '--remote',
           '--limit',
           '2',
-          '--json',
+          '--format',
+          'json',
         ],
         { env },
       ),
@@ -171,7 +175,8 @@ test('real binary proves the isolated complete V1 workflow', async () => {
         '--realm',
         'mail',
         '--local-only',
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -193,7 +198,8 @@ test('real binary proves the isolated complete V1 workflow', async () => {
             '--realm',
             'mail',
             '--local-only',
-            '--json',
+            '--format',
+            'json',
           ],
           { env },
         )
@@ -207,7 +213,8 @@ test('real binary proves the isolated complete V1 workflow', async () => {
         '--realm',
         'files',
         '--local-only',
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -227,7 +234,8 @@ test('real binary proves the isolated complete V1 workflow', async () => {
             '--realm',
             'files',
             '--local-only',
-            '--json',
+            '--format',
+            'json',
           ],
           { env },
         )
@@ -240,7 +248,9 @@ test('real binary proves the isolated complete V1 workflow', async () => {
       ]),
     ).toEqual(new Set([gmailSource, localSource]))
 
-    const localGet = await sandbox.run(['get', localRef, '--json'], { env })
+    const localGet = await sandbox.run(['get', localRef, '--format', 'json'], {
+      env,
+    })
     expect(jsonOutput(localGet)).toMatchObject({
       resource: {
         ref: localRef,
@@ -257,7 +267,10 @@ test('real binary proves the isolated complete V1 workflow', async () => {
     const messageRef = `ctx://${gmailSource}/message/workflow-root`
     const replyRef = `ctx://${gmailSource}/message/workflow-reply`
     mock.resetRequests()
-    const gmailGet = await sandbox.run(['get', messageRef, '--json'], { env })
+    const gmailGet = await sandbox.run(
+      ['get', messageRef, '--format', 'json'],
+      { env },
+    )
     expect(jsonOutput(gmailGet)).toMatchObject({
       resource: {
         ref: messageRef,
@@ -281,7 +294,7 @@ test('real binary proves the isolated complete V1 workflow', async () => {
     ).toHaveLength(1)
 
     mock.resetRequests()
-    const thread = await sandbox.run(['thread', replyRef, '--json'], {
+    const thread = await sandbox.run(['thread', replyRef, '--format', 'json'], {
       env,
     })
     const threadJson = jsonOutput(thread) as {
@@ -306,7 +319,7 @@ test('real binary proves the isolated complete V1 workflow', async () => {
 
     const artifactRef = `${messageRef}/attachment/workflow-root-attachment`
     const listed = await sandbox.run(
-      ['artifact', 'list', messageRef, '--json'],
+      ['artifact', 'list', messageRef, '--format', 'json'],
       { env },
     )
     expect(jsonOutput(listed)).toEqual({
@@ -325,7 +338,15 @@ test('real binary proves the isolated complete V1 workflow', async () => {
     mock.resetRequests()
     const firstOutput = join(sandbox.dir, 'first-attachment.txt')
     const firstDownload = await sandbox.run(
-      ['artifact', 'download', artifactRef, '--output', firstOutput, '--json'],
+      [
+        'artifact',
+        'download',
+        artifactRef,
+        '--output',
+        firstOutput,
+        '--format',
+        'json',
+      ],
       { env },
     )
     const firstDownloadJson = jsonOutput(firstDownload) as {
@@ -353,7 +374,15 @@ test('real binary proves the isolated complete V1 workflow', async () => {
 
     const secondOutput = join(sandbox.dir, 'second-attachment.txt')
     const secondDownload = await sandbox.run(
-      ['artifact', 'download', artifactRef, '--output', secondOutput, '--json'],
+      [
+        'artifact',
+        'download',
+        artifactRef,
+        '--output',
+        secondOutput,
+        '--format',
+        'json',
+      ],
       { env },
     )
     const secondDownloadJson = jsonOutput(
@@ -429,7 +458,8 @@ test('real binary proves the isolated complete V1 workflow', async () => {
         'workflow-mail',
         '--input',
         JSON.stringify(createInput),
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -466,7 +496,8 @@ test('real binary proves the isolated complete V1 workflow', async () => {
         'workflow-mail',
         '--input',
         JSON.stringify(updateInput),
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )

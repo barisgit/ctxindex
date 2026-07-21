@@ -62,7 +62,7 @@ test('relocated compiled CLI serves embedded bundled skills', async () => {
     expect(list.stdout).not.toContain('reference/cli-overview\t')
     expect(list.stdout).not.toContain('README\t')
 
-    const listJson = await run(['skills', 'list', '--json'])
+    const listJson = await run(['skills', 'list', '--format', 'json'])
     expect(listJson.exitCode).toBe(0)
     expect(JSON.parse(listJson.stdout)).toEqual(
       expect.arrayContaining([
@@ -75,7 +75,7 @@ test('relocated compiled CLI serves embedded bundled skills', async () => {
     expect(get.stdout).toContain('# Getting started with ctxindex')
     expect(get.stdout).toContain('ctxindex --help')
     expect(get.stdout).toContain(
-      'ctxindex describe <profile|adapter|action> <id> --json',
+      'ctxindex describe <profile|adapter|action> <id> --format json',
     )
     expect(get.stdout).toContain('ctxindex extension list')
     expect(get.stdout).toContain('ctxindex skills list')
@@ -99,7 +99,8 @@ test('relocated compiled CLI serves embedded bundled skills', async () => {
       'get',
       'getting-started',
       '--inline',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(getJson.exitCode).toBe(0)
     const document = JSON.parse(getJson.stdout) as { content: string }

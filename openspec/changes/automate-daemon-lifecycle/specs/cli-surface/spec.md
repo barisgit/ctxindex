@@ -12,7 +12,7 @@ Ordinary commands MUST preserve the existing explicit selection behavior in this
 - **THEN** both invocations succeed deterministically and the second reports the already-running compatible instance without launching another owner
 
 #### Scenario: Agent inspects running status
-- **WHEN** an agent invokes `ctxindex daemon status --json` for a compatible ready daemon
+- **WHEN** an agent invokes `ctxindex daemon status --format json` for a compatible ready daemon
 - **THEN** the CLI reports deterministic running lifecycle, health, readiness, protocol, instance, and active-request state without a transport envelope
 
 #### Scenario: Agent inspects stopped status

@@ -7,10 +7,10 @@ OAuth lifecycle commands MUST include exactly these public forms:
 
 ```text
 oauth-app add <provider> <label> --from-env
-oauth-app list [--format pretty|text|json] [--json]
+oauth-app list [--format pretty|text|json]
 oauth-app remove <provider> <label>
 account add <provider> --app <label> [--label <label>]
-account list [--format pretty|text|json] [--json]
+account list [--format pretty|text|json]
 account remove <label>
 ```
 
@@ -22,7 +22,7 @@ The CLI MUST NOT expose a `client` command, alias, flag, inventory entity, or co
 
 `account add` MUST require `--app <label>`, resolve exact `(providerId,label)`, and fail before secret/database/browser/network effects when the Provider or App is unknown. Authorization MUST use the selected active or persisted local App config and snapshot it into the private Grant. Authorization and refresh MUST NOT reread App config from environment variables.
 
-The launch-critical structured reads `search`, `get`, `thread`, `artifact list`, `status`, `source list`, `realm list`, `account list`, `oauth-app list`, and `extension list` MUST accept `--format pretty|text|json`. This requirement makes no shared-format claim for any other command. If neither format flag is present, stdout attached to a TTY MUST select `pretty` and non-TTY stdout MUST select `text`. `--json` MUST remain an exact shorthand for `--format json`, and combining `--json` with any `--format` value MUST fail as invalid usage before command effects. Pretty output MUST adapt to terminal display width, MUST use vertical records when a complete table is not usable, MUST constrain every physical rendered line to the available display columns, and MUST losslessly wrap rather than truncate, ellipsize, or omit semantic values. Text collection output MUST be deterministic escaped TSV: null MUST encode as reserved `\N`, while literal backslash, tab, carriage return, and newline MUST be escaped so every string remains distinct from null. Text singular-Resource output MUST include every envelope field and the complete payload, using compact JSON for nested values. JSON MUST be compact canonical structured output. Successful mutation receipts SHOULD remain terse.
+The launch-critical structured reads `search`, `get`, `thread`, `artifact list`, `status`, `source list`, `realm list`, `account list`, `oauth-app list`, and `extension list` MUST accept `--format pretty|text|json`. Frequent unambiguous options MUST expose these Citty aliases wherever the corresponding long option exists: `-f` for `--format`, `-s` for `--source`, `-r` for `--realm`, `-l` for `--limit`, and `-o` for file `--output`. Generated Adapter configuration flags and ambiguous domain selectors MUST remain long-only. This requirement makes no shared-format claim for any other command. If neither format flag is present, stdout attached to a TTY MUST select `pretty` and non-TTY stdout MUST select `text`. `--format` MUST be the sole output selector, with `-f` as its exact short alias. The CLI MUST NOT expose `--json`; JSON callers MUST use `--format json` or `-f json`. Pretty output MUST adapt to terminal display width, MUST use vertical records when a complete table is not usable, MUST constrain every physical rendered line to the available display columns, and MUST losslessly wrap rather than truncate, ellipsize, or omit semantic values. Text collection output MUST be deterministic escaped TSV: null MUST encode as reserved `\N`, while literal backslash, tab, carriage return, and newline MUST be escaped so every string remains distinct from null. Text singular-Resource output MUST include every envelope field and the complete payload, using compact JSON for nested values. JSON MUST be compact canonical structured output. Successful mutation receipts SHOULD remain terse.
 
 Warnings from those structured reads MUST be written only to stderr in pretty and text modes. In JSON mode warnings MUST remain only in the JSON stdout envelope where that envelope owns warnings. Format selection MUST NOT leak warnings or diagnostics into the opposite stream.
 
@@ -47,16 +47,16 @@ Unknown Realm, OAuth App, Account, Source, or Adapter references MUST fail fast 
 - **THEN** parsing rejects it as invalid usage and creates no state
 
 #### Scenario: OAuth App JSON inventory is safe
-- **WHEN** an agent runs `oauth-app list --json`
+- **WHEN** an agent runs `oauth-app list --format json`
 - **THEN** every row contains only Provider id, label, origin, and safe provenance
 
 #### Scenario: Omitted format follows stdout destination
-- **WHEN** a structured read is invoked without `--format` or `--json`
+- **WHEN** a structured read is invoked without `--format`
 - **THEN** it selects pretty output for TTY stdout and deterministic text for non-TTY stdout
 
-#### Scenario: Conflicting output selectors are rejected
-- **WHEN** a caller supplies both `--json` and `--format pretty|text|json`
-- **THEN** the CLI exits `2` before opening application dependencies
+#### Scenario: Removed JSON flag is rejected
+- **WHEN** a caller supplies the removed `--json` flag
+- **THEN** the CLI exits `2` before opening application dependencies and advertises `--format`
 
 #### Scenario: Narrow pretty output preserves complete values
 - **WHEN** pretty collection output contains a Ref longer than the available terminal width
@@ -71,9 +71,9 @@ Unknown Realm, OAuth App, Account, Source, or Adapter references MUST fail fast 
 - **THEN** stdout contains the complete Resource envelope and payload and readable warnings appear only on stderr
 
 #### Scenario: JSON remains one compact document
-- **WHEN** a structured read runs with `--format json` or `--json`
+- **WHEN** a structured read runs with `--format json` or `-f json`
 - **THEN** stdout is one compact canonical JSON document and no warning from its result envelope is duplicated to stderr
 
 #### Scenario: Primary thread and Artifact reads share formats
 - **WHEN** a caller invokes `thread <ref>` or `artifact list <ref>`
-- **THEN** the command supports the same destination-aware pretty, escaped text, compact JSON, shorthand, conflict, and warning-stream rules
+- **THEN** the command supports the same destination-aware pretty, escaped text, compact JSON, format-alias, and warning-stream rules

@@ -1,5 +1,6 @@
 import { defineCtxCommand } from '../command-model'
 import { mapErrorToExit, runWithExit } from '../format/exit'
+import { outputFormatArg } from '../format/output'
 import {
   type DaemonLifecycle,
   type DaemonStartResult,
@@ -97,19 +98,20 @@ export async function handleDaemonCommand(
   }
 }
 
-const jsonArgs = {
-  json: { type: 'boolean' as const, description: 'Print JSON' },
-}
+const outputArgs = { format: outputFormatArg }
 
 export const daemonCommand = defineCtxCommand({
   meta: { name: 'daemon', description: 'Manage the background local daemon.' },
   subCommands: {
     start: defineCtxCommand({
       meta: { name: 'start', description: 'Start the background daemon.' },
-      args: jsonArgs,
+      args: outputArgs,
       run: ({ args }) =>
         runWithExit(() =>
-          handleDaemonCommand({ kind: 'start', json: args.json ?? false }),
+          handleDaemonCommand({
+            kind: 'start',
+            json: args.format === 'json',
+          }),
         ),
     }),
     status: defineCtxCommand({
@@ -117,10 +119,13 @@ export const daemonCommand = defineCtxCommand({
         name: 'status',
         description: 'Inspect daemon lifecycle and health.',
       },
-      args: jsonArgs,
+      args: outputArgs,
       run: ({ args }) =>
         runWithExit(() =>
-          handleDaemonCommand({ kind: 'status', json: args.json ?? false }),
+          handleDaemonCommand({
+            kind: 'status',
+            json: args.format === 'json',
+          }),
         ),
     }),
     stop: defineCtxCommand({
@@ -128,10 +133,13 @@ export const daemonCommand = defineCtxCommand({
         name: 'stop',
         description: 'Stop the background daemon gracefully.',
       },
-      args: jsonArgs,
+      args: outputArgs,
       run: ({ args }) =>
         runWithExit(() =>
-          handleDaemonCommand({ kind: 'stop', json: args.json ?? false }),
+          handleDaemonCommand({
+            kind: 'stop',
+            json: args.format === 'json',
+          }),
         ),
     }),
   },

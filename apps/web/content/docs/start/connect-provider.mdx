@@ -8,7 +8,7 @@ A provider-backed Source needs three separate things: an available **OAuth App**
 ## Inspect available OAuth Apps
 
 ```sh
-ctxindex oauth-app list --json
+ctxindex oauth-app list --format json
 ```
 
 Bundled Google and Microsoft Extensions may expose public desktop OAuth Apps. ctxindex selects one as the managed default only when host policy exactly matches its Provider, label, owning Extension, and bundled provenance. Provider verification, tenant policy, publisher status, consent, or requested scopes can still cause the provider to reject authorization.
@@ -35,12 +35,12 @@ The public App inventory never exposes App config, client ids, desktop-secret me
 List loaded Source Adapters and inspect the generated config schema before adding a Source:
 
 ```sh
-ctxindex describe adapter microsoft.mailbox --json
+ctxindex describe adapter microsoft.mailbox --format json
 ctxindex source add microsoft.mailbox \
   --realm company \
   --account work \
   --label work-mail
-ctxindex sync --source work-mail --json
+ctxindex sync --source work-mail --format json
 ```
 
 Repeat with a calendar Adapter only when you need that collection. Accounts can back multiple compatible Sources; a Source always belongs to exactly one Realm.

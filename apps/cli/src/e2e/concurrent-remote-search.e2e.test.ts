@@ -112,7 +112,8 @@ test('compiled CLI serializes concurrent remote-search cache batches across proc
           'work-mailbox',
           '--limit',
           '20',
-          '--json',
+          '--format',
+          'json',
         ],
         {
           cwd: '/',

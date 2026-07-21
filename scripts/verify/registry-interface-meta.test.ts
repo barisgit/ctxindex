@@ -5,7 +5,7 @@ import { CTXINDEX_BUILTIN_EXTENSIONS } from '@ctxindex/adapters'
 const requiredDiscoverySnippets = [
   'ctxindex --help',
   'ctxindex describe',
-  'ctxindex describe <profile|adapter|action> <id> --json',
+  'ctxindex describe <profile|adapter|action> <id> --format json',
   'ctxindex extension list',
   'ctxindex skills list',
   'ctxindex skills get <name>',
@@ -71,7 +71,7 @@ test('workflow skills point to runtime vocabulary instead of declaring it', asyn
     expect(containsRegistryInventory(proseWithoutDiscovery, term)).toBe(false)
   }
   expect(prose).toContain(
-    'ctxindex describe <profile|adapter|action> <id> --json',
+    'ctxindex describe <profile|adapter|action> <id> --format json',
   )
   expect(prose).toContain('ctxindex --help')
   expect(prose).toContain('ctxindex describe')

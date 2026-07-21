@@ -29,7 +29,7 @@ SHALL write no partial output when any candidate fails.
 ### Requirement: Deterministic aggregate Extension search
 
 The CLI SHALL provide Marketplace search over configured Catalog snapshots with
-human and `--json` output. It SHALL match id and summary case-insensitively,
+human and `--format json` output. It SHALL match id and summary case-insensitively,
 retain duplicate curation rows across Catalogs, and use deterministic ordering.
 
 Default search SHALL refresh configured Catalogs. `--no-refresh` SHALL use only
@@ -104,7 +104,7 @@ installer and SHALL return source-neutral results and stable errors.
 #### Scenario: Catalog lifecycle is requested as JSON
 
 - **WHEN** add, refresh, list, show, remove, search, or install is requested with
-  `--json`
+  `--format json`
 - **THEN** the CLI returns deterministic structured output without prompts
 
 #### Scenario: Catalog package install succeeds

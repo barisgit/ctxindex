@@ -140,7 +140,7 @@ test('provider-neutral account authorization deduplicates Accounts and safely re
       { label: 'Primary Inbox', grant_id: sharedGrantId },
     ])
 
-    const listed = await sandbox.run(['account', 'list', '--json'])
+    const listed = await sandbox.run(['account', 'list', '--format', 'json'])
     expect(listed.exitCode, listed.stderr).toBe(0)
     expect(listed.stdout).not.toContain('canary')
     expect(listed.stdout).not.toContain('subject-1')

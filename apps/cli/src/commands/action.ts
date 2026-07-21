@@ -8,6 +8,7 @@ export const actionRunCommand = defineCtxCommand({
     'action-id': { type: 'positional', required: true },
     source: {
       type: 'string',
+      alias: 's',
       required: true,
       description: 'Exact Source label or ID',
     },
@@ -16,7 +17,12 @@ export const actionRunCommand = defineCtxCommand({
       required: true,
       description: 'Inline JSON object or UTF-8 JSON file path',
     },
-    json: { type: 'boolean', description: 'Print deterministic JSON' },
+    format: {
+      type: 'enum',
+      options: ['pretty', 'text', 'json'],
+      alias: 'f',
+      description: 'Output format: pretty, text, or json',
+    },
   },
   run: ({ args }) =>
     runWithExit(() =>
@@ -25,7 +31,7 @@ export const actionRunCommand = defineCtxCommand({
         actionId: args['action-id'],
         sourceId: args.source,
         input: args.input,
-        json: args.json ?? false,
+        json: args.format === 'json',
       }),
     ),
 })

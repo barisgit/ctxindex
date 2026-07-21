@@ -51,11 +51,11 @@ export const sourceAddBaseArgs = {
     required: false,
     description: 'Adapter ID',
   },
-  realm: { type: 'string', description: 'Realm slug' },
+  realm: { type: 'string', alias: 'r', description: 'Realm slug' },
 } as const
 
 export const sourceListArgs = {
-  realm: { type: 'string', description: 'Realm slug' },
+  realm: { type: 'string', alias: 'r', description: 'Realm slug' },
   ...structuredOutputArgs,
 } as const
 

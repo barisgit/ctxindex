@@ -6,7 +6,7 @@ Some Sources support useful remote operations but should not participate in rout
 
 - Allow Source creation to explicitly disable sync while preserving sync-enabled creation as the default.
 - Add one bare `--no-sync` flag to `source add`, with strict rejection of assignments, repetitions, and malformed forms before persistent state is opened.
-- Persist the selected sync policy in the existing `sources.sync_enabled` column and expose it as `syncEnabled` in `source list --json`.
+- Persist the selected sync policy in the existing `sources.sync_enabled` column and expose it as `syncEnabled` in `source list --format json`.
 - Preserve existing behavior in which all-Source sync skips disabled Sources and targeted sync rejects a disabled Source before invoking its provider.
 - Do not mutate existing Sources and do not add a schema migration.
 

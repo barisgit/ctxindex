@@ -8,6 +8,7 @@ import type {
 import { CtxindexError } from '@ctxindex/core/errors'
 import { defineCtxCommand } from '../command-model'
 import { mapErrorToExit, runWithExit } from '../format/exit'
+import { outputFormatArg } from '../format/output'
 import {
   type DocsServiceLoader,
   type DocumentationListItem,
@@ -208,7 +209,7 @@ export const docsListCommand = defineCtxCommand({
       type: 'string',
       description: 'Filter by one exact loaded Extension id',
     },
-    json: { type: 'boolean', description: 'Print JSON' },
+    format: outputFormatArg,
   },
   run: ({ args }) =>
     runWithExit(() =>
@@ -216,7 +217,7 @@ export const docsListCommand = defineCtxCommand({
         ...(args.extension === undefined
           ? {}
           : { extensionId: args.extension }),
-        json: args.json ?? false,
+        json: args.format === 'json',
       }),
     ),
 })
@@ -235,9 +236,10 @@ export const docsGetCommand = defineCtxCommand({
     },
     output: {
       type: 'string',
+      alias: 'o',
       description: 'Copy content to this explicit output path',
     },
-    json: { type: 'boolean', description: 'Print JSON' },
+    format: outputFormatArg,
   },
   run: ({ args }) =>
     runWithExit(() =>
@@ -247,7 +249,7 @@ export const docsGetCommand = defineCtxCommand({
           ? {}
           : { extensionId: args.extension }),
         ...(args.output === undefined ? {} : { output: args.output }),
-        json: args.json ?? false,
+        json: args.format === 'json',
       }),
     ),
 })
@@ -264,7 +266,7 @@ export const docsSearchCommand = defineCtxCommand({
       type: 'string',
       description: 'Filter by one exact loaded Extension id',
     },
-    json: { type: 'boolean', description: 'Print JSON' },
+    format: outputFormatArg,
   },
   run: ({ args }) =>
     runWithExit(() =>
@@ -273,7 +275,7 @@ export const docsSearchCommand = defineCtxCommand({
         ...(args.extension === undefined
           ? {}
           : { extensionId: args.extension }),
-        json: args.json ?? false,
+        json: args.format === 'json',
       }),
     ),
 })

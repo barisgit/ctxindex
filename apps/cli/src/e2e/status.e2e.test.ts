@@ -62,7 +62,13 @@ async function addSource(
 }
 
 async function syncSource(sandbox: Sandbox, sourceId: string): Promise<void> {
-  const result = await sandbox.run(['sync', '--source', sourceId, '--json'])
+  const result = await sandbox.run([
+    'sync',
+    '--source',
+    sourceId,
+    '--format',
+    'json',
+  ])
   expect(result.exitCode, result.stderr).toBe(0)
 }
 
@@ -154,7 +160,7 @@ test('json output reflects the generic cursor from a real sync', async () => {
     const sourceId = await addSource(sandbox)
     await syncSource(sandbox, sourceId)
 
-    const result = await sandbox.run(['status', '--json'])
+    const result = await sandbox.run(['status', '--format', 'json'])
 
     expect(result.exitCode).toBe(0)
     expect(result.stderr).toBe('')
@@ -189,7 +195,7 @@ test('counts match fresh-schema SQLite state', async () => {
     await syncSource(sandbox, firstSourceId)
     await syncSource(sandbox, secondSourceId)
 
-    const result = await sandbox.run(['status', '--json'])
+    const result = await sandbox.run(['status', '--format', 'json'])
     const rows = parseStatusRows(result.stdout)
 
     expect(result.exitCode).toBe(0)
@@ -221,7 +227,7 @@ test('unknown source id fails fast with exit 2', async () => {
 test('no sources still exits 0', async () => {
   const sandbox = await initSandbox()
   try {
-    const result = await sandbox.run(['status', '--json'])
+    const result = await sandbox.run(['status', '--format', 'json'])
 
     expect(result.exitCode).toBe(0)
     expect(result.stderr).toBe('')
@@ -236,11 +242,17 @@ test('reports derived unavailability separately from failed sync status', async 
   try {
     const sourceId = await addSource(sandbox)
     markAdapterUnavailable(sandbox, sourceId)
-    const sync = await sandbox.run(['sync', '--source', sourceId, '--json'])
+    const sync = await sandbox.run([
+      'sync',
+      '--source',
+      sourceId,
+      '--format',
+      'json',
+    ])
     expect(sync.exitCode).toBe(50)
 
     const rows = parseStatusRows(
-      (await sandbox.run(['status', '--json'])).stdout,
+      (await sandbox.run(['status', '--format', 'json'])).stdout,
     )
     expect(rows[0]?.sourceId).toBe(sourceId)
     expect(rows[0]?.availability).toBe('extension_unavailable')

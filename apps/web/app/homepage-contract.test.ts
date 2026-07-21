@@ -14,7 +14,9 @@ test('homepage demo keeps commands and result in one replaceable component', () 
   expect(DEMO_COMMANDS).toContain('git clone')
   expect(DEMO_COMMANDS).toContain('bun cli extension install local')
   expect(DEMO_COMMANDS).toContain('bun cli sync --source demo-tenders')
-  expect(DEMO_COMMANDS).toContain('"bridge inspection" --realm demo --json')
+  expect(DEMO_COMMANDS).toContain(
+    '"bridge inspection" --realm demo --format json',
+  )
   expect(DEMO_RESULT).toContain('ctx://<source-id>/tender/JN-002%2F2026')
   expect(DEMO_RESULT).toContain('Municipal bridge inspection')
 })

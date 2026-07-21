@@ -13,18 +13,18 @@ Every ctxindex workflow uses the same small model:
 ## Inspect loaded vocabulary
 
 ```sh
-ctxindex describe --json
-ctxindex describe profile communication.message --json
-ctxindex describe adapter microsoft.mailbox --json
+ctxindex describe --format json
+ctxindex describe profile communication.message --format json
+ctxindex describe adapter microsoft.mailbox --format json
 ```
 
-Use the compact default for orientation and request `describe --full --json` only when you need the complete registry snapshot.
+Use the compact default for orientation and request `describe --full --format json` only when you need the complete registry snapshot.
 
 ## Materialize deliberately
 
 ```sh
-ctxindex sync --realm company --json
-ctxindex status --realm company --json
+ctxindex sync --realm company --format json
+ctxindex status --realm company --format json
 ```
 
 Sync is a strategy for fast local discovery. Providers and files remain canonical. Purging local materializations does not delete provider records.
@@ -32,9 +32,9 @@ Sync is a strategy for fast local discovery. Providers and files remain canonica
 ## Search, then follow the Ref
 
 ```sh
-ctxindex search "quarterly planning" --realm company --json
-ctxindex get 'ctx://…' --json
-ctxindex thread 'ctx://…' --json
+ctxindex search "quarterly planning" --realm company --format json
+ctxindex get 'ctx://…' --format json
+ctxindex thread 'ctx://…' --format json
 ctxindex export 'ctx://…' --format json
 ```
 
@@ -45,7 +45,7 @@ An omitted Realm considers every eligible Realm. An explicit Realm filter is exa
 ```sh
 ctxindex describe action communication.message.draft.create \
   --source work-mail \
-  --json
+  --format json
 ```
 
 Actions are typed Profile mutations implemented by a Source Adapter. Current provider mutation stops at reversible email Draft creation and update. ctxindex never sends email.

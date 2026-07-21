@@ -114,7 +114,8 @@ test('relocated compiled CLI resumes Microsoft mailbox enumeration beyond 50', a
       'communication.message',
       '--limit',
       '100',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(first.exitCode, first.stderr).toBe(0)
     const firstJson = JSON.parse(first.stdout) as {
@@ -137,7 +138,8 @@ test('relocated compiled CLI resumes Microsoft mailbox enumeration beyond 50', a
       '100',
       '--continuation',
       continuation,
-      '--json',
+      '--format',
+      'json',
     ])
     expect(second.exitCode, second.stderr).toBe(0)
     const secondJson = JSON.parse(second.stdout) as {

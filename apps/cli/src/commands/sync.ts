@@ -5,18 +5,18 @@ import { handleSyncCommand } from '../sync/runner'
 export const syncCommand = defineCtxCommand({
   meta: { name: 'sync', description: 'Run a sync for one or all sources.' },
   args: {
-    source: { type: 'string', description: 'Source label or ID' },
+    source: { type: 'string', alias: 's', description: 'Source label or ID' },
     mode: {
       type: 'enum',
       options: ['sync', 'resync', 'diff'],
       default: 'sync',
       description: 'Sync mode (sync|resync|diff)',
     },
-    json: { type: 'boolean', description: 'Print JSON' },
     format: {
       type: 'enum',
-      options: ['summary', 'events', 'compact'],
+      options: ['summary', 'events', 'compact', 'json'],
       default: 'summary',
+      alias: 'f',
       description: 'Output format',
     },
   },
@@ -25,8 +25,8 @@ export const syncCommand = defineCtxCommand({
       handleSyncCommand({
         ...(args.source !== undefined ? { sourceId: args.source } : {}),
         mode: args.mode,
-        json: args.json ?? false,
-        format: args.format,
+        json: args.format === 'json',
+        format: args.format === 'json' ? 'summary' : args.format,
       }),
     ),
 })

@@ -267,7 +267,7 @@ Fresh persistence uses `oauth_apps` and Grant snapshot fields with no Client mig
 
 ```text
 oauth-app add <provider> <label> --from-env
-oauth-app list [--json]
+oauth-app list [--format json]
 oauth-app remove <provider> <label>
 account add <provider> --app <label> [--label <label>]
 ```
@@ -276,7 +276,7 @@ No `client` command or alias remains. The parser accepts no literal App config, 
 
 Unknown Provider/App selection fails before environment or secret reads, database mutation, browser launch, or Provider egress. Missing/invalid environment config fails before secret-store writes, database mutation, or network effects. Persistence writes config values to the configured secret backend, writes the local App record only after all references exist, and cleans newly written references on failure.
 
-`oauth-app list --json` and human inventory use an explicit safe projection containing Provider id, label, origin, and safe provenance when applicable. Remove resolves exact `(providerId,label)` and affects only future authorization; existing Grants retain their snapshots. `account add` requires `--app` even if one App exists, resolves exact `(providerId,label)` before effects, and snapshots the selected config. Authorization and refresh never consult `registration.environment` or reread App config from the process environment.
+`oauth-app list --format json` and human inventory use an explicit safe projection containing Provider id, label, origin, and safe provenance when applicable. Remove resolves exact `(providerId,label)` and affects only future authorization; existing Grants retain their snapshots. `account add` requires `--app` even if one App exists, resolves exact `(providerId,label)` before effects, and snapshots the selected config. Authorization and refresh never consult `registration.environment` or reread App config from the process environment.
 
 `CtxindexAuthErrorCode` replaces `missing_oauth_client_creds` with `missing_oauth_app_config`. The replacement retains the old code's stable CLI exit mapping; there is no compatibility alias. Add-time unknown/missing/invalid user input remains invalid usage and exits `2` with zero durable/network effects.
 

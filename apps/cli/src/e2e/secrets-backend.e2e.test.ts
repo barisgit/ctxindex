@@ -175,7 +175,7 @@ test('secret backend status and switching preserve typed refs without exposing v
     )
     seedGrant(sandbox, appConfigRef, accessRef, refreshRef)
 
-    const status = await sandbox.run(['secrets', 'status', '--json'])
+    const status = await sandbox.run(['secrets', 'status', '--format', 'json'])
     expect(status.exitCode).toBe(0)
     expect(status.stderr).toBe('')
     expect(JSON.parse(status.stdout)).toEqual({
@@ -256,7 +256,7 @@ test('secret backend status and switching preserve typed refs without exposing v
     )
 
     const unavailableStatus = await sandbox.run(
-      ['secrets', 'status', '--json'],
+      ['secrets', 'status', '--format', 'json'],
       { env: { CTXINDEX_KEYTAR_MOCK_FILE: unavailableMock } },
     )
     expect(unavailableStatus.exitCode).toBe(0)
@@ -274,7 +274,12 @@ test('secret backend status and switching preserve typed refs without exposing v
       },
       configPath(sandbox),
     )
-    const lightStatus = await sandbox.run(['secrets', 'status', '--json'])
+    const lightStatus = await sandbox.run([
+      'secrets',
+      'status',
+      '--format',
+      'json',
+    ])
     expect(lightStatus.exitCode).toBe(0)
     expect(lightStatus.stderr).toBe('')
     expect(JSON.parse(lightStatus.stdout).backend).toBe('file')

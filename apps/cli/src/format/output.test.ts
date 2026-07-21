@@ -26,15 +26,11 @@ describe('structured output selection', () => {
     expect(resolveOutputFormat({ format: 'pretty' }, { isTTY: false })).toBe(
       'pretty',
     )
-    expect(resolveOutputFormat({ json: true }, { isTTY: true })).toBe('json')
+    expect(resolveOutputFormat({ format: 'json' }, { isTTY: true })).toBe(
+      'json',
+    )
     expect(resolveOutputFormat({}, { isTTY: true })).toBe('pretty')
     expect(resolveOutputFormat({}, { isTTY: false })).toBe('text')
-  })
-
-  test('rejects combining --json with any --format value', () => {
-    expect(() =>
-      resolveOutputFormat({ format: 'json', json: true }, { isTTY: false }),
-    ).toThrow('cannot combine --json with --format')
   })
 })
 

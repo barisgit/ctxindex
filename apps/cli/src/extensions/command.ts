@@ -1,13 +1,12 @@
 import { defineCtxCommand } from '../command-model'
 import { runWithExit } from '../format/exit'
-import { resolveOutputFormat, structuredOutputArgs } from '../format/output'
+import {
+  outputFormatArg,
+  resolveOutputFormat,
+  structuredOutputArgs,
+} from '../format/output'
 import { handleExtensionsCommand } from './handle-extensions-command'
 
-const jsonArg = {
-  type: 'boolean' as const,
-  default: false as const,
-  description: 'Print JSON',
-}
 const trustArg = {
   type: 'boolean' as const,
   required: true as const,
@@ -52,11 +51,12 @@ export const extensionCommand = defineCtxCommand({
             catalog: { type: 'string', description: 'Exact Catalog id' },
             output: {
               type: 'string',
+              alias: 'o',
               description:
                 'Write the generated ctxindex-catalog.json manifest to this file path',
             },
             trust: trustArg,
-            json: jsonArg,
+            format: outputFormatArg,
           },
           run: ({ args }) =>
             runWithExit(() =>
@@ -68,7 +68,7 @@ export const extensionCommand = defineCtxCommand({
                   : { catalogId: args.catalog }),
                 ...(args.output === undefined ? {} : { output: args.output }),
                 trust: args.trust,
-                json: args.json,
+                json: args.format === 'json',
               }),
             ),
         }),
@@ -79,7 +79,7 @@ export const extensionCommand = defineCtxCommand({
             repository: { type: 'positional', required: true },
             ref: { type: 'string', required: true },
             trust: trustArg,
-            json: jsonArg,
+            format: outputFormatArg,
           },
           run: ({ args }) =>
             runWithExit(() =>
@@ -89,19 +89,19 @@ export const extensionCommand = defineCtxCommand({
                 repository: args.repository,
                 ref: args.ref,
                 trust: args.trust,
-                json: args.json,
+                json: args.format === 'json',
               }),
             ),
         }),
         list: defineCtxCommand({
           meta: { name: 'list', description: 'List Git Catalogs.' },
-          args: { refresh: refreshArg, json: jsonArg },
+          args: { refresh: refreshArg, format: outputFormatArg },
           run: ({ args }) =>
             runWithExit(() =>
               handleExtensionsCommand({
                 kind: 'catalog-list',
                 noRefresh: !args.refresh,
-                json: args.json,
+                json: args.format === 'json',
               }),
             ),
         }),
@@ -111,7 +111,7 @@ export const extensionCommand = defineCtxCommand({
             name: { type: 'positional', required: true },
             'extension-id': { type: 'positional', required: false },
             refresh: refreshArg,
-            json: jsonArg,
+            format: outputFormatArg,
           },
           run: ({ args }) =>
             runWithExit(() =>
@@ -122,7 +122,7 @@ export const extensionCommand = defineCtxCommand({
                   ? {}
                   : { extensionId: args['extension-id'] }),
                 noRefresh: !args.refresh,
-                json: args.json,
+                json: args.format === 'json',
               }),
             ),
         }),
@@ -134,7 +134,7 @@ export const extensionCommand = defineCtxCommand({
           args: {
             query: { type: 'positional', required: false },
             refresh: refreshArg,
-            json: jsonArg,
+            format: outputFormatArg,
           },
           run: ({ args }) =>
             runWithExit(() =>
@@ -142,7 +142,7 @@ export const extensionCommand = defineCtxCommand({
                 kind: 'catalog-search',
                 ...(args.query === undefined ? {} : { query: args.query }),
                 noRefresh: !args.refresh,
-                json: args.json,
+                json: args.format === 'json',
               }),
             ),
         }),
@@ -150,14 +150,14 @@ export const extensionCommand = defineCtxCommand({
           meta: { name: 'refresh', description: 'Refresh a Git Catalog pin.' },
           args: {
             name: { type: 'positional', required: true },
-            json: jsonArg,
+            format: outputFormatArg,
           },
           run: ({ args }) =>
             runWithExit(() =>
               handleExtensionsCommand({
                 kind: 'catalog-refresh',
                 name: args.name,
-                json: args.json,
+                json: args.format === 'json',
               }),
             ),
         }),
@@ -165,14 +165,14 @@ export const extensionCommand = defineCtxCommand({
           meta: { name: 'remove', description: 'Remove a Git Catalog.' },
           args: {
             name: { type: 'positional', required: true },
-            json: jsonArg,
+            format: outputFormatArg,
           },
           run: ({ args }) =>
             runWithExit(() =>
               handleExtensionsCommand({
                 kind: 'catalog-remove',
                 name: args.name,
-                json: args.json,
+                json: args.format === 'json',
               }),
             ),
         }),
@@ -202,7 +202,7 @@ export const extensionCommand = defineCtxCommand({
           description: 'Stable Extension id',
         },
         refresh: refreshArg,
-        json: jsonArg,
+        format: outputFormatArg,
       },
       run: ({ args }) =>
         runWithExit(() =>
@@ -212,7 +212,7 @@ export const extensionCommand = defineCtxCommand({
             target: args.target,
             extensionId: args['extension-id'],
             noRefresh: !args.refresh,
-            json: args.json,
+            json: args.format === 'json',
           }),
         ),
     }),
@@ -224,14 +224,14 @@ export const extensionCommand = defineCtxCommand({
       },
       args: {
         'extension-id': { type: 'positional', required: true },
-        json: jsonArg,
+        format: outputFormatArg,
       },
       run: ({ args }) =>
         runWithExit(() =>
           handleExtensionsCommand({
             kind: 'update',
             extensionId: args['extension-id'],
-            json: args.json,
+            json: args.format === 'json',
           }),
         ),
     }),
@@ -245,7 +245,7 @@ export const extensionCommand = defineCtxCommand({
           description:
             'Remove activation while preserving dependent Sources and data',
         },
-        json: jsonArg,
+        format: outputFormatArg,
       },
       run: ({ args }) =>
         runWithExit(() =>
@@ -253,7 +253,7 @@ export const extensionCommand = defineCtxCommand({
             kind: 'uninstall',
             extensionId: args['extension-id'],
             force: args.force,
-            json: args.json,
+            json: args.format === 'json',
           }),
         ),
     }),

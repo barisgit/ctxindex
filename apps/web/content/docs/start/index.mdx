@@ -56,12 +56,12 @@ The shortest trustworthy path starts without OAuth or provider traffic. You will
     Materialize and search that Source.
 
     ```sh
-    ctxindex sync --source work-files --json
+    ctxindex sync --source work-files --format json
     ctxindex search "Aurora kickoff" \
       --realm work \
       --kind file \
       --local-only \
-      --json
+      --format json
     ```
   </Step>
 </Steps>
@@ -87,7 +87,7 @@ A successful search returns a stable Ref and a bounded result envelope:
 Pass the returned Ref through unchanged:
 
 ```sh
-ctxindex get 'ctx://01J00000000000000000000000/file/aurora.txt' --json
+ctxindex get 'ctx://01J00000000000000000000000/file/aurora.txt' --format json
 ctxindex export 'ctx://01J00000000000000000000000/file/aurora.txt' --format json
 ```
 

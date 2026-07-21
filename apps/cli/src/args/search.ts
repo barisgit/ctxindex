@@ -9,12 +9,14 @@ export const searchArgs = {
   query: { type: 'positional', required: false, description: 'Query text' },
   realm: {
     type: 'string',
+    alias: 'r',
     multiple: true,
     description: 'Exact Realm slug (repeatable)',
   },
   adapter: { type: 'string', description: 'Adapter ID' },
   source: {
     type: 'string',
+    alias: 's',
     multiple: true,
     description: 'Exact Source label or ID (repeatable)',
   },
@@ -26,7 +28,7 @@ export const searchArgs = {
   },
   since: { type: 'string', description: 'Start ISO date' },
   until: { type: 'string', description: 'End ISO date' },
-  limit: { type: 'string', description: 'Result limit' },
+  limit: { type: 'string', alias: 'l', description: 'Result limit' },
   offset: { type: 'string', description: 'Local pagination offset' },
   continuation: {
     type: 'string',
@@ -110,8 +112,8 @@ function parseField(raw: string): {
 export function resolveSearchArgs(args: SearchCommandArgs): ResolvedSearchArgs {
   if (
     args.refs === true &&
-    (args.json === true ||
-      (args.format !== undefined && args.format !== 'text'))
+    args.format !== undefined &&
+    args.format !== 'text'
   ) {
     invalid(
       'search: --refs supports only omitted/default text or --format text',

@@ -24,7 +24,8 @@ const malformedCommands = [
     'SOURCE',
     '--input',
     '{not-json',
-    '--json',
+    '--format',
+    'json',
   ],
   ['sync', '--format', 'not-a-format'],
 ] as const

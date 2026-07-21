@@ -176,9 +176,12 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
     const workSourceId = await addSource('work', workSourceLabel)
     await addSource('personal', 'personal-outlook')
 
-    const inventoryResult = await sandbox.run(['account', 'list', '--json'], {
-      env,
-    })
+    const inventoryResult = await sandbox.run(
+      ['account', 'list', '--format', 'json'],
+      {
+        env,
+      },
+    )
     expect(inventoryResult.exitCode, inventoryResult.stderr).toBe(0)
     expect(inventoryResult.stdout).not.toContain('microsoft-work-subject')
     expect(inventoryResult.stdout).not.toMatch(/grant|scope/i)
@@ -195,7 +198,8 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
       workSourceLabel,
     ])
     const sources = JSON.parse(
-      (await sandbox.run(['source', 'list', '--json'], { env })).stdout,
+      (await sandbox.run(['source', 'list', '--format', 'json'], { env }))
+        .stdout,
     ) as { label: string }[]
     expect(sources.map(({ label }) => label).sort()).toEqual([
       'personal-outlook',
@@ -227,7 +231,8 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
         'communication.message',
         '--limit',
         '100',
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -272,7 +277,8 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
         '100',
         '--continuation',
         enumerationContinuation,
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -316,7 +322,8 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
         'unread=true',
         '--limit',
         '50',
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -347,7 +354,8 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
         '1',
         '--continuation',
         firstEnumerationJson.pagination.continuation ?? '',
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -365,7 +373,8 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
         '100',
         '--continuation',
         'malformed',
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -375,7 +384,15 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
 
     graph.resetRequests()
     const searched = await sandbox.run(
-      ['search', 'Quarterly outlook', '--remote', '--realm', 'work', '--json'],
+      [
+        'search',
+        'Quarterly outlook',
+        '--remote',
+        '--realm',
+        'work',
+        '--format',
+        'json',
+      ],
       { env },
     )
     expect(searched.exitCode, searched.stderr).toBe(0)
@@ -414,7 +431,15 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
       ),
     )
     const moved = await sandbox.run(
-      ['search', 'Quarterly outlook', '--remote', '--realm', 'work', '--json'],
+      [
+        'search',
+        'Quarterly outlook',
+        '--remote',
+        '--realm',
+        'work',
+        '--format',
+        'json',
+      ],
       { env },
     )
     expect(moved.exitCode, moved.stderr).toBe(0)
@@ -424,7 +449,7 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
       ),
     ).toEqual(expect.arrayContaining([rootRef, replyRef]))
 
-    const thread = await sandbox.run(['thread', replyRef, '--json'], {
+    const thread = await sandbox.run(['thread', replyRef, '--format', 'json'], {
       env,
     })
     expect(thread.exitCode, thread.stderr).toBe(0)
@@ -440,7 +465,9 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
     })
 
     graph.resetRequests()
-    const retrieved = await sandbox.run(['get', replyRef, '--json'], { env })
+    const retrieved = await sandbox.run(['get', replyRef, '--format', 'json'], {
+      env,
+    })
     expect(retrieved.exitCode, retrieved.stderr).toBe(0)
     const getJson = JSON.parse(retrieved.stdout) as {
       resource: {
@@ -490,9 +517,12 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
     ).toEqual([null, '1'])
 
     const requestsBeforeArtifactList = graph.readRequests().length
-    const listed = await sandbox.run(['artifact', 'list', replyRef, '--json'], {
-      env,
-    })
+    const listed = await sandbox.run(
+      ['artifact', 'list', replyRef, '--format', 'json'],
+      {
+        env,
+      },
+    )
     expect(listed.exitCode, listed.stderr).toBe(0)
     expect(JSON.parse(listed.stdout)).toEqual({
       resourceRef: replyRef,
@@ -508,7 +538,9 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
     expect(graph.readRequests()).toHaveLength(requestsBeforeArtifactList)
 
     const getRequests = graph.readRequests().length
-    const cached = await sandbox.run(['get', replyRef, '--json'], { env })
+    const cached = await sandbox.run(['get', replyRef, '--format', 'json'], {
+      env,
+    })
     expect(cached.exitCode, cached.stderr).toBe(0)
     expect(cached.stdout).toBe(retrieved.stdout)
     expect(graph.readRequests()).toHaveLength(getRequests)
@@ -516,7 +548,15 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
     graph.resetRequests()
     const firstOutput = join(sandbox.dir, 'outlook-first.txt')
     const firstDownload = await sandbox.run(
-      ['artifact', 'download', artifactRef, '--output', firstOutput, '--json'],
+      [
+        'artifact',
+        'download',
+        artifactRef,
+        '--output',
+        firstOutput,
+        '--format',
+        'json',
+      ],
       { env },
     )
     expect(firstDownload.exitCode, firstDownload.stderr).toBe(0)
@@ -529,7 +569,15 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
 
     const secondOutput = join(sandbox.dir, 'outlook-second.txt')
     const secondDownload = await sandbox.run(
-      ['artifact', 'download', artifactRef, '--output', secondOutput, '--json'],
+      [
+        'artifact',
+        'download',
+        artifactRef,
+        '--output',
+        secondOutput,
+        '--format',
+        'json',
+      ],
       { env },
     )
     expect(secondDownload.exitCode, secondDownload.stderr).toBe(0)
@@ -572,7 +620,8 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
           subject: 'Invalid',
           bodyText: 'Must not persist',
         }),
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -596,7 +645,8 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
         workSourceLabel,
         '--input',
         JSON.stringify(createInput),
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -637,7 +687,8 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
         workSourceLabel,
         '--input',
         JSON.stringify(updateInput),
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -685,7 +736,10 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
     ).toBe(true)
 
     graph.resetRequests()
-    const cachedDraft = await sandbox.run(['get', draftRef, '--json'], { env })
+    const cachedDraft = await sandbox.run(
+      ['get', draftRef, '--format', 'json'],
+      { env },
+    )
     expect(cachedDraft.exitCode, cachedDraft.stderr).toBe(0)
     expect(JSON.parse(cachedDraft.stdout)).toMatchObject({
       resource: {
@@ -711,9 +765,12 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
       bodyText: updateInput.bodyText,
     })
 
-    const completeParent = await sandbox.run(['get', rootRef, '--json'], {
-      env,
-    })
+    const completeParent = await sandbox.run(
+      ['get', rootRef, '--format', 'json'],
+      {
+        env,
+      },
+    )
     expect(completeParent.exitCode, completeParent.stderr).toBe(0)
     graph.resetRequests()
     const replyCreated = await sandbox.run(
@@ -725,7 +782,8 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
         workSourceLabel,
         '--input',
         JSON.stringify({ replyToRef: rootRef, bodyText: 'Native reply body.' }),
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -768,7 +826,8 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
           replyToRef: replyRef,
           bodyText: 'Must not change parent',
         }),
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -785,7 +844,8 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
         workSourceLabel,
         '--input',
         '{}',
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -796,7 +856,7 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
     graph.resetRequests()
     graph.setGraphStatus(503)
     const degraded = await sandbox.run(
-      ['search', 'failure', '--remote', '--realm', 'work', '--json'],
+      ['search', 'failure', '--remote', '--realm', 'work', '--format', 'json'],
       { env },
     )
     expect(degraded.exitCode, degraded.stderr).toBe(0)

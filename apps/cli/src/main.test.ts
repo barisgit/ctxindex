@@ -74,7 +74,7 @@ for (const args of [
   })
 }
 
-test('rejects --json with --format before initialization or command effects', async () => {
+test('rejects removed --json before initialization or command effects', async () => {
   const error = spyOn(console, 'error').mockImplementation(() => {})
 
   expect(
@@ -82,17 +82,15 @@ test('rejects --json with --format before initialization or command effects', as
       'get',
       'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/item/one',
       '--json',
-      '--format',
-      'json',
     ]),
   ).toBe(2)
-  expect(error).toHaveBeenCalledWith('cannot combine --json with --format')
+  expect(error).toHaveBeenCalled()
 })
 
 test('rejects search refs with JSON before initialization or command effects', async () => {
   const error = spyOn(console, 'error').mockImplementation(() => {})
 
-  expect(await runCli(['search', 'needle', '--refs', '--json'])).toBe(2)
+  expect(await runCli(['search', 'needle', '--refs', '-f', 'json'])).toBe(2)
   expect(error).toHaveBeenCalledWith(
     'search: --refs supports only omitted/default text or --format text',
   )

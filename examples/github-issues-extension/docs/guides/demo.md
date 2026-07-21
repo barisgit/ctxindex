@@ -14,14 +14,14 @@ bun cli realm add demo --name "Demo"
 bun cli extension install local \
   ./examples/github-issues-extension \
   ctxindex.github-issues-demo \
-  --json
+  --format json
 bun cli source add github.issues \
   --realm demo \
   --label ctxindex-issues \
   --config-owner barisgit \
   --config-repository ctxindex
-bun cli sync --source ctxindex-issues --json
-bun cli search daemon --source ctxindex-issues --local-only --limit 5 --offset 0 --json
+bun cli sync --source ctxindex-issues --format json
+bun cli search daemon --source ctxindex-issues --local-only --limit 5 --offset 0 --format json
 ```
 
 Before `barisgit/ctxindex` is public, use the already-public `octocat/Hello-World` repository as a small connectivity fixture by replacing the two config values:

@@ -1,7 +1,11 @@
 import { handleArtifactCommand } from '../artifact/handle-artifact-command'
 import { defineCtxCommand } from '../command-model'
 import { runWithExit } from '../format/exit'
-import { resolveOutputFormat, structuredOutputArgs } from '../format/output'
+import {
+  outputFormatArg,
+  resolveOutputFormat,
+  structuredOutputArgs,
+} from '../format/output'
 
 export const artifactListCommand = defineCtxCommand({
   meta: {
@@ -29,8 +33,12 @@ export const artifactDownloadCommand = defineCtxCommand({
   },
   args: {
     ref: { type: 'positional', required: true, description: 'Artifact Ref' },
-    output: { type: 'string', description: 'Copy cached bytes to this path' },
-    json: { type: 'boolean', description: 'Print deterministic JSON' },
+    output: {
+      type: 'string',
+      alias: 'o',
+      description: 'Copy cached bytes to this path',
+    },
+    format: outputFormatArg,
   },
   run: ({ args }) =>
     runWithExit(() =>
@@ -38,7 +46,7 @@ export const artifactDownloadCommand = defineCtxCommand({
         kind: 'download',
         ref: args.ref,
         ...(args.output === undefined ? {} : { outputPath: args.output }),
-        json: args.json ?? false,
+        json: args.format === 'json',
       }),
     ),
 })
@@ -48,12 +56,10 @@ export const artifactPurgeCommand = defineCtxCommand({
     name: 'purge',
     description: 'Remove all managed Artifact cache state.',
   },
-  args: {
-    json: { type: 'boolean', description: 'Print deterministic JSON' },
-  },
+  args: { format: outputFormatArg },
   run: ({ args }) =>
     runWithExit(() =>
-      handleArtifactCommand({ kind: 'purge', json: args.json ?? false }),
+      handleArtifactCommand({ kind: 'purge', json: args.format === 'json' }),
     ),
 })
 

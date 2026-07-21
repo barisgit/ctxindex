@@ -37,35 +37,35 @@ printf 'Quarterly planning notes for Project Aurora.\n' > /tmp/ctx-tour/plan.txt
 
 bun cli init
 bun cli realm add work
-bun cli describe adapter local.directory --json
+bun cli describe adapter local.directory --format json
 bun cli source add local.directory \
   --realm work --label work-files \
   --config-root-path /tmp/ctx-tour
-bun cli source list --json
-bun cli sync --source work-files --json
-bun cli search planning --realm work --kind file --local-only --json
-bun cli get 'ctx://<SOURCE_ULID>/file/plan.txt' --json
-bun cli status --source work-files --json
+bun cli source list --format json
+bun cli sync --source work-files --format json
+bun cli search planning --realm work --kind file --local-only --format json
+bun cli get 'ctx://<SOURCE_ULID>/file/plan.txt' --format json
+bun cli status --source work-files --format json
 ```
 
-To exercise the prototype, initialize before starting it, then run `bun cli daemon start` and perform Realm/Source setup, sync, search, get, thread, and status through ordinary CLI commands. The detached process survives the starting CLI. Source add obtains generated config-option metadata from the daemon's immutable active registry. `bun cli daemon status --json` reports stopped, transitional, unavailable, unsupported, or health-backed running state; `bun cli daemon stop --json` requests graceful shutdown and observes ownership release. Start and stop are idempotent. Ordinary commands do not autostart until every stateful family is daemon-routed or a proven safe exception.
+To exercise the prototype, initialize before starting it, then run `bun cli daemon start` and perform Realm/Source setup, sync, search, get, thread, and status through ordinary CLI commands. The detached process survives the starting CLI. Source add obtains generated config-option metadata from the daemon's immutable active registry. `bun cli daemon status --format json` reports stopped, transitional, unavailable, unsupported, or health-backed running state; `bun cli daemon stop --format json` requests graceful shutdown and observes ownership release. Start and stop are idempotent. Ordinary commands do not autostart until every stateful family is daemon-routed or a proven safe exception.
 
 Expected output shapes, omitting generated ids and timestamps:
 
-Search, get, thread, Artifact list, status, and Source, Realm, Account, OAuth App, and Extension inventories accept `--format pretty|text|json`: omission selects width-aware pretty output on an interactive terminal and deterministic escaped text through a pipe. `--json` is shorthand for compact JSON. Long Refs remain complete, and `get` carries the full Resource envelope and payload in every mode. Daemon lifecycle output remains a separate contract.
+Search, get, thread, Artifact list, status, and Source, Realm, Account, OAuth App, and Extension inventories accept `--format pretty|text|json`: omission selects width-aware pretty output on an interactive terminal and deterministic escaped text through a pipe. `--format` is the sole output selector, `-f` is its short alias, and `--format json` selects compact JSON. Long Refs remain complete, and `get` carries the full Resource envelope and payload in every mode.
 
 | Command | Shape and meaning |
 | --- | --- |
 | `init` | Readable initialization confirmation. It creates no implicit Realm. |
-| `describe adapter … --json` | Adapter `id`, Profiles, optional Provider/access binding, routing, capabilities, config JSON Schema, and generated config options such as `--config-root-path`. |
-| `source list --json` | Array of Sources with id, label, Realm, Adapter, config, availability, and sync counts. Public inventory does not expose the private Grant link. |
-| `sync … --json` | `{ "mode": "sync", "results": [{ "sourceId": "…", "status": "completed", "run": { "runId": "…", "mode": "sync", "status": "completed", "added": 1, "updated": 0, "deleted": 0, "warningsCount": 0, "lastWarning": null, "errorsCount": 0, "warnings": [] } }], "warnings": [] }` |
+| `describe adapter … --format json` | Adapter `id`, Profiles, optional Provider/access binding, routing, capabilities, config JSON Schema, and generated config options such as `--config-root-path`. |
+| `source list --format json` | Array of Sources with id, label, Realm, Adapter, config, availability, and sync counts. Public inventory does not expose the private Grant link. |
+| `sync … --format json` | `{ "mode": "sync", "results": [{ "sourceId": "…", "status": "completed", "run": { "runId": "…", "mode": "sync", "status": "completed", "added": 1, "updated": 0, "deleted": 0, "warningsCount": 0, "lastWarning": null, "errorsCount": 0, "warnings": [] } }], "warnings": [] }` |
 | `sync … --format events` | One JSON line per observed Source start, count-only progress update, and terminal Source outcome. Events arrive while the operation runs rather than being reconstructed afterward. |
-| `search … --json` | `{ "results": [{ "ref": "ctx://…/file/plan.txt", "profile": { "id": "file", "version": 1 }, "origin": "local", "title": "plan.txt", "chunks": [{ "index": 0, "snippet": "…planning…" }] }], "pagination": { "offset": 0, "limit": 20, "hasMore": false }, "warnings": [] }` |
-| `get … --json` | `{ "resource": { "ref": "ctx://…", "realmId": "work", "profile": { "id": "file", "version": 1 }, "origin": "synced", "payload": { "path": "plan.txt", "mediaType": "text/plain", "text": "…" } }, "warnings": [] }` |
-| `status … --json` | Array with Source availability, last status/run, separate warning/error counts, last structured warning, bounded last error, and opaque Adapter cursor. |
+| `search … --format json` | `{ "results": [{ "ref": "ctx://…/file/plan.txt", "profile": { "id": "file", "version": 1 }, "origin": "local", "title": "plan.txt", "chunks": [{ "index": 0, "snippet": "…planning…" }] }], "pagination": { "offset": 0, "limit": 20, "hasMore": false }, "warnings": [] }` |
+| `get … --format json` | `{ "resource": { "ref": "ctx://…", "realmId": "work", "profile": { "id": "file", "version": 1 }, "origin": "synced", "payload": { "path": "plan.txt", "mediaType": "text/plain", "text": "…" } }, "warnings": [] }` |
+| `status … --format json` | Array with Source availability, last status/run, separate warning/error counts, last structured warning, bounded last error, and opaque Adapter cursor. |
 
-OAuth Sources first need an available OAuth App. The bundled Google and Microsoft Extensions carry public native-App definitions, and `account add <provider>` selects one only when host policy exactly matches its App identity, owning Extension, and bundled provenance. Provider verification, tenant consent, and scope approval remain pending, so provider rejection is possible. Local BYOA remains the deterministic fallback: `oauth-app add <provider> <label> --from-env`, then `account add <provider> --app <label>`. `source add` binds the resulting Account with `--account`. Before mutating provider state, inspect `describe action <id> --source <source> --json`. V1 only creates or updates email Drafts; it never sends them.
+OAuth Sources first need an available OAuth App. The bundled Google and Microsoft Extensions carry public native-App definitions, and `account add <provider>` selects one only when host policy exactly matches its App identity, owning Extension, and bundled provenance. Provider verification, tenant consent, and scope approval remain pending, so provider rejection is possible. Local BYOA remains the deterministic fallback: `oauth-app add <provider> <label> --from-env`, then `account add <provider> --app <label>`. `source add` binds the resulting Account with `--account`. Before mutating provider state, inspect `describe action <id> --source <source> --format json`. V1 only creates or updates email Drafts; it never sends them.
 
 Catalogs are authored as plain package exports. A trusted build turns literal Extensions and exact npm, Git, or local package descriptors into a deterministic schema-v2 snapshot with replay-locked artifacts. Repository add/refresh remains a separate data-only trust boundary: it resolves one full Git ref to an immutable commit without importing Catalog-controlled code. Marketplace search aggregates the stored entries; it refreshes configured Catalogs by default, while `--no-refresh` is an inert, offline projection with snapshot age.
 
@@ -75,9 +75,9 @@ Install has its own execution acknowledgement. It refreshes only the selected Ca
 bun cli extension catalog build /absolute/catalog-author-package \
   --output ctxindex-catalog.json --trust
 bun cli extension catalog add team /absolute/catalog-repo --ref refs/heads/main --trust
-bun cli extension catalog search example --no-refresh --json
+bun cli extension catalog search example --no-refresh --format json
 bun cli extension install catalog team example.extension --no-refresh
-bun cli extension list --json
+bun cli extension list --format json
 bun cli extension uninstall example.extension
 ```
 
@@ -100,7 +100,7 @@ ctxindex is a **local personal-context gateway** with four operations over the s
 
 This is a deterministic access model, not a canonical database. A Ref survives synced, remote, cached, and temporarily unavailable states.
 
-The CLI is the sole agent integration surface. Agents compose generic commands with escaped low-token text or compact `--json`; loaded registries define valid kinds, fields, Source options, exports, and Actions. The private local RPC boundary is application plumbing, not a public API or an alternative agent interface. There is no provider-specific command family, SaaS canonical store, workflow-policy engine, arbitrary Extension command surface, or MCP server in the current product.
+The CLI is the sole agent integration surface. Agents compose generic commands with escaped low-token text or compact `--format json`; loaded registries define valid kinds, fields, Source options, exports, and Actions. The private local RPC boundary is application plumbing, not a public API or an alternative agent interface. There is no provider-specific command family, SaaS canonical store, workflow-policy engine, arbitrary Extension command surface, or MCP server in the current product.
 
 The public landing and documentation web surface is a non-normative projection of those contracts. Documentation pages are prerendered, while site search needs a compatible Next.js server or serverless runtime. The site stores no ctxindex user or provider state and does not operate a hosted Extension marketplace. The current Marketplace is a local deterministic search over configured Catalog snapshots, not a hosted registry.
 
@@ -230,7 +230,7 @@ A sync-capable Adapter emits upserts, removals, checkpoints, and warnings. Core 
 
 A global advisory lock prevents overlapping syncs. A second attempt records failed `sync busy` because it was not explicitly cancelled; readers continue. SQLite uses WAL, foreign keys, normal synchronous mode, and bounded busy timeout. Synced deletion creates a tombstone hidden from ordinary search; deleting an ad-hoc cache entry does not.
 
-The prototype extracts one/all-Source sync selection into a daemon-agnostic core application service. Realm/Source management, `sync`, `status`, `search`, exact `get`, and local thread traversal use daemon-owned orchestration through `apps/daemon` when exact-tuple discovery selects the local process, preserving existing terminal readable/JSON result shapes. Sync is a typed oRPC event iterator: Source start, cumulative count-only progress, and terminal Source events are strict bounded DTOs, delivered in producer order with one-item backpressure, followed by the existing terminal result or declared error. `--format events` writes those events as they arrive; `--json` suppresses live output and remains one atomic terminal document. Returning or disconnecting from the iterator aborts and settles the request without accumulating an operation-sized queue.
+The prototype extracts one/all-Source sync selection into a daemon-agnostic core application service. Realm/Source management, `sync`, `status`, `search`, exact `get`, and local thread traversal use daemon-owned orchestration through `apps/daemon` when exact-tuple discovery selects the local process, preserving existing terminal readable/JSON result shapes. Sync is a typed oRPC event iterator: Source start, cumulative count-only progress, and terminal Source events are strict bounded DTOs, delivered in producer order with one-item backpressure, followed by the existing terminal result or declared error. `--format events` writes those events as they arrive; `--format json` suppresses live output and remains one atomic terminal document. Returning or disconnecting from the iterator aborts and settles the request without accumulating an operation-sized queue.
 
 Strict private DTOs bound nested JSON, Resources, thread trees, counts, and byte sizes; oversized results fail as `result_too_large` rather than being truncated. SIGINT is request-scoped: cancellation travels from the CLI through the private RPC request signal into core and the Adapter, with checks before persistence and mutations, preserving transaction rollback and Sync Run bookkeeping without stopping unrelated work or the daemon. Provider warnings are projected to bounded public codes/messages rather than forwarding raw provider text.
 
@@ -299,15 +299,15 @@ Managed runnable bytes are content-addressed beneath the data directory, and abs
 
 The CLI is deterministic and non-interactive. Input comes from non-secret flags, declared environments, typed references, files, or declared stdin. Missing input fails instead of prompting. The only interactive surface is a browser in an explicitly requested OAuth loopback.
 
-The launch-critical structured reads—search, get, thread, Artifact list, status, and Source, Realm, Account, OAuth App, and Extension inventories—share `--format pretty|text|json`. Omission selects width-aware `cli-table3` tables or vertical cards on a TTY and deterministic escaped TSV or labeled complete Resource text otherwise. TSV reserves `\N` for null after escaping literal backslashes. Values are losslessly wrapped rather than ellipsized. `--json` is shorthand for compact JSON and conflicts with explicit `--format`. Pretty/text warnings go only to stderr, while JSON result envelopes retain their warnings on stdout.
+The launch-critical structured reads—search, get, thread, Artifact list, status, and Source, Realm, Account, OAuth App, and Extension inventories—share `--format pretty|text|json`. Omission selects width-aware `cli-table3` tables or vertical cards on a TTY and deterministic escaped TSV or labeled complete Resource text otherwise. TSV reserves `\N` for null after escaping literal backslashes. Values are losslessly wrapped rather than ellipsized. `--format` is the sole output selector, with `-f` as its short alias. Pretty/text warnings go only to stderr, while JSON result envelopes retain their warnings on stdout.
 
 Profile `export --format` and reference-oriented `describe --format` retain separate format semantics. Sync and daemon lifecycle commands retain their own output contracts; this shared read contract makes no claim about their formatting. Registry-backed `describe` owns fields, formats, config flags, OAuth declarations, and Action schemas, avoiding duplicated help. The same Citty definitions own parsing, complete-path `--help`, constrained values, and the generated web CLI reference.
 
 `docs list|get|search` reads a bounded build-time product documentation bundle plus loaded Extension documentation without the web runtime or network. Bundled docs always remain in the CLI; selected-daemon mode reads Extension inventory, exact text/assets, and search snippets from that daemon's startup-loaded registry, while direct mode loads them locally. Markdown remains inert text, binary assets require an explicit output path, and loaded schema truth still comes from `describe`.
 
-Generic verbs cover initialization, OAuth App/Account/Realm/Source management, sync, search, get, threads, Artifacts, exports, Actions, status, purge, Extensions, secrets, and bundled skills. OAuth lifecycle grammar includes `oauth-app add <provider> <label> --from-env`, `oauth-app list [--format pretty|text|json] [--json]`, `oauth-app remove <provider> <label>`, and `account add <provider> [--app <label>] [--label <label>]`; there is no `client` alias or literal-config argument. Omitted App selection is restricted to exact managed policy, while explicit labels remain exact and deterministic. Search help exposes local offsets and exact-Source remote continuation without provider-specific commands. Merged multi-Source search has no global continuation; a truncation warning names the exact Source that must be selected for a resumable rerun. Bundled skills provide concise orientation to what ctxindex is, when to use it, and the live discovery surfaces; generated help and loaded-definition output remain authoritative for interface facts.
+Generic verbs cover initialization, OAuth App/Account/Realm/Source management, sync, search, get, threads, Artifacts, exports, Actions, status, purge, Extensions, secrets, and bundled skills. OAuth lifecycle grammar includes `oauth-app add <provider> <label> --from-env`, `oauth-app list [--format pretty|text|json]`, `oauth-app remove <provider> <label>`, and `account add <provider> [--app <label>] [--label <label>]`; there is no `client` alias or literal-config argument. Omitted App selection is restricted to exact managed policy, while explicit labels remain exact and deterministic. Search help exposes local offsets and exact-Source remote continuation without provider-specific commands. Merged multi-Source search has no global continuation; a truncation warning names the exact Source that must be selected for a resumable rerun. Bundled skills provide concise orientation to what ctxindex is, when to use it, and the live discovery surfaces; generated help and loaded-definition output remain authoritative for interface facts.
 
-Sync has two intentionally different machine-readable modes. `--json` emits exactly one terminal result document and no progress records. `--format events` emits each live event as a JSON line, while summary and compact modes preserve terminal stdout and may report bounded progress on stderr. A selected daemon stream is authoritative: transport failure never retries through direct database access.
+Sync has two intentionally different machine-readable modes. `--format json` emits exactly one terminal result document and no progress records. `--format events` emits each live event as a JSON line, while summary and compact modes preserve terminal stdout and may report bounded progress on stderr. A selected daemon stream is authoritative: transport failure never retries through direct database access.
 
 The active prototype adds background `daemon start`, `daemon status`, and `daemon stop`. Start detaches the packaged sibling and waits for compatible readiness; status is observational and health-backed; stop uses graceful RPC shutdown or lease-proven stale-state cleanup. All support readable and JSON output. Realm add/list, Source add/list/remove, sync/status, search, exact get, and local thread traversal are daemon-routed business commands. Validated discovery metadata for the exact canonical runtime tuple selects RPC; after selection, stale metadata, an unreachable socket, or a lost connection returns `daemon_unavailable` with no direct-storage fallback. Without a selector, these commands keep their direct path after shared database-lease acquisition. Command-triggered autostart remains gated until every stateful family is routed or allowlisted as a safe exception.
 

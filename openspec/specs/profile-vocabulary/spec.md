@@ -41,7 +41,7 @@ For V1, valid kinds and aliases, typed field filters, export formats, Source con
 - **THEN** the system returns a compact grouped index, a compact selected list, and one full readable definition respectively
 
 #### Scenario: Agent requests exact machine schemas
-- **WHEN** an agent requests exact-id JSON or explicitly requests `describe --full --json`
+- **WHEN** an agent requests exact-id JSON or explicitly requests `describe --full --format json`
 - **THEN** the system returns lossless deterministic registry schema data with cardinality matching the query
 
 #### Scenario: Help remains concise and discoverable

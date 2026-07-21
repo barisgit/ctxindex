@@ -1,6 +1,6 @@
 ## 1. Shared format contract
 
-- [x] 1.1 Add failing pure tests for explicit/default format resolution, `--json` conflicts, TSV escaping, terminal-width layout switching, and complete non-truncated values.
+- [x] 1.1 Add failing pure tests for explicit/default format resolution, TSV escaping, terminal-width layout switching, and complete non-truncated values.
 - [x] 1.2 Implement the shared structured-output arguments, resolver, escaped TSV serializer, and `cli-table3` pretty renderer.
 - [x] 1.3 Run the shared formatter and command-model focused tests before migrating commands.
 
@@ -19,7 +19,7 @@
 
 ## 4. Documentation and maps
 
-- [x] 4.1 Update CLI help/reference and user/agent documentation for the shared defaults, text grammar, JSON shorthand, complete get output, and export/describe exceptions.
+- [x] 4.1 Update CLI help/reference and user/agent documentation for the shared defaults, text grammar, explicit JSON format, complete get output, and export/describe exceptions.
 - [x] 4.2 Document sync as a temporary exception and record the required pretty/text/json mapping follow-up without editing sync command files.
 - [x] 4.3 Refresh affected CLI, format, Search, argument, command, and workflow codemaps and run their focused documentation tests.
 
@@ -37,3 +37,10 @@
 - [x] 6.3 Add failing display-width tests and constrain vertical cards to the available terminal width with lossless wrapping.
 - [x] 6.4 Add failing TSV round-trip tests, define unambiguous null encoding, and remove Search sentinel coercions.
 - [x] 6.5 Run focused tests, CLI typecheck/lint, strict OpenSpec validation, obtain re-review when available, and commit without full CI, push, merge, archive, or user-state access.
+
+## 7. Pre-release flag simplification
+
+- [x] 7.1 Remove public `--json`, expose JSON only through `--format json`/`-f json`, and migrate sync, daemon lifecycle, docs, skills, secrets, Actions, Artifacts, and Extension lifecycle commands.
+- [x] 7.2 Add conservative `-s`, `-r`, `-l`, and file-output `-o` aliases through authoritative Citty definitions and verify their generated help/reference projection.
+- [x] 7.3 Update all current-facing docs, examples, skills, canonical specs, and tests; prove removed `--json` fails before effects.
+- [x] 7.4 Run focused CLI tests, regenerate the CLI reference, run full CI and strict OpenSpec validation, then commit locally without pushing.

@@ -43,7 +43,7 @@ test('skills get returns bundled markdown', async () => {
   expect(result.stdout).toContain('# Getting started with ctxindex')
   expect(result.stdout).toContain('ctxindex --help')
   expect(result.stdout).toContain(
-    'ctxindex describe <profile|adapter|action> <id> --json',
+    'ctxindex describe <profile|adapter|action> <id> --format json',
   )
   expect(result.stdout).not.toContain('reference/cli-overview')
   expect(result.stdout).not.toContain('```')
@@ -73,13 +73,14 @@ test('skills path returns an existing directory', async () => {
   expect(existsSync(path)).toBe(true)
 })
 
-test('skills --json output is parseable', async () => {
-  const listResult = await runCtxindex(['skills', 'list', '--json'])
+test('skills JSON format output is parseable', async () => {
+  const listResult = await runCtxindex(['skills', 'list', '--format', 'json'])
   const getResult = await runCtxindex([
     'skills',
     'get',
     'getting-started',
-    '--json',
+    '--format',
+    'json',
   ])
 
   expect(listResult.exitCode).toBe(0)

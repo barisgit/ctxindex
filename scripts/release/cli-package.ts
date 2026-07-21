@@ -580,7 +580,7 @@ export async function smokeCliPackage(
     let startedInstanceId: string | undefined
     try {
       const started = await runWithExit(
-        [executable, 'daemon', 'start', '--json'],
+        [executable, 'daemon', 'start', '--format', 'json'],
         { cwd: outsideDirectory, env },
       )
       if (started.exitCode !== 0) {
@@ -598,7 +598,7 @@ export async function smokeCliPackage(
         )
       }
       startedInstanceId = startedOutput.health.instanceId
-      const observed = await cli(['daemon', 'status', '--json'])
+      const observed = await cli(['daemon', 'status', '--format', 'json'])
       const observedOutput = JSON.parse(observed.stdout)
       if (
         observedOutput.status !== 'running' ||
@@ -612,7 +612,7 @@ export async function smokeCliPackage(
       lifecycleFailure = error
     } finally {
       const stopped = await runWithExit(
-        [executable, 'daemon', 'stop', '--json'],
+        [executable, 'daemon', 'stop', '--format', 'json'],
         { cwd: outsideDirectory, env },
       )
       let stopFailure: unknown
@@ -698,7 +698,7 @@ export async function smokeCliPackage(
     `[extensions]\npaths = ${JSON.stringify([extensionPath])}\n\n[secrets]\nbackend = "file"\n\n[log]\nlevel = "info"\n\n[log.file]\nrotate = "daily"\nretain_days = 14\ncompress = true\n`,
   )
   const extensions = JSON.parse(
-    (await cli(['extension', 'list', '--json'])).stdout,
+    (await cli(['extension', 'list', '--format', 'json'])).stdout,
   ) as readonly { readonly id?: string }[]
   if (!extensions.some(({ id }) => id === 'fixture.installed-package')) {
     throw new Error(

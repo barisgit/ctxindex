@@ -3,21 +3,17 @@ import Table from 'cli-table3'
 export const OUTPUT_FORMATS = ['pretty', 'text', 'json'] as const
 export type OutputFormat = (typeof OUTPUT_FORMATS)[number]
 
-export const structuredOutputArgs = {
-  format: {
-    type: 'enum' as const,
-    options: [...OUTPUT_FORMATS],
-    description: 'Output format: pretty, text, or json',
-  },
-  json: {
-    type: 'boolean' as const,
-    description: 'Shorthand for --format json',
-  },
+export const outputFormatArg = {
+  type: 'enum' as const,
+  options: [...OUTPUT_FORMATS],
+  alias: 'f',
+  description: 'Output format: pretty, text, or json',
 }
+
+export const structuredOutputArgs = { format: outputFormatArg }
 
 export interface OutputSelection {
   readonly format?: OutputFormat | undefined
-  readonly json?: boolean | undefined
 }
 
 export interface OutputEnvironment {
@@ -38,12 +34,6 @@ export function resolveOutputFormat(
   selection: OutputSelection,
   environment: OutputEnvironment = outputEnvironment(),
 ): OutputFormat {
-  if (selection.json === true && selection.format !== undefined) {
-    throw Object.assign(new Error('cannot combine --json with --format'), {
-      code: 'invalid_args',
-    })
-  }
-  if (selection.json === true) return 'json'
   return selection.format ?? (environment.isTTY ? 'pretty' : 'text')
 }
 

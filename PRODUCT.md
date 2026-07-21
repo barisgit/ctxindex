@@ -17,7 +17,7 @@ The voice is exact, quiet, and capable. Prefer concrete commands, results, and t
 
 1. Install ctxindex, initialize local state, connect a providerless directory Source, and obtain a useful search result.
 2. Connect Google or Microsoft through an available managed OAuth App or explicit local BYOA fallback without implying universal provider approval.
-3. Give a shell-capable agent governed access through `ctxindex ... --json` commands.
+3. Give a shell-capable agent governed access through `ctxindex ... --format json` commands.
 4. Author a type-safe Extension with the same SDK used by built-in Extensions.
 5. Find exact CLI and SDK reference only after the usage-oriented guidance.
 

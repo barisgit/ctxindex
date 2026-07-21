@@ -256,9 +256,12 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
       'work/calendar',
     )
 
-    const inventoryResult = await sandbox.run(['account', 'list', '--json'], {
-      env: baseEnv,
-    })
+    const inventoryResult = await sandbox.run(
+      ['account', 'list', '--format', 'json'],
+      {
+        env: baseEnv,
+      },
+    )
     expect(inventoryResult.exitCode, inventoryResult.stderr).toBe(0)
     expect(inventoryResult.stdout).not.toContain('canary')
     const inventory = JSON.parse(inventoryResult.stdout) as {
@@ -274,8 +277,11 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
       'work-microsoft',
     ])
     const sources = JSON.parse(
-      (await sandbox.run(['source', 'list', '--json'], { env: baseEnv }))
-        .stdout,
+      (
+        await sandbox.run(['source', 'list', '--format', 'json'], {
+          env: baseEnv,
+        })
+      ).stdout,
     ) as { label: string }[]
     expect(sources.map(({ label }) => label)).toEqual([
       googleSourceLabel,
@@ -289,9 +295,12 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
       [googleSourceLabel, 2],
       [graphSourceLabel, 2],
     ] as const) {
-      const result = await sandbox.run(['sync', '--source', source, '--json'], {
-        env: baseEnv,
-      })
+      const result = await sandbox.run(
+        ['sync', '--source', source, '--format', 'json'],
+        {
+          env: baseEnv,
+        },
+      )
       if (result.exitCode !== 0)
         throw new Error(
           `Calendar sync failed: ${result.stderr}\n${result.stdout}\n${JSON.stringify(graph.readRequests())}`,
@@ -309,7 +318,8 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
         'Cross-provider planning',
         '--kind',
         'calendar.event',
-        '--json',
+        '--format',
+        'json',
       ],
       { env: baseEnv },
     )
@@ -340,7 +350,8 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
           realm,
           '--kind',
           'calendar.event',
-          '--json',
+          '--format',
+          'json',
         ],
         { env: baseEnv },
       )
@@ -348,7 +359,9 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
       expect(JSON.parse(searched.stdout).results).toEqual([
         expect.objectContaining({ ref, sourceId }),
       ])
-      const got = await sandbox.run(['get', '--json', ref], { env: baseEnv })
+      const got = await sandbox.run(['get', '--format', 'json', ref], {
+        env: baseEnv,
+      })
       expect(got.exitCode, got.stderr).toBe(0)
       expect(JSON.parse(got.stdout).resource).toMatchObject({
         ref,
@@ -377,9 +390,12 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
       ),
     ])
     for (const source of [googleSourceLabel, graphSourceLabel]) {
-      const result = await sandbox.run(['sync', '--source', source, '--json'], {
-        env: baseEnv,
-      })
+      const result = await sandbox.run(
+        ['sync', '--source', source, '--format', 'json'],
+        {
+          env: baseEnv,
+        },
+      )
       expect(result.exitCode, result.stderr).toBe(0)
       expect(syncRun(result.stdout)).toMatchObject({
         added: 1,
@@ -397,7 +413,7 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
       4_000,
     )
     const wideSync = await sandbox.run(
-      ['sync', '--source', 'wide-microsoft-calendar', '--json'],
+      ['sync', '--source', 'wide-microsoft-calendar', '--format', 'json'],
       { env: baseEnv },
     )
     expect(wideSync.exitCode, wideSync.stderr).toBe(0)
@@ -407,7 +423,14 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
       deleted: 0,
     })
     const wideSearch = await sandbox.run(
-      ['search', 'Far future work event', '--realm', 'work', '--json'],
+      [
+        'search',
+        'Far future work event',
+        '--realm',
+        'work',
+        '--format',
+        'json',
+      ],
       { env: baseEnv },
     )
     expect(wideSearch.exitCode, wideSearch.stderr).toBe(0)
@@ -446,7 +469,8 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
           source,
           '--input',
           '{}',
-          '--json',
+          '--format',
+          'json',
         ],
         { env: baseEnv },
       )

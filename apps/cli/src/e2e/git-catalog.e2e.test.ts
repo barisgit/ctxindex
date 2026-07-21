@@ -50,7 +50,8 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       '--catalog',
       'fixture.catalog',
       '--trust',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(built.exitCode, built.stderr).toBe(0)
     expect(JSON.parse(built.stdout)).toMatchObject({
@@ -107,7 +108,8 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       '--ref',
       'refs/heads/main',
       '--trust',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(added.exitCode, added.stderr).toBe(0)
     const addedCatalog = JSON.parse(added.stdout)
@@ -126,7 +128,8 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       'search',
       'fixture.catalog',
       '--no-refresh',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(storedSearch.exitCode, storedSearch.stderr).toBe(0)
     const storedRows = JSON.parse(storedSearch.stdout)
@@ -153,7 +156,8 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
             'catalog',
             'search',
             '--no-refresh',
-            '--json',
+            '--format',
+            'json',
           ])
         ).stdout,
       )[0].commit,
@@ -162,7 +166,8 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       'extension',
       'catalog',
       'search',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(refreshedSearch.exitCode, refreshedSearch.stderr).toBe(0)
     expect(JSON.parse(refreshedSearch.stdout)[0].commit).toBe(searchCommit)
@@ -173,14 +178,16 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       'catalog',
       'list',
       '--no-refresh',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(JSON.parse(staleList.stdout)[0].commit).toBe(searchCommit)
     const refreshedList = await sandbox.run([
       'extension',
       'catalog',
       'list',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(refreshedList.exitCode, refreshedList.stderr).toBe(0)
     expect(JSON.parse(refreshedList.stdout)[0].commit).toBe(listCommit)
@@ -193,7 +200,8 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       'fixture',
       'fixture.catalog.literal',
       '--no-refresh',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(JSON.parse(staleShow.stdout).commit).toBe(listCommit)
     const refreshedShow = await sandbox.run([
@@ -202,7 +210,8 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       'show',
       'fixture',
       'fixture.catalog.literal',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(refreshedShow.exitCode, refreshedShow.stderr).toBe(0)
     expect(JSON.parse(refreshedShow.stdout)).toMatchObject({
@@ -226,7 +235,8 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       'catalog',
       'fixture',
       'fixture.catalog.literal',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(literalInstalled.exitCode, literalInstalled.stderr).toBe(0)
     const literalV1 = JSON.parse(literalInstalled.stdout)
@@ -258,7 +268,8 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       '--catalog',
       'fixture.catalog',
       '--trust',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(rebuilt.exitCode, rebuilt.stderr).toBe(0)
     expect(JSON.parse(rebuilt.stdout).changed).toBe(true)
@@ -272,7 +283,8 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       'catalog',
       'fixture',
       'fixture.catalog.literal',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(literalReplacement.exitCode, literalReplacement.stderr).toBe(0)
     const literalV2 = JSON.parse(literalReplacement.stdout)
@@ -288,7 +300,8 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       'fixture',
       'fixture.catalog.git',
       '--no-refresh',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(gitInstalled.exitCode, gitInstalled.stderr).toBe(0)
     expect(JSON.parse(gitInstalled.stdout)).toMatchObject({
@@ -307,7 +320,8 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       'fixture',
       'fixture.catalog.local',
       '--no-refresh',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(localInstalled.exitCode, localInstalled.stderr).toBe(0)
     expect(JSON.parse(localInstalled.stdout)).toMatchObject({
@@ -324,7 +338,8 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       'extension',
       'uninstall',
       'fixture.catalog.local',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(removedCuratedLocal.exitCode, removedCuratedLocal.stderr).toBe(0)
     const directLocal = await sandbox.run([
@@ -333,7 +348,8 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       'local',
       join(repository, 'packages', 'local'),
       'fixture.catalog.local',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(directLocal.exitCode, directLocal.stderr).toBe(0)
     const otherOriginCollision = await sandbox.run([
@@ -343,7 +359,8 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       'fixture',
       'fixture.catalog.local',
       '--no-refresh',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(otherOriginCollision.exitCode).toBe(50)
     expect(otherOriginCollision.stderr).toContain('another origin')
@@ -351,7 +368,8 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       'extension',
       'uninstall',
       'fixture.catalog.local',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(removedDirectLocal.exitCode, removedDirectLocal.stderr).toBe(0)
     const restoredCuratedLocal = await sandbox.run([
@@ -361,7 +379,8 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       'fixture',
       'fixture.catalog.local',
       '--no-refresh',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(restoredCuratedLocal.exitCode, restoredCuratedLocal.stderr).toBe(0)
 
@@ -408,9 +427,12 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
     await mkdir(offlineBin)
     await symlink(process.execPath, join(offlineBin, 'bun'))
     const offlineEnv = { ...relocatedEnv, PATH: offlineBin }
-    const loaded = await sandbox.run(['extension', 'list', '--json'], {
-      env: offlineEnv,
-    })
+    const loaded = await sandbox.run(
+      ['extension', 'list', '--format', 'json'],
+      {
+        env: offlineEnv,
+      },
+    )
     expect(loaded.exitCode, loaded.stderr).toBe(0)
     for (const extensionId of [
       'fixture.catalog.literal',
@@ -441,7 +463,7 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
     ).toBe(true)
 
     const failedRefresh = await sandbox.run(
-      ['extension', 'catalog', 'show', 'fixture', '--json'],
+      ['extension', 'catalog', 'show', 'fixture', '--format', 'json'],
       { env: offlineEnv },
     )
     expect(failedRefresh.exitCode).toBe(30)
@@ -453,7 +475,8 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
         'fixture',
         'fixture.catalog.literal',
         '--no-refresh',
-        '--json',
+        '--format',
+        'json',
       ],
       { env: offlineEnv },
     )
@@ -466,7 +489,7 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       'fixture.catalog.local',
     ]) {
       const uninstalled = await sandbox.run(
-        ['extension', 'uninstall', extensionId, '--json'],
+        ['extension', 'uninstall', extensionId, '--format', 'json'],
         { env: offlineEnv },
       )
       expect(uninstalled.exitCode, uninstalled.stderr).toBe(0)
@@ -477,7 +500,7 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       })
     }
     const removed = await sandbox.run(
-      ['extension', 'catalog', 'remove', 'fixture', '--json'],
+      ['extension', 'catalog', 'remove', 'fixture', '--format', 'json'],
       { env: offlineEnv },
     )
     expect(removed.exitCode, removed.stderr).toBe(0)

@@ -56,7 +56,7 @@ bun cli --help
     Materialize the Source into the local index:
 
     ```sh
-    bun cli sync --source work-files --json
+    bun cli sync --source work-files --format json
     ```
   </Step>
 </Steps>
@@ -70,20 +70,20 @@ bun cli search "Aurora kickoff" \
   --realm work \
   --kind file \
   --local-only \
-  --json
+  --format json
 ```
 
 Use that exact Ref to retrieve the complete Resource, then export its validated Profile payload:
 
 ```sh
-bun cli get 'ctx://01J00000000000000000000000/file/aurora.txt' --json
+bun cli get 'ctx://01J00000000000000000000000/file/aurora.txt' --format json
 bun cli export 'ctx://01J00000000000000000000000/file/aurora.txt' --format json
 ```
 
 Do not reconstruct provider Refs from provider ids. Treat the adapter-owned suffix as opaque and pass through the Ref returned by search or another ctxindex command.
 
 <Callout>
-  JSON export is always available. Any additional export formats come from the Resource's loaded Profile; inspect the Profile with `bun cli describe profile <id> --json`.
+  JSON export is always available. Any additional export formats come from the Resource's loaded Profile; inspect the Profile with `bun cli describe profile <id> --format json`.
 </Callout>
 
 ## Example session
@@ -100,13 +100,13 @@ realm added: work
 $ bun cli source add local.directory --realm work --label work-files --config-root-path "$HOME/context"
 source added: 01J00000000000000000000000
 
-$ bun cli sync --source work-files --json
+$ bun cli sync --source work-files --format json
 {"mode":"sync","results":[{"sourceId":"01J00000000000000000000000","status":"completed","run":{"runId":"01J00000000000000000000001","mode":"sync","status":"completed","added":1,"updated":0,"deleted":0,"warningsCount":0,"lastWarning":null,"errorsCount":0,"warnings":[]}}],"warnings":[]}
 
-$ bun cli search "Aurora kickoff" --realm work --kind file --local-only --json
+$ bun cli search "Aurora kickoff" --realm work --kind file --local-only --format json
 {"results":[{"ref":"ctx://01J00000000000000000000000/file/aurora.txt","profile":{"id":"file","version":1},"sourceId":"01J00000000000000000000000","origin":"local","originRank":0,"title":"aurora.txt","chunks":[{"index":0,"snippet":"Project <mark>Aurora</mark> <mark>kickoff</mark> is Tuesday at 10:00.\nOwner: Maya Chen."}]}],"pagination":{"offset":0,"limit":20,"hasMore":false},"warnings":[]}
 
-$ bun cli get 'ctx://01J00000000000000000000000/file/aurora.txt' --json
+$ bun cli get 'ctx://01J00000000000000000000000/file/aurora.txt' --format json
 {"resource":{"ref":"ctx://01J00000000000000000000000/file/aurora.txt","sourceId":"01J00000000000000000000000","realmId":"work","profile":{"id":"file","version":1},"origin":"synced","title":"aurora.txt","payload":{"path":"aurora.txt","name":"aurora.txt","mediaType":"text/plain","text":"Project Aurora kickoff is Tuesday at 10:00.\nOwner: Maya Chen.\n"}},"warnings":[]}
 
 $ bun cli export 'ctx://01J00000000000000000000000/file/aurora.txt' --format json

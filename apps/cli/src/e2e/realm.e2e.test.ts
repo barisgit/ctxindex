@@ -68,7 +68,7 @@ test('realm add persists optional display names without changing text output', a
     expect(unnamed.stderr).toBe('')
     expect(unnamed.stdout).toBe('realm added: work\n')
 
-    const list = await sandbox.run(['realm', 'list', '--json'])
+    const list = await sandbox.run(['realm', 'list', '--format', 'json'])
     expect(list.exitCode).toBe(0)
     expect(list.stderr).toBe('')
 
@@ -113,7 +113,7 @@ test('invalid realm add input exits 2 without writing', async () => {
       expect(result.stderr.length).toBeGreaterThan(0)
     }
 
-    const list = await sandbox.run(['realm', 'list', '--json'])
+    const list = await sandbox.run(['realm', 'list', '--format', 'json'])
     expect(list.exitCode, list.stderr).toBe(0)
     expect(parseRealmList(list.stdout)).toEqual([])
   } finally {
@@ -163,7 +163,7 @@ test('invalid realm name exits 2', async () => {
 test('list json parses', async () => {
   const sandbox = await initSandbox()
   try {
-    const list = await sandbox.run(['realm', 'list', '--json'])
+    const list = await sandbox.run(['realm', 'list', '--format', 'json'])
 
     expect(list.exitCode).toBe(0)
     expect(list.stderr).toBe('')

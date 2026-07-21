@@ -76,7 +76,7 @@ export default function HomePage() {
               </span>
               <code className="min-w-0 text-text-primary">
                 ctxindex search &quot;Aurora kickoff&quot; --realm work --kind
-                file --json
+                file --format json
               </code>
             </div>
             <div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-3 border-t border-border-default pt-3 font-mono text-xs leading-relaxed">

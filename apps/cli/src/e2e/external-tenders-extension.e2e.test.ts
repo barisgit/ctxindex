@@ -148,7 +148,13 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
     expect(sourceMatch?.[1]).toBeDefined()
     const sourceId = sourceMatch?.[1] as string
 
-    const synced = await run(['sync', '--source', 'demo-tenders', '--json'])
+    const synced = await run([
+      'sync',
+      '--source',
+      'demo-tenders',
+      '--format',
+      'json',
+    ])
     expect(synced.exitCode, synced.stderr).toBe(0)
     expect(synced.stderr).toBe('')
     expect(JSON.parse(synced.stdout)).toEqual({
@@ -183,7 +189,8 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
       sourceId,
       '--field',
       'status=awarded',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(typedFieldMiss.exitCode, typedFieldMiss.stderr).toBe(0)
     expect(typedFieldMiss.stderr).toBe('')
@@ -203,7 +210,8 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
       'status=open',
       '--field',
       'category=cybersecurity services',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(searched.exitCode, searched.stderr).toBe(0)
     expect(searched.stderr).toBe('')
@@ -232,7 +240,7 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
       warnings: [],
     })
 
-    const got = await run(['get', '--json', ref])
+    const got = await run(['get', '--format', 'json', ref])
     expect(got.exitCode, got.stderr).toBe(0)
     expect(got.stderr).toBe('')
     const getJson = JSON.parse(got.stdout)
@@ -305,14 +313,14 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
 
     await writeFile(configPath, configText([]))
 
-    const unavailableSources = await run(['source', 'list', '--json'])
+    const unavailableSources = await run(['source', 'list', '--format', 'json'])
     expect(unavailableSources.exitCode, unavailableSources.stderr).toBe(0)
     expect(JSON.parse(unavailableSources.stdout)[0]).toMatchObject({
       id: sourceId,
       availability: 'extension_unavailable',
       lastStatus: 'idle',
     })
-    const unavailableStatus = await run(['status', '--json'])
+    const unavailableStatus = await run(['status', '--format', 'json'])
     expect(unavailableStatus.exitCode, unavailableStatus.stderr).toBe(0)
     expect(JSON.parse(unavailableStatus.stdout)[0]).toMatchObject({
       sourceId,
@@ -320,14 +328,19 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
       lastStatus: 'idle',
     })
 
-    const degradedSearch = await run(['search', '--json', 'cybersecurity'])
+    const degradedSearch = await run([
+      'search',
+      '--format',
+      'json',
+      'cybersecurity',
+    ])
     expect(degradedSearch.exitCode, degradedSearch.stderr).toBe(0)
     expect(JSON.parse(degradedSearch.stdout)).toMatchObject({
       results: [{ ref, title: 'Cybersecurity incident response retainer' }],
       warnings: [{ sourceId, code: 'extension_unavailable' }],
     })
 
-    const cachedGet = await run(['get', '--json', ref])
+    const cachedGet = await run(['get', '--format', 'json', ref])
     expect(cachedGet.exitCode, cachedGet.stderr).toBe(0)
     expect(JSON.parse(cachedGet.stdout)).toMatchObject({
       resource: { ref, id: getJson.resource.id, origin: 'synced' },
@@ -336,7 +349,13 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
     expect(cachedGet.stderr).toBe('')
     expect(resourceSnapshot()).toEqual(syncedResources)
 
-    const unavailableSync = await run(['sync', '--json', '--source', sourceId])
+    const unavailableSync = await run([
+      'sync',
+      '--format',
+      'json',
+      '--source',
+      sourceId,
+    ])
     expect(unavailableSync.exitCode).toBe(50)
     expect(JSON.parse(unavailableSync.stdout).results[0]).toMatchObject({
       sourceId,
@@ -344,7 +363,7 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
       error: { code: 'adapter_unavailable' },
       exitCode: 50,
     })
-    const failedStatus = await run(['status', '--json'])
+    const failedStatus = await run(['status', '--format', 'json'])
     expect(JSON.parse(failedStatus.stdout)[0]).toMatchObject({
       sourceId,
       availability: 'extension_unavailable',
@@ -354,14 +373,14 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
 
     await writeFile(configPath, configText([extensionPath]))
 
-    const restoredSources = await run(['source', 'list', '--json'])
+    const restoredSources = await run(['source', 'list', '--format', 'json'])
     expect(restoredSources.exitCode, restoredSources.stderr).toBe(0)
     expect(JSON.parse(restoredSources.stdout)[0]).toMatchObject({
       id: sourceId,
       availability: 'available',
       lastStatus: 'failed',
     })
-    const restoredStatus = await run(['status', '--json'])
+    const restoredStatus = await run(['status', '--format', 'json'])
     expect(JSON.parse(restoredStatus.stdout)[0]).toMatchObject({
       sourceId,
       availability: 'available',
@@ -369,7 +388,8 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
     })
     const restoredSearch = await run([
       'search',
-      '--json',
+      '--format',
+      'json',
       '--kind',
       'ctxindex.demo.tender',
       'cybersecurity',

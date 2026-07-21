@@ -22,11 +22,15 @@ export const describeCommand = defineCtxCommand({
       type: 'enum',
       options: ['text', 'markdown', 'json'],
       default: 'text',
+      alias: 'f',
       description: 'Output format',
     },
-    json: { type: 'boolean', description: 'Print pure JSON' },
     full: { type: 'boolean', description: 'Show every matched definition' },
-    source: { type: 'string', description: 'Exact Source label or ID' },
+    source: {
+      type: 'string',
+      alias: 's',
+      description: 'Exact Source label or ID',
+    },
   },
   run: ({ args }) =>
     runWithExit(() =>
@@ -34,7 +38,6 @@ export const describeCommand = defineCtxCommand({
         ...(args.selector === undefined ? {} : { selector: args.selector }),
         ...(args.id === undefined ? {} : { id: args.id }),
         format: args.format,
-        json: args.json ?? false,
         full: args.full ?? false,
         ...(args.source === undefined ? {} : { sourceId: args.source }),
       }),

@@ -6,7 +6,7 @@ The `sync` CLI currently tolerates malformed arguments and can begin execution a
 
 - Define the accepted `sync` argument grammar as closed and reject every argument outside it with invalid-usage exit `2`.
 - Reject duplicate scalar and boolean flags instead of choosing one value.
-- Reject `--json=<value>` and other assignments to boolean flags.
+- Reject `--format json=<value>` and other assignments to boolean flags.
 - Require scalar flags to receive exactly one following or inline value.
 - Require malformed input to fail before creating sync runs or changing Source sync state.
 - **Breaking:** malformed invocations that were previously tolerated now fail with exit `2`.

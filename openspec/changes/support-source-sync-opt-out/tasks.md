@@ -10,7 +10,7 @@
 
 ## 3. Inventory and sync enforcement
 
-- [x] 3.1 Add failing formatter/e2e assertions for `source list --json` reporting `syncEnabled`, then expose the stored value.
+- [x] 3.1 Add failing formatter/e2e assertions for `source list --format json` reporting `syncEnabled`, then expose the stored value.
 - [x] 3.2 Verify all-Source sync skips disabled Sources and targeted disabled-Source sync performs zero provider calls, strengthening focused tests where necessary.
 - [x] 3.3 Run focused Source formatter/e2e and sync command tests.
 

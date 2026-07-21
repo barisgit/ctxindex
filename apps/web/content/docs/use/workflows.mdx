@@ -11,9 +11,9 @@ Source Adapters normalize provider records into portable Profiles. The CLI does 
 ctxindex search "invoice" \
   --realm company \
   --kind message \
-  --json
-ctxindex get 'ctx://…/message/…' --json
-ctxindex thread 'ctx://…/message/…' --json
+  --format json
+ctxindex get 'ctx://…/message/…' --format json
+ctxindex thread 'ctx://…/message/…' --format json
 ```
 
 Retrieve a complete parent message before creating a reply Draft. Then inspect the Source-specific Action schema and pass its complete typed input.
@@ -26,8 +26,8 @@ Retrieve a complete parent message before creating a reply Draft. Then inspect t
 ctxindex search "design review" \
   --realm company \
   --kind calendar-event \
-  --json
-ctxindex get 'ctx://…/calendar-event/…' --json
+  --format json
+ctxindex get 'ctx://…/calendar-event/…' --format json
 ```
 
 Calendar Events use half-open intervals: `start` is inclusive and `end` is exclusive. All-day events use local dates; timed events use instants with timezone context.

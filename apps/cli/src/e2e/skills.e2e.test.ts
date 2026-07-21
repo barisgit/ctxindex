@@ -28,7 +28,7 @@ test('skills get returns markdown', async () => {
     expect(result.stdout).toContain('ctxindex --help')
     expect(result.stdout).toContain('ctxindex describe')
     expect(result.stdout).toContain(
-      'ctxindex describe <profile|adapter|action> <id> --json',
+      'ctxindex describe <profile|adapter|action> <id> --format json',
     )
     expect(result.stdout).toContain('ctxindex extension list')
     expect(result.stdout).toContain('ctxindex skills list')

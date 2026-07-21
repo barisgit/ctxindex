@@ -10,14 +10,14 @@ ctxindex presents Gmail and Outlook messages through the provider-neutral `commu
 First inspect the configured Sources and their Account bindings:
 
 ```sh
-ctxindex account list --json
-ctxindex source list --json
+ctxindex account list --format json
+ctxindex source list --format json
 ```
 
 Search every configured mailbox by omitting `--realm` and `--source`:
 
 ```sh
-ctxindex search "renewal notice" --kind mail --json
+ctxindex search "renewal notice" --kind mail --format json
 ```
 
 Restrict a search to one operating context or mailbox when the task requires it:
@@ -26,12 +26,12 @@ Restrict a search to one operating context or mailbox when the task requires it:
 ctxindex search "renewal notice" \
   --kind mail \
   --realm company \
-  --json
+  --format json
 
 ctxindex search "flight receipt" \
   --kind mail \
   --source personal-gmail \
-  --json
+  --format json
 ```
 
 An omitted Realm spans all Realms. `--realm company` is exact and never includes personal Sources implicitly. Gmail and Outlook mailbox Sources use provider search when routing requires it, but return the same result envelope and stable Ref shape.
@@ -45,7 +45,7 @@ ctxindex search --remote \
   --field unread=true \
   --since 2026-07-01 \
   --limit 50 \
-  --json
+  --format json
 
 ctxindex search --remote \
   --source company-mail \
@@ -54,7 +54,7 @@ ctxindex search --remote \
   --since 2026-07-01 \
   --limit 50 \
   --continuation '<pagination.continuation>' \
-  --json
+  --format json
 ```
 
 `unread=true` and `unread=false` are exact booleans. Remote continuation cannot be combined with local `--offset`, and a `truncated` warning with a non-null continuation means more provider results are resumable. A truncation warning without a continuation is not resumable through `--continuation`.
@@ -66,19 +66,19 @@ ctxindex search --remote \
 ### Search for the message
 
 ```sh
-ctxindex search "deployment approval" --kind mail --json
+ctxindex search "deployment approval" --kind mail --format json
 ```
 
 ### Retrieve the complete message
 
 ```sh
-ctxindex get 'ctx://01J00000000000000000000000/message/stable-message-id' --json
+ctxindex get 'ctx://01J00000000000000000000000/message/stable-message-id' --format json
 ```
 
 ### Load the related conversation
 
 ```sh
-ctxindex thread 'ctx://01J00000000000000000000000/message/stable-message-id' --json
+ctxindex thread 'ctx://01J00000000000000000000000/message/stable-message-id' --format json
 ```
 
 `thread` follows stored conversation membership and parent Relations. It returns a reply tree when parent edges are available and otherwise a date-ordered list.
@@ -92,7 +92,7 @@ A Draft is reversible provider state, not text that exists only in an agent conv
 ```sh
 ctxindex describe action communication.message.draft.create \
   --source company-mail \
-  --json
+  --format json
 ```
 
 Create the Draft through the mailbox Source that should own it:
@@ -110,7 +110,7 @@ JSON
 ctxindex action run communication.message.draft.create \
   --source company-mail \
   --input /tmp/new-draft.json \
-  --json
+  --format json
 ```
 
 Both Gmail and Outlook mailbox Adapters implement this Action. The result returns a normalized `communication.message` Resource Ref for the provider-persisted Draft.
@@ -120,7 +120,7 @@ Both Gmail and Outlook mailbox Adapters implement this Action. The result return
 A reply Action does not fetch missing parent data. First use `get` on the exact parent Ref so a complete, non-deleted message from the selected Source is available locally:
 
 ```sh
-ctxindex get 'ctx://01J00000000000000000000000/message/stable-message-id' --json
+ctxindex get 'ctx://01J00000000000000000000000/message/stable-message-id' --format json
 ```
 
 Then create the reply with the strict reply branch. It accepts only the local parent Ref and body text; ctxindex derives the single recipient, reply subject, and provider-native thread state from the parent:
@@ -136,7 +136,7 @@ JSON
 ctxindex action run communication.message.draft.create \
   --source company-mail \
   --input /tmp/reply-draft.json \
-  --json
+  --format json
 ```
 
 The parent must belong to `company-mail`, be locally complete, and contain the provider threading fields. Reply-all and caller-supplied recipients or subject are intentionally unavailable.
@@ -148,7 +148,7 @@ Inspect the current update union before constructing input:
 ```sh
 ctxindex describe action communication.message.draft.update \
   --source company-mail \
-  --json
+  --format json
 ```
 
 A standalone Draft update replaces the complete addressed content. Supply the Draft Ref returned by create or retrieval and the full desired recipient arrays, subject, and body. Empty `cc` and `bcc` arrays explicitly clear those recipients:
@@ -168,14 +168,14 @@ JSON
 ctxindex action run communication.message.draft.update \
   --source company-mail \
   --input /tmp/updated-draft.json \
-  --json
+  --format json
 ```
 
 Reply context is immutable. Before updating a reply Draft, ensure both its Draft Ref and its parent message are complete local Resources in the same selected Source (Action results are already materialized; otherwise use `get`). The update must repeat the exact stored `replyToRef` and may replace only `bodyText`:
 
 ```sh
-ctxindex get 'ctx://01J00000000000000000000000/draft/stable-draft-id' --json
-ctxindex get 'ctx://01J00000000000000000000000/message/stable-message-id' --json
+ctxindex get 'ctx://01J00000000000000000000000/draft/stable-draft-id' --format json
+ctxindex get 'ctx://01J00000000000000000000000/message/stable-message-id' --format json
 
 cat > /tmp/updated-reply-draft.json <<'JSON'
 {
@@ -188,7 +188,7 @@ JSON
 ctxindex action run communication.message.draft.update \
   --source company-mail \
   --input /tmp/updated-reply-draft.json \
-  --json
+  --format json
 ```
 
 Changing `replyToRef`, using the standalone branch for a stored reply Draft, or supplying recipients or subject in the reply branch fails before provider I/O.

@@ -4,7 +4,7 @@
 The system SHALL expose the configured secret backend, availability, and aggregate referenced-secret counts through deterministic JSON output. Aggregate counts MUST include local OAuth App config references, private Grant App-snapshot references, and token references without distinguishing or exposing secret values. Status, diagnostics, logs, and OAuth App inventory MUST NOT include secret values, config values, config keys, environment values, credentials, authorization headers, tokens, client ids, desktop-secret metadata, or typed secret references.
 
 #### Scenario: Agent inspects storage containing Apps and Grants
-- **WHEN** an agent runs `secrets status --json` while local Apps and authorized Accounts exist
+- **WHEN** an agent runs `secrets status --format json` while local Apps and authorized Accounts exist
 - **THEN** output reports only backend status and aggregate counts without opening or rendering App config or Grant snapshot values
 
 #### Scenario: Unavailable backend has no fallback

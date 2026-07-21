@@ -1,13 +1,13 @@
-> **SUPERSEDED — DO NOT SYNC.** This completed Client-era change is retained only as historical evidence. `redesign-extension-sdk` removes the Client surface and replaces it with `oauth-app list --json`. Its delta spec MUST NOT be synced into canonical specs. Archive only with explicit user approval.
+> **SUPERSEDED — DO NOT SYNC.** This completed Client-era change is retained only as historical evidence. `redesign-extension-sdk` removes the Client surface and replaces it with `oauth-app list --format json`. Its delta spec MUST NOT be synced into canonical specs. Archive only with explicit user approval.
 
 ## Why
 
-`client list` is the only primary identity inventory command that cannot emit machine-readable JSON. Agents currently have to parse its presentation-oriented text even though Client inventory is already deterministic and secret-safe and comparable Account and Source inventory commands support `--json`.
+`client list` is the only primary identity inventory command that cannot emit machine-readable JSON. Agents currently have to parse its presentation-oriented text even though Client inventory is already deterministic and secret-safe and comparable Account and Source inventory commands support `--format json`.
 
 ## What Changes
 
-- Accept `--json` on `client list` and return the existing safe Client inventory metadata as a stable JSON array.
-- Preserve the current human-readable output when `--json` is omitted.
+- Accept `--format json` on `client list` and return the existing safe Client inventory metadata as a stable JSON array.
+- Preserve the current human-readable output when `--format json` is omitted.
 - Return `[]` with exit 0 for an empty JSON inventory.
 - Document and test the JSON inventory form, including deterministic ordering and secret redaction.
 

@@ -381,8 +381,8 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
       fixtureRoot,
     ])
 
-    const accountsResult = await ok(['account', 'list', '--json'])
-    expect((await ok(['account', 'list', '--json'])).stdout).toBe(
+    const accountsResult = await ok(['account', 'list', '--format', 'json'])
+    expect((await ok(['account', 'list', '--format', 'json'])).stdout).toBe(
       accountsResult.stdout,
     )
     const accounts = deterministicJson(accountsResult.stdout) as {
@@ -409,8 +409,8 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
       expect(accountsResult.stdout).not.toContain(canary)
     }
 
-    const sourcesResult = await ok(['source', 'list', '--json'])
-    expect((await ok(['source', 'list', '--json'])).stdout).toBe(
+    const sourcesResult = await ok(['source', 'list', '--format', 'json'])
+    expect((await ok(['source', 'list', '--format', 'json'])).stdout).toBe(
       sourcesResult.stdout,
     )
     const sources = deterministicJson(sourcesResult.stdout) as {
@@ -447,12 +447,13 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
       localSourceLabel,
     ]) {
       deterministicJson(
-        (await ok(['sync', '--source', source, '--json'])).stdout,
+        (await ok(['sync', '--source', source, '--format', 'json'])).stdout,
       )
     }
 
     const remoteSearch = deterministicJson(
-      (await ok(['search', 'Shared workflow', '--remote', '--json'])).stdout,
+      (await ok(['search', 'Shared workflow', '--remote', '--format', 'json']))
+        .stdout,
     ) as { results: { sourceId: string; ref: string }[] }
     expect(
       new Set(remoteSearch.results.map(({ sourceId }) => sourceId)),
@@ -460,11 +461,12 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
     const indexedSearchResult = await ok([
       'search',
       'Shared workflow',
-      '--json',
+      '--format',
+      'json',
     ])
-    expect((await ok(['search', 'Shared workflow', '--json'])).stdout).toBe(
-      indexedSearchResult.stdout,
-    )
+    expect(
+      (await ok(['search', 'Shared workflow', '--format', 'json'])).stdout,
+    ).toBe(indexedSearchResult.stdout)
     const indexedSearch = deterministicJson(indexedSearchResult.stdout) as {
       results: { sourceId: string }[]
     }
@@ -496,7 +498,8 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
             '--remote',
             '--realm',
             realm,
-            '--json',
+            '--format',
+            'json',
           ])
         ).stdout,
       ) as { results: { sourceId: string }[] }
@@ -504,16 +507,32 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
         new Set(expectedRemote),
       )
       const indexed = deterministicJson(
-        (await ok(['search', 'Shared workflow', '--realm', realm, '--json']))
-          .stdout,
+        (
+          await ok([
+            'search',
+            'Shared workflow',
+            '--realm',
+            realm,
+            '--format',
+            'json',
+          ])
+        ).stdout,
       ) as { results: { sourceId: string }[] }
       expect(new Set(indexed.results.map(({ sourceId }) => sourceId))).toEqual(
         new Set(expectedIndexed),
       )
     }
     const filesSearch = deterministicJson(
-      (await ok(['search', 'Shared workflow', '--realm', 'files', '--json']))
-        .stdout,
+      (
+        await ok([
+          'search',
+          'Shared workflow',
+          '--realm',
+          'files',
+          '--format',
+          'json',
+        ])
+      ).stdout,
     ) as { results: { sourceId: string }[] }
     expect(filesSearch.results.map(({ sourceId }) => sourceId)).toEqual([
       localSource,
@@ -532,7 +551,7 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
       [localRef, { path: 'workflow.txt' }],
     ] as const) {
       const got = deterministicJson(
-        (await ok(['get', ref, '--json'])).stdout,
+        (await ok(['get', ref, '--format', 'json'])).stdout,
       ) as {
         resource: { payload: Record<string, unknown> }
       }
@@ -543,14 +562,14 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
       [gmailRef, ['gmail-root', 'gmail-reply']],
       [outlookRef, ['outlook-root', 'outlook-reply']],
     ] as const) {
-      const thread = await ok(['thread', ref, '--json'])
+      const thread = await ok(['thread', ref, '--format', 'json'])
       deterministicJson(thread.stdout)
       for (const id of ids) expect(thread.stdout).toContain(`/message/${id}`)
     }
 
     const graphRequestsBeforeArtifact = graph.readRequests().length
     const outlook = deterministicJson(
-      (await ok(['get', outlookRef, '--json'])).stdout,
+      (await ok(['get', outlookRef, '--format', 'json'])).stdout,
     ) as {
       resource: { payload: { attachments: { ref: string }[] } }
     }
@@ -563,7 +582,8 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
       artifactRef,
       '--output',
       firstOutput,
-      '--json',
+      '--format',
+      'json',
     ])
     const attachmentFetches = graph
       .readRequests()
@@ -575,7 +595,8 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
       artifactRef,
       '--output',
       secondOutput,
-      '--json',
+      '--format',
+      'json',
     ])
     expect(await readFile(firstOutput, 'utf8')).toBe(
       'relocated attachment bytes\n',
@@ -633,7 +654,8 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
       workOutlookLabel,
       '--input',
       '{not-json',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(malformed.exitCode).toBe(2)
     const injected = await run([
@@ -648,7 +670,8 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
         subject: 'Invalid',
         bodyText: 'Must not persist',
       }),
-      '--json',
+      '--format',
+      'json',
     ])
     expect(injected.exitCode).toBe(2)
     expect(workGmail.readRecordedRequests()).toEqual([])
@@ -672,7 +695,8 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
               subject: `${provider} original`,
               bodyText: `${provider} original body`,
             }),
-            '--json',
+            '--format',
+            'json',
           ])
         ).stdout,
       ) as { resource: { ref: string } }
@@ -691,7 +715,8 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
               subject: `${provider} replacement`,
               bodyText: `${provider} replacement body`,
             }),
-            '--json',
+            '--format',
+            'json',
           ])
         ).stdout,
       ) as {
@@ -728,7 +753,8 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
       workOutlookLabel,
       '--input',
       '{}',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(unknown.exitCode).toBe(2)
     expect(

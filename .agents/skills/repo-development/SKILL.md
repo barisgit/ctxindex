@@ -56,7 +56,7 @@ bun cli extension list
 bun cli describe
 ```
 
-The loaded registry and generated interface are authoritative vocabulary. The compact generated index lists loaded definition IDs. Inspect one definition with `bun cli describe <profile|adapter|action> <id> --json`; request `bun cli describe --full --format markdown` only when a complete snapshot is needed. Detail output owns aliases, field types, export formats, Adapter configuration flags, OAuth declarations, and Action schemas. Do not copy provider-specific IDs, fields, scopes, or formats from this skill into automation.
+The loaded registry and generated interface are authoritative vocabulary. The compact generated index lists loaded definition IDs. Inspect one definition with `bun cli describe <profile|adapter|action> <id> --format json`; request `bun cli describe --full --format markdown` only when a complete snapshot is needed. Detail output owns aliases, field types, export formats, Adapter configuration flags, OAuth declarations, and Action schemas. Do not copy provider-specific IDs, fields, scopes, or formats from this skill into automation.
 
 ## Use fresh isolated state
 
@@ -84,17 +84,17 @@ Choose an Adapter and its generated options from `describe`, then bind the Sourc
 ```sh
 bun cli source add <adapter-id> --realm personal <generated-adapter-options>
 bun cli sync
-bun cli search '<query>' --realm personal --json
-bun cli status --json
+bun cli search '<query>' --realm personal --format json
+bun cli status --format json
 ```
 
 Use `sync` only when the selected Adapter declares that capability. Federated Sources can be searched remotely immediately. Follow returned stable `ctx://` Refs with the generic retrieval verbs:
 
 ```sh
-bun cli get <ref> --json
-bun cli thread <ref> --json
-bun cli artifact list <ref> --json
-bun cli artifact download <artifact-ref> --output <path> --json
+bun cli get <ref> --format json
+bun cli thread <ref> --format json
+bun cli artifact list <ref> --format json
+bun cli artifact download <artifact-ref> --output <path> --format json
 bun cli export <ref> --format <generated-format> > output.ext
 ```
 
@@ -105,8 +105,8 @@ Remote paging is cursor-based and distinct from local offsets when the selected 
 Before any provider mutation, inspect the generated reversible Action schema and select the Source explicitly. Provider mutations stop at reversible email Draft create/update; ctxindex never sends mail.
 
 ```sh
-bun cli describe action <generated-action-id> --source <source-id> --json
-bun cli action run <generated-action-id> --source <source-id> --input <json-or-file> --json
+bun cli describe action <generated-action-id> --source <source-id> --format json
+bun cli action run <generated-action-id> --source <source-id> --input <json-or-file> --format json
 ```
 
 ## Inspect bundled skills
@@ -123,7 +123,7 @@ bun cli skills path
 Inspect the configured secret backend or switch it explicitly. A switch copies and verifies stored values before committing configuration and cleaning the old backend; secret values are never accepted on this command line.
 
 ```sh
-bun cli secrets status --json
+bun cli secrets status --format json
 bun cli secrets backend set keychain
 bun cli secrets backend set file
 ```
@@ -132,11 +132,11 @@ Discover OAuth Provider ids, exact Adapter scopes, API hosts, App labels, and lo
 
 ```sh
 bun cli describe adapter <adapter-id>
-bun cli describe adapter <adapter-id> --json
+bun cli describe adapter <adapter-id> --format json
 bun cli oauth-app add <provider> <app-label> --from-env
 bun cli oauth-app list
 bun cli account add <provider> --app <app-label>
-bun cli account list --json
+bun cli account list --format json
 ```
 
 OAuth App selection is always exact. When `--app` is omitted, core selects only one active Extension App that exactly matches the host's managed-App policy; it never guesses from local or unreviewed Apps. Supplying `--app <label>` bypasses managed-default selection and is the deterministic path for any Extension App or local BYOA App. App labels are unique per Provider across Extension Apps and local BYOA Apps; neither origin can shadow the other. `oauth-app list` exposes only Provider id, label, origin, and safe provenance. Account labels default to the verified provider identity. Source labels default to `<account-label>-<adapter-tail>` or `<adapter-tail>` without an Account. Account and Source labels are globally unique. Labels remain verbatim, and collisions fail with exit 2 instead of prompting or auto-suffixing.
@@ -148,11 +148,11 @@ Account authorization requests the provider base scopes plus the sorted union of
 ```sh
 bun cli oauth-app add <provider-id> <app-label> --from-env
 bun cli account add <provider-id> --app <app-label> --label <account-label>
-bun cli account list --json
+bun cli account list --format json
 bun cli source add <calendar-adapter-id> --realm <realm> --account <account-label> --label '<calendar-label>' <generated-calendar-options>
-bun cli sync --source <calendar-label> --json
-bun cli search '<query>' --kind <event-profile-id-or-alias> --realm <realm> --json
-bun cli get <ctx-calendar-event-ref> --json
+bun cli sync --source <calendar-label> --format json
+bun cli search '<query>' --kind <event-profile-id-or-alias> --realm <realm> --format json
+bun cli get <ctx-calendar-event-ref> --format json
 ```
 
 Do not run live provider tests from the general automated lane. Accepted live checks use the isolated Human checkpoint procedure and redacted evidence under the active charter. Mocked CLI e2e coverage supplies loopback-only endpoints and synthetic credentials for search/get, Draft Actions, and network egress; never substitute real credentials into that lane.

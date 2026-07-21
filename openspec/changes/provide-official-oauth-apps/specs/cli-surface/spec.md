@@ -7,10 +7,10 @@ OAuth lifecycle commands MUST include exactly these public forms:
 
 ```text
 oauth-app add <provider> <label> --from-env
-oauth-app list [--json]
+oauth-app list [--format json]
 oauth-app remove <provider> <label>
 account add <provider> [--app <label>] [--label <label>]
-account list [--json]
+account list [--format json]
 account remove <label>
 ```
 
@@ -49,5 +49,5 @@ Unknown Realm, OAuth App, Account, Source, or Adapter references MUST fail fast 
 - **THEN** parsing rejects it as invalid usage and creates no state
 
 #### Scenario: OAuth App JSON inventory is safe
-- **WHEN** an agent runs `oauth-app list --json`
+- **WHEN** an agent runs `oauth-app list --format json`
 - **THEN** every row contains only Provider id, label, origin, and safe provenance

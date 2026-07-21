@@ -65,7 +65,7 @@ The approved direction is an ordinary TypeScript import graph. Package managers 
 
 18. **The pre-alpha schema uses OAuth App names directly.** Fresh storage uses `oauth_apps` and Grant-owned App snapshot fields, with no Client compatibility table, view, migration, or command alias.
 
-19. **The CLI names and selects OAuth Apps exactly.** Local BYOA lifecycle is `oauth-app add <provider> <label> --from-env`, `oauth-app list [--json]`, and `oauth-app remove <provider> <label>`. There is no `client` command or alias. `account add <provider> --app <label> [--label <label>]` requires the exact Provider-scoped App label and never guesses even when only one App exists. Inventory projects identity and safe provenance only.
+19. **The CLI names and selects OAuth Apps exactly.** Local BYOA lifecycle is `oauth-app add <provider> <label> --from-env`, `oauth-app list [--format json]`, and `oauth-app remove <provider> <label>`. There is no `client` command or alias. `account add <provider> --app <label> [--label <label>]` requires the exact Provider-scoped App label and never guesses even when only one App exists. Inventory projects identity and safe provenance only.
 
 20. **Environment input is Provider-authored and one-shot.** OAuth registration metadata contains a typed mapping from every top-level App config key to a safe environment variable name. Only local BYOA `oauth-app add --from-env` consumes that mapping. It reads values through the central environment loader, validates the complete config before persistence, and stores values as typed secret references. Extension Apps do not read this mapping. Authorization and refresh never reread environment config; the selected App is snapshotted into its private Grant.
 

@@ -17,7 +17,7 @@ typed streaming contract before more long-running operations are migrated.
   provider bodies, paths, or secrets.
 - Make cancellation or client disconnect abort the producer, release iterator
   resources, and preserve existing transactional Sync Run bookkeeping.
-- Preserve one final JSON document for `sync --json`; make `--format events`
+- Preserve one final JSON document for `sync --format json`; make `--format events`
   render events as they arrive while summary and compact formats retain their
   existing terminal shapes.
 - Keep the private protocol exact-versioned and the CLI as the only supported

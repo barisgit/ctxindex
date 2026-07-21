@@ -2,7 +2,7 @@
 
 ### Requirement: Live sync output preserves machine-readable results
 When daemon sync is selected, the CLI MUST consume the typed stream without
-opening the client database or falling back to direct composition. `sync --json`
+opening the client database or falling back to direct composition. `sync --format json`
 MUST emit exactly one final JSON document with the established aggregate result
 shape. `sync --format events` MUST emit progress as it arrives and MUST preserve
 the established Source completed/failed event shapes. Summary and compact output
@@ -10,7 +10,7 @@ MUST preserve their terminal stdout shapes and MAY render bounded live progress
 to stderr. Final exit selection MUST remain derived from terminal Source results.
 
 #### Scenario: JSON sync receives progress
-- **WHEN** daemon sync yields multiple progress events and returns successfully under `--json`
+- **WHEN** daemon sync yields multiple progress events and returns successfully under `--format json`
 - **THEN** stdout contains one valid final JSON document and no partial event documents
 
 #### Scenario: Event-formatted sync receives progress

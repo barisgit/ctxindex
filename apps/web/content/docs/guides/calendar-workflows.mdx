@@ -10,9 +10,9 @@ Google Calendar and Microsoft Calendar Sources normalize events into the provide
 Use registry output instead of assuming provider options:
 
 ```sh
-ctxindex describe adapter google.calendar --json
-ctxindex describe adapter microsoft.calendar --json
-ctxindex account list --json
+ctxindex describe adapter google.calendar --format json
+ctxindex describe adapter microsoft.calendar --format json
+ctxindex account list --format json
 ```
 
 Each calendar Source selects one provider calendar. For example:
@@ -32,8 +32,8 @@ The generated calendar flags and defaults come from the loaded Adapter schema. A
 ## Sync before searching
 
 ```sh
-ctxindex sync --source work-calendar --json
-ctxindex status --source work-calendar --json
+ctxindex sync --source work-calendar --format json
+ctxindex status --source work-calendar --format json
 ```
 
 The configured past and future windows define indexed coverage. Incremental sync retains its anchored window and records provider deletions; only a complete reconciliation advances the anchor. Choose wider history in the Source configuration when the workflow needs it.
@@ -48,7 +48,7 @@ ctxindex search \
   --realm company \
   --since '<START_DATE>' \
   --until '<END_DATE>' \
-  --json
+  --format json
 ```
 
 Add text or typed fields to narrow the result set:
@@ -60,7 +60,7 @@ ctxindex search "planning" \
   --field allDay=false \
   --since '<START_DATE>' \
   --until '<END_DATE>' \
-  --json
+  --format json
 ```
 
 Replace `<START_DATE>` and `<END_DATE>` with the upcoming ISO date interval for the current run. Omit `--realm` to search all configured Google and Microsoft calendar Sources. An explicit Realm is exact.
@@ -70,7 +70,7 @@ Replace `<START_DATE>` and `<END_DATE>` with the upcoming ISO date interval for 
 Use the Ref returned by search rather than reconstructing provider IDs:
 
 ```sh
-ctxindex get 'ctx://01J00000000000000000000000/event/stable-event-id' --json
+ctxindex get 'ctx://01J00000000000000000000000/event/stable-event-id' --format json
 ```
 
 Timed Calendar Events preserve their RFC 3339 instants and timezone. All-day Calendar Events preserve local start dates and exclusive end dates rather than inventing UTC-midnight timestamps. Keep that distinction when presenting an agenda.

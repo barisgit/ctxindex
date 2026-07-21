@@ -60,7 +60,7 @@ export async function resolveDraftAttachments(
     if (!artifact)
       throw new CtxindexValidationError(
         'invalid_action_input',
-        `Artifact is not cached and available for this Action: ${ref}. Download it first with: ctxindex artifact download ${ref} --json`,
+        `Artifact is not cached and available for this Action: ${ref}. Download it first with: ctxindex artifact download ${ref} --format json`,
       )
     validateAttachment(artifact)
     totalBytes += artifact.byteSize

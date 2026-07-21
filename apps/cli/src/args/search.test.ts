@@ -24,7 +24,7 @@ describe('search CLI arguments', () => {
         '--realm',
         'work',
         '--realm=personal',
-        '--source',
+        '-s',
         'mail',
         '--source=calendar',
         '--kind',
@@ -33,7 +33,8 @@ describe('search CLI arguments', () => {
         'sender=alice@example.com',
         '--field=unread=true',
         '--remote',
-        '--json',
+        '-f',
+        'json',
       ]),
     ).toEqual({
       format: 'json',
@@ -53,9 +54,7 @@ describe('search CLI arguments', () => {
   })
 
   test('accepts filter-only enumeration and exact remote continuation', async () => {
-    expect(
-      await resolve(['--realm', 'work', '--limit', '20', '--json']),
-    ).toEqual({
+    expect(await resolve(['-r', 'work', '-l', '20', '-f', 'json'])).toEqual({
       format: 'json',
       refs: false,
       input: { realms: ['work'], limit: 20 },
@@ -107,7 +106,6 @@ describe('search CLI arguments', () => {
         'next',
       ],
       ['x', '--offset', '5'],
-      ['x', '--refs', '--json'],
       ['x', '--refs', '--format', 'json'],
       ['x', '--refs', '--format', 'pretty'],
     ]) {
