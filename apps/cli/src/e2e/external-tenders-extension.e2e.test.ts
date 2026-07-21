@@ -333,7 +333,7 @@ test('relocated compiled CLI syncs external tenders through generic verbs', asyn
       resource: { ref, id: getJson.resource.id, origin: 'synced' },
       warnings: [{ code: 'unknown_profile_version', ref }],
     })
-    expect(cachedGet.stderr).toContain('unknown_profile_version')
+    expect(cachedGet.stderr).toBe('')
     expect(resourceSnapshot()).toEqual(syncedResources)
 
     const unavailableSync = await run(['sync', '--json', '--source', sourceId])

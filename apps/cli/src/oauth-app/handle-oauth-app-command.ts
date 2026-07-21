@@ -13,6 +13,7 @@ import {
   formatOAuthAppInventory,
   formatOAuthAppRemoved,
 } from '../format/oauth-app'
+import type { OutputFormat } from '../format/output'
 
 export interface OAuthAppCommandDeps {
   readonly acquireOwnership: typeof acquireDirectDatabaseOwnership
@@ -24,7 +25,7 @@ export interface OAuthAppCommandDeps {
 
 export type OAuthAppCommandInput =
   | { readonly kind: 'add'; readonly provider: string; readonly label: string }
-  | { readonly kind: 'list'; readonly json: boolean }
+  | { readonly kind: 'list'; readonly format: OutputFormat }
   | {
       readonly kind: 'remove'
       readonly provider: string
@@ -110,7 +111,10 @@ export async function handleOAuthAppCommand(
       deps = await services.open()
       if (parsed.kind === 'list') {
         console.log(
-          formatOAuthAppInventory(deps.oauthAppService.listApps(), parsed.json),
+          formatOAuthAppInventory(
+            deps.oauthAppService.listApps(),
+            parsed.format,
+          ),
         )
       } else {
         await deps.oauthAppService.removeLocalApp(parsed.provider, parsed.label)

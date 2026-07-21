@@ -1,6 +1,7 @@
 import { daemonStatus, selectDaemon } from '../daemon/client'
 import { openDeps } from '../deps'
 import { mapErrorToExit } from '../format/exit'
+import type { OutputFormat } from '../format/output'
 import { formatStatus } from '../format/status'
 
 function printOutput(output: string): void {
@@ -15,8 +16,7 @@ export interface StatusCommandDeps {
 
 export interface StatusCommandInput {
   readonly sourceId?: string
-  readonly json: boolean
-  readonly format: 'summary' | 'compact'
+  readonly format: OutputFormat
 }
 
 const defaultDeps: StatusCommandDeps = {
@@ -55,7 +55,7 @@ export async function handleStatusCommand(
                 }
               : null,
           })),
-          parsed,
+          parsed.format,
         ),
       )
       return 0
@@ -64,7 +64,9 @@ export async function handleStatusCommand(
     const input = parsed.sourceId
       ? { sourceId: deps.sourceService.resolveSourceId(parsed.sourceId) }
       : {}
-    printOutput(formatStatus(deps.sourceService.getStatus(input), parsed))
+    printOutput(
+      formatStatus(deps.sourceService.getStatus(input), parsed.format),
+    )
     return 0
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))

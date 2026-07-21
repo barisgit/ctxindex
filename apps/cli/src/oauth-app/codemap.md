@@ -8,7 +8,7 @@ Orchestrates local OAuth App add/list/remove commands without exposing configura
 
 - `commands/oauth-app.ts` declares the exact typed add/list/remove grammar and passes an `OAuthAppCommandInput` union to `handle-oauth-app-command.ts`, the workflow boundary.
 - Add acquires one retained direct database owner before Extension imports, reads local OAuth App identities and loads one complete-registry snapshot under that owner, then reads only Provider-declared `registration.environment` names when `--from-env` is selected. It validates the resulting config before opening mutable dependencies and reuses the exact snapshot and owner for collision checking and secret-backed persistence.
-- Inventory and removal use the safe OAuth App service projection keyed by exact `(provider, label)` identity.
+- Inventory uses the safe OAuth App service projection through shared pretty/text/json rendering; removal remains keyed by exact `(provider, label)` identity.
 
 ## Data & control flow
 

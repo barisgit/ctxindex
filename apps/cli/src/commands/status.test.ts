@@ -45,7 +45,7 @@ test('selected RPC status preserves JSON shape and never opens direct deps', asy
   ]
   expect(
     await handleStatusCommand(
-      { json: true, format: 'summary' },
+      { format: 'json' },
       deps({
         selectDaemon: () => selection,
         daemonStatus: async () => ({ rows }),
@@ -63,7 +63,7 @@ test('selected unreachable status fails unavailable without direct fallback', as
   let opened = false
   expect(
     await handleStatusCommand(
-      { json: false, format: 'summary' },
+      { format: 'text' },
       deps({
         selectDaemon: () => selection,
         daemonStatus: async () => {
@@ -93,7 +93,7 @@ test.each([
   const error = spyOn(console, 'error').mockImplementation(() => {})
   expect(
     await handleStatusCommand(
-      { sourceId: 'source-a', json: false, format: 'summary' },
+      { sourceId: 'source-a', format: 'text' },
       deps({
         selectDaemon: () => selection,
         daemonStatus: async () => {
@@ -115,7 +115,7 @@ test('no selector retains the direct status path and closes it', async () => {
   let closed = false
   expect(
     await handleStatusCommand(
-      { json: true, format: 'summary' },
+      { format: 'json' },
       deps({
         open: async () =>
           ({

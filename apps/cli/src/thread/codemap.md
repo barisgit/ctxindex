@@ -8,7 +8,7 @@ Orchestrates local Resource-thread retrieval and presentation across daemon and 
 
 - `handle-thread-get-command.ts` consumes the typed `thread <ref>` input and validates the Resource Ref before daemon selection or direct dependency opening.
 - A selected daemon handles the bounded thread request without client SQLite access or fallback.
-- Text output walks the validated tree deterministically; JSON preserves the typed envelope and warnings.
+- Pretty/text output flattens the validated tree into complete Resource rows with explicit depth through `format/thread.ts`; JSON preserves the typed envelope and warnings.
 
 ## Integration points
 

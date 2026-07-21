@@ -1,5 +1,6 @@
 import { defineCtxCommand } from '../command-model'
 import { runWithExit } from '../format/exit'
+import { resolveOutputFormat, structuredOutputArgs } from '../format/output'
 import { handleExtensionsCommand } from './handle-extensions-command'
 
 const jsonArg = {
@@ -24,10 +25,13 @@ export const extensionCommand = defineCtxCommand({
   subCommands: {
     list: defineCtxCommand({
       meta: { name: 'list', description: 'List loaded Extensions.' },
-      args: { json: jsonArg },
+      args: structuredOutputArgs,
       run: ({ args }) =>
         runWithExit(() =>
-          handleExtensionsCommand({ kind: 'list', json: args.json }),
+          handleExtensionsCommand({
+            kind: 'list',
+            format: resolveOutputFormat(args),
+          }),
         ),
     }),
     catalog: defineCtxCommand({

@@ -8,7 +8,7 @@ Orchestrates Realm add/list across selected-daemon and direct core paths.
 
 - `commands/realm.ts` defines and validates add/list arguments, then passes a typed `RealmCommandInput` to the handler before any route or storage effect.
 - The handler installs request-scoped SIGINT cancellation and never opens direct dependencies after daemon selection.
-- Preserves the existing Realm formatter and stable exit mapping in both modes.
+- Realm inventory uses the shared compact JSON, escaped TSV, or width-aware pretty renderer with stable exit mapping in both daemon and direct modes.
 
 ## Integration points
 

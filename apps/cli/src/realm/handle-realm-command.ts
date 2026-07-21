@@ -1,6 +1,7 @@
 import { daemonRealmAdd, daemonRealmList, selectDaemon } from '../daemon/client'
 import { openDeps } from '../deps'
 import { mapErrorToExit } from '../format/exit'
+import type { OutputFormat } from '../format/output'
 import { formatRealmAdded, formatRealms } from '../format/realm'
 
 function printOutput(output: string): void {
@@ -16,7 +17,7 @@ export interface RealmCommandDeps {
 
 export type RealmCommandInput =
   | { readonly kind: 'add'; readonly slug: string; readonly name?: string }
-  | { readonly kind: 'list'; readonly json: boolean }
+  | { readonly kind: 'list'; readonly format: OutputFormat }
 
 const defaultDeps: RealmCommandDeps = {
   selectDaemon,
@@ -48,7 +49,7 @@ export async function handleRealmCommand(
         console.log(formatRealmAdded(parsed.slug))
       } else {
         const result = await services.realmList(daemon, controller.signal)
-        printOutput(formatRealms(result.rows, { json: parsed.json }))
+        printOutput(formatRealms(result.rows, parsed.format))
       }
       return 0
     }
@@ -61,9 +62,7 @@ export async function handleRealmCommand(
       console.log(formatRealmAdded(parsed.slug))
       return 0
     }
-    printOutput(
-      formatRealms(deps.realmService.listRealms(), { json: parsed.json }),
-    )
+    printOutput(formatRealms(deps.realmService.listRealms(), parsed.format))
     return 0
   } catch (err) {
     console.error(err instanceof Error ? err.message : String(err))

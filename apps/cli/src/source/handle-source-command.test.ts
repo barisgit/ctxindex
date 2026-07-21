@@ -137,7 +137,8 @@ test('selected daemon handles Source list and remove without direct open', async
       await handleSourceCommand(
         {
           kind: 'list',
-          args: { _: [], format: 'table', json: true } as never,
+          args: { _: [], format: 'json', json: false } as never,
+          format: 'json',
         },
         route,
         deps,
@@ -617,7 +618,8 @@ test('cleanup failures do not replace success and ownership release is independe
     const exit = await handleSourceCommand(
       {
         kind: 'list',
-        args: { _: [], format: 'table', json: false } as never,
+        args: { _: [], format: 'text', json: false } as never,
+        format: 'text',
       },
       route,
       {

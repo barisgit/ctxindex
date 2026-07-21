@@ -4,6 +4,7 @@ import {
   formatArtifactDownloadJson,
   formatArtifactDownloadText,
   formatArtifactListJson,
+  formatArtifactListPretty,
   formatArtifactListText,
 } from '../format/artifact'
 import { handleArtifactCommand } from './handle-artifact-command'
@@ -51,9 +52,14 @@ const purged = {
 describe('artifact command output and handlers', () => {
   test('formats deterministic compact text and JSON without binary or CAS paths', () => {
     expect(formatArtifactListText(listed)).toBe(
-      `${artifactRef}\tfile.bin\tapplication/octet-stream\t4`,
+      `ref\tfilename\tmediaType\tbyteSize\n${artifactRef}\tfile.bin\tapplication/octet-stream\t4`,
     )
     expect(formatArtifactListJson(listed)).toBe(JSON.stringify(listed))
+    expect(
+      formatArtifactListPretty(listed, { columns: 40 })
+        .split('\n')
+        .every((line) => Bun.stringWidth(line) <= 40),
+    ).toBe(true)
     expect(formatArtifactDownloadText(downloaded)).toBe(
       `${artifactRef}\tmiss\t/tmp/file.bin`,
     )
@@ -80,7 +86,7 @@ describe('artifact command output and handlers', () => {
 
     expect(
       await handleArtifactCommand(
-        { kind: 'list', ref: originRef, json: true },
+        { kind: 'list', ref: originRef, format: 'json' },
         open,
       ),
     ).toBe(0)

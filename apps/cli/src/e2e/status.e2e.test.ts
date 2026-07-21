@@ -126,7 +126,7 @@ test('text output renders real completed local sync state', async () => {
   }
 })
 
-test('compact output includes a real unavailable-Adapter failure summary', async () => {
+test('text output includes a real unavailable-Adapter failure summary', async () => {
   const sandbox = await initSandbox()
   try {
     const sourceId = await addSource(sandbox)
@@ -134,18 +134,15 @@ test('compact output includes a real unavailable-Adapter failure summary', async
     const sync = await sandbox.run(['sync', '--source', sourceId])
     expect(sync.exitCode).toBe(50)
 
-    const result = await sandbox.run(['status', '--format', 'compact'])
+    const result = await sandbox.run(['status', '--format', 'text'])
 
     expect(result.exitCode).toBe(0)
     expect(result.stderr).toBe('')
     expect(result.stdout).toContain(sourceId)
-    expect(result.stdout).toContain('adapter=missing.adapter')
-    expect(result.stdout).toContain('status=extension_unavailable')
-    expect(result.stdout).toContain('warnings=0')
-    expect(result.stdout).toContain('errors=1')
-    expect(result.stdout).toContain(
-      'error=Source_Adapter_definition_is_unavailable',
-    )
+    expect(result.stdout).toContain('missing.adapter')
+    expect(result.stdout).toContain('extension_unavailable')
+    expect(result.stdout).toContain('\t0\t-\t1\t')
+    expect(result.stdout).toContain('Source Adapter definition is unavailable')
   } finally {
     await sandbox.cleanup()
   }

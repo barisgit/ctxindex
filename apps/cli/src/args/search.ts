@@ -1,4 +1,9 @@
 import type { CtxParsedArgs } from '../command-model'
+import {
+  type OutputFormat,
+  resolveOutputFormat,
+  structuredOutputArgs,
+} from '../format/output'
 
 export const searchArgs = {
   query: { type: 'positional', required: false, description: 'Query text' },
@@ -35,7 +40,7 @@ export const searchArgs = {
   'local-only': { type: 'boolean', description: 'Search local only' },
   remote: { type: 'boolean', description: 'Search remote Sources only' },
   explain: { type: 'boolean', description: 'Explain per-Source routing' },
-  json: { type: 'boolean', description: 'Print deterministic JSON' },
+  ...structuredOutputArgs,
 } as const
 
 export type SearchCommandArgs = CtxParsedArgs<typeof searchArgs>
@@ -60,7 +65,7 @@ export interface ExecuteSearchInput {
 
 export interface ResolvedSearchArgs {
   readonly input: ExecuteSearchInput
-  readonly json: boolean
+  readonly format: OutputFormat
   readonly refs: boolean
 }
 
@@ -103,6 +108,15 @@ function parseField(raw: string): {
 }
 
 export function resolveSearchArgs(args: SearchCommandArgs): ResolvedSearchArgs {
+  if (
+    args.refs === true &&
+    (args.json === true ||
+      (args.format !== undefined && args.format !== 'text'))
+  ) {
+    invalid(
+      'search: --refs supports only omitted/default text or --format text',
+    )
+  }
   const text = args.query?.trim()
   const since = parseDate('since', args.since)
   const until = parseDate('until', args.until)
@@ -169,7 +183,10 @@ export function resolveSearchArgs(args: SearchCommandArgs): ResolvedSearchArgs {
   }
 
   return {
-    json: args.json === true,
+    format:
+      args.refs === true && args.format === undefined
+        ? 'text'
+        : resolveOutputFormat(args),
     refs: args.refs === true,
     input: {
       ...(text ? { text } : {}),

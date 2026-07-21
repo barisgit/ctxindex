@@ -1,4 +1,11 @@
 import type { OAuthAppInventoryItem } from '@ctxindex/core/oauth-app'
+import {
+  compactJson,
+  formatPrettyCollection,
+  formatTsv,
+  type OutputColumn,
+  type OutputFormat,
+} from './output'
 
 export function formatOAuthAppAdded(providerId: string, label: string): string {
   return `OAuth App added: ${providerId} ${JSON.stringify(label)}`
@@ -6,16 +13,19 @@ export function formatOAuthAppAdded(providerId: string, label: string): string {
 
 export function formatOAuthAppInventory(
   apps: readonly OAuthAppInventoryItem[],
-  json: boolean,
+  format: OutputFormat,
 ): string {
-  if (json) return JSON.stringify(apps, null, 2)
-  if (apps.length === 0) return 'No OAuth Apps available.'
-  return apps
-    .map(
-      (app) =>
-        `${app.providerId} ${JSON.stringify(app.label)} origin=${app.origin}`,
-    )
-    .join('\n')
+  if (format === 'json') return compactJson(apps)
+  const rows = apps.map((app) => ({ ...app }))
+  const columns = [
+    { key: 'providerId', label: 'Provider' },
+    { key: 'label', label: 'OAuth App' },
+    { key: 'origin', label: 'Origin' },
+    { key: 'provenance', label: 'Provenance' },
+  ] satisfies readonly OutputColumn[]
+  return format === 'pretty'
+    ? formatPrettyCollection(columns, rows)
+    : formatTsv(columns, rows)
 }
 
 export function formatOAuthAppRemoved(

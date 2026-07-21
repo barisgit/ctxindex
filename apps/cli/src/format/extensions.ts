@@ -1,19 +1,13 @@
 import type { DirectExtensionInventoryEntry } from '@ctxindex/core'
 import type { ExtensionLoadProvenance } from '@ctxindex/core/extension'
 import { compareReferences, compareStrings } from '@ctxindex/core/registry'
-
-type ProvenanceWithAge = ExtensionLoadProvenance & {
-  readonly snapshotAgeMs?: number
-}
-
-function provenanceText(provenance: ProvenanceWithAge): string {
-  if (provenance.kind === 'builtin') return 'builtin'
-  if (provenance.kind === 'path') return `path ${provenance.path}`
-  if (provenance.kind === 'direct') {
-    return `direct ${provenance.sourceKind} ${provenance.requestedTarget} ${provenance.resolvedIdentity} ${provenance.materializationDigest} installed ${provenance.installedAt} updated ${provenance.updatedAt}`
-  }
-  return `catalog ${provenance.catalog} ${provenance.catalogId} ${provenance.commit} ${provenance.repository} ${JSON.stringify(provenance.sourceLocator)}${provenance.snapshotAgeMs === undefined ? '' : ` age ${provenance.snapshotAgeMs}ms`} source ${provenance.sourceKind} ${provenance.requestedTarget} ${provenance.resolvedIdentity} ${provenance.materializationDigest} installed ${provenance.installedAt} updated ${provenance.updatedAt}`
-}
+import {
+  compactJson,
+  formatPrettyCollection,
+  formatTsv,
+  type OutputColumn,
+  type OutputFormat,
+} from './output'
 
 export function formatExtensions(
   registry: {
@@ -23,7 +17,7 @@ export function formatExtensions(
       adapters: readonly { id: string }[]
     }[]
   },
-  jsonOutput: boolean,
+  format: OutputFormat,
   provenance: readonly ExtensionLoadProvenance[] = [],
   installedInventory: readonly DirectExtensionInventoryEntry[] = [],
   now = Date.now(),
@@ -109,11 +103,25 @@ export function formatExtensions(
         ...(source === undefined ? {} : { provenance: source }),
       }
     })
-  if (jsonOutput) return JSON.stringify(extensions, null, 2)
-  return extensions
-    .map(
-      (extension) =>
-        `${extension.id}${extension.available === false ? '\tUnavailable' : ''}\tProfiles: ${extension.profiles.map((item) => `${item.id}@${item.version}`).join(', ') || 'none'}\tAdapters: ${extension.adapters.map((item) => item.id).join(', ') || 'none'}${extension.provenance === undefined ? '' : `\tProvenance: ${provenanceText(extension.provenance)}`}`,
-    )
-    .join('\n')
+  if (format === 'json') return compactJson(extensions)
+  const rows = extensions.map((extension) => ({
+    id: extension.id,
+    available: extension.available !== false,
+    profiles: compactJson(extension.profiles),
+    adapters: compactJson(extension.adapters),
+    provenance:
+      extension.provenance === undefined
+        ? 'null'
+        : compactJson(extension.provenance),
+  }))
+  const columns = [
+    { key: 'id', label: 'Extension' },
+    { key: 'available', label: 'Available' },
+    { key: 'profiles', label: 'Profiles' },
+    { key: 'adapters', label: 'Adapters' },
+    { key: 'provenance', label: 'Provenance' },
+  ] satisfies readonly OutputColumn[]
+  return format === 'pretty'
+    ? formatPrettyCollection(columns, rows)
+    : formatTsv(columns, rows)
 }

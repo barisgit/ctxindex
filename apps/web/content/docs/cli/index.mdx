@@ -117,12 +117,14 @@ USAGE ctxindex account list [OPTIONS]
 
 OPTIONS
 
-  --json    Print JSON
+  --format=<pretty|text|json>    Output format: pretty, text, or json
+                       --json    Shorthand for --format json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
-| `--json` | Print JSON | Optional |
+| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
+| `--json` | Shorthand for --format json | Optional |
 
 ## `ctxindex account remove`
 
@@ -196,12 +198,14 @@ USAGE ctxindex oauth-app list [OPTIONS]
 
 OPTIONS
 
-  --json    Output JSON
+  --format=<pretty|text|json>    Output format: pretty, text, or json
+                       --json    Shorthand for --format json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
-| `--json` | Output JSON | Optional |
+| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
+| `--json` | Shorthand for --format json | Optional |
 
 ## `ctxindex oauth-app remove`
 
@@ -447,12 +451,14 @@ USAGE ctxindex extension list [OPTIONS]
 
 OPTIONS
 
-  --json    Print JSON (Default: false)
+  --format=<pretty|text|json>    Output format: pretty, text, or json
+                       --json    Shorthand for --format json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
-| `--json` | Print JSON | Optional. Default: `false` |
+| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
+| `--json` | Shorthand for --format json | Optional |
 
 ## `ctxindex extension catalog`
 
@@ -809,13 +815,15 @@ ARGUMENTS
 
 OPTIONS
 
-  --json    Print deterministic JSON
+  --format=<pretty|text|json>    Output format: pretty, text, or json
+                       --json    Shorthand for --format json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<ref>` | Resource Ref | Required |
-| `--json` | Print deterministic JSON | Optional |
+| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
+| `--json` | Shorthand for --format json | Optional |
 
 ## `ctxindex artifact download`
 
@@ -911,12 +919,14 @@ USAGE ctxindex realm list [OPTIONS]
 
 OPTIONS
 
-  --json    Print JSON
+  --format=<pretty|text|json>    Output format: pretty, text, or json
+                       --json    Shorthand for --format json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
-| `--json` | Print JSON | Optional |
+| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
+| `--json` | Shorthand for --format json | Optional |
 
 ## `ctxindex source`
 
@@ -982,16 +992,16 @@ USAGE ctxindex source list [OPTIONS]
 
 OPTIONS
 
-           --realm=<realm>    Realm slug
-  --format=<table|compact>    Output format (Default: table)
-                    --json    Print JSON
+              --realm=<realm>    Realm slug
+  --format=<pretty|text|json>    Output format: pretty, text, or json
+                       --json    Shorthand for --format json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `--realm` | Realm slug | Optional |
-| `--format` | Output format | Optional. Choices: `table`, `compact`. Default: `table` |
-| `--json` | Print JSON | Optional |
+| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
+| `--json` | Shorthand for --format json | Optional |
 
 ## `ctxindex source remove`
 
@@ -1050,13 +1060,15 @@ ARGUMENTS
 
 OPTIONS
 
-  --json    Print deterministic JSON
+  --format=<pretty|text|json>    Output format: pretty, text, or json
+                       --json    Shorthand for --format json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<ref>` | Resource Ref | Required |
-| `--json` | Print deterministic JSON | Optional |
+| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
+| `--json` | Shorthand for --format json | Optional |
 
 ## `ctxindex export`
 
@@ -1096,13 +1108,15 @@ ARGUMENTS
 
 OPTIONS
 
-  --json    Print deterministic JSON
+  --format=<pretty|text|json>    Output format: pretty, text, or json
+                       --json    Shorthand for --format json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<ref>` | Resource Ref | Required |
-| `--json` | Print deterministic JSON | Optional |
+| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
+| `--json` | Shorthand for --format json | Optional |
 
 ## `ctxindex search`
 
@@ -1134,7 +1148,8 @@ OPTIONS
                    --local-only    Search local only
                        --remote    Search remote Sources only
                       --explain    Explain per-Source routing
-                         --json    Print deterministic JSON
+    --format=<pretty|text|json>    Output format: pretty, text, or json
+                         --json    Shorthand for --format json
 ```
 
 | Argument | Description | Contract |
@@ -1155,7 +1170,8 @@ OPTIONS
 | `--local-only` | Search local only | Optional |
 | `--remote` | Search remote Sources only | Optional |
 | `--explain` | Explain per-Source routing | Optional |
-| `--json` | Print deterministic JSON | Optional |
+| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
+| `--json` | Shorthand for --format json | Optional |
 
 ## `ctxindex status`
 
@@ -1168,16 +1184,16 @@ USAGE ctxindex status [OPTIONS]
 
 OPTIONS
 
-           --source=<source>    Source label or ID
-  --format=<summary|compact>    Output format: summary or compact (Default: summary)
-                      --json    Print JSON
+            --source=<source>    Source label or ID
+  --format=<pretty|text|json>    Output format: pretty, text, or json
+                       --json    Shorthand for --format json
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `--source` | Source label or ID | Optional |
-| `--format` | Output format: summary or compact | Optional. Choices: `summary`, `compact`. Default: `summary` |
-| `--json` | Print JSON | Optional |
+| `--format` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
+| `--json` | Shorthand for --format json | Optional |
 
 ## `ctxindex secrets`
 

@@ -3,6 +3,7 @@ import { CtxindexNotFoundError } from '@ctxindex/core/errors'
 import type { ThreadResult } from '@ctxindex/core/thread'
 import {
   formatThreadJson,
+  formatThreadPretty,
   formatThreadText,
   handleThreadGetCommand,
 } from './thread'
@@ -57,8 +58,17 @@ const result: ThreadResult = {
 }
 
 describe('thread output', () => {
-  test('formats deterministic compact text with tree indentation', () => {
-    expect(formatThreadText(result)).toBe(`${ref}\tRoot\n  ${childRef}`)
+  test('formats complete deterministic text rows and narrow pretty cards', () => {
+    const text = formatThreadText(result)
+    expect(text).toContain('depth\tref\tsourceId\trealmId\tprofile')
+    expect(text).toContain(`0\t${ref}`)
+    expect(text).toContain('{"body":"full payload"}')
+    expect(text).toContain(`1\t${childRef}`)
+    const pretty = formatThreadPretty(result, { columns: 40 })
+    expect(
+      pretty.split('\n').every((line) => Bun.stringWidth(line) <= 40),
+    ).toBe(true)
+    expect(pretty).not.toContain('…')
   })
 
   test('formats the typed JSON envelope with full Resource payloads', () => {
@@ -75,7 +85,7 @@ describe('thread output', () => {
       },
     })
 
-    expect(await handleThreadGetCommand({ ref, json: true }, open)).toBe(0)
+    expect(await handleThreadGetCommand({ ref, format: 'json' }, open)).toBe(0)
     expect(log).toHaveBeenCalledWith(formatThreadJson(result))
     expect(closed).toBe(true)
     log.mockRestore()
@@ -86,7 +96,7 @@ describe('thread output', () => {
     let opened = false
     try {
       const exit = await handleThreadGetCommand(
-        { ref, json: true },
+        { ref, format: 'json' },
         async () => {
           opened = true
           throw new Error('direct dependencies opened')
@@ -120,10 +130,10 @@ describe('thread output', () => {
     }
 
     expect(
-      await handleThreadGetCommand({ ref: 'bad-ref', json: false }, open),
+      await handleThreadGetCommand({ ref: 'bad-ref', format: 'text' }, open),
     ).toBe(2)
     expect(opens).toBe(0)
-    expect(await handleThreadGetCommand({ ref, json: false }, open)).toBe(2)
+    expect(await handleThreadGetCommand({ ref, format: 'text' }, open)).toBe(2)
     expect(opens).toBe(1)
     error.mockRestore()
   })

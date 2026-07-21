@@ -1,6 +1,7 @@
 import { handleArtifactCommand } from '../artifact/handle-artifact-command'
 import { defineCtxCommand } from '../command-model'
 import { runWithExit } from '../format/exit'
+import { resolveOutputFormat, structuredOutputArgs } from '../format/output'
 
 export const artifactListCommand = defineCtxCommand({
   meta: {
@@ -9,14 +10,14 @@ export const artifactListCommand = defineCtxCommand({
   },
   args: {
     ref: { type: 'positional', required: true, description: 'Resource Ref' },
-    json: { type: 'boolean', description: 'Print deterministic JSON' },
+    ...structuredOutputArgs,
   },
   run: ({ args }) =>
     runWithExit(() =>
       handleArtifactCommand({
         kind: 'list',
         ref: args.ref,
-        json: args.json ?? false,
+        format: resolveOutputFormat(args),
       }),
     ),
 })

@@ -21,6 +21,7 @@ import {
   type DirectDatabaseOwnership,
 } from '../direct-database'
 import { mapErrorToExit } from '../format/exit'
+import type { OutputFormat } from '../format/output'
 import {
   formatSourceAdded,
   formatSourceRemoved,
@@ -162,7 +163,11 @@ export async function resolveSourceCommandRoute(
 
 export type SourceCommandInput =
   | { readonly kind: 'add'; readonly args: SourceAddCommandArgs }
-  | { readonly kind: 'list'; readonly args: SourceListCommandArgs }
+  | {
+      readonly kind: 'list'
+      readonly args: SourceListCommandArgs
+      readonly format: OutputFormat
+    }
   | { readonly kind: 'remove'; readonly args: SourceRemoveCommandArgs }
 
 export async function handleSourceCommand(
@@ -192,8 +197,7 @@ export async function handleSourceCommand(
               ...(input.args.realm === undefined
                 ? {}
                 : { realmSlug: input.args.realm }),
-              json: input.args.json === true,
-              format: input.args.format,
+              format: input.format,
             }
           : { kind: 'remove' as const, sourceId: input.args.source }
     if (route.kind === 'daemon') {
@@ -222,7 +226,7 @@ export async function handleSourceCommand(
           parsed.realmSlug ? { realmSlug: parsed.realmSlug } : {},
           controller.signal,
         )
-        const output = formatSources(result.rows, parsed)
+        const output = formatSources(result.rows, parsed.format)
         if (output.length > 0) console.log(output)
       } else {
         const result = await services.sourceRemove(
@@ -290,7 +294,7 @@ export async function handleSourceCommand(
     } else if (active.kind === 'list') {
       const output = formatSources(
         deps.sourceService.listSources(active),
-        active,
+        active.format,
       )
       if (output.length > 0) console.log(output)
     } else {

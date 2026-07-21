@@ -1,6 +1,7 @@
 import { handleAccountCommand } from '../account/handle-account-command'
 import { defineCtxCommand } from '../command-model'
 import { runWithExit } from '../format/exit'
+import { resolveOutputFormat, structuredOutputArgs } from '../format/output'
 
 export const accountCommand = defineCtxCommand({
   meta: { name: 'account', description: 'Authorize and manage Accounts.' },
@@ -30,10 +31,13 @@ export const accountCommand = defineCtxCommand({
         name: 'list',
         description: 'List Accounts with bound Sources.',
       },
-      args: { json: { type: 'boolean', description: 'Print JSON' } },
+      args: structuredOutputArgs,
       run: ({ args }) =>
         runWithExit(() =>
-          handleAccountCommand({ kind: 'list', json: args.json ?? false }),
+          handleAccountCommand({
+            kind: 'list',
+            format: resolveOutputFormat(args),
+          }),
         ),
     }),
     remove: defineCtxCommand({

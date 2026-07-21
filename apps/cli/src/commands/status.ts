@@ -1,5 +1,6 @@
 import { defineCtxCommand } from '../command-model'
 import { runWithExit } from '../format/exit'
+import { resolveOutputFormat, structuredOutputArgs } from '../format/output'
 import { handleStatusCommand } from '../status/handle-status-command'
 
 export {
@@ -12,20 +13,13 @@ export const statusCommand = defineCtxCommand({
   meta: { name: 'status', description: 'Show last sync status.' },
   args: {
     source: { type: 'string', description: 'Source label or ID' },
-    format: {
-      type: 'enum',
-      options: ['summary', 'compact'],
-      default: 'summary',
-      description: 'Output format: summary or compact',
-    },
-    json: { type: 'boolean', description: 'Print JSON' },
+    ...structuredOutputArgs,
   },
   run: ({ args }) =>
     runWithExit(() =>
       handleStatusCommand({
         ...(args.source !== undefined ? { sourceId: args.source } : {}),
-        format: args.format,
-        json: args.json ?? false,
+        format: resolveOutputFormat(args),
       }),
     ),
 })

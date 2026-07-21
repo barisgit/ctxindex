@@ -3,10 +3,17 @@ import { defineCtxCommand } from '../command-model'
 import { runWithExit } from '../format/exit'
 import {
   formatSearchJson,
+  formatSearchPretty,
+  formatSearchText,
   handleSearchCommand,
 } from '../search/handle-search-command'
 
-export { formatSearchJson, handleSearchCommand }
+export {
+  formatSearchJson,
+  formatSearchPretty,
+  formatSearchText,
+  handleSearchCommand,
+}
 
 export const searchCommand = defineCtxCommand({
   meta: { name: 'search', description: 'Search context Resources.' },

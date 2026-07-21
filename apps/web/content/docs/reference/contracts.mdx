@@ -13,11 +13,15 @@ ctx://<source-ulid>/<adapter-owned-suffix>
 
 Copy returned Refs through `search`, `get`, `thread`, `export`, Artifact, and Action workflows. Do not reconstruct the suffix from provider ids.
 
-## JSON
+## Structured output
 
-Most commands accept `--json` and write one machine-readable result to stdout. Diagnostics remain separate from stdout. Byte-stream export uses `--format json` for the validated Profile payload.
+Search, get, thread, Artifact list, status, and Source, Realm, Account, OAuth App, and Extension inventories accept `--format pretty|text|json`. Omit the flag in a terminal for width-aware tables or vertical cards; redirected output defaults to deterministic low-token text. Text collections use escaped TSV (`\\`, `\t`, `\r`, and `\n`) and reserve `\N` for null; because literal backslashes are escaped first, the string `\N` is encoded as `\\N`. Singular Resource text labels every complete envelope field and prints nested values as compact JSON. Values and Refs are losslessly wrapped rather than ellipsized.
 
-Search results include a `results` array, pagination, and bounded warnings. Remote continuations are opaque and cannot be combined with local offsets.
+`--json` is shorthand for `--format json` and writes one compact machine-readable result to stdout. Do not combine it with `--format`. Read warnings stay on stderr for pretty/text and inside an owning JSON result envelope for JSON. Byte-stream export uses its separate `--format json` Profile payload contract; `describe --format` independently selects reference text, Markdown, or JSON.
+
+`sync` and daemon lifecycle commands retain their separate output contracts. Profile export and reference describe formats are also separate domains; none silently inherit this batch layout.
+
+Search results include a `results` array, pagination, and bounded warnings. Remote continuations are opaque and cannot be combined with local offsets. A merged multi-Source result has no global continuation; when one Source truncates, rerun the unchanged search with that exact Source instead of expecting a returned cursor.
 
 ## Warnings and errors
 

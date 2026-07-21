@@ -7,6 +7,7 @@ import {
 } from '../command-model'
 import { daemonCommand } from '../daemon/command'
 import { accountCommand } from './account'
+import { artifactCommand } from './artifact'
 import { describeCommand } from './describe'
 import { exportCommand } from './export'
 import { getCommand } from './get'
@@ -17,6 +18,7 @@ import { secretsCommand } from './secrets'
 import { skillsCommand } from './skills'
 import { statusCommand } from './status'
 import { syncCommand } from './sync'
+import { threadCommand } from './thread'
 
 afterEach(() => {
   process.exitCode = 0
@@ -28,6 +30,7 @@ function commandTree() {
     meta: { name: 'ctxindex' },
     subCommands: {
       account: accountCommand,
+      artifact: artifactCommand,
       daemon: daemonCommand,
       describe: describeCommand,
       export: exportCommand,
@@ -39,6 +42,7 @@ function commandTree() {
       skills: skillsCommand,
       status: statusCommand,
       sync: syncCommand,
+      thread: threadCommand,
     },
   })
 }
@@ -75,10 +79,20 @@ test('core command definitions own required arguments and bounded choices', asyn
     expect.objectContaining({
       name: 'format',
       type: 'enum',
-      choices: ['summary', 'compact'],
-      defaultValue: 'summary',
+      choices: ['pretty', 'text', 'json'],
+      required: false,
     }),
   )
+  for (const path of ['ctxindex artifact list', 'ctxindex thread']) {
+    expect(commands.get(path)?.arguments).toContainEqual(
+      expect.objectContaining({
+        name: 'format',
+        type: 'enum',
+        choices: ['pretty', 'text', 'json'],
+        required: false,
+      }),
+    )
+  }
   expect(commands.get('ctxindex sync')?.arguments).toContainEqual(
     expect.objectContaining({
       name: 'mode',

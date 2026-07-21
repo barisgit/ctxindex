@@ -1,5 +1,6 @@
 import { defineCtxCommand } from '../command-model'
 import { runWithExit } from '../format/exit'
+import { resolveOutputFormat, structuredOutputArgs } from '../format/output'
 import { handleRealmCommand } from '../realm/handle-realm-command'
 
 export { handleRealmCommand }
@@ -24,10 +25,13 @@ export const realmCommand = defineCtxCommand({
     }),
     list: defineCtxCommand({
       meta: { name: 'list', description: 'List existing realms.' },
-      args: { json: { type: 'boolean', description: 'Print JSON' } },
+      args: structuredOutputArgs,
       run: ({ args }) =>
         runWithExit(() =>
-          handleRealmCommand({ kind: 'list', json: args.json ?? false }),
+          handleRealmCommand({
+            kind: 'list',
+            format: resolveOutputFormat(args),
+          }),
         ),
     }),
   },

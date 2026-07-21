@@ -357,23 +357,33 @@ export class SearchPlanner {
         }
       }),
     )
+    const exposesRemoteContinuation =
+      input.remote === true &&
+      input.sourceIds?.length === 1 &&
+      remoteRuns.length === 1
     const providerOrigins = remoteRuns.map((run) => {
-      warnings.push(...run.warnings)
+      warnings.push(
+        ...run.warnings.map((warning) =>
+          warning.code === 'truncated' && !exposesRemoteContinuation
+            ? {
+                ...warning,
+                message: `Remote results were truncated; rerun the unchanged search with exact Source ${run.sourceId}`,
+              }
+            : warning,
+        ),
+      )
       outcome.set(run.sourceId, run.outcome)
       return run.origin
     })
 
     const results = interleave([localUnified, ...providerOrigins], limit)
-    const remotePagination =
-      input.remote === true &&
-      input.sourceIds?.length === 1 &&
-      remoteRuns.length === 1
-        ? {
-            limit,
-            hasMore: remoteRuns[0]?.continuation !== undefined,
-            continuation: remoteRuns[0]?.continuation ?? null,
-          }
-        : undefined
+    const remotePagination = exposesRemoteContinuation
+      ? {
+          limit,
+          hasMore: remoteRuns[0]?.continuation !== undefined,
+          continuation: remoteRuns[0]?.continuation ?? null,
+        }
+      : undefined
     const explain = plans.map((plan) => ({
       sourceId: plan.row.id,
       routing: plan.routing,

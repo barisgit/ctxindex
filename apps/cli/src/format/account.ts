@@ -1,7 +1,14 @@
 import type { AccountInventoryItem } from '@ctxindex/core/account'
+import {
+  compactJson,
+  formatPrettyCollection,
+  formatTsv,
+  type OutputColumn,
+  type OutputFormat,
+} from './output'
 
 function label(value: string | null, fallback: string): string {
-  return value === null ? fallback : JSON.stringify(value)
+  return value === null ? fallback : value
 }
 
 export function formatAccountAdded(result: {
@@ -16,22 +23,26 @@ export function formatAccountRemoved(label: string): string {
 
 export function formatAccountInventory(
   accounts: readonly AccountInventoryItem[],
-  json: boolean,
+  format: OutputFormat,
 ): string {
-  if (json) return JSON.stringify(accounts, null, 2)
-  if (accounts.length === 0) return 'No Accounts configured.'
-
-  const lines: string[] = []
-  for (const account of accounts) {
-    lines.push(
-      `ACCOUNT ${account.id}  provider=${account.provider}  label=${label(account.label, '(unlabeled)')}`,
-      `  AUTH ${account.expiryState}  expiresAt=${account.expiresAt ?? '-'}`,
-    )
-    for (const source of account.sources) {
-      lines.push(
-        `  SOURCE ${source.id}  label=${JSON.stringify(source.label)}  adapter=${source.adapter.id}  realm=${source.realm.slug}`,
-      )
-    }
-  }
-  return lines.join('\n')
+  if (format === 'json') return compactJson(accounts)
+  const rows = accounts.map((account) => ({
+    id: account.id,
+    provider: account.provider,
+    label: label(account.label, '(unlabeled)'),
+    expiryState: account.expiryState,
+    expiresAt: account.expiresAt,
+    sources: compactJson(account.sources),
+  }))
+  const columns = [
+    { key: 'label', label: 'Account' },
+    { key: 'provider', label: 'Provider' },
+    { key: 'expiryState', label: 'Auth' },
+    { key: 'expiresAt', label: 'Expires at' },
+    { key: 'sources', label: 'Sources' },
+    { key: 'id', label: 'ID' },
+  ] satisfies readonly OutputColumn[]
+  return format === 'pretty'
+    ? formatPrettyCollection(columns, rows)
+    : formatTsv(columns, rows)
 }

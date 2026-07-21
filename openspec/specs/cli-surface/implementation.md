@@ -169,6 +169,23 @@ export function parseFlags(
   options: ParseFlagsOptions = {},
 ): ParsedFlags;
 
+export type OutputFormat = 'pretty' | 'text' | 'json'
+
+export interface OutputSelection {
+  readonly format?: OutputFormat | undefined
+  readonly json?: boolean | undefined
+}
+
+export interface OutputEnvironment {
+  readonly isTTY: boolean
+  readonly columns?: number
+}
+
+export function resolveOutputFormat(
+  selection: OutputSelection,
+  environment?: OutputEnvironment,
+): OutputFormat;
+
 ```
 
 ### @ctxindex/cli — Account arguments
@@ -181,7 +198,7 @@ export type AccountArgs =
       readonly app?: string
       readonly label?: string
     }
-  | { readonly kind: 'list'; readonly json: boolean }
+  | { readonly kind: 'list'; readonly format: OutputFormat }
   | { readonly kind: 'remove'; readonly label: string }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
@@ -217,7 +234,7 @@ export function parseActionArgs(args: string[]): ActionArgs;
 
 ```ts
 export type ArtifactListArgs =
-  | { readonly kind: 'list'; readonly ref: string; readonly json: boolean }
+  | { readonly kind: 'list'; readonly ref: string; readonly format: OutputFormat }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
 
@@ -248,7 +265,7 @@ export type OAuthAppArgs =
       readonly label: string
       readonly fromEnv: true
     }
-  | { readonly kind: 'list'; readonly json: boolean }
+  | { readonly kind: 'list'; readonly format: OutputFormat }
   | {
       readonly kind: 'remove'
       readonly provider: string
@@ -292,7 +309,7 @@ export function parseExportArgs(args: string[]): ExportArgs;
 
 ```ts
 export type ExtensionsArgs =
-  | { readonly kind: 'list'; readonly json: boolean }
+  | { readonly kind: 'list'; readonly format: OutputFormat }
   | {
       readonly kind: 'search'
       readonly query?: string
@@ -373,7 +390,7 @@ export function parseExtensionsArgs(args: string[]): ExtensionsArgs;
 
 ```ts
 export type GetArgs =
-  | { readonly kind: 'get'; readonly ref: string; readonly json: boolean }
+  | { readonly kind: 'get'; readonly ref: string; readonly format: OutputFormat }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
 
@@ -385,7 +402,7 @@ export function parseGetArgs(args: string[]): GetArgs;
 ```ts
 export type RealmArgs =
   | { readonly kind: 'add'; readonly slug: string; readonly name?: string }
-  | { readonly kind: 'list'; readonly json: boolean }
+  | { readonly kind: 'list'; readonly format: OutputFormat }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
 
@@ -406,6 +423,7 @@ export interface ExecuteSearchInput {
   readonly until?: number
   readonly limit?: number
   readonly offset?: number
+  readonly continuation?: string
   readonly explain?: boolean
   readonly localOnly?: boolean
   readonly remote?: boolean
@@ -415,7 +433,7 @@ export type SearchArgs =
   | {
       readonly kind: 'search'
       readonly input: ExecuteSearchInput
-      readonly json: boolean
+      readonly format: OutputFormat
       readonly refs: boolean
     }
   | { readonly kind: 'help' }
@@ -470,8 +488,7 @@ export type SourceArgs =
   | {
       readonly kind: 'list'
       readonly realmSlug?: string
-      readonly json: boolean
-      readonly format: 'table' | 'compact'
+      readonly format: OutputFormat
     }
   | { readonly kind: 'remove'; readonly sourceId: string }
   | { readonly kind: 'help' }
@@ -490,8 +507,7 @@ export type StatusArgs =
   | {
       readonly kind: 'status'
       readonly sourceId?: string
-      readonly json: boolean
-      readonly format: 'summary' | 'compact'
+      readonly format: OutputFormat
     }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
@@ -516,13 +532,13 @@ export type SyncArgs =
 export function parseSyncArgs(args: string[]): SyncArgs;
 ```
 
-Sync, status, and Source inventory formatters project core-owned `warningsCount`, `lastWarning`, `errorsCount`, and `lastError` values directly. Failed sync formatting reads bounded diagnostics from core's failure channel while retaining the safe public error message and stable exit. The CLI labels the two severities independently in JSON and readable output and does not reconstruct severity from diagnostic text.
+Sync, status, and Source inventory formatters project core-owned `warningsCount`, `lastWarning`, `errorsCount`, and `lastError` values directly. Failed sync formatting reads bounded diagnostics from core's failure channel while retaining the safe public error message and stable exit. The CLI labels the two severities independently in JSON and readable output and does not reconstruct severity from diagnostic text. Sync retains its existing summary/events/compact/JSON modes until streaming integration deliberately maps pretty to human progress, text to deterministic line-oriented events, and JSON to structured events plus a terminal result.
 
 ### @ctxindex/cli — thread arguments
 
 ```ts
 export type ThreadGetArgs =
-  | { readonly kind: 'get'; readonly ref: string; readonly json: boolean }
+  | { readonly kind: 'get'; readonly ref: string; readonly format: OutputFormat }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
 
@@ -547,6 +563,8 @@ export function parsePurgeArtifactsArgs(args: string[]): PurgeArtifactsArgs;
 Database-backed command dependency setup requires both the persisted config and database created by explicit `init` before opening SQLite. The shared preflight fails with the fixed exit-2 guidance `ctxindex is not initialized; run ctxindex init` and no durable side effects when either is absent. OAuth App add preserves loaded-Provider validation, then invokes the preflight before declared configuration environments are read; list/remove check before dependencies. `init` retains backend selection before database bootstrap. Help, argument parsing, Provider validation, and pure definition discovery remain available on fresh state.
 
 Parser unions are the command boundary. Registry-derived Source config, fields, kinds, exports, and Actions are resolved before service calls rather than duplicated as provider branches. The OAuth surface contains only `oauth-app` and `account` commands: App add requires exact Provider and label plus `--from-env`; Account add accepts an optional `--app`. An explicit label bypasses managed selection, while omission delegates to core's host-policy resolver and feeds the returned exact label through the same OAuth App service resolver. The CLI owns only this branch and static BYOA formatting; it does not infer Apps or reproduce policy, provenance, scope, or Provider logic. No `client` route or alias is parsed. Structured output writes safe projections to stdout and human diagnostics to stderr; App config, credential values, tokens, authorization codes, and secret-store passphrases never enter argv or output.
+
+The exact launch-critical reads search, get, thread, Artifact list, status, and Source, Realm, Account, OAuth App, and Extension inventories resolve `OutputFormat` before opening services. The shared resolver rejects simultaneous `--json` and `--format`, chooses pretty only for TTY stdout, and otherwise chooses text. One presentation module owns compact JSON, deterministic TSV escaping with reserved `\N` nulls, and width-aware presentation. Pretty collections use a horizontal `cli-table3` table only when complete values fit the detected display width; narrow output grapheme-wraps before bounded vertical tables and uses plain labeled cards below the table's structural minimum. Both paths preserve characters and never ellipsize values. Domain formatters continue to own ordered safe projections. Search, get, thread, and Artifact list handlers keep JSON warnings in their result envelope and write warnings to stderr only for pretty/text. Get formats the complete existing Resource envelope and payload; search formats complete Refs; thread emits complete ordered Resource rows with tree depth. Search `--refs` is text-only and rejects explicit pretty/JSON selectors before dependencies. Profile export, describe, sync, and daemon lifecycle retain independent format domains.
 
 The Extension command adapter keeps the Catalog lifecycle, Marketplace projection,
 and trusted installation seams distinct: inert repository/manifest reads delegate
