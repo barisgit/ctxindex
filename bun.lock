@@ -79,14 +79,12 @@
       },
     },
     "examples/tenders-extension": {
-      "name": "@ctxindex/example-tenders-extension",
-      "version": "0.0.0",
-      "dependencies": {
-        "@ctxindex/extension-sdk": "workspace:*",
-      },
+      "name": "@ctxindex/demo-tenders",
+      "version": "0.1.0",
       "devDependencies": {
-        "@ctxindex/adapters": "workspace:*",
-        "@ctxindex/core": "workspace:*",
+        "@ctxindex/adapters": "0.0.0",
+        "@ctxindex/core": "0.0.0",
+        "@ctxindex/extension-sdk": "0.0.0",
       },
     },
     "packages/adapters": {
@@ -186,9 +184,9 @@
 
     "@ctxindex/daemon": ["@ctxindex/daemon@workspace:apps/daemon"],
 
-    "@ctxindex/example-issues-extension": ["@ctxindex/example-issues-extension@workspace:examples/issues-extension"],
+    "@ctxindex/demo-tenders": ["@ctxindex/demo-tenders@workspace:examples/tenders-extension"],
 
-    "@ctxindex/example-tenders-extension": ["@ctxindex/example-tenders-extension@workspace:examples/tenders-extension"],
+    "@ctxindex/example-issues-extension": ["@ctxindex/example-issues-extension@workspace:examples/issues-extension"],
 
     "@ctxindex/extension-sdk": ["@ctxindex/extension-sdk@workspace:packages/extension-sdk"],
 
