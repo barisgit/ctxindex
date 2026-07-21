@@ -92,19 +92,20 @@ ctxindex --help
 
 ## Instant no-account demo
 
-After `@ctxindex/demo-tenders` is published, install the official providerless Extension and Sync eight complete fictional tender Resources. It needs no OAuth, secrets, provider traffic, or prepared files:
+The standalone [`barisgit/ctxindex-extensions`](https://github.com/barisgit/ctxindex-extensions) repository is the checked public Extension and Catalog example. Install its credential-free GitHub Issues Extension directly from Git, then sync any public repository:
 
 ```sh
-ctxindex extension install npm \
-  '@ctxindex/demo-tenders@0.1.0' \
-  ctxindex.demo
-ctxindex realm add demo --name 'Instant demo'
-ctxindex source add ctxindex.demo.tenders --realm demo --label demo-tenders
-ctxindex sync --source demo-tenders
-ctxindex search 'solar schools' --realm demo
+ctxindex extension install git \
+  'git+https://github.com:443/barisgit/ctxindex-extensions.git#main' \
+  barisgit.github-issues
+ctxindex realm add demo --name Demo
+ctxindex source add github.issues --realm demo --label gh-issues \
+  --config-owner barisgit --config-repository ctxindex
+ctxindex sync --source gh-issues
+ctxindex search issue --source gh-issues --local-only
 ```
 
-The install command is an explicit trust grant for package code and records an immutable exact version and integrity. Package publication plus anonymous install is a launch Human checkpoint; the [five-minute walkthrough](examples/tenders-extension/README.md) documents the current packed-artifact proof and continues through typed field filtering and complete Resource retrieval. All included tender records and organizations are synthetic.
+The install command is an explicit trust grant for package code and records the resolved commit and integrity. The external repository uses only the published Extension SDK and Profiles packages, includes synthetic network tests, and also publishes a Catalog manifest for discovery testing.
 
 ## Packaging and release
 

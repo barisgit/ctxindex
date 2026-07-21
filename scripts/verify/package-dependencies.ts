@@ -558,10 +558,7 @@ function allowedWorkspaceDependencies(
   workspacePackages: readonly WorkspacePackage[],
 ): Set<string> {
   const relativeDirectory = workspacePackage.directory.replaceAll('\\', '/')
-  if (
-    relativeDirectory.includes('/apps/') ||
-    relativeDirectory.includes('/examples/')
-  ) {
+  if (relativeDirectory.includes('/apps/')) {
     return new Set(
       workspacePackages
         .filter((candidate) =>

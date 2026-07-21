@@ -6,7 +6,7 @@ Implements the public ctxindex landing page and documentation site as a private 
 
 ## Design / patterns
 
-- `content/docs/` is the authored documentation tree. Its primary navigation follows reader intent through `start/`, `use/`, `extend/`, `reference/`, and `contribute/`; the generated CLI subtree remains a secondary reference surface. `source.config.ts` declares the Fumadocs MDX schemas and enables processed Markdown for machine-readable representations.
+- `content/docs/` is the authored documentation tree. The root page owns the providerless first-success path; `start/` holds optional provider, agent, and troubleshooting follow-ups, while `use/`, `extend/`, `reference/`, and `contribute/` group the remaining reader tasks. Generated CLI and linked concept pages remain secondary reference surfaces. `source.config.ts` declares the Fumadocs MDX schemas, enables processed Markdown for machine-readable representations, and converts focused Mermaid fences into the shared server-rendered `components/mermaid.tsx` diagram surface.
 - `lib/source.ts` is the Source Gateway over generated `collections/server` data. It centralizes page lookup, navigation-tree creation, static route parameters, Markdown rendering, and social-image paths.
 - Route components under `app/` separate the marketing shell, documentation layout/page rendering, search endpoint, text representations, and generated image representations.
 - `lib/shared.ts` owns stable route constants, canonical URL helpers, repository source links, and representation-slug parsing. `proxy.ts` applies content negotiation for Markdown-preferring documentation requests.
@@ -28,7 +28,7 @@ Implements the public ctxindex landing page and documentation site as a private 
 
 ## Integration points
 
-- Registered by the root `apps/*` Bun workspace; `apps/web/package.json` owns the Next dev/start/build, quality, and clean/fullclean tasks dispatched by root Turbo commands. `next.config.mjs` pins Turbopack discovery to the repository worktree root.
+- Registered by the root `apps/*` Bun workspace; `apps/web/package.json` owns the Next dev/start/build, quality, and clean/fullclean tasks dispatched by root Turbo commands. `next.config.mjs` pins Turbopack discovery to the repository worktree root and redirects consolidated legacy documentation routes to their canonical pages.
 - Depends on Next.js and React for routing/rendering, Fumadocs packages for MDX compilation, source loading, documentation UI, search, and representations, and Tailwind/PostCSS for styling.
 - Reads `NEXT_PUBLIC_SITE_URL` only to derive canonical absolute metadata URLs; source links target the repository's `apps/web/content/docs/` tree.
 - Does not import ctxindex runtime packages; it documents the CLI contract rather than embedding a second agent integration surface.

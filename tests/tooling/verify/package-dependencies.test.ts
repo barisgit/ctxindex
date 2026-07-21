@@ -118,40 +118,6 @@ test('applications may declare bundled source imports as development dependencie
   expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([])
 })
 
-test('example packages may use public packages as runtime or test dependencies', async () => {
-  fixtureRoot = await createFixtureRoot()
-  await writeFixture(
-    join(fixtureRoot, 'package.json'),
-    JSON.stringify({ workspaces: ['packages/*', 'examples/*'] }),
-  )
-  await writeFixture(
-    join(fixtureRoot, 'packages/extension-sdk/package.json'),
-    JSON.stringify({ name: '@ctxindex/extension-sdk', dependencies: {} }),
-  )
-  await writeFixture(
-    join(fixtureRoot, 'packages/core/package.json'),
-    JSON.stringify({ name: '@ctxindex/core', dependencies: {} }),
-  )
-  await writeFixture(
-    join(fixtureRoot, 'examples/demo/package.json'),
-    JSON.stringify({
-      name: '@ctxindex/example-demo',
-      dependencies: { '@ctxindex/extension-sdk': 'workspace:*' },
-      devDependencies: { '@ctxindex/core': 'workspace:*' },
-    }),
-  )
-  await writeFixture(
-    join(fixtureRoot, 'examples/demo/index.ts'),
-    "import '@ctxindex/extension-sdk'",
-  )
-  await writeFixture(
-    join(fixtureRoot, 'examples/demo/index.test.ts'),
-    "import '@ctxindex/core'",
-  )
-
-  expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([])
-})
-
 test('rpc package rejects transport, lifecycle, storage, provider, formatting, and business imports', async () => {
   fixtureRoot = await createFixtureRoot()
   for (const [directory, name] of [
@@ -588,7 +554,7 @@ test('discovers package files under apps/* and packages/* without a source allow
     "import 'zod'",
   )
   await writeFixture(
-    join(fixtureRoot, 'examples/skipped/package.json'),
+    join(fixtureRoot, 'ignored/skipped/package.json'),
     JSON.stringify({ name: 'skipped' }),
   )
   await writeFixture(

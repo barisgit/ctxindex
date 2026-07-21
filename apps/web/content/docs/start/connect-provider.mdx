@@ -5,13 +5,39 @@ description: Authorize an Account through an available managed OAuth App or expl
 
 A provider-backed Source needs three separate things: an available **OAuth App** definition, an authorized **Account**, and a configured **Source** using one Source Adapter.
 
+Both App paths lead to the same local model. The selected OAuth App authorizes an Account; a Source then combines that Account with one compatible Source Adapter inside an exact Realm.
+
+```mermaid
+flowchart LR
+  Bundled[Bundled managed App] --> App[Selected OAuth App]
+  BYOA[Local BYOA App] --> App
+  App -->|authorizes| Account
+  Account --> Source
+  Adapter[Source Adapter] --> Source
+  Realm -->|owns| Source
+```
+
 ## Inspect available OAuth Apps
 
 ```sh
 ctxindex oauth-app list --format json
 ```
 
-Bundled Google and Microsoft Extensions may expose public desktop OAuth Apps. ctxindex selects one as the managed default only when host policy exactly matches its Provider, label, owning Extension, and bundled provenance. Provider verification, tenant policy, publisher status, consent, or requested scopes can still cause the provider to reject authorization.
+Bundled Google and Microsoft Extensions may expose public desktop OAuth Apps. ctxindex selects one as the managed default only when host policy exactly matches its Provider, label, owning Extension, and bundled provenance.
+
+<Callout type="warn">
+  **The bundled Google and Microsoft OAuth Apps are not verified.** I maintain
+  ctxindex as an individual and cannot get them verified at the moment.
+  Provider verification can also take several weeks. This may change later.
+</Callout>
+
+### Microsoft
+
+Microsoft should still work without verification, especially for personal Microsoft Accounts and organizational tenants that allow user consent. A Microsoft 365 administrator can still require admin consent or block unverified Apps.
+
+### Google
+
+Google may show an unverified-app warning, restrict access to configured test users, or block requested scopes. If the bundled App does not work for your Google identity, configure local BYOA instead.
 
 ## Authorize an Account
 

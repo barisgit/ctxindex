@@ -10,6 +10,19 @@ Every ctxindex workflow uses the same small model:
 3. A **Profile** gives Resources portable shape, search vocabulary, Relations, Artifacts, exports, and Actions.
 4. A **Ref** addresses one Resource independently of local materialization.
 
+The diagram shows the ordinary read path. A Realm owns Sources; each Source either materializes Resources locally or searches its provider, and every result hands back a stable Ref.
+
+```mermaid
+flowchart LR
+  Realm -->|owns| Source
+  Source -->|sync| Index[Local materialization]
+  Source -->|remote search| Results[Search results]
+  Index -->|local search| Results
+  Profile -. shapes .-> Results
+  Results --> Ref[Stable Ref]
+  Ref --> Follow[Get, thread, or export]
+```
+
 ## Inspect loaded vocabulary
 
 ```sh
@@ -50,4 +63,4 @@ ctxindex describe action mail.message.draft.create \
 
 Actions are typed Profile mutations implemented by a Source Adapter. Current provider mutation stops at reversible email Draft creation and update. ctxindex never sends email.
 
-Read the focused [mail](/docs/guides/mail-workflows), [calendar](/docs/guides/calendar-workflows), and [agent](/docs/guides/agent-integration) guides next.
+Read the focused [mail](/docs/use/mail), [calendar](/docs/use/calendar), and [agent](/docs/start/agent-usage) guides next.

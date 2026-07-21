@@ -289,3 +289,72 @@ html > body[data-scroll-locked] {
     --fd-toc-width: 240px;
   }
 }
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes ctx-graph-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-4px);
+    }
+  }
+
+  .ctx-graph-float {
+    animation: ctx-graph-float 5.5s ease-in-out infinite;
+    transform-box: fill-box;
+  }
+
+  @keyframes ctx-graph-ring {
+    0% {
+      transform: scale(1);
+      opacity: 0.55;
+    }
+    70%,
+    100% {
+      transform: scale(1.45);
+      opacity: 0;
+    }
+  }
+
+  .ctx-graph-ring {
+    animation: ctx-graph-ring 3.2s ease-out infinite;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  @keyframes ctx-graph-dash {
+    to {
+      stroke-dashoffset: -20;
+    }
+  }
+
+  .ctx-graph-dash {
+    animation: ctx-graph-dash 1.6s linear infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ctx-graph-pulses,
+  .ctx-graph-ring {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes ctx-morph-swap {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .ctx-morph-swap {
+    animation: ctx-morph-swap 0.35s ease-out both;
+  }
+}

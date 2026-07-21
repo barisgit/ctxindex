@@ -9,16 +9,14 @@ import {
 } from '../components/demo-quickstart'
 
 test('homepage demo keeps commands and result in one replaceable component', () => {
-  expect(DEMO_EXTENSION_TARGET).toBe('./examples/tenders-extension')
-  expect(DEMO_EXTENSION_ID).toBe('enarocanje.proof')
-  expect(DEMO_COMMANDS).toContain('git clone')
-  expect(DEMO_COMMANDS).toContain('bun cli extension install local')
-  expect(DEMO_COMMANDS).toContain('bun cli sync --source demo-tenders')
-  expect(DEMO_COMMANDS).toContain(
-    '"bridge inspection" --realm demo --format json',
-  )
-  expect(DEMO_RESULT).toContain('ctx://<source-id>/tender/JN-002%2F2026')
-  expect(DEMO_RESULT).toContain('Municipal bridge inspection')
+  expect(DEMO_EXTENSION_TARGET).toContain('barisgit/ctxindex-extensions')
+  expect(DEMO_EXTENSION_ID).toBe('barisgit.github-issues')
+  expect(DEMO_COMMANDS).toContain('bun add --global ctxindex')
+  expect(DEMO_COMMANDS).toContain('ctxindex extension install git')
+  expect(DEMO_COMMANDS).toContain('ctxindex sync --source gh-issues')
+  expect(DEMO_COMMANDS).toContain('issue --source gh-issues --local-only')
+  expect(DEMO_RESULT).toContain('ctx://<source-id>/issue/84')
+  expect(DEMO_RESULT).toContain('Ship the portable Agent Skill')
 })
 
 test('homepage proves the local agent workflow before secondary paths', async () => {
@@ -34,12 +32,15 @@ test('homepage proves the local agent workflow before secondary paths', async ()
     resolve(import.meta.dir, '../components/demo-video.tsx'),
     'utf8',
   )
+  const highlighter = await readFile(
+    resolve(import.meta.dir, '../components/code-highlight.tsx'),
+    'utf8',
+  )
   const css = await readFile(resolve(import.meta.dir, 'global.css'), 'utf8')
 
-  expect(page).toContain('shell-capable agent can use them')
-  expect(page).toContain('mail, calendars, files, and')
+  expect(page).toContain('All your context. One command')
+  expect(page).toMatch(/grouped\s+into Realms, indexed on your machine/u)
   expect(page).toContain('Try the no-auth demo')
-  expect(page).toContain('ctx://…/file/aurora.txt')
   expect(page).toContain('Providers stay canonical')
   expect(page).toContain('trusted in-process code')
   expect(page).toContain('href="/docs/start/agent-usage"')
@@ -51,6 +52,10 @@ test('homepage proves the local agent workflow before secondary paths', async ()
   expect(video).toContain('DEMO_VIDEO_CAPTIONS')
   expect(video).toContain('if (!DEMO_VIDEO_SRC || !DEMO_VIDEO_CAPTIONS)')
   expect(video).toContain('return null')
+  expect(highlighter).toContain("from 'fumadocs-ui/components/codeblock.rsc'")
+  expect(highlighter).toContain('ServerCodeBlock')
+  expect(highlighter).not.toContain("from 'shiki'")
+  expect(highlighter).not.toContain('dangerouslySetInnerHTML')
   expect(css).not.toContain('.ctx-hero-glow')
   expect(css).not.toContain('radial-gradient')
 })

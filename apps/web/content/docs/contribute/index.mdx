@@ -1,18 +1,59 @@
 ---
 title: Contribute to ctxindex
-description: Work from issues and OpenSpec changes, preserve architecture boundaries, and prove each slice.
+description: Set up the workspace, follow the canonical contracts, and prove each focused change.
 ---
 
-ctxindex is pre-alpha and developed in public. Start from a GitHub issue, follow repository branch/worktree rules, and use an OpenSpec change for non-trivial behavior.
+ctxindex is pre-alpha and developed in public. Start from a GitHub issue and read [`CONTRIBUTING.md`](https://github.com/barisgit/ctxindex/blob/main/CONTRIBUTING.md) before changing behavior.
 
-1. Read [`CONTRIBUTING.md`](https://github.com/barisgit/ctxindex/blob/main/CONTRIBUTING.md).
-2. Read `CONTEXT.md` for terminology and the relevant capability specs for behavior.
-3. Add a failing reproduction for bugs or focused tests with new behavior.
-4. Run slice gates before the full repository and strict OpenSpec gates.
-5. Refresh affected codemaps after structural changes.
+## Set up the workspace
 
-The CLI is the only agent integration surface. Do not add an MCP server, agent-specific integration layer, arbitrary Extension command family, or provider mutation beyond reversible email Drafts.
+ctxindex pins Bun 1.3.14 and uses Bun workspaces with Turborepo.
 
-- [Development workflow](/docs/contribute/development)
-- [Architecture and visual design](/docs/contribute/architecture-design)
-- [GitHub repository](https://github.com/barisgit/ctxindex)
+```bash
+bun install
+bun cli --help
+bun dev
+```
+
+Use package-owned focused commands while iterating:
+
+```bash
+bun test <focused-test-file>
+bun run --cwd apps/web typecheck
+bun run --cwd apps/web build
+```
+
+Before completing a non-trivial change, run the repository gates:
+
+```bash
+bun run ci
+bun run test:integration
+bun run test:e2e
+bunx openspec validate --all --strict
+```
+
+The test lanes are separate so pull requests can run them in parallel. Worktrees created by the repository helper also isolate CLI state, preventing one change from reusing another worktree's database, config, or installed Extensions.
+
+## Find the source of truth
+
+| Source | Owns |
+| --- | --- |
+| `CONTEXT.md` | ubiquitous language and domain relationships |
+| `openspec/specs/**` | normative capability behavior and selective implementation doctrine |
+| `SYSTEM.md` | readable, non-normative system projection |
+| `docs/design/2026-07-13-context-access-layer.md` | accepted cross-cutting decisions D1–D22 |
+| `DESIGN.md` | project-wide visual doctrine |
+| `codemap.md` files | hierarchical implementation maps |
+
+The public CLI composes private core, Adapter, Profile, and Extension SDK workspaces. Extensions import the public SDK facade and ordinary definition packages; they do not import runtime internals. The website projects those contracts without owning product behavior or user state.
+
+The CLI is the only agent integration surface. Do not add an MCP server, an agent-specific integration layer, arbitrary Extension command families, or provider mutations beyond reversible email Drafts.
+
+## Prove the change
+
+1. Add a failing reproduction for a bug or a focused test for new behavior.
+2. Pass each focused task and Slice gate before moving on.
+3. Refresh affected `codemap.md` files after structural changes.
+4. Never commit secrets or `.env` files, delete user data under `~/.local/share/ctxindex` without consent, or use live provider traffic when fixtures prove the contract.
+
+Use the live [`/design`](/design) specimen and public [`/brand`](/brand) assets for visual work instead of inventing parallel tokens or logo geometry.
