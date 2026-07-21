@@ -424,7 +424,7 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
       ),
     ).toEqual(expect.arrayContaining([rootRef, replyRef]))
 
-    const thread = await sandbox.run(['thread', 'get', replyRef, '--json'], {
+    const thread = await sandbox.run(['thread', replyRef, '--json'], {
       env,
     })
     expect(thread.exitCode, thread.stderr).toBe(0)

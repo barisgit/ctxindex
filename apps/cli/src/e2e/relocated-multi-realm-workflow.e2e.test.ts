@@ -543,7 +543,7 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
       [gmailRef, ['gmail-root', 'gmail-reply']],
       [outlookRef, ['outlook-root', 'outlook-reply']],
     ] as const) {
-      const thread = await ok(['thread', 'get', ref, '--json'])
+      const thread = await ok(['thread', ref, '--json'])
       deterministicJson(thread.stdout)
       for (const id of ids) expect(thread.stdout).toContain(`/message/${id}`)
     }

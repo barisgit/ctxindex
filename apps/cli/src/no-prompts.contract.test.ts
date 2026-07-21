@@ -109,7 +109,7 @@ describe('no-prompts contract', () => {
     try {
       const { exitCode, stderr } = await spawnCli(['auth'], env, 'null')
       expect(exitCode).toBe(2)
-      expect(stderr).toContain('Unknown command')
+      expect(stderr).toContain('unknown command auth')
     } finally {
       await cleanup()
     }

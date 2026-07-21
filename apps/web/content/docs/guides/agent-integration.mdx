@@ -63,7 +63,7 @@ ctxindex get 'ctx://01J00000000000000000000000/message/stable-message-id' --json
 ### Traverse related messages when needed
 
 ```sh
-ctxindex thread get 'ctx://01J00000000000000000000000/message/stable-message-id' --json
+ctxindex thread 'ctx://01J00000000000000000000000/message/stable-message-id' --json
 ```
 
 Use the returned thread to summarize a conversation or establish reply context. Do not infer a thread by grouping subjects yourself.
@@ -75,7 +75,7 @@ Use the returned thread to summarize a conversation or establish reply context. 
 Inspect the Action before generating input:
 
 ```sh
-ctxindex action describe communication.message.draft.create \
+ctxindex describe action communication.message.draft.create \
   --source company-mail \
   --json
 ```

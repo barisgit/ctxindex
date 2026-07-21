@@ -35,7 +35,9 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       'fixture.catalog',
     ])
     expect(missingBuildTrust.exitCode).toBe(2)
-    expect(missingBuildTrust.stderr).toContain('--trust is required')
+    expect(missingBuildTrust.stderr).toContain(
+      'Missing required argument: --trust',
+    )
     expect(
       await Bun.file(join(repository, 'ctxindex-catalog.json')).exists(),
     ).toBe(false)
@@ -92,7 +94,9 @@ test('schema-v2 Git Catalog lifecycle builds, refreshes, replaces, relocates, an
       'refs/heads/main',
     ])
     expect(missingAddTrust.exitCode).toBe(2)
-    expect(missingAddTrust.stderr).toContain('--trust is required')
+    expect(missingAddTrust.stderr).toContain(
+      'Missing required argument: --trust',
+    )
 
     const added = await sandbox.run([
       'extension',

@@ -311,9 +311,10 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
     ])
     expect(npmInstalled.exitCode, npmInstalled.stderr).toBe(0)
     const npmV1 = JSON.parse(npmInstalled.stdout)
-    const npmResolvedIdentity = String(npmV1.resolvedIdentity)
+    const npmResolvedIdentity = `${npmV1.source.exact_version} (${npmV1.source.integrity})`
+    expect(npmV1.action).toBe('installed')
     expect(npmV1.id).toBe('fixture.direct.npm')
-    expect(npmV1.sourceKind).toBe('npm')
+    expect(npmV1.source.kind).toBe('npm')
     expect(npmResolvedIdentity).toContain('1.0.0')
     expect(npmResolvedIdentity).toContain('sha512-')
     expect(
@@ -322,7 +323,7 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
           baseEnv.CTXINDEX_DATA_HOME,
           'direct-extensions',
           'materializations',
-          npmV1.materializationDigest,
+          npmV1.materialization_digest,
           'node_modules',
           'fixture-direct-npm',
           'lifecycle-ran',
@@ -340,9 +341,10 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
     ])
     expect(gitInstalled.exitCode, gitInstalled.stderr).toBe(0)
     const gitV1 = JSON.parse(gitInstalled.stdout)
-    const gitResolvedIdentity = String(gitV1.resolvedIdentity)
+    const gitResolvedIdentity = String(gitV1.source.commit)
+    expect(gitV1.action).toBe('installed')
     expect(gitV1.id).toBe('fixture.direct.git')
-    expect(gitV1.sourceKind).toBe('git')
+    expect(gitV1.source.kind).toBe('git')
     expect(gitResolvedIdentity).toMatch(/^[0-9a-f]{40,64}$/)
 
     const localInstalled = await run([
@@ -356,8 +358,9 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
     expect(localInstalled.exitCode, localInstalled.stderr).toBe(0)
     const localV1 = JSON.parse(localInstalled.stdout)
     expect(localV1).toMatchObject({
+      action: 'installed',
       id: 'fixture.direct.local',
-      sourceKind: 'local',
+      source: { kind: 'local' },
     })
 
     await writeFile(
@@ -424,9 +427,10 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       '--json',
     ])
     expect(npmUpdated.exitCode, npmUpdated.stderr).toBe(0)
-    expect(JSON.parse(npmUpdated.stdout).materializationDigest).toBe(
-      npmV1.materializationDigest,
-    )
+    expect(JSON.parse(npmUpdated.stdout)).toMatchObject({
+      action: 'updated',
+      materialization_digest: npmV1.materialization_digest,
+    })
     const gitUpdated = await run([
       'extension',
       'update',
@@ -434,7 +438,7 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       '--json',
     ])
     expect(gitUpdated.exitCode, gitUpdated.stderr).toBe(0)
-    expect(JSON.parse(gitUpdated.stdout).resolvedIdentity).not.toBe(
+    expect(JSON.parse(gitUpdated.stdout).source.commit).not.toBe(
       gitResolvedIdentity,
     )
     const localUpdated = await run([
@@ -444,8 +448,8 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       '--json',
     ])
     expect(localUpdated.exitCode, localUpdated.stderr).toBe(0)
-    expect(JSON.parse(localUpdated.stdout).materializationDigest).not.toBe(
-      localV1.materializationDigest,
+    expect(JSON.parse(localUpdated.stdout).materialization_digest).not.toBe(
+      localV1.materialization_digest,
     )
 
     expect((await run(['realm', 'add', 'work'])).exitCode).toBe(0)
@@ -540,8 +544,8 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
         '--json',
       ],
       [
-        'action',
         'describe',
+        'action',
         'communication.message.draft.create',
         '--source',
         'fixture-source',
@@ -550,7 +554,7 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       ['sync', '--json'],
       ['get', '--json', resourceRef],
       ['export', '--format', 'json', resourceRef],
-      ['thread', 'get', '--json', resourceRef],
+      ['thread', '--json', resourceRef],
       ['artifact', 'list', '--json', resourceRef],
       ['extension', 'catalog', 'list', '--no-refresh', '--json'],
       ['skills', 'list', '--json'],

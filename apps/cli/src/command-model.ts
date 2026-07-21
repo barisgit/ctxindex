@@ -40,7 +40,9 @@ export type CtxParsedArgs<TArgs extends CtxArgsDef> = Omit<
     readonly type: 'positional'
     readonly options: readonly (infer TOption extends string)[]
   }
-    ? TOption
+    ? TArgs[TName] extends { readonly required: true }
+      ? TOption
+      : TOption | undefined
     : TArgs[TName] extends { readonly multiple: true }
       ? readonly string[]
       : ParsedArgs<TArgs>[TName]
@@ -552,19 +554,20 @@ export async function validateCommandInvocation<TArgs extends ArgsDef>(
   rawArgs: readonly string[],
 ): Promise<string | undefined> {
   if (
-    rawArgs.some((argument) => argument === '--help' || argument === '-h') ||
-    (rawArgs.length === 1 &&
-      (rawArgs[0] === '--version' || rawArgs[0] === '-v'))
+    rawArgs.length === 1 &&
+    (rawArgs[0] === '--version' || rawArgs[0] === '-v')
   ) {
     return undefined
   }
+  const withoutHelp = (tokens: readonly string[]) =>
+    tokens.filter((token) => token !== '--help' && token !== '-h')
   let command = root as unknown as CommandDef<ArgsDef>
   let remaining = [...rawArgs]
   while (true) {
     const definitions = await resolveValue(command.args ?? {})
     const hasSubCommands = command.subCommands !== undefined
     if (!hasSubCommands) {
-      const error = validateTokens(remaining, definitions)
+      const error = validateTokens(withoutHelp(remaining), definitions)
       return error === undefined
         ? undefined
         : `${commandPath(command).join(' ')}: ${error}`
@@ -572,7 +575,7 @@ export async function validateCommandInvocation<TArgs extends ArgsDef>(
 
     const index = subCommandIndex(remaining, definitions)
     const segment = index === undefined ? remaining : remaining.slice(0, index)
-    const error = validateTokens(segment, definitions)
+    const error = validateTokens(withoutHelp(segment), definitions)
     if (error !== undefined) {
       return `${commandPath(command).join(' ')}: ${error}`
     }
@@ -580,7 +583,9 @@ export async function validateCommandInvocation<TArgs extends ArgsDef>(
     const name = remaining[index]
     if (name === undefined) return undefined
     const child = await findSubCommand(command, name)
-    if (child === undefined) return undefined
+    if (child === undefined) {
+      return `${commandPath(command).join(' ')}: unknown command ${name}`
+    }
     command = child
     remaining = remaining.slice(index + 1)
   }

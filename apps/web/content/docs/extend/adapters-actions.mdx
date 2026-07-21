@@ -1,0 +1,52 @@
+---
+title: Source Adapters, capabilities, and Actions
+description: Bind a Source to Profiles and optional Provider operations with compile-time consistency.
+---
+
+A Source Adapter owns one Source's configuration and operations. It may import exactly one Provider or operate providerlessly.
+
+## Capabilities gate operations
+
+| Capability | Required implementation |
+| --- | --- |
+| `sync` | cursor-driven emission of Resource upserts, removals, warnings, and checkpoints |
+| `search-remote` | provider search returning bounded normalized results and optional continuation |
+| `retrieve` | exact complete Resource retrieval by Ref |
+| `download` | streaming one resolved Artifact's bytes into managed storage |
+
+Declaring a capability requires its operation; omitting a capability forbids that operation. The SDK preserves this relationship through inference and core validates it again before activation.
+
+Search routing (`indexed`, `federated`, or `hybrid`) is not a capability. CLI routing flags override Source configuration, which overrides the Adapter's decision.
+
+## Provider access
+
+A provider-backed Adapter declares only its additional scopes and API hosts:
+
+```ts
+defineAdapter({
+  id: 'acme.mailbox',
+  provider: acmeProvider,
+  access: { scopes: ['mail.read'] },
+  providerApiHosts: ['mail.api.example.com'],
+  // configSchema, profiles, routing, capabilities, operations, actions
+})
+```
+
+The host supplies scoped `context.fetch`; do not import stored tokens or core runtime internals.
+
+## Actions
+
+Profiles declare Action identity, effect, input, and output Profile. Each Adapter binds only the Actions it supports and supplies the implementation:
+
+```ts
+actions: {
+  'acme.note.draft.create': {
+    profile: noteProfile,
+    input: createDraftInput,
+    output: noteProfile,
+    run: createDraft,
+  },
+}
+```
+
+An Adapter cannot implement an undeclared Profile Action. Action contexts expose the selected Source, validated input, scoped fetch/logger/cancellation, and narrow read-only Resource/Artifact resolvers—not database or arbitrary provider access.

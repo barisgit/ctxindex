@@ -118,6 +118,14 @@ export function sourceRouteDescriptions(
   return route.definitions?.description.sources ?? []
 }
 
+export async function sourceHelpDescriptions(
+  services: SourceCommandDeps = defaultDeps,
+): Promise<readonly SourceArgumentDescription[]> {
+  const selection = services.selectDaemon()
+  if (selection) return (await services.sourceDefinitions(selection)).rows
+  return (await services.loadDefinitions()).description.sources
+}
+
 export async function resolveSourceCommandRoute(
   needsDefinitions: boolean,
   services: SourceCommandDeps = defaultDeps,

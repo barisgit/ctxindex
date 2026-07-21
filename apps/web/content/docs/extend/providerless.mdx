@@ -1,0 +1,94 @@
+---
+title: Providerless Extension quickstart
+description: Define a Profile, local Source Adapter, Extension root, documentation sidecar, and package entry without authentication or provider egress.
+---
+
+The repository's tested [`examples/tenders-extension`](https://github.com/barisgit/ctxindex/tree/main/examples/tenders-extension) package is the complete reference. A providerless Adapter simply omits `provider`, `access`, and `providerApiHosts`.
+
+## `extension.ts`
+
+```ts
+import {
+  defineAdapter,
+  defineExtension,
+  defineProfile,
+  docs,
+  z,
+} from '@ctxindex/extension-sdk'
+
+export const tenderProfile = defineProfile({
+  id: 'enarocanje.tender',
+  version: 1,
+  schema: z.object({
+    reference: z.string(),
+    title: z.string(),
+    description: z.string(),
+    publishedAt: z.string().datetime(),
+  }).strict(),
+  search: {
+    title: (tender) => tender.title,
+    occurredAt: (tender) => new Date(tender.publishedAt),
+    chunks: (tender) => [tender.description],
+    fields: {
+      reference: {
+        type: 'string',
+        extract: (tender) => tender.reference,
+      },
+    },
+  },
+})
+
+export const tenderAdapter = defineAdapter({
+  id: 'enarocanje.fixture',
+  configSchema: z.object({}).strict(),
+  profiles: [tenderProfile],
+  routing: 'indexed',
+  capabilities: ['sync'],
+  operations: {
+    sync: async (context) => {
+      for (const payload of loadTenders()) {
+        await context.emit({
+          type: 'upsertResource',
+          resource: {
+            ref: `ctx://${context.source.id}/tender/${encodeURIComponent(payload.reference)}`,
+            profile: { id: tenderProfile.id, version: tenderProfile.version },
+            completeness: 'complete',
+            title: payload.title,
+            occurredAt: Date.parse(payload.publishedAt),
+            payload,
+          },
+        })
+      }
+      await context.emit({ type: 'checkpoint', cursor: { version: 1 } })
+    },
+  },
+  actions: {},
+})
+
+export default defineExtension({
+  id: 'enarocanje.proof',
+  adapters: [tenderAdapter],
+  docs: docs('./docs'),
+})
+```
+
+`loadTenders()` is ordinary package code; the [checked repository example](https://github.com/barisgit/ctxindex/blob/main/examples/tenders-extension/extension.ts) supplies deterministic fixtures. Operation contexts expose only the facilities for that capability.
+
+## `package.json`
+
+```json
+{
+  "name": "@acme/ctxindex-tenders",
+  "type": "module",
+  "ctxindex": {
+    "extensions": ["./extension.ts"]
+  },
+  "dependencies": {
+    "@ctxindex/extension-sdk": "^1.0.0"
+  }
+}
+```
+
+Each entry names an ESM module, not an export symbol. ctxindex imports the module once and collects every plain exported Extension root. Supporting Profile and Adapter exports do not activate independently.
+
+Providerless operation synthesizes no Provider, OAuth App, Account, Grant, provider access, or provider egress state.

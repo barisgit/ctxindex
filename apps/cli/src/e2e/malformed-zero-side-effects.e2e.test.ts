@@ -55,10 +55,7 @@ test('malformed commands perform zero auth, network, or storage work', async () 
       const result = await sandbox.run([...args], { env })
       expect(result.exitCode, `${args.join(' ')}\n${result.stderr}`).toBe(2)
       if (args[0] === 'auth') {
-        expect(result.stderr).toContain('Unknown command')
-        expect(result.stdout).toContain('ctxindex init|account|oauth-app')
-        expect(result.stdout).not.toContain('init|auth|')
-      } else {
+        expect(result.stderr).toContain('unknown command auth')
         expect(result.stdout).toBe('')
       }
       expect(result.stderr).not.toContain('malformed-secret-canary')

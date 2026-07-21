@@ -80,7 +80,7 @@ export function renderCommandReferenceMarkdown(
     'description: Generated command and option reference for ctxindex.',
     '---',
     '',
-    '<!-- Generated from the Citty command tree. Do not edit by hand. -->',
+    '{/* Generated from the Citty command tree. Do not edit by hand. */}',
     '',
     'The command tree below is generated from the same definitions used for parsing and `--help`. For task-oriented workflows, use the guides and examples instead.',
     '',

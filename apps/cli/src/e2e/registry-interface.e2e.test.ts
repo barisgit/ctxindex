@@ -79,7 +79,9 @@ test('interpreted registry interface follows an explicit external Extension', as
     )
     const unknownSelector = await run(['describe', 'kind'])
     expect(unknownSelector.exitCode).toBe(2)
-    expect(unknownSelector.stderr).toContain('unknown selector')
+    expect(unknownSelector.stderr).toContain(
+      'invalid value for argument selector',
+    )
     const unknown = await run(['describe', 'adapter', 'missing'])
     expect(unknown.exitCode).toBe(2)
     expect(unknown.stderr).toContain('unknown adapter id')
@@ -288,7 +290,7 @@ test('interpreted registry interface follows an explicit external Extension', as
 
     const removedClientAlias = await run(['client'])
     expect(removedClientAlias.exitCode).toBe(2)
-    expect(removedClientAlias.stderr).toContain('Unknown command')
+    expect(removedClientAlias.stderr).toContain('unknown command client')
 
     const extensions = await run(['extension', 'list', '--json'])
     expect(extensions.exitCode, extensions.stderr).toBe(0)

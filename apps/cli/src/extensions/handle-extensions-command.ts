@@ -1,6 +1,5 @@
 import {
   parseDirectExtensionTarget,
-  projectDirectExtensionRecord,
   validateDirectExtensionId,
   validateDirectPackageTarget,
 } from '@ctxindex/core'
@@ -12,14 +11,11 @@ import {
   formatCatalogBuild,
   formatCatalogExtension,
   formatCatalogs,
-  formatInstalledExtension,
   formatMarketplace,
 } from '../format/catalog'
-import {
-  formatDirectExtension,
-  formatDirectExtensionUninstall,
-} from '../format/direct-extension'
+import { formatDirectExtensionUninstall } from '../format/direct-extension'
 import { mapErrorToExit } from '../format/exit'
+import { formatExtensionLifecycle } from '../format/extension-lifecycle'
 import { formatExtensions } from '../format/registry'
 import {
   createExtensionCommandServices,
@@ -240,7 +236,7 @@ export async function handleExtensionsCommand(
             }),
           )
           console.log(
-            formatInstalledExtension('Installed', installed, parsed.json),
+            formatExtensionLifecycle('Installed', installed, parsed.json),
           )
           return 0
         }
@@ -273,11 +269,7 @@ export async function handleExtensionsCommand(
           }),
         )
         console.log(
-          formatDirectExtension(
-            'Installed',
-            projectDirectExtensionRecord(installed),
-            parsed.json,
-          ),
+          formatExtensionLifecycle('Installed', installed, parsed.json),
         )
         return 0
       }
@@ -292,7 +284,7 @@ export async function handleExtensionsCommand(
             signal,
           }),
         )
-        console.log(formatInstalledExtension('Updated', updated, parsed.json))
+        console.log(formatExtensionLifecycle('Updated', updated, parsed.json))
         return 0
       }
       case 'uninstall': {

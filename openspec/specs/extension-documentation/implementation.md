@@ -17,3 +17,7 @@ Future browser consumers must still sanitize Markdown as untrusted display input
 ## Distribution
 
 External and installed package roots resolve `./docs` beside the module entry already imported by the package-entry seam. Built-in source directories live under `packages/adapters/src/builtin-documentation/`; `packages/adapters/scripts/generate-documentation.ts` resolves those descriptors with the shared core resolver and writes the embedded virtual module. Built-in freshness tests compare both forms, and the relocated compiled-host gate reads the embedded projection without checkout files.
+
+Public authoring guidance is backed by repository example workspaces rather than documentation-only pseudo-APIs. Providerless and provider-backed examples import the public SDK facade, expose plain roots through package-owned `ctxindex.extensions` modules, resolve normal package dependencies before host loading, and exercise real package-entry/documentation discovery. The checked source remains authoritative when a guide presents a shortened excerpt.
+
+Author examples and public projections must not expose OAuth App configuration, client ids from real applications, desktop-secret metadata, tokens, Grant state, or secret references. Reserved example endpoints and non-secret fixture App metadata keep provider-backed tests deterministic and offline. Focused tests verify manifest discovery, exact imported leaves, capability/operation consistency, normalized operation results, documentation routes/assets, and absence of live provider egress.

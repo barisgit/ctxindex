@@ -1,8 +1,5 @@
 import { expect, test } from 'bun:test'
-import {
-  formatDirectExtension,
-  formatDirectExtensionUninstall,
-} from './direct-extension'
+import { formatDirectExtensionUninstall } from './direct-extension'
 
 const extension = {
   id: 'example.direct',
@@ -13,12 +10,6 @@ const extension = {
   installedAt: 100,
   updatedAt: 200,
 }
-
-test('direct lifecycle text includes immutable provenance and both timestamps', () => {
-  expect(formatDirectExtension('Updated', extension, false)).toContain(
-    'Installed: 100\tUpdated: 200',
-  )
-})
 
 test('forced uninstall states data preservation and unavailable Sources', () => {
   const result = {

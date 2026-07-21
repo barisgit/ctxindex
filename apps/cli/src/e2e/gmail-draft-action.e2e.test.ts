@@ -402,8 +402,8 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
 
     const unknown = await sandbox.run(
       [
-        'action',
         'describe',
+        'action',
         'communication.message.draft.send',
         '--source',
         sourceLabel,

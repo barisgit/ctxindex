@@ -18,7 +18,7 @@ ctxindex is a local personal-context gateway that gives agents and users one int
 - `.agents/skills/repo-development/SKILL.md` — triggered contributor doctrine, CLI workflow, and verification guidance.
 - `DESIGN.md` — project-wide visual doctrine for the adaptive ctxindex mark, semantic color roles, typography, component treatment, motion, and accessibility; the web app supplies its executable specimen.
 - `apps/cli/bin/ctxindex.mjs` — executable shim forwarding argv to `runCli` and assigning its exit code.
-- `apps/web/app/(home)/page.tsx`, `apps/web/app/(home)/design/page.tsx`, and `apps/web/app/docs/[[...slug]]/page.tsx` — Next.js landing page, live visual-system specimen, and Fumadocs-backed documentation routes.
+- `apps/web/app/(home)/page.tsx`, `apps/web/app/(home)/design/page.tsx`, and `apps/web/app/docs/[[...slug]]/page.tsx` — product-first command/result landing page, live visual-system specimen, and Fumadocs-backed task-oriented documentation routes.
 - `apps/daemon/src/main.ts` — foreground daemon process entry that composes retained ownership, core services, RPC transport, and graceful shutdown.
 - `packages/core/src/index.ts` — core domain services and runtime infrastructure export surface.
 - `packages/rpc/src/index.ts` — composition-only local wire schemas, router contract, and generated client type.
@@ -35,7 +35,7 @@ CLI input is parsed and dispatched by `apps/cli/` into core services. Realm, Sou
 - Root orchestration: Bun workspaces and Turbo tasks in `package.json`; repository gates enforce dependency and architecture boundaries.
 - Runtime: core storage, schema, configuration, secrets, logging, networking, auth, and operation services under `packages/core/src/`.
 - External systems: Google OAuth/Gmail/Calendar, Microsoft OAuth/Graph Calendar and Outlook mailbox, and filesystem access under `packages/adapters/src/`.
-- Public extension boundary: `packages/extension-sdk/src/index.ts`, demonstrated by manifest-discoverable package `examples/tenders-extension/`.
+- Public extension boundary: `packages/extension-sdk/src/index.ts`, demonstrated by manifest-discoverable providerless `examples/tenders-extension/` and provider-backed `examples/issues-extension/` packages.
 
 ## Directory map
 

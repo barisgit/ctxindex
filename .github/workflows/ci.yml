@@ -43,8 +43,12 @@ jobs:
         run: bun run scripts/verify/cli-no-business-logic.ts
       - name: cli-framework-citty
         run: bun run scripts/verify/cli-framework-citty.ts
+      - name: cli-command-drift
+        run: bun run scripts/verify/cli-command-drift.ts
       - name: cli-thin-lines
         run: bun run scripts/verify/cli-thin-lines.ts
+      - name: cli-reference
+        run: bun run check:cli-reference
       - name: exports-map
         run: bun run scripts/verify/exports-map.ts
       - name: full-test-suite

@@ -287,10 +287,17 @@ function validateReferences(candidates: readonly Candidate[]): void {
       referenceCount += 1
       if (referenceCount > MAX_REFERENCES) fail('too many references')
       const destination = rawDestination.split('#', 1)[0] as string
+      const sameSitePath =
+        destination.startsWith('/') &&
+        !destination.startsWith('//') &&
+        !destination.includes('\\') &&
+        !destination.includes('\0') &&
+        !destination.includes('%') &&
+        !destination.includes('?')
       if (
         destination.length === 0 ||
         destination.startsWith('#') ||
-        destination.startsWith('/docs/') ||
+        sameSitePath ||
         /^https:\/\//iu.test(destination)
       )
         continue
@@ -324,7 +331,7 @@ function defaultRoots(): readonly BundledDocumentationRoot[] {
     {
       root: resolve(import.meta.dir, '../../../../apps/web/content/docs'),
       logicalPrefix: '',
-      exclude: ['cli', 'meta.json', 'concepts/meta.json', 'guides/meta.json'],
+      exclude: ['cli'],
     },
   ]
 }
@@ -344,6 +351,7 @@ export function buildBundledDocumentationManifest(
       )) {
         const path = resolve(directory, entry.name)
         const sourceRelativePath = relative(root, path).split(sep).join('/')
+        if (entry.isFile() && entry.name === 'meta.json') continue
         if (
           exclusions.some(
             (excluded) =>

@@ -1,0 +1,57 @@
+---
+title: Author a Catalog
+description: Curate literal and package-backed Extensions into a deterministic local Marketplace snapshot.
+---
+
+A Catalog is optional curation. It can export literal Extension values from the author package and descriptors pointing to npm, Git, or contained local packages.
+
+```ts
+import {
+  defineCatalog,
+  packageExtension,
+} from '@ctxindex/extension-sdk'
+import localNotes from './local-notes'
+
+export default defineCatalog({
+  id: 'acme.catalog',
+  label: 'Acme context',
+  summary: 'Reviewed Acme Extensions.',
+  entrySummaries: {
+    'acme.local-notes': 'Index local Acme notes.',
+    'acme.mail': 'Search Acme mail.',
+  },
+  extensions: [
+    localNotes,
+    packageExtension(
+      { kind: 'npm', target: '@acme/ctxindex-mail@^2' },
+      'acme.mail',
+    ),
+    packageExtension(
+      { kind: 'git', target: 'git+https://github.com/acme/tasks.git#main' },
+      'acme.tasks',
+    ),
+    packageExtension(
+      { kind: 'local', target: './packages/calendar' },
+      'acme.calendar',
+    ),
+  ],
+})
+```
+
+Catalogs do not nest. A Catalog entry is a literal Extension or one `packageExtension(source, extensionId)` descriptor—not another Catalog or a textual dependency reference.
+
+## Build and trust
+
+```sh
+ctxindex extension catalog build . \
+  --catalog acme.catalog \
+  --output ./dist/ctxindex-catalog.json \
+  --trust \
+  --json
+```
+
+Build trust covers author-controlled module import, package acquisition, and Bun execution. The deterministic snapshot contains bounded inert metadata and replay-locked artifacts. Catalog add/refresh/list/show/search parse data and never import Catalog modules.
+
+Install has a second trust gate because it exactly replays and activates the selected Extension. Catalog refresh does not silently update installed bytes.
+
+Use a Catalog when curated discovery is valuable. Direct npm/Git/local installation remains the lower-friction distribution path for many Extensions.

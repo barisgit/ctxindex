@@ -386,6 +386,85 @@ test('update delegates to the origin-neutral lifecycle and preserves Catalog pro
   }
 })
 
+test('install and update keep one generic JSON shape across direct and Catalog origins', async () => {
+  const { curation: _curation, ...directRecord } = installed
+  const output = spyOn(console, 'log').mockImplementation(() => {})
+  const error = spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    const cases = [
+      {
+        input: {
+          kind: 'install' as const,
+          sourceKind: 'catalog' as const,
+          target: 'fixture',
+          extensionId: installed.id,
+          noRefresh: false,
+          json: true,
+        },
+        record: installed,
+        action: 'installed',
+      },
+      {
+        input: {
+          kind: 'install' as const,
+          sourceKind: 'npm' as const,
+          target: '@fixture/extension@^1',
+          extensionId: directRecord.id,
+          noRefresh: false,
+          json: true,
+        },
+        record: directRecord,
+        action: 'installed',
+      },
+      {
+        input: {
+          kind: 'update' as const,
+          extensionId: installed.id,
+          json: true,
+        },
+        record: installed,
+        action: 'updated',
+      },
+      {
+        input: {
+          kind: 'update' as const,
+          extensionId: directRecord.id,
+          json: true,
+        },
+        record: directRecord,
+        action: 'updated',
+      },
+    ]
+
+    for (const item of cases) {
+      output.mockClear()
+      expect(
+        await handleExtensionsCommand(
+          item.input,
+          services({
+            catalogInstallation: {
+              install: async () => item.record,
+            } as unknown as ExtensionCommandServices['catalogInstallation'],
+            direct: {
+              install: async () => item.record,
+            } as unknown as DirectExtensionService,
+            lifecycle: {
+              update: async () => item.record,
+            } as unknown as ExtensionCommandServices['lifecycle'],
+          }),
+        ),
+      ).toBe(0)
+      const value = JSON.parse(String(output.mock.calls[0]?.[0]))
+      expect(value).toEqual({ action: item.action, ...item.record })
+      expect(value).not.toHaveProperty('sourceKind')
+      expect(value).not.toHaveProperty('materializationDigest')
+    }
+  } finally {
+    output.mockRestore()
+    error.mockRestore()
+  }
+})
+
 test('direct install rejects Catalog-only --no-refresh before acquisition or trust notice', async () => {
   let calls = 0
   const error = spyOn(console, 'error').mockImplementation(() => {})

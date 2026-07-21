@@ -1,4 +1,8 @@
 import { afterEach, expect, spyOn, test } from 'bun:test'
+import { writeFileSync } from 'node:fs'
+import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { loadCliDefinitions } from '../definitions'
 import {
   type DirectDatabaseOwnership,
@@ -183,6 +187,7 @@ test('runCli retains one selected daemon from Source argument construction throu
           root_path: '/tmp/work',
           labels: ['first', 'second'],
         }),
+        syncEnabled: false,
       })
       return { sourceId: 'source-1', realmId: 'work' }
     },
@@ -212,6 +217,7 @@ test('runCli retains one selected daemon from Source argument construction throu
           '--config-labels',
           'first',
           '--config-labels=second',
+          '--no-sync',
         ],
         { source: deps },
       ),
@@ -313,6 +319,41 @@ test('runCli loads active Source definitions for add help without executing', as
     expect(output.join('\n')).toContain('--config-labels')
   } finally {
     log.mockRestore()
+  }
+})
+
+test('direct Source add help loads dynamic definitions without creating ownership files', async () => {
+  const loaded = await loadCliDefinitions()
+  const root = await mkdtemp(join(tmpdir(), 'ctxindex-source-help-'))
+  const output = spyOn(console, 'log').mockImplementation(() => {})
+  try {
+    expect(
+      await runCli(['source', 'add', '--help'], {
+        source: {
+          selectDaemon: () => null,
+          sourceDefinitions: async () => {
+            throw new Error('daemon definitions requested')
+          },
+          sourceAdd: async () => {
+            throw new Error('daemon add requested')
+          },
+          sourceList: async () => ({ rows: [] }),
+          sourceRemove: async () => ({ sourceId: 'unused' }),
+          acquireOwnership: () => {
+            writeFileSync(join(root, 'ctxindex.sqlite.owner.lock'), 'lease')
+            return fakeOwnership([])
+          },
+          loadDefinitions: async () => loaded,
+          open: async () => {
+            throw new Error('help opened dependencies')
+          },
+        },
+      }),
+    ).toBe(0)
+    expect(await readdir(root)).toEqual([])
+  } finally {
+    output.mockRestore()
+    await rm(root, { recursive: true, force: true })
   }
 })
 
@@ -450,7 +491,7 @@ test('Source add ownership conflict maps to prototype unsupported before dynamic
   }
 })
 
-test('direct Source add help releases ownership after generating dynamic options', async () => {
+test('direct Source add help reuses one definition snapshot without ownership', async () => {
   const loaded = await loadCliDefinitions()
   const events: string[] = []
   const output = spyOn(console, 'log').mockImplementation(() => {})
@@ -481,12 +522,7 @@ test('direct Source add help releases ownership after generating dynamic options
     })
 
     expect(exit).toBe(0)
-    expect(events).toEqual([
-      'acquire-owner',
-      'read-identities',
-      'load-definitions',
-      'close-owner',
-    ])
+    expect(events).toEqual(['load-definitions'])
   } finally {
     output.mockRestore()
   }

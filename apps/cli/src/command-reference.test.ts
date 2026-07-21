@@ -29,7 +29,9 @@ test('renders deterministic Markdown from the command projection', async () => {
     await projectCommandReference(root),
   )
 
-  expect(markdown).toContain('<!-- Generated from the Citty command tree.')
+  expect(markdown).toContain(
+    '{/* Generated from the Citty command tree. Do not edit by hand. */}',
+  )
   expect(markdown).toContain('## `ctxindex search`')
   expect(markdown).toContain('Search context.')
   expect(markdown).toContain('ctxindex search')

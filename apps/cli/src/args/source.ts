@@ -243,6 +243,6 @@ export function resolveSourceAddArgs(
     ...(args['search-routing'] === undefined
       ? {}
       : { searchRouting: args['search-routing'] }),
-    ...(args['no-sync'] === true ? { syncEnabled: false } : {}),
+    ...(args.sync === false ? { syncEnabled: false } : {}),
   }
 }

@@ -13,6 +13,7 @@ import {
   handleSourceCommand,
   retainSourceCommandRoute,
   type SourceCommandDeps,
+  sourceHelpDescriptions,
   sourceRouteDescriptions,
 } from '../source/handle-source-command'
 
@@ -31,13 +32,16 @@ export function createSourceCommandRuntime(
     services,
   )
   const route = retained.resolve
+  let retainedHelpDescriptions:
+    | Promise<Awaited<ReturnType<typeof sourceHelpDescriptions>>>
+    | undefined
+  const helpDescriptions = () =>
+    (retainedHelpDescriptions ??= sourceHelpDescriptions(services))
   const activeSourceDescriptions = async () => {
     if (!needsDynamicSourceArgs(invocationArgs)) return []
-    const descriptions = sourceRouteDescriptions(await route())
-    if (invocationArgs.includes('--help') || invocationArgs.includes('-h')) {
-      await retained.close()
-    }
-    return descriptions
+    if (invocationArgs.includes('--help') || invocationArgs.includes('-h'))
+      return helpDescriptions()
+    return sourceRouteDescriptions(await route())
   }
 
   const command = defineCtxCommand({

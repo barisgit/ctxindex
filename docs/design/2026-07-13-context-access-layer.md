@@ -258,7 +258,7 @@ again if they return. Dangling edges remain legal and queryable as unresolved.
 Relations are indexed in both directions; "resources related to X by R" is a
 query primitive.
 
-`thread get <ref>`: union of provider `conversation` membership and `parent`
+`thread <ref>`: union of provider `conversation` membership and `parent`
 reply-tree walk (both directions); tree when headers exist, flat fallback
 otherwise. Provider conversation identifiers are Source-scoped before relation
 extraction because providers do not guarantee mailbox-global identity.
@@ -462,7 +462,7 @@ ctxindex search <query> [--realm|--source|--adapter|--kind|--field k=v ...]
                         [--include-deleted] [--explain] [--json]
 ctxindex aggregate --field <name> [same filters] [--top N] [--json]
 ctxindex get <ref> [--json]
-ctxindex thread get <ref> [--json]
+ctxindex thread <ref> [--json]
 ctxindex artifact list <ref> [--json]
 ctxindex artifact download <artifact-ref> [--output <path>]
 ctxindex export <ref> --format <fmt> [--output <path>]

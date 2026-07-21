@@ -1,0 +1,31 @@
+---
+title: Trust and local-state boundaries
+description: Know what ctxindex stores, what remains canonical, and where executable trust or provider egress begins.
+---
+
+## Local state
+
+ctxindex stores configuration, SQLite projections, caches, logs, private Grant references, and installed Extension materializations on the local machine. The website stores none of this state.
+
+Providers and files remain canonical. Local Resource materializations are purgeable; provider records are not transferred into a hosted ctxindex account.
+
+## Provider access
+
+- An OAuth App is public registration metadata or local BYOA state, not an Account or token.
+- An Account owns one private Grant snapshot and may back multiple compatible Sources.
+- A provider-backed Source Adapter receives only its configured Source, scoped provider fetch, logger, cancellation signal, and operation-specific callbacks.
+- A providerless Adapter creates no Provider, OAuth App, Account, Grant, or provider egress requirement.
+
+## Extension trust
+
+Extensions run in-process and are not sandboxed. Install only code you trust. Source acquisition, Catalog browsing, and executable installation are intentionally separate boundaries.
+
+Catalog snapshots are bounded inert data during add, refresh, list, show, and search. A trusted Catalog build and a trusted Extension install are the executable boundaries.
+
+## Mutation boundary
+
+Profile Actions are explicit and typed. V1 provider mutation stops at reversible email Draft create/update. ctxindex does not send messages or provide arbitrary provider API access through Extension commands.
+
+## Agent boundary
+
+The CLI is the only agent integration surface. Realm and Source filters express the context an agent may consider for one operation; they are not remote tenants or hosted authorization boundaries.

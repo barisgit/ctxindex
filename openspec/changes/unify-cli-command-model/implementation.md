@@ -104,7 +104,7 @@ The bundled manifest macro walks only configured canonical product-documentation
 ```ts
 export type InstalledExtensionUpdateInput = {
   readonly extensionId: string
-  readonly completeRegistry: CompleteRegistryInput
+  readonly signal?: AbortSignal
 }
 
 export interface InstalledExtensionLifecycleService {
@@ -113,6 +113,8 @@ export interface InstalledExtensionLifecycleService {
   ): Promise<GenericExtensionInstallationRecord>
 }
 ```
+
+The lifecycle service selects direct or Catalog-curated replay from persisted provenance. Runtime-complete registry validation remains owned by the downstream installer and Catalog installation service rather than duplicated at this dispatch boundary.
 
 The service reads the exact record under lifecycle coordination and dispatches from persisted provenance. Direct records reuse generic reacquisition. Catalog-curated records resolve their configured Catalog by exact curation identity, refresh only that Catalog outside the installation lock, stage exact replay, then compare-and-swap the selected Catalog snapshot and installation record under the existing lifecycle lock. Both branches use the canonical installer and atomic generic record publication.
 

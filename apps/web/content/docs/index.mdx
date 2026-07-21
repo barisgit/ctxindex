@@ -1,51 +1,42 @@
 ---
-title: ctxindex
-description: A local personal-context gateway with one deterministic CLI for agents.
+title: ctxindex documentation
+description: Start locally, use ctxindex from an agent, extend the typed context graph, or look up an exact contract.
 ---
 
-ctxindex gives agents one command vocabulary for context spread across providers and local files. Mail, Calendar Events, files, and extension-defined domains become **Resources** with stable `ctx://` **Refs**. Providers and the filesystem remain canonical; local projections and caches support search, retrieval, Relations, export, and narrowly typed **Actions**.
+ctxindex gives shell-capable agents one local typed interface over mail, calendars, files, and Extension-defined context. The CLI is the integration surface: agents compose deterministic commands, read `--json`, and act only through configured Sources.
 
-## Mental model in five lines
+## Start
 
-1. A **Realm** is a user-defined operating context whose Sources should be searched and reasoned about together.
-2. A **Source** is one configured connection to one provider collection or local directory, and belongs to exactly one Realm.
-3. A **Profile** defines a Resource's portable shape, searchable vocabulary, exports, Relations, Artifacts, and Actions.
-4. A **Source Adapter** performs provider or filesystem I/O and emits Resources that conform to Profiles.
-5. A **Resource** is one addressable unit of context; its stable **Ref** identifies it independently of local materialization.
+Install ctxindex, index one local directory without an Account, then optionally connect Google or Microsoft.
 
-The CLI is the agent integration surface. Agents compose commands such as `search`, `get`, `thread`, `export`, and `action`, request deterministic JSON where available, and use stable exit codes instead of provider-specific integrations.
+- [Installation and first success](/docs/start)
+- [Connect a provider](/docs/start/connect-provider)
+- [Use ctxindex from an agent](/docs/start/agent-usage)
+- [Troubleshooting](/docs/start/troubleshooting)
 
-## Start here
+## Use
 
-<Cards>
-  <Card
-    title="Getting started"
-    description="Install with Bun, configure a local Source, and run search, get, and export."
-    href="/docs/getting-started"
-  />
-  <Card
-    title="Concepts"
-    description="Understand Realms, Sources, Resources, Refs, Profiles, Actions, and materialization."
-    href="/docs/concepts/realms-and-sources"
-  />
-  <Card
-    title="CLI reference"
-    description="Look up commands, arguments, output contracts, and stable exit behavior."
-    href="/docs/cli"
-  />
-  <Card
-    title="Guides"
-    description="Follow focused workflows for agents, mail, calendars, and configured providers."
-    href="/docs/guides/agent-integration"
-  />
-  <Card
-    title="Examples"
-    description="See practical command sequences built on the provider-neutral CLI."
-    href="/docs/examples"
-  />
-  <Card
-    title="Local Git Catalog"
-    description="Discover and install trusted Profiles and Source Adapters from merged local Catalogs."
-    href="/docs/examples/marketplace"
-  />
-</Cards>
+Organize Sources into exact Realms, materialize provider context locally, and compose search, retrieval, export, and reversible Draft workflows.
+
+- [Core workflow](/docs/use)
+- [Mail and calendar workflows](/docs/use/workflows)
+- [Extensions and the local Marketplace](/docs/use/extensions)
+- [Trust and local-state boundaries](/docs/use/trust)
+
+## Extend
+
+Author the same plain, type-safe Extension graph used by ctxindex's bundled Google, Microsoft, and local definitions.
+
+- [Extension SDK overview](/docs/extend)
+- [Providerless quickstart](/docs/extend/providerless)
+- [Provider-backed quickstart](/docs/extend/provider-backed)
+- [Package, test, and publish](/docs/extend/package-test-publish)
+
+## Reference and contribute
+
+- [Generated CLI and contract reference](/docs/reference)
+- [Contribute to ctxindex](/docs/contribute)
+
+<Callout>
+  Capability specs and `CONTEXT.md` own behavior and terminology. This website is a maintained public projection of those contracts.
+</Callout>

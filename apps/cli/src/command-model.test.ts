@@ -146,6 +146,20 @@ test('rejects unknown options in their command segment before dispatch', async (
   ).toBeUndefined()
 })
 
+test('rejects an unknown command even when help is requested', async () => {
+  const command = defineCtxCommand({
+    meta: { name: 'ctxindex' },
+    subCommands: {
+      known: defineCtxCommand({ meta: { name: 'known' } }),
+    },
+  })
+  await prepareCommandTree(command)
+
+  await expect(
+    validateCommandInvocation(command, ['definitely-not-a-command', '--help']),
+  ).resolves.toBe('ctxindex: unknown command definitely-not-a-command')
+})
+
 test.each([
   [['subject', '--wat'], '--wat'],
   [['subject', '--json', '--json'], '--json'],
@@ -209,6 +223,8 @@ test('preserves undefined for an omitted optional constrained positional', async
       },
     },
     run: ({ args }) => {
+      const omitted: typeof args.selector = undefined
+      expect(omitted).toBeUndefined()
       received.push(args.selector)
     },
   })

@@ -210,7 +210,7 @@ export const docsListCommand = defineCtxCommand({
   args: {
     extension: {
       type: 'string',
-      description: 'Select one exact loaded Extension id',
+      description: 'Filter by one exact loaded Extension id',
     },
     json: { type: 'boolean', description: 'Print JSON' },
   },
@@ -235,7 +235,7 @@ export const docsGetCommand = defineCtxCommand({
     },
     extension: {
       type: 'string',
-      description: 'Select one exact loaded Extension id',
+      description: 'Filter by one exact loaded Extension id',
     },
     output: {
       type: 'string',
@@ -266,7 +266,7 @@ export const docsSearchCommand = defineCtxCommand({
     },
     extension: {
       type: 'string',
-      description: 'Select one exact loaded Extension id',
+      description: 'Filter by one exact loaded Extension id',
     },
     json: { type: 'boolean', description: 'Print JSON' },
   },

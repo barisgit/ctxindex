@@ -10,9 +10,11 @@ test('builds an ordered bounded manifest from explicit authored roots', async ()
   try {
     await mkdir(join(root, 'guides'))
     await mkdir(join(root, 'images'))
+    await writeFile(join(root, 'meta.json'), '{"pages":["index","guides"]}')
+    await writeFile(join(root, 'guides/meta.json'), '{"pages":["index"]}')
     await writeFile(
       join(root, 'index.mdx'),
-      '---\ntitle: Home\ndescription: Product docs.\n---\n\n[Start](guides/index.mdx)\n\n![Pixel](images/pixel.png)\n\n[Web](/docs/start) [External](https://example.test/docs)',
+      '---\ntitle: Home\ndescription: Product docs.\n---\n\n[Start](guides/index.mdx)\n\n![Pixel](images/pixel.png)\n\n[Web](/docs/start) [Design](/design) [External](https://example.test/docs)',
     )
     await writeFile(
       join(root, 'guides/index.mdx'),
@@ -41,6 +43,7 @@ test('builds an ordered bounded manifest from explicit authored roots', async ()
     expect(home).toContain('[Start](guides/README.md)')
     expect(home).toContain('![Pixel](images/pixel.png)')
     expect(home).toContain('[Web](/docs/start)')
+    expect(home).toContain('[Design](/design)')
     expect(home).toContain('[External](https://example.test/docs)')
     const content = Buffer.from(
       manifest[1]?.contentBase64 ?? '',

@@ -46,7 +46,11 @@ describe('simplified Resource command grammar', () => {
       'USAGE ctxindex thread [OPTIONS] <REF>',
     )
     expect(await renderCommandUsage(describeCommand)).toContain('--source')
-    expect(actionRunCommand.args).toMatchObject({
+    const actionArgs =
+      typeof actionRunCommand.args === 'function'
+        ? await actionRunCommand.args()
+        : await actionRunCommand.args
+    expect(actionArgs).toMatchObject({
       'action-id': { type: 'positional', required: true },
       source: { type: 'string', required: true },
       input: { type: 'string', required: true },
