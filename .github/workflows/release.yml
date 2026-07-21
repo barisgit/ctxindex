@@ -148,9 +148,8 @@ jobs:
         run: sha256sum --check "$ARCHIVE.sha256"
       - name: Create or verify exact tag
         run: |
-          existing="$(git ls-remote --refs origin "refs/tags/$RELEASE_TAG")"
-          if test -n "$existing"; then
-            test "${existing%%[[:space:]]*}" = "$GITHUB_SHA"
+          if existing="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha' 2>/dev/null)"; then
+            test "$existing" = "$GITHUB_SHA"
           else
             gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
               -f "ref=refs/tags/$RELEASE_TAG" \

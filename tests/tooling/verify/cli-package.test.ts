@@ -30,7 +30,7 @@ test('the private monorepo builds one public installable ctxindex package', asyn
 
   expect(cli).toMatchObject({
     name: 'ctxindex',
-    version: '0.1.1',
+    version: '0.1.2',
     license: 'MIT',
     homepage: 'https://ctxindex.com',
     bugs: { url: 'https://github.com/barisgit/ctxindex/issues' },
