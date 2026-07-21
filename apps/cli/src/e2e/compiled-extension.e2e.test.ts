@@ -4,10 +4,30 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 const fixtureDir = join(import.meta.dir, 'fixtures', 'compiled-extension')
-const extensionSdkDir = resolve(
-  import.meta.dir,
-  '../../../../packages/extension-sdk',
-)
+const repoRoot = resolve(import.meta.dir, '../../../..')
+
+async function packExtensionSdk(destination: string): Promise<string> {
+  const child = Bun.spawn(
+    [
+      process.execPath,
+      join(repoRoot, 'scripts/release/extension-sdk-package.ts'),
+      'pack',
+      destination,
+    ],
+    { cwd: repoRoot, stdout: 'pipe', stderr: 'pipe' },
+  )
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ])
+  expect(exitCode, `${stdout}\n${stderr}`).toBe(0)
+  const archive = stdout.trim().split('\n').at(-1)
+  if (archive === undefined || archive.length === 0) {
+    throw new Error(`SDK pack did not return an archive path: ${stdout}`)
+  }
+  return archive
+}
 
 test('relocated compiled host loads an external TypeScript Extension', async () => {
   const sandbox = await mkdtemp(join(tmpdir(), 'ctxindex-compiled-extension-'))
@@ -24,6 +44,9 @@ test('relocated compiled host loads an external TypeScript Extension', async () 
     await cp(join(fixtureDir, 'dependency'), join(sandbox, 'dependency'), {
       recursive: true,
     })
+    const extensionSdkArchive = await packExtensionSdk(
+      join(sandbox, 'artifacts'),
+    )
 
     const install = Bun.spawn(
       [
@@ -31,7 +54,7 @@ test('relocated compiled host loads an external TypeScript Extension', async () 
         'add',
         '--cwd',
         externalPath,
-        `@ctxindex/extension-sdk@file:${extensionSdkDir}`,
+        `@ctxindex/extension-sdk@file:${extensionSdkArchive}`,
         '--offline',
         '--backend=copyfile',
       ],
@@ -115,4 +138,4 @@ test('relocated compiled host loads an external TypeScript Extension', async () 
   } finally {
     await rm(sandbox, { recursive: true, force: true })
   }
-}, 30_000)
+}, 60_000)

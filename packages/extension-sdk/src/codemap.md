@@ -24,7 +24,7 @@ Defines the stateless public TypeScript contract used to author ctxindex Provide
 
 ## Integration points
 
-- Exposed inside the monorepo by the private `@ctxindex/extension-sdk` workspace package; its only runtime dependency is Zod.
+- Exposed inside the monorepo through the `@ctxindex/extension-sdk` workspace and outside it through the built public package; its only runtime dependency is Zod.
 - Authored against by `packages/profiles/src/`, `packages/adapters/src/`, external extension packages such as `examples/tenders-extension/extension.ts`, and package-backed Catalog author packages.
 - Imported by `packages/core/src/extension/loader.ts` and validated/assembled through `packages/core/src/registry/complete-registry.ts` and `definition-registries.ts`.
 - Its contracts are consumed by core source, sync, search, action, resource, relation, artifact, export, and OAuth-app workflows.

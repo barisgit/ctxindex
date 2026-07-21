@@ -2,11 +2,11 @@
 
 ## Responsibility
 
-Defines the private workspace authoring/runtime contract for ctxindex Extension graphs, package-backed Catalog curation, and passive documentation sidecars: Providers, OAuth Apps, Profiles, Adapters, provider operations, and their host callbacks.
+Defines the public authoring/runtime contract for ctxindex Extension graphs, package-backed Catalog curation, and passive documentation sidecars: Providers, OAuth Apps, Profiles, Adapters, provider operations, and their host callbacks.
 
 ## Design / patterns
 
-- `package.json` exposes only `src/index.ts` as `@ctxindex/extension-sdk`; the barrel is a stable facade over private cohesive modules.
+- `package.json` exposes only `src/index.ts` as `@ctxindex/extension-sdk` inside the workspace; the barrel is a stable facade over cohesive contract modules. `scripts/release/extension-sdk-package.ts` builds that entry point plus declarations into an independently publishable, public package with Zod as its sole runtime dependency.
 - Generic identity factories (`defineProvider`, `defineOAuthApp`, `defineProfile`, `defineAdapter`, and `defineExtension`) add a discriminating `kind` while retaining literal definition data through inference. `defineCatalog` adds a validated Catalog root, and `packageExtension` identifies one exact Extension within an npm, Git, or local package target.
 - `docs('./docs')` returns a pure relative descriptor; generated builds may instead supply one eager virtual tree of Markdown strings and image bytes. Only Extension roots carry either declaration.
 - Provider policy is separate from Adapter behavior: a Provider owns authentication and network policy, OAuth Apps supply schema-typed registrations, and Adapters declare source-specific scopes, API hosts, capabilities, and Actions.
@@ -22,6 +22,6 @@ Defines the private workspace authoring/runtime contract for ctxindex Extension 
 
 ## Integration points
 
-- Depends only on Zod; the package manifest owns build, quality, test, and clean/fullclean tasks dispatched by root Turbo commands.
+- Depends only on Zod; the package manifest owns build, quality, test, and clean/fullclean tasks dispatched by root Turbo commands. The release packager stages `dist`, `README.md`, and `LICENSE` with a generated public manifest, and smoke-tests the exact archive through an external consumer.
 - Used by `packages/profiles/src/`, `packages/adapters/src/`, and external extension modules.
 - Core loads extension roots in `packages/core/src/extension/loader.ts`, builds reachable graphs in `packages/core/src/registry/complete-registry.ts`, and exposes definitions through `definition-registries.ts`.
