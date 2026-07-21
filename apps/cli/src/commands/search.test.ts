@@ -55,7 +55,7 @@ describe('search JSON output', () => {
         warnings: [],
       }),
     ).toBe(
-      '{"results":[],"pagination":{"offset":20,"limit":20,"hasMore":true},"warnings":[]}',
+      '{"results":[],"warnings":[],"pagination":{"offset":20,"limit":20,"hasMore":true}}',
     )
   })
 
@@ -220,7 +220,7 @@ describe('search JSON output', () => {
         warnings: [],
       }),
     ).toBe(
-      '{"results":[],"pagination":{"limit":50,"hasMore":true,"continuation":"opaque-next-page"},"warnings":[]}',
+      '{"results":[],"warnings":[],"pagination":{"limit":50,"hasMore":true,"continuation":"opaque-next-page"}}',
     )
   })
 })

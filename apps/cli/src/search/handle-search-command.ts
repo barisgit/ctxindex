@@ -22,7 +22,14 @@ type SearchResult =
   | RpcSearchResult
 
 export function formatSearchJson(result: SearchResult): string {
-  return compactJson(result)
+  return compactJson({
+    results: result.results,
+    warnings: result.warnings,
+    ...(result.pagination === undefined
+      ? {}
+      : { pagination: result.pagination }),
+    ...(result.explain === undefined ? {} : { explain: result.explain }),
+  })
 }
 
 const searchColumns = [

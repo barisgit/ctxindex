@@ -50,8 +50,8 @@ test('binary CLI enumerates filter-only searches locally and paginates determini
     const enumerated = JSON.parse(enumerate.stdout)
     expect(Object.keys(enumerated)).toEqual([
       'results',
-      'pagination',
       'warnings',
+      'pagination',
     ])
     expect(enumerated.pagination).toEqual({
       offset: 0,
@@ -157,7 +157,7 @@ test('binary CLI enumerates filter-only searches locally and paginates determini
       env,
     })
     expect(remote.exitCode).toBe(0)
-    expect(remote.stderr).toContain('does not support remote search')
+    expect(remote.stderr).toContain('remote_search_unsupported')
 
     const badOffset = await sandbox.run(
       ['search', 'content', '--kind', 'file', '--offset', '2'],
