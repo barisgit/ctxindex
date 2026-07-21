@@ -14,9 +14,10 @@
     "test:e2e": "NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-e2e.json bun run ../../scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' --pass-with-no-tests e2e.test"
   },
   "dependencies": {
-    "@ctxindex/official": "workspace:*",
     "@ctxindex/core": "workspace:*",
+    "@ctxindex/extension-sdk": "workspace:*",
     "@ctxindex/local-daemon": "workspace:*",
+    "@ctxindex/official": "workspace:*",
     "@ctxindex/rpc": "workspace:*",
     "@orpc/server": "1.14.8"
   }
