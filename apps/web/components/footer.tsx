@@ -45,7 +45,7 @@ export function Footer() {
             you stay in control.
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
+        <div className="grid w-fit grid-cols-2 gap-8 sm:grid-cols-3">
           {groups.map((g) => (
             <div key={g.title}>
               <h3 className="mb-3 text-sm font-semibold">{g.title}</h3>
@@ -54,7 +54,7 @@ export function Footer() {
                   <li key={l.href}>
                     <Link
                       href={l.href}
-                      className="inline-flex min-h-11 items-center text-sm text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-fd-ring)]"
+                      className="text-sm text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-fd-ring)]"
                     >
                       {l.label}
                     </Link>
