@@ -1,10 +1,10 @@
 import { expect, test } from 'bun:test'
 import { cp, mkdir, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { createSandbox } from '@ctxindex/core/testing'
+import { createSandbox, type Sandbox } from '@ctxindex/core/testing'
 
 const repoRoot = resolve(import.meta.dir, '../../../..')
-const cliBin = join(repoRoot, 'apps/cli/bin/ctxindex.mjs')
+const daemonMain = join(repoRoot, 'apps/daemon/src/main.ts')
 const extensionSourcePath = resolve(
   import.meta.dir,
   '../../../../examples/github-issues-extension',
@@ -30,10 +30,24 @@ function githubIssue(number: number) {
   }
 }
 
+async function waitForDaemonReady(sandbox: Sandbox): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const status = await sandbox.run(['daemon', 'status', '--format', 'json'])
+    if (status.exitCode === 0) {
+      const result = JSON.parse(status.stdout) as { status?: string }
+      if (result.status === 'running') return
+    }
+    await Bun.sleep(25)
+  }
+  throw new Error('preloaded test daemon did not become ready')
+}
+
 test('external GitHub Issues Extension syncs mocked data for local paged search and get', async () => {
   const sandbox = await createSandbox()
   const extensionPath = join(sandbox.dir, 'compiled-github-issues-extension')
   const preloadPath = join(sandbox.dir, 'github-fetch-preload.ts')
+  let daemonProcess: ReturnType<typeof Bun.spawn> | undefined
+  let daemonOutput: Promise<readonly [string, string]> | undefined
   try {
     await mkdir(join(extensionPath, 'dist'), { recursive: true })
     const extensionBuild = Bun.spawn(
@@ -79,24 +93,6 @@ test('external GitHub Issues Extension syncs mocked data for local paged search 
       `[extensions]\npaths = ${JSON.stringify([extensionPath])}\n\n[secrets]\nbackend = "keychain"\n\n[log]\nlevel = "info"\n\n[log.file]\nrotate = "daily"\nretain_days = 14\ncompress = true\n`,
     )
 
-    const realm = await sandbox.run(['realm', 'add', 'demo', '--name', 'Demo'])
-    expect(realm.exitCode, realm.stderr).toBe(0)
-    const added = await sandbox.run([
-      'source',
-      'add',
-      'github.issues',
-      '--realm',
-      'demo',
-      '--label',
-      'github-demo',
-      '--config-owner',
-      'acme',
-      '--config-repository',
-      'widgets',
-    ])
-    expect(added.exitCode, added.stderr).toBe(0)
-    const sourceId = parseSourceId(added.stdout)
-
     const expectedUrl =
       'https://api.github.com/repos/acme/widgets/issues?state=all&sort=updated&direction=desc&per_page=100'
     await writeFile(
@@ -115,18 +111,8 @@ globalThis.fetch = async (input, init = {}) => {
 }
 `,
     )
-    const syncProcess = Bun.spawn(
-      [
-        'bun',
-        '--preload',
-        preloadPath,
-        cliBin,
-        'sync',
-        '--source',
-        'github-demo',
-        '--format',
-        'json',
-      ],
+    const spawnedDaemon = Bun.spawn(
+      ['bun', '--preload', preloadPath, daemonMain],
       {
         cwd: repoRoot,
         env: sandbox.env,
@@ -135,13 +121,40 @@ globalThis.fetch = async (input, init = {}) => {
         stderr: 'pipe',
       },
     )
-    const [syncExitCode, syncStdout, syncStderr] = await Promise.all([
-      syncProcess.exited,
-      new Response(syncProcess.stdout).text(),
-      new Response(syncProcess.stderr).text(),
+    daemonProcess = spawnedDaemon
+    daemonOutput = Promise.all([
+      new Response(spawnedDaemon.stdout).text(),
+      new Response(spawnedDaemon.stderr).text(),
     ])
-    expect(syncExitCode, syncStderr).toBe(0)
-    expect(JSON.parse(syncStdout)).toMatchObject({
+    await waitForDaemonReady(sandbox)
+
+    const realm = await sandbox.run(['realm', 'add', 'demo', '--name', 'Demo'])
+    expect(realm.exitCode, realm.stderr).toBe(0)
+    const added = await sandbox.run([
+      'source',
+      'add',
+      'github.issues',
+      '--realm',
+      'demo',
+      '--label',
+      'github-demo',
+      '--config-owner',
+      'acme',
+      '--config-repository',
+      'widgets',
+    ])
+    expect(added.exitCode, added.stderr).toBe(0)
+    const sourceId = parseSourceId(added.stdout)
+
+    const synced = await sandbox.run([
+      'sync',
+      '--source',
+      'github-demo',
+      '--format',
+      'json',
+    ])
+    expect(synced.exitCode, synced.stderr).toBe(0)
+    expect(JSON.parse(synced.stdout)).toMatchObject({
       mode: 'sync',
       results: [
         {
@@ -157,7 +170,7 @@ globalThis.fetch = async (input, init = {}) => {
       ],
       warnings: [],
     })
-    expect(syncStderr).toBe('')
+    expect(synced.stderr).toBe('')
 
     const firstPage = await sandbox.run([
       'search',
@@ -216,6 +229,19 @@ globalThis.fetch = async (input, init = {}) => {
       warnings: [],
     })
   } finally {
+    if (daemonProcess) {
+      const stopped = await sandbox.run(['daemon', 'stop', '--format', 'json'])
+      if (stopped.exitCode !== 0) daemonProcess.kill('SIGTERM')
+      const exited = await Promise.race([
+        daemonProcess.exited.then(() => true),
+        Bun.sleep(2_000).then(() => false),
+      ])
+      if (!exited) {
+        daemonProcess.kill('SIGKILL')
+        await daemonProcess.exited
+      }
+      await daemonOutput
+    }
     await sandbox.cleanup()
   }
 })
