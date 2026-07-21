@@ -54,4 +54,10 @@ test('byte transfer rejects oversized payloads before retaining them', () => {
   expect(() => store.create(Uint8Array.of(1, 2, 3))).toThrow(
     ByteTransferTooLargeError,
   )
+  const retained = store.create(Uint8Array.of(1))
+  expect(() => store.create(Uint8Array.of(2, 3))).toThrow(
+    ByteTransferTooLargeError,
+  )
+  expect(store.consume(retained.ticket)).toEqual(Uint8Array.of(1))
+  expect(() => store.create(Uint8Array.of(2, 3))).not.toThrow()
 })

@@ -41,6 +41,7 @@ export class ByteTransferStore
   readonly #now: () => number
   readonly #randomBytes: () => Uint8Array
   readonly #pending = new Map<string, PendingTransfer>()
+  #pendingBytes = 0
 
   constructor(options: ByteTransferStoreOptions = {}) {
     this.#maxBytes = options.maxBytes ?? RPC_BYTE_TRANSFER_MAX_BYTES
@@ -54,9 +55,10 @@ export class ByteTransferStore
   }
 
   create(bytes: Uint8Array): ByteTransferDescriptor {
-    if (bytes.byteLength > this.#maxBytes) throw new ByteTransferTooLargeError()
     const now = this.#now()
     this.#prune(now)
+    if (bytes.byteLength > this.#maxBytes - this.#pendingBytes)
+      throw new ByteTransferTooLargeError()
     const expiresAt = now + this.#ttlMs
     if (!Number.isSafeInteger(expiresAt))
       throw new RangeError('Byte transfer expiry is invalid')
@@ -67,6 +69,7 @@ export class ByteTransferStore
       const ticket = Buffer.from(random).toString('hex')
       if (!TICKET_PATTERN.test(ticket) || this.#pending.has(ticket)) continue
       this.#pending.set(ticket, { bytes: bytes.slice(), expiresAt })
+      this.#pendingBytes += bytes.byteLength
       return { ticket, byteSize: bytes.byteLength, expiresAt }
     }
     throw new Error('Unable to allocate a byte transfer ticket')
@@ -76,17 +79,22 @@ export class ByteTransferStore
     if (!TICKET_PATTERN.test(ticket)) return null
     const entry = this.#pending.get(ticket)
     this.#pending.delete(ticket)
+    if (entry) this.#pendingBytes -= entry.bytes.byteLength
     if (!entry || entry.expiresAt <= this.#now()) return null
     return entry.bytes
   }
 
   close(): void {
     this.#pending.clear()
+    this.#pendingBytes = 0
   }
 
   #prune(now: number): void {
     for (const [ticket, entry] of this.#pending) {
-      if (entry.expiresAt <= now) this.#pending.delete(ticket)
+      if (entry.expiresAt <= now) {
+        this.#pending.delete(ticket)
+        this.#pendingBytes -= entry.bytes.byteLength
+      }
     }
   }
 }
