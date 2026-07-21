@@ -639,6 +639,7 @@ export async function daemonAccountAdd(
       completed = true
       return result.value
     } finally {
+      prompt.controller.abort()
       prompt.close()
     }
   } catch (error) {

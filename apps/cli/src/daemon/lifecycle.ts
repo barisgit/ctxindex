@@ -143,6 +143,61 @@ const defaultBackgroundLaunchDependencies: BackgroundLaunchDependencies = {
   spawn: (argv, options) => Bun.spawn([...argv], options),
 }
 
+const DAEMON_ENVIRONMENT_ALLOWLIST = [
+  'HOME',
+  'USER',
+  'LOGNAME',
+  'PATH',
+  'TMPDIR',
+  'TMP',
+  'TEMP',
+  'LANG',
+  'LC_ALL',
+  'LC_CTYPE',
+  'XDG_CONFIG_HOME',
+  'XDG_DATA_HOME',
+  'XDG_STATE_HOME',
+  'XDG_CACHE_HOME',
+  'NODE_ENV',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+  'NODE_EXTRA_CA_CERTS',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'NO_PROXY',
+  'http_proxy',
+  'https_proxy',
+  'no_proxy',
+  'CTXINDEX_CONFIG_HOME',
+  'CTXINDEX_DATA_HOME',
+  'CTXINDEX_STATE_HOME',
+  'CTXINDEX_CACHE_HOME',
+  'CTXINDEX_DAEMON_RUNTIME_ROOT',
+  'CTXINDEX_BUILD_VERSION',
+  'CTXINDEX_LOG_LEVEL',
+  'CTXINDEX_LOG_SYNC',
+  'CTXINDEX_SECRETS_PASSPHRASE',
+  'CTXINDEX_KEYTAR_MOCK_FILE',
+  'CTXINDEX_GRAPH_MOCK_BASE_URL',
+  'CTXINDEX_GOOGLE_CALENDAR_MOCK_BASE_URL',
+  'CTXINDEX_GMAIL_MOCK_BASE_URL',
+  'CTXINDEX_TEST_LOG_ROTATE_BYTES',
+  'CTXINDEX_TEST_LOG_SPAM_BYTES',
+  'CTXINDEX_TEST_SYNC_DELAY_MS',
+  'CTXINDEX_E2E_TRACE_STORAGE_ACQUIRE__',
+] as const
+
+export function daemonSpawnEnvironment(
+  source: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const environment: NodeJS.ProcessEnv = {}
+  for (const name of DAEMON_ENVIRONMENT_ALLOWLIST) {
+    const value = source[name]
+    if (value !== undefined) environment[name] = value
+  }
+  return environment
+}
+
 export function launchBackgroundDaemon(
   argv: readonly string[],
   stateRoot: string,
@@ -155,7 +210,7 @@ export function launchBackgroundDaemon(
       stdin: 'ignore',
       stdout: descriptor,
       stderr: descriptor,
-      env: process.env,
+      env: daemonSpawnEnvironment(),
     })
     child.unref()
   } finally {

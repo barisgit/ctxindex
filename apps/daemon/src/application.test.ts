@@ -263,6 +263,77 @@ test('Account authorization streams one URL and accepts one hidden response with
   expect(JSON.stringify(terminal)).not.toContain('private-code')
 })
 
+test('Account response bypasses an exclusive secret switch queued behind authorization', async () => {
+  const calls: string[] = []
+  const app = application({
+    createAuthorizationRequestId: () => 'authorization-request',
+    accountService: {
+      authorize: async (
+        _input: unknown,
+        interaction: {
+          readonly readAuthorizationResponse: (prompt: {
+            readonly authorizationUrl: string
+            readonly redirectUri: string
+            readonly signal: AbortSignal
+          }) => Promise<string | undefined>
+        },
+      ) => {
+        await interaction.readAuthorizationResponse({
+          authorizationUrl: 'https://accounts.example/authorize',
+          redirectUri: 'http://localhost/callback',
+          signal: new AbortController().signal,
+        })
+        calls.push('authorized')
+        return { accountId: 'account-id' }
+      },
+      list: () => [],
+      remove: async () => {},
+    },
+    secretBackendManager: {
+      async getStatus() {
+        throw new Error('unused')
+      },
+      async switchBackend(target: 'keychain' | 'file') {
+        calls.push(`switched:${target}`)
+        return {
+          backend: target,
+          copied: 0,
+          cleaned: 0,
+          cleanupPending: false,
+          warnings: [],
+        }
+      },
+    },
+  })
+  app.markReady()
+  const opened = await app.account.add(
+    { provider: 'google' },
+    context('account-add'),
+  )
+  if (!opened.ok) throw new Error('Expected Account stream admission')
+  expect((await opened.value.next()).done).toBe(false)
+  const switching = app.secrets.backend.set(
+    { target: 'file' },
+    context('secrets-switch'),
+  )
+  await Promise.resolve()
+  expect(calls).toEqual([])
+  const response = app.account.respond(
+    { requestId: 'authorization-request', response: 'private-code' },
+    context('account-respond'),
+  )
+  const outcome = await Promise.race([
+    response.then(() => 'responded' as const),
+    Bun.sleep(20).then(() => 'timeout' as const),
+  ])
+  if (outcome === 'timeout') await opened.value.return?.()
+  expect(outcome).toBe('responded')
+  expect(await response).toEqual({ ok: true, value: { accepted: true } })
+  expect((await opened.value.next()).done).toBe(true)
+  expect(await switching).toMatchObject({ ok: true })
+  expect(calls).toEqual(['authorized', 'switched:file'])
+})
+
 test('automatic loopback completion aborts and removes pending manual input', async () => {
   const app = application({
     createAuthorizationRequestId: () => 'automatic-request',

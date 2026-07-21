@@ -454,6 +454,62 @@ test('daemon Account add maps prompt cancellation before transport teardown', as
   }
 })
 
+test('daemon Account terminal rejection always aborts hidden prompt input', async () => {
+  const setup = await fixture()
+  const selection = selectDaemonForRuntime(setup.runtime, {
+    testEndpoint: '/tmp/ctxd-account-terminal-rejection.sock',
+  }) as DaemonSelection
+  let index = 0
+  let promptAborted = false
+  const iterator = {
+    [Symbol.asyncIterator]() {
+      return this
+    },
+    async next() {
+      if (index++ === 0)
+        return {
+          done: false as const,
+          value: {
+            type: 'authorization.required' as const,
+            requestId: 'request-id',
+            authorizationUrl: 'https://accounts.example/authorize',
+          },
+        }
+      throw new Error('terminal transport rejection')
+    },
+  } as AsyncIteratorObject<RpcAccountAddEvent, RpcAccountAddResult, void>
+  try {
+    await expect(
+      daemonAccountAdd(
+        selection,
+        { provider: 'google' },
+        {
+          emitAuthorizationUrl() {},
+          readAuthorizationResponse: ({ signal }) =>
+            new Promise((resolve) => {
+              signal.addEventListener(
+                'abort',
+                () => {
+                  promptAborted = true
+                  resolve(undefined)
+                },
+                { once: true },
+              )
+            }),
+        },
+        undefined,
+        {
+          createClient: () =>
+            accountClient({ iterator, respond: async () => {} }),
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'daemon_unavailable' })
+    expect(promptAborted).toBe(true)
+  } finally {
+    await setup.close()
+  }
+})
+
 test('daemon OAuth App add never replays secret-bearing config', async () => {
   const setup = await fixture()
   let reconnects = 0

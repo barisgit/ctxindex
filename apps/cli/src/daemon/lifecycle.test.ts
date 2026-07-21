@@ -20,6 +20,7 @@ import {
 import {
   createDaemonLifecycle,
   type DaemonLifecycleDependencies,
+  daemonSpawnEnvironment,
   launchBackgroundDaemon,
   openDaemonDiagnostics,
   removeStaleDaemonEndpoint,
@@ -171,6 +172,33 @@ test('background launch is detached, ignores stdin, redirects output, and unrefs
   })
   expect(unrefs).toBe(1)
   expect(closed).toEqual([41])
+})
+
+test('daemon spawn environment keeps infrastructure and drops Provider secrets', () => {
+  expect(
+    daemonSpawnEnvironment({
+      HOME: '/home/user',
+      PATH: '/bin',
+      XDG_DATA_HOME: '/data',
+      CTXINDEX_DATA_HOME: '/ctx-data',
+      CTXINDEX_DAEMON_RUNTIME_ROOT: '/runtime',
+      CTXINDEX_SECRETS_PASSPHRASE: 'file-backend-passphrase',
+      NODE_ENV: 'test',
+      CTXINDEX_GMAIL_MOCK_BASE_URL: 'http://127.0.0.1:1234',
+      CTXINDEX_GOOGLE_CLIENT_ID: 'public-provider-value',
+      CTXINDEX_GOOGLE_CLIENT_SECRET: 'private-provider-value',
+      ACME_OAUTH_CLIENT_SECRET: 'private-extension-value',
+    }),
+  ).toEqual({
+    HOME: '/home/user',
+    PATH: '/bin',
+    XDG_DATA_HOME: '/data',
+    CTXINDEX_DATA_HOME: '/ctx-data',
+    CTXINDEX_DAEMON_RUNTIME_ROOT: '/runtime',
+    CTXINDEX_SECRETS_PASSPHRASE: 'file-backend-passphrase',
+    NODE_ENV: 'test',
+    CTXINDEX_GMAIL_MOCK_BASE_URL: 'http://127.0.0.1:1234',
+  })
 })
 
 test('daemon diagnostics use owner-private directory and file modes', () => {

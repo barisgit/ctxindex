@@ -981,16 +981,21 @@ export class DaemonApplication implements DaemonRpcApplication {
     input: RpcAccountRespondInput,
     context: RpcRequestContext,
   ): Promise<RpcResult<RpcAccountRespondResult>> {
-    return this.#business(context, async () => {
-      const pending = this.#pendingAuthorizationResponses.get(input.requestId)
-      if (!pending)
-        throw new CtxindexNotFoundError(
-          'The OAuth authorization request is no longer active.',
-        )
-      this.#pendingAuthorizationResponses.delete(input.requestId)
-      pending.resolve(input.response)
-      return { accepted: true }
-    })
+    return this.#business(
+      context,
+      async () => {
+        const pending = this.#pendingAuthorizationResponses.get(input.requestId)
+        if (!pending)
+          throw new CtxindexNotFoundError(
+            'The OAuth authorization request is no longer active.',
+          )
+        this.#pendingAuthorizationResponses.delete(input.requestId)
+        pending.resolve(input.response)
+        return { accepted: true }
+      },
+      true,
+      'none',
+    )
   }
 
   accountList(
@@ -1509,7 +1514,7 @@ export class DaemonApplication implements DaemonRpcApplication {
     context: RpcRequestContext,
     invoke: (signal: AbortSignal) => Promise<T>,
     resetsIdle = true,
-    secretAccess: 'shared' | 'exclusive' = 'shared',
+    secretAccess: 'shared' | 'exclusive' | 'none' = 'shared',
   ): Promise<RpcResult<T>> {
     if (this.#lifecycle !== 'ready')
       return Promise.resolve(unavailable(this.#lifecycle))
@@ -1526,10 +1531,15 @@ export class DaemonApplication implements DaemonRpcApplication {
     this.#active.set(key, { controller, settled })
     this.#touchIdle(resetsIdle)
 
-    return this.#withSecretAccess(secretAccess, () => {
+    const operation = () => {
       controller.signal.throwIfAborted()
       return invoke(controller.signal)
-    })
+    }
+    return (
+      secretAccess === 'none'
+        ? Promise.resolve().then(operation)
+        : this.#withSecretAccess(secretAccess, operation)
+    )
       .then(
         (value): RpcResult<T> =>
           controller.signal.aborted
