@@ -13,9 +13,9 @@ Defines the authoritative Citty command tree and thin typed adapters connecting 
 - `action run`, exact Action describe, sync, status, and search descriptors advertise Source label-or-ID inputs; search additionally documents opaque single-Source remote continuation, and handlers resolve Source references before core calls.
 - `thread.ts` is a leaf for `thread <ref>`; `artifact.ts` groups list/download/purge; `action.ts` retains only run; and `describe.ts` owns source-aware exact Action inspection.
 - `account`, `oauth-app`, `realm`, `source`, `extension list`, `status`, `search`, `get`, `thread`, and `artifact list` reuse the shared pretty/text/json definition and resolve destination-aware defaults before workflow effects. `export`, `describe`, sync, daemon lifecycle, Artifact download, and Artifact purge retain their independent output domains.
-- `secrets.ts`, `status.ts`, `get.ts`, `export.ts`, and `skills.ts` define their full public grammar and pass typed values directly into focused workflows. Ref and secret-backend semantic validation remains effect-free inside those workflows, while enum/default/help behavior comes from the descriptors.
+- `secrets.ts`, `status.ts`, `get.ts`, and `export.ts` define their full public grammar and pass typed values directly into focused workflows. Ref and secret-backend semantic validation remains effect-free inside those workflows, while enum/default/help behavior comes from the descriptors.
 - `init.ts` is a thin descriptor that delegates the full leased initialization lifecycle to the top-level `direct-database.ts` boundary.
-- `docs.ts` groups the offline `list`, exact `get`, and bounded text `search` descriptors; `../docs/command.ts` owns source composition, safe projections, explicit output-copy semantics, and rendering.
+- `docs.ts` groups the offline `list`, exact `get`, `get-skill`, and bounded text `search` descriptors; `../docs/command.ts` owns source composition, the portable Agent Skill resolver, safe projections, explicit output-copy semantics, and rendering.
 - `extensions.ts` is a minimal registration re-export; the `extensions/` workflow folder owns the nested Catalog descriptors and core-service delegation.
 
 ## Data & control flow

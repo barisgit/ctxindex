@@ -9,13 +9,13 @@ import { daemonCommand } from '../daemon/command'
 import { accountCommand } from './account'
 import { artifactCommand } from './artifact'
 import { describeCommand } from './describe'
+import { docsCommand } from './docs'
 import { exportCommand } from './export'
 import { getCommand } from './get'
 import { initCommand } from './init'
 import { oauthAppCommand } from './oauth-app'
 import { realmCommand } from './realm'
 import { secretsCommand } from './secrets'
-import { skillsCommand } from './skills'
 import { statusCommand } from './status'
 import { syncCommand } from './sync'
 import { threadCommand } from './thread'
@@ -33,13 +33,13 @@ function commandTree() {
       artifact: artifactCommand,
       daemon: daemonCommand,
       describe: describeCommand,
+      docs: docsCommand,
       export: exportCommand,
       get: getCommand,
       init: initCommand,
       'oauth-app': oauthAppCommand,
       realm: realmCommand,
       secrets: secretsCommand,
-      skills: skillsCommand,
       status: statusCommand,
       sync: syncCommand,
       thread: threadCommand,
@@ -116,7 +116,20 @@ test('core command definitions own required arguments and bounded choices', asyn
       'ctxindex oauth-app add',
       'ctxindex realm add',
       'ctxindex secrets backend set',
-      'ctxindex skills get',
+      'ctxindex docs get-skill',
+    ]),
+  )
+  expect(
+    [...commands.keys()].some((path) => path.startsWith('ctxindex skills')),
+  ).toBe(false)
+  expect(commands.get('ctxindex docs get-skill')?.arguments).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ name: 'output', aliases: ['o'] }),
+      expect.objectContaining({
+        name: 'format',
+        choices: ['text', 'json'],
+        defaultValue: 'text',
+      }),
     ]),
   )
 })

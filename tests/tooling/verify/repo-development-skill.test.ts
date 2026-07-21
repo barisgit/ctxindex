@@ -5,16 +5,15 @@ import { fileURLToPath } from 'node:url'
 
 const repoRoot = resolve(fileURLToPath(new URL('../../../', import.meta.url)))
 const skillPath = join(repoRoot, '.agents/skills/repo-development/SKILL.md')
-const bundledSkillPath = join(repoRoot, 'skills/getting-started.md')
-const cliOverviewPath = join(repoRoot, 'skills/reference/cli-overview.md')
+const bundledSkillPath = join(repoRoot, 'skills/ctxindex/SKILL.md')
 const cliMainPath = join(repoRoot, 'apps/cli/src/main.ts')
 const requiredDiscoverySnippets = [
-  'ctxindex --help',
-  'ctxindex describe',
+  'ctxindex docs list --format json',
+  'ctxindex docs search "<topic>" --format json',
+  'ctxindex docs get <path>',
+  'ctxindex describe --format json',
   'ctxindex describe <profile|adapter|action> <id> --format json',
-  'ctxindex extension list',
-  'ctxindex skills list',
-  'ctxindex skills get <name>',
+  'ctxindex --help',
 ] as const
 
 interface CtxindexInvocation {
@@ -161,7 +160,7 @@ test('repo-development skill keeps the supported CLI walkthrough', async () => {
     'bun cli export',
     'bun cli describe action',
     'bun cli action run',
-    'bun cli skills list',
+    'bun cli docs get-skill',
     'bun cli secrets status',
     'bun cli oauth-app add',
     'bun cli account add',
@@ -184,31 +183,28 @@ test('documented commands match implemented commands', async () => {
   expect(missingFromCommands).toEqual([])
 })
 
-test('bundled skill is concise orientation to live discovery', async () => {
-  const [orientation, mainSource] = await Promise.all([
-    readBundledSkill(),
-    readCliMain(),
-  ])
+test('portable Agent Skill is concise orientation to live discovery', async () => {
+  const orientation = await readBundledSkill()
 
+  expect(orientation).toMatch(
+    /^---\nname: ctxindex\ndescription: [^\n]+\n---\n\n# ctxindex\n/,
+  )
   for (const discovery of requiredDiscoverySnippets) {
     expect(orientation).toContain(discovery)
   }
-
-  expect(inlineCodeSpans(orientation)).toEqual(requiredDiscoverySnippets)
-  expect(fenceOpeningLines(orientation)).toEqual([])
-  expect(
-    staticCommandInventory(orientation, implementedCommands(mainSource)),
-  ).toEqual([])
-
-  for (const command of implementedCommands(mainSource)) {
-    if (['describe', 'extension', 'skills'].includes(command)) continue
-    expect(orientation).not.toMatch(new RegExp(`ctxindex\\s+${command}\\b`))
-  }
-
+  expect(requiredDiscoverySnippets).toHaveLength(6)
+  expect(orientation).toContain('local personal-context gateway')
+  expect(orientation).toContain('configured mail, calendars, files')
+  expect(orientation).toContain('Extension-defined Sources')
+  expect(orientation).toContain('set -euo pipefail')
+  expect(orientation).toContain('--format json')
+  expect(orientation).toContain("jq -er '.results[0].ref'")
+  expect(orientation).not.toMatch(
+    /never sends|only reversible|Draft create\/update/i,
+  )
   expect(orientation).not.toMatch(
     /--from-env|oauth-app add|account add|source add|provider console|credential/i,
   )
-  expect(await Bun.file(cliOverviewPath).exists()).toBe(false)
 })
 
 test('bundled orientation guard rejects static inventories and schemas', async () => {

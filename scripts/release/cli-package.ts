@@ -510,9 +510,9 @@ export async function smokeCliPackage(
   if (!oauthAppHelp.stdout.includes('ctxindex oauth-app add|list|remove')) {
     throw new Error('Installed CLI help did not expose OAuth App commands')
   }
-  const skills = await cli(['skills', 'get', 'getting-started'])
-  if (!skills.stdout.startsWith('# Getting started with ctxindex')) {
-    throw new Error('Installed CLI could not read its bundled skill')
+  const skill = await cli(['docs', 'get-skill'])
+  if (!skill.stdout.startsWith('---\nname: ctxindex\n')) {
+    throw new Error('Installed CLI could not read its portable Agent Skill')
   }
 
   const keytarMockFile = join(smokeRoot, 'keytar.json')

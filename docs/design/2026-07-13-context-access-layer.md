@@ -39,11 +39,11 @@ Division of labor with the surrounding ecosystem:
   model or provider runtime. V1 exposes the CLI; ten provider MCPs would remain
   ten auth/identity/search/artifact silos, while one future ctxindex MCP could
   expose the shared data plane.
-- **ACF** (`../agent-capability-format`): future distribution of agent-facing
-  skill docs. ctxindex Extensions may bundle Providers, OAuth Apps, Profiles,
-  Adapters, and one passive documentation sidecar, but not agent workflow
-  skills. The existing `ctxindex skills` surface remains for bundled workflow
-  docs but may later be superseded by ACF emission.
+- **Portable Agent Skill**: ctxindex ships one standard `skills/ctxindex/SKILL.md`
+  for concise workflow orientation. The CLI embeds its exact release bytes and
+  exposes them through `ctxindex docs get-skill`; loaded schemas and passive
+  Extension documentation remain live discovery surfaces rather than skill
+  content.
 
 Explicitly out of scope: SaaS/remote canonical store, arbitrary provider
 automation, agent workflow policy, and a universal sync protocol. Typed
@@ -472,7 +472,7 @@ ctxindex status [--source <label|id>] [--format json]
 ctxindex purge index|raw|artifacts|adhoc|source <label|id>
 ctxindex extensions list
 ctxindex describe [profile|adapter|action] [id] [--format json]
-ctxindex skills list|get|path      # retained; ACF may supersede
+ctxindex docs get-skill [--output <path>] [--format text|json]
 ctxindex secrets status [--format json]
 ctxindex secrets backend set <keychain|file>
 ```

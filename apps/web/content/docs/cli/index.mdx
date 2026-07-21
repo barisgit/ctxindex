@@ -14,7 +14,7 @@ Give shell-capable agents one local, typed interface to your personal context.
 ```text
 Give shell-capable agents one local, typed interface to your personal context. (ctxindex v0.0.0)
 
-USAGE ctxindex [OPTIONS] init|account|oauth-app|describe|docs|daemon|extension|action|artifact|realm|source|sync|get|export|thread|search|status|secrets|skills
+USAGE ctxindex [OPTIONS] init|account|oauth-app|describe|docs|daemon|extension|action|artifact|realm|source|sync|get|export|thread|search|status|secrets
 
 OPTIONS
 
@@ -40,7 +40,6 @@ COMMANDS
      search    Search context Resources.
      status    Show last sync status.
     secrets    Inspect and select secret storage.
-     skills    Inspect bundled skills.
 
 Use ctxindex <command> --help for more information about a command.
 
@@ -259,13 +258,14 @@ Inspect bundled and loaded Extension documentation offline.
 ```text
 Inspect bundled and loaded Extension documentation offline. (ctxindex docs v0.0.0)
 
-USAGE ctxindex docs list|get|search
+USAGE ctxindex docs list|get|get-skill|search
 
 COMMANDS
 
-    list    List offline documentation.
-     get    Retrieve exact offline documentation.
-  search    Search offline documentation.
+       list    List offline documentation.
+        get    Retrieve exact offline documentation.
+  get-skill    Retrieve the portable ctxindex Agent Skill.
+     search    Search offline documentation.
 
 Use ctxindex docs <command> --help for more information about a command.
 ```
@@ -316,6 +316,26 @@ OPTIONS
 | `--extension` | Filter by one exact loaded Extension id | Optional |
 | `--output`, `-o` | Copy content to this explicit output path | Optional |
 | `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
+
+## `ctxindex docs get-skill`
+
+Retrieve the portable ctxindex Agent Skill.
+
+```text
+Retrieve the portable ctxindex Agent Skill. (ctxindex docs get-skill v0.0.0)
+
+USAGE ctxindex docs get-skill [OPTIONS]
+
+OPTIONS
+
+     -o, --output=<output>    Copy the exact SKILL.md to this explicit output path
+  -f, --format=<text|json>    Output format: text or json (Default: text)
+```
+
+| Argument | Description | Contract |
+| --- | --- | --- |
+| `--output`, `-o` | Copy the exact SKILL.md to this explicit output path | Optional |
+| `--format`, `-f` | Output format: text or json | Optional. Choices: `text`, `json`. Default: `text` |
 
 ## `ctxindex docs search`
 
@@ -1239,74 +1259,3 @@ ARGUMENTS
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `<target>` |  | Required. Choices: `keychain`, `file` |
-
-## `ctxindex skills`
-
-Inspect bundled skills.
-
-```text
-Inspect bundled skills. (ctxindex skills v0.0.0)
-
-USAGE ctxindex skills list|get|path
-
-COMMANDS
-
-  list    List bundled skills.
-   get    Print a bundled skill.
-  path    Print bundled skills location.
-
-Use ctxindex skills <command> --help for more information about a command.
-```
-
-## `ctxindex skills list`
-
-List bundled skills.
-
-```text
-List bundled skills. (ctxindex skills list v0.0.0)
-
-USAGE ctxindex skills list [OPTIONS]
-
-OPTIONS
-
-  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
-```
-
-| Argument | Description | Contract |
-| --- | --- | --- |
-| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
-
-## `ctxindex skills get`
-
-Print a bundled skill.
-
-```text
-Print a bundled skill. (ctxindex skills get v0.0.0)
-
-USAGE ctxindex skills get [OPTIONS] <NAME>
-
-ARGUMENTS
-
-  NAME    (Required)
-
-OPTIONS
-
-                         --inline    Inline file references
-  -f, --format=<pretty|text|json>    Output format: pretty, text, or json
-```
-
-| Argument | Description | Contract |
-| --- | --- | --- |
-| `<name>` |  | Required |
-| `--inline` | Inline file references | Optional |
-| `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
-
-## `ctxindex skills path`
-
-Print bundled skills location.
-
-```text
-Print bundled skills location. (ctxindex skills path v0.0.0)
-
-USAGE ctxindex skills path
-```

@@ -1,5 +1,5 @@
 import { afterEach, expect, spyOn, test } from 'bun:test'
-import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { DocumentationService } from '@ctxindex/core/documentation'
@@ -12,15 +12,58 @@ import type { DocumentationProjection } from '@ctxindex/core/extension'
 import type { DaemonSelection } from '../daemon/client'
 import {
   handleDocsGet,
+  handleDocsGetSkill,
   handleDocsList,
   handleDocsSearch,
   loadDocsCommandService,
 } from './command'
 
+const agentSkill = {
+  name: 'ctxindex',
+  description: 'Use ctxindex for personal context.',
+  byteSize: 119,
+  content:
+    '---\nname: ctxindex\ndescription: Use ctxindex for personal context.\n---\n\n# ctxindex\n\nUse live discovery.\n',
+}
+
 afterEach(() => {
   spyOn(console, 'log').mockRestore()
   spyOn(console, 'error').mockRestore()
   spyOn(process.stdout, 'write').mockRestore()
+})
+
+test('prints and copies the exact bundled Agent Skill without loading docs', async () => {
+  const stdout = spyOn(process.stdout, 'write').mockImplementation(() => true)
+  expect(await handleDocsGetSkill({ json: false }, () => agentSkill)).toBe(0)
+  expect(stdout).toHaveBeenCalledWith(agentSkill.content)
+
+  stdout.mockClear()
+  const output = spyOn(console, 'log').mockImplementation(() => {})
+  expect(await handleDocsGetSkill({ json: true }, () => agentSkill)).toBe(0)
+  expect(JSON.parse(String(output.mock.calls[0]?.[0]))).toEqual(agentSkill)
+
+  const root = await mkdtemp(join(tmpdir(), 'ctxindex-agent-skill-'))
+  try {
+    const outputPath = join(root, 'SKILL.md')
+    expect(
+      await handleDocsGetSkill(
+        { json: false, output: outputPath },
+        () => agentSkill,
+      ),
+    ).toBe(0)
+    expect(await readFile(outputPath, 'utf8')).toBe(agentSkill.content)
+    expect((await stat(outputPath)).mode & 0o777).toBe(0o600)
+    const error = spyOn(console, 'error').mockImplementation(() => {})
+    expect(
+      await handleDocsGetSkill(
+        { json: false, output: outputPath },
+        () => agentSkill,
+      ),
+    ).toBe(2)
+    expect(error.mock.calls[0]?.[0]).toContain('already exists')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 const markdown = {

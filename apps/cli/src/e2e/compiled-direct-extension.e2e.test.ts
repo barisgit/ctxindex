@@ -573,7 +573,7 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       ['thread', '--format', 'json', resourceRef],
       ['artifact', 'list', '--format', 'json', resourceRef],
       ['extension', 'catalog', 'list', '--no-refresh', '--format', 'json'],
-      ['skills', 'list', '--format', 'json'],
+      ['docs', 'get-skill', '--format', 'json'],
     ]) {
       const result = await run(args, offlineEnv)
       expect(result.exitCode, `${args.join(' ')}\n${result.stderr}`).toBe(0)

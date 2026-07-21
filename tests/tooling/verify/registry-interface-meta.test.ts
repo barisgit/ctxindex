@@ -5,9 +5,9 @@ const requiredDiscoverySnippets = [
   'ctxindex --help',
   'ctxindex describe',
   'ctxindex describe <profile|adapter|action> <id> --format json',
-  'ctxindex extension list',
-  'ctxindex skills list',
-  'ctxindex skills get <name>',
+  'ctxindex docs list --format json',
+  'ctxindex docs search "<topic>" --format json',
+  'ctxindex docs get <path>',
 ] as const
 
 function escapeRegExp(value: string): string {
@@ -37,7 +37,7 @@ function containsRegistryInventory(prose: string, term: string): boolean {
 }
 
 test('workflow skills point to runtime vocabulary instead of declaring it', async () => {
-  const prose = await Bun.file('skills/getting-started.md').text()
+  const prose = await Bun.file('skills/ctxindex/SKILL.md').text()
   const proseWithoutDiscovery = requiredDiscoverySnippets.reduce(
     (current, snippet) => current.replaceAll(snippet, ''),
     prose,
@@ -63,9 +63,9 @@ test('workflow skills point to runtime vocabulary instead of declaring it', asyn
   )
   expect(prose).toContain('ctxindex --help')
   expect(prose).toContain('ctxindex describe')
-  expect(prose).toContain('ctxindex extension list')
-  expect(prose).toContain('ctxindex skills list')
-  expect(prose).toContain('ctxindex skills get <name>')
+  expect(prose).toContain('ctxindex docs list --format json')
+  expect(prose).toContain('ctxindex docs search "<topic>" --format json')
+  expect(prose).toContain('ctxindex docs get <path>')
   expect(prose).not.toContain('--config-root-path')
 })
 

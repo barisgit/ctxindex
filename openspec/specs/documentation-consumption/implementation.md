@@ -28,8 +28,10 @@ interface DocsCommandService {
 
 One invocation selects its route once. Direct mode loads one local Extension definition snapshot and composes its projection with the bundled source. Selected-daemon mode keeps bundled get/list/search local and delegates only Extension operations through the generated RPC client. A selected request failure remains a daemon failure and never enters the direct loader. Combined inventory and search results use bundled-first, Extension-id, and logical-path ordering.
 
+`docs get-skill` is a separate local leaf command over one immutable build-time value. It never enters `DocumentationService`, loads Extensions, or selects a daemon. Text output preserves the exact embedded `SKILL.md`; JSON projects its bounded frontmatter metadata and content. Explicit copying reuses the documentation command's owner-private temporary-file and exclusive-link publication boundary.
+
 ## Presentation and verification
 
 Inventory and search use content-free values. Exact Markdown and generated metadata remain inert strings. Exact assets become bytes only after strict RPC output validation and still require an explicit destination; atomic hard-link publication prevents overwrite.
 
-Focused tests cover direct composition, selected-daemon routing, bundled-only retrieval, deterministic merging, binary decoding, and fail-closed selection. Compiled tests cover relocated bundled docs and selected-daemon Extension retrieval over the Unix transport. CLI thinness, typecheck, and no-business-logic gates protect the boundary.
+Focused tests cover direct composition, selected-daemon routing, bundled-only retrieval, portable skill text/JSON/copy behavior, deterministic merging, binary decoding, and fail-closed selection. Compiled tests cover relocated bundled docs, byte-exact portable skill retrieval, and selected-daemon Extension retrieval over the Unix transport. CLI thinness, typecheck, and no-business-logic gates protect the boundary.

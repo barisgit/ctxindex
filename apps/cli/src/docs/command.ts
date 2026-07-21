@@ -9,6 +9,7 @@ import { CtxindexError } from '@ctxindex/core/errors'
 import { defineCtxCommand } from '../command-model'
 import { mapErrorToExit, runWithExit } from '../format/exit'
 import { outputFormatArg } from '../format/output'
+import { type BundledAgentSkill, resolveAgentSkill } from './agent-skill'
 import {
   type DocsServiceLoader,
   type DocumentationListItem,
@@ -21,6 +22,38 @@ interface DocsListInput {
   readonly extensionId?: string
   readonly json: boolean
 }
+
+export async function handleDocsGetSkill(
+  input: DocsGetSkillInput,
+  resolveSkill: AgentSkillResolver = resolveAgentSkill,
+): Promise<number> {
+  try {
+    const skill = resolveSkill()
+    if (input.output !== undefined) {
+      await copyExactOutput(input.output, skill.content)
+      if (input.json) {
+        const { content: _content, ...metadata } = skill
+        console.log(JSON.stringify(metadata, null, 2))
+      } else {
+        console.log(`${skill.name}\t${skill.byteSize} bytes copied`)
+      }
+      return 0
+    }
+    if (input.json) console.log(JSON.stringify(skill, null, 2))
+    else process.stdout.write(skill.content)
+    return 0
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    return mapErrorToExit(error)
+  }
+}
+
+interface DocsGetSkillInput {
+  readonly output?: string
+  readonly json: boolean
+}
+
+type AgentSkillResolver = () => BundledAgentSkill
 
 interface DocsGetInput extends DocsListInput {
   readonly path: string
@@ -275,6 +308,34 @@ export const docsSearchCommand = defineCtxCommand({
         ...(args.extension === undefined
           ? {}
           : { extensionId: args.extension }),
+        json: args.format === 'json',
+      }),
+    ),
+})
+
+export const docsGetSkillCommand = defineCtxCommand({
+  meta: {
+    name: 'get-skill',
+    description: 'Retrieve the portable ctxindex Agent Skill.',
+  },
+  args: {
+    output: {
+      type: 'string',
+      alias: 'o',
+      description: 'Copy the exact SKILL.md to this explicit output path',
+    },
+    format: {
+      type: 'enum',
+      options: ['text', 'json'],
+      default: 'text',
+      alias: 'f',
+      description: 'Output format: text or json',
+    },
+  },
+  run: ({ args }) =>
+    runWithExit(() =>
+      handleDocsGetSkill({
+        ...(args.output === undefined ? {} : { output: args.output }),
         json: args.format === 'json',
       }),
     ),
