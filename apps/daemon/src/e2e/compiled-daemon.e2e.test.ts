@@ -525,6 +525,33 @@ describe.skipIf(process.platform !== 'darwin')(
 
         daemon = startDaemon(runtime)
         const metadata = await waitForReady(runtime, daemon)
+        const documentation = await runCli(runtime, ['docs', 'list', '--json'])
+        expect(documentation.exitCode, documentation.stderr).toBe(0)
+        expect(JSON.parse(documentation.stdout)).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              origin: 'bundled',
+              path: 'getting-started.md',
+            }),
+            expect.objectContaining({
+              origin: 'extension',
+              extensionId: 'ctxindex.local',
+              path: 'README.md',
+            }),
+          ]),
+        )
+        const extensionDocumentation = await runCli(runtime, [
+          'docs',
+          'get',
+          'README.md',
+          '--extension',
+          'ctxindex.local',
+        ])
+        expect(
+          extensionDocumentation.exitCode,
+          extensionDocumentation.stderr,
+        ).toBe(0)
+        expect(extensionDocumentation.stdout).toContain('# Local directory')
         const daemonRealm = await runCli(runtime, [
           'realm',
           'add',

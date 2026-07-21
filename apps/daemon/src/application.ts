@@ -3,6 +3,11 @@ import {
   isGrantCompatible,
   providerIdForAuth,
 } from '@ctxindex/core/auth'
+import type {
+  DocumentationItem,
+  DocumentationSearchResult,
+  DocumentationService,
+} from '@ctxindex/core/documentation'
 import {
   CtxindexAuthError,
   CtxindexNotFoundError,
@@ -30,6 +35,13 @@ import type {
 import type { ThreadResult, ThreadService } from '@ctxindex/core/thread'
 import type {
   DaemonRpcApplication,
+  RpcDocumentationGetInput,
+  RpcDocumentationGetResult,
+  RpcDocumentationListInput,
+  RpcDocumentationListResult,
+  RpcDocumentationRow,
+  RpcDocumentationSearchInput,
+  RpcDocumentationSearchResult,
   RpcFailure,
   RpcHealthInput,
   RpcHealthResult,
@@ -68,6 +80,9 @@ import type {
   RpcWarning,
 } from '@ctxindex/rpc'
 import {
+  rpcDocumentationGetResultSchema,
+  rpcDocumentationListResultSchema,
+  rpcDocumentationSearchResultSchema,
   rpcJsonCursorSchema,
   rpcJsonDefaultSchema,
   rpcResourceGetResultSchema,
@@ -85,6 +100,10 @@ export interface DaemonApplicationOptions {
   readonly startedAt: string
   readonly pid: number
   readonly extensionDiagnosticsCount: number
+  readonly documentationService: Pick<
+    DocumentationService,
+    'list' | 'get' | 'search'
+  >
   readonly observationTimeoutMs: number
   readonly authService?: Pick<AuthService, 'listGrants'>
   readonly realmService?: Pick<RealmService, 'createRealm' | 'listRealms'>
@@ -491,6 +510,52 @@ function presentThreadNode(
   }
 }
 
+function documentationRow(value: DocumentationItem): RpcDocumentationRow {
+  if (value.origin.kind !== 'extension') throw new ResultTooLargeError()
+  return {
+    extensionId: value.origin.extensionId,
+    path: value.path,
+    kind: value.kind,
+    mediaType: value.mediaType,
+    byteSize: value.byteSize,
+    ...(value.title === undefined ? {} : { title: value.title }),
+    ...(value.summary === undefined ? {} : { summary: value.summary }),
+  } as RpcDocumentationRow
+}
+
+function documentationItem(
+  value: DocumentationItem,
+): RpcDocumentationGetResult['item'] {
+  const row = documentationRow(value)
+  if (value.kind === 'asset') {
+    return {
+      ...row,
+      kind: 'asset',
+      mediaType: value.mediaType,
+      contentBase64: Buffer.from(value.content as Uint8Array).toString(
+        'base64',
+      ),
+    } as RpcDocumentationGetResult['item']
+  }
+  return {
+    ...row,
+    kind: value.kind,
+    mediaType: value.mediaType,
+    content: value.content as string,
+  } as RpcDocumentationGetResult['item']
+}
+
+function documentationSearchRow(value: DocumentationSearchResult) {
+  if (value.origin.kind !== 'extension') throw new ResultTooLargeError()
+  return {
+    extensionId: value.origin.extensionId,
+    path: value.path,
+    ...(value.title === undefined ? {} : { title: value.title }),
+    ...(value.summary === undefined ? {} : { summary: value.summary }),
+    snippet: value.snippet,
+  }
+}
+
 export class DaemonApplication implements DaemonRpcApplication {
   readonly #active = new Map<string, ActiveRequest>()
   readonly #options: DaemonApplicationOptions
@@ -505,6 +570,11 @@ export class DaemonApplication implements DaemonRpcApplication {
   readonly realm: DaemonRpcApplication['realm'] = {
     add: (input, context) => this.realmAdd(input, context),
     list: (input, context) => this.realmList(input, context),
+  }
+  readonly documentation: DaemonRpcApplication['documentation'] = {
+    list: (input, context) => this.documentationList(input, context),
+    get: (input, context) => this.documentationGet(input, context),
+    search: (input, context) => this.documentationSearch(input, context),
   }
   readonly source: DaemonRpcApplication['source'] = {
     definitions: (input, context) => this.sourceDefinitions(input, context),
@@ -626,6 +696,66 @@ export class DaemonApplication implements DaemonRpcApplication {
     return this.#business(context, async () => {
       if (!this.#options.realmService) throw new Error('Realm service missing')
       return { rows: this.#options.realmService.listRealms() }
+    })
+  }
+
+  documentationList(
+    input: RpcDocumentationListInput,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcDocumentationListResult>> {
+    return this.#business(context, async () => {
+      const output = {
+        rows: this.#options.documentationService
+          .list(
+            input.extensionId === undefined
+              ? {}
+              : { extensionId: input.extensionId },
+          )
+          .map(documentationRow),
+      }
+      const parsed = rpcDocumentationListResultSchema.safeParse(output)
+      if (!parsed.success) throw new ResultTooLargeError()
+      return parsed.data
+    })
+  }
+
+  documentationGet(
+    input: RpcDocumentationGetInput,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcDocumentationGetResult>> {
+    return this.#business(context, async () => {
+      const output = {
+        item: documentationItem(
+          this.#options.documentationService.get({
+            extensionId: input.extensionId,
+            path: input.path,
+          }),
+        ),
+      }
+      const parsed = rpcDocumentationGetResultSchema.safeParse(output)
+      if (!parsed.success) throw new ResultTooLargeError()
+      return parsed.data
+    })
+  }
+
+  documentationSearch(
+    input: RpcDocumentationSearchInput,
+    context: RpcRequestContext,
+  ): Promise<RpcResult<RpcDocumentationSearchResult>> {
+    return this.#business(context, async () => {
+      const output = {
+        rows: this.#options.documentationService
+          .search({
+            query: input.query,
+            ...(input.extensionId === undefined
+              ? {}
+              : { extensionId: input.extensionId }),
+          })
+          .map(documentationSearchRow),
+      }
+      const parsed = rpcDocumentationSearchResultSchema.safeParse(output)
+      if (!parsed.success) throw new ResultTooLargeError()
+      return parsed.data
     })
   }
 

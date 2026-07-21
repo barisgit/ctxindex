@@ -11,6 +11,9 @@ import {
   type RpcRequestContext,
   type RpcResult,
   type RpcTransportContext,
+  rpcDocumentationGetResultSchema,
+  rpcDocumentationListResultSchema,
+  rpcDocumentationSearchResultSchema,
   type rpcFailureRegistry,
   rpcFailureSchema,
   rpcHealthResultSchema,
@@ -338,6 +341,47 @@ export function createDaemonRouter(
                 applicationContext(context, signal),
               ),
             rpcRealmListResultSchema,
+            errors,
+          ),
+        ),
+    },
+    documentation: {
+      list: os.documentation.list
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.documentation.list(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcDocumentationListResultSchema,
+            errors,
+          ),
+        ),
+      get: os.documentation.get
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.documentation.get(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcDocumentationGetResultSchema,
+            errors,
+          ),
+        ),
+      search: os.documentation.search
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.documentation.search(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcDocumentationSearchResultSchema,
             errors,
           ),
         ),

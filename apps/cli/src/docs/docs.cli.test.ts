@@ -4,11 +4,18 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { DocumentationService } from '@ctxindex/core/documentation'
 import {
+  createBundledDocumentationSource,
   createDocumentationService,
   createExtensionDocumentationSource,
 } from '@ctxindex/core/documentation'
 import type { DocumentationProjection } from '@ctxindex/core/extension'
-import { handleDocsGet, handleDocsList, handleDocsSearch } from './command'
+import type { DaemonSelection } from '../daemon/client'
+import {
+  handleDocsGet,
+  handleDocsList,
+  handleDocsSearch,
+  loadDocsCommandService,
+} from './command'
 
 afterEach(() => {
   spyOn(console, 'log').mockRestore()
@@ -21,7 +28,7 @@ const markdown = {
   path: 'getting-started.md',
   kind: 'markdown' as const,
   mediaType: 'text/markdown',
-  byteSize: 15,
+  byteSize: 17,
   title: 'Getting started',
   content: '# Getting started',
 }
@@ -56,7 +63,7 @@ test('prints safe inventory and inert Markdown/JSON', async () => {
     path: 'getting-started.md',
     kind: 'markdown',
     mediaType: 'text/markdown',
-    byteSize: 15,
+    byteSize: 17,
     title: 'Getting started',
   })
   expect(JSON.stringify(inventory)).not.toContain('content')
@@ -165,4 +172,168 @@ test('formats bounded search results as JSON', async () => {
     title: 'Getting started',
     snippet: '# Getting started',
   })
+})
+
+test('selected daemon supplies only Extension docs while bundled docs stay local', async () => {
+  const selection = {} as DaemonSelection
+  let directLoads = 0
+  let daemonGets = 0
+  const loaded = await loadDocsCommandService({
+    selectDaemon: () => selection,
+    loadCliDefinitions: async () => {
+      directLoads += 1
+      throw new Error('direct loading must not run')
+    },
+    printExtensionDiagnostics: () => {},
+    resolveBundledDocumentation: () =>
+      createBundledDocumentationSource([markdown]),
+    daemonDocumentationList: async () => ({
+      rows: [
+        {
+          extensionId: 'fixture.docs',
+          path: 'README.md',
+          kind: 'markdown',
+          mediaType: 'text/markdown',
+          byteSize: 9,
+          title: 'Fixture',
+        },
+        {
+          extensionId: 'alpha.docs',
+          path: 'README.md',
+          kind: 'markdown',
+          mediaType: 'text/markdown',
+          byteSize: 7,
+          title: 'Alpha',
+        },
+      ],
+    }),
+    daemonDocumentationGet: async (_selection, input) => {
+      daemonGets += 1
+      return input.path.endsWith('.png')
+        ? {
+            item: {
+              extensionId: 'fixture.docs',
+              path: 'assets/pixel.png',
+              kind: 'asset',
+              mediaType: 'image/png',
+              byteSize: 8,
+              contentBase64: 'iVBORw0KGgo=',
+            },
+          }
+        : {
+            item: {
+              extensionId: 'fixture.docs',
+              path: 'README.md',
+              kind: 'markdown',
+              mediaType: 'text/markdown',
+              byteSize: 9,
+              title: 'Fixture',
+              content: '# Fixture',
+            },
+          }
+    },
+    daemonDocumentationSearch: async () => ({
+      rows: [
+        {
+          extensionId: 'fixture.docs',
+          path: 'README.md',
+          title: 'Fixture',
+          snippet: '# Fixture',
+        },
+      ],
+    }),
+  })
+
+  expect(
+    (await loaded.list({})).map((item) =>
+      item.origin.kind === 'bundled' ? 'bundled' : item.origin.extensionId,
+    ),
+  ).toEqual(['bundled', 'alpha.docs', 'fixture.docs'])
+  expect(await loaded.get({ path: 'getting-started.md' })).toMatchObject({
+    origin: { kind: 'bundled' },
+  })
+  expect(daemonGets).toBe(0)
+  expect(
+    await loaded.get({
+      extensionId: 'fixture.docs',
+      path: 'assets/pixel.png',
+    }),
+  ).toMatchObject({ kind: 'asset', content: asset.content })
+  expect(daemonGets).toBe(1)
+  expect(
+    (await loaded.search({ query: 'fixture' })).map((row) => row.origin.kind),
+  ).toEqual(['extension'])
+  expect(
+    (await loaded.search({ query: 'getting' })).map((row) => row.origin.kind),
+  ).toEqual(['bundled', 'extension'])
+  expect(directLoads).toBe(0)
+})
+
+test('selected daemon failures never fall back to direct Extension loading', async () => {
+  let directLoads = 0
+  const expected = new Error('selected daemon failed')
+  const loaded = await loadDocsCommandService({
+    selectDaemon: () => ({}) as DaemonSelection,
+    loadCliDefinitions: async () => {
+      directLoads += 1
+      throw new Error('must not run')
+    },
+    printExtensionDiagnostics: () => {},
+    resolveBundledDocumentation: () =>
+      createBundledDocumentationSource([markdown]),
+    daemonDocumentationList: async () => {
+      throw expected
+    },
+    daemonDocumentationGet: async () => {
+      throw expected
+    },
+    daemonDocumentationSearch: async () => {
+      throw expected
+    },
+  })
+  await expect(loaded.list({})).rejects.toBe(expected)
+  expect(directLoads).toBe(0)
+})
+
+test('direct mode retains local Extension documentation composition', async () => {
+  let directLoads = 0
+  const loaded = await loadDocsCommandService({
+    selectDaemon: () => null,
+    loadCliDefinitions: async () => {
+      directLoads += 1
+      return {
+        documentation: {
+          list: () => [
+            {
+              extensionId: 'fixture.docs',
+              path: 'README.md',
+              origin: 'authored',
+              kind: 'markdown',
+              mediaType: 'text/markdown',
+              content: '# Fixture',
+            },
+          ],
+          get: () => undefined,
+        },
+        diagnostics: [],
+      } as never
+    },
+    printExtensionDiagnostics: () => {},
+    resolveBundledDocumentation: () =>
+      createBundledDocumentationSource([markdown]),
+    daemonDocumentationList: async () => {
+      throw new Error('must not run')
+    },
+    daemonDocumentationGet: async () => {
+      throw new Error('must not run')
+    },
+    daemonDocumentationSearch: async () => {
+      throw new Error('must not run')
+    },
+  })
+  expect((await loaded.list({})).map((item) => item.origin.kind)).toEqual([
+    'bundled',
+    'extension',
+  ])
+  expect(directLoads).toBe(1)
 })

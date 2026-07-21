@@ -6,6 +6,10 @@ import { type AuthService, createAuthService } from '@ctxindex/core/auth'
 import { type CtxindexConfig, readConfig } from '@ctxindex/core/config'
 import { DirectExtensionStore } from '@ctxindex/core/direct-extension'
 import {
+  createDocumentationService,
+  createExtensionDocumentationSource,
+} from '@ctxindex/core/documentation'
+import {
   type LoadExtensionsResult,
   loadExtensions,
 } from '@ctxindex/core/extension'
@@ -114,7 +118,10 @@ export interface DaemonRuntimeHooks {
       typeof listLocalOAuthAppIdentities
     >
   }) => Promise<
-    Pick<LoadExtensionsResult, 'completeRegistry' | 'diagnostics' | 'registry'>
+    Pick<
+      LoadExtensionsResult,
+      'completeRegistry' | 'diagnostics' | 'documentation' | 'registry'
+    >
   >
   readonly openDatabase: (path: string) => Promise<CtxindexDatabase>
   readonly runMigrations: (database: CtxindexDatabase) => Promise<void>
@@ -434,6 +441,9 @@ export async function startDaemon(
       startedAt,
       pid: process.pid,
       extensionDiagnosticsCount: loaded.diagnostics.length,
+      documentationService: createDocumentationService([
+        createExtensionDocumentationSource(loaded.documentation),
+      ]),
       observationTimeoutMs,
       ...services,
       onStopping: () => {

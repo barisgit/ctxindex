@@ -14,6 +14,14 @@
 
 Future browser consumers must still sanitize Markdown as untrusted display input, disable raw HTML and active attributes, enforce safe schemes, and prevent network-loaded media. Core validation is a portable-data boundary, not an HTML trust boundary.
 
+## Daemon transport projection
+
+When the daemon owns the active registry, its startup composition adapts the exact retained `DocumentationProjection` into one Extension-only core `DocumentationService`. The contract-derived daemon application exposes that service through a `documentation` family with list, exact-get, and search procedures. `@ctxindex/rpc` remains composition-only: it defines strict schemas and handler-free procedures but never imports Extension loading or documentation business logic.
+
+Inventory DTOs carry Extension id, logical path, content kind, media type, byte size, and optional title/summary without content. Search DTOs carry the same logical identity plus bounded snippets. Exact text DTOs carry bounded UTF-8; exact assets carry canonical Base64 whose decoded size matches the declared byte count. All DTOs are closed, byte/count bounded, and omit module URLs, source or materialization paths, readers, callbacks, executable definitions, schemas, provider state, and diagnostics. Invalid application output becomes `result_too_large` rather than a partial or truncated response.
+
+The existing protocol/runtime compatibility middleware and request-scoped cancellation wrap all three procedures. The daemon projection remains immutable for the daemon lifetime; changing installed Extensions or their documentation requires a later daemon restart rather than request-time reload.
+
 ## Distribution
 
 External and installed package roots resolve `./docs` beside the module entry already imported by the package-entry seam. Built-in source directories live under `packages/adapters/src/builtin-documentation/`; `packages/adapters/scripts/generate-documentation.ts` resolves those descriptors with the shared core resolver and writes the embedded virtual module. Built-in freshness tests compare both forms, and the relocated compiled-host gate reads the embedded projection without checkout files.
