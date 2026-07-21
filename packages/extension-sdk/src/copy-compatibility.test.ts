@@ -109,6 +109,13 @@ test('definitions compose across two physical SDK and Zod copies', async () => {
 
     expect(sdkA.z).not.toBe(sdkB.z)
     expect(sdkA.z.ZodObject).not.toBe(sdkB.z.ZodObject)
+    expect(
+      sdkB.isSyncError(
+        sdkA.syncError('rate_limited', 'Retry the copied Adapter later.', {
+          retryAfterMs: 1_000,
+        }),
+      ),
+    ).toBe(true)
     expect(extension.providers[0]).toBe(provider)
     expect(extension.profiles[0]).toBe(profile)
     expect(catalog.extensions[0]).toBe(extension)

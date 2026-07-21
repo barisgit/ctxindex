@@ -4,7 +4,7 @@ import type {
   ExportResourceResult,
 } from '@ctxindex/core/export'
 import { UnsupportedExportFormatError } from '@ctxindex/core/export'
-import { handleExportCommand } from './export'
+import { type ExportCommandDeps, handleExportCommand } from './export'
 
 const ref = 'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/message/one'
 const deps = {
@@ -12,6 +12,23 @@ const deps = {
   registry: {} as never,
   authService: {} as never,
   logger: {} as never,
+}
+
+function directServices(
+  open: ExportCommandDeps['open'],
+  runExport: ExportCommandDeps['runExport'],
+): ExportCommandDeps {
+  return {
+    selectDaemon: () => {
+      throw new Error('legacy selection invoked')
+    },
+    ensureDaemonSelection: async () => ({ status: 'unsupported' }),
+    export: async () => {
+      throw new Error('daemon export invoked')
+    },
+    open,
+    runExport,
+  }
 }
 
 describe('export command', () => {
@@ -39,7 +56,10 @@ describe('export command', () => {
     const error = spyOn(console, 'error').mockImplementation(() => {})
 
     expect(
-      await handleExportCommand({ ref, format: 'binary' }, open, run),
+      await handleExportCommand(
+        { ref, format: 'binary' },
+        directServices(open, run),
+      ),
     ).toBe(0)
     expect(write).toHaveBeenCalledTimes(1)
     expect(write).toHaveBeenCalledWith(bytes)
@@ -68,7 +88,9 @@ describe('export command', () => {
     expect(
       await handleExportCommand(
         { ref: 'not-a-ref', format: 'json' },
-        open as never,
+        directServices(open as never, async () => {
+          throw new Error('must not export')
+        }),
       ),
     ).toBe(2)
     expect(opened).toBe(false)
@@ -91,13 +113,87 @@ describe('export command', () => {
       )
     }
     const error = spyOn(console, 'error').mockImplementation(() => {})
-    expect(await handleExportCommand({ ref, format: 'mbox' }, open, run)).toBe(
-      2,
-    )
+    expect(
+      await handleExportCommand(
+        { ref, format: 'mbox' },
+        directServices(open, run),
+      ),
+    ).toBe(2)
     expect(closed).toBe(true)
     expect(error).toHaveBeenCalledWith(
       expect.stringContaining('mail.message@1'),
     )
     error.mockRestore()
+  })
+
+  test('selected daemon writes exact bytes without opening direct dependencies', async () => {
+    const bytes = Uint8Array.of(1, 2, 3)
+    let opened = false
+    const write = spyOn(process.stdout, 'write').mockImplementation(() => true)
+    try {
+      expect(
+        await handleExportCommand(
+          { ref, format: 'binary' },
+          {
+            selectDaemon: () => {
+              throw new Error('legacy selection invoked')
+            },
+            ensureDaemonSelection: async () => ({
+              status: 'selected',
+              selection: {} as never,
+              started: true,
+            }),
+            export: async () => ({
+              bytes,
+              mediaType: 'application/octet-stream',
+              format: 'binary',
+              ref,
+              warnings: [],
+            }),
+            open: async () => {
+              opened = true
+              throw new Error('direct dependencies opened')
+            },
+            runExport: async () => {
+              throw new Error('direct export invoked')
+            },
+          },
+        ),
+      ).toBe(0)
+      expect(opened).toBe(false)
+      expect(write).toHaveBeenCalledWith(bytes)
+    } finally {
+      write.mockRestore()
+    }
+  })
+
+  test('never falls back after a selected daemon export failure', async () => {
+    const error = spyOn(console, 'error').mockImplementation(() => {})
+    let opened = false
+    try {
+      expect(
+        await handleExportCommand(
+          { ref, format: 'binary' },
+          {
+            selectDaemon: () => ({}) as never,
+            export: async () => {
+              throw Object.assign(new Error('daemon unavailable'), {
+                code: 'daemon_unavailable',
+              })
+            },
+            open: async () => {
+              opened = true
+              throw new Error('direct dependencies opened')
+            },
+            runExport: async () => {
+              throw new Error('direct export invoked')
+            },
+          },
+        ),
+      ).toBe(50)
+      expect(opened).toBe(false)
+    } finally {
+      error.mockRestore()
+    }
   })
 })

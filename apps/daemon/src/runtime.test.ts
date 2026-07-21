@@ -24,7 +24,24 @@ import {
   isDaemonStartupFailure,
   type StartDaemonOptions,
   startDaemon,
+  validateDaemonOAuthAppConfig,
 } from './runtime'
+
+test('daemon OAuth App config rejects unknown fields without exposing values', () => {
+  const secret = 'private-secret-canary'
+  const attempt = () =>
+    validateDaemonOAuthAppConfig(googleOAuthProvider, {
+      clientId: 'public-id',
+      clientSecret: secret,
+      unexpected: secret,
+    })
+  expect(attempt).toThrow('OAuth App configuration contains an unknown field')
+  try {
+    attempt()
+  } catch (error) {
+    expect(String(error)).not.toContain(secret)
+  }
+})
 
 const emptyDocumentation = {
   list: () => [],
@@ -36,6 +53,39 @@ function lease(name: string, events: string[]): FileLease {
     mode: 'exclusive',
     targetDigest: name.padEnd(64, '0'),
     release: () => events.push(`release:${name}`),
+  }
+}
+
+class TestIdleClock {
+  now = 0
+  #nextId = 0
+  readonly #timers = new Map<
+    number,
+    { readonly deadline: number; readonly callback: () => void }
+  >()
+
+  readonly hooks = {
+    now: () => this.now,
+    setTimeout: (callback: () => void, delayMs: number): number => {
+      const id = this.#nextId++
+      this.#timers.set(id, { deadline: this.now + delayMs, callback })
+      return id
+    },
+    clearTimeout: (id: unknown): void => {
+      if (typeof id === 'number') this.#timers.delete(id)
+    },
+  }
+
+  advance(milliseconds: number): void {
+    this.now += milliseconds
+    while (true) {
+      const due = [...this.#timers.entries()]
+        .filter(([, timer]) => timer.deadline <= this.now)
+        .sort((left, right) => left[1].deadline - right[1].deadline)[0]
+      if (!due) return
+      this.#timers.delete(due[0])
+      due[1].callback()
+    }
   }
 }
 
@@ -91,6 +141,7 @@ test('startup failure guard rejects owner-attributed lease conflicts', () => {
 
 test('startup owns leases before one load/open and publishes ready last', async () => {
   const events: string[] = []
+  const idleClock = new TestIdleClock()
   let lifecycleProof: FileLease | undefined
   const leases: FileLeaseBackend = {
     acquire(input) {
@@ -108,6 +159,7 @@ test('startup owns leases before one load/open and publishes ready last', async 
       cacheRoot: '/tmp/ctxd-cache',
     },
     leaseBackend: leases,
+    idleTimer: idleClock.hooks,
     endpointRuntimeRoot: '/tmp/ctxd-runtime',
     hooks: {
       readMatchingMetadata: () => {
@@ -165,6 +217,22 @@ test('startup owns leases before one load/open and publishes ready last', async 
       composeServices: () => {
         events.push('compose')
         return {
+          secretBackendManager: {
+            getStatus: async () => ({
+              backend: 'file' as const,
+              backends: {
+                file: { available: true, referenceCount: 0 },
+                keychain: { available: false, referenceCount: 0 },
+              },
+            }),
+            switchBackend: async (target: 'keychain' | 'file') => ({
+              backend: target,
+              copied: 0,
+              cleaned: 0,
+              cleanupPending: false,
+              warnings: [],
+            }),
+          },
           syncService: {
             run: async () => ({ mode: 'sync', results: [], warnings: [] }),
           },
@@ -216,6 +284,12 @@ test('startup owns leases before one load/open and publishes ready last', async 
     (await daemon.application.system.health({}, daemon.testContext())).ok,
   ).toBe(true)
   expect(
+    await daemon.application.secrets.status({}, daemon.testContext()),
+  ).toMatchObject({
+    ok: true,
+    value: { backend: 'file' },
+  })
+  expect(
     await daemon.application.documentation.get(
       { extensionId: 'fixture.docs', path: 'README.md' },
       daemon.testContext(),
@@ -224,7 +298,11 @@ test('startup owns leases before one load/open and publishes ready last', async 
     ok: true,
     value: { item: { content: '# Fixture' } },
   })
-  expect(await daemon.close(100)).toEqual({ status: 'complete' })
+  idleClock.advance(299_999)
+  expect(daemon.application.lifecycle).toBe('ready')
+  idleClock.advance(1)
+  expect(daemon.application.lifecycle).toBe('stopping')
+  await daemon.closed
   expect(events.slice(-7)).toEqual([
     'metadata:stopping',
     'close:db',
@@ -523,7 +601,9 @@ test('non-cooperative request times out while ownership remains, then cleans up 
   })
   expect(events).toEqual([])
   settle()
-  await pending
+  const opened = await pending
+  if (!opened.ok) throw new Error('Expected stream admission')
+  await opened.value.next()
   await daemon.closed
   expect(events).toContain('close:db')
   expect(events).toContain('release:database')

@@ -2,6 +2,10 @@ import { SearchPlanner } from '@ctxindex/core/search'
 import type { RpcSearchResult } from '@ctxindex/rpc'
 import type { ResolvedSearchArgs } from '../args/search'
 import { daemonSearch, selectDaemon } from '../daemon/client'
+import {
+  ensureDaemonSelection,
+  selectEnsuredDaemonRoute,
+} from '../daemon/ensure'
 import { openDeps } from '../deps'
 import { mapErrorToExit } from '../format/exit'
 import {
@@ -54,12 +58,14 @@ export function formatSearchPretty(
 
 export interface SearchCommandDeps {
   readonly selectDaemon: typeof selectDaemon
+  readonly ensureDaemonSelection?: typeof ensureDaemonSelection
   readonly search: typeof daemonSearch
   readonly open: typeof openDeps
 }
 
 const defaultDeps: SearchCommandDeps = {
   selectDaemon,
+  ensureDaemonSelection,
   search: daemonSearch,
   open: openDeps,
 }
@@ -95,7 +101,7 @@ export async function handleSearchCommand(
   process.once('SIGINT', cancel)
   let deps: Awaited<ReturnType<typeof openDeps>> | undefined
   try {
-    const daemon = services.selectDaemon()
+    const daemon = await selectEnsuredDaemonRoute(services, controller.signal)
     let result: SearchResult
     if (daemon)
       result = await services.search(daemon, parsed.input, controller.signal)

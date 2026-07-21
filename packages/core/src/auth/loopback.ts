@@ -152,6 +152,7 @@ export async function openOAuthLoopback(input: {
   readonly readAuthorizationResponse?: (
     prompt: OAuthAuthorizationResponsePrompt,
   ) => Promise<string | undefined>
+  readonly signal?: AbortSignal
 }): Promise<OAuthLoopbackResult> {
   const state = randomToken()
   const codeVerifier = randomToken()
@@ -179,6 +180,10 @@ export async function openOAuthLoopback(input: {
   const manualInput = new AbortController()
   let finishCallback: (error: CtxindexAuthError | null, code?: string) => void =
     () => {}
+  const abort = () =>
+    finishCallback(
+      new CtxindexAuthError('oauth_failed', 'OAuth authorization cancelled'),
+    )
   const callback = new Promise<string>((resolve, reject) => {
     finishCallback = (error: CtxindexAuthError | null, code?: string) => {
       if (settled) return
@@ -197,6 +202,8 @@ export async function openOAuthLoopback(input: {
         ),
       input.timeoutMs ?? defaultTimeoutMs,
     )
+    if (input.signal?.aborted) abort()
+    else input.signal?.addEventListener('abort', abort, { once: true })
     server.on('request', (request, response) => {
       const url = new URL(request.url ?? '/', redirectUri)
       if (url.pathname !== callbackPath) {
@@ -271,6 +278,7 @@ export async function openOAuthLoopback(input: {
     const code = await callback
     return { code, codeVerifier, redirectUri, authorizationUrl }
   } finally {
+    input.signal?.removeEventListener('abort', abort)
     if (timer) clearTimeout(timer)
     await close(server)
   }

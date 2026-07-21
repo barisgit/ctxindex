@@ -1,6 +1,10 @@
 import { parseRef } from '@ctxindex/core'
 import type { ThreadService } from '@ctxindex/core/thread'
 import { daemonThreadGet, selectDaemon } from '../daemon/client'
+import {
+  ensureDaemonSelection,
+  resolveEnsuredDaemonSelection,
+} from '../daemon/ensure'
 import { openDeps } from '../deps'
 import { mapErrorToExit } from '../format/exit'
 import type { OutputFormat } from '../format/output'
@@ -20,10 +24,20 @@ export interface ThreadCommandInput {
   readonly format: OutputFormat
 }
 
+export interface ThreadCommandDaemonRoutes {
+  readonly select: typeof selectDaemon
+  readonly ensure?: typeof ensureDaemonSelection
+  readonly get: typeof daemonThreadGet
+}
+
 export async function handleThreadGetCommand(
   input: ThreadCommandInput,
   open: OpenThreadDeps = openDeps,
-  daemon = { select: selectDaemon, get: daemonThreadGet },
+  daemon: ThreadCommandDaemonRoutes = {
+    select: selectDaemon,
+    ensure: ensureDaemonSelection,
+    get: daemonThreadGet,
+  },
 ): Promise<number> {
   try {
     parseRef(input.ref)
@@ -37,7 +51,11 @@ export async function handleThreadGetCommand(
   process.once('SIGINT', cancel)
   let deps: Awaited<ReturnType<OpenThreadDeps>> | undefined
   try {
-    const selection = daemon.select()
+    const selection = await resolveEnsuredDaemonSelection(
+      daemon.ensure,
+      daemon.select,
+      controller.signal,
+    )
     const result = selection
       ? await daemon.get(selection, input.ref, controller.signal)
       : await (async () => {

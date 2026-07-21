@@ -146,6 +146,7 @@ function services(
     loadDefinitions: async () => emptyDefinitions(),
     readOAuthAppIdentities: async () => [],
     readSourceBindings: async () => [],
+    coordinateMutation: async (operation) => operation(),
     ...overrides,
   }
 }
@@ -494,6 +495,119 @@ test('direct install rejects Catalog-only --no-refresh before acquisition or tru
       expect.stringContaining('Trust notice'),
     )
   } finally {
+    error.mockRestore()
+  }
+})
+
+test('install, update, and uninstall execute inside daemon mutation coordination', async () => {
+  const events: string[] = []
+  const output = spyOn(console, 'log').mockImplementation(() => {})
+  const error = spyOn(console, 'error').mockImplementation(() => {})
+  const coordinated = services({
+    coordinateMutation: async (operation) => {
+      events.push('coordinate:start')
+      try {
+        return await operation()
+      } finally {
+        events.push('coordinate:end')
+      }
+    },
+    catalogInstallation: {
+      install: async () => {
+        events.push('catalog-install')
+        return installed
+      },
+    } as unknown as ExtensionCommandServices['catalogInstallation'],
+    direct: {
+      install: async () => {
+        events.push('direct-install')
+        return installed
+      },
+      uninstall: async () => {
+        events.push('uninstall')
+        return {
+          extension: {
+            id: installed.id,
+            sourceKind: 'npm',
+            requestedTarget: '@fixture/extension@^1',
+            resolvedIdentity: '1.2.3',
+            materializationDigest: digest,
+            installedAt: 1,
+            updatedAt: 1,
+          },
+          blockingSources: [],
+          forced: false,
+          dataPreserved: true,
+        }
+      },
+    } as unknown as DirectExtensionService,
+    lifecycle: {
+      update: async () => {
+        events.push('update')
+        return installed
+      },
+    } as unknown as ExtensionCommandServices['lifecycle'],
+  })
+  try {
+    expect(
+      await handleExtensionsCommand(
+        {
+          kind: 'install',
+          sourceKind: 'catalog',
+          target: 'fixture',
+          extensionId: installed.id,
+          noRefresh: false,
+          json: true,
+        },
+        coordinated,
+      ),
+    ).toBe(0)
+    expect(
+      await handleExtensionsCommand(
+        {
+          kind: 'install',
+          sourceKind: 'npm',
+          target: '@fixture/extension@^1',
+          extensionId: installed.id,
+          noRefresh: false,
+          json: true,
+        },
+        coordinated,
+      ),
+    ).toBe(0)
+    expect(
+      await handleExtensionsCommand(
+        { kind: 'update', extensionId: installed.id, json: true },
+        coordinated,
+      ),
+    ).toBe(0)
+    expect(
+      await handleExtensionsCommand(
+        {
+          kind: 'uninstall',
+          extensionId: installed.id,
+          force: false,
+          json: true,
+        },
+        coordinated,
+      ),
+    ).toBe(0)
+    expect(events).toEqual([
+      'coordinate:start',
+      'catalog-install',
+      'coordinate:end',
+      'coordinate:start',
+      'direct-install',
+      'coordinate:end',
+      'coordinate:start',
+      'update',
+      'coordinate:end',
+      'coordinate:start',
+      'uninstall',
+      'coordinate:end',
+    ])
+  } finally {
+    output.mockRestore()
     error.mockRestore()
   }
 })

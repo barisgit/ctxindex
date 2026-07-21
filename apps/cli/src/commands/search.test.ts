@@ -94,7 +94,14 @@ describe('search JSON output', () => {
           refs: false,
         },
         {
-          selectDaemon: () => ({}) as never,
+          selectDaemon: () => {
+            throw new Error('legacy selection invoked')
+          },
+          ensureDaemonSelection: async () => ({
+            status: 'selected',
+            selection: {} as never,
+            started: true,
+          }),
           search: async (_selection, input) => {
             expect(input.text).toBe('needle')
             return {

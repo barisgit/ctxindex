@@ -43,6 +43,16 @@ export interface ArtifactDownloadResult {
   readonly outputPath?: string | undefined
 }
 
+export interface CachedArtifactBytes {
+  readonly artifact: DownloadedArtifact
+  readonly bytes: Uint8Array
+}
+
+export interface ArtifactTransferPreparation {
+  readonly download: ArtifactDownloadResult
+  readonly bytes: Uint8Array
+}
+
 export interface ArtifactServiceInput {
   readonly db: CtxindexDatabase
   readonly registry: ExtensionRegistry
@@ -146,10 +156,17 @@ function publicArtifact(artifact: Artifact): DownloadedArtifact {
   return result
 }
 
+interface ArtifactMaterialization {
+  readonly controller: AbortController
+  promise: Promise<Artifact>
+  waiters: number
+  settled: boolean
+}
+
 export class ArtifactService {
   private readonly store: ArtifactStore
   private readonly resources: ResourceStore
-  private readonly inFlight = new Map<string, Promise<Artifact>>()
+  private readonly inFlight = new Map<string, ArtifactMaterialization>()
   private activeDownloads = 0
   private purging = false
 
@@ -163,6 +180,33 @@ export class ArtifactService {
     const resource = this.resources.get(ref)
     if (!resource) throw new CtxindexNotFoundError(`Resource not found: ${ref}`)
     return descriptors(resource, this.input)
+  }
+
+  async readCached(
+    ref: string,
+    maxByteSize: number,
+  ): Promise<CachedArtifactBytes | null> {
+    parseRef(ref)
+    if (!Number.isSafeInteger(maxByteSize) || maxByteSize < 0) {
+      throw new CtxindexValidationError(
+        'invalid_artifact_ref',
+        'Artifact transfer limit must be a non-negative safe integer',
+      )
+    }
+    const artifact = await this.store.get(ref)
+    if (!artifact) return null
+    if (artifact.byteSize > maxByteSize) {
+      throw new CtxindexValidationError(
+        'invalid_artifact_ref',
+        `Artifact "${ref}" exceeds the ${maxByteSize}-byte transfer limit`,
+      )
+    }
+    const cached = await this.store.read(ref)
+    if (!cached) return null
+    return {
+      artifact: publicArtifact(cached.artifact),
+      bytes: cached.bytes,
+    }
   }
 
   async resolveCached(
@@ -236,22 +280,31 @@ export class ArtifactService {
       throw new CtxindexError('Artifact purge is in progress', 'conflict')
     this.activeDownloads += 1
     try {
-      parseRef(ref)
-      const cached = await this.store.get(ref)
-      if (cached) return this.finish(cached, 'hit', options.outputPath)
+      return await this.downloadTracked(ref, options)
+    } finally {
+      this.activeDownloads -= 1
+    }
+  }
 
-      let pending = this.inFlight.get(ref)
-      if (!pending) {
-        pending = this.materialize(
-          ref,
-          options.signal ?? new AbortController().signal,
+  async downloadForTransfer(
+    ref: string,
+    maxByteSize: number,
+    signal: AbortSignal,
+  ): Promise<ArtifactTransferPreparation> {
+    if (this.purging)
+      throw new CtxindexError('Artifact purge is in progress', 'conflict')
+    this.activeDownloads += 1
+    try {
+      const download = await this.downloadTracked(ref, { signal })
+      signal.throwIfAborted()
+      const cached = await this.readCached(ref, maxByteSize)
+      if (!cached)
+        throw new CtxindexError(
+          'Artifact cache state disappeared during transfer preparation',
+          'conflict',
         )
-        this.inFlight.set(ref, pending)
-        void pending
-          .finally(() => this.inFlight.delete(ref))
-          .catch(() => undefined)
-      }
-      return this.finish(await pending, 'miss', options.outputPath)
+      signal.throwIfAborted()
+      return { download, bytes: cached.bytes }
     } finally {
       this.activeDownloads -= 1
     }
@@ -342,6 +395,82 @@ export class ArtifactService {
           write: (chunk) => writer.write(chunk),
         }),
     )
+  }
+
+  private async downloadTracked(
+    ref: string,
+    options: {
+      readonly outputPath?: string
+      readonly signal?: AbortSignal
+    },
+  ): Promise<ArtifactDownloadResult> {
+    parseRef(ref)
+    options.signal?.throwIfAborted()
+    const cached = await this.store.get(ref)
+    if (cached) return this.finish(cached, 'hit', options.outputPath)
+
+    const pending = this.materialization(ref)
+    const artifact = await this.waitForMaterialization(pending, options.signal)
+    return this.finish(artifact, 'miss', options.outputPath)
+  }
+
+  private materialization(ref: string): ArtifactMaterialization {
+    const current = this.inFlight.get(ref)
+    if (current && !current.controller.signal.aborted) return current
+
+    const controller = new AbortController()
+    this.activeDownloads += 1
+    const materialization = this.materialize(ref, controller.signal)
+    const entry: ArtifactMaterialization = {
+      controller,
+      promise: materialization,
+      waiters: 0,
+      settled: false,
+    }
+    entry.promise = materialization.finally(() => {
+      entry.settled = true
+      this.activeDownloads -= 1
+      if (this.inFlight.get(ref) === entry) this.inFlight.delete(ref)
+    })
+    this.inFlight.set(ref, entry)
+    void entry.promise.catch(() => undefined)
+    return entry
+  }
+
+  private async waitForMaterialization(
+    entry: ArtifactMaterialization,
+    signal: AbortSignal | undefined,
+  ): Promise<Artifact> {
+    signal?.throwIfAborted()
+    entry.waiters += 1
+    let cancelled = false
+    try {
+      if (!signal) return await entry.promise
+      return await new Promise<Artifact>((resolve, reject) => {
+        let finished = false
+        const finish = (settle: () => void) => {
+          if (finished) return
+          finished = true
+          signal.removeEventListener('abort', onAbort)
+          settle()
+        }
+        const onAbort = () => {
+          cancelled = true
+          finish(() => reject(signal.reason))
+        }
+        signal.addEventListener('abort', onAbort, { once: true })
+        if (signal.aborted) onAbort()
+        void entry.promise.then(
+          (artifact) => finish(() => resolve(artifact)),
+          (error: unknown) => finish(() => reject(error)),
+        )
+      })
+    } finally {
+      entry.waiters -= 1
+      if (cancelled && entry.waiters === 0 && !entry.settled) {
+        entry.controller.abort()
+      }
+    }
   }
 
   private async finish(

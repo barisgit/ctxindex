@@ -404,19 +404,39 @@ describe('GitHub Issues sync', () => {
     const run = context(fetchImpl)
     await expect(
       githubIssuesAdapter.operations.sync(run.value),
-    ).rejects.toThrow('offline')
+    ).rejects.toEqual({
+      kind: 'ctxindex.sync-error',
+      code: 'network',
+      message: 'GitHub Issues network request failed.',
+    })
     expect(requests).toHaveLength(1)
     expect(run.emissions).toEqual([])
   })
 
-  test.each([403, 429])('does not retry HTTP %d', async (status) => {
+  test.each([
+    [403, 'provider_bad_response', undefined],
+    [429, 'rate_limited', 12_000],
+  ] as const)('does not retry HTTP %d and reports %s', async (status, code, retryAfterMs) => {
     const { fetchImpl, requests } = mockFetch(() =>
-      Response.json({ message: 'rate limited' }, { status }),
+      Response.json(
+        { message: 'private provider response' },
+        {
+          status,
+          ...(retryAfterMs === undefined
+            ? {}
+            : { headers: { 'retry-after': String(retryAfterMs / 1_000) } }),
+        },
+      ),
     )
     const run = context(fetchImpl)
     await expect(
       githubIssuesAdapter.operations.sync(run.value),
-    ).rejects.toThrow(new RegExp(String(status)))
+    ).rejects.toMatchObject({
+      kind: 'ctxindex.sync-error',
+      code,
+      message: `GitHub Issues request failed with HTTP ${status}.`,
+      ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+    })
     expect(requests).toHaveLength(1)
     expect(run.emissions).toEqual([])
   })

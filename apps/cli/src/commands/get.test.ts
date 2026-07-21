@@ -62,7 +62,14 @@ describe('get output', () => {
       const exit = await handleGetCommand(
         { ref: result.resource.ref, format: 'json' },
         {
-          selectDaemon: () => ({}) as never,
+          selectDaemon: () => {
+            throw new Error('legacy selection invoked')
+          },
+          ensureDaemonSelection: async () => ({
+            status: 'selected',
+            selection: {} as never,
+            started: true,
+          }),
           get: async () => result as never,
           open: async () => {
             opened = true
@@ -118,7 +125,10 @@ describe('get output', () => {
       const exit = await handleGetCommand(
         { ref: result.resource.ref, format: 'text' },
         {
-          selectDaemon: () => null,
+          selectDaemon: () => {
+            throw new Error('legacy selection invoked')
+          },
+          ensureDaemonSelection: async () => ({ status: 'unsupported' }),
           get: async () => {
             throw new Error('daemon transport invoked')
           },

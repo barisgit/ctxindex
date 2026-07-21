@@ -57,6 +57,9 @@ import type {
   SearchRouting,
   SyncContext,
   SyncEmission,
+  SyncError,
+  SyncErrorCode,
+  SyncErrorOptions,
   SyncedResource,
   SyncMode,
 } from './index'
@@ -121,6 +124,9 @@ type PublicTypeSurface = {
   syncedResource: SyncedResource
   syncContext: SyncContext
   syncEmission: SyncEmission
+  syncError: SyncError
+  syncErrorCode: SyncErrorCode
+  syncErrorOptions: SyncErrorOptions
   syncMode: SyncMode
 }
 
@@ -185,6 +191,9 @@ const publicSymbolNames = [
   'SearchRouting',
   'SyncContext',
   'SyncEmission',
+  'SyncError',
+  'SyncErrorCode',
+  'SyncErrorOptions',
   'SyncMode',
   'SyncedResource',
   'auth',
@@ -195,7 +204,9 @@ const publicSymbolNames = [
   'defineProfile',
   'defineProvider',
   'docs',
+  'isSyncError',
   'packageExtension',
+  'syncError',
   'z',
 ]
 
@@ -222,7 +233,9 @@ test('public index exports the exact symbol surface', async () => {
     'defineProfile',
     'defineProvider',
     'docs',
+    'isSyncError',
     'packageExtension',
+    'syncError',
     'z',
   ])
 })

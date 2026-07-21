@@ -1,5 +1,9 @@
 import type { SyncEmission, SyncMode } from '@ctxindex/extension-sdk'
-import { CtxindexAuthError, CtxindexSyncError } from '../errors'
+import {
+  CtxindexAuthError,
+  CtxindexSyncError,
+  normalizeSyncError,
+} from '../errors'
 import { mapSyncErrorCode } from '../exit-codes'
 import { newId } from '../ids'
 import { parseRef } from '../ref/ref'
@@ -416,20 +420,21 @@ export class SyncCoordinator {
         warnings,
       }
     } catch (cause) {
+      const failure = normalizeSyncError(cause) ?? cause
       const completedAt = Date.now()
       const lastError = bounded(
-        cause instanceof Error ? cause.message : String(cause),
+        failure instanceof Error ? failure.message : String(failure),
       )
       let runStatus: 'failed' | 'cancelled' = 'failed'
       let lastStatus: 'needs_auth' | 'failed' = 'failed'
-      if (cause instanceof CtxindexSyncError) {
-        const mapping = mapSyncErrorCode(cause.code)
+      if (failure instanceof CtxindexSyncError) {
+        const mapping = mapSyncErrorCode(failure.code)
         runStatus = mapping.runStatus
         lastStatus =
           mapping.lastStatus === 'needs_auth' ? 'needs_auth' : 'failed'
       } else if (
-        cause instanceof CtxindexAuthError &&
-        (cause.code === 'needs_auth' || cause.code === 'invalid_grant')
+        failure instanceof CtxindexAuthError &&
+        (failure.code === 'needs_auth' || failure.code === 'invalid_grant')
       ) {
         lastStatus = 'needs_auth'
       }
@@ -481,15 +486,15 @@ export class SyncCoordinator {
           )
           .run(runId)
       })()
-      if (typeof cause === 'object' && cause !== null) {
-        failureDiagnostics.set(cause, {
+      if (typeof failure === 'object' && failure !== null) {
+        failureDiagnostics.set(failure, {
           warningsCount: warnings.length,
           lastWarning: warnings.at(-1) ?? null,
           errorsCount: 1,
           lastError,
         })
       }
-      throw cause
+      throw failure
     }
   }
 }

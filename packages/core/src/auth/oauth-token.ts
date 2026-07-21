@@ -64,6 +64,7 @@ export async function postOAuthToken(input: {
   readonly clientId: string
   readonly clientSecret?: string
   readonly grant: OAuthGrant
+  readonly signal?: AbortSignal
 }): Promise<OAuthTokenResponse> {
   assertOAuthProviderHost(input.provider, input.endpoint)
   if (
@@ -95,6 +96,7 @@ export async function postOAuthToken(input: {
         headers: { 'content-type': 'application/x-www-form-urlencoded' },
         body,
         redirect: 'manual',
+        ...(input.signal ? { signal: input.signal } : {}),
       },
       input.provider.auth.allowedHosts,
     )

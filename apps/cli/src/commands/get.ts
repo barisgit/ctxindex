@@ -2,6 +2,11 @@ import { parseRef } from '@ctxindex/core'
 import { getSourceResource } from '@ctxindex/core/source'
 import { defineCtxCommand } from '../command-model'
 import { daemonResourceGet, selectDaemon } from '../daemon/client'
+import {
+  type DaemonRouteSelector,
+  ensureDaemonSelection,
+  selectEnsuredDaemonRoute,
+} from '../daemon/ensure'
 import { openDeps } from '../deps'
 import { mapErrorToExit, runWithExit } from '../format/exit'
 import {
@@ -17,8 +22,7 @@ import {
 
 export { formatGetJson, formatGetPretty, formatGetText }
 
-export interface GetCommandDeps {
-  readonly selectDaemon: typeof selectDaemon
+export interface GetCommandDeps extends DaemonRouteSelector {
   readonly get: typeof daemonResourceGet
   readonly open: typeof openDeps
 }
@@ -30,6 +34,7 @@ export type GetCommandInput = {
 
 const defaultDeps: GetCommandDeps = {
   selectDaemon,
+  ensureDaemonSelection,
   get: daemonResourceGet,
   open: openDeps,
 }
@@ -50,7 +55,7 @@ export async function handleGetCommand(
   process.once('SIGINT', cancel)
   let deps: Awaited<ReturnType<typeof openDeps>> | undefined
   try {
-    const daemon = services.selectDaemon()
+    const daemon = await selectEnsuredDaemonRoute(services, controller.signal)
     const result = daemon
       ? await services.get(daemon, parsed.ref, controller.signal)
       : await (async () => {

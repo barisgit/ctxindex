@@ -287,6 +287,9 @@ async function extractLocalDaemonBoundaryUses(
     const builtinRoot = specifier.replace(/^node:/, '').split('/')[0]
     const allowedTestProcessImport =
       allowTestRuntimePrimitives && builtinRoot === 'process'
+    const allowedLeaseChildProcessImport =
+      relative(packageDirectory, fileName).replaceAll('\\', '/') ===
+        'src/lease.ts' && builtinRoot === 'child_process'
     if (packageName !== undefined)
       uses.add(
         rpcForbiddenStoragePackages.has(packageName) ? specifier : packageName,
@@ -305,7 +308,8 @@ async function extractLocalDaemonBoundaryUses(
         !specifier.startsWith('/') &&
         !specifier.startsWith('#') &&
         !localDaemonAllowedBuiltinRoots.has(builtinRoot) &&
-        !allowedTestProcessImport) ||
+        !allowedTestProcessImport &&
+        !allowedLeaseChildProcessImport) ||
       (packageName !== undefined && applicationPackages.has(packageName)) ||
       /(?:^|\/)apps\//.test(specifier) ||
       /(?:^|\/)(?:format|formatter|formatters)(?:\/|$)/.test(specifier)

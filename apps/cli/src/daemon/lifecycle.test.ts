@@ -20,6 +20,7 @@ import {
 import {
   createDaemonLifecycle,
   type DaemonLifecycleDependencies,
+  daemonSpawnEnvironment,
   launchBackgroundDaemon,
   openDaemonDiagnostics,
   removeStaleDaemonEndpoint,
@@ -173,6 +174,58 @@ test('background launch is detached, ignores stdin, redirects output, and unrefs
   expect(closed).toEqual([41])
 })
 
+test('daemon spawn environment keeps infrastructure and drops Provider secrets', () => {
+  expect(
+    daemonSpawnEnvironment({
+      HOME: '/home/user',
+      PATH: '/bin',
+      XDG_DATA_HOME: '/data',
+      CTXINDEX_DATA_HOME: '/ctx-data',
+      CTXINDEX_DAEMON_RUNTIME_ROOT: '/runtime',
+      CTXINDEX_SECRETS_PASSPHRASE: 'file-backend-passphrase',
+      NODE_ENV: 'test',
+      CTXINDEX_GMAIL_MOCK_BASE_URL: 'http://127.0.0.1:1234',
+      CTXINDEX_GOOGLE_CLIENT_ID: 'public-provider-value',
+      CTXINDEX_GOOGLE_CLIENT_SECRET: 'private-provider-value',
+      ACME_OAUTH_CLIENT_SECRET: 'private-extension-value',
+    }),
+  ).toEqual({
+    HOME: '/home/user',
+    PATH: '/bin',
+    XDG_DATA_HOME: '/data',
+    CTXINDEX_DATA_HOME: '/ctx-data',
+    CTXINDEX_DAEMON_RUNTIME_ROOT: '/runtime',
+    CTXINDEX_SECRETS_PASSPHRASE: 'file-backend-passphrase',
+    NODE_ENV: 'test',
+    CTXINDEX_GMAIL_MOCK_BASE_URL: 'http://127.0.0.1:1234',
+  })
+})
+
+test('daemon spawn environment only forwards exact Provider test endpoints in test mode', () => {
+  const endpoints = {
+    CTXINDEX_GMAIL_MOCK_BASE_URL: 'http://127.0.0.1:1234',
+    CTXINDEX_GOOGLE_CALENDAR_MOCK_BASE_URL: 'http://127.0.0.1:2345',
+    CTXINDEX_GRAPH_MOCK_BASE_URL: 'http://127.0.0.1:3456',
+  }
+
+  expect(daemonSpawnEnvironment(endpoints)).toEqual({})
+  expect(
+    daemonSpawnEnvironment({
+      NODE_ENV: 'production',
+      ...endpoints,
+    }),
+  ).toEqual({ NODE_ENV: 'production' })
+  expect(
+    daemonSpawnEnvironment({
+      NODE_ENV: 'test',
+      ...endpoints,
+      CTXINDEX_GOOGLE_MOCK_BASE_URL: 'http://127.0.0.1:4567',
+      CTXINDEX_MICROSOFT_MOCK_BASE_URL: 'http://127.0.0.1:5678',
+      ACME_PROVIDER_MOCK_BASE_URL: 'http://127.0.0.1:6789',
+    }),
+  ).toEqual({ NODE_ENV: 'test', ...endpoints })
+})
+
 test('daemon diagnostics use owner-private directory and file modes', () => {
   const root = mkdtempSync(join(tmpdir(), 'ctxindex-daemon-diagnostics-'))
   cleanup.push(root)
@@ -245,6 +298,88 @@ test('absent start launches and polls compatible health', async () => {
     health,
   })
   expect(launches).toBe(1)
+})
+
+test('start waits for a stopping owner to release before launching its replacement', async () => {
+  let current: DaemonSelection | null = {
+    ...selection,
+    metadata: { ...metadata, lifecycle: 'stopping' },
+  }
+  let clock = 0
+  let launches = 0
+  const lifecycle = createDaemonLifecycle(
+    dependencies({
+      select: () => current,
+      health: async (selected) => {
+        if (selected.metadata?.lifecycle === 'ready') return health
+        throw new DaemonCliError({
+          kind: 'daemon_unavailable',
+          code: 'daemon_unavailable',
+          message: 'The daemon is stopping and is not accepting new work.',
+        })
+      },
+      cleanupStale: () => {
+        if (clock < 750) return 'busy'
+        current = null
+        return 'removed'
+      },
+      launch: () => {
+        launches += 1
+        if (current === null) current = selection
+      },
+      now: () => clock,
+      sleep: async (milliseconds) => {
+        clock += milliseconds
+      },
+    }),
+  )
+
+  await expect(lifecycle.start()).resolves.toEqual({
+    status: 'running',
+    started: true,
+    health,
+  })
+  expect(clock).toBeGreaterThanOrEqual(750)
+  expect(launches).toBe(1)
+})
+
+test.each([
+  'start',
+  'status',
+  'stop',
+] as const)('%s preserves health-probe cancellation without lifecycle side effects', async (action) => {
+  let launches = 0
+  let shutdowns = 0
+  let cleanups = 0
+  const lifecycle = createDaemonLifecycle(
+    dependencies({
+      health: async () => {
+        throw Object.assign(new Error('cancelled health probe'), {
+          code: 'cancelled' as const,
+        })
+      },
+      launch: () => {
+        launches += 1
+      },
+      shutdown: async () => {
+        shutdowns += 1
+        throw new Error('must not shut down after cancellation')
+      },
+      cleanupStale: () => {
+        cleanups += 1
+        return 'removed'
+      },
+    }),
+  )
+
+  await expect(lifecycle[action]()).rejects.toMatchObject({
+    code: 'cancelled',
+  })
+  expect({ launches, shutdowns, cleanups }).toEqual({
+    launches: 0,
+    shutdowns: 0,
+    cleanups: 0,
+  })
 })
 
 test('launch failures do not expose host paths or raw errors', async () => {

@@ -47,6 +47,7 @@ const optionalPublicStringSchema = boundedString(2_048, 0)
 const sourceConfigJsonSchema = boundedString(65_536, 0)
 const versionStringSchema = boundedString(64)
 const countSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER)
+export const RPC_BYTE_TRANSFER_MAX_BYTES = 64 * 1_024 * 1_024
 const signedTimestampMsSchema = z.number().int().safe()
 const boundedCountSchema = z.number().int().min(0).max(1_000_000)
 const timeoutMsSchema = z.number().int().min(0).max(60_000)
@@ -320,6 +321,201 @@ export const rpcHealthResultSchema = z
   })
   .readonly()
 export type RpcHealthResult = z.infer<typeof rpcHealthResultSchema>
+
+const rpcOAuthAppConfigSchema = z
+  .record(identifierSchema, terminalSafeString(16_384, 0))
+  .superRefine((value, context) => {
+    const entries = Object.entries(value)
+    if (entries.length > 32) {
+      context.addIssue({ code: 'custom', message: 'Too many config fields' })
+      return
+    }
+    const bytes = entries.reduce(
+      (total, [key, fieldValue]) =>
+        total +
+        utf8.encode(key).byteLength +
+        utf8.encode(fieldValue).byteLength,
+      0,
+    )
+    if (bytes > 65_536)
+      context.addIssue({ code: 'custom', message: 'Config is too large' })
+  })
+  .readonly()
+
+const rpcOAuthAppEnvironmentSchema = z
+  .record(identifierSchema, z.string().regex(/^[A-Z_][A-Z0-9_]*$/))
+  .refine((value) => Object.keys(value).length <= 32, {
+    message: 'Too many environment fields',
+  })
+  .readonly()
+
+export const rpcOAuthAppRegistrationInputSchema = z.strictObject({
+  provider: identifierSchema,
+})
+export type RpcOAuthAppRegistrationInput = Readonly<
+  z.infer<typeof rpcOAuthAppRegistrationInputSchema>
+>
+
+export const rpcOAuthAppRegistrationResultSchema = z
+  .strictObject({ environment: rpcOAuthAppEnvironmentSchema })
+  .readonly()
+export type RpcOAuthAppRegistrationResult = z.infer<
+  typeof rpcOAuthAppRegistrationResultSchema
+>
+
+export const rpcOAuthAppAddInputSchema = z.strictObject({
+  provider: identifierSchema,
+  label: identifierSchema,
+  config: rpcOAuthAppConfigSchema,
+})
+export type RpcOAuthAppAddInput = Readonly<
+  z.infer<typeof rpcOAuthAppAddInputSchema>
+>
+
+export const rpcOAuthAppAddResultSchema = z
+  .strictObject({ providerId: identifierSchema, label: identifierSchema })
+  .readonly()
+export type RpcOAuthAppAddResult = z.infer<typeof rpcOAuthAppAddResultSchema>
+
+export const rpcOAuthAppListInputSchema = z.strictObject({})
+export type RpcOAuthAppListInput = Readonly<
+  z.infer<typeof rpcOAuthAppListInputSchema>
+>
+
+const rpcOAuthAppProvenanceSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('local') }).readonly(),
+  z
+    .strictObject({
+      kind: z.literal('extension'),
+      source: z.enum(['builtin', 'catalog', 'direct', 'explicit-path']),
+      packageName: optionalPublicStringSchema.optional(),
+      packageVersion: versionStringSchema.optional(),
+      integrity: longPublicStringSchema.optional(),
+      commit: optionalPublicStringSchema.optional(),
+    })
+    .readonly(),
+])
+
+export const rpcOAuthAppRowSchema = z
+  .strictObject({
+    providerId: identifierSchema,
+    label: identifierSchema,
+    origin: z.enum(['extension', 'local']),
+    provenance: rpcOAuthAppProvenanceSchema,
+  })
+  .readonly()
+export type RpcOAuthAppRow = z.infer<typeof rpcOAuthAppRowSchema>
+
+export const rpcOAuthAppListResultSchema = z
+  .strictObject({ rows: z.array(rpcOAuthAppRowSchema).max(4_096).readonly() })
+  .readonly()
+export type RpcOAuthAppListResult = z.infer<typeof rpcOAuthAppListResultSchema>
+
+export const rpcOAuthAppRemoveInputSchema = z.strictObject({
+  provider: identifierSchema,
+  label: identifierSchema,
+})
+export type RpcOAuthAppRemoveInput = Readonly<
+  z.infer<typeof rpcOAuthAppRemoveInputSchema>
+>
+
+export const rpcOAuthAppRemoveResultSchema = z
+  .strictObject({ providerId: identifierSchema, label: identifierSchema })
+  .readonly()
+export type RpcOAuthAppRemoveResult = z.infer<
+  typeof rpcOAuthAppRemoveResultSchema
+>
+
+export const rpcAccountAddInputSchema = z.strictObject({
+  provider: identifierSchema,
+  app: identifierSchema.optional(),
+  label: identifierSchema.optional(),
+  loopbackTimeoutSeconds: z.number().finite().min(0).max(3_600).optional(),
+  oauthMockBaseUrl: terminalSafeString(2_048).optional(),
+})
+export type RpcAccountAddInput = Readonly<
+  z.infer<typeof rpcAccountAddInputSchema>
+>
+
+export const rpcAccountAddEventSchema = z
+  .strictObject({
+    type: z.literal('authorization.required'),
+    requestId: identifierSchema,
+    authorizationUrl: terminalSafeString(16_384),
+  })
+  .readonly()
+export type RpcAccountAddEvent = z.infer<typeof rpcAccountAddEventSchema>
+
+export const rpcAccountAddResultSchema = z
+  .strictObject({ accountId: identifierSchema })
+  .readonly()
+export type RpcAccountAddResult = z.infer<typeof rpcAccountAddResultSchema>
+
+export const rpcAccountRespondInputSchema = z.strictObject({
+  requestId: identifierSchema,
+  response: terminalSafeString(16_384),
+})
+export type RpcAccountRespondInput = Readonly<
+  z.infer<typeof rpcAccountRespondInputSchema>
+>
+
+export const rpcAccountRespondResultSchema = z
+  .strictObject({ accepted: z.literal(true) })
+  .readonly()
+export type RpcAccountRespondResult = z.infer<
+  typeof rpcAccountRespondResultSchema
+>
+
+export const rpcAccountListInputSchema = z.strictObject({})
+export type RpcAccountListInput = Readonly<
+  z.infer<typeof rpcAccountListInputSchema>
+>
+
+const rpcAccountSourceSchema = z
+  .strictObject({
+    id: identifierSchema,
+    label: identifierSchema,
+    adapter: z.strictObject({ id: identifierSchema }).readonly(),
+    realm: z
+      .strictObject({
+        id: identifierSchema,
+        slug: identifierSchema,
+        label: optionalPublicStringSchema.nullable(),
+      })
+      .readonly(),
+  })
+  .readonly()
+
+export const rpcAccountRowSchema = z
+  .strictObject({
+    id: identifierSchema,
+    provider: identifierSchema,
+    label: identifierSchema.nullable(),
+    expiresAt: signedTimestampMsSchema.nullable(),
+    expiryState: z.enum(['active', 'expired', 'unknown']),
+    sources: z.array(rpcAccountSourceSchema).max(4_096).readonly(),
+  })
+  .readonly()
+export type RpcAccountRow = z.infer<typeof rpcAccountRowSchema>
+
+export const rpcAccountListResultSchema = z
+  .strictObject({ rows: z.array(rpcAccountRowSchema).max(4_096).readonly() })
+  .readonly()
+export type RpcAccountListResult = z.infer<typeof rpcAccountListResultSchema>
+
+export const rpcAccountRemoveInputSchema = z.strictObject({
+  label: identifierSchema,
+})
+export type RpcAccountRemoveInput = Readonly<
+  z.infer<typeof rpcAccountRemoveInputSchema>
+>
+
+export const rpcAccountRemoveResultSchema = z
+  .strictObject({ label: identifierSchema })
+  .readonly()
+export type RpcAccountRemoveResult = z.infer<
+  typeof rpcAccountRemoveResultSchema
+>
 
 const rpcDocumentationRowFields = {
   extensionId: documentationExtensionIdSchema,
@@ -698,6 +894,54 @@ export const rpcStatusResultSchema = z
   .strictObject({ rows: z.array(rpcStatusRowSchema).max(1_024).readonly() })
   .readonly()
 export type RpcStatusResult = z.infer<typeof rpcStatusResultSchema>
+
+const rpcSecretBackendSchema = z.enum(['keychain', 'file'])
+const rpcSecretBackendStateSchema = z
+  .strictObject({
+    available: z.boolean(),
+    referenceCount: countSchema,
+  })
+  .readonly()
+
+export const rpcSecretsStatusInputSchema = z.strictObject({})
+export type RpcSecretsStatusInput = Readonly<
+  z.infer<typeof rpcSecretsStatusInputSchema>
+>
+
+export const rpcSecretsStatusResultSchema = z
+  .strictObject({
+    backend: rpcSecretBackendSchema,
+    backends: z
+      .strictObject({
+        file: rpcSecretBackendStateSchema,
+        keychain: rpcSecretBackendStateSchema,
+      })
+      .readonly(),
+  })
+  .readonly()
+export type RpcSecretsStatusResult = z.infer<
+  typeof rpcSecretsStatusResultSchema
+>
+
+export const rpcSecretsBackendSetInputSchema = z.strictObject({
+  target: rpcSecretBackendSchema,
+})
+export type RpcSecretsBackendSetInput = Readonly<
+  z.infer<typeof rpcSecretsBackendSetInputSchema>
+>
+
+export const rpcSecretsBackendSetResultSchema = z
+  .strictObject({
+    backend: rpcSecretBackendSchema,
+    copied: countSchema,
+    cleaned: countSchema,
+    cleanupPending: z.boolean(),
+    warnings: z.array(terminalSafeString(512)).max(16).readonly(),
+  })
+  .readonly()
+export type RpcSecretsBackendSetResult = z.infer<
+  typeof rpcSecretsBackendSetResultSchema
+>
 
 export const rpcRealmAddInputSchema = z.strictObject({
   slug: identifierSchema,
@@ -1209,6 +1453,35 @@ export const rpcResourceWarningSchema = z
     ref: refSchema,
   })
   .readonly()
+
+export const rpcByteTransferDescriptorSchema = z
+  .strictObject({
+    ticket: z.string().regex(/^[a-f0-9]{64}$/),
+    byteSize: z.number().int().min(0).max(RPC_BYTE_TRANSFER_MAX_BYTES),
+    expiresAt: countSchema,
+  })
+  .readonly()
+export type RpcByteTransferDescriptor = z.infer<
+  typeof rpcByteTransferDescriptorSchema
+>
+
+export const rpcExportInputSchema = z.strictObject({
+  ref: refSchema,
+  format: identifierSchema,
+})
+export type RpcExportInput = Readonly<z.infer<typeof rpcExportInputSchema>>
+
+export const rpcExportResultSchema = z
+  .strictObject({
+    transfer: rpcByteTransferDescriptorSchema,
+    mediaType: terminalSafeString(255),
+    format: identifierSchema,
+    ref: refSchema,
+    warnings: z.array(rpcResourceWarningSchema).max(256).readonly(),
+  })
+  .readonly()
+export type RpcExportResult = z.infer<typeof rpcExportResultSchema>
+
 export const rpcResourceGetResultSchema = z
   .strictObject({
     resource: rpcStoredResourceSchema,
@@ -1216,6 +1489,178 @@ export const rpcResourceGetResultSchema = z
   })
   .readonly()
 export type RpcResourceGetResult = z.infer<typeof rpcResourceGetResultSchema>
+
+export const rpcArtifactDescriptorSchema = z
+  .strictObject({
+    ref: refSchema,
+    filename: terminalSafeString(1_024, 0).optional(),
+    mediaType: terminalSafeString(256, 0).optional(),
+    byteSize: countSchema.optional(),
+  })
+  .readonly()
+export type RpcArtifactDescriptor = z.infer<typeof rpcArtifactDescriptorSchema>
+
+export const rpcArtifactWarningSchema = z
+  .strictObject({
+    code: publicCodeSchema,
+    message: publicMessageSchema,
+    ref: refSchema,
+  })
+  .readonly()
+
+export const rpcArtifactListInputSchema = z.strictObject({ ref: refSchema })
+export type RpcArtifactListInput = Readonly<
+  z.infer<typeof rpcArtifactListInputSchema>
+>
+
+export const rpcArtifactListResultSchema = z
+  .strictObject({
+    resourceRef: refSchema,
+    artifacts: z.array(rpcArtifactDescriptorSchema).max(1_024).readonly(),
+    warnings: z.array(rpcArtifactWarningSchema).max(256).readonly(),
+  })
+  .readonly()
+export type RpcArtifactListResult = z.infer<typeof rpcArtifactListResultSchema>
+
+export const rpcArtifactDownloadInputSchema = z.strictObject({
+  ref: refSchema,
+  transfer: z.boolean(),
+})
+export type RpcArtifactDownloadInput = Readonly<
+  z.infer<typeof rpcArtifactDownloadInputSchema>
+>
+
+export const rpcDownloadedArtifactSchema = z
+  .strictObject({
+    ref: refSchema,
+    originRef: refSchema,
+    contentHash: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+    mediaType: terminalSafeString(256),
+    byteSize: countSchema,
+    retentionClass: z.literal('cached'),
+    createdAt: countSchema,
+  })
+  .readonly()
+
+export const rpcArtifactDownloadResultSchema = z
+  .strictObject({
+    artifact: rpcDownloadedArtifactSchema,
+    cache: z.enum(['hit', 'miss']),
+    transfer: rpcByteTransferDescriptorSchema.optional(),
+  })
+  .readonly()
+export type RpcArtifactDownloadResult = z.infer<
+  typeof rpcArtifactDownloadResultSchema
+>
+
+export const rpcArtifactPurgeInputSchema = z.strictObject({})
+export type RpcArtifactPurgeInput = Readonly<
+  z.infer<typeof rpcArtifactPurgeInputSchema>
+>
+
+export const rpcArtifactDiskAccountingSchema = z
+  .strictObject({
+    artifactCount: countSchema,
+    objectCount: countSchema,
+    logicalBytes: countSchema,
+    physicalBytes: countSchema,
+  })
+  .readonly()
+
+export const rpcArtifactPurgeResultSchema = z
+  .strictObject({
+    artifactCountRemoved: countSchema,
+    objectCountRemoved: countSchema,
+    logicalBytesFreed: countSchema,
+    physicalBytesFreed: countSchema,
+    diskAccounting: rpcArtifactDiskAccountingSchema,
+  })
+  .readonly()
+export type RpcArtifactPurgeResult = z.infer<
+  typeof rpcArtifactPurgeResultSchema
+>
+
+const rpcActionProfileSchema = z
+  .strictObject({
+    id: identifierSchema,
+    version: z.number().int().min(1).max(65_535),
+  })
+  .readonly()
+const rpcActionAdapterSchema = z
+  .strictObject({ id: identifierSchema })
+  .readonly()
+const rpcActionInputDescriptionSchema = z.custom<
+  Readonly<Record<string, RpcSafeJson>>
+>(
+  (value) =>
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    rpcSafeJsonSchema.safeParse(value).success,
+  { message: 'Must be a bounded safe JSON object' },
+)
+
+export const rpcActionDescribeInputSchema = z.strictObject({
+  actionId: identifierSchema,
+  source: identifierSchema,
+})
+export type RpcActionDescribeInput = Readonly<
+  z.infer<typeof rpcActionDescribeInputSchema>
+>
+
+export const rpcActionDescribeResultSchema = z
+  .strictObject({
+    id: identifierSchema,
+    profile: rpcActionProfileSchema,
+    effect: z.enum(['reversible', 'irreversible']),
+    input: rpcActionInputDescriptionSchema,
+    output: rpcActionProfileSchema,
+    adapters: z.array(rpcActionAdapterSchema).max(1_024).readonly(),
+    sources: z
+      .array(
+        z.union([
+          z
+            .strictObject({
+              id: identifierSchema,
+              adapter: rpcActionAdapterSchema,
+              available: z.literal(true),
+            })
+            .readonly(),
+          z
+            .strictObject({
+              id: identifierSchema,
+              adapter: rpcActionAdapterSchema,
+              available: z.literal(false),
+              reason: z.enum(['adapter_unavailable', 'action_unsupported']),
+            })
+            .readonly(),
+        ]),
+      )
+      .max(1_024)
+      .readonly(),
+  })
+  .readonly()
+export type RpcActionDescribeResult = z.infer<
+  typeof rpcActionDescribeResultSchema
+>
+
+export const rpcActionRunInputSchema = z.strictObject({
+  actionId: identifierSchema,
+  source: identifierSchema,
+  actionInput: rpcSafeJsonSchema,
+  confirmIrreversible: z.boolean(),
+})
+export type RpcActionRunInput = Readonly<
+  z.infer<typeof rpcActionRunInputSchema>
+>
+
+export const rpcActionRunResultSchema = z
+  .strictObject({
+    resource: rpcStoredResourceSchema,
+    warnings: z.array(rpcResourceWarningSchema).max(256).readonly(),
+  })
+  .readonly()
+export type RpcActionRunResult = z.infer<typeof rpcActionRunResultSchema>
 
 export const rpcThreadGetInputSchema = z.strictObject({ ref: refSchema })
 export type RpcThreadGetInput = Readonly<

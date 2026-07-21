@@ -8,7 +8,7 @@ Owns registry-description selection and source-aware Action inspection behind th
 
 - `handle-describe-command.ts` consumes typed command values and rejects selector, source, format, and full/detail conflicts before loading definitions or opening application state.
 - General Profile, Adapter, and Action inventory/detail views load one registry projection and delegate deterministic text, Markdown, or JSON rendering to `format/registry.ts`.
-- An exact Action id routes to the Action describe workflow; `--source` is accepted only there and resolves exact Source availability without executing the Action.
+- An exact Action id without `--source` stays on the generated registry projection and never opens SQLite. Adding `--source` routes to the stateful Action describe workflow and resolves exact Source availability without executing the Action.
 - The injectable Action-describe boundary allows focused routing tests without database or provider effects.
 
 ## Integration points

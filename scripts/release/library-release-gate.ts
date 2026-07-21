@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { appendFile, readFile } from 'node:fs/promises'
 import { basename, resolve } from 'node:path'
 
@@ -17,6 +18,7 @@ export interface RegistryResult {
   readonly status: number
   readonly name?: string
   readonly version?: string
+  readonly integrity?: string
 }
 
 export interface LibraryGateInput {
@@ -42,6 +44,7 @@ export interface LibraryReleaseMatrix {
 export interface LibraryPublishPreflightInput {
   readonly candidate: LibraryReleaseCandidate
   readonly registry: RegistryResult
+  readonly archiveIntegrity: string
   readonly runAttempt: number
 }
 
@@ -64,11 +67,33 @@ const libraries: readonly LibraryDefinition[] = [
 
 const semverPattern =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/
+const sha512IntegrityPattern = /^sha512-([A-Za-z0-9+/]{86}==)$/
 
 function assertSemver(version: string): void {
   if (!semverPattern.test(version)) {
     throw new TypeError(`${version} is not a valid semantic version`)
   }
+}
+
+function assertRegistryIntegrity(
+  integrity: string | undefined,
+): asserts integrity is string {
+  if (integrity === undefined || !isSha512Integrity(integrity)) {
+    throw new Error('npm registry returned missing or malformed dist.integrity')
+  }
+}
+
+function assertArchiveIntegrity(integrity: string): void {
+  if (!isSha512Integrity(integrity)) {
+    throw new Error('Built archive integrity is malformed')
+  }
+}
+
+function isSha512Integrity(integrity: string): boolean {
+  const match = sha512IntegrityPattern.exec(integrity)
+  if (match === null || match[1] === undefined) return false
+  const digest = Buffer.from(match[1], 'base64')
+  return digest.byteLength === 64 && digest.toString('base64') === match[1]
 }
 
 interface ParsedSemver {
@@ -140,9 +165,8 @@ export function evaluateLibraryRelease(
     ) {
       throw new Error('npm registry did not confirm exact package version')
     }
-    return null
-  }
-  if (input.registry.status !== 404) {
+    assertRegistryIntegrity(input.registry.integrity)
+  } else if (input.registry.status !== 404) {
     throw new Error(
       `Unexpected npm registry response ${input.registry.status} for ${input.definition.packageName}`,
     )
@@ -185,7 +209,18 @@ async function exactRegistryVersion(
   if (typeof record.name !== 'string' || typeof record.version !== 'string') {
     throw new Error('npm registry did not confirm exact package version')
   }
-  return { status: 200, name: record.name, version: record.version }
+  const dist = record.dist
+  const integrity =
+    typeof dist === 'object' && dist !== null
+      ? (dist as Record<string, unknown>).integrity
+      : undefined
+  assertRegistryIntegrity(typeof integrity === 'string' ? integrity : undefined)
+  return {
+    status: 200,
+    name: record.name,
+    version: record.version,
+    integrity,
+  }
 }
 
 async function manifestAtRevision(
@@ -316,6 +351,7 @@ export function evaluateLibraryPublishPreflight(
   if (!Number.isSafeInteger(input.runAttempt) || input.runAttempt < 1) {
     throw new TypeError('GitHub run attempt must be a positive integer')
   }
+  assertArchiveIntegrity(input.archiveIntegrity)
   if (input.registry.status === 404) return 'publish'
   if (input.registry.status !== 200) {
     throw new Error(
@@ -327,6 +363,10 @@ export function evaluateLibraryPublishPreflight(
     input.registry.version !== input.candidate.version
   ) {
     throw new Error('npm registry did not confirm exact package version')
+  }
+  assertRegistryIntegrity(input.registry.integrity)
+  if (input.registry.integrity !== input.archiveIntegrity) {
+    throw new Error('Published package integrity does not match built archive')
   }
   if (input.runAttempt === 1) {
     throw new Error(
@@ -362,20 +402,22 @@ async function prepareCandidates(matrix: LibraryReleaseMatrix): Promise<void> {
 async function assertArtifactChecksum(
   directory: string,
   candidate: LibraryReleaseCandidate,
-): Promise<string> {
+): Promise<{ readonly archive: string; readonly integrity: string }> {
   const archive = resolve(directory, candidate.archiveName)
   const expected = await readFile(`${archive}.sha256`, 'utf8')
   const match = /^([a-f0-9]{64}) {2}([^\n]+)\n$/.exec(expected)
   if (match === null || match[2] !== basename(archive)) {
     throw new Error(`Malformed checksum for ${candidate.archiveName}`)
   }
-  const actual = new Bun.CryptoHasher('sha256')
-    .update(await Bun.file(archive).arrayBuffer())
-    .digest('hex')
+  const bytes = await Bun.file(archive).arrayBuffer()
+  const actual = new Bun.CryptoHasher('sha256').update(bytes).digest('hex')
   if (actual !== match[1]) {
     throw new Error(`Checksum mismatch for ${candidate.archiveName}`)
   }
-  return archive
+  const integrity = `sha512-${new Bun.CryptoHasher('sha512')
+    .update(bytes)
+    .digest('base64')}`
+  return { archive, integrity }
 }
 
 async function publishCandidates(
@@ -388,12 +430,16 @@ async function publishCandidates(
   }
   const runAttempt = Number(encodedRunAttempt)
   for (const candidate of matrix.include) {
-    const archive = await assertArtifactChecksum(directory, candidate)
+    const { archive, integrity } = await assertArtifactChecksum(
+      directory,
+      candidate,
+    )
     const definition = libraryForName(candidate.packageName)
     const registry = await exactRegistryVersion(definition, candidate.version)
     const decision = evaluateLibraryPublishPreflight({
       candidate,
       registry,
+      archiveIntegrity: integrity,
       runAttempt,
     })
     if (decision === 'skip') {

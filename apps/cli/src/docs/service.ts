@@ -6,6 +6,8 @@ import {
   type DocumentationSearchResult,
   type DocumentationService,
 } from '@ctxindex/core/documentation'
+import { CtxindexError } from '@ctxindex/core/errors'
+import { assertInitialized } from '../commands/db'
 import {
   type DaemonSelection,
   daemonDocumentationGet,
@@ -13,6 +15,10 @@ import {
   daemonDocumentationSearch,
   selectDaemon,
 } from '../daemon/client'
+import {
+  ensureDaemonSelection,
+  selectEnsuredDaemonRoute,
+} from '../daemon/ensure'
 import { loadCliDefinitions, printExtensionDiagnostics } from '../definitions'
 import { resolveBundledDocumentation } from './resolve'
 
@@ -36,7 +42,9 @@ export interface DocsCommandService {
 export type DocsServiceLoader = () => Promise<DocsCommandService>
 
 export interface DocsRouteServices {
+  readonly assertInitialized?: typeof assertInitialized
   readonly selectDaemon: typeof selectDaemon
+  readonly ensureDaemonSelection?: typeof ensureDaemonSelection
   readonly daemonDocumentationList: typeof daemonDocumentationList
   readonly daemonDocumentationGet: typeof daemonDocumentationGet
   readonly daemonDocumentationSearch: typeof daemonDocumentationSearch
@@ -174,7 +182,9 @@ function selectedDaemonService(
 }
 
 const defaultRouteServices: DocsRouteServices = {
+  assertInitialized,
   selectDaemon,
+  ensureDaemonSelection,
   daemonDocumentationList,
   daemonDocumentationGet,
   daemonDocumentationSearch,
@@ -188,7 +198,22 @@ export async function loadDocsCommandService(
 ): Promise<DocsCommandService> {
   const bundledSource = services.resolveBundledDocumentation()
   const bundled = createDocumentationService([bundledSource])
-  const selection = services.selectDaemon()
+  if (services.assertInitialized) {
+    try {
+      await services.assertInitialized()
+    } catch (error) {
+      if (!(error instanceof CtxindexError) || error.code !== 'invalid_args') {
+        throw error
+      }
+      const loaded = await services.loadCliDefinitions()
+      services.printExtensionDiagnostics(loaded.diagnostics)
+      return createDocumentationService([
+        bundledSource,
+        createExtensionDocumentationSource(loaded.documentation),
+      ])
+    }
+  }
+  const selection = await selectEnsuredDaemonRoute(services)
   if (selection !== null) {
     return selectedDaemonService(selection, bundled, services)
   }

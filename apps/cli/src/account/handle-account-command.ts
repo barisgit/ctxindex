@@ -1,4 +1,9 @@
-import { authorizeProvider, resolveOAuthSelection } from '@ctxindex/core/auth'
+import {
+  authorizeProvider,
+  launchOAuthBrowser,
+  resolveOAuthSelection,
+} from '@ctxindex/core/auth'
+import { readEnvironmentVariable } from '@ctxindex/core/config'
 import { CtxindexValidationError } from '@ctxindex/core/errors'
 import {
   type ManagedOAuthAppPolicy,
@@ -9,6 +14,16 @@ import {
 import type { CompleteRegistry } from '@ctxindex/core/registry'
 import { CTXINDEX_MANAGED_OAUTH_APP_POLICIES } from '@ctxindex/official'
 import { assertInitialized } from '../commands/db'
+import {
+  daemonAccountAdd,
+  daemonAccountList,
+  daemonAccountRemove,
+  selectDaemon,
+} from '../daemon/client'
+import {
+  ensureDaemonSelection,
+  selectEnsuredDaemonRoute,
+} from '../daemon/ensure'
 import { loadAuthDefinitionDeps, openAccountDeps, openDeps } from '../deps'
 import {
   formatAccountAdded,
@@ -25,6 +40,13 @@ export interface AccountCommandRuntime {
   readonly openAccountDeps: typeof openAccountDeps
   readonly openDeps: typeof openDeps
   readonly authorizeProvider: typeof authorizeProvider
+  readonly selectDaemon?: typeof selectDaemon
+  readonly ensureDaemonSelection?: typeof ensureDaemonSelection
+  readonly daemonAccountAdd?: typeof daemonAccountAdd
+  readonly daemonAccountList?: typeof daemonAccountList
+  readonly daemonAccountRemove?: typeof daemonAccountRemove
+  readonly launchOAuthBrowser: typeof launchOAuthBrowser
+  readonly readEnvironmentVariable: typeof readEnvironmentVariable
 }
 
 export type AccountCommandInput =
@@ -43,6 +65,13 @@ const accountCommandRuntime: AccountCommandRuntime = {
   openAccountDeps,
   openDeps,
   authorizeProvider,
+  selectDaemon,
+  ensureDaemonSelection,
+  daemonAccountAdd,
+  daemonAccountList,
+  daemonAccountRemove,
+  launchOAuthBrowser,
+  readEnvironmentVariable,
 }
 
 function availableOAuthAppLabels(
@@ -108,7 +137,84 @@ export async function handleAccountCommand(
     | Awaited<ReturnType<typeof openAccountDeps>>
     | undefined
   let managedProviderId: string | undefined
+  const controller = new AbortController()
+  const cancel = () => controller.abort()
+  process.once('SIGINT', cancel)
   try {
+    if (parsed.kind === 'add') {
+      try {
+        await runtime.assertInitialized()
+      } catch (initializationError) {
+        const definitions = await runtime.loadAuthDefinitionDeps()
+        resolveOAuthSelection(definitions.completeRegistry, parsed.provider)
+        throw initializationError
+      }
+    } else {
+      await runtime.assertInitialized()
+    }
+    const daemon = runtime.selectDaemon
+      ? await selectEnsuredDaemonRoute(
+          {
+            selectDaemon: runtime.selectDaemon,
+            ...(runtime.ensureDaemonSelection
+              ? { ensureDaemonSelection: runtime.ensureDaemonSelection }
+              : {}),
+          },
+          controller.signal,
+        )
+      : null
+    if (daemon) {
+      if (parsed.kind === 'list') {
+        const result = await (runtime.daemonAccountList ?? daemonAccountList)(
+          daemon,
+          controller.signal,
+        )
+        console.log(formatAccountInventory(result.rows, parsed.format))
+      } else if (parsed.kind === 'remove') {
+        await (runtime.daemonAccountRemove ?? daemonAccountRemove)(
+          daemon,
+          parsed.label,
+          controller.signal,
+        )
+        console.log(formatAccountRemoved(parsed.label))
+      } else {
+        const timeout = Number(
+          runtime.readEnvironmentVariable('CTXINDEX_LOOPBACK_TIMEOUT_SECS'),
+        )
+        const noBrowser =
+          runtime.readEnvironmentVariable('CTXINDEX_NO_BROWSER') === '1'
+        const oauthMockBaseUrl = runtime.readEnvironmentVariable(
+          'CTXINDEX_OAUTH_MOCK_BASE_URL',
+        )
+        const result = await (runtime.daemonAccountAdd ?? daemonAccountAdd)(
+          daemon,
+          {
+            provider: parsed.provider,
+            ...(parsed.app === undefined ? {} : { app: parsed.app }),
+            ...(parsed.label === undefined ? {} : { label: parsed.label }),
+            ...(Number.isFinite(timeout) && timeout >= 0 && timeout <= 3_600
+              ? { loopbackTimeoutSeconds: timeout }
+              : {}),
+            ...(oauthMockBaseUrl ? { oauthMockBaseUrl } : {}),
+          },
+          {
+            emitAuthorizationUrl: async (url) => {
+              console.log(`Open this URL: ${url}`)
+              if (!noBrowser) {
+                try {
+                  await runtime.launchOAuthBrowser(url)
+                } catch {}
+              }
+            },
+            readAuthorizationResponse: (input) =>
+              readHiddenOAuthResponse({ ...input, onCancel: cancel }),
+          },
+          controller.signal,
+        )
+        console.log(formatAccountAdded(result))
+      }
+      return 0
+    }
     if (parsed.kind === 'list') {
       deps = await runtime.openAccountDeps()
       console.log(
@@ -122,13 +228,6 @@ export async function handleAccountCommand(
       await deps.authService.removeAccount(parsed.label)
       console.log(formatAccountRemoved(parsed.label))
     } else {
-      try {
-        await runtime.assertInitialized()
-      } catch (initializationError) {
-        const definitions = await runtime.loadAuthDefinitionDeps()
-        resolveOAuthSelection(definitions.completeRegistry, parsed.provider)
-        throw initializationError
-      }
       const opened = await runtime.openDeps()
       deps = opened
       resolveOAuthSelection(opened.completeRegistry, parsed.provider)
@@ -185,7 +284,8 @@ export async function handleAccountCommand(
             return app
           },
           emitAuthorizationUrl: (url) => console.log(`Open this URL: ${url}`),
-          readAuthorizationResponse: readHiddenOAuthResponse,
+          readAuthorizationResponse: (input) =>
+            readHiddenOAuthResponse({ ...input, onCancel: cancel }),
         },
       )
       console.log(formatAccountAdded(result))
@@ -195,6 +295,7 @@ export async function handleAccountCommand(
     console.error(formatAccountCommandError(error, managedProviderId))
     return mapErrorToExit(error)
   } finally {
+    process.removeListener('SIGINT', cancel)
     await deps?.close()
   }
 }

@@ -1,4 +1,9 @@
+import { assertValidRealmSlug } from '@ctxindex/core/realm'
 import { daemonRealmAdd, daemonRealmList, selectDaemon } from '../daemon/client'
+import {
+  ensureDaemonSelection,
+  selectEnsuredDaemonRoute,
+} from '../daemon/ensure'
 import { openDeps } from '../deps'
 import { mapErrorToExit } from '../format/exit'
 import type { OutputFormat } from '../format/output'
@@ -10,6 +15,7 @@ function printOutput(output: string): void {
 
 export interface RealmCommandDeps {
   readonly selectDaemon: typeof selectDaemon
+  readonly ensureDaemonSelection?: typeof ensureDaemonSelection
   readonly realmAdd: typeof daemonRealmAdd
   readonly realmList: typeof daemonRealmList
   readonly open: typeof openDeps
@@ -21,6 +27,7 @@ export type RealmCommandInput =
 
 const defaultDeps: RealmCommandDeps = {
   selectDaemon,
+  ensureDaemonSelection,
   realmAdd: daemonRealmAdd,
   realmList: daemonRealmList,
   open: openDeps,
@@ -30,12 +37,18 @@ export async function handleRealmCommand(
   parsed: RealmCommandInput,
   services: RealmCommandDeps = defaultDeps,
 ): Promise<number> {
+  try {
+    if (parsed.kind === 'add') assertValidRealmSlug(parsed.slug)
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    return mapErrorToExit(error)
+  }
   let deps: Awaited<ReturnType<typeof openDeps>> | undefined
   const controller = new AbortController()
   const cancel = () => controller.abort()
   process.once('SIGINT', cancel)
   try {
-    const daemon = services.selectDaemon()
+    const daemon = await selectEnsuredDaemonRoute(services, controller.signal)
     if (daemon) {
       if (parsed.kind === 'add') {
         await services.realmAdd(

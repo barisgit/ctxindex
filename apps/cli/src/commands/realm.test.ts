@@ -5,6 +5,33 @@ afterEach(() => {
   process.removeAllListeners('SIGINT')
 })
 
+test('invalid Realm slug fails before daemon ensure', async () => {
+  const error = spyOn(console, 'error').mockImplementation(() => {})
+  let ensured = false
+  try {
+    expect(
+      await handleRealmCommand(
+        { kind: 'add', slug: 'not valid' },
+        {
+          selectDaemon: () => null,
+          ensureDaemonSelection: async () => {
+            ensured = true
+            throw new Error('daemon ensure invoked')
+          },
+          realmAdd: async () => ({ realmId: 'unused' }),
+          realmList: async () => ({ rows: [] }),
+          open: async () => {
+            throw new Error('direct dependencies opened')
+          },
+        },
+      ),
+    ).toBe(2)
+    expect(ensured).toBe(false)
+  } finally {
+    error.mockRestore()
+  }
+})
+
 test('selected daemon handles Realm add without opening direct dependencies', async () => {
   const output: string[] = []
   const log = spyOn(console, 'log').mockImplementation((value) => {
@@ -15,7 +42,14 @@ test('selected daemon handles Realm add without opening direct dependencies', as
     const exit = await handleRealmCommand(
       { kind: 'add', slug: 'work', name: 'Work' },
       {
-        selectDaemon: () => ({}) as never,
+        selectDaemon: () => {
+          throw new Error('legacy selection invoked')
+        },
+        ensureDaemonSelection: async () => ({
+          status: 'selected',
+          selection: {} as never,
+          started: true,
+        }),
         realmAdd: async (_selection, input) => {
           expect(input).toEqual({ slug: 'work', displayName: 'Work' })
           return { realmId: 'work' }

@@ -8,7 +8,7 @@ Defines the Realm application service and persistence-facing types for creating,
 
 - `createRealmService()` is a dependency-injected service factory over `CtxindexDatabase` and `Logger`.
 - `RealmService` is a synchronous CRUD port; `RealmRow` mirrors the selected `realms` columns.
-- Realm slugs are validated locally, serve directly as realm IDs, and are checked for uniqueness before insertion.
+- Exported `assertValidRealmSlug()` owns effect-free slug syntax so the CLI can reject malformed input before daemon ensure; valid slugs serve directly as realm IDs and are checked for uniqueness before insertion.
 - Domain validation failures use `CtxindexValidationError` codes `invalid_filter` and `duplicate_realm_slug`.
 
 ## Data & control flow
@@ -20,6 +20,6 @@ Defines the Realm application service and persistence-facing types for creating,
 
 ## Integration points
 
-- Re-exported by `packages/core/src/index.ts`; `apps/cli/src/deps.ts` constructs the service and CLI realm formatting consumes `RealmRow`.
+- Re-exported through the Realm subpath; `apps/cli/src/deps.ts` constructs the service, the Realm command uses the validator before routing, and CLI formatting consumes `RealmRow`.
 - `packages/core/src/source/types.ts` accepts `RealmService` as a source-service dependency.
 - Depends on `packages/core/src/storage/`, `packages/core/src/logger/`, and `packages/core/src/errors.ts`; SQL targets the `realms` table.

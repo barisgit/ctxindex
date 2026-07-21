@@ -359,6 +359,7 @@ import '@orpc/server'
 import 'bun'
 import 'bun:ffi'
 import 'bun:sqlite'
+import 'node:child_process'
 import 'node:process'
 import 'drizzle-orm/sqlite-core'
 
@@ -389,6 +390,7 @@ void query
       'bun:sqlite',
       'drizzle-orm/sqlite-core',
       'fetch',
+      'node:child_process',
       'node:process',
       'package-private',
       'process',
@@ -425,6 +427,13 @@ export const acquire = open
 `,
   )
   await writeFixture(
+    join(fixtureRoot, 'packages/local-daemon/src/lease.ts'),
+    `
+import { spawnSync } from 'node:child_process'
+export const lock = spawnSync
+`,
+  )
+  await writeFixture(
     join(fixtureRoot, 'packages/local-daemon/src/index.test.ts'),
     `
 import { test } from 'bun:test'
@@ -433,6 +442,28 @@ test('identity', () => {})
   )
 
   expect(await verifyWorkspaceDependencies(fixtureRoot)).toEqual([])
+})
+
+test('local daemon child process allowance is exact to the lease owner module', async () => {
+  fixtureRoot = await createFixtureRoot()
+  await writeFixture(
+    join(fixtureRoot, 'packages/local-daemon/package.json'),
+    JSON.stringify({
+      name: '@ctxindex/local-daemon',
+      private: true,
+      dependencies: {},
+    }),
+  )
+  await writeFixture(
+    join(fixtureRoot, 'packages/local-daemon/src/internal/src/lease.ts'),
+    "import { spawnSync } from 'node:child_process'; void spawnSync",
+  )
+
+  expect(await verifyWorkspaceDependencies(fixtureRoot)).toContainEqual({
+    type: 'local-daemon-boundary',
+    packageName: '@ctxindex/local-daemon',
+    dependency: 'node:child_process',
+  })
 })
 
 test('local daemon package rejects relative imports that escape its package', async () => {

@@ -35,6 +35,7 @@ export interface AuthorizeProviderDependencies {
     prompt: OAuthAuthorizationResponsePrompt,
   ) => Promise<string | undefined>
   readonly now?: () => number
+  readonly signal?: AbortSignal
 }
 export interface AuthorizeProviderResult extends AddGrantResult {
   readonly provider: string
@@ -65,6 +66,7 @@ export async function authorizeProvider(
       clientId,
       ...(clientSecret ? { clientSecret } : {}),
       grant: { kind: 'refresh_token', refreshToken },
+      ...(deps.signal ? { signal: deps.signal } : {}),
     })
     durableRefreshToken = token.refreshToken ?? refreshToken
   } else {
@@ -93,6 +95,7 @@ export async function authorizeProvider(
       ...(deps.readAuthorizationResponse
         ? { readAuthorizationResponse: deps.readAuthorizationResponse }
         : {}),
+      ...(deps.signal ? { signal: deps.signal } : {}),
     })
     token = await postOAuthToken({
       provider,
@@ -105,6 +108,7 @@ export async function authorizeProvider(
         redirectUri: callback.redirectUri,
         codeVerifier: callback.codeVerifier,
       },
+      ...(deps.signal ? { signal: deps.signal } : {}),
     })
     if (!token.refreshToken)
       throw new CtxindexAuthError(
@@ -118,6 +122,7 @@ export async function authorizeProvider(
     provider,
     endpoint: resolveOAuthEndpoint(provider, 'identity', readEnvironment),
     accessToken: token.accessToken,
+    ...(deps.signal ? { signal: deps.signal } : {}),
   })
   const expiresAt = (deps.now ?? Date.now)() + token.expiresIn * 1000
   const result = await deps.authService.addGrant({

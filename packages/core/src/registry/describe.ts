@@ -108,6 +108,10 @@ export interface RegistryDescription {
   readonly actions: readonly ActionDescription[]
 }
 
+function toPlainJsonSchema(schema: z.ZodType): object {
+  return JSON.parse(JSON.stringify(z.toJSONSchema(schema)))
+}
+
 export function describeRegistry(registry: {
   readonly profiles: Pick<ExtensionRegistry['profiles'], 'list'>
   readonly adapters: Pick<ExtensionRegistry['adapters'], 'list'>
@@ -132,7 +136,7 @@ export function describeRegistry(registry: {
         })),
     })),
     sources: adapters.map((adapter) => {
-      const config = z.toJSONSchema(adapter.configSchema)
+      const config = toPlainJsonSchema(adapter.configSchema)
       return {
         id: adapter.id,
         profiles: adapter.profiles
@@ -165,7 +169,7 @@ export function describeRegistry(registry: {
           id,
           profile: { id: profile.id, version: profile.version },
           effect: action.effect,
-          input: z.toJSONSchema(action.input),
+          input: toPlainJsonSchema(action.input),
           output: action.output,
           adapters: adapters
             .filter(

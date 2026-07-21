@@ -1,4 +1,8 @@
 import { daemonStatus, selectDaemon } from '../daemon/client'
+import {
+  ensureDaemonSelection,
+  selectEnsuredDaemonRoute,
+} from '../daemon/ensure'
 import { openDeps } from '../deps'
 import { mapErrorToExit } from '../format/exit'
 import type { OutputFormat } from '../format/output'
@@ -10,6 +14,7 @@ function printOutput(output: string): void {
 
 export interface StatusCommandDeps {
   readonly selectDaemon: typeof selectDaemon
+  readonly ensureDaemonSelection?: typeof ensureDaemonSelection
   readonly daemonStatus: typeof daemonStatus
   readonly open: typeof openDeps
 }
@@ -21,6 +26,7 @@ export interface StatusCommandInput {
 
 const defaultDeps: StatusCommandDeps = {
   selectDaemon,
+  ensureDaemonSelection,
   daemonStatus,
   open: openDeps,
 }
@@ -34,7 +40,7 @@ export async function handleStatusCommand(
   process.once('SIGINT', cancel)
   let deps: Awaited<ReturnType<typeof openDeps>> | undefined
   try {
-    const daemon = services.selectDaemon()
+    const daemon = await selectEnsuredDaemonRoute(services, controller.signal)
     if (daemon) {
       const result = await services.daemonStatus(
         daemon,

@@ -43,6 +43,8 @@ OAuth App, Account, secret-backend, Artifact, export, Action, purge, and install
 
 Artifact downloads and exports use a separately bounded local byte-transfer adapter rather than embedding arbitrary bytes or host paths in JSON procedures. Its exact ticketing and cleanup contract is completed before those commands migrate.
 
+The selected local transfer adapter retains at most 64 MiB per payload in daemon memory, returns only a cryptographically opaque 256-bit one-use ticket plus exact size and expiry metadata through RPC, and serves the bytes from an exact path on the existing owner-private Unix socket. Tickets expire after 30 seconds, consumption atomically removes them, and daemon shutdown clears all pending entries. CLI file consumers stage mode-`0600` bytes beside the destination and hard-link without overwrite before cleanup; stdout consumers validate the exact declared byte count before writing.
+
 ### 4. Bootstrap and filesystem-only exceptions are explicit
 
 Pre-daemon `init` may remain a direct bootstrap because no initialized runtime exists yet. Catalog acquisition and inspection may remain direct only where they neither open SQLite nor mutate the active installed registry. Any operation that needs database-backed OAuth App collision checks, changes installed activation, or changes state observed by the active registry must coordinate through the daemon or require a verified stopped state.

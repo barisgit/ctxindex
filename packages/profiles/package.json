@@ -1,6 +1,6 @@
 {
   "name": "@ctxindex/profiles",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Portable domain Profiles for ctxindex Resources.",
   "license": "MIT",
   "private": true,
@@ -22,7 +22,7 @@
     "fullclean": "rm -rf .turbo dist coverage node_modules"
   },
   "dependencies": {
-    "@ctxindex/extension-sdk": "0.1.0",
+    "@ctxindex/extension-sdk": "0.1.1",
     "zod": "^4.4.3"
   }
 }

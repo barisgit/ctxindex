@@ -40,7 +40,6 @@ declare const __CTXINDEX_PACKAGED__: boolean | undefined
 const STARTUP_TIMEOUT_MS = 10_000
 const OBSERVATION_TIMEOUT_MS = 5_000
 const SHUTDOWN_TIMEOUT_MS = 10_000
-const TRANSITION_GRACE_MS = 500
 const POLL_INTERVAL_MS = 25
 
 export interface DaemonLaunchResolutionOptions {
@@ -144,6 +143,70 @@ const defaultBackgroundLaunchDependencies: BackgroundLaunchDependencies = {
   spawn: (argv, options) => Bun.spawn([...argv], options),
 }
 
+const DAEMON_ENVIRONMENT_ALLOWLIST = [
+  'HOME',
+  'USER',
+  'LOGNAME',
+  'PATH',
+  'TMPDIR',
+  'TMP',
+  'TEMP',
+  'LANG',
+  'LC_ALL',
+  'LC_CTYPE',
+  'XDG_CONFIG_HOME',
+  'XDG_DATA_HOME',
+  'XDG_STATE_HOME',
+  'XDG_CACHE_HOME',
+  'NODE_ENV',
+  'SSL_CERT_FILE',
+  'SSL_CERT_DIR',
+  'NODE_EXTRA_CA_CERTS',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'NO_PROXY',
+  'http_proxy',
+  'https_proxy',
+  'no_proxy',
+  'CTXINDEX_CONFIG_HOME',
+  'CTXINDEX_DATA_HOME',
+  'CTXINDEX_STATE_HOME',
+  'CTXINDEX_CACHE_HOME',
+  'CTXINDEX_DAEMON_RUNTIME_ROOT',
+  'CTXINDEX_BUILD_VERSION',
+  'CTXINDEX_LOG_LEVEL',
+  'CTXINDEX_LOG_SYNC',
+  'CTXINDEX_SECRETS_PASSPHRASE',
+  'CTXINDEX_KEYTAR_MOCK_FILE',
+  'CTXINDEX_TEST_LOG_ROTATE_BYTES',
+  'CTXINDEX_TEST_LOG_SPAM_BYTES',
+  'CTXINDEX_TEST_SYNC_DELAY_MS',
+  'CTXINDEX_E2E_TRACE_STORAGE_ACQUIRE__',
+] as const
+
+const DAEMON_PROVIDER_TEST_ENVIRONMENT_ALLOWLIST = [
+  'CTXINDEX_GRAPH_MOCK_BASE_URL',
+  'CTXINDEX_GOOGLE_CALENDAR_MOCK_BASE_URL',
+  'CTXINDEX_GMAIL_MOCK_BASE_URL',
+] as const
+
+export function daemonSpawnEnvironment(
+  source: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const environment: NodeJS.ProcessEnv = {}
+  for (const name of DAEMON_ENVIRONMENT_ALLOWLIST) {
+    const value = source[name]
+    if (value !== undefined) environment[name] = value
+  }
+  if (source.NODE_ENV === 'test') {
+    for (const name of DAEMON_PROVIDER_TEST_ENVIRONMENT_ALLOWLIST) {
+      const value = source[name]
+      if (value !== undefined) environment[name] = value
+    }
+  }
+  return environment
+}
+
 export function launchBackgroundDaemon(
   argv: readonly string[],
   stateRoot: string,
@@ -156,7 +219,7 @@ export function launchBackgroundDaemon(
       stdin: 'ignore',
       stdout: descriptor,
       stderr: descriptor,
-      env: process.env,
+      env: daemonSpawnEnvironment(),
     })
     child.unref()
   } finally {
@@ -411,6 +474,13 @@ export function createDaemonLifecycle(
         dependencies.health(selection, requestSignal),
       )
     } catch (error) {
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'cancelled'
+      ) {
+        throw error
+      }
       if (error instanceof DaemonCliError) {
         if (error.code !== 'daemon_unavailable') throw error
       }
@@ -438,6 +508,37 @@ export function createDaemonLifecycle(
     return null
   }
 
+  async function waitForOwnerReleaseOrReady(
+    deadline: number,
+    signal?: AbortSignal,
+  ): Promise<
+    | { readonly status: 'ready'; readonly health: RpcHealthResult }
+    | { readonly status: 'released' }
+    | { readonly status: 'timeout' }
+  > {
+    while (dependencies.now() <= deadline) {
+      throwIfCancelled(signal)
+      const current = dependencies.select()
+      if (!current) return { status: 'released' }
+      const remaining = deadline - dependencies.now()
+      const observed = await healthOrNull(
+        current,
+        signal,
+        Math.min(OBSERVATION_TIMEOUT_MS, Math.max(1, remaining)),
+      )
+      if (observed?.ready) return { status: 'ready', health: observed }
+      if (current.selectedBy === 'metadata') {
+        const cleaned = dependencies.cleanupStale(current)
+        if (cleaned === 'removed' || cleaned === 'missing') {
+          return { status: 'released' }
+        }
+      }
+      if (dependencies.now() >= deadline) break
+      await dependencies.sleep(POLL_INTERVAL_MS)
+    }
+    return { status: 'timeout' }
+  }
+
   async function startOnce(signal?: AbortSignal): Promise<DaemonStartResult> {
     throwIfCancelled(signal)
     if (!dependencies.supported()) {
@@ -445,6 +546,7 @@ export function createDaemonLifecycle(
     }
     await dependencies.assertInitialized()
     throwIfCancelled(signal)
+    const deadline = dependencies.now() + STARTUP_TIMEOUT_MS
     const existing = dependencies.select()
     if (existing) {
       const ready = await healthOrNull(existing, signal)
@@ -457,12 +559,18 @@ export function createDaemonLifecycle(
         existing.metadata?.lifecycle === 'starting' ||
         existing.metadata?.lifecycle === 'stopping'
       ) {
-        const transitioned = await waitForReady(
-          dependencies.now() + TRANSITION_GRACE_MS,
-          signal,
-        )
-        if (transitioned) {
-          return { status: 'running', started: false, health: transitioned }
+        const transition = await waitForOwnerReleaseOrReady(deadline, signal)
+        if (transition.status === 'ready') {
+          return {
+            status: 'running',
+            started: false,
+            health: transition.health,
+          }
+        }
+        if (transition.status === 'timeout') {
+          throw unavailable(
+            'The local daemon did not become ready. Inspect `ctxindex daemon status` and the private daemon startup log.',
+          )
         }
       }
     }
@@ -473,10 +581,7 @@ export function createDaemonLifecycle(
         'The local daemon could not be launched. Inspect the private daemon startup log.',
       )
     }
-    const ready = await waitForReady(
-      dependencies.now() + STARTUP_TIMEOUT_MS,
-      signal,
-    )
+    const ready = await waitForReady(deadline, signal)
     if (!ready) {
       throw unavailable(
         'The local daemon did not become ready. Inspect `ctxindex daemon status` and the private daemon startup log.',

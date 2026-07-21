@@ -1,44 +1,13 @@
-import type { SecretBackend } from '@ctxindex/core/secrets'
 import { defineCtxCommand } from '../command-model'
-import { openSecretDeps } from '../deps'
-import { mapErrorToExit, runWithExit } from '../format/exit'
+import { runWithExit } from '../format/exit'
 import { outputFormatArg } from '../format/output'
-import {
-  formatSecretBackendStatus,
-  formatSecretBackendSwitch,
-} from '../format/secrets'
+import { handleSecretsCommand } from '../secrets/handle-secrets-command'
 
-export type SecretsCommandInput =
-  | { readonly kind: 'status'; readonly json: boolean }
-  | { readonly kind: 'set'; readonly target: SecretBackend }
-
-export async function handleSecretsCommand(
-  parsed: SecretsCommandInput,
-): Promise<number> {
-  let deps: Awaited<ReturnType<typeof openSecretDeps>> | undefined
-  try {
-    deps = await openSecretDeps()
-    if (parsed.kind === 'status') {
-      console.log(
-        formatSecretBackendStatus(
-          await deps.secretBackendManager.getStatus(),
-          parsed.json,
-        ),
-      )
-      return 0
-    }
-
-    const result = await deps.secretBackendManager.switchBackend(parsed.target)
-    console.log(formatSecretBackendSwitch(result))
-    for (const warning of result.warnings) console.error(`warning: ${warning}`)
-    return 0
-  } catch (err) {
-    console.error(err instanceof Error ? err.message : String(err))
-    return mapErrorToExit(err)
-  } finally {
-    await deps?.close()
-  }
-}
+export {
+  handleSecretsCommand,
+  type SecretsCommandDeps,
+  type SecretsCommandInput,
+} from '../secrets/handle-secrets-command'
 
 export const secretsCommand = defineCtxCommand({
   meta: { name: 'secrets', description: 'Inspect and select secret storage.' },
