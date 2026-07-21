@@ -109,6 +109,9 @@ describe('registry-derived describe data', () => {
         adapters: [{ id: 'fake.notes' }],
       },
     ])
+    expect(Reflect.ownKeys(result.actions[0]?.input ?? {})).not.toContain(
+      '~standard',
+    )
   })
 
   test('sorts definitions and binds duplicate Action ids by exact Profile', () => {
