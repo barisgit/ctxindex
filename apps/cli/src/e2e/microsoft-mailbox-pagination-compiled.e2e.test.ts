@@ -1,11 +1,8 @@
 import { expect, test } from 'bun:test'
-import { chmod } from 'node:fs/promises'
-import { join } from 'node:path'
 import { createSandbox } from '@ctxindex/core/testing'
+import { buildCompiledCliHarness } from './_compiled-cli-harness'
 import { type MockGraphMessage, startMockGraph } from './_mock-graph'
 import { installLoopbackBrowser } from './_oauth-account'
-
-const repoRoot = new URL('../../../../', import.meta.url).pathname
 
 function fixtureMessage(index: number): MockGraphMessage {
   return {
@@ -32,49 +29,18 @@ test('relocated compiled CLI resumes Microsoft mailbox enumeration beyond 50', a
       { ...fixtureMessage(99), id: 'compiled-hidden-draft', isDraft: true },
     ],
   })
-  const compiled = join(sandbox.dir, 'ctxindex')
+  const harness = await buildCompiledCliHarness()
+  let env: Readonly<Record<string, string | undefined>> | undefined
   try {
-    const build = Bun.spawn(
-      [
-        'bun',
-        'build',
-        '--compile',
-        'apps/cli/bin/ctxindex.mjs',
-        '--outfile',
-        compiled,
-      ],
-      { cwd: repoRoot, stdout: 'pipe', stderr: 'pipe' },
-    )
-    const [buildStdout, buildStderr, buildExitCode] = await Promise.all([
-      new Response(build.stdout).text(),
-      new Response(build.stderr).text(),
-      build.exited,
-    ])
-    expect(buildExitCode, `${buildStdout}\n${buildStderr}`).toBe(0)
-    await chmod(compiled, 0o755)
-
     const browser = await installLoopbackBrowser(sandbox.dir)
-    const env = {
+    env = {
       ...sandbox.env,
       ...graph.env(sandbox, {
         PATH: `${browser}:${process.env.PATH ?? ''}`,
         CTXINDEX_LOOPBACK_TIMEOUT_SECS: '5',
       }),
     }
-    const run = async (args: string[]) => {
-      const child = Bun.spawn([compiled, ...args], {
-        cwd: '/',
-        env,
-        stdout: 'pipe',
-        stderr: 'pipe',
-      })
-      const [stdout, stderr, exitCode] = await Promise.all([
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
-        child.exited,
-      ])
-      return { stdout, stderr, exitCode }
-    }
+    const run = (args: string[]) => harness.run(args, env ?? {})
 
     for (const args of [
       ['init'],
@@ -170,6 +136,12 @@ test('relocated compiled CLI resumes Microsoft mailbox enumeration beyond 50', a
         .every(({ prefer }) => prefer?.includes('IdType="ImmutableId"')),
     ).toBe(true)
   } finally {
+    if (env) {
+      await harness
+        .run(['daemon', 'stop', '--format', 'json'], env)
+        .catch(() => undefined)
+    }
+    await harness.cleanup()
     graph.stop()
     await sandbox.cleanup()
   }
