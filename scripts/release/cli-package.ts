@@ -683,7 +683,7 @@ export async function smokeCliPackage(
         private: true,
         type: 'module',
         ctxindex: { extensions: ['./extension.ts'] },
-        dependencies: { '@ctxindex/extension-sdk': '0.0.0' },
+        dependencies: { '@ctxindex/extension-sdk': '0.1.0' },
       },
       null,
       2,

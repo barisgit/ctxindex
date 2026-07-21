@@ -3,7 +3,8 @@
 ## Responsibility
 
 Builds, validates, smoke-tests, and release-gates the public `ctxindex` npm
-artifact without publishing from local development or touching user state.
+CLI and `@ctxindex/extension-sdk` npm artifacts without publishing from local
+development or touching user state.
 
 ## Design / patterns
 
@@ -26,6 +27,12 @@ artifact without publishing from local development or touching user state.
 - `release-gate.ts` separates a pure strict-semver/registry decision from Git and
   npm-registry I/O. Exact existing versions skip idempotently; only a forward,
   unpublished version proceeds, and every indeterminate response fails closed.
+- `extension-sdk-package.ts` is the Extension SDK package-policy owner. It builds
+  the SDK runtime and declaration files, stages a generated public manifest with
+  only Zod as a dependency, packs a fixed allowlist, rejects secrets, workspace
+  metadata, checkout paths, private workspace imports, and unresolved or
+  extensionless declaration imports, then proves the exact archive through a
+  clean external NodeNext TypeScript/Bun consumer.
 
 ## Data & control flow
 
@@ -38,6 +45,10 @@ artifact without publishing from local development or touching user state.
 5. Only after npm publication succeeds, an isolated `contents: write` job
    verifies the transferred archive again, creates or confirms the exact
    commit-bound version tag, and creates or refreshes its GitHub Release assets.
+6. Root `build:extension-sdk-package`, `pack:extension-sdk-package`,
+   `verify:extension-sdk-package`, `smoke:extension-sdk-package`, and
+   `prepare:extension-sdk-release` commands dispatch the SDK artifact lifecycle;
+   the final command packs, validates, smoke-tests, and writes its checksum.
 
 ## Integration points
 
@@ -45,5 +56,7 @@ artifact without publishing from local development or touching user state.
   `apps/cli/README.md`, and the root `LICENSE`.
 - Exposed through root `build:cli-package`, `pack:cli-package`, and
   `smoke:cli-package` scripts and composed by the release workflow.
+- Exposed through the root Extension SDK package lifecycle scripts; its unit and
+  exact-archive integration tests live beside the packager.
 - Tests live beside the scripts; installed CLI state is confined to temporary
   `BUN_INSTALL_*` and `CTXINDEX_*_HOME` directories.

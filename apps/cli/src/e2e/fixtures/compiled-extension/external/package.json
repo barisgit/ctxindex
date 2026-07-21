@@ -9,7 +9,7 @@
     ]
   },
   "dependencies": {
-    "@ctxindex/extension-sdk": "workspace:*",
+    "@ctxindex/extension-sdk": "0.1.0",
     "extension-fixture-dep": "file:../dependency"
   }
 }

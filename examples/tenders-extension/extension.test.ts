@@ -73,7 +73,7 @@ describe('official instant-demo tenders Extension', () => {
       version: '0.1.0',
       license: 'MIT',
       ctxindex: { extensions: ['./demo-extension.js'] },
-      devDependencies: { '@ctxindex/extension-sdk': '0.0.0' },
+      devDependencies: { '@ctxindex/extension-sdk': '0.1.0' },
     })
     const resolved = await resolvePackageEntries(packageRoot, manifest, {
       origin: 'explicit-path',
