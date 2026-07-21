@@ -1,9 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import {
   type AnyProfileDefinition,
+  auth,
   defineAdapter,
   defineExtension,
   defineProfile,
+  defineProvider,
 } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
 import { createExtensionRegistry } from './definition-registries'
@@ -112,6 +114,77 @@ describe('registry-derived describe data', () => {
     expect(Reflect.ownKeys(result.actions[0]?.input ?? {})).not.toContain(
       '~standard',
     )
+  })
+
+  test('projects Provider registration config as plain JSON Schema', () => {
+    const provider = defineProvider({
+      id: 'fake.oauth',
+      auth: auth.oauth2({
+        authorizationUrl: 'https://auth.example.test/authorize',
+        tokenUrl: 'https://auth.example.test/token',
+        identity: {
+          url: 'https://api.example.test/userinfo',
+          subjectPath: ['sub'],
+          labelPaths: [['email']],
+          identities: [{ kind: 'email', path: ['email'] }],
+        },
+        pkce: { method: 'S256', required: true },
+        registration: {
+          type: 'public',
+          configSchema: z
+            .object({
+              clientId: z.string().min(1).describe('OAuth client id'),
+            })
+            .strict(),
+          environment: { clientId: 'CTXINDEX_FAKE_CLIENT_ID' },
+        },
+        baseScopes: ['openid'],
+        allowedHosts: ['api.example.test', 'auth.example.test'],
+      }),
+    })
+    const adapter = defineAdapter({
+      id: 'fake.oauth-adapter',
+      provider,
+      access: { scopes: ['fake.read'] },
+      providerApiHosts: ['api.example.test'],
+      configSchema: z.object({}),
+      profiles: [],
+      routing: 'indexed',
+      capabilities: [],
+      operations: {},
+      actions: {},
+    })
+
+    const result = describeRegistry({
+      profiles: { list: () => [] },
+      adapters: { list: () => [adapter] },
+    })
+    const serialized = JSON.parse(JSON.stringify(result)) as {
+      sources: {
+        provider?: {
+          auth?: {
+            registration?: { configSchema?: object }
+          }
+        }
+      }[]
+    }
+
+    expect(
+      serialized.sources[0]?.provider?.auth?.registration?.configSchema,
+    ).toEqual({
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      properties: {
+        clientId: {
+          type: 'string',
+          minLength: 1,
+          description: 'OAuth client id',
+        },
+      },
+      required: ['clientId'],
+      additionalProperties: false,
+    })
+    expect(JSON.stringify(serialized)).not.toContain('"def"')
   })
 
   test('sorts definitions and binds duplicate Action ids by exact Profile', () => {

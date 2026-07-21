@@ -25,8 +25,11 @@ export function needsDynamicSourceArgs(
   })
 }
 
+const adapterSelectorDescription =
+  'Adapter ID (provide the positional ID or --adapter)'
+
 export const sourceAddBaseArgs = {
-  adapter: { type: 'string', description: 'Adapter ID' },
+  adapter: { type: 'string', description: adapterSelectorDescription },
   label: { type: 'string', description: 'Global Source label' },
   account: {
     type: 'string',
@@ -49,7 +52,7 @@ export const sourceAddBaseArgs = {
   'adapter-id': {
     type: 'positional',
     required: false,
-    description: 'Adapter ID',
+    description: adapterSelectorDescription,
   },
   realm: { type: 'string', alias: 'r', description: 'Realm slug' },
 } as const

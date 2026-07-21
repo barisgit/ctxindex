@@ -47,6 +47,13 @@ When a policy-qualified managed App is available:
 ctxindex account add microsoft --label work
 ```
 
+The CLI opens the authorization URL when the local environment supports it, then races two completion paths:
+
+1. the provider redirects to the temporary loopback callback on the same machine; or
+2. you paste the complete redirect URL or authorization code into the hidden terminal prompt.
+
+The second path is for SSH, containers, and other headless or remote terminals. Complete consent in your browser, then copy the final `http://localhost:.../oauth/callback?...` URL from that browser and paste it into the waiting CLI. The prompt does not echo the URL or code. `Ctrl-C` cancels both paths and restores terminal input.
+
 For deterministic bring-your-own-app setup, configure the Provider-authored environment variables once, persist a labeled local OAuth App, and select it exactly:
 
 ```sh

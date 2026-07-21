@@ -13,6 +13,7 @@ import {
 
 const commandPaths = new WeakMap<object, readonly string[]>()
 const commandVersions = new WeakMap<object, string | undefined>()
+const commandReferenceArgs = new WeakMap<object, () => Promise<ArgsDef>>()
 const rootHelpPromotions = new WeakSet<object>()
 
 type MultipleStringArgDef = Omit<StringArgDef, 'default'> & {
@@ -60,6 +61,10 @@ export type CtxCommandDef<TArgs extends CtxArgsDef = CtxArgsDef> = Omit<
   'run'
 > & {
   readonly promoteInRootHelp?: boolean
+  readonly referenceArgs?:
+    | TArgs
+    | Promise<TArgs>
+    | (() => TArgs | Promise<TArgs>)
   readonly run?: (
     context: CtxCommandContext<TArgs>,
   ) => unknown | Promise<unknown>
@@ -255,6 +260,7 @@ export function defineCtxCommand<const TArgs extends CtxArgsDef = CtxArgsDef>(
 ): CommandDef<TArgs> {
   const {
     promoteInRootHelp = false,
+    referenceArgs,
     run: originalRun,
     args: originalArgs,
     ...commandDefinition
@@ -301,6 +307,11 @@ export function defineCtxCommand<const TArgs extends CtxArgsDef = CtxArgsDef>(
         }),
   })
   if (promoteInRootHelp) rootHelpPromotions.add(command)
+  if (referenceArgs !== undefined) {
+    commandReferenceArgs.set(command, async () =>
+      normalizeDefinitions(await resolveValue(referenceArgs)),
+    )
+  }
   return command
 }
 
@@ -380,6 +391,8 @@ export interface CommandReferenceArgument {
   readonly aliases?: readonly string[]
   readonly choices?: readonly string[]
   readonly defaultValue?: boolean | number | string
+  readonly negativeName?: string
+  readonly negativeDescription?: string
 }
 
 export interface CommandReferenceEntry {
@@ -415,7 +428,28 @@ function projectArgument(
     ...(definition.default === undefined
       ? {}
       : { defaultValue: definition.default }),
+    ...(definition.type !== 'boolean' ||
+    (definition.default !== true &&
+      definition.negativeDescription === undefined)
+      ? {}
+      : {
+          negativeName: `no-${name}`,
+          ...(definition.negativeDescription === undefined
+            ? {}
+            : { negativeDescription: definition.negativeDescription }),
+        }),
   }
+}
+
+async function renderReferenceUsage<TArgs extends ArgsDef>(
+  command: CommandDef<TArgs>,
+  definitions: ArgsDef,
+): Promise<string> {
+  const meta = await resolveValue(command.meta ?? {})
+  const referenceCommand = defineCommand({ meta, args: definitions })
+  commandPaths.set(referenceCommand, commandPath(command))
+  commandVersions.set(referenceCommand, commandVersions.get(command))
+  return renderCommandUsage(referenceCommand)
 }
 
 export async function projectCommandReference<TArgs extends ArgsDef>(
@@ -428,7 +462,11 @@ export async function projectCommandReference<TArgs extends ArgsDef>(
     command: CommandDef<TCommandArgs>,
   ): Promise<void> {
     const meta = await resolveValue(command.meta ?? {})
-    const definitions = await resolveValue(command.args ?? ({} as TCommandArgs))
+    const referenceArguments = commandReferenceArgs.get(command)
+    const definitions =
+      referenceArguments === undefined
+        ? await resolveValue(command.args ?? ({} as TCommandArgs))
+        : await referenceArguments()
     const children =
       command.subCommands === undefined
         ? {}
@@ -438,7 +476,10 @@ export async function projectCommandReference<TArgs extends ArgsDef>(
       ...(meta.description === undefined
         ? {}
         : { description: meta.description }),
-      usage: await renderCommandUsage(command),
+      usage:
+        referenceArguments === undefined
+          ? await renderCommandUsage(command)
+          : await renderReferenceUsage(command, definitions),
       arguments: Object.entries(definitions).map(([name, definition]) =>
         projectArgument(name, definition),
       ),

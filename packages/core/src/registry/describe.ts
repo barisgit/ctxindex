@@ -1,3 +1,4 @@
+import type { AnyProviderDefinition } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
 import { compareReferences, compareStrings } from './compare'
 import type { ExtensionRegistry } from './definition-registries'
@@ -76,7 +77,7 @@ export interface SourceDescription extends AdapterIdentity {
   readonly routing: string
   readonly provider?: {
     readonly id: string
-    readonly auth: object
+    readonly auth: ProviderAuthDescription
   }
   readonly access?: { readonly scopes: readonly string[] }
   readonly providerApiHosts: readonly string[]
@@ -84,6 +85,29 @@ export interface SourceDescription extends AdapterIdentity {
   readonly config: object
   readonly configOptions: readonly ConfigOptionDescription[]
 }
+
+type OAuth2ProviderAuth = Extract<
+  AnyProviderDefinition['auth'],
+  { readonly kind: 'oauth2' }
+>
+
+export type ProviderAuthDescription =
+  | { readonly kind: 'none' }
+  | {
+      readonly kind: 'oauth2'
+      readonly authorizationUrl: string
+      readonly tokenUrl: string
+      readonly identity: OAuth2ProviderAuth['identity']
+      readonly pkce: OAuth2ProviderAuth['pkce']
+      readonly registration: {
+        readonly type: OAuth2ProviderAuth['registration']['type']
+        readonly configSchema: object
+        readonly environment: Readonly<Record<string, string>>
+      }
+      readonly baseScopes: readonly string[]
+      readonly allowedHosts: readonly string[]
+      readonly fixedAuthorizationParams?: Readonly<Record<string, string>>
+    }
 
 export interface ConfigOptionDescription {
   readonly property: string
@@ -110,6 +134,29 @@ export interface RegistryDescription {
 
 function toPlainJsonSchema(schema: z.ZodType): object {
   return JSON.parse(JSON.stringify(z.toJSONSchema(schema)))
+}
+
+function describeProviderAuth(
+  auth: AnyProviderDefinition['auth'],
+): ProviderAuthDescription {
+  if (auth.kind === 'none') return { kind: 'none' }
+  return {
+    kind: auth.kind,
+    authorizationUrl: auth.authorizationUrl,
+    tokenUrl: auth.tokenUrl,
+    identity: auth.identity,
+    pkce: auth.pkce,
+    registration: {
+      type: auth.registration.type,
+      configSchema: toPlainJsonSchema(auth.registration.configSchema),
+      environment: { ...auth.registration.environment },
+    },
+    baseScopes: [...auth.baseScopes],
+    allowedHosts: [...auth.allowedHosts],
+    ...(auth.fixedAuthorizationParams === undefined
+      ? {}
+      : { fixedAuthorizationParams: { ...auth.fixedAuthorizationParams } }),
+  }
 }
 
 export function describeRegistry(registry: {
@@ -148,7 +195,7 @@ export function describeRegistry(registry: {
           : {
               provider: {
                 id: adapter.provider.id,
-                auth: adapter.provider.auth,
+                auth: describeProviderAuth(adapter.provider.auth),
               },
             }),
         ...(adapter.access === undefined

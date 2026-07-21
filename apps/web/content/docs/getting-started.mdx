@@ -1,116 +1,24 @@
 ---
-title: Getting started
-description: Install ctxindex with Bun, configure a local directory Source, and run your first commands.
+title: Install ctxindex
+description: Install the released CLI or run ctxindex from a source checkout.
 ---
 
-This walkthrough indexes one local directory, searches it, retrieves a complete Resource, and exports its validated payload. It does not require a provider Account.
+Install the released CLI with the repository-pinned Bun runtime:
 
-<Callout>
-  Commands use `bun cli` from the repository root. If you are using an installed executable, replace `bun cli` with `ctxindex`.
-</Callout>
+```bash
+bun add --global ctxindex
+ctxindex --help
+```
 
-## Install with Bun
+For a source checkout:
 
-ctxindex is pre-alpha and currently runs from a source checkout. Use the repository-pinned Bun 1.3.14 to install workspace dependencies:
-
-```sh
-bun install
+```bash
+git clone https://github.com/barisgit/ctxindex.git
+cd ctxindex
+bun install --frozen-lockfile
 bun cli --help
 ```
 
-`bun cli` and `bun run cli` both dispatch to the development CLI.
+`bun cli` is the development equivalent of the installed `ctxindex` executable. Both keep configuration, SQLite projections, cached Artifacts, and OAuth Grants on the local machine.
 
-## Configure your first Realm and Source
-
-<Steps>
-  <Step>
-    Create a directory with one file, then initialize ctxindex:
-
-    ```sh
-    mkdir -p "$HOME/context"
-    printf 'Project Aurora kickoff is Tuesday at 10:00.\nOwner: Maya Chen.\n' \
-      > "$HOME/context/aurora.txt"
-    bun cli init
-    ```
-
-    `init` creates the local config, data, state, cache, logs, and SQLite database. It does not create an implicit Realm.
-  </Step>
-  <Step>
-    Add a user-defined Realm for work context:
-
-    ```sh
-    bun cli realm add work --name "Work"
-    ```
-  </Step>
-  <Step>
-    Add the directory as a Source. A local directory Source represents exactly one root directory and belongs to exactly one Realm.
-
-    ```sh
-    bun cli source add local.directory \
-      --realm work \
-      --label work-files \
-      --config-root-path "$HOME/context"
-    ```
-  </Step>
-  <Step>
-    Materialize the Source into the local index:
-
-    ```sh
-    bun cli sync --source work-files --format json
-    ```
-  </Step>
-</Steps>
-
-## Search, retrieve, and export
-
-Search the local projection and copy the returned Ref:
-
-```sh
-bun cli search "Aurora kickoff" \
-  --realm work \
-  --kind file \
-  --local-only \
-  --format json
-```
-
-Use that exact Ref to retrieve the complete Resource, then export its validated Profile payload:
-
-```sh
-bun cli get 'ctx://01J00000000000000000000000/file/aurora.txt' --format json
-bun cli export 'ctx://01J00000000000000000000000/file/aurora.txt' --format json
-```
-
-Do not reconstruct provider Refs from provider ids. Treat the adapter-owned suffix as opaque and pass through the Ref returned by search or another ctxindex command.
-
-<Callout>
-  JSON export is always available. Any additional export formats come from the Resource's loaded Profile; inspect the Profile with `bun cli describe profile <id> --format json`.
-</Callout>
-
-## Example session
-
-A successful run looks like this. Generated ULIDs, timestamps, and unrelated JSON fields are shortened.
-
-```console
-$ bun cli init
-ctxindex initialized
-
-$ bun cli realm add work --name "Work"
-realm added: work
-
-$ bun cli source add local.directory --realm work --label work-files --config-root-path "$HOME/context"
-source added: 01J00000000000000000000000
-
-$ bun cli sync --source work-files --format json
-{"mode":"sync","results":[{"sourceId":"01J00000000000000000000000","status":"completed","run":{"runId":"01J00000000000000000000001","mode":"sync","status":"completed","added":1,"updated":0,"deleted":0,"warningsCount":0,"lastWarning":null,"errorsCount":0,"warnings":[]}}],"warnings":[]}
-
-$ bun cli search "Aurora kickoff" --realm work --kind file --local-only --format json
-{"results":[{"ref":"ctx://01J00000000000000000000000/file/aurora.txt","profile":{"id":"file","version":1},"sourceId":"01J00000000000000000000000","origin":"local","originRank":0,"title":"aurora.txt","chunks":[{"index":0,"snippet":"Project <mark>Aurora</mark> <mark>kickoff</mark> is Tuesday at 10:00.\nOwner: Maya Chen."}]}],"pagination":{"offset":0,"limit":20,"hasMore":false},"warnings":[]}
-
-$ bun cli get 'ctx://01J00000000000000000000000/file/aurora.txt' --format json
-{"resource":{"ref":"ctx://01J00000000000000000000000/file/aurora.txt","sourceId":"01J00000000000000000000000","realmId":"work","profile":{"id":"file","version":1},"origin":"synced","title":"aurora.txt","payload":{"path":"aurora.txt","name":"aurora.txt","mediaType":"text/plain","text":"Project Aurora kickoff is Tuesday at 10:00.\nOwner: Maya Chen.\n"}},"warnings":[]}
-
-$ bun cli export 'ctx://01J00000000000000000000000/file/aurora.txt' --format json
-{"mediaType":"text/plain","name":"aurora.txt","path":"aurora.txt","text":"Project Aurora kickoff is Tuesday at 10:00.\nOwner: Maya Chen.\n"}
-```
-
-An omitted Realm filter searches all eligible Realms. An explicit `--realm work` filter is exact and never includes another Realm implicitly.
+Continue with the [five-command providerless walkthrough](/docs), [connect a mail or calendar Account](/docs/start/connect-provider), or [install the external example Extension](/docs/use/extensions). Use `ctxindex <command> --help` for exact current syntax instead of a second handwritten command inventory.

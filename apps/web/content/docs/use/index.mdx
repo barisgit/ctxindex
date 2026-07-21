@@ -36,11 +36,11 @@ Use the compact default for orientation and request `describe --full --format js
 ## Materialize deliberately
 
 ```sh
-ctxindex sync --realm company --format json
-ctxindex status --realm company --format json
+ctxindex sync --source company-mail --format json
+ctxindex status --source company-mail --format json
 ```
 
-Sync is a strategy for fast local discovery. Providers and files remain canonical. Purging local materializations does not delete provider records.
+Omit `--source` from `sync` or `status` to select all configured Sources. Sync is a strategy for fast local discovery; it is selected by Source, not Realm. Providers and files remain canonical. Purging local materializations does not delete provider records.
 
 ## Search, then follow the Ref
 

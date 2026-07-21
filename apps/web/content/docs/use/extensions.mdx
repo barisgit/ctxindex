@@ -1,54 +1,89 @@
 ---
-title: Extensions and the local Marketplace
-description: Install trusted Extensions directly or discover them through optional local Catalogs.
+title: Try an external Extension
+description: Install the public GitHub Issues example directly or through its Catalog, then sync and search real data.
 ---
 
-An Extension is trusted in-process TypeScript or JavaScript. It can be installed directly from npm, Git, or a local package; a Catalog is optional discovery and curation, not a required dependency graph.
+The standalone [`barisgit/ctxindex-extensions`](https://github.com/barisgit/ctxindex-extensions) repository proves that an Extension and Catalog can live outside ctxindex and use only the published SDK packages. Its `barisgit.github-issues` Extension needs no credentials: it indexes public GitHub issues and comments through the anonymous API.
 
-## Install directly
+<Callout type="warn">
+  Extensions execute trusted package code in-process. Read the repository before installing it. GitHub's anonymous API limit is 60 requests per hour per IP, so use a small public repository for the first run.
+</Callout>
 
-```sh
-ctxindex extension install npm @acme/ctxindex-mail@1.2.0 acme.mail --format json
+## Install directly from Git
+
+```bash
 ctxindex extension install git \
-  'git+https://github.com/acme/ctxindex-mail.git#4f3c2b1' \
-  acme.mail \
+  'git+https://github.com:443/barisgit/ctxindex-extensions.git#main' \
+  barisgit.github-issues \
   --format json
-ctxindex extension install local ./extensions/mail acme.mail --format json
 ```
 
-Package tooling resolves ordinary package dependencies. ctxindex selects one exact exported Extension root, validates the complete candidate registry, and publishes immutable managed bytes.
+The explicit `:443` keeps Bun 1.3.14 on the verifiable Git transport instead of its GitHub archive shorthand. ctxindex resolves the mutable `main` request once, records the exact commit, validates the complete resulting registry, and installs immutable managed bytes.
 
-## Discover through a Catalog
+## Or discover it through the Catalog
 
-A local Marketplace is the merged search projection of explicitly configured Git Catalog snapshots:
+The same repository exports the `barisgit.ctxindex-extensions` Catalog and commits its inert snapshot:
 
-```sh
-ctxindex extension catalog add community https://example.com/catalog.git \
+```bash
+ctxindex extension catalog add community \
+  https://github.com/barisgit/ctxindex-extensions.git \
   --ref refs/heads/main \
   --trust
-ctxindex extension catalog search mail --format json
-ctxindex extension install catalog community acme.mail --format json
+
+ctxindex extension catalog search github --format json
+ctxindex extension install catalog community barisgit.github-issues --format json
 ```
 
-Catalog add acknowledges repository acquisition. Installation is the separate executable boundary: it replays packages and imports trusted Extension code. To publish curated entries, [author a Catalog](/docs/extend/catalogs). Catalog search and Catalog-backed install refresh the involved Catalog by default; `--no-refresh` deliberately uses stored snapshots and reports their age.
+Catalog search refreshes configured Catalogs by default. Add `--no-refresh` to use stored snapshots offline. The Catalog is optional curation; direct npm, Git, and local installation remain first-class.
 
-Startup is offline: it reads installed records and managed bytes without refreshing Catalogs, contacting npm or Git, or invoking a package manager.
+## Add a Source and use it
 
-## Update and uninstall
+```bash
+ctxindex realm add demo --name "Demo"
+ctxindex source add github.issues \
+  --realm demo \
+  --label gh-issues \
+  --config-owner barisgit \
+  --config-repository ctxindex
 
-```sh
-ctxindex extension update acme.mail --format json
-ctxindex extension uninstall acme.mail --format json
+ctxindex sync --source gh-issues --format json
+ctxindex search issue \
+  --source gh-issues \
+  --local-only \
+  --limit 5 \
+  --format json
+
+ctxindex search \
+  --source gh-issues \
+  --kind software.issue \
+  --field state=open \
+  --local-only \
+  --format json
 ```
 
-Updates explicitly re-pin installed code. Uninstall is blocked while configured Sources require the Extension unless `--force` preserves those Sources and data in an unavailable state.
+Copy a returned Ref through unchanged:
 
-[Open the generated CLI reference](/docs/cli)
+```bash
+ctxindex get 'ctx://<source-id>/issue/42' --format json
+ctxindex thread 'ctx://<source-id>/issue/42' --format json
+```
 
-Installed Documentation Trees remain available offline through the CLI:
+The checked implementation, Catalog, synthetic HTTP tests, and package manifest are all in the [external repository](https://github.com/barisgit/ctxindex-extensions). To understand how it is authored, continue with the [Extension SDK guide](/docs/extend).
 
-```sh
-ctxindex docs list --format json
-ctxindex docs search "first sync" --format json
-ctxindex docs get acme.mail README.md
+## Update, inspect, and remove
+
+```bash
+ctxindex extension list --format json
+ctxindex extension update barisgit.github-issues --format json
+ctxindex extension uninstall barisgit.github-issues --format json
+```
+
+Updates explicitly reacquire and re-pin installed code. Uninstall is blocked while configured Sources depend on the Extension unless `--force` preserves those Sources and their materialized data as unavailable.
+
+Installed documentation stays offline and agent-readable:
+
+```bash
+ctxindex docs list --extension barisgit.github-issues --format json
+ctxindex docs search "first sync" --extension barisgit.github-issues --format json
+ctxindex docs get README.md --extension barisgit.github-issues
 ```

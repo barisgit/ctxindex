@@ -49,10 +49,11 @@ describe('public documentation information architecture', () => {
   })
 
   test('keeps one current page for each public workflow', async () => {
-    const [agentUsage, mail, calendar, contribute] = await Promise.all([
+    const [agentUsage, mail, calendar, daemon, contribute] = await Promise.all([
       readFile(join(docsRoot, 'start', 'agent-usage.mdx'), 'utf8'),
       readFile(join(docsRoot, 'use', 'mail.mdx'), 'utf8'),
       readFile(join(docsRoot, 'use', 'calendar.mdx'), 'utf8'),
+      readFile(join(docsRoot, 'use', 'daemon.mdx'), 'utf8'),
       readFile(join(docsRoot, 'contribute', 'index.mdx'), 'utf8'),
     ])
 
@@ -60,6 +61,9 @@ describe('public documentation information architecture', () => {
     expect(agentUsage).toContain('--kind mail.message')
     expect(mail).toContain('--kind mail.message')
     expect(calendar).toContain('--kind calendar.event')
+    expect(daemon).toContain('starts it when absent')
+    expect(daemon).toContain('five idle minutes')
+    expect(daemon).toContain('ctxindex daemon status')
     expect(contribute).toContain('bun run test:integration')
 
     for (const legacyPath of [
@@ -98,6 +102,8 @@ describe('public documentation information architecture', () => {
     expect(connectProvider).toContain('Google')
     expect(connectProvider).toContain('test users')
     expect(connectProvider).toContain('BYOA')
+    expect(connectProvider).toContain('hidden terminal prompt')
+    expect(connectProvider).toContain('http://localhost:')
   })
 
   test('uses diagrams only for the core workflow and definition graphs', async () => {
@@ -146,14 +152,11 @@ describe('public documentation information architecture', () => {
   })
 
   test('publishes both checked Extension authoring lanes', async () => {
-    const providerless = await readFile(
-      join(docsRoot, 'extend/providerless.mdx'),
-      'utf8',
-    )
-    const providerBacked = await readFile(
-      join(docsRoot, 'extend/provider-backed.mdx'),
-      'utf8',
-    )
+    const [providerless, providerBacked, extensionUsage] = await Promise.all([
+      readFile(join(docsRoot, 'extend/providerless.mdx'), 'utf8'),
+      readFile(join(docsRoot, 'extend/provider-backed.mdx'), 'utf8'),
+      readFile(join(docsRoot, 'use/extensions.mdx'), 'utf8'),
+    ])
 
     expect(providerless).toContain('barisgit/ctxindex-extensions')
     expect(providerless).toContain('defineAdapter')
@@ -161,6 +164,38 @@ describe('public documentation information architecture', () => {
     expect(providerBacked).toContain('barisgit/ctxindex-extensions')
     expect(providerBacked).toContain('defineOAuthApp')
     expect(providerBacked).toContain("access: { scopes: ['issues.read'] }")
+    expect(extensionUsage).toContain(
+      'git+https://github.com:443/barisgit/ctxindex-extensions.git#main',
+    )
+    expect(extensionUsage).toContain(
+      'ctxindex extension install catalog community barisgit.github-issues',
+    )
+    expect(extensionUsage).toContain(
+      'ctxindex docs get README.md --extension barisgit.github-issues',
+    )
+  })
+
+  test('keeps CLI syntax in executable help instead of authored reference prose', async () => {
+    const duplicateLinks: string[] = []
+    const unsupportedRealmSelectors: string[] = []
+    for (const path of await collectMdx(docsRoot)) {
+      if (path === join(docsRoot, 'cli', 'index.mdx')) continue
+      const source = await readFile(path, 'utf8')
+      if (source.includes('](/docs/cli)')) {
+        duplicateLinks.push(path.replace(`${docsRoot}/`, ''))
+      }
+      if (/ctxindex (?:sync|status)[^\n]*--realm/u.test(source)) {
+        unsupportedRealmSelectors.push(path.replace(`${docsRoot}/`, ''))
+      }
+    }
+    expect(duplicateLinks).toEqual([])
+    expect(unsupportedRealmSelectors).toEqual([])
+
+    const reference = await readFile(
+      join(docsRoot, 'reference', 'index.mdx'),
+      'utf8',
+    )
+    expect(reference).toContain('ctxindex <command> --help')
   })
 
   test('resolves every authored absolute docs link', async () => {

@@ -1,30 +1,34 @@
 ---
 name: ctxindex
-description: Use ctxindex when an agent needs deterministic access to configured personal or work context—email, calendars, local files, and Extension-defined Sources—through one local typed CLI. Discover loaded schemas, search scoped Realms and Sources, retrieve opaque ctx:// references, export data, and run declared Actions without provider-specific integrations.
+description: Use ctxindex when an agent needs deterministic access to configured email, calendars, local files, or Extension-defined context through one local typed CLI. Discover loaded schemas, search scoped Realms and Sources, retrieve opaque ctx:// references, export data, and run declared Actions.
 ---
 
 # ctxindex
 
-ctxindex is a local personal-context gateway for shell-capable agents. It provides one provider-neutral interface over configured mail, calendars, files, and loaded Extensions.
+ctxindex is a local personal-context gateway for configured mail, calendars, files, and Extension-defined Sources. Use the installed CLI as the authority: loaded Extensions can add Profiles, Adapters, fields, formats, Actions, and documentation.
 
-## Learn the installed interface
-
-Treat the installed CLI and its bundled documentation as authoritative:
+## Discover before acting
 
 ```sh
+ctxindex --help
 ctxindex docs list --format json
 ctxindex docs search "<topic>" --format json
 ctxindex docs get <path>
 ctxindex describe --format json
-ctxindex describe <profile|adapter|action> <id> --format json
-ctxindex --help
+ctxindex source list --format json
 ```
 
-Do not guess loaded kinds, fields, Source options, export formats, or Action schemas. Discover them with `describe`. Scope searches by Realm or Source when context boundaries matter, preserve returned `ctx://` Refs as opaque values, use `--format json` for programmatic consumption, and check the process exit code before reading stdout.
+Before using one definition or Action, inspect it exactly:
 
-## Compose commands in Bash
+```sh
+ctxindex describe <profile|adapter|action> <id> --format json
+```
 
-This example searches one Realm, selects the first returned Ref, and retrieves its complete Resource. It requires `jq` and stops if either command fails or the search returns no result.
+Do not guess loaded vocabulary or input schemas. Scope sensitive searches by exact Realm or Source, preserve returned `ctx://` Refs unchanged, check the process exit code, and use `--format json` for typed composition or `--format text` for lower token usage.
+
+## Search, select, retrieve
+
+This Bash example requires `jq` and stops on failure or an empty result:
 
 ```sh
 set -euo pipefail
@@ -38,4 +42,4 @@ ref="$(jq -er '.results[0].ref' <<<"$results")"
 ctxindex get "$ref" --format json
 ```
 
-Use each loaded Action's discovered schema and effect metadata before invoking it.
+Inspect an Action's discovered schema and effect metadata before invoking it. Keep agent policy and approval outside ctxindex; use ctxindex for context access and declared typed Actions.

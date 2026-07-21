@@ -32,6 +32,24 @@ function argumentDetails(argument: CommandReferenceArgument): string {
     .join('. ')
 }
 
+function argumentRows(
+  argument: CommandReferenceArgument,
+): readonly CommandReferenceArgument[] {
+  if (argument.negativeName === undefined) return [argument]
+  return [
+    argument,
+    {
+      name: argument.negativeName,
+      type: 'boolean',
+      required: false,
+      multiple: false,
+      description:
+        argument.negativeDescription ??
+        `Disable ${argument.description ?? `--${argument.name}`}`,
+    },
+  ]
+}
+
 export function renderCommandReferenceMarkdown(
   projection: CommandReferenceProjection,
 ): string {
@@ -44,15 +62,17 @@ export function renderCommandReferenceMarkdown(
             '',
             '| Argument | Description | Contract |',
             '| --- | --- | --- |',
-            ...command.arguments.map((argument) =>
-              [
-                escapeTable(argumentName(argument)),
-                escapeTable(argument.description ?? ''),
-                escapeTable(argumentDetails(argument)),
-              ]
-                .join(' | ')
-                .replace(/^/, '| ')
-                .replace(/$/, ' |'),
+            ...command.arguments.flatMap((argument) =>
+              argumentRows(argument).map((row) =>
+                [
+                  escapeTable(argumentName(row)),
+                  escapeTable(row.description ?? ''),
+                  escapeTable(argumentDetails(row)),
+                ]
+                  .join(' | ')
+                  .replace(/^/, '| ')
+                  .replace(/$/, ' |'),
+              ),
             ),
           ].join('\n')
     return [

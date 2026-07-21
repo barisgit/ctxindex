@@ -4,11 +4,11 @@
     "index",
     "providerless",
     "provider-backed",
-    "profiles",
-    "providers-oauth-apps",
-    "adapters-actions",
-    "documentation",
     "package-test-publish",
+    "profiles",
+    "adapters-actions",
+    "providers-oauth-apps",
+    "documentation",
     "catalogs"
   ]
 }

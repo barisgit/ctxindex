@@ -122,18 +122,7 @@ _Avoid_: Source, import
 - A provider-persisted **Draft** is a **Resource** created or updated by an **Action**.
 - A **Chat Message** belongs to a provider conversation through a generic `conversation` **Relation** and may reply to another message through a generic `parent` **Relation**; those roles do not require a separate conversation Resource.
 
-## Example dialogue
-
-> **Dev:** "Should a search for company mail also include personal Gmail?"
-> **Domain expert:** "Only when no **Realm** filter was requested. `--realm company` means exactly the company **Realm**; there is no implicit global realm."
-
-> **Dev:** "The agent wrote an email in chat. Is that a **Draft**?"
-> **Domain expert:** "Not yet. It becomes a **Draft** when ctxindex invokes a typed Action through the chosen mailbox **Source** and persists it with the provider."
-
-> **Dev:** "Does the Gmail **Extension** implement `search` directly?"
-> **Domain expert:** "Its **Source Adapter** does. The **Extension** only bundles that adapter with the mail **Profiles** it uses."
-
-## Flagged ambiguities
+## Settled boundaries
 
 - Resolved: `plugin` is not domain language; use **Extension** for a distributable module and **Source Adapter** for provider-facing behavior.
 - Resolved: all context belongs to the person, while **Realm** distinguishes operating contexts such as personal, company, and university.

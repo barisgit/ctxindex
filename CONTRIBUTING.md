@@ -1,9 +1,10 @@
 # Contributing to ctxindex
 
-ctxindex is pre-alpha. Work is organized around focused GitHub issues, one
-issue-linked branch, and one pull request. Product behavior remains owned by
-the repository's specification documents; an issue records the problem and
-evidence, while OpenSpec owns normative changes and implementation tasks.
+ctxindex is pre-alpha. Product behavior is owned by the repository's
+specifications: an issue records the problem and evidence, while OpenSpec owns
+normative changes and implementation tasks. External contributions use focused
+pull requests. Maintainers may land genuinely trivial documentation or
+non-contract fixes directly when a branch and PR would add no review value.
 
 ## Issue taxonomy
 
@@ -24,9 +25,11 @@ do not add parallel `in-progress` labels.
 
 1. Start from a GitHub issue with runtime evidence, an expected outcome,
    acceptance criteria, and explicit non-goals.
-2. Create a short issue-linked branch named `<type>/<short-slug>`, where
-   `<type>` is `feature`, `fix`, `docs`, or `chore` (for example
-   `feature/browse-and-paginate-search`).
+2. Create its isolated worktree with
+   `./scripts/worktree-new.sh <type>/<short-slug>`. Branches use one of
+   `feature`, `fix`, `docs`, or
+   `chore` (for example `feature/browse-and-paginate-search`). The worktree
+   lives under `.worktrees/` and `bun cli` automatically uses isolated state.
 3. For a non-trivial behavior change, create the OpenSpec change on that branch
    before implementation. The issue owns the user-visible problem; the
    OpenSpec proposal, delta specs, design, and tasks own the solution contract.
@@ -35,11 +38,9 @@ do not add parallel `in-progress` labels.
 5. Run the focused checks plus the repository gates documented in the
    [`repo-development` skill](.agents/skills/repo-development/SKILL.md).
 6. Open one pull request that links and closes the issue. Pull requests into
-   `main` run the fast repository gate, integration tests, and E2E tests as
-   parallel required jobs; Turbo exposes their package and root verifier tasks.
-   Include the
-   observed behavior change, verification evidence, remaining risk, and any
-   human checkpoint still required.
+   `main` run the repository, integration, and E2E gates. Include the observed
+   behavior change, verification evidence, remaining risk, and any human
+   checkpoint still required.
 7. Run `openspec-verify-change` after implementation. Archive a completed
    OpenSpec change only when explicitly requested.
 
@@ -84,7 +85,15 @@ or unredacted provider payloads. Store redacted operator evidence under
 
 ## Sources of truth
 
-Do not duplicate product behavior in issues or contributor documentation. Use
-the documentation ownership map in [`README.md`](README.md) to locate the
-authoritative domain vocabulary, specification, release scope, design
-decisions, implementation choices, and agent-driving recipes.
+Do not duplicate product behavior in issues or contributor prose:
+
+| Question | Owner |
+| --- | --- |
+| Domain terms and relationships | [`CONTEXT.md`](CONTEXT.md) |
+| Normative behavior | [`openspec/specs/`](openspec/specs/) |
+| Selective implementation doctrine | Adjacent `implementation.md` sidecars |
+| Current readable system tour | [`SYSTEM.md`](SYSTEM.md) |
+| Accepted cross-cutting decisions D1-D22 | [`docs/design/2026-07-13-context-access-layer.md`](docs/design/2026-07-13-context-access-layer.md) |
+| Completed release scope | [`docs/milestones/`](docs/milestones/) |
+| Future possibilities | [`BACKLOG.md`](BACKLOG.md) |
+| Agent-driving development workflow | [`.agents/skills/repo-development/SKILL.md`](.agents/skills/repo-development/SKILL.md) |

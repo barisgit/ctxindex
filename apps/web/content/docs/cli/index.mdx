@@ -12,7 +12,7 @@ The command tree below is generated from the same definitions used for parsing a
 Give shell-capable agents one local, typed interface to your personal context.
 
 ```text
-Give shell-capable agents one local, typed interface to your personal context. (ctxindex v0.0.0)
+Give shell-capable agents one local, typed interface to your personal context. (ctxindex v0.1.3)
 
 USAGE ctxindex [OPTIONS] init|account|oauth-app|describe|docs|daemon|extension|action|artifact|realm|source|sync|get|export|thread|search|status|secrets
 
@@ -57,7 +57,7 @@ INTERFACE
 Set up ctxindex config, data, state, cache, logs, and SQLite.
 
 ```text
-Set up ctxindex config, data, state, cache, logs, and SQLite. (ctxindex init v0.0.0)
+Set up ctxindex config, data, state, cache, logs, and SQLite. (ctxindex init v0.1.3)
 
 USAGE ctxindex init
 ```
@@ -67,7 +67,7 @@ USAGE ctxindex init
 Authorize and manage Accounts.
 
 ```text
-Authorize and manage Accounts. (ctxindex account v0.0.0)
+Authorize and manage Accounts. (ctxindex account v0.1.3)
 
 USAGE ctxindex account add|list|remove
 
@@ -85,7 +85,7 @@ Use ctxindex account <command> --help for more information about a command.
 Authorize one provider Account.
 
 ```text
-Authorize one provider Account. (ctxindex account add v0.0.0)
+Authorize one provider Account. (ctxindex account add v0.1.3)
 
 USAGE ctxindex account add [OPTIONS] <PROVIDER>
 
@@ -110,7 +110,7 @@ OPTIONS
 List Accounts with bound Sources.
 
 ```text
-List Accounts with bound Sources. (ctxindex account list v0.0.0)
+List Accounts with bound Sources. (ctxindex account list v0.1.3)
 
 USAGE ctxindex account list [OPTIONS]
 
@@ -128,7 +128,7 @@ OPTIONS
 Remove an Account by label.
 
 ```text
-Remove an Account by label. (ctxindex account remove v0.0.0)
+Remove an Account by label. (ctxindex account remove v0.1.3)
 
 USAGE ctxindex account remove [OPTIONS] <LABEL>
 
@@ -146,7 +146,7 @@ ARGUMENTS
 Manage available OAuth Apps.
 
 ```text
-Manage available OAuth Apps. (ctxindex oauth-app v0.0.0)
+Manage available OAuth Apps. (ctxindex oauth-app v0.1.3)
 
 USAGE ctxindex oauth-app add|list|remove
 
@@ -164,7 +164,7 @@ Use ctxindex oauth-app <command> --help for more information about a command.
 Add a local OAuth App from declared environment values.
 
 ```text
-Add a local OAuth App from declared environment values. (ctxindex oauth-app add v0.0.0)
+Add a local OAuth App from declared environment values. (ctxindex oauth-app add v0.1.3)
 
 USAGE ctxindex oauth-app add [OPTIONS] <PROVIDER> <LABEL> --from-env
 
@@ -189,7 +189,7 @@ OPTIONS
 List available OAuth Apps.
 
 ```text
-List available OAuth Apps. (ctxindex oauth-app list v0.0.0)
+List available OAuth Apps. (ctxindex oauth-app list v0.1.3)
 
 USAGE ctxindex oauth-app list [OPTIONS]
 
@@ -207,7 +207,7 @@ OPTIONS
 Remove a local OAuth App.
 
 ```text
-Remove a local OAuth App. (ctxindex oauth-app remove v0.0.0)
+Remove a local OAuth App. (ctxindex oauth-app remove v0.1.3)
 
 USAGE ctxindex oauth-app remove [OPTIONS] <PROVIDER> <LABEL>
 
@@ -227,7 +227,7 @@ ARGUMENTS
 Describe loaded Profiles, Adapters, and Actions.
 
 ```text
-Describe loaded Profiles, Adapters, and Actions. (ctxindex describe v0.0.0)
+Describe loaded Profiles, Adapters, and Actions. (ctxindex describe v0.1.3)
 
 USAGE ctxindex describe [OPTIONS] [SELECTOR] [ID]
 
@@ -256,7 +256,7 @@ OPTIONS
 Inspect bundled and loaded Extension documentation offline.
 
 ```text
-Inspect bundled and loaded Extension documentation offline. (ctxindex docs v0.0.0)
+Inspect bundled and loaded Extension documentation offline. (ctxindex docs v0.1.3)
 
 USAGE ctxindex docs list|get|get-skill|search
 
@@ -275,7 +275,7 @@ Use ctxindex docs <command> --help for more information about a command.
 List offline documentation.
 
 ```text
-List offline documentation. (ctxindex docs list v0.0.0)
+List offline documentation. (ctxindex docs list v0.1.3)
 
 USAGE ctxindex docs list [OPTIONS]
 
@@ -295,7 +295,7 @@ OPTIONS
 Retrieve exact offline documentation.
 
 ```text
-Retrieve exact offline documentation. (ctxindex docs get v0.0.0)
+Retrieve exact offline documentation. (ctxindex docs get v0.1.3)
 
 USAGE ctxindex docs get [OPTIONS] <PATH>
 
@@ -322,7 +322,7 @@ OPTIONS
 Retrieve the portable ctxindex Agent Skill.
 
 ```text
-Retrieve the portable ctxindex Agent Skill. (ctxindex docs get-skill v0.0.0)
+Retrieve the portable ctxindex Agent Skill. (ctxindex docs get-skill v0.1.3)
 
 USAGE ctxindex docs get-skill [OPTIONS]
 
@@ -342,7 +342,7 @@ OPTIONS
 Search offline documentation.
 
 ```text
-Search offline documentation. (ctxindex docs search v0.0.0)
+Search offline documentation. (ctxindex docs search v0.1.3)
 
 USAGE ctxindex docs search [OPTIONS] <QUERY>
 
@@ -367,7 +367,7 @@ OPTIONS
 Manage the background local daemon.
 
 ```text
-Manage the background local daemon. (ctxindex daemon v0.0.0)
+Manage the background local daemon. (ctxindex daemon v0.1.3)
 
 USAGE ctxindex daemon start|status|stop
 
@@ -385,7 +385,7 @@ Use ctxindex daemon <command> --help for more information about a command.
 Start the background daemon.
 
 ```text
-Start the background daemon. (ctxindex daemon start v0.0.0)
+Start the background daemon. (ctxindex daemon start v0.1.3)
 
 USAGE ctxindex daemon start [OPTIONS]
 
@@ -403,7 +403,7 @@ OPTIONS
 Inspect daemon lifecycle and health.
 
 ```text
-Inspect daemon lifecycle and health. (ctxindex daemon status v0.0.0)
+Inspect daemon lifecycle and health. (ctxindex daemon status v0.1.3)
 
 USAGE ctxindex daemon status [OPTIONS]
 
@@ -421,7 +421,7 @@ OPTIONS
 Stop the background daemon gracefully.
 
 ```text
-Stop the background daemon gracefully. (ctxindex daemon stop v0.0.0)
+Stop the background daemon gracefully. (ctxindex daemon stop v0.1.3)
 
 USAGE ctxindex daemon stop [OPTIONS]
 
@@ -439,7 +439,7 @@ OPTIONS
 Inspect and manage Extensions.
 
 ```text
-Inspect and manage Extensions. (ctxindex extension v0.0.0)
+Inspect and manage Extensions. (ctxindex extension v0.1.3)
 
 USAGE ctxindex extension list|catalog|install|update|uninstall
 
@@ -459,7 +459,7 @@ Use ctxindex extension <command> --help for more information about a command.
 List loaded Extensions.
 
 ```text
-List loaded Extensions. (ctxindex extension list v0.0.0)
+List loaded Extensions. (ctxindex extension list v0.1.3)
 
 USAGE ctxindex extension list [OPTIONS]
 
@@ -477,7 +477,7 @@ OPTIONS
 Manage trusted Git Catalogs.
 
 ```text
-Manage trusted Git Catalogs. (ctxindex extension catalog v0.0.0)
+Manage trusted Git Catalogs. (ctxindex extension catalog v0.1.3)
 
 USAGE ctxindex extension catalog build|add|list|show|search|refresh|remove
 
@@ -499,7 +499,7 @@ Use ctxindex extension catalog <command> --help for more information about a com
 Build an inert Catalog snapshot from a trusted local package.
 
 ```text
-Build an inert Catalog snapshot from a trusted local package. (ctxindex extension catalog build v0.0.0)
+Build an inert Catalog snapshot from a trusted local package. (ctxindex extension catalog build v0.1.3)
 
 USAGE ctxindex extension catalog build [OPTIONS] <PACKAGE-ROOT> --trust
 
@@ -528,7 +528,7 @@ OPTIONS
 Add a trusted Git Catalog.
 
 ```text
-Add a trusted Git Catalog. (ctxindex extension catalog add v0.0.0)
+Add a trusted Git Catalog. (ctxindex extension catalog add v0.1.3)
 
 USAGE ctxindex extension catalog add [OPTIONS] <NAME> <REPOSITORY> --ref=<ref> --trust
 
@@ -557,7 +557,7 @@ OPTIONS
 List Git Catalogs.
 
 ```text
-List Git Catalogs. (ctxindex extension catalog list v0.0.0)
+List Git Catalogs. (ctxindex extension catalog list v0.1.3)
 
 USAGE ctxindex extension catalog list [OPTIONS]
 
@@ -571,6 +571,7 @@ OPTIONS
 | Argument | Description | Contract |
 | --- | --- | --- |
 | `--refresh` | Refresh Catalog state before reading | Optional. Default: `true` |
+| `--no-refresh` | Use the stored Catalog snapshot without refreshing | Optional |
 | `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex extension catalog show`
@@ -578,7 +579,7 @@ OPTIONS
 Show a Git Catalog entry.
 
 ```text
-Show a Git Catalog entry. (ctxindex extension catalog show v0.0.0)
+Show a Git Catalog entry. (ctxindex extension catalog show v0.1.3)
 
 USAGE ctxindex extension catalog show [OPTIONS] <NAME> [EXTENSION-ID]
 
@@ -599,6 +600,7 @@ OPTIONS
 | `<name>` |  | Required |
 | `<extension-id>` |  | Optional |
 | `--refresh` | Refresh Catalog state before reading | Optional. Default: `true` |
+| `--no-refresh` | Use the stored Catalog snapshot without refreshing | Optional |
 | `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex extension catalog search`
@@ -606,13 +608,13 @@ OPTIONS
 Search Extensions across configured Catalogs.
 
 ```text
-Search Extensions across configured Catalogs. (ctxindex extension catalog search v0.0.0)
+Search Extensions across configured Catalogs. (ctxindex extension catalog search v0.1.3)
 
 USAGE ctxindex extension catalog search [OPTIONS] [QUERY]
 
 ARGUMENTS
 
-  QUERY
+  QUERY    Optional text to match Extension names and descriptions
 
 OPTIONS
 
@@ -623,8 +625,9 @@ OPTIONS
 
 | Argument | Description | Contract |
 | --- | --- | --- |
-| `<query>` |  | Optional |
+| `<query>` | Optional text to match Extension names and descriptions | Optional |
 | `--refresh` | Refresh Catalog state before reading | Optional. Default: `true` |
+| `--no-refresh` | Use the stored Catalog snapshot without refreshing | Optional |
 | `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex extension catalog refresh`
@@ -632,7 +635,7 @@ OPTIONS
 Refresh a Git Catalog pin.
 
 ```text
-Refresh a Git Catalog pin. (ctxindex extension catalog refresh v0.0.0)
+Refresh a Git Catalog pin. (ctxindex extension catalog refresh v0.1.3)
 
 USAGE ctxindex extension catalog refresh [OPTIONS] <NAME>
 
@@ -655,7 +658,7 @@ OPTIONS
 Remove a Git Catalog.
 
 ```text
-Remove a Git Catalog. (ctxindex extension catalog remove v0.0.0)
+Remove a Git Catalog. (ctxindex extension catalog remove v0.1.3)
 
 USAGE ctxindex extension catalog remove [OPTIONS] <NAME>
 
@@ -678,7 +681,7 @@ OPTIONS
 Trust, acquire, and execute one exact Catalog, npm, Git, or local Extension.
 
 ```text
-Trust, acquire, and execute one exact Catalog, npm, Git, or local Extension. (ctxindex extension install v0.0.0)
+Trust, acquire, and execute one exact Catalog, npm, Git, or local Extension. (ctxindex extension install v0.1.3)
 
 USAGE ctxindex extension install [OPTIONS] <SOURCE-KIND> <TARGET> <EXTENSION-ID>
 
@@ -701,6 +704,7 @@ OPTIONS
 | `<target>` | Catalog name or direct package target | Required |
 | `<extension-id>` | Stable Extension id | Required |
 | `--refresh` | Refresh Catalog state before reading | Optional. Default: `true` |
+| `--no-refresh` | Use the stored Catalog snapshot without refreshing | Optional |
 | `--format`, `-f` | Output format: pretty, text, or json | Optional. Choices: `pretty`, `text`, `json` |
 
 ## `ctxindex extension update`
@@ -708,7 +712,7 @@ OPTIONS
 Trust, reacquire, and execute an installed Extension from its persisted provenance.
 
 ```text
-Trust, reacquire, and execute an installed Extension from its persisted provenance. (ctxindex extension update v0.0.0)
+Trust, reacquire, and execute an installed Extension from its persisted provenance. (ctxindex extension update v0.1.3)
 
 USAGE ctxindex extension update [OPTIONS] <EXTENSION-ID>
 
@@ -731,7 +735,7 @@ OPTIONS
 Uninstall an Extension.
 
 ```text
-Uninstall an Extension. (ctxindex extension uninstall v0.0.0)
+Uninstall an Extension. (ctxindex extension uninstall v0.1.3)
 
 USAGE ctxindex extension uninstall [OPTIONS] <EXTENSION-ID>
 
@@ -756,7 +760,7 @@ OPTIONS
 Run typed Actions.
 
 ```text
-Run typed Actions. (ctxindex action v0.0.0)
+Run typed Actions. (ctxindex action v0.1.3)
 
 USAGE ctxindex action run
 
@@ -772,7 +776,7 @@ Use ctxindex action <command> --help for more information about a command.
 Run a registry Action.
 
 ```text
-Run a registry Action. (ctxindex action run v0.0.0)
+Run a registry Action. (ctxindex action run v0.1.3)
 
 USAGE ctxindex action run [OPTIONS] <ACTION-ID> --source=<source> --input=<input>
 
@@ -799,7 +803,7 @@ OPTIONS
 List, download, and purge managed Artifacts.
 
 ```text
-List, download, and purge managed Artifacts. (ctxindex artifact v0.0.0)
+List, download, and purge managed Artifacts. (ctxindex artifact v0.1.3)
 
 USAGE ctxindex artifact list|download|purge
 
@@ -817,7 +821,7 @@ Use ctxindex artifact <command> --help for more information about a command.
 List Artifact descriptors for a Resource.
 
 ```text
-List Artifact descriptors for a Resource. (ctxindex artifact list v0.0.0)
+List Artifact descriptors for a Resource. (ctxindex artifact list v0.1.3)
 
 USAGE ctxindex artifact list [OPTIONS] <REF>
 
@@ -840,7 +844,7 @@ OPTIONS
 Download an Artifact into the managed cache.
 
 ```text
-Download an Artifact into the managed cache. (ctxindex artifact download v0.0.0)
+Download an Artifact into the managed cache. (ctxindex artifact download v0.1.3)
 
 USAGE ctxindex artifact download [OPTIONS] <REF>
 
@@ -865,7 +869,7 @@ OPTIONS
 Remove all managed Artifact cache state.
 
 ```text
-Remove all managed Artifact cache state. (ctxindex artifact purge v0.0.0)
+Remove all managed Artifact cache state. (ctxindex artifact purge v0.1.3)
 
 USAGE ctxindex artifact purge [OPTIONS]
 
@@ -883,7 +887,7 @@ OPTIONS
 Manage indexing realms.
 
 ```text
-Manage indexing realms. (ctxindex realm v0.0.0)
+Manage indexing realms. (ctxindex realm v0.1.3)
 
 USAGE ctxindex realm add|list
 
@@ -900,7 +904,7 @@ Use ctxindex realm <command> --help for more information about a command.
 Add a realm.
 
 ```text
-Add a realm. (ctxindex realm add v0.0.0)
+Add a realm. (ctxindex realm add v0.1.3)
 
 USAGE ctxindex realm add [OPTIONS] <SLUG>
 
@@ -923,7 +927,7 @@ OPTIONS
 List existing realms.
 
 ```text
-List existing realms. (ctxindex realm list v0.0.0)
+List existing realms. (ctxindex realm list v0.1.3)
 
 USAGE ctxindex realm list [OPTIONS]
 
@@ -941,7 +945,7 @@ OPTIONS
 Manage indexed sources.
 
 ```text
-Manage indexed sources. (ctxindex source v0.0.0)
+Manage indexed sources. (ctxindex source v0.1.3)
 
 USAGE ctxindex source add|list|remove
 
@@ -959,42 +963,56 @@ Use ctxindex source <command> --help for more information about a command.
 Add a source.
 
 ```text
-Add a source. (ctxindex source add v0.0.0)
+Add a source. (ctxindex source add v0.1.3)
 
 USAGE ctxindex source add [OPTIONS] [ADAPTER-ID]
 
 ARGUMENTS
 
-  ADAPTER-ID    Adapter ID
+  ADAPTER-ID    Adapter ID (provide the positional ID or --adapter)
 
 OPTIONS
 
-                          --adapter=<adapter>    Adapter ID
-                              --label=<label>    Global Source label
-                          --account=<account>    Account label or Account ID
-                  --config-json=<config_json>    Adapter config JSON
-  --search-routing=<indexed|federated|hybrid>    Source search routing override
-                                    --no-sync    Disable synchronization for this Source
-                          -r, --realm=<realm>    Realm slug
+                              --adapter=<adapter>    Adapter ID (provide the positional ID or --adapter)
+                                  --label=<label>    Global Source label
+                              --account=<account>    Account label or Account ID
+                      --config-json=<config_json>    Adapter config JSON
+      --search-routing=<indexed|federated|hybrid>    Source search routing override
+                                        --no-sync    Disable synchronization for this Source
+                              -r, --realm=<realm>    Realm slug
+        --config-calendar-id=<config_calendar_id>    google.calendar: calendar_id (string, default "primary"); microsoft.calendar: calendar_id (string, default "default")
+                --config-exclude=<config_exclude>    local.directory: exclude (string[])
+        --config-future-days=<config_future_days>    google.calendar: future_days (integer, default 730); microsoft.calendar: future_days (integer, default 730)
+                --config-include=<config_include>    local.directory: include (string[])
+            --config-past-days=<config_past_days>    google.calendar: past_days (integer, default 365); microsoft.calendar: past_days (integer, default 365)
+            --config-root-path=<config_root_path>    local.directory: root_path (string, required)
+  --config-size-cap-bytes=<config_size_cap_bytes>    local.directory: size_cap_bytes (integer)
 ```
 
 | Argument | Description | Contract |
 | --- | --- | --- |
-| `--adapter` | Adapter ID | Optional |
+| `--adapter` | Adapter ID (provide the positional ID or --adapter) | Optional |
 | `--label` | Global Source label | Optional |
 | `--account` | Account label or Account ID | Optional |
 | `--config-json` | Adapter config JSON | Optional |
 | `--search-routing` | Source search routing override | Optional. Choices: `indexed`, `federated`, `hybrid` |
 | `--no-sync` | Disable synchronization for this Source | Optional |
-| `<adapter-id>` | Adapter ID | Optional |
+| `<adapter-id>` | Adapter ID (provide the positional ID or --adapter) | Optional |
 | `--realm`, `-r` | Realm slug | Optional |
+| `--config-calendar-id` | google.calendar: calendar_id (string, default "primary"); microsoft.calendar: calendar_id (string, default "default") | Optional |
+| `--config-exclude` | local.directory: exclude (string[]) | Optional. Repeatable |
+| `--config-future-days` | google.calendar: future_days (integer, default 730); microsoft.calendar: future_days (integer, default 730) | Optional |
+| `--config-include` | local.directory: include (string[]) | Optional. Repeatable |
+| `--config-past-days` | google.calendar: past_days (integer, default 365); microsoft.calendar: past_days (integer, default 365) | Optional |
+| `--config-root-path` | local.directory: root_path (string, required) | Optional |
+| `--config-size-cap-bytes` | local.directory: size_cap_bytes (integer) | Optional |
 
 ## `ctxindex source list`
 
 List sources.
 
 ```text
-List sources. (ctxindex source list v0.0.0)
+List sources. (ctxindex source list v0.1.3)
 
 USAGE ctxindex source list [OPTIONS]
 
@@ -1014,7 +1032,7 @@ OPTIONS
 Remove a source.
 
 ```text
-Remove a source. (ctxindex source remove v0.0.0)
+Remove a source. (ctxindex source remove v0.1.3)
 
 USAGE ctxindex source remove [OPTIONS] <SOURCE>
 
@@ -1032,7 +1050,7 @@ ARGUMENTS
 Run a sync for one or all sources.
 
 ```text
-Run a sync for one or all sources. (ctxindex sync v0.0.0)
+Run a sync for one or all sources. (ctxindex sync v0.1.3)
 
 USAGE ctxindex sync [OPTIONS]
 
@@ -1054,7 +1072,7 @@ OPTIONS
 Get a Resource by exact Ref.
 
 ```text
-Get a Resource by exact Ref. (ctxindex get v0.0.0)
+Get a Resource by exact Ref. (ctxindex get v0.1.3)
 
 USAGE ctxindex get [OPTIONS] <REF>
 
@@ -1077,7 +1095,7 @@ OPTIONS
 Export a Resource in a Profile format.
 
 ```text
-Export a Resource in a Profile format. (ctxindex export v0.0.0)
+Export a Resource in a Profile format. (ctxindex export v0.1.3)
 
 USAGE ctxindex export [OPTIONS] <REF> --format=<format>
 
@@ -1100,7 +1118,7 @@ OPTIONS
 Get a local related Resource thread.
 
 ```text
-Get a local related Resource thread. (ctxindex thread v0.0.0)
+Get a local related Resource thread. (ctxindex thread v0.1.3)
 
 USAGE ctxindex thread [OPTIONS] <REF>
 
@@ -1123,7 +1141,7 @@ OPTIONS
 Search context Resources.
 
 ```text
-Search context Resources. (ctxindex search v0.0.0)
+Search context Resources. (ctxindex search v0.1.3)
 
 USAGE ctxindex search [OPTIONS] [QUERY]
 
@@ -1176,7 +1194,7 @@ OPTIONS
 Show last sync status.
 
 ```text
-Show last sync status. (ctxindex status v0.0.0)
+Show last sync status. (ctxindex status v0.1.3)
 
 USAGE ctxindex status [OPTIONS]
 
@@ -1196,7 +1214,7 @@ OPTIONS
 Inspect and select secret storage.
 
 ```text
-Inspect and select secret storage. (ctxindex secrets v0.0.0)
+Inspect and select secret storage. (ctxindex secrets v0.1.3)
 
 USAGE ctxindex secrets status|backend
 
@@ -1213,7 +1231,7 @@ Use ctxindex secrets <command> --help for more information about a command.
 Show safe backend status.
 
 ```text
-Show safe backend status. (ctxindex secrets status v0.0.0)
+Show safe backend status. (ctxindex secrets status v0.1.3)
 
 USAGE ctxindex secrets status [OPTIONS]
 
@@ -1231,7 +1249,7 @@ OPTIONS
 Manage the active backend.
 
 ```text
-Manage the active backend. (ctxindex secrets backend v0.0.0)
+Manage the active backend. (ctxindex secrets backend v0.1.3)
 
 USAGE ctxindex secrets backend set
 
@@ -1247,7 +1265,7 @@ Use ctxindex secrets backend <command> --help for more information about a comma
 Set keychain or file backend.
 
 ```text
-Set keychain or file backend. (ctxindex secrets backend set v0.0.0)
+Set keychain or file backend. (ctxindex secrets backend set v0.1.3)
 
 USAGE ctxindex secrets backend set [OPTIONS] <TARGET>
 

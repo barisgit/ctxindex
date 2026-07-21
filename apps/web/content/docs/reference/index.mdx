@@ -1,18 +1,23 @@
 ---
 title: Reference
-description: Look up generated CLI syntax and stable public contracts after you know the workflow.
+description: Look up stable public contracts after you know the workflow.
 ---
 
 Reference answers exact lookup questions. If you are installing or connecting ctxindex for the first time, begin with [Start](/docs). If you are building an Extension, begin with [Extend](/docs/extend).
 
-## Generated CLI reference
+## Exact command syntax
 
-The command tree, flags, arguments, and output help are generated from the same CLI definitions that run the executable. Generated pages are intentionally secondary to usage guides so onboarding does not become a command inventory.
+The executable already renders its command tree from the same Citty definitions that parse invocations. Use `ctxindex <command> --help` instead of a second prose command inventory:
 
-[Open the CLI reference](/docs/cli)
+```bash
+ctxindex --help
+ctxindex search --help
+ctxindex source add --help
+ctxindex extension catalog --help
+```
 
 <Callout>
-  If a guide and generated command reference disagree, treat current CLI help and capability specs as authoritative and report the documentation drift.
+  If a guide and current CLI help disagree, treat CLI help and capability specs as authoritative and report the documentation drift.
 </Callout>
 
 ## SDK and domain contracts

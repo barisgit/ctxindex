@@ -3,6 +3,8 @@ import { writeFileSync } from 'node:fs'
 import { mkdtemp, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { defineCtxCommand, projectCommandReference } from '../command-model'
+import { createSourceCommand } from '../commands/source'
 import { loadCliDefinitions } from '../definitions'
 import {
   type DirectDatabaseOwnership,
@@ -41,6 +43,42 @@ const definitions = {
     },
   ],
 } as const
+
+test('reference projection resolves dynamic Source config arguments', async () => {
+  let definitionRequests = 0
+  const source = createSourceCommand([], {
+    selectDaemon: () => ({}) as never,
+    sourceDefinitions: async () => {
+      definitionRequests += 1
+      return definitions
+    },
+    sourceAdd: async () => {
+      throw new Error('source add executed')
+    },
+    sourceList: async () => ({ rows: [] }),
+    sourceRemove: async () => ({ sourceId: 'unused' }),
+    loadDefinitions: async () => {
+      throw new Error('direct definitions loaded')
+    },
+    open: async () => {
+      throw new Error('direct dependencies opened')
+    },
+  })
+  const root = defineCtxCommand({
+    meta: { name: 'ctxindex' },
+    subCommands: { source },
+  })
+
+  const projection = await projectCommandReference(root)
+  const add = projection.commands.find(
+    ({ path }) => path.join(' ') === 'ctxindex source add',
+  )
+
+  expect(definitionRequests).toBe(1)
+  expect(add?.arguments).toContainEqual(
+    expect.objectContaining({ name: 'config-root-path' }),
+  )
+})
 
 function fakeOwnership(events: string[]): DirectDatabaseOwnership {
   return {

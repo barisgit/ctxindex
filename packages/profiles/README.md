@@ -1,16 +1,23 @@
 # @ctxindex/profiles
 
-Portable, versioned domain Profiles for ctxindex Resources.
+Portable, versioned Profile definitions and payload schemas for ctxindex Resources.
 
-```ts
-import { mailMessageProfile } from '@ctxindex/profiles/mail-message'
-
-console.log(mailMessageProfile.id)
+```sh
+bun add @ctxindex/profiles
 ```
 
-The package exports the complete Profile collection from `@ctxindex/profiles`
-and dedicated `calendar-event`, `chat-message`, `mail-message`, and `file`
-subpaths. Profile schemas use the tested Zod version shared with
-`@ctxindex/extension-sdk`.
+Import the full collection or one stable subpath:
 
-Licensed under MIT.
+```ts
+import { fileProfile, mailMessageProfile } from '@ctxindex/profiles'
+import {
+  type MailMessage,
+  mailMessageSchema,
+} from '@ctxindex/profiles/mail-message'
+```
+
+Published subpaths are `calendar-event`, `chat-message`, `mail-message`, and `file`. Each exports its canonical Profile, schema, inferred payload type, and related helpers where applicable.
+
+See [Profiles](https://ctxindex.com/docs/extend/profiles) for authoring and compatibility guidance.
+
+MIT licensed.

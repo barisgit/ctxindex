@@ -20,6 +20,12 @@ test('renders deterministic Markdown from the command projection', async () => {
             alias: 'r',
             description: 'Exact Realm',
           },
+          refresh: {
+            type: 'boolean',
+            default: true,
+            description: 'Refresh Catalog state',
+            negativeDescription: 'Use the stored Catalog snapshot',
+          },
         },
       }),
     },
@@ -37,4 +43,6 @@ test('renders deterministic Markdown from the command projection', async () => {
   expect(markdown).toContain('ctxindex search')
   expect(markdown).toContain('`--realm`, `-r`')
   expect(markdown).toContain('Repeatable')
+  expect(markdown).toContain('`--no-refresh`')
+  expect(markdown).toContain('Use the stored Catalog snapshot')
 })

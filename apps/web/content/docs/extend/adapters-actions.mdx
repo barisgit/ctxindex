@@ -34,6 +34,29 @@ defineAdapter({
 
 The host supplies scoped `context.fetch`; do not import stored tokens or core runtime internals.
 
+## Return portable failures
+
+Throw `syncError(...)` for expected provider failures instead of relying on a package-local Error subclass. The marker is structurally recognized across separately installed SDK copies while its schema keeps diagnostics bounded:
+
+```ts
+import { syncError } from '@ctxindex/extension-sdk'
+
+if (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0') {
+  throw syncError('rate_limited', {
+    message: 'GitHub anonymous API rate limit exhausted',
+    retryAfterMs: millisecondsUntilReset(response.headers),
+  })
+}
+
+if (!response.ok) {
+  throw syncError('provider_bad_response', {
+    message: `GitHub returned HTTP ${response.status}`,
+  })
+}
+```
+
+Use the narrowest stable code. Do not include response bodies, tokens, filesystem paths, or unbounded provider diagnostics in messages. Preserve cancellation instead of turning it into a provider failure.
+
 ## Actions
 
 Profiles declare Action identity, effect, input, and output Profile. Each Adapter binds only the Actions it supports and supplies the implementation:
@@ -50,3 +73,14 @@ actions: {
 ```
 
 An Adapter cannot implement an undeclared Profile Action. Action contexts expose the selected Source, validated input, scoped fetch/logger/cancellation, and narrow read-only Resource/Artifact resolvers—not database or arbitrary provider access.
+
+## Operation checklist
+
+- Parse `context.source.config` with the same strict schema the Adapter declares.
+- Validate provider JSON before normalizing it into Profile payloads.
+- Pass `context.signal` to every fetch.
+- Keep Refs stable and treat the suffix after the Source id as Adapter-owned opaque identity.
+- Bound pages, results, cursors, warning text, and downloaded bytes.
+- Emit a checkpoint only after every Resource covered by that cursor has been emitted.
+
+The [external GitHub Issues Adapter](https://github.com/barisgit/ctxindex-extensions/blob/main/index.ts) is the complete checked example for sync, pagination, cursor validation, portable failures, Profile reuse, and synthetic provider tests.

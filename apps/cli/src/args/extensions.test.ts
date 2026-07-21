@@ -72,6 +72,15 @@ test('declares the singular Extension command tree and uniform install grammar',
       .get('ctxindex extension catalog build')
       ?.arguments.map(({ name }) => name),
   ).toContain('trust')
+  expect(
+    commands
+      .get('ctxindex extension catalog search')
+      ?.arguments.find(({ name }) => name === 'query'),
+  ).toEqual(
+    expect.objectContaining({
+      description: 'Optional text to match Extension names and descriptions',
+    }),
+  )
 })
 
 test('rejects an invalid install source kind from the command definition before effects', async () => {

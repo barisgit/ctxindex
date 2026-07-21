@@ -46,11 +46,14 @@ function captureProcessExit(): () => void {
   }
 }
 
-function createRootCommand(source = sourceCommand) {
+export function createRootCommand(
+  source = sourceCommand,
+  version = cliVersion,
+) {
   return defineCtxCommand({
     meta: {
       name: 'ctxindex',
-      version: cliVersion,
+      version,
       description:
         'Give shell-capable agents one local, typed interface to your personal context.',
     },

@@ -87,6 +87,15 @@ test('Account selector is public while Grant selection remains absent', () => {
   expect(Object.keys(sourceAddBaseArgs)).not.toContain('grant')
 })
 
+test('source add documents its required alternative Adapter selectors', () => {
+  expect(sourceAddBaseArgs.adapter.description).toBe(
+    'Adapter ID (provide the positional ID or --adapter)',
+  )
+  expect(sourceAddBaseArgs['adapter-id'].description).toBe(
+    'Adapter ID (provide the positional ID or --adapter)',
+  )
+})
+
 describe('source add generated Adapter config options', () => {
   test('resolves external primitive and repeatable array values from Citty args', async () => {
     expect(

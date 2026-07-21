@@ -33,6 +33,14 @@ ctxindex describe adapter google.calendar --format json
 
 `describe` is especially important when external Extensions are loaded: they can add Profiles and Source Adapters without adding provider-specific commands.
 
+For an agent that supports portable skills, install the exact skill embedded in the CLI release:
+
+```bash
+ctxindex docs get-skill --output ./SKILL.md
+```
+
+The skill teaches command composition; `describe` remains the live authority for definitions contributed by the Extensions installed on that machine.
+
 ## Compose a read workflow
 
 <Steps>

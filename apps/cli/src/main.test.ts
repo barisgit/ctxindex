@@ -1,6 +1,7 @@
 import { afterEach, expect, spyOn, test } from 'bun:test'
 import type { CommandDef } from 'citty'
-import { rootCommand, runCli } from './main'
+import { prepareCommandTree, renderCommandUsage } from './command-model'
+import { createRootCommand, rootCommand, runCli } from './main'
 
 const rootSubCommands = rootCommand.subCommands as Record<string, CommandDef>
 
@@ -59,6 +60,12 @@ test('prints export help successfully', async () => {
 
   expect(await runCli(['export', '--help'])).toBe(0)
   expect(log).toHaveBeenCalled()
+})
+
+test('reference roots accept the package-derived CLI version', async () => {
+  const root = createRootCommand(undefined, '9.9.9')
+  await prepareCommandTree(root)
+  expect(await renderCommandUsage(root)).toContain('ctxindex v9.9.9')
 })
 
 for (const args of [

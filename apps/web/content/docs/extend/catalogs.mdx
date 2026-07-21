@@ -5,6 +5,8 @@ description: Curate literal and package-backed Extensions into a deterministic l
 
 A Catalog is optional curation. It can export literal Extension values from the author package and descriptors pointing to npm, Git, or contained local packages.
 
+See the runnable [`barisgit.ctxindex-extensions` Catalog](https://github.com/barisgit/ctxindex-extensions/blob/main/index.ts) and its committed [`ctxindex-catalog.json`](https://github.com/barisgit/ctxindex-extensions/blob/main/ctxindex-catalog.json) before authoring your own.
+
 ```ts
 import {
   defineCatalog,
@@ -55,3 +57,19 @@ Build trust covers author-controlled module import, package acquisition, and Bun
 Install has a second trust gate because it exactly replays and activates the selected Extension. Catalog refresh does not silently update installed bytes.
 
 Use a Catalog when curated discovery is valuable. Direct npm/Git/local installation remains the lower-friction distribution path for many Extensions.
+
+## Verify the user path
+
+Test the exact repository URL and ref a user will add:
+
+```sh
+ctxindex extension catalog add community \
+  https://github.com/barisgit/ctxindex-extensions.git \
+  --ref refs/heads/main \
+  --trust
+ctxindex extension catalog show community --format json
+ctxindex extension catalog search github --format json
+ctxindex extension install catalog community barisgit.github-issues --format json
+```
+
+Search and install refresh the involved Catalog by default. `--no-refresh` deliberately uses the stored snapshot and reports its age. Startup never refreshes Catalogs or silently updates installed Extension bytes.

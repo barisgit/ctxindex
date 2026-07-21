@@ -1,44 +1,27 @@
 # @ctxindex/extension-sdk
 
-Type-safe factories and contracts for authoring ctxindex Extensions and Catalogs.
+Type-safe factories and runtime contracts for ctxindex Extensions and Catalogs.
+
+```sh
+bun add @ctxindex/extension-sdk
+```
 
 ```ts
 import {
   defineAdapter,
+  defineCatalog,
   defineExtension,
+  defineOAuthApp,
   defineProfile,
+  defineProvider,
+  docs,
+  packageExtension,
   z,
 } from '@ctxindex/extension-sdk'
-
-const note = defineProfile({
-  id: 'example.note',
-  version: 1,
-  schema: z.object({ title: z.string(), body: z.string() }),
-  search: {
-    title: (value) => value.title,
-    chunks: (value) => [value.body],
-  },
-})
-
-const adapter = defineAdapter({
-  id: 'example.notes',
-  configSchema: z.object({}),
-  profiles: [note],
-  routing: 'indexed',
-  capabilities: [],
-  operations: {},
-  actions: {},
-})
-
-export default defineExtension({
-  id: 'example.notes',
-  profiles: [note],
-  adapters: [adapter],
-})
 ```
 
-Extensions are ordinary ESM packages. Add their built entry to `ctxindex.extensions` in `package.json`; install them directly from npm, Git, or a local directory; or include them in a ctxindex Catalog.
+The package exports the tested Zod instance as `z`, so definitions retain inference and use the same schemas ctxindex validates at runtime. Extensions are ordinary ESM packages and use the same SDK whether maintained by ctxindex or externally.
 
-The SDK targets Bun 1.3.14 and exports Zod as `z` so schemas and inferred types use the tested compatible version. See [ctxindex.com/docs](https://ctxindex.com/docs) for the complete authoring guide.
+See the [Extension SDK guide](https://ctxindex.com/docs/extend) for providerless and provider-backed examples, documentation, package metadata, testing, and publishing. Public examples live in [`barisgit/ctxindex-extensions`](https://github.com/barisgit/ctxindex-extensions).
 
-Licensed under MIT.
+MIT licensed.

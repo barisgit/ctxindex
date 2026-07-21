@@ -5,7 +5,7 @@ description: Define a Profile, local Source Adapter, Extension root, documentati
 
 The standalone [`barisgit/ctxindex-extensions`](https://github.com/barisgit/ctxindex-extensions) repository is the complete checked public-SDK reference. A providerless Adapter simply omits `provider`, `access`, and `providerApiHosts`.
 
-## `extension.ts`
+## `index.ts`
 
 ```ts
 import {
@@ -81,10 +81,10 @@ export default defineExtension({
   "name": "@acme/ctxindex-notes",
   "type": "module",
   "ctxindex": {
-    "extensions": ["./extension.ts"]
+    "extensions": ["./index.ts"]
   },
   "dependencies": {
-    "@ctxindex/extension-sdk": "^1.0.0"
+    "@ctxindex/extension-sdk": "0.1.1"
   }
 }
 ```

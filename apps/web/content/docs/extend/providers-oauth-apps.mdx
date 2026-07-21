@@ -9,6 +9,8 @@ A Provider owns external-service identity, one current auth method (`auth.oauth2
 
 Provider ids are stable semantic identity. At most one non-conflicting definition for an id can be active.
 
+Use `auth.none()` for a public API that needs no ctxindex Account. The Adapter may still declare `providerApiHosts`, giving host policy and diagnostics a stable provider identity without inventing credentials. Use OAuth only when the service truly requires an authorized identity.
+
 ## OAuth App
 
 `defineOAuthApp(exactProvider, { label, config })` binds one public registration definition to an exact imported OAuth2 Provider. Its identity is `(providerId, label)`.
@@ -24,6 +26,8 @@ The label is Provider-scoped and may contain readable text allowed by the valida
 
 An Extension App is permitted only when the Provider registration policy is public. Confidential Apps remain local secret-backed BYOA state.
 
+An embedded public client id is expected to be visible; it identifies the provider registration but grants no user data by itself. Tokens and Grants remain local secret-backed state. The Provider's registration schema determines whether a local BYOA App can be added with `ctxindex oauth-app add <provider> <label> --from-env`.
+
 ## Runtime state is separate
 
 - An **OAuth App** is public definition metadata or local BYOA configuration.
@@ -35,3 +39,5 @@ Removing an Extension App blocks future selection but does not invalidate existi
 ## Reuse across packages
 
 If another Extension needs the Provider, it imports the exact Provider value from its package. It does not copy a string ref. If a Git-only Extension wants type-safe reuse, package-manager Git dependencies work like any other dependency; npm publication is optional.
+
+Only definitions reachable through installed Extension roots become active. A package dependency makes an imported factory available to TypeScript; it does not separately install or activate that dependency's Extension roots.

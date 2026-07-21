@@ -1,7 +1,10 @@
-# Portable ctxindex Agent Skill
+# ctxindex Agent Skill
 
-`ctxindex/SKILL.md` is the one portable Agent Skill shipped with ctxindex. Keep its frontmatter standard and its body concise: it explains when to use ctxindex, points agents at live discovery, and includes one programmatic composition without duplicating loaded schemas or provider-specific instructions.
+[`ctxindex/SKILL.md`](ctxindex/SKILL.md) is the portable Agent Skill embedded in every `ctxindex` release. It teaches shell-capable agents to discover the installed interface, search configured context, and follow opaque Resource Refs without duplicating Extension schemas or provider instructions.
 
-The release embeds the exact file. Retrieve it with `ctxindex docs get-skill` or copy it with `ctxindex docs get-skill --output <path>`.
+```sh
+ctxindex docs get-skill
+ctxindex docs get-skill --output ./SKILL.md
+```
 
-Repository contributor guidance lives in [`.agents/skills/repo-development/SKILL.md`](../.agents/skills/repo-development/SKILL.md). The normative contract lives in [`openspec/specs/cli-surface/spec.md`](../openspec/specs/cli-surface/spec.md).
+Repository development guidance lives in [`.agents/skills/repo-development/SKILL.md`](../.agents/skills/repo-development/SKILL.md). CLI behavior is specified in [`openspec/specs/cli-surface/spec.md`](../openspec/specs/cli-surface/spec.md).

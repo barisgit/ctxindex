@@ -6,7 +6,7 @@ description: Install ctxindex, index one local file without an Account, and retu
 ctxindex gives shell-capable agents one local, typed interface over mail, calendars, files, and Extension-defined context. The shortest trustworthy path starts with a local directory: no Account, OAuth flow, or provider traffic.
 
 <Callout>
-  ctxindex requires Bun 1.3.14. If the npm package is not available yet, use the source-checkout tab.
+  ctxindex requires Bun 1.3.14. The CLI is published as `ctxindex`; Extension authors use `@ctxindex/extension-sdk` and `@ctxindex/profiles`.
 </Callout>
 
 <Tabs items={["Released package", "Source checkout"]}>
@@ -79,8 +79,8 @@ A successful search returns a stable Ref in a bounded result envelope:
       "title": "aurora.txt"
     }
   ],
-  "pagination": { "offset": 0, "limit": 20, "hasMore": false },
-  "warnings": []
+  "warnings": [],
+  "pagination": { "offset": 0, "limit": 20, "hasMore": false }
 }
 ```
 
@@ -97,4 +97,5 @@ Do not reconstruct provider-owned Ref suffixes. Copy the Ref returned by ctxinde
 
 - [Connect Google or Microsoft](/docs/start/connect-provider)
 - [Use ctxindex from an agent](/docs/start/agent-usage)
+- [Install the public GitHub Issues example](/docs/use/extensions)
 - [Understand the core workflow](/docs/use)

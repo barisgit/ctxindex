@@ -8,30 +8,33 @@ ctxindex is a local personal-context gateway. The CLI is its agent integration s
 ## System shape
 
 ```text
-                              ┌──────────────────────────────┐
-                              │ Provider or local filesystem │
-                              │      canonical context       │
-                              └──────────────▲───────────────┘
-                                             │ provider I/O
-Agent ──> CLI ──> provider-neutral core ──> Source Adapter
-                    │              │              ▲
-                    │              └── Source ────┘
-                    │                    ▲
-                    │               Realm contains
-                    │
-                    └──> SQLite projections + managed Artifact cache
+                                      ┌──────────────────────────────┐
+                                      │ Provider or local filesystem │
+                                      │      canonical context       │
+                                      └──────────────▲───────────────┘
+                                                     │ provider I/O
+Agent ──> CLI ──local typed RPC──> daemon ──> provider-neutral core
+                                      │                    │
+                                      │              Source Adapter
+                                      │                    ▲
+                                      │               Source + Realm
+                                      │
+                                      └──> SQLite projections + managed Artifact cache
 
 OAuth App ──> Account ──> Grant ──explicit binding──> Source
 ```
 
 The main boundaries are deliberate:
 
-- the CLI parses, composes, formats, and maps final exits;
+- the CLI parses, formats, maps final exits, and automatically ensures the exact local daemon for stateful work;
+- the daemon owns the long-lived registry, database, background sync streams, and coordinated provider operations, then exits after an idle period;
 - core owns provider-neutral orchestration, validation, SQLite, and cache state;
 - Profiles own portable domain vocabulary;
 - Providers own reusable authentication, registration, identity, and allowed-host declarations;
 - Source Adapters own Source configuration, requested access, transport, normalization, and declared operations, and may be provider-bound or providerless;
 - Extensions are plain exported roots bundling Source Adapters and OAuth Apps plus optional standalone Providers/Profiles, without adding commands or an authoring dependency graph.
+
+The daemon is local infrastructure, not a hosted account or remote data plane. Ordinary commands start it on demand; `ctxindex daemon status`, `start`, and `stop` exist for observation and recovery. The CLI never falls back to opening the same database after it has selected a daemon route.
 
 ## Sync and live search share one Resource model
 

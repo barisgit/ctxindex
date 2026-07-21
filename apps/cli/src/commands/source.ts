@@ -48,6 +48,7 @@ export function createSourceCommandRuntime(
       add: defineCtxCommand<ReturnType<typeof sourceAddArgs>>({
         meta: { name: 'add', description: 'Add a source.' },
         args: async () => sourceAddArgs(await activeSourceDescriptions()),
+        referenceArgs: async () => sourceAddArgs(await helpDescriptions()),
         run: ({ args }) =>
           runWithExit(async () => {
             resolveSourceAdapterId(args)

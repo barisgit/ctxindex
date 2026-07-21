@@ -5,6 +5,8 @@ description: Author one acyclic, type-safe definition graph with ordinary TypeSc
 
 Built-in and external Extensions use the same `@ctxindex/extension-sdk` factories and the same collection, conflict, and complete-registry validation path. Built-ins have distribution privilege, not a private API.
 
+The fastest way to learn the public seam is the standalone [`barisgit/ctxindex-extensions`](https://github.com/barisgit/ctxindex-extensions) repository. It imports only `@ctxindex/extension-sdk@0.1.1` and `@ctxindex/profiles@0.1.1`, exports one Extension and one Catalog from `index.ts`, and tests provider traffic with synthetic responses.
+
 ```mermaid
 flowchart LR
   P[Provider] --> A[Source Adapter]
@@ -55,6 +57,23 @@ npm, Git, and local dependencies are ordinary package dependencies. The package 
 
 ## Choose a path
 
-- [Providerless quickstart](/docs/extend/providerless): local data, generated fixtures, or APIs that need no ctxindex Account.
-- [Provider-backed quickstart](/docs/extend/provider-backed): OAuth identity, scoped provider egress, and remote operations.
-- [Package, test, and publish](/docs/extend/package-test-publish): manifest entries, direct installation, dependencies, and release.
+| Goal | Start here |
+| --- | --- |
+| Index local data or synthetic fixtures | [Providerless quickstart](/docs/extend/providerless) |
+| Call a public or authenticated API | [Provider-backed quickstart](/docs/extend/provider-backed) |
+| Make a Git/local/npm package installable | [Package, test, and publish](/docs/extend/package-test-publish) |
+| Define portable Resource meaning | [Profiles](/docs/extend/profiles) |
+| Implement sync, search, retrieve, downloads, or Actions | [Adapters and Actions](/docs/extend/adapters-actions) |
+| Add OAuth policy or a public App | [Providers and OAuth Apps](/docs/extend/providers-oauth-apps) |
+| Ship Markdown and image assets | [Extension documentation](/docs/extend/documentation) |
+| Curate several Extensions | [Catalogs](/docs/extend/catalogs) |
+
+## Authoring rules that prevent surprises
+
+- Export ordinary `defineExtension(...)` or `defineCatalog(...)` values from modules listed in `package.json`; there is no host callback or factory-of-factories.
+- Import reusable Provider and Profile values through normal TypeScript dependencies. ctxindex does not resolve textual definition references or a second Extension dependency graph.
+- Keep Provider I/O inside Adapter operation contexts and use the supplied `fetch`, logger, and cancellation signal.
+- Validate Source config, provider responses, cursors, and Action inputs. SDK types improve authoring; runtime schemas remain authoritative at the trust boundary.
+- Treat docs as a passive sidecar. They explain definitions but cannot change schemas, scopes, capabilities, or Actions.
+
+Use `ctxindex describe --full --format json` after installation to inspect the exact registry ctxindex activated.

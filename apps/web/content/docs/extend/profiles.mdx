@@ -41,3 +41,27 @@ Profiles may define:
 - typed Action declarations with reversible or irreversible effect metadata.
 
 The Profile never performs provider I/O and does not own Source configuration. Import it into every Adapter that emits that Resource shape.
+
+## Reuse before redefining
+
+Canonical portable Profiles are published from `@ctxindex/profiles`:
+
+```ts
+import { chatMessageProfile, mailMessageProfile } from '@ctxindex/profiles'
+```
+
+Import the exact Profile object when its semantics fit. Do not create another `mail.message@1` with a similar schema: the complete registry accepts one compatible definition for an identity and rejects conflicting executable/schema-bearing leaves.
+
+Create a new Profile when the domain really has different identity, payload meaning, search fields, Relations, Artifacts, exports, or Actions. Telegram messages and email can share generic conversation relationships without pretending their entire payloads are the same kind.
+
+## Design a Profile for retrieval, not a provider response
+
+- Keep the payload provider-neutral and strict; validate provider DTOs separately inside each Adapter.
+- Store information needed to render a complete Resource, not every field returned by an API.
+- Derive search text and typed fields purely from the payload.
+- Use Relations for navigable edges and natural-key resolution instead of embedding local database ids.
+- Describe downloadable bytes as Artifacts; do not download them during projection.
+- Make export renderers deterministic and free of provider I/O.
+- Version semantics deliberately. A breaking payload or vocabulary change gets a new numeric version.
+
+The external example defines `software.issue@1` and reuses `chat.message@1` from `@ctxindex/profiles`; read the [checked source](https://github.com/barisgit/ctxindex-extensions/blob/main/index.ts) to see both patterns together.

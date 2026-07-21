@@ -132,7 +132,12 @@ export const extensionCommand = defineCtxCommand({
             description: 'Search Extensions across configured Catalogs.',
           },
           args: {
-            query: { type: 'positional', required: false },
+            query: {
+              type: 'positional',
+              required: false,
+              description:
+                'Optional text to match Extension names and descriptions',
+            },
             refresh: refreshArg,
             format: outputFormatArg,
           },
