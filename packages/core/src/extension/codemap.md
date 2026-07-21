@@ -16,7 +16,7 @@ Discovers exported Extension and authoring-time Catalog values from package modu
 
 ## Data & control flow
 
-1. The already acquired `@ctxindex/adapters` module namespace enters the same namespace collector used for package entries and forms the initial complete candidate; the host does not preselect its Extension exports.
+1. The already acquired `@ctxindex/official` module namespace enters the same namespace collector used for package entries and forms the initial complete candidate; the host does not preselect its Extension exports.
 2. Each configured path identifies a package root. The loader reads its manifest, resolves and imports declared entries once, collects every exported Extension root, resolves any directory sidecar relative to its entry, and atomically validates the combined candidate.
 3. Authoring inspection can validate both Extension and Catalog exports, exact-select one Catalog, and recover an inline Extension by recorded Catalog entry index and identity.
 4. Each installed record derives a managed content-addressed root, verifies its digest, exact-selects its recorded Extension id, and enters the same candidate-validation path without acquisition. Optional curation metadata changes only provenance from direct to Catalog.

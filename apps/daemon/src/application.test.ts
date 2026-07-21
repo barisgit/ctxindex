@@ -1157,7 +1157,7 @@ test('search forwards query-less and resumed exact-Source remote pagination', as
   const first = await app.search.query(
     {
       sourceIds: ['work-outlook'],
-      kind: 'communication.message',
+      kind: 'mail.message',
       limit: 50,
       remote: true,
     },
@@ -1175,7 +1175,7 @@ test('search forwards query-less and resumed exact-Source remote pagination', as
   })
   expect(inputs[0]).toMatchObject({
     sourceIds: ['01ARZ3NDEKTSV4RRFFQ69G5FAV'],
-    kind: 'communication.message',
+    kind: 'mail.message',
     limit: 50,
     remote: true,
   })
@@ -1183,7 +1183,7 @@ test('search forwards query-less and resumed exact-Source remote pagination', as
   const resumed = await app.search.query(
     {
       sourceIds: ['work-outlook'],
-      kind: 'communication.message',
+      kind: 'mail.message',
       limit: 50,
       remote: true,
       continuation: 'opaque-next-page',
@@ -1198,7 +1198,7 @@ test('search forwards query-less and resumed exact-Source remote pagination', as
   })
   expect(inputs[1]).toMatchObject({
     sourceIds: ['01ARZ3NDEKTSV4RRFFQ69G5FAV'],
-    kind: 'communication.message',
+    kind: 'mail.message',
     limit: 50,
     remote: true,
     continuation: 'opaque-next-page',

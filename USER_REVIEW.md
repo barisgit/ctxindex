@@ -75,7 +75,7 @@ Why your review matters: this fixes the canonical vocabulary boundary for V1.
 
 Please confirm that V1 bundles exactly:
 
-- `communication.message@1`
+- `mail.message@1`
 - `calendar.event@1`
 - `file@1`
 

@@ -3,7 +3,7 @@ import { DemoQuickstart } from '@/components/demo-quickstart'
 import { DEMO_VIDEO_READY, DemoVideo } from '@/components/demo-video'
 
 const contextKinds = [
-  ['mail', 'communication.message'],
+  ['mail', 'mail.message'],
   ['calendars', 'calendar.event'],
   ['files', 'file'],
   ['Extensions', 'your.profile'],

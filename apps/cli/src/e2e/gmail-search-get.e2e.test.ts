@@ -77,7 +77,7 @@ test('mocked Gmail remote search and cached get use stable canonical Refs', asyn
       results: [
         {
           ref,
-          profile: { id: 'communication.message', version: 1 },
+          profile: { id: 'mail.message', version: 1 },
           sourceId,
           origin: 'provider',
           originRank: 0,
@@ -89,7 +89,7 @@ test('mocked Gmail remote search and cached get use stable canonical Refs', asyn
       ],
       warnings: [],
     })
-    expect(ref).not.toContain('/communication.message/')
+    expect(ref).not.toContain('/mail.message/')
     expect(mock.readRequests()).toEqual([
       {
         method: 'GET',
@@ -113,7 +113,7 @@ test('mocked Gmail remote search and cached get use stable canonical Refs', asyn
       resource: {
         ref,
         sourceId,
-        profile: { id: 'communication.message', version: 1 },
+        profile: { id: 'mail.message', version: 1 },
         origin: 'adhoc',
         title: 'ctxindex mock hello',
         payload: {

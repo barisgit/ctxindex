@@ -24,7 +24,7 @@ Houses external Extension examples that demonstrate the public authoring contrac
 ## Integration points
 
 - Workspace boundary: the root manifest includes `examples/*`; the dependency verifier scans each example's production and test imports while allowing dependencies only on public `packages/*` workspaces.
-- Public authoring API: `@ctxindex/extension-sdk` factories and SDK-exported `z`. The demo's package entry bundles the SDK runtime; `@ctxindex/core` and `@ctxindex/adapters` remain test-only workspace dependencies for package discovery and built-in isolation checks.
+- Public authoring API: `@ctxindex/extension-sdk` factories and SDK-exported `z`. The demo's package entry bundles the SDK runtime; `@ctxindex/core` and `@ctxindex/official` remain test-only workspace dependencies for package discovery and built-in isolation checks.
 - Fixture input: `examples/tenders-extension/fixtures.ts` (`TENDER_FIXTURES`, `TenderFixture`).
 - Runtime boundary: package-entry discovery, exported-value collection, complete-registry validation, and sync `context.emit()`.
 - Provider-backed proof: `examples/issues-extension/` uses reserved `.invalid` endpoints and a test-injected fetch fixture; no live provider egress or secret state is required.

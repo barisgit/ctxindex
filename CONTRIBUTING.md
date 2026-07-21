@@ -65,7 +65,7 @@ manifest and installs that exact tarball with temporary
 `CTXINDEX_*_HOME` paths. Run the focused package checks from the repository root:
 
 ```sh
-bun test scripts/verify/cli-package.test.ts scripts/release/cli-package.test.ts
+bun test tests/tooling/verify/cli-package.test.ts tests/tooling/release/cli-package.test.ts
 bun run pack:cli-package
 bun run smoke:cli-package -- dist/npm/artifacts/ctxindex-<version>.tgz
 ```

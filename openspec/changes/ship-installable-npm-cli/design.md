@@ -15,7 +15,7 @@ The distribution must preserve Bun 1.3.14 behavior, embedded migration SQL and s
 
 **Non-Goals:**
 
-- Publishing `@ctxindex/core`, `@ctxindex/adapters`, `@ctxindex/profiles`, or `@ctxindex/extension-sdk`.
+- Publishing `@ctxindex/core`, `@ctxindex/official`, `@ctxindex/profiles`, or `@ctxindex/extension-sdk`.
 - Replacing the compiled-executable verification path or changing CLI/domain behavior.
 - Publishing from this change, handling npm credentials, or changing user/provider state.
 - Adding a Node runtime target or platform-specific npm packages.

@@ -6,8 +6,8 @@ import { createSandbox, type Sandbox } from '@ctxindex/core/testing'
 import { type MockGraphMessage, startMockGraph } from './_mock-graph'
 import { installLoopbackBrowser } from './_oauth-account'
 
-const createDraftActionId = 'communication.message.draft.create'
-const updateDraftActionId = 'communication.message.draft.update'
+const createDraftActionId = 'mail.message.draft.create'
+const updateDraftActionId = 'mail.message.draft.update'
 const syntheticReplyId = `${'R'.repeat(143)}=`
 
 function parseSourceId(stdout: string): string {
@@ -228,7 +228,7 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
         '--source',
         workSourceLabel,
         '--kind',
-        'communication.message',
+        'mail.message',
         '--limit',
         '100',
         '--format',
@@ -272,7 +272,7 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
         '--source',
         workSourceLabel,
         '--kind',
-        'communication.message',
+        'mail.message',
         '--limit',
         '100',
         '--continuation',
@@ -317,7 +317,7 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
         '--source',
         workSourceLabel,
         '--kind',
-        'communication.message',
+        'mail.message',
         '--field',
         'unread=true',
         '--limit',
@@ -347,7 +347,7 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
         '--source',
         workSourceLabel,
         '--kind',
-        'communication.message',
+        'mail.message',
         '--limit',
         '100',
         '--offset',
@@ -368,7 +368,7 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
         '--source',
         workSourceLabel,
         '--kind',
-        'communication.message',
+        'mail.message',
         '--limit',
         '100',
         '--continuation',
@@ -839,7 +839,7 @@ test('binary CLI runs provider-neutral Outlook read and artifact workflow', asyn
       [
         'action',
         'run',
-        'communication.message.draft.send',
+        'mail.message.draft.send',
         '--source',
         workSourceLabel,
         '--input',

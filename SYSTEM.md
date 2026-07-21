@@ -4,7 +4,7 @@
 >
 > **Last refreshed:** 2026-07-21
 >
-> **Sources consulted for this refresh:** `CONTEXT.md`; the current `cli-surface`, `search-routing`, `documentation-consumption`, `extension-documentation`, `extension-installation`, `extension-catalogs`, `extension-loading`, and `sync-operations` capability specs; their present implementation sidecars, including `daemon-operation-streams`; the active `stream-daemon-operations`, `route-extension-docs-through-daemon`, `automate-daemon-lifecycle`, `unify-cli-output-formats`, `unify-cli-command-model`, and `rebuild-product-extension-sdk-docs` artifacts; and affected CLI, core, RPC, daemon, distribution, web, and Extension codemaps. Canonical capability specs take precedence over older pre-alpha interface listings. Section 13 retains the full source map.
+> **Sources consulted for this refresh:** `CONTEXT.md`; the current `cli-surface`, `search-routing`, `documentation-consumption`, `extension-documentation`, `extension-installation`, `extension-catalogs`, `extension-loading`, `module-architecture`, and `sync-operations` capability specs; their present implementation sidecars, including `daemon-operation-streams`; the active `stream-daemon-operations`, `route-extension-docs-through-daemon`, `automate-daemon-lifecycle`, `unify-cli-output-formats`, `unify-cli-command-model`, `rebuild-product-extension-sdk-docs`, and `rename-official-integration-package` artifacts; and affected CLI, core, RPC, daemon, distribution, web, and Extension codemaps. Canonical capability specs take precedence over older pre-alpha interface listings. Section 13 retains the full source map.
 
 ## 1. 10-minute tour
 
@@ -104,7 +104,7 @@ The CLI is the sole agent integration surface. Agents compose generic commands w
 
 The public landing and documentation web surface is a non-normative projection of those contracts. Documentation pages are prerendered, while site search needs a compatible Next.js server or serverless runtime. The site stores no ctxindex user or provider state and does not operate a hosted Extension marketplace. The current Marketplace is a local deterministic search over configured Catalog snapshots, not a hosted registry.
 
-Package responsibilities are stable: the public unscoped `ctxindex` package parses, composes, formats, and maps final exits; private workspace packages `@ctxindex/extension-sdk`, `@ctxindex/core`, `@ctxindex/profiles`, and `@ctxindex/adapters` respectively own pure Extension/Catalog authoring contracts, provider-neutral Catalog generation and generic installation plus runtime/storage, bundled vocabulary, and provider transport and normalization. The prototype adds three private boundaries without promoting them into released doctrine: `@ctxindex/rpc` is composition-only wire schema/router code; `@ctxindex/local-daemon` owns canonical runtime identity, discovery, endpoints, and retained leases; and `apps/daemon` owns background runtime composition, SQLite, the immutable Extension registry, request tracking, and local transport.
+Package responsibilities are stable: the public unscoped `ctxindex` package parses, composes, formats, and maps final exits; private workspace packages `@ctxindex/extension-sdk`, `@ctxindex/core`, and `@ctxindex/profiles` respectively own pure Extension/Catalog authoring contracts, provider-neutral Catalog generation and generic installation plus runtime/storage, and bundled vocabulary. `@ctxindex/official` distributes the ctxindex-maintained Providers, OAuth Apps, Source Adapters, shared transports, documentation trees, and Extension roots; generic Adapter authoring contracts remain in the SDK. The prototype adds three private boundaries without promoting them into released doctrine: `@ctxindex/rpc` is composition-only wire schema/router code; `@ctxindex/local-daemon` owns canonical runtime identity, discovery, endpoints, and retained leases; and `apps/daemon` owns background runtime composition, SQLite, the immutable Extension registry, request tracking, and local transport.
 
 ## 3. Domain model
 
@@ -131,7 +131,7 @@ Package responsibilities are stable: the public unscoped `ctxindex` package pars
 | **Field Index** | Generic typed rows projected from Profile fields. |
 | **Sync Run** | One recorded refresh attempt, separate from current Source state. |
 
-Internal row ids are not Refs; the public Resource identity is its Source-scoped Ref. Provider and local identifiers may appear in Source-scoped Resource Refs, envelope metadata, or typed Profile fields, but core has no separate external-reference store. For `communication.message`, the normalized RFC `Message-ID` header value is the typed `rfcMessageId` Profile field. The same provider record exposed by two Sources remains two Resources; natural-key Relations resolve typed fields through the Field Index with zero-to-many exact-value matches across Sources and Realms, without collapsing Source-scoped identities. Relations are order-independent and bidirectional, and may resolve after a target arrives. Generic threading uses conversation and parent edges rather than mail-specific tables.
+Internal row ids are not Refs; the public Resource identity is its Source-scoped Ref. Provider and local identifiers may appear in Source-scoped Resource Refs, envelope metadata, or typed Profile fields, but core has no separate external-reference store. For `mail.message`, the normalized RFC `Message-ID` header value is the typed `rfcMessageId` Profile field. The same provider record exposed by two Sources remains two Resources; natural-key Relations resolve typed fields through the Field Index with zero-to-many exact-value matches across Sources and Realms, without collapsing Source-scoped identities. Relations are order-independent and bidirectional, and may resolve after a target arrives. Generic threading uses conversation and parent edges rather than mail-specific tables.
 
 ## 4. Trust boundaries and security model
 
@@ -256,8 +256,8 @@ Profiles declare Action id, input schema, output Profile, effect, docs, and exam
 
 V1 exposes exactly:
 
-- `communication.message.draft.create`
-- `communication.message.draft.update`
+- `mail.message.draft.create`
+- `mail.message.draft.update`
 
 Google and Microsoft mailbox Adapters bind the same strict provider-independent unions. Standalone create returns a normalized message Resource; standalone update replaces complete recipients, subject, and text for an existing same-Source Draft while preserving its Ref.
 

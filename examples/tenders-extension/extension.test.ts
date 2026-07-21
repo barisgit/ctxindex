@@ -73,7 +73,7 @@ describe('official instant-demo tenders Extension', () => {
       version: '0.1.0',
       license: 'MIT',
       ctxindex: { extensions: ['./demo-extension.js'] },
-      devDependencies: { '@ctxindex/extension-sdk': '0.0.0' },
+      devDependencies: { '@ctxindex/extension-sdk': '0.1.0' },
     })
     const resolved = await resolvePackageEntries(packageRoot, manifest, {
       origin: 'explicit-path',
@@ -127,7 +127,7 @@ test('uses ordinary public SDK imports and is not bundled', async () => {
   }
   expect(sdkImportCount).toBe(1)
 
-  const { CTXINDEX_BUILTIN_EXTENSIONS } = await import('@ctxindex/adapters')
+  const { CTXINDEX_BUILTIN_EXTENSIONS } = await import('@ctxindex/official')
   expect(
     CTXINDEX_BUILTIN_EXTENSIONS.some(
       (extension) => String(extension.id) === 'ctxindex.demo',

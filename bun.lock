@@ -16,15 +16,15 @@
     },
     "apps/cli": {
       "name": "ctxindex",
-      "version": "0.0.0",
+      "version": "0.1.1",
       "bin": {
         "ctxindex": "dist/ctxindex.mjs",
       },
       "devDependencies": {
-        "@ctxindex/adapters": "workspace:*",
         "@ctxindex/core": "workspace:*",
         "@ctxindex/extension-sdk": "workspace:*",
         "@ctxindex/local-daemon": "workspace:*",
+        "@ctxindex/official": "workspace:*",
         "@ctxindex/rpc": "workspace:*",
         "@orpc/client": "1.14.8",
         "citty": "latest",
@@ -36,9 +36,9 @@
       "name": "@ctxindex/daemon",
       "version": "0.0.0",
       "dependencies": {
-        "@ctxindex/adapters": "workspace:*",
         "@ctxindex/core": "workspace:*",
         "@ctxindex/local-daemon": "workspace:*",
+        "@ctxindex/official": "workspace:*",
         "@ctxindex/rpc": "workspace:*",
         "@orpc/server": "1.14.8",
       },
@@ -75,8 +75,8 @@
         "@ctxindex/extension-sdk": "workspace:*",
       },
       "devDependencies": {
-        "@ctxindex/adapters": "workspace:*",
         "@ctxindex/core": "workspace:*",
+        "@ctxindex/official": "workspace:*",
       },
     },
     "examples/issues-extension": {
@@ -93,22 +93,9 @@
       "name": "@ctxindex/demo-tenders",
       "version": "0.1.0",
       "devDependencies": {
-        "@ctxindex/adapters": "0.0.0",
         "@ctxindex/core": "0.0.0",
         "@ctxindex/extension-sdk": "0.0.0",
-      },
-    },
-    "packages/adapters": {
-      "name": "@ctxindex/adapters",
-      "version": "0.0.0",
-      "dependencies": {
-        "@ctxindex/core": "workspace:*",
-        "@ctxindex/extension-sdk": "workspace:*",
-        "@ctxindex/profiles": "workspace:*",
-        "file-type": "latest",
-        "ignore": "latest",
-        "linkedom": "latest",
-        "zod": "latest",
+        "@ctxindex/official": "0.0.0",
       },
     },
     "packages/core": {
@@ -131,14 +118,27 @@
     },
     "packages/extension-sdk": {
       "name": "@ctxindex/extension-sdk",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
-        "zod": "latest",
+        "zod": "^4.4.3",
       },
     },
     "packages/local-daemon": {
       "name": "@ctxindex/local-daemon",
       "version": "0.0.0",
+    },
+    "packages/official": {
+      "name": "@ctxindex/official",
+      "version": "0.0.0",
+      "dependencies": {
+        "@ctxindex/core": "workspace:*",
+        "@ctxindex/extension-sdk": "workspace:*",
+        "@ctxindex/profiles": "workspace:*",
+        "file-type": "latest",
+        "ignore": "latest",
+        "linkedom": "latest",
+        "zod": "latest",
+      },
     },
     "packages/profiles": {
       "name": "@ctxindex/profiles",
@@ -189,8 +189,6 @@
 
     "@colors/colors": ["@colors/colors@1.5.0", "", {}, "sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ=="],
 
-    "@ctxindex/adapters": ["@ctxindex/adapters@workspace:packages/adapters"],
-
     "@ctxindex/core": ["@ctxindex/core@workspace:packages/core"],
 
     "@ctxindex/daemon": ["@ctxindex/daemon@workspace:apps/daemon"],
@@ -204,6 +202,8 @@
     "@ctxindex/extension-sdk": ["@ctxindex/extension-sdk@workspace:packages/extension-sdk"],
 
     "@ctxindex/local-daemon": ["@ctxindex/local-daemon@workspace:packages/local-daemon"],
+
+    "@ctxindex/official": ["@ctxindex/official@workspace:packages/official"],
 
     "@ctxindex/profiles": ["@ctxindex/profiles@workspace:packages/profiles"],
 

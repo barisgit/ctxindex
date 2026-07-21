@@ -85,7 +85,7 @@ describe('export command', () => {
     })
     const run = async () => {
       throw new UnsupportedExportFormatError(
-        { id: 'communication.message', version: 1 },
+        { id: 'mail.message', version: 1 },
         'mbox',
         ['eml', 'json'],
       )
@@ -96,7 +96,7 @@ describe('export command', () => {
     )
     expect(closed).toBe(true)
     expect(error).toHaveBeenCalledWith(
-      expect.stringContaining('communication.message@1'),
+      expect.stringContaining('mail.message@1'),
     )
     error.mockRestore()
   })

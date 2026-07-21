@@ -18,8 +18,8 @@ const sourceB = '01ARZ3NDEKTSV4RRFFQ69G5FAW'
 const sourceC = '01ARZ3NDEKTSV4RRFFQ69G5FAX'
 const dbs: Database[] = []
 
-const communicationMessageTestProfile = defineProfile({
-  id: 'communication.message',
+const mailMessageTestProfile = defineProfile({
+  id: 'mail.message',
   version: 1,
   schema: z.object({
     providerMessageId: z.string(),
@@ -112,15 +112,15 @@ async function setupMessages(messages: readonly Message[]) {
   insertSource.run(sourceB, 'work', 'fake', sourceB, '{}', 1, 1)
   insertSource.run(sourceC, 'archive', 'fake', sourceC, '{}', 1, 1)
   dbs.push(db)
-  const profiles = createProfileRegistry([communicationMessageTestProfile])
+  const profiles = createProfileRegistry([mailMessageTestProfile])
   const resources = new ResourceStore(db, profiles)
   for (const message of messages) {
     resources.upsert({
       ref: messageRef(message.sourceId, message.key),
       sourceId: message.sourceId,
       profile: {
-        id: communicationMessageTestProfile.id,
-        version: communicationMessageTestProfile.version,
+        id: mailMessageTestProfile.id,
+        version: mailMessageTestProfile.version,
       },
       origin: 'synced',
       completeness: 'complete',

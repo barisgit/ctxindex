@@ -89,13 +89,13 @@ test('interpreted registry interface follows an explicit external Extension', as
     const text = await run(['describe', 'action'])
     expect(text.exitCode, text.stderr).toBe(0)
     expect(text.stdout).toContain('ACTIONS (2)')
-    expect(text.stdout).toContain('communication.message.draft.create')
+    expect(text.stdout).toContain('mail.message.draft.create')
     expect(text.stdout).not.toContain('input:')
 
     const actionDetail = await run([
       'describe',
       'action',
-      'communication.message.draft.create',
+      'mail.message.draft.create',
     ])
     expect(actionDetail.exitCode, actionDetail.stderr).toBe(0)
     expect(actionDetail.stdout).toContain('  input:\n    branch 1:')
@@ -113,13 +113,13 @@ test('interpreted registry interface follows an explicit external Extension', as
     const actionJson = await run([
       'describe',
       'action',
-      'communication.message.draft.create',
+      'mail.message.draft.create',
       '--format',
       'json',
     ])
     expect(actionJson.exitCode, actionJson.stderr).toBe(0)
     expect(JSON.parse(actionJson.stdout)).toMatchObject({
-      id: 'communication.message.draft.create',
+      id: 'mail.message.draft.create',
       input: {
         $schema: 'https://json-schema.org/draft/2020-12/schema',
         anyOf: [
@@ -151,7 +151,7 @@ test('interpreted registry interface follows an explicit external Extension', as
     const actionMarkdown = await run([
       'describe',
       'action',
-      'communication.message.draft.create',
+      'mail.message.draft.create',
       '--format',
       'markdown',
     ])

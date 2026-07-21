@@ -1,9 +1,9 @@
-import * as builtins from '@ctxindex/adapters'
 import { defaultConfig } from '@ctxindex/core/config'
 import {
   importExtensionDefinition,
   loadExtensions,
 } from '@ctxindex/core/extension'
+import * as builtins from '@ctxindex/official'
 
 const packageRoot = process.argv[2]
 if (!packageRoot) {

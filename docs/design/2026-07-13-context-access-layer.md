@@ -148,7 +148,7 @@ Profile vocabulary slots (V1, each versioned):
 
 ```ts
 defineProfile({
-  id: "communication.message",
+  id: "mail.message",
   version: 1,
   schema: z.object({ ... }),          // payload validation, types derive from it
   search: {
@@ -170,10 +170,10 @@ defineProfile({
     eml: { mediaType: "message/rfc822", render: renderEml },
   },
   actions: {
-    "communication.message.draft.create": {
+    "mail.message.draft.create": {
       effect: "reversible",
       input: z.object({ to: z.array(z.string()), subject: z.string(), bodyText: z.string() }),
-      output: { profile: "communication.message" },
+      output: { profile: "mail.message" },
       docs: "Persist a provider Draft through an explicit mailbox Source",
     },
   },
@@ -195,7 +195,7 @@ Rules:
 4. **No speculative migration (D22)** — V1 records version `1`, but no payload
    migration mechanism exists until a second real Profile version requires one.
 
-Canonical Profiles bundled with the binary: `communication.message@1`, `calendar.event@1`, and `file@1`.
+Canonical Profiles bundled with the binary: `mail.message@1`, `chat.message@1`, `calendar.event@1`, and `file@1`.
 External Extensions may define additional Profiles through the same public API;
 V1 does not pre-select future task or conversation Profile domains or additional
 export formats. Conversation behavior uses message Relations, and Artifacts are
@@ -360,7 +360,7 @@ Grant.
 Profiles declare provider-independent Action ids, input/output schemas, effect
 classification, docs, and examples. Adapters bind implementations through a
 specific Source and its existing auth context. V1 implements only reversible
-`communication.message.draft.create` and `.update`; sending and other provider
+`mail.message.draft.create` and `.update`; sending and other provider
 mutations are deferred. Agent composition and approval remain workflow policy.
 
 Gmail Draft identity uses the provider's immutable Draft id, not the embedded
@@ -406,7 +406,7 @@ Authoring — top-level pure factories, pi-style:
 
 ```ts
 import { defineAdapter, defineExtension, defineProfile } from "@ctxindex/extension-sdk";
-import { communication } from "@ctxindex/profiles";  // typed descriptors of bundled profiles
+import { mailMessageProfile } from "@ctxindex/profiles";  // canonical email Profile
 ```
 
 - Factories return plain versioned definition objects; no module-level mutable
@@ -480,10 +480,10 @@ ctxindex secrets backend set <keychain|file>
 Search results and Source descriptions carry machine-readable affordances so
 agents never need provider knowledge: ref, kind, snippet, and available
 operations/Actions derived from Adapter capabilities + Profile vocabulary
-(`get`, `export:eml`, `download`, `communication.message.draft.create`).
+(`get`, `export:eml`, `download`, `mail.message.draft.create`).
 
 Example verb collapse: the Hermes CLI's bespoke `mail senders` becomes
-`ctxindex aggregate --field sender --kind communication.message --since 365d --top 50 --format json`.
+`ctxindex aggregate --field sender --kind mail.message --since 365d --top 50 --format json`.
 
 ## 11. Documentation ownership
 

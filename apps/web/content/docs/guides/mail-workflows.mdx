@@ -3,7 +3,7 @@ title: Mail workflows
 description: Search multiple mail accounts, retrieve threads, and create reversible provider Drafts.
 ---
 
-ctxindex presents Gmail and Outlook messages through the provider-neutral `communication.message` Profile. Each mailbox is a Source attached to one Account and one Realm, while search can span Sources and providers.
+ctxindex presents Gmail and Outlook messages through the provider-neutral `mail.message` Profile. Each mailbox is a Source attached to one Account and one Realm, while search can span Sources and providers.
 
 ## Search across accounts
 
@@ -41,7 +41,7 @@ To list recent unread mail without inventing query text, select one remote mailb
 ```sh
 ctxindex search --remote \
   --source company-mail \
-  --kind communication.message \
+  --kind mail.message \
   --field unread=true \
   --since 2026-07-01 \
   --limit 50 \
@@ -49,7 +49,7 @@ ctxindex search --remote \
 
 ctxindex search --remote \
   --source company-mail \
-  --kind communication.message \
+  --kind mail.message \
   --field unread=true \
   --since 2026-07-01 \
   --limit 50 \
@@ -90,7 +90,7 @@ ctxindex thread 'ctx://01J00000000000000000000000/message/stable-message-id' --f
 A Draft is reversible provider state, not text that exists only in an agent conversation. Inspect the live Action schema before constructing input:
 
 ```sh
-ctxindex describe action communication.message.draft.create \
+ctxindex describe action mail.message.draft.create \
   --source company-mail \
   --format json
 ```
@@ -107,13 +107,13 @@ cat > /tmp/new-draft.json <<'JSON'
 }
 JSON
 
-ctxindex action run communication.message.draft.create \
+ctxindex action run mail.message.draft.create \
   --source company-mail \
   --input /tmp/new-draft.json \
   --format json
 ```
 
-Both Gmail and Outlook mailbox Adapters implement this Action. The result returns a normalized `communication.message` Resource Ref for the provider-persisted Draft.
+Both Gmail and Outlook mailbox Adapters implement this Action. The result returns a normalized `mail.message` Resource Ref for the provider-persisted Draft.
 
 ## Create a threaded reply Draft
 
@@ -133,7 +133,7 @@ cat > /tmp/reply-draft.json <<'JSON'
 }
 JSON
 
-ctxindex action run communication.message.draft.create \
+ctxindex action run mail.message.draft.create \
   --source company-mail \
   --input /tmp/reply-draft.json \
   --format json
@@ -146,7 +146,7 @@ The parent must belong to `company-mail`, be locally complete, and contain the p
 Inspect the current update union before constructing input:
 
 ```sh
-ctxindex describe action communication.message.draft.update \
+ctxindex describe action mail.message.draft.update \
   --source company-mail \
   --format json
 ```
@@ -165,7 +165,7 @@ cat > /tmp/updated-draft.json <<'JSON'
 }
 JSON
 
-ctxindex action run communication.message.draft.update \
+ctxindex action run mail.message.draft.update \
   --source company-mail \
   --input /tmp/updated-draft.json \
   --format json
@@ -185,7 +185,7 @@ cat > /tmp/updated-reply-draft.json <<'JSON'
 }
 JSON
 
-ctxindex action run communication.message.draft.update \
+ctxindex action run mail.message.draft.update \
   --source company-mail \
   --input /tmp/updated-reply-draft.json \
   --format json

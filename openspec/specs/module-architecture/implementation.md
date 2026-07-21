@@ -17,8 +17,9 @@ These listings prioritize interfaces, type aliases, discriminated unions, and fu
   public authoring contracts and generic definition factories
 @ctxindex/profiles
   bundled provider-neutral Profile definitions
-@ctxindex/adapters
-  bundled provider implementations
+@ctxindex/official
+  official Providers, OAuth Apps, Source Adapters, shared transports,
+  documentation trees, and Extension roots
 ```
 
 ### @ctxindex/extension-sdk — imported-value authoring boundary
@@ -52,10 +53,10 @@ export async function loadExtensions(
 
 ctxindex is a Bun and TypeScript monorepo; Node is not a build target. Bun remains pinned through `packageManager` at 1.3.14. The distribution target is the CLI entrypoint compiled with `bun build --compile`; migration SQL is imported as text and bundled skills are embedded so relocated binaries retain both.
 
-The CLI composes services, parses arguments, formats output, and maps errors. It owns no provider HTTP, SQL, identity generation, or domain behavior. Core owns orchestration, persistence, the source-neutral `ctxindex.extensions` entry resolver, namespace/root and reachable-leaf collectors, conservative duplicate handling, complete-registry validation, and atomic activation. Providers own auth and OAuth App registration contracts; Profiles own provider-neutral validation and projections; Adapters own Provider access, transport, normalization, operations, and Actions; the SDK owns core-independent plain-value authoring contracts. Extension roots only compose imported values and may declare one documentation sidecar, while package tooling owns dependencies. Core resolves sidecars before registry activation and excludes them from definition equivalence. Built-in, explicit-path, and Catalog origins enter the same collector and activation boundary.
+The CLI composes services, parses arguments, formats output, and maps errors. It owns no provider HTTP, SQL, identity generation, or domain behavior. Core owns orchestration, persistence, the source-neutral `ctxindex.extensions` entry resolver, namespace/root and reachable-leaf collectors, conservative duplicate handling, complete-registry validation, and atomic activation. Providers own auth and OAuth App registration contracts; Profiles own provider-neutral validation and projections; Adapters own Provider access, transport, normalization, operations, and Actions; the SDK owns core-independent plain-value authoring contracts. `@ctxindex/official` distributes ctxindex-maintained Providers, OAuth Apps, Source Adapters, shared transports, documentation trees, and Extension roots without owning generic Adapter contracts. Extension roots only compose imported values and may declare one documentation sidecar, while package tooling owns dependencies. Core resolves sidecars before registry activation and excludes them from definition equivalence. Built-in, explicit-path, and Catalog origins enter the same collector and activation boundary.
 
 The repository is pre-alpha. Implementation starts from the fresh schema and adds no prototype compatibility or data migration path.
 
 ## Verification
 
-Use Bun's colocated unit/integration/e2e tests. Storage tests create fresh sandboxes; provider tests use loopback-only authorized HTTP. `scripts/verify/architecture-lint.ts`, package-dependency checks, SDK inference fixtures, common-origin activation tests, documentation resolver/projection tests, and relocated compiled-host and CLI tests enforce this shape. Verification rejects leaf documentation, reference/dependency/host-callback surfaces, providerless authorization fields, origin-specific registration, and pre-validation registry mutation.
+Use Bun's colocated unit/integration/e2e tests. Storage tests create fresh sandboxes; provider tests use loopback-only authorized HTTP. `scripts/verify/architecture-lint.ts`, package-dependency checks, the stale official-package-name check, SDK inference fixtures, common-origin activation tests, documentation resolver/projection tests, and relocated compiled-host and CLI tests enforce this shape. Verification rejects stale current references to the superseded official-package coordinate, leaf documentation, reference/dependency/host-callback surfaces, providerless authorization fields, origin-specific registration, and pre-validation registry mutation.

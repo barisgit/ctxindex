@@ -561,7 +561,7 @@ test('relocated compiled CLI manages direct npm, Git, and local pins offline', a
       [
         'describe',
         'action',
-        'communication.message.draft.create',
+        'mail.message.draft.create',
         '--source',
         'fixture-source',
         '--format',

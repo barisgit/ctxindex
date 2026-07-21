@@ -22,6 +22,6 @@ Provides the public, credential-free GitHub Issues demonstration Extension. The 
 
 ## Integration
 
-- Runtime dependency: `@ctxindex/extension-sdk`; `@ctxindex/core` and `@ctxindex/adapters` are package-test dev dependencies for package discovery and built-in isolation checks.
+- Runtime dependency: `@ctxindex/extension-sdk`; `@ctxindex/core` and `@ctxindex/official` are package-test dev dependencies for package discovery and built-in isolation checks.
 - Network boundary: only `https://api.github.com/repos/{owner}/{repository}/issues` through operation-context fetch; no token, OAuth app, secret state, DOM scraping, or live provider contact in automated tests.
 - Website handoff: `website-handoff.ts` defines the intended website/demo integration contract for the extension path, IDs, Realm/Source labels, and `barisgit/ctxindex` then `octocat/Hello-World` fallback configuration. No production consumer exists in this change set yet.

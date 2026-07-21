@@ -24,8 +24,8 @@ import {
 import { installLoopbackBrowser } from './_oauth-account'
 
 const repoRoot = new URL('../../../../', import.meta.url).pathname
-const createDraft = 'communication.message.draft.create'
-const updateDraft = 'communication.message.draft.update'
+const createDraft = 'mail.message.draft.create'
+const updateDraft = 'mail.message.draft.update'
 
 function parseSourceId(stdout: string): string {
   const match = /^source added: (.+)$/m.exec(stdout)
@@ -748,7 +748,7 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
     const unknown = await run([
       'action',
       'run',
-      'communication.message.draft.send',
+      'mail.message.draft.send',
       '--source',
       workOutlookLabel,
       '--input',

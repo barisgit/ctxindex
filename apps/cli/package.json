@@ -1,6 +1,6 @@
 {
   "name": "ctxindex",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local personal-context gateway CLI for agents",
   "license": "MIT",
   "homepage": "https://ctxindex.com",
@@ -42,7 +42,7 @@
     "fullclean": "rm -rf .turbo dist coverage node_modules"
   },
   "devDependencies": {
-    "@ctxindex/adapters": "workspace:*",
+    "@ctxindex/official": "workspace:*",
     "@ctxindex/core": "workspace:*",
     "@ctxindex/extension-sdk": "workspace:*",
     "@ctxindex/local-daemon": "workspace:*",

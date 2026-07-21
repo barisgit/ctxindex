@@ -27,7 +27,7 @@ Do not hard-code kinds, Source options, formats, or Action schemas when the regi
 ```sh
 ctxindex describe --full --format json
 ctxindex source list --format json
-ctxindex describe profile communication.message --format json
+ctxindex describe profile mail.message --format json
 ctxindex describe adapter google.calendar --format json
 ```
 
@@ -75,7 +75,7 @@ Use the returned thread to summarize a conversation or establish reply context. 
 Inspect the Action before generating input:
 
 ```sh
-ctxindex describe action communication.message.draft.create \
+ctxindex describe action mail.message.draft.create \
   --source company-mail \
   --format json
 ```
@@ -91,7 +91,7 @@ cat > /tmp/ctxindex-draft.json <<'JSON'
 }
 JSON
 
-ctxindex action run communication.message.draft.create \
+ctxindex action run mail.message.draft.create \
   --source company-mail \
   --input /tmp/ctxindex-draft.json \
   --format json
@@ -104,7 +104,7 @@ For a threaded reply, first use `get` to materialize a complete parent in the sa
 ```sh
 ctxindex get 'ctx://01J00000000000000000000000/message/stable-message-id' --format json
 
-ctxindex action run communication.message.draft.create \
+ctxindex action run mail.message.draft.create \
   --source company-mail \
   --input '{"replyToRef":"ctx://01J00000000000000000000000/message/stable-message-id","bodyText":"Thanks for the update."}' \
   --format json

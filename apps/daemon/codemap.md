@@ -21,5 +21,5 @@ Packages the Bun-executed local ctxindex daemon application: production service 
 ## Integration points
 
 - Registered by the root `package.json` `apps/*` workspace pattern.
-- Depends on `@ctxindex/adapters` for built-in Extensions, `@ctxindex/core` for storage/config/services, `@ctxindex/local-daemon` for identity/discovery/leases, `@ctxindex/rpc` for contract/router composition, and `@orpc/server` for the fetch adapter.
+- Depends on `@ctxindex/official` for built-in Extensions, `@ctxindex/core` for storage/config/services, `@ctxindex/local-daemon` for identity/discovery/leases, `@ctxindex/rpc` for contract/router composition, and `@orpc/server` for the fetch adapter.
 - Detailed map: `apps/daemon/src/codemap.md`.
