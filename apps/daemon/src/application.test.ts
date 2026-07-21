@@ -1393,7 +1393,10 @@ test('resource failures preserve every auth and sync taxonomy code through RPC',
       kind: 'ctxindex',
       taxonomy: 'sync',
       code,
-      message: 'The daemon could not complete the request.',
+      message:
+        code === 'not_found'
+          ? 'The provider resource was not found (status 404).'
+          : 'The daemon could not complete the request.',
       ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
     })
   }
@@ -1471,19 +1474,37 @@ test('raw errors cannot impersonate trusted public validation failures', async (
   expect(JSON.stringify(result)).not.toContain(canary)
 })
 
-test('Artifact download preserves trusted unsupported and provider-network failures through RPC', async () => {
-  for (const [code, taxonomy, message] of [
+test('Artifact download preserves trusted failure parity without exposing private diagnostics', async () => {
+  for (const [code, taxonomy, privateMessage, publicMessage] of [
     [
       'unsupported_capability',
       'other',
-      'Source Adapter does not support Artifact download',
+      'Unsupported Artifact operation at /Users/private/cache',
+      'The Source Adapter does not support the requested capability.',
     ],
-    ['network', 'sync', 'Provider request failed'],
+    [
+      'network',
+      'sync',
+      'Provider request failed with raw response body',
+      'The provider network request failed.',
+    ],
+    [
+      'data_integrity',
+      'other',
+      'Artifact CAS object is unreadable: /Users/private/cache/object',
+      'Stored data failed integrity validation.',
+    ],
+    [
+      'output_exists',
+      'other',
+      'Output path already exists: /Users/private/output.bin',
+      'The requested output already exists.',
+    ],
   ] as const) {
     const app = application({
       artifactService: {
         download: async () => {
-          throw new CtxindexError(message, code)
+          throw new CtxindexError(privateMessage, code)
         },
       } as never,
     })
@@ -1495,33 +1516,8 @@ test('Artifact download preserves trusted unsupported and provider-network failu
           transfer: false,
         }),
       ),
-    ).toEqual({ kind: 'ctxindex', taxonomy, code, message })
+    ).toEqual({ kind: 'ctxindex', taxonomy, code, message: publicMessage })
   }
-
-  const unsafe = application({
-    artifactService: {
-      download: async () => {
-        throw new CtxindexError(
-          `unsafe control\n${'x'.repeat(600)}`,
-          'unsupported_capability',
-        )
-      },
-    } as never,
-  })
-  unsafe.markReady()
-  expect(
-    await rpcFailure(
-      clientFor(unsafe).artifact.download({
-        ref: 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/one/attachment/file',
-        transfer: false,
-      }),
-    ),
-  ).toEqual({
-    kind: 'ctxindex',
-    taxonomy: 'other',
-    code: 'unsupported_capability',
-    message: 'The daemon could not complete the request.',
-  })
 
   const raw = application({
     artifactService: {

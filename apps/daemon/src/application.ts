@@ -315,48 +315,48 @@ class StreamRendezvous<T, TReturn> {
 
 class ResultTooLargeError extends Error {}
 
-const trustedBaseSyncCodes = new Set([
-  'auth_expired',
-  'auth_revoked',
-  'rate_limited',
-  'network',
-  'provider_unavailable',
-  'provider_bad_response',
-  'provider_quota',
-  'permission_denied',
-  'cancelled',
-  'unknown',
-  'not_implemented_yet',
+const trustedSyncMessages = new Map<string, string>([
+  ['auth_expired', 'Authentication expired.'],
+  ['auth_revoked', 'Authentication was revoked.'],
+  ['rate_limited', 'The provider rate limit was reached.'],
+  ['network', 'The provider network request failed.'],
+  ['provider_unavailable', 'The provider is unavailable.'],
+  ['provider_bad_response', 'The provider returned an invalid response.'],
+  ['provider_quota', 'The provider quota was exhausted.'],
+  ['not_found', 'The provider resource was not found (status 404).'],
+  ['permission_denied', 'The provider denied permission.'],
+  ['cancelled', 'The request was cancelled.'],
+  ['unknown', 'The provider request failed.'],
+  ['not_implemented_yet', 'The requested operation is not implemented yet.'],
 ])
 
-const trustedBaseOtherCodes = new Set([
-  'adapter_unavailable',
-  'conflict',
-  'data_integrity',
-  'egress_denied',
-  'invalid_action_result',
-  'invalid_retrieve_result',
-  'invalid_source_config',
-  'output_exists',
-  'remote_search_unsupported',
-  'retrieve_unsupported',
-  'storage_busy',
-  'sync_unsupported',
-  'unsupported_capability',
+const trustedBaseOtherMessages = new Map<string, string>([
+  ['adapter_unavailable', 'The Source Adapter is unavailable.'],
+  ['conflict', 'The request conflicts with current state.'],
+  ['data_integrity', 'Stored data failed integrity validation.'],
+  ['egress_denied', 'The requested network destination is not allowed.'],
+  [
+    'invalid_action_result',
+    'The Source Adapter returned an invalid Action result.',
+  ],
+  [
+    'invalid_retrieve_result',
+    'The Source Adapter returned an invalid retrieval result.',
+  ],
+  ['invalid_source_config', 'The Source configuration is invalid.'],
+  ['output_exists', 'The requested output already exists.'],
+  [
+    'remote_search_unsupported',
+    'The Source Adapter does not support remote search.',
+  ],
+  ['retrieve_unsupported', 'The Source Adapter does not support retrieval.'],
+  ['storage_busy', 'Local storage is temporarily busy; retry the request.'],
+  ['sync_unsupported', 'The Source Adapter does not support synchronization.'],
+  [
+    'unsupported_capability',
+    'The Source Adapter does not support the requested capability.',
+  ],
 ])
-
-function boundedPublicMessage(message: string): string {
-  if (!message.isWellFormed())
-    return 'The daemon could not complete the request.'
-  for (const character of message) {
-    const code = character.codePointAt(0) ?? 0
-    if (code <= 31 || (code >= 127 && code <= 159))
-      return 'The daemon could not complete the request.'
-  }
-  return new TextEncoder().encode(message).byteLength <= 512
-    ? message
-    : 'The daemon could not complete the request.'
-}
 
 function failure(error: unknown): RpcFailure {
   if (error instanceof ResultTooLargeError) {
@@ -383,7 +383,11 @@ function failure(error: unknown): RpcFailure {
       kind: 'ctxindex',
       taxonomy: 'sync',
       code: error.code,
-      message: 'The daemon could not complete the request.',
+      message:
+        error.code === 'not_found'
+          ? (trustedSyncMessages.get(error.code) ??
+            'The daemon could not complete the request.')
+          : 'The daemon could not complete the request.',
       ...(retryAfterMs !== undefined &&
       Number.isSafeInteger(retryAfterMs) &&
       retryAfterMs >= 0 &&
@@ -427,20 +431,22 @@ function failure(error: unknown): RpcFailure {
     }
   }
   if (error instanceof CtxindexError) {
-    if (trustedBaseSyncCodes.has(error.code)) {
+    const syncMessage = trustedSyncMessages.get(error.code)
+    if (syncMessage) {
       return {
         kind: 'ctxindex',
         taxonomy: 'sync',
         code: error.code,
-        message: boundedPublicMessage(error.message),
+        message: syncMessage,
       }
     }
-    if (trustedBaseOtherCodes.has(error.code)) {
+    const otherMessage = trustedBaseOtherMessages.get(error.code)
+    if (otherMessage) {
       return {
         kind: 'ctxindex',
         taxonomy: 'other',
         code: error.code,
-        message: boundedPublicMessage(error.message),
+        message: otherMessage,
       }
     }
   }
