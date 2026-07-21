@@ -622,12 +622,7 @@ describe.skipIf(process.platform !== 'darwin')(
           }),
         )
 
-        const thread = await runCli(runtime, [
-          'thread',
-          'get',
-          resourceRef,
-          '--json',
-        ])
+        const thread = await runCli(runtime, ['thread', resourceRef, '--json'])
         expect(thread.exitCode, thread.stderr).toBe(0)
         expect(JSON.parse(thread.stdout)).toEqual(
           expect.objectContaining({
@@ -728,8 +723,8 @@ describe.skipIf(process.platform !== 'darwin')(
           ['secrets', 'status'],
           ['artifact', 'list', `ctx://${sourceId}/file/one`],
           ['export', `ctx://${sourceId}/file/one`, '--format', 'text'],
-          ['action', 'describe', 'missing.action'],
-          ['purge', 'artifacts'],
+          ['describe', 'action', 'missing.action', '--source', sourceId],
+          ['artifact', 'purge'],
         ]
         for (const args of statefulCommands) {
           const result = await runCli(runtime, args)

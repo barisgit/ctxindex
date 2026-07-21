@@ -1,11 +1,9 @@
 import {
   parseDirectExtensionTarget,
-  projectDirectExtensionRecord,
   validateDirectExtensionId,
   validateDirectPackageTarget,
 } from '@ctxindex/core'
 import { safeExtensionDiagnostic } from '@ctxindex/core/extension'
-import { parseExtensionsArgs } from '../args/extensions'
 import { printExtensionDiagnostics } from '../definitions'
 import { PrototypeUnsupportedError } from '../direct-database'
 import {
@@ -13,14 +11,11 @@ import {
   formatCatalogBuild,
   formatCatalogExtension,
   formatCatalogs,
-  formatInstalledExtension,
   formatMarketplace,
 } from '../format/catalog'
-import {
-  formatDirectExtension,
-  formatDirectExtensionUninstall,
-} from '../format/direct-extension'
+import { formatDirectExtensionUninstall } from '../format/direct-extension'
 import { mapErrorToExit } from '../format/exit'
+import { formatExtensionLifecycle } from '../format/extension-lifecycle'
 import { formatExtensions } from '../format/registry'
 import {
   createExtensionCommandServices,
@@ -40,16 +35,76 @@ export async function runWithSigintCancellation<T>(
   }
 }
 
+export type ExtensionCommandInput =
+  | { readonly kind: 'list'; readonly json: boolean }
+  | {
+      readonly kind: 'catalog-build'
+      readonly packageRoot: string
+      readonly catalogId?: string
+      readonly output?: string
+      readonly trust: boolean
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'catalog-add'
+      readonly name: string
+      readonly repository: string
+      readonly ref: string
+      readonly trust: boolean
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'catalog-list'
+      readonly noRefresh: boolean
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'catalog-show'
+      readonly name: string
+      readonly extensionId?: string
+      readonly noRefresh: boolean
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'catalog-refresh'
+      readonly name: string
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'catalog-remove'
+      readonly name: string
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'catalog-search'
+      readonly query?: string
+      readonly noRefresh: boolean
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'install'
+      readonly sourceKind: 'catalog' | 'npm' | 'git' | 'local'
+      readonly target: string
+      readonly extensionId: string
+      readonly noRefresh: boolean
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'update'
+      readonly extensionId: string
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'uninstall'
+      readonly extensionId: string
+      readonly force: boolean
+      readonly json: boolean
+    }
+
 export async function handleExtensionsCommand(
-  args: string[],
+  parsed: ExtensionCommandInput,
   services: ExtensionCommandServices = createExtensionCommandServices(),
 ): Promise<number> {
-  const parsed = parseExtensionsArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(parsed.message)
-    return 2
-  }
   try {
     switch (parsed.kind) {
       case 'list': {
@@ -149,7 +204,7 @@ export async function handleExtensionsCommand(
         )
         return 0
       }
-      case 'search': {
+      case 'catalog-search': {
         console.log(
           formatMarketplace(
             await services.catalogs.search(parsed.query, {
@@ -160,25 +215,31 @@ export async function handleExtensionsCommand(
         )
         return 0
       }
-      case 'catalog-install': {
+      case 'install': {
+        if (parsed.sourceKind !== 'catalog' && parsed.noRefresh) {
+          console.error(
+            'extension install: --no-refresh is valid only for Catalog installation',
+          )
+          return 2
+        }
+        validateDirectExtensionId(parsed.extensionId)
         console.error(
-          'Trust notice: this command acquires and executes Catalog-curated third-party Extension code in-process; validation is not a sandbox.',
+          'Trust notice: this command acquires and executes third-party Extension code in-process; validation is not a sandbox.',
         )
-        const installed = await runWithSigintCancellation((signal) =>
-          services.catalogInstallation.install({
-            catalog: parsed.catalog,
-            extensionId: parsed.extensionId,
-            trust: parsed.trust,
-            noRefresh: parsed.noRefresh,
-            signal,
-          }),
-        )
-        console.log(
-          formatInstalledExtension('Installed', installed, parsed.json),
-        )
-        return 0
-      }
-      case 'direct-install': {
+        if (parsed.sourceKind === 'catalog') {
+          const installed = await runWithSigintCancellation((signal) =>
+            services.catalogInstallation.install({
+              catalog: parsed.target,
+              extensionId: parsed.extensionId,
+              noRefresh: parsed.noRefresh,
+              signal,
+            }),
+          )
+          console.log(
+            formatExtensionLifecycle('Installed', installed, parsed.json),
+          )
+          return 0
+        }
         const target = parseDirectExtensionTarget(
           parsed.sourceKind,
           parsed.target,
@@ -188,9 +249,6 @@ export async function handleExtensionsCommand(
           },
         )
         validateDirectExtensionId(parsed.extensionId)
-        console.error(
-          'Trust notice: this command acquires and executes third-party Extension code in-process; validation is not a sandbox.',
-        )
         const installed = await runWithSigintCancellation((signal) =>
           services.direct.install({
             target,
@@ -211,48 +269,22 @@ export async function handleExtensionsCommand(
           }),
         )
         console.log(
-          formatDirectExtension(
-            'Installed',
-            projectDirectExtensionRecord(installed),
-            parsed.json,
-          ),
+          formatExtensionLifecycle('Installed', installed, parsed.json),
         )
         return 0
       }
-      case 'direct-update': {
+      case 'update': {
         validateDirectExtensionId(parsed.extensionId)
         console.error(
           'Trust notice: this command acquires and executes third-party Extension code in-process; validation is not a sandbox.',
         )
         const updated = await runWithSigintCancellation((signal) =>
-          services.direct.update({
+          services.lifecycle.update({
             extensionId: parsed.extensionId,
-            loadValidationContext: async () => {
-              const localOAuthAppIdentities =
-                await services.readOAuthAppIdentities()
-              const fresh = await services.loadDefinitions({
-                localOAuthAppIdentities,
-              })
-              return {
-                registry: fresh.registry,
-                roots: fresh.roots,
-                localOAuthAppIdentities,
-                alternateOriginAvailable: fresh.provenance.some(
-                  (entry) =>
-                    entry.id === parsed.extensionId && entry.kind !== 'direct',
-                ),
-              }
-            },
             signal,
           }),
         )
-        console.log(
-          formatDirectExtension(
-            'Updated',
-            projectDirectExtensionRecord(updated),
-            parsed.json,
-          ),
-        )
+        console.log(formatExtensionLifecycle('Updated', updated, parsed.json))
         return 0
       }
       case 'uninstall': {

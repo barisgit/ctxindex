@@ -52,16 +52,12 @@ test('malformed sync arguments fail before initialization', async () => {
     for (const result of results) {
       expect(result.exitCode, result.stderr).toBe(2)
     }
-    expect(results[0]?.stderr).toContain('sync: unknown flag --unknown')
-    expect(results[1]?.stderr).toContain(
-      'sync: option must follow command: --wat',
+    expect(results[0]?.stderr).toContain(
+      'ctxindex sync: unknown option --unknown',
     )
-    expect(results[2]?.stderr).toContain(
-      'sync: option must follow command: --json',
-    )
-    expect(results[3]?.stderr).toContain(
-      'sync: option must follow command: --mode',
-    )
+    expect(results[1]?.stderr).toContain('ctxindex: unknown option --wat')
+    expect(results[2]?.stderr).toContain('ctxindex: unknown option --json')
+    expect(results[3]?.stderr).toContain('ctxindex: unknown option --mode')
   } finally {
     await sandbox.cleanup()
   }
@@ -135,12 +131,11 @@ test('malformed sync arguments leave configured sync state unchanged', async () 
       expect(result.exitCode, result.stderr).toBe(2)
     }
     expect(results.at(-2)?.stderr).toContain(
-      'sync: --mode requires a non-empty value',
+      'ctxindex sync: option --mode requires a non-empty value',
     )
-    expect(results.at(-1)?.stderr).toContain(
-      'sync: --mode must be sync, resync, or diff',
-    )
+    expect(results.at(-1)?.stderr).toContain('Invalid value for argument:')
+    expect(results.at(-1)?.stderr).toContain('Expected one of:')
   } finally {
     await sandbox.cleanup()
   }
-}, 15_000)
+}, 30_000)

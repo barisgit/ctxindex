@@ -41,7 +41,7 @@ export default defineCatalog({
 Build trust is required before ctxindex acquires packages, invokes Bun, or imports the author module. The package does not need to be published to npm.
 
 ```sh
-ctxindex extensions catalog build ./community-author \
+ctxindex extension catalog build ./community-author \
   --catalog community.catalog \
   --output ./dist/ctxindex-catalog.json \
   --trust \
@@ -53,41 +53,41 @@ ctxindex extensions catalog build ./community-author \
 Adding a repository has its own trust acknowledgement:
 
 ```sh
-ctxindex extensions catalog add community https://example.com/catalog.git \
+ctxindex extension catalog add community https://example.com/catalog.git \
   --ref refs/heads/main \
   --trust \
   --json
 
-ctxindex extensions search mail --json
-ctxindex extensions catalog show community community.mail --json
+ctxindex extension catalog search mail --json
+ctxindex extension catalog show community community.mail --json
 ```
 
 Marketplace search retains matching curation rows from every configured Catalog, including duplicate stable ids across Catalogs. Search, list, and show refresh by default. Use stored state deliberately with `--no-refresh`; offline output reports the stored snapshot age.
 
 ```sh
-ctxindex extensions search mail --no-refresh --json
-ctxindex extensions catalog list --no-refresh --json
-ctxindex extensions catalog show community --no-refresh --json
+ctxindex extension catalog search mail --no-refresh --json
+ctxindex extension catalog list --no-refresh --json
+ctxindex extension catalog show community --no-refresh --json
 ```
 
 ## Install and remove
 
-Installing executable code requires trust independently of authoring and repository acquisition. Select the configured Catalog and stable, versionless Extension id:
+The install command is an explicit trust grant for executable code, independently of authoring and repository acquisition. Select the `catalog` source kind, configured Catalog, and stable, versionless Extension id:
 
 ```sh
-ctxindex extensions install community community.mail --trust --json
-ctxindex extensions list --json
+ctxindex extension install catalog community community.mail --json
+ctxindex extension list --json
 ```
 
 Install refreshes only the selected Catalog by default. Add `--no-refresh` to install from its stored snapshot. On success, exact replayed bytes are published to generic content-addressed storage. Startup and listing then use only that installed record and managed materialization, without the network, Bun package execution, Catalog checkout, or author checkout.
 
-A later trusted install may replace the record only when its configured Catalog name and Catalog id match. Collisions with a direct install, another Catalog, a built-in, or an explicit path require uninstalling the existing Extension first.
+A later install may replace the record only when its configured Catalog name and Catalog id match. Collisions with a direct install, another Catalog, a built-in, or an explicit path require uninstalling the existing Extension first.
 
 Uninstall works the same for direct and Catalog-curated records and does not require Catalog availability:
 
 ```sh
-ctxindex extensions uninstall community.mail --json
-ctxindex extensions catalog remove community --json
+ctxindex extension uninstall community.mail --json
+ctxindex extension catalog remove community --json
 ```
 
 Uninstall is blocked while configured Sources require the Extension's Adapter unless `--force` is supplied; forced removal preserves those Sources and their data as unavailable. Catalog removal is blocked until no installed record cites that configured Catalog.

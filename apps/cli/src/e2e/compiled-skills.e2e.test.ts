@@ -77,7 +77,7 @@ test('relocated compiled CLI serves embedded bundled skills', async () => {
     expect(get.stdout).toContain(
       'ctxindex describe <profile|adapter|action> <id> --json',
     )
-    expect(get.stdout).toContain('ctxindex extensions list')
+    expect(get.stdout).toContain('ctxindex extension list')
     expect(get.stdout).toContain('ctxindex skills list')
     expect(get.stdout).toContain('ctxindex skills get <name>')
     expect(get.stdout).not.toMatch(/--from-env|oauth-app add|account add/)

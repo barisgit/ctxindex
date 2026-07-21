@@ -42,21 +42,28 @@ describe('search JSON output', () => {
     const log = spyOn(console, 'log').mockImplementation(() => {})
     let opened = false
     try {
-      const exit = await handleSearchCommand(['needle', '--json'], {
-        selectDaemon: () => ({}) as never,
-        search: async (_selection, input) => {
-          expect(input.text).toBe('needle')
-          return {
-            results: [],
-            warnings: [],
-            pagination: { offset: 0, limit: 20, hasMore: false },
-          }
+      const exit = await handleSearchCommand(
+        {
+          input: { text: 'needle' },
+          json: true,
+          refs: false,
         },
-        open: async () => {
-          opened = true
-          throw new Error('direct dependencies opened')
+        {
+          selectDaemon: () => ({}) as never,
+          search: async (_selection, input) => {
+            expect(input.text).toBe('needle')
+            return {
+              results: [],
+              warnings: [],
+              pagination: { offset: 0, limit: 20, hasMore: false },
+            }
+          },
+          open: async () => {
+            opened = true
+            throw new Error('direct dependencies opened')
+          },
         },
-      })
+      )
       expect(exit).toBe(0)
       expect(opened).toBe(false)
       expect(log).toHaveBeenCalledWith(
@@ -77,25 +84,32 @@ describe('search JSON output', () => {
       },
     )
     try {
-      const exit = await handleSearchCommand(['needle', '--remote'], {
-        selectDaemon: () => null,
-        search: async () => {
-          throw new Error('daemon transport invoked')
+      const exit = await handleSearchCommand(
+        {
+          input: { text: 'needle', remote: true },
+          json: false,
+          refs: false,
         },
-        open: async () =>
-          ({
-            db: {},
-            registry: { profiles: {} },
-            authService: {},
-            logger: {},
-            sourceService: {
-              resolveSourceId: () => {
-                throw new Error('source selector resolved')
+        {
+          selectDaemon: () => null,
+          search: async () => {
+            throw new Error('daemon transport invoked')
+          },
+          open: async () =>
+            ({
+              db: {},
+              registry: { profiles: {} },
+              authService: {},
+              logger: {},
+              sourceService: {
+                resolveSourceId: () => {
+                  throw new Error('source selector resolved')
+                },
               },
-            },
-            close: async () => {},
-          }) as never,
-      })
+              close: async () => {},
+            }) as never,
+        },
+      )
 
       expect(exit).toBe(130)
       expect(search).toHaveBeenCalledTimes(1)

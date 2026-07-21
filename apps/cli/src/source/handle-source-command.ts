@@ -1,9 +1,10 @@
 import { CtxindexValidationError } from '@ctxindex/core/errors'
 import {
-  parseSourceArgs,
-  preflightSourceArgs,
+  resolveSourceAddArgs,
+  type SourceAddCommandArgs,
   type SourceArgumentDescription,
-  sourceUsage,
+  type SourceListCommandArgs,
+  type SourceRemoveCommandArgs,
 } from '../args/source'
 import {
   type DaemonSelection,
@@ -62,7 +63,6 @@ export type SourceCommandRoute =
       readonly ownership: DirectDatabaseOwnership
       readonly definitions?: LoadedDefinitions
     }
-  | { readonly kind: 'local' }
 
 export const defaultSourceCommandDeps = defaultDeps
 
@@ -81,14 +81,14 @@ export interface RetainedSourceCommandRoute {
 }
 
 export function retainSourceCommandRoute(
-  invocationArgs: string[],
+  needsDefinitions: boolean,
   services: SourceCommandDeps = defaultDeps,
 ): RetainedSourceCommandRoute {
   let retained: Promise<SourceCommandRoute> | undefined
   let routeError: unknown
   let closed = false
   const resolve = (): Promise<SourceCommandRoute> => {
-    retained ??= resolveSourceCommandRoute(invocationArgs, services).catch(
+    retained ??= resolveSourceCommandRoute(needsDefinitions, services).catch(
       (error: unknown) => {
         routeError = error
         throw error
@@ -115,26 +115,21 @@ export function sourceRouteDescriptions(
   route: SourceCommandRoute,
 ): readonly SourceArgumentDescription[] {
   if (route.kind === 'daemon') return route.definitions?.rows ?? []
-  if (route.kind === 'direct') {
-    return route.definitions?.description.sources ?? []
-  }
-  return []
+  return route.definitions?.description.sources ?? []
+}
+
+export async function sourceHelpDescriptions(
+  services: SourceCommandDeps = defaultDeps,
+): Promise<readonly SourceArgumentDescription[]> {
+  const selection = services.selectDaemon()
+  if (selection) return (await services.sourceDefinitions(selection)).rows
+  return (await services.loadDefinitions()).description.sources
 }
 
 export async function resolveSourceCommandRoute(
-  args: string[],
+  needsDefinitions: boolean,
   services: SourceCommandDeps = defaultDeps,
 ): Promise<SourceCommandRoute> {
-  const preliminary = preflightSourceArgs(args)
-  const needsDefinitions =
-    preliminary.kind === 'needs-definitions' ||
-    (preliminary.kind === 'help' && args[0] === 'add')
-  if (
-    !needsDefinitions &&
-    (preliminary.kind === 'unknown' || preliminary.kind === 'help')
-  ) {
-    return { kind: 'local' }
-  }
   const selection = services.selectDaemon()
   if (selection) {
     return needsDefinitions
@@ -165,10 +160,15 @@ export async function resolveSourceCommandRoute(
   }
 }
 
+export type SourceCommandInput =
+  | { readonly kind: 'add'; readonly args: SourceAddCommandArgs }
+  | { readonly kind: 'list'; readonly args: SourceListCommandArgs }
+  | { readonly kind: 'remove'; readonly args: SourceRemoveCommandArgs }
+
 export async function handleSourceCommand(
-  args: string[],
+  input: SourceCommandInput,
+  retainedRoute: SourceCommandRoute,
   services: SourceCommandDeps = defaultDeps,
-  retainedRoute?: SourceCommandRoute,
 ): Promise<number> {
   let deps: Awaited<ReturnType<typeof openDeps>> | undefined
   let directOwnership: DirectDatabaseOwnership | undefined
@@ -177,29 +177,25 @@ export async function handleSourceCommand(
   const cancel = () => controller.abort()
   process.once('SIGINT', cancel)
   try {
-    const preliminary = preflightSourceArgs(args)
-    if (preliminary.kind === 'unknown') {
-      console.error(`${preliminary.message}. Try: ${sourceUsage}`)
-      return 2
-    }
-    const needsDefinitions = preliminary.kind === 'needs-definitions'
-    const route =
-      retainedRoute ?? (await resolveSourceCommandRoute(args, services))
+    const route = retainedRoute
     if (route.kind === 'direct') directRoute = route
-    const daemonDefinitions =
-      route.kind === 'daemon' ? route.definitions : undefined
     const definitions = route.kind === 'direct' ? route.definitions : undefined
-    const parsed = needsDefinitions
-      ? parseSourceArgs(
-          args,
-          daemonDefinitions?.rows ?? definitions?.description.sources,
-        )
-      : preliminary
-    if (parsed.kind === 'help') return 0
-    if (parsed.kind === 'unknown') {
-      console.error(`${parsed.message}. Try: ${sourceUsage}`)
-      return 2
-    }
+    const parsed =
+      input.kind === 'add'
+        ? {
+            kind: 'add' as const,
+            ...resolveSourceAddArgs(input.args, sourceRouteDescriptions(route)),
+          }
+        : input.kind === 'list'
+          ? {
+              kind: 'list' as const,
+              ...(input.args.realm === undefined
+                ? {}
+                : { realmSlug: input.args.realm }),
+              json: input.args.json === true,
+              format: input.args.format,
+            }
+          : { kind: 'remove' as const, sourceId: input.args.source }
     if (route.kind === 'daemon') {
       if (parsed.kind === 'add') {
         const result = await services.sourceAdd(
@@ -238,7 +234,6 @@ export async function handleSourceCommand(
       }
       return 0
     }
-    if (route.kind === 'local') return 0
     directOwnership = route.ownership
     const directDefinitions =
       definitions ??
@@ -250,12 +245,7 @@ export async function handleSourceCommand(
       definitions: directDefinitions,
       databaseOwnership: directOwnership,
     })
-    const active = parseSourceArgs(args, directDefinitions.description.sources)
-    if (active.kind === 'unknown') {
-      console.error(`${active.message}. Try: ${sourceUsage}`)
-      return 2
-    }
-    if (active.kind === 'help') return 0
+    const active = parsed
     if (active.kind === 'add') {
       const adapter = deps.registry.adapters.get({ id: active.adapterId })
       if (!adapter)

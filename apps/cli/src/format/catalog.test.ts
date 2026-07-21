@@ -9,9 +9,9 @@ import {
   formatCatalog,
   formatCatalogBuild,
   formatCatalogExtension,
-  formatInstalledExtension,
   formatMarketplace,
 } from './catalog'
+import { formatExtensionLifecycle } from './extension-lifecycle'
 
 const digest = 'b'.repeat(64)
 const catalog: CatalogRecord = {
@@ -102,7 +102,7 @@ test('Catalog output surfaces age and exact versionless locators', () => {
 
 test('Catalog install output preserves generic execution and curation facts', () => {
   expect(
-    JSON.parse(formatInstalledExtension('Installed', installed, true)),
+    JSON.parse(formatExtensionLifecycle('Installed', installed, true)),
   ).toMatchObject({
     action: 'installed',
     id: 'fixture.extension',
@@ -113,10 +113,11 @@ test('Catalog install output preserves generic execution and curation facts', ()
       source_locator: { kind: 'package', entryIndex: 0 },
     },
   })
-  const human = formatInstalledExtension('Installed', installed, false)
+  const human = formatExtensionLifecycle('Installed', installed, false)
   expect(human).toContain('Catalog: fixture')
   expect(human).toContain('Locator: package entry 0')
   expect(human).toContain('Resolved: 2.1.0 (sha512-fixture)')
+  expect(human).toContain(`Materialization: ${digest}`)
 })
 
 test('Marketplace output includes deterministic Catalog age and exact source details', () => {

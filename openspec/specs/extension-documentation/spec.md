@@ -58,7 +58,11 @@ The system SHALL project authored documentation separately from deterministic re
 - **THEN** generated reference omits that flag while the authored statement remains non-normative prose
 
 ### Requirement: Projection is transport-neutral and browser-safe by contract
-Core SHALL expose one deterministic transport-neutral documentation projection suitable for future CLI, agent, and local-web consumers. This change SHALL NOT require a CLI or web consumer implementation. Any browser consumer MUST sanitize rendered Markdown independently, disable raw HTML and script/event attributes, reject unsafe URL schemes, and prevent network-loaded media even after core validation.
+Core SHALL expose one deterministic transport-neutral documentation projection consumed by the CLI documentation surface and suitable for future agent and local-web consumers. The CLI consumer SHALL emit Markdown as inert text or JSON, SHALL copy verified assets only to an explicit output path, and SHALL NOT interpret Markdown as terminal control, HTML, or executable content. Any browser consumer MUST sanitize rendered Markdown independently, disable raw HTML and script/event attributes, reject unsafe URL schemes, and prevent network-loaded media even after core validation.
+
+#### Scenario: CLI retrieves validated Markdown
+- **WHEN** the CLI retrieves a loaded Extension Markdown document
+- **THEN** it emits the portable string without rendering HTML or resolving remote content
 
 #### Scenario: Future browser renders validated Markdown
 - **WHEN** a future local browser surface renders a projected Markdown document

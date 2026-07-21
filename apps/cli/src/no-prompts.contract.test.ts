@@ -109,7 +109,7 @@ describe('no-prompts contract', () => {
     try {
       const { exitCode, stderr } = await spawnCli(['auth'], env, 'null')
       expect(exitCode).toBe(2)
-      expect(stderr).toContain('Unknown command')
+      expect(stderr).toContain('unknown command auth')
     } finally {
       await cleanup()
     }
@@ -118,7 +118,7 @@ describe('no-prompts contract', () => {
   test('registry inspection: exits 0 with stdin=null', async () => {
     const { env, cleanup } = await mkSandbox()
     try {
-      for (const args of [['describe'], ['extensions', 'list']]) {
+      for (const args of [['describe'], ['extension', 'list']]) {
         const { exitCode } = await spawnCli(args, env, 'null')
         expect(exitCode).toBe(0)
       }
@@ -196,17 +196,16 @@ describe('no-prompts contract', () => {
   // ---------------------------------------------------------------------------
   // Commands that require args — must fail fast (non-zero), not hang
   // ---------------------------------------------------------------------------
-  test('action describe/run: missing required input exits non-zero without prompting', async () => {
+  test('action run: missing required input exits non-zero without prompting', async () => {
     const { env, cleanup } = await mkSandbox()
     try {
-      for (const args of [
-        ['action', 'describe'],
+      const { exitCode, stderr } = await spawnCli(
         ['action', 'run'],
-      ]) {
-        const { exitCode, stderr } = await spawnCli(args, env, 'null')
-        expect(exitCode).not.toBe(0)
-        expect(stderr.length).toBeGreaterThan(0)
-      }
+        env,
+        'null',
+      )
+      expect(exitCode).not.toBe(0)
+      expect(stderr.length).toBeGreaterThan(0)
     } finally {
       await cleanup()
     }
@@ -301,7 +300,7 @@ describe('no-prompts contract', () => {
         'null',
       )
       expect(exitCode).toBe(2)
-      expect(stderr).toContain('missing skill name')
+      expect(stderr).toContain('Missing required positional argument: NAME')
     } finally {
       await cleanup()
     }

@@ -4,7 +4,9 @@ import type {
   CatalogCurationProvenanceInput,
   ExactExtensionInstallCandidate,
   GenericExtensionInstallationRecord,
+  GenericExtensionPackageInstaller,
 } from '../direct-extension'
+import { validateDirectExtensionId } from '../direct-extension'
 import { createExtensionHostDiagnostic } from '../extension/diagnostics'
 import { catalogSnapshotPath, validateCatalogSnapshot } from './paths'
 import type {
@@ -96,6 +98,7 @@ export interface ExactCatalogExtensionInstaller {
   installExact(
     input: ExactExtensionInstallCandidate & {
       readonly curation?: CatalogCurationProvenanceInput
+      readonly expectedPrevious?: GenericExtensionInstallationRecord
       readonly validatePreCommit?: () => Promise<void>
       readonly signal?: AbortSignal
     },
@@ -122,14 +125,22 @@ export class CatalogInstallationService {
   async install(input: {
     readonly catalog: string
     readonly extensionId: string
-    readonly trust: boolean
     readonly noRefresh?: boolean
     readonly signal?: AbortSignal
+    readonly expectedPrevious?: GenericExtensionInstallationRecord
   }): Promise<GenericExtensionInstallationRecord> {
-    if (input.trust !== true) invalid('Extension install requires --trust')
     const catalog = await this.catalogs.show(input.catalog, {
       refresh: input.noRefresh !== true,
     })
+    if (
+      input.expectedPrevious?.curation !== undefined &&
+      (catalog.name !== input.expectedPrevious.curation.catalog_name ||
+        catalog.catalog_id !== input.expectedPrevious.curation.catalog_id)
+    ) {
+      validationFailure(
+        `Catalog ${input.catalog} no longer matches the installed curation`,
+      )
+    }
     const entryIndex = catalog.extensions.findIndex(
       (entry) => entry.id === input.extensionId,
     )
@@ -171,6 +182,9 @@ export class CatalogInstallationService {
         entry: snapshotEntry,
         entryIndex,
       }),
+      ...(input.expectedPrevious === undefined
+        ? {}
+        : { expectedPrevious: input.expectedPrevious }),
       validatePreCommit: async () => {
         let configured: CatalogRecord
         try {
@@ -192,6 +206,48 @@ export class CatalogInstallationService {
         )
           catalogChanged(catalog.name)
       },
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+    })
+  }
+}
+
+export interface InstalledExtensionLifecycleServiceOptions {
+  readonly records: {
+    readRecords(): Promise<readonly GenericExtensionInstallationRecord[]>
+  }
+  readonly installer: Pick<GenericExtensionPackageInstaller, 'updateDirect'>
+  readonly catalogInstallation: CatalogInstallationService
+}
+
+export class InstalledExtensionLifecycleService {
+  readonly records: InstalledExtensionLifecycleServiceOptions['records']
+  readonly installer: InstalledExtensionLifecycleServiceOptions['installer']
+  readonly catalogInstallation: CatalogInstallationService
+
+  constructor(options: InstalledExtensionLifecycleServiceOptions) {
+    this.records = options.records
+    this.installer = options.installer
+    this.catalogInstallation = options.catalogInstallation
+  }
+
+  async update(input: {
+    readonly extensionId: string
+    readonly signal?: AbortSignal
+  }): Promise<GenericExtensionInstallationRecord> {
+    validateDirectExtensionId(input.extensionId)
+    const installed = (await this.records.readRecords()).find(
+      (record) => record.id === input.extensionId,
+    )
+    if (installed === undefined) {
+      return this.installer.updateDirect(input)
+    }
+    if (installed.curation === undefined) {
+      return this.installer.updateDirect(input)
+    }
+    return this.catalogInstallation.install({
+      catalog: installed.curation.catalog_name,
+      extensionId: installed.id,
+      expectedPrevious: installed,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
     })
   }

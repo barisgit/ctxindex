@@ -19,6 +19,8 @@
     "build:web": "turbo run build --filter web",
     "build:cli": "turbo run build --filter ctxindex",
     "build:cli-package": "bun run --cwd apps/cli build:package",
+    "generate:cli-reference": "bun scripts/docs/generate-cli-reference.ts",
+    "check:cli-reference": "bun scripts/docs/generate-cli-reference.ts --check",
     "pack:cli-package": "bun scripts/release/cli-package.ts pack dist/npm/artifacts",
     "smoke:cli-package": "bun scripts/release/cli-package.ts smoke",
     "lint": "turbo run lint",

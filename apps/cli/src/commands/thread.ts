@@ -1,4 +1,4 @@
-import { defineCommand } from 'citty'
+import { defineCtxCommand } from '../command-model'
 import { runWithExit } from '../format/exit'
 import {
   formatThreadJson,
@@ -8,16 +8,14 @@ import {
 
 export { formatThreadJson, formatThreadText, handleThreadGetCommand }
 
-export const threadGetCommand = defineCommand({
-  meta: { name: 'get', description: 'Get a local related Resource thread.' },
+export const threadCommand = defineCtxCommand({
+  meta: { name: 'thread', description: 'Get a local related Resource thread.' },
   args: {
-    ref: { type: 'positional', required: false, description: 'Resource Ref' },
+    ref: { type: 'positional', required: true, description: 'Resource Ref' },
     json: { type: 'boolean', description: 'Print deterministic JSON' },
   },
-  run: ({ rawArgs }) => runWithExit(() => handleThreadGetCommand(rawArgs)),
-})
-
-export const threadCommand = defineCommand({
-  meta: { name: 'thread', description: 'Traverse local Resource Relations.' },
-  subCommands: { get: threadGetCommand },
+  run: ({ args }) =>
+    runWithExit(() =>
+      handleThreadGetCommand({ ref: args.ref, json: args.json ?? false }),
+    ),
 })

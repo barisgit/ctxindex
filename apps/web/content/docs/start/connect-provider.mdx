@@ -1,0 +1,50 @@
+---
+title: Connect Google or Microsoft
+description: Authorize an Account through an available managed OAuth App or explicit local BYOA fallback.
+---
+
+A provider-backed Source needs three separate things: an available **OAuth App** definition, an authorized **Account**, and a configured **Source** using one Source Adapter.
+
+## Inspect available OAuth Apps
+
+```sh
+ctxindex oauth-app list --json
+```
+
+Bundled Google and Microsoft Extensions may expose public desktop OAuth Apps. ctxindex selects one as the managed default only when host policy exactly matches its Provider, label, owning Extension, and bundled provenance. Provider verification, tenant policy, publisher status, consent, or requested scopes can still cause the provider to reject authorization.
+
+## Authorize an Account
+
+When a policy-qualified managed App is available:
+
+```sh
+ctxindex account add microsoft --label work
+```
+
+For deterministic bring-your-own-app setup, configure the Provider-authored environment variables once, persist a labeled local OAuth App, and select it exactly:
+
+```sh
+ctxindex oauth-app add microsoft my-app --from-env
+ctxindex account add microsoft --app my-app --label work
+```
+
+The public App inventory never exposes App config, client ids, desktop-secret metadata, token data, secret references, or secret values.
+
+## Add Sources
+
+List loaded Source Adapters and inspect the generated config schema before adding a Source:
+
+```sh
+ctxindex describe adapter microsoft.mailbox --json
+ctxindex source add microsoft.mailbox \
+  --realm company \
+  --account work \
+  --label work-mail
+ctxindex sync --source work-mail --json
+```
+
+Repeat with a calendar Adapter only when you need that collection. Accounts can back multiple compatible Sources; a Source always belongs to exactly one Realm.
+
+<Callout type="warn">
+  Never paste credentials into an agent conversation or commit `.env` files. OAuth App configuration and Grants are local private state.
+</Callout>

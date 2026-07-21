@@ -41,3 +41,23 @@ test('declares --no-sync as a generated Source add boolean argument', async () =
     description: 'Disable synchronization for this Source',
   })
 })
+
+test('marks array-valued generated Adapter options as repeatable', () => {
+  const args = generatedSourceConfigArgs([
+    {
+      id: 'array.adapter',
+      configOptions: [
+        {
+          property: 'labels',
+          flag: '--config-labels',
+          type: 'string[]',
+          required: false,
+        },
+      ],
+    },
+  ])
+  expect(args['config-labels']).toMatchObject({
+    type: 'string',
+    multiple: true,
+  })
+})

@@ -1,10 +1,8 @@
-import type { ArtifactService } from '@ctxindex/core/artifact'
-import {
-  artifactDownloadUsage,
-  artifactListUsage,
-  parseArtifactDownloadArgs,
-  parseArtifactListArgs,
-} from '../args/artifact'
+import { parseRef } from '@ctxindex/core'
+import type {
+  ArtifactPurgeResult,
+  ArtifactService,
+} from '@ctxindex/core/artifact'
 import { openDeps } from '../deps'
 import {
   formatArtifactDownloadJson,
@@ -19,46 +17,75 @@ type OpenArtifactDeps = () => Promise<{
   close(): Promise<void>
 }>
 
+export type ArtifactCommandInput =
+  | { readonly kind: 'list'; readonly ref: string; readonly json: boolean }
+  | {
+      readonly kind: 'download'
+      readonly ref: string
+      readonly outputPath?: string
+      readonly json: boolean
+    }
+  | { readonly kind: 'purge'; readonly json: boolean }
+
+export function formatPurgeArtifactsJson(result: ArtifactPurgeResult): string {
+  return JSON.stringify(result)
+}
+
+export function formatPurgeArtifactsText(result: ArtifactPurgeResult): string {
+  return [
+    result.artifactCountRemoved,
+    result.objectCountRemoved,
+    result.logicalBytesFreed,
+    result.physicalBytesFreed,
+  ].join('\t')
+}
+
 export async function handleArtifactCommand(
-  args: ['list' | 'download', ...string[]],
+  input: ArtifactCommandInput,
   open: OpenArtifactDeps = openDeps,
 ): Promise<number> {
-  const [command, ...commandArgs] = args
-  const parsed =
-    command === 'list'
-      ? parseArtifactListArgs(commandArgs)
-      : parseArtifactDownloadArgs(commandArgs)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(
-      `${parsed.message}. Try: ${command === 'list' ? artifactListUsage : artifactDownloadUsage}`,
-    )
-    return 2
+  if (input.kind !== 'purge') {
+    try {
+      parseRef(input.ref)
+    } catch {
+      console.error(`artifact ${input.kind}: invalid <ref>: ${input.ref}`)
+      return 2
+    }
   }
   const deps = await open()
   try {
-    if (parsed.kind === 'list') {
-      const result = await deps.artifactService.list(parsed.ref)
+    if (input.kind === 'list') {
+      const result = await deps.artifactService.list(input.ref)
       console.log(
-        parsed.json
+        input.json
           ? formatArtifactListJson(result)
           : formatArtifactListText(result),
       )
-      if (!parsed.json) {
+      if (!input.json) {
         for (const warning of result.warnings)
           console.error(`${warning.code}\t${warning.message}`)
       }
       return 0
     }
 
-    const result = await deps.artifactService.download(parsed.ref, {
-      ...(parsed.outputPath === undefined
+    if (input.kind === 'purge') {
+      const result = await deps.artifactService.purge()
+      console.log(
+        input.json
+          ? formatPurgeArtifactsJson(result)
+          : formatPurgeArtifactsText(result),
+      )
+      return 0
+    }
+
+    const result = await deps.artifactService.download(input.ref, {
+      ...(input.outputPath === undefined
         ? {}
-        : { outputPath: parsed.outputPath }),
+        : { outputPath: input.outputPath }),
       signal: new AbortController().signal,
     })
     console.log(
-      parsed.json
+      input.json
         ? formatArtifactDownloadJson(result)
         : formatArtifactDownloadText(result),
     )

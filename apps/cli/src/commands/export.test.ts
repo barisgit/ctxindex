@@ -38,9 +38,9 @@ describe('export command', () => {
     const log = spyOn(console, 'log').mockImplementation(() => {})
     const error = spyOn(console, 'error').mockImplementation(() => {})
 
-    expect(await handleExportCommand([ref, '--format=binary'], open, run)).toBe(
-      0,
-    )
+    expect(
+      await handleExportCommand({ ref, format: 'binary' }, open, run),
+    ).toBe(0)
     expect(write).toHaveBeenCalledTimes(1)
     expect(write).toHaveBeenCalledWith(bytes)
     expect(log).not.toHaveBeenCalled()
@@ -67,11 +67,10 @@ describe('export command', () => {
     const error = spyOn(console, 'error').mockImplementation(() => {})
     expect(
       await handleExportCommand(
-        ['not-a-ref', '--format', 'json'],
+        { ref: 'not-a-ref', format: 'json' },
         open as never,
       ),
     ).toBe(2)
-    expect(await handleExportCommand(['--help'], open as never)).toBe(0)
     expect(opened).toBe(false)
     error.mockRestore()
   })
@@ -92,9 +91,9 @@ describe('export command', () => {
       )
     }
     const error = spyOn(console, 'error').mockImplementation(() => {})
-    expect(
-      await handleExportCommand([ref, '--format', 'mbox'], open, run),
-    ).toBe(2)
+    expect(await handleExportCommand({ ref, format: 'mbox' }, open, run)).toBe(
+      2,
+    )
     expect(closed).toBe(true)
     expect(error).toHaveBeenCalledWith(
       expect.stringContaining('communication.message@1'),

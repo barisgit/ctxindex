@@ -1,5 +1,5 @@
-import { defineCommand } from 'citty'
-import { parseSecretsArgs, secretsUsage } from '../args/secrets'
+import type { SecretBackend } from '@ctxindex/core/secrets'
+import { defineCtxCommand } from '../command-model'
 import { openSecretDeps } from '../deps'
 import { mapErrorToExit, runWithExit } from '../format/exit'
 import {
@@ -7,14 +7,13 @@ import {
   formatSecretBackendSwitch,
 } from '../format/secrets'
 
-export async function handleSecretsCommand(args: string[]): Promise<number> {
-  const parsed = parseSecretsArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(`${parsed.message}. Try: ${secretsUsage}`)
-    return 2
-  }
+export type SecretsCommandInput =
+  | { readonly kind: 'status'; readonly json: boolean }
+  | { readonly kind: 'set'; readonly target: SecretBackend }
 
+export async function handleSecretsCommand(
+  parsed: SecretsCommandInput,
+): Promise<number> {
   let deps: Awaited<ReturnType<typeof openSecretDeps>> | undefined
   try {
     deps = await openSecretDeps()
@@ -40,26 +39,35 @@ export async function handleSecretsCommand(args: string[]): Promise<number> {
   }
 }
 
-export const secretsCommand = defineCommand({
+export const secretsCommand = defineCtxCommand({
   meta: { name: 'secrets', description: 'Inspect and select secret storage.' },
   subCommands: {
-    status: defineCommand({
+    status: defineCtxCommand({
       meta: { name: 'status', description: 'Show safe backend status.' },
       args: { json: { type: 'boolean', description: 'Print JSON' } },
-      run: ({ rawArgs }) =>
-        runWithExit(() => handleSecretsCommand(['status', ...rawArgs])),
+      run: ({ args }) =>
+        runWithExit(() =>
+          handleSecretsCommand({ kind: 'status', json: args.json ?? false }),
+        ),
     }),
-    backend: defineCommand({
+    backend: defineCtxCommand({
       meta: { name: 'backend', description: 'Manage the active backend.' },
       subCommands: {
-        set: defineCommand({
+        set: defineCtxCommand({
           meta: { name: 'set', description: 'Set keychain or file backend.' },
           args: {
-            target: { type: 'positional', required: true },
+            target: {
+              type: 'positional',
+              required: true,
+              options: ['keychain', 'file'],
+            },
           },
-          run: ({ rawArgs }) =>
+          run: ({ args }) =>
             runWithExit(() =>
-              handleSecretsCommand(['backend', 'set', ...rawArgs]),
+              handleSecretsCommand({
+                kind: 'set',
+                target: args.target,
+              }),
             ),
         }),
       },

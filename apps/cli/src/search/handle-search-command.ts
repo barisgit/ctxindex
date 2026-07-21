@@ -1,6 +1,6 @@
 import { SearchPlanner } from '@ctxindex/core/search'
 import type { RpcSearchResult } from '@ctxindex/rpc'
-import { parseSearchArgs, searchUsage } from '../args/search'
+import type { ResolvedSearchArgs } from '../args/search'
 import { daemonSearch, selectDaemon } from '../daemon/client'
 import { openDeps } from '../deps'
 import { mapErrorToExit } from '../format/exit'
@@ -44,16 +44,9 @@ function printSearch(
 }
 
 export async function handleSearchCommand(
-  args: string[],
+  parsed: ResolvedSearchArgs,
   services: SearchCommandDeps = defaultDeps,
 ): Promise<number> {
-  const parsed = parseSearchArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(`${parsed.message}. Try: ${searchUsage}`)
-    return 2
-  }
-
   const controller = new AbortController()
   const cancel = () => controller.abort()
   process.once('SIGINT', cancel)

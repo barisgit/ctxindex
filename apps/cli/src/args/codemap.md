@@ -2,24 +2,20 @@
 
 ## Responsibility
 
-Pure argv parsing into typed discriminated command unions.
+Defines reusable Citty argument models and typed semantic normalization for the dynamic Source and Search command families.
 
 ## Design / patterns
 
-- `flags.ts` centralizes help, scalar/list extraction, duplicate detection, and strict closed-grammar failures.
-- `oauth-app.ts` accepts add-from-environment, safe list, and exact provider/label removal; no configuration value is accepted on argv.
-- `account.ts` requires an exact OAuth App label for provider authorization and accepts optional Account labels, deterministic inventory, and label removal.
-- `daemon.ts` defines the exact foreground `serve`, side-effect-free `health`, and graceful `shutdown` grammar; `status.ts` now uses the same strict unknown/duplicate/missing-value and positional rejection as `sync.ts`.
-- `source.ts` derives `--config-*` values from a minimal active-registry projection, accepts `--label` and Account label/Account ID references, rejects removed forms, and keeps list/remove grammar independent of registry loading.
-- Ref-bearing parsers validate stable `ctx://` / Artifact Refs; search/sync/status/Action source flags remain strings for later label-or-ID resolution.
-- Source add preflights common grammar and potentially generated `--config-*` value shape before active-definition retrieval, then performs Adapter-specific option/type validation against that immutable projection.
-- `search.ts` permits query-less filtered remote execution and accepts a non-blank opaque `--continuation` only with `--remote`, exactly one `--source`, and no `--offset`; offsets remain local-only pagination.
-- `extensions.ts` parses trusted package-backed `catalog build`, trusted Git Catalog add and versionless Catalog install, stored-or-refreshed Catalog list/show/search reads, explicit direct `npm|git|local` targets with `--extension <id>`, and one origin-neutral `uninstall <id> [--force]` grammar without performing acquisition.
+- `source.ts` exports the static Source add/list/remove argument definitions plus registry-derived `--config-*` definitions. Array-valued Adapter options opt into the command model's definition-derived `multiple: true` behavior, while scalar options remain non-repeatable.
+- Source normalization selects the positional or option Adapter id, validates their mutual exclusion, maps generated configuration flags back to Adapter properties, parses declared primitive and array types, and produces the provider-neutral add input shape.
+- `search.ts` is the single declaration of Search positionals and options. Realm, Source, and field filters are repeatable Citty strings; routing flags and output modes remain typed booleans.
+- Search normalization validates dates, counts, typed `name=value` fields, query-less filtering, routing conflicts, and local-offset versus remote-continuation constraints before orchestration starts.
+- No module reparses raw argv or renders a handwritten usage string. Generic token validation and collection of repeatable values are owned by `../command-model.ts`; Citty owns enum, default, positional, and base help behavior.
 
 ## Data & control flow
 
-Handlers pass remaining argv to `parse*Args`; parsers split flags/positionals, validate required values and conflicts, then return an operation, `help`, or `{ kind: "unknown", message }`. Parsers perform no I/O.
+`commands/source.ts` and `commands/search.ts` attach these definitions to `defineCtxCommand`. Citty supplies typed parsed values, semantic normalizers produce execution inputs, and handlers receive only those typed values. Dynamic Source definitions use the retained active registry projection for parsing, validation, and help.
 
 ## Integration points
 
-Consumed by matching command/workflow modules. Domain grammar types come from core registry, source, secrets, and Ref capabilities.
+Consumed by the Source/Search command descriptors and handlers. Source definitions depend on the core registry description shape; normalized values flow into daemon RPC inputs, `SourceService`, and `SearchPlanner`.

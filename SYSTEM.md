@@ -2,9 +2,9 @@
 
 > **NON-NORMATIVE — readable projection, not the contract.** If this document conflicts with a capability specification, `openspec/specs/<capability>/spec.md` wins.
 >
-> **Last refreshed:** 2026-07-20
+> **Last refreshed:** 2026-07-21
 >
-> **Sources consulted for this refresh:** `CONTEXT.md`; the current `cli-surface`, `extension-catalogs`, `extension-installation`, and `extension-loading` capability specs; their implementation sidecars; `openspec/changes/add-package-backed-catalog-authoring/implementation.md`; and the affected CLI, daemon, core, and Extension SDK `codemap.md` files. The CLI and Catalog capability sidecars still show older pre-alpha interfaces, so the current capability specs take precedence and the active change sidecar is used only for implementation ownership. Section 13 retains the full source map.
+> **Sources consulted for this refresh:** `CONTEXT.md`; the current `cli-surface`, `documentation-consumption`, `extension-documentation`, `extension-installation`, `extension-catalogs`, and `extension-loading` capability specs; their present implementation sidecars; the active `unify-cli-command-model` and `rebuild-product-extension-sdk-docs` implementation artifacts; and affected CLI, core, web, and Extension codemaps. Canonical capability specs take precedence over older pre-alpha interface listings. Section 13 retains the full source map.
 
 ## 1. 10-minute tour
 
@@ -62,28 +62,28 @@ Expected output shapes, omitting generated ids and timestamps:
 | `get … --json` | `{ "resource": { "ref": "ctx://…", "realmId": "work", "profile": { "id": "file", "version": 1 }, "origin": "synced", "payload": { "path": "plan.txt", "mediaType": "text/plain", "text": "…" } }, "warnings": [] }` |
 | `status … --json` | Array with Source availability, last status/run, separate warning/error counts, last structured warning, bounded last error, and opaque Adapter cursor. |
 
-OAuth Sources first need an available OAuth App. The bundled Google and Microsoft Extensions carry public native-App definitions, and `account add <provider>` selects one only when host policy exactly matches its App identity, owning Extension, and bundled provenance. Provider verification, tenant consent, and scope approval remain pending, so provider rejection is possible. Local BYOA remains the deterministic fallback: `oauth-app add <provider> <label> --from-env`, then `account add <provider> --app <label>`. `source add` binds the resulting Account with `--account`. Before mutating provider state, inspect `action describe <id> --source <source> --json`. V1 only creates or updates email Drafts; it never sends them.
+OAuth Sources first need an available OAuth App. The bundled Google and Microsoft Extensions carry public native-App definitions, and `account add <provider>` selects one only when host policy exactly matches its App identity, owning Extension, and bundled provenance. Provider verification, tenant consent, and scope approval remain pending, so provider rejection is possible. Local BYOA remains the deterministic fallback: `oauth-app add <provider> <label> --from-env`, then `account add <provider> --app <label>`. `source add` binds the resulting Account with `--account`. Before mutating provider state, inspect `describe action <id> --source <source> --json`. V1 only creates or updates email Drafts; it never sends them.
 
 Catalogs are authored as plain package exports. A trusted build turns literal Extensions and exact npm, Git, or local package descriptors into a deterministic schema-v2 snapshot with replay-locked artifacts. Repository add/refresh remains a separate data-only trust boundary: it resolves one full Git ref to an immutable commit without importing Catalog-controlled code. Marketplace search aggregates the stored entries; it refreshes configured Catalogs by default, while `--no-refresh` is an inert, offline projection with snapshot age.
 
 Install has its own execution acknowledgement. It refreshes only the selected Catalog unless `--no-refresh`, replays the selected versionless entry through the same canonical installer used by direct packages, and writes one generic installed record with optional Catalog curation. A later Catalog refresh does not change installed bytes. Startup and loaded-Extension listing use only that record and its managed materialization:
 
 ```sh
-bun cli extensions catalog build /absolute/catalog-author-package \
+bun cli extension catalog build /absolute/catalog-author-package \
   --output ctxindex-catalog.json --trust
-bun cli extensions catalog add team /absolute/catalog-repo --ref refs/heads/main --trust
-bun cli extensions search example --no-refresh --json
-bun cli extensions install team example.extension --trust --no-refresh
-bun cli extensions list --json
-bun cli extensions uninstall example.extension
+bun cli extension catalog add team /absolute/catalog-repo --ref refs/heads/main --trust
+bun cli extension catalog search example --no-refresh --json
+bun cli extension install catalog team example.extension --no-refresh
+bun cli extension list --json
+bun cli extension uninstall example.extension
 ```
 
 Packages can also be installed directly from npm, Git, or a local directory. The selector chooses exactly one Extension root; update reuses the stored target, while startup uses only the immutable local pin:
 
 ```sh
-bun cli extensions install npm @example/ctxindex-extension --extension example.extension
-bun cli extensions update example.extension
-bun cli extensions uninstall example.extension
+bun cli extension install npm @example/ctxindex-extension example.extension
+bun cli extension update example.extension
+bun cli extension uninstall example.extension
 ```
 
 ## 2. Overview and value proposition
@@ -152,7 +152,7 @@ Profiles own pure domain semantics: schema validation, title/summary/chunk proje
 
 `defineProfile`, `defineProvider`, `defineOAuthApp`, `defineAdapter`, and `defineExtension` are side-effect-free, inference-preserving factories for discriminated plain values; the SDK also exports its supported Zod instance. `defineCatalog` produces an equally plain Catalog root, and `packageExtension` identifies one versionless Extension id in an explicit npm, Git, or local target. Catalogs accept only literal Extension values and those package descriptors; creating either value performs no filesystem, package-manager, import, trust, or persistence work. Adapters and Apps import exact Provider/Profile values, so TypeScript preserves types when packages are available. There are no string reference factories, host callback, global registration, or Extension dependency graph: package managers acquire ordinary dependencies, while normal imports express reuse.
 
-An Extension root may declare one passive documentation sidecar with the pure `docs('./docs')` descriptor or an eager virtual tree. Core binds directory form to the already acquired definition module, validates both forms through the same bounded resolver, then removes the declaration before definition-registry activation. Extension, Provider, Profile, and Adapter ids share a bounded lowercase ASCII route-safe grammar. Trees require `README.md`; Provider and Adapter pages use stable-id routes, Profile pages use exact `id@version` routes, and an unversioned Profile alias exists only when unambiguous. Authored Markdown/assets remain separate from deterministic generated JSON reference data. Core exposes the transport-neutral projection as passive data for future CLI, agent, and local-web consumers. The projection exposes no host path or URL and is not trusted HTML; presentation consumers remain deferred, and any future browser renderer must sanitize again and prevent network-loaded media.
+An Extension root may declare one passive documentation sidecar with the pure `docs('./docs')` descriptor or an eager virtual tree. Core binds directory form to the already acquired definition module, validates both forms through the same bounded resolver, then removes the declaration before definition-registry activation. Extension, Provider, Profile, and Adapter ids share a bounded lowercase ASCII route-safe grammar. Trees require `README.md`; Provider and Adapter pages use stable-id routes, Profile pages use exact `id@version` routes, and an unversioned Profile alias exists only when unambiguous. Authored Markdown/assets remain separate from deterministic generated JSON reference data. Core exposes the transport-neutral projection as passive data. The CLI composes it with bundled product documentation for offline list, exact retrieval, and bounded search. The projection exposes no host path or URL and is not trusted HTML; any future browser renderer must sanitize again and prevent network-loaded media.
 
 One package declares ordered entry modules in `package.json` under `ctxindex.extensions`. Runtime loading collects Extension roots; trusted Catalog build and exact literal replay may also inspect Catalog roots from those same declared modules. A module may export both root kinds, but undeclared files, nested Catalog values, and sibling roots are never selected implicitly. Catalog roots are authoring values rather than runtime registry members. An Extension root contributes its Adapters and Apps, transitively collects their exact Providers/Profiles, and may list standalone leaves. The complete candidate registry is staged and validated atomically. Same-object reuse may coalesce; distinct executable or schema-bearing same-id values conflict because JavaScript cannot prove equivalence; only genuinely pure declarative values may coalesce by canonical structural equality. OAuth App duplicates always conflict.
 
@@ -227,7 +227,7 @@ A sync-capable Adapter emits upserts, removals, checkpoints, and warnings. Core 
 
 A global advisory lock prevents overlapping syncs. A second attempt records failed `sync busy` because it was not explicitly cancelled; readers continue. SQLite uses WAL, foreign keys, normal synchronous mode, and bounded busy timeout. Synced deletion creates a tombstone hidden from ordinary search; deleting an ad-hoc cache entry does not.
 
-The prototype extracts one/all-Source sync selection into a daemon-agnostic core application service. Realm/Source management, `sync`, `status`, `search`, exact `get`, and local `thread get` use daemon-owned orchestration through `apps/daemon` when exact-tuple discovery selects the local process, preserving existing readable/JSON result shapes. Strict private DTOs bound nested JSON, Resources, thread trees, counts, and byte sizes; oversized results fail as `result_too_large` rather than being truncated. SIGINT is request-scoped: cancellation travels from the CLI through the private RPC request signal into core and the Adapter, with checks before persistence and mutations, preserving transaction rollback and Sync Run bookkeeping without stopping unrelated work or the daemon. Provider warnings are projected to bounded public codes/messages rather than forwarding raw provider text.
+The prototype extracts one/all-Source sync selection into a daemon-agnostic core application service. Realm/Source management, `sync`, `status`, `search`, exact `get`, and local thread traversal use daemon-owned orchestration through `apps/daemon` when exact-tuple discovery selects the local process, preserving existing readable/JSON result shapes. Strict private DTOs bound nested JSON, Resources, thread trees, counts, and byte sizes; oversized results fail as `result_too_large` rather than being truncated. SIGINT is request-scoped: cancellation travels from the CLI through the private RPC request signal into core and the Adapter, with checks before persistence and mutations, preserving transaction rollback and Sync Run bookkeeping without stopping unrelated work or the daemon. Provider warnings are projected to bounded public codes/messages rather than forwarding raw provider text.
 
 ## 8. Provider coverage and limitations
 
@@ -247,7 +247,7 @@ The calendar specs conflict on recurring Google identity: `calendar-context` des
 
 ## 9. Typed Actions and Drafts
 
-Profiles declare Action id, input schema, output Profile, effect, docs, and examples. Adapters bind provider implementations. `action describe` reports the registry contract and per-Source availability; `action run` requires one Source, validates all input before provider I/O, invokes once with automatic unauthorized retry disabled, validates output, and may cache the result as complete `adhoc` state.
+Profiles declare Action id, input schema, output Profile, effect, docs, and examples. Adapters bind provider implementations. `describe action` reports the registry contract and optional per-Source availability; `action run` requires one Source, validates all input before provider I/O, invokes once with automatic unauthorized retry disabled, validates output, and may cache the result as complete `adhoc` state.
 
 V1 exposes exactly:
 
@@ -294,7 +294,9 @@ Managed runnable bytes are content-addressed beneath the data directory, and abs
 
 The CLI is deterministic and non-interactive. Input comes from non-secret flags, declared environments, typed references, files, or declared stdin. Missing input fails instead of prompting. The only interactive surface is a browser in an explicitly requested OAuth loopback.
 
-Readable output is compact; JSON goes to stdout and diagnostics to stderr. Registry-backed `describe` owns fields, formats, config flags, OAuth declarations, and Action schemas, avoiding duplicated help.
+Readable output is compact; JSON goes to stdout and diagnostics to stderr. Registry-backed `describe` owns fields, formats, config flags, OAuth declarations, and Action schemas, avoiding duplicated help. The same Citty definitions own parsing, complete-path `--help`, constrained values, and the generated web CLI reference.
+
+`docs list|get|search` reads a bounded build-time product documentation bundle plus loaded Extension documentation without the web runtime or network. Markdown remains inert text, binary assets require an explicit output path, and loaded schema truth still comes from `describe`.
 
 Generic verbs cover initialization, OAuth App/Account/Realm/Source management, sync, search, get, threads, Artifacts, exports, Actions, status, purge, Extensions, secrets, and bundled skills. OAuth lifecycle grammar includes `oauth-app add <provider> <label> --from-env`, `oauth-app list [--json]`, `oauth-app remove <provider> <label>`, and `account add <provider> [--app <label>] [--label <label>]`; there is no `client` alias or literal-config argument. Omitted App selection is restricted to exact managed policy, while explicit labels remain exact and deterministic. Search help exposes local offsets and exact-Source remote continuation without provider-specific commands. Bundled skills provide concise orientation to what ctxindex is, when to use it, and the live discovery surfaces; generated help and loaded-definition output remain authoritative for interface facts.
 
@@ -302,9 +304,9 @@ The active prototype adds `daemon serve`, `daemon health`, and `daemon shutdown`
 
 All other SQLite-backed commands remain unconverted. While the daemon owns their target database, they fail `prototype_unsupported` with exit `50` before runtime composition or database open. The remaining families are initialization, Account and OAuth App management, secret-backend operations, Artifact access, export, typed Actions, and local cache purge; the compiled proof covers one representative command from each family and covers both list and authorization preflight for Accounts. Extension installation remains a direct filesystem/Catalog mutation, but its local OAuth App identity preflight also acquires the shared database lease and fails before Catalog access or mutation while the daemon owns the database. Without exclusive daemon ownership these paths retain direct behavior behind a shared lease. This fence is a limitation of the partial prototype, not complete CLI migration.
 
-Catalog distribution adds deterministic `extensions catalog build|add|list|show|refresh|remove`, `extensions search`, `extensions install`, and origin-neutral `extensions uninstall` commands. Build accepts an author package, optional Catalog id, and output path, and requires author trust before Bun or import. Add independently requires repository trust. Marketplace search, list, and show refresh configured Catalog data by default; `--no-refresh` uses stored inert snapshots and reports age. Install accepts one configured Catalog plus a versionless Extension id, requires execution trust before its selected refresh or replay, and refreshes only that Catalog unless `--no-refresh`.
+Catalog distribution adds deterministic `extension catalog build|add|list|show|search|refresh|remove`, uniform `extension install`, provenance-aware `extension update`, and origin-neutral `extension uninstall` commands. Build accepts an author package, optional Catalog id, and output path, and requires author trust before Bun or import. Add independently requires repository trust. Marketplace search, list, and show refresh configured Catalog data by default; `--no-refresh` uses stored inert snapshots and reports age. An explicit install or update is the execution trust grant; Catalog install refreshes only its selected Catalog unless `--no-refresh`.
 
-Direct distribution keeps `extensions install <npm|git|local> <target> --extension <id>`, `extensions update <id>`, and `extensions uninstall <id> [--force]`. Both routes use the same generic installer and record. Direct update cannot take over curated state; Catalog install can replace only the same Catalog's curation; every other origin collision gives uninstall-first guidance. Missing required trust or invalid/versioned selectors exit `2` before effects; package acquisition failures exit `30`; replay, manifest, selection, integrity, definition-validation, and complete-registry conflicts exit `50`. Failed candidates never replace a prior valid pin. Normal uninstall is blocked when it would strand Source Adapter bindings; forced uninstall preserves Source-owned state and reports affected Sources unavailable. Loaded-Extension listing stays offline and reports exact generic provenance plus optional stored Catalog name/id, commit, locator, and lifecycle timestamps without implying that a newer configured Catalog pin is installed.
+Direct distribution uses `extension install <npm|git|local> <target> <extension-id>`, `extension update <id>`, and `extension uninstall <id> [--force]`. Both direct and Catalog routes use the same generic installer, record, and mutation output. Update follows persisted provenance and cannot switch origin; same-Catalog replacement retains its curation identity, while every other origin collision gives uninstall-first guidance. Invalid selectors exit `2` before effects; package acquisition failures exit `30`; replay, manifest, selection, integrity, definition-validation, and complete-registry conflicts exit `50`. Failed candidates never replace a prior valid pin. Normal uninstall is blocked when it would strand Source Adapter bindings; forced uninstall preserves Source-owned state and reports affected Sources unavailable. Loaded-Extension listing stays offline and reports exact generic provenance plus optional stored Catalog name/id, commit, locator, and lifecycle timestamps without implying that a newer configured Catalog pin is installed.
 
 | Exit | Stable meaning | Caller response |
 | ---: | --- | --- |

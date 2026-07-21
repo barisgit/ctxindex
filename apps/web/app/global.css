@@ -231,14 +231,6 @@ html > body[data-scroll-locked] {
   }
 }
 
-.ctx-hero-glow {
-  background: radial-gradient(
-    ellipse 60% 50% at 50% 0%,
-    color-mix(in oklab, var(--ctx-signal) 9%, transparent),
-    transparent 70%
-  );
-}
-
 /* Keep docs navigation anchored to the viewport on wide displays. Fumadocs'
    default grid centers the sidebar, article, and TOC as one bounded shell,
    which turns the left gutter into a visually oversized sidebar at 4K. */

@@ -9,6 +9,7 @@ import {
   buildCatalogSnapshot,
   CatalogInstallationService,
   CatalogService,
+  InstalledExtensionLifecycleService,
 } from '@ctxindex/core/catalog'
 import { dataDir } from '@ctxindex/core/paths'
 import { loadCliDefinitions } from '../definitions'
@@ -21,6 +22,7 @@ export interface ExtensionCommandServices {
   readonly catalogs: CatalogService
   readonly catalogInstallation: CatalogInstallationService
   readonly genericInstaller: GenericExtensionPackageInstaller
+  readonly lifecycle: InstalledExtensionLifecycleService
   readonly direct: DirectExtensionService
   readonly buildCatalogSnapshot: typeof buildCatalogSnapshot
   readonly loadDefinitions: typeof loadCliDefinitions
@@ -80,13 +82,19 @@ export function createExtensionCommandServices(
     dataRoot,
     installationRecords: store,
   })
+  const catalogInstallation = new CatalogInstallationService({
+    catalogs,
+    installer: genericInstaller,
+    dataRoot,
+  })
   return {
     catalogs,
     genericInstaller,
-    catalogInstallation: new CatalogInstallationService({
-      catalogs,
+    catalogInstallation,
+    lifecycle: new InstalledExtensionLifecycleService({
+      records: store,
       installer: genericInstaller,
-      dataRoot,
+      catalogInstallation,
     }),
     direct: new DirectExtensionService({ store, materializer }),
     buildCatalogSnapshot,

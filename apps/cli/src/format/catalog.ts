@@ -1,7 +1,4 @@
-import type {
-  CatalogSourceLocator,
-  GenericExtensionInstallationRecord,
-} from '@ctxindex/core'
+import type { CatalogSourceLocator } from '@ctxindex/core'
 import type {
   BuildCatalogSnapshotResult,
   CatalogManifestEntry,
@@ -39,15 +36,6 @@ function entrySourceDescription(entry: CatalogManifestEntry): string {
 function locatorDescription(locator: CatalogSourceLocator): string {
   if (locator.kind === 'package') return `package entry ${locator.entryIndex}`
   return `literal ${locator.module}#${locator.catalogId}[${locator.entryIndex}]:${locator.extensionId}`
-}
-
-function installedResolvedIdentity(
-  record: GenericExtensionInstallationRecord,
-): string {
-  if (record.source.kind === 'npm')
-    return `${record.source.exact_version}${record.source.integrity === undefined ? '' : ` (${record.source.integrity})`}`
-  if (record.source.kind === 'git') return record.source.commit
-  return record.source.content_digest
 }
 
 export function formatCatalogs(
@@ -127,19 +115,4 @@ export function formatCatalogBuild(
   }
   if (json) return JSON.stringify(value, null, 2)
   return `Built ${value.catalogId}\tExtensions: ${value.extensionCount}\tChanged: ${value.changed ? 'yes' : 'no'}\tOutput: ${value.outputPath}`
-}
-
-export function formatInstalledExtension(
-  action: 'Installed' | 'Uninstalled',
-  extension: GenericExtensionInstallationRecord,
-  json: boolean,
-): string {
-  if (json)
-    return JSON.stringify(
-      { action: action.toLowerCase(), ...extension },
-      null,
-      2,
-    )
-  const curation = extension.curation
-  return `${action} ${extension.id}\tCatalog: ${curation?.catalog_name ?? 'none'}\tCommit: ${curation?.commit ?? 'none'}\tLocator: ${curation === undefined ? 'none' : locatorDescription(curation.source_locator)}\tSource: ${extension.source.kind} ${extension.source.requested_target}\tResolved: ${installedResolvedIdentity(extension)}\tInstalled: ${extension.installed_at}\tUpdated: ${extension.updated_at}`
 }

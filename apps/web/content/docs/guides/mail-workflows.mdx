@@ -78,10 +78,10 @@ ctxindex get 'ctx://01J00000000000000000000000/message/stable-message-id' --json
 ### Load the related conversation
 
 ```sh
-ctxindex thread get 'ctx://01J00000000000000000000000/message/stable-message-id' --json
+ctxindex thread 'ctx://01J00000000000000000000000/message/stable-message-id' --json
 ```
 
-`thread get` follows stored conversation membership and parent Relations. It returns a reply tree when parent edges are available and otherwise a date-ordered list.
+`thread` follows stored conversation membership and parent Relations. It returns a reply tree when parent edges are available and otherwise a date-ordered list.
 
 </Steps>
 
@@ -90,7 +90,7 @@ ctxindex thread get 'ctx://01J00000000000000000000000/message/stable-message-id'
 A Draft is reversible provider state, not text that exists only in an agent conversation. Inspect the live Action schema before constructing input:
 
 ```sh
-ctxindex action describe communication.message.draft.create \
+ctxindex describe action communication.message.draft.create \
   --source company-mail \
   --json
 ```
@@ -146,7 +146,7 @@ The parent must belong to `company-mail`, be locally complete, and contain the p
 Inspect the current update union before constructing input:
 
 ```sh
-ctxindex action describe communication.message.draft.update \
+ctxindex describe action communication.message.draft.update \
   --source company-mail \
   --json
 ```

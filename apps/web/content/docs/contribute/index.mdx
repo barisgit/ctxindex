@@ -1,0 +1,18 @@
+---
+title: Contribute to ctxindex
+description: Work from issues and OpenSpec changes, preserve architecture boundaries, and prove each slice.
+---
+
+ctxindex is pre-alpha and developed in public. Start from a GitHub issue, follow repository branch/worktree rules, and use an OpenSpec change for non-trivial behavior.
+
+1. Read [`CONTRIBUTING.md`](https://github.com/barisgit/ctxindex/blob/main/CONTRIBUTING.md).
+2. Read `CONTEXT.md` for terminology and the relevant capability specs for behavior.
+3. Add a failing reproduction for bugs or focused tests with new behavior.
+4. Run slice gates before the full repository and strict OpenSpec gates.
+5. Refresh affected codemaps after structural changes.
+
+The CLI is the only agent integration surface. Do not add an MCP server, agent-specific integration layer, arbitrary Extension command family, or provider mutation beyond reversible email Drafts.
+
+- [Development workflow](/docs/contribute/development)
+- [Architecture and visual design](/docs/contribute/architecture-design)
+- [GitHub repository](https://github.com/barisgit/ctxindex)

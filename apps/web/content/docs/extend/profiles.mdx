@@ -1,0 +1,43 @@
+---
+title: Profiles
+description: Define stable versioned Resource semantics independently of providers and storage.
+---
+
+A Profile is the portable contract for one Resource kind. Its identity is `(id, version)`; changing payload meaning requires a new version.
+
+```ts
+import { defineProfile, z } from '@ctxindex/extension-sdk'
+
+export const noteProfile = defineProfile({
+  id: 'acme.note',
+  version: 1,
+  schema: z.object({
+    title: z.string(),
+    body: z.string(),
+    pinned: z.boolean(),
+  }).strict(),
+  search: {
+    title: (note) => note.title,
+    chunks: (note) => [note.body],
+    fields: {
+      pinned: { type: 'boolean', extract: (note) => note.pinned },
+    },
+  },
+  exports: {
+    markdown: {
+      mediaType: 'text/markdown',
+      render: (note) => `# ${note.title}\n\n${note.body}\n`,
+    },
+  },
+})
+```
+
+Profiles may define:
+
+- validated payload schema and derived search title, summary, time, chunks, and typed fields;
+- Relations to other Refs or natural-key fields;
+- Artifact descriptors for bytes an Adapter can download on demand;
+- deterministic export renderers;
+- typed Action declarations with reversible or irreversible effect metadata.
+
+The Profile never performs provider I/O and does not own Source configuration. Import it into every Adapter that emits that Resource shape.

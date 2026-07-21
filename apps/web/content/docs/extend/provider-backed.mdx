@@ -1,0 +1,113 @@
+---
+title: Provider-backed Extension quickstart
+description: Define OAuth policy, a public App, scoped provider access, and a remote-search Adapter through exact imports.
+---
+
+The tested [`examples/issues-extension`](https://github.com/barisgit/ctxindex/tree/main/examples/issues-extension) package is a compact complete graph. Its endpoints use the reserved `.invalid` domain and its public client id is a non-secret fixture.
+
+## Provider and Profile
+
+```ts
+import {
+  auth,
+  defineProfile,
+  defineProvider,
+  z,
+} from '@ctxindex/extension-sdk'
+
+export const issueProfile = defineProfile({
+  id: 'example.issue',
+  version: 1,
+  schema: z.object({
+    id: z.string(),
+    title: z.string(),
+    state: z.enum(['open', 'closed']),
+    updatedAt: z.string().datetime(),
+  }).strict(),
+  search: {
+    title: (issue) => issue.title,
+    occurredAt: (issue) => new Date(issue.updatedAt),
+    fields: {
+      state: { type: 'string', extract: (issue) => issue.state },
+    },
+  },
+})
+
+export const projectProvider = defineProvider({
+  id: 'example.projects',
+  auth: auth.oauth2({
+    authorizationUrl: 'https://auth.example.invalid/authorize',
+    tokenUrl: 'https://auth.example.invalid/token',
+    identity: {
+      url: 'https://api.example.invalid/me',
+      subjectPath: ['id'],
+      labelPaths: [['email']],
+      identities: [{ kind: 'email', path: ['email'] }],
+    },
+    pkce: { method: 'S256', required: true },
+    registration: {
+      type: 'public',
+      configSchema: z.object({ clientId: z.string() }).strict(),
+      environment: { clientId: 'EXAMPLE_PROJECTS_CLIENT_ID' },
+    },
+    baseScopes: ['openid', 'email'],
+    allowedHosts: ['auth.example.invalid', 'api.example.invalid'],
+  }),
+})
+```
+
+The Provider owns identity/authentication, registration shape, base scopes, and its complete allowed-host boundary.
+
+## OAuth App, Adapter, and Extension
+
+```ts
+import {
+  defineAdapter,
+  defineExtension,
+  defineOAuthApp,
+  docs,
+  z,
+} from '@ctxindex/extension-sdk'
+import { issueProfile, projectProvider } from './definitions'
+
+export const desktopApp = defineOAuthApp(projectProvider, {
+  label: 'desktop',
+  config: { clientId: 'example-public-client-id' },
+})
+
+export const issueAdapter = defineAdapter({
+  id: 'example.issues',
+  provider: projectProvider,
+  access: { scopes: ['issues.read'] },
+  providerApiHosts: ['api.example.invalid'],
+  configSchema: z.object({ project: z.string() }).strict(),
+  profiles: [issueProfile],
+  routing: 'federated',
+  capabilities: ['search-remote'],
+  operations: {
+    searchRemote: async (context) => {
+      const response = await context.fetch('https://api.example.invalid/issues', {
+        signal: context.signal,
+      })
+      if (!response.ok) throw new Error(`Issue search failed: ${response.status}`)
+      const items = await response.json()
+      return {
+        resources: normalizeIssues(items, context.source.id, issueProfile),
+        warnings: [],
+      }
+    },
+  },
+  actions: {},
+})
+
+export default defineExtension({
+  id: 'example.issues',
+  oauthApps: [desktopApp],
+  adapters: [issueAdapter],
+  docs: docs('./docs'),
+})
+```
+
+Use the [complete checked source](https://github.com/barisgit/ctxindex/blob/main/examples/issues-extension/extension.ts) when copying: it validates Source config and provider JSON, propagates cancellation, encodes paths, and returns typed result envelopes.
+
+Adapter scopes are the access required by this Source behavior. Core computes the effective authorization union from the Provider's base scopes and the selected compatible Source Adapters. OAuth App config remains public registration metadata; local Accounts and Grants are private runtime state.

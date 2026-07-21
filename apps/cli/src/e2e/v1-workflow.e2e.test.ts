@@ -281,7 +281,7 @@ test('real binary proves the isolated complete V1 workflow', async () => {
     ).toHaveLength(1)
 
     mock.resetRequests()
-    const thread = await sandbox.run(['thread', 'get', replyRef, '--json'], {
+    const thread = await sandbox.run(['thread', replyRef, '--json'], {
       env,
     })
     const threadJson = jsonOutput(thread) as {

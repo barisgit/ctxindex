@@ -460,7 +460,6 @@ export async function runMailboxRetrievalArtifactReplay(
 
     const thread = await runOk(harness, active.env, [
       'thread',
-      'get',
       replyRef,
       '--json',
     ])
@@ -505,8 +504,8 @@ export async function runMailboxRetrievalArtifactReplay(
     expect(providerRequests(driver, active)).toEqual([])
 
     const purged = await runOk(harness, active.env, [
+      'artifact',
       'purge',
-      'artifacts',
       '--json',
     ])
     expect(JSON.parse(purged.stdout)).toMatchObject({

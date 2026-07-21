@@ -1,16 +1,4 @@
-import type {
-  DirectExtensionInventoryEntry,
-  DirectExtensionUninstallResult,
-} from '@ctxindex/core'
-
-export function formatDirectExtension(
-  verb: 'Installed' | 'Updated',
-  extension: DirectExtensionInventoryEntry,
-  json: boolean,
-): string {
-  if (json) return JSON.stringify(extension, null, 2)
-  return `${verb} ${extension.id}\tSource: ${extension.sourceKind} ${extension.requestedTarget}\tResolved: ${extension.resolvedIdentity}\tMaterialization: ${extension.materializationDigest}\tInstalled: ${extension.installedAt}\tUpdated: ${extension.updatedAt}`
-}
+import type { DirectExtensionUninstallResult } from '@ctxindex/core'
 
 export function formatDirectExtensionUninstall(
   result: DirectExtensionUninstallResult,

@@ -665,7 +665,7 @@ export async function smokeCliPackage(
     `[extensions]\npaths = ${JSON.stringify([extensionPath])}\n\n[secrets]\nbackend = "file"\n\n[log]\nlevel = "info"\n\n[log.file]\nrotate = "daily"\nretain_days = 14\ncompress = true\n`,
   )
   const extensions = JSON.parse(
-    (await cli(['extensions', 'list', '--json'])).stdout,
+    (await cli(['extension', 'list', '--json'])).stdout,
   ) as readonly { readonly id?: string }[]
   if (!extensions.some(({ id }) => id === 'fixture.installed-package')) {
     throw new Error(

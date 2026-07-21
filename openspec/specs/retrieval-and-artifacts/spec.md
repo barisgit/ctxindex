@@ -17,15 +17,15 @@ For V1, `get <ref>` SHALL return a complete Resource from local materialization 
 - **THEN** the Adapter retrieves the complete Resource and core returns and caches it as `adhoc`
 
 ### Requirement: Thread retrieval uses generic Relations
-For V1, `thread get <ref>` SHALL return the union of provider conversation membership and bidirectional `parent` Relation traversal. It MUST present a tree when parent edges exist and otherwise a flat date-ordered list.
+For V1, `thread <ref>` SHALL return the union of provider conversation membership and bidirectional `parent` Relation traversal. It MUST present a tree when parent edges exist and otherwise a flat date-ordered list.
 
 #### Scenario: Reply tree is assembled across arrival order
 - **WHEN** related Gmail messages have conversation membership and parent Relations that were stored in any order
-- **THEN** `thread get` returns their complete union as a reply tree
+- **THEN** `thread` returns their complete union as a reply tree
 
 #### Scenario: Conversation without parent edges is ordered
 - **WHEN** conversation members have no resolvable parent Relations
-- **THEN** `thread get` returns a flat list ordered by date
+- **THEN** `thread` returns a flat list ordered by date
 
 ### Requirement: Managed Artifact lifecycle
 For V1, Artifact bytes SHALL use a content-addressed managed store with media type, size, origin Ref, and retention metadata. Download MUST use cached bytes when present and otherwise the Adapter's `download` capability; `--output` MUST copy bytes without transferring store ownership. Sync MUST NOT fetch all Artifact bytes by default, and the store SHALL support explicit purge and disk accounting.
@@ -39,14 +39,14 @@ For V1, Artifact bytes SHALL use a content-addressed managed store with media ty
 - **THEN** core serves the stored bytes without provider I/O
 
 ### Requirement: V1 Artifact retention is explicit cached state
-For V1, every materialized Artifact byte object SHALL use the retention class `cached`. Cached bytes MUST be fetched only on demand, retained indefinitely, and removed only by explicit `ctxindex purge artifacts`. V1 MUST NOT automatically evict Artifact bytes by age, quota, or storage pressure. Purge MUST remove managed bytes and cache metadata without removing the owning Resource or its Profile-derived Artifact descriptor, so a later download can fetch the bytes again.
+For V1, every materialized Artifact byte object SHALL use the retention class `cached`. Cached bytes MUST be fetched only on demand, retained indefinitely, and removed only by explicit `ctxindex artifact purge`. V1 MUST NOT automatically evict Artifact bytes by age, quota, or storage pressure. Purge MUST remove managed bytes and cache metadata without removing the owning Resource or its Profile-derived Artifact descriptor, so a later download can fetch the bytes again.
 
 #### Scenario: Lazy download remains cached
 - **WHEN** an uncached Artifact is downloaded successfully
 - **THEN** its bytes are stored with retention class `cached` and remain available for cache reuse until explicit purge
 
 #### Scenario: Explicit purge preserves rediscovery
-- **WHEN** the caller runs `ctxindex purge artifacts`
+- **WHEN** the caller runs `ctxindex artifact purge`
 - **THEN** managed Artifact bytes and cache metadata are removed while owning Resources and their Artifact descriptors remain available for a later re-download
 
 ### Requirement: Profile-declared export
@@ -68,7 +68,7 @@ For V1, `microsoft.mailbox` Resources SHALL use the existing complete Resource r
 - **THEN** the owning Adapter retrieves and caches a complete `communication.message` Resource through the generic path
 
 #### Scenario: Outlook thread uses Relations
-- **WHEN** a caller runs `thread get` for related Microsoft messages
+- **WHEN** a caller runs `thread` for related Microsoft messages
 - **THEN** generic Relation traversal returns their deterministic union without a provider-specific thread command
 
 #### Scenario: Outlook attachment uses the managed cache
@@ -93,7 +93,7 @@ The system MUST preserve the following contract without changing the normative f
 
 Retrieval: `get <ref>` MUST return the complete resource, serving from local rows when present and invoking the adapter's `retrieve` capability otherwise. Retrieved resources are cached as `adhoc` rows ([generic storage](../generic-storage/spec.md)).
 
-Thread retrieval: `thread get <ref>` MUST return the union of provider conversation membership and the reply-tree walk over `parent` relations in both directions, presenting a tree when parent edges exist and a flat, date-ordered list otherwise.
+Thread retrieval: `thread <ref>` MUST return the union of provider conversation membership and the reply-tree walk over `parent` relations in both directions, presenting a tree when parent edges exist and a flat, date-ordered list otherwise.
 
 Artifacts: artifact bytes MUST live in a content-addressed store with recorded media type, size, origin ref, and retention class. Downloads MUST be served from the store when present (cache) and via the adapter's `download` capability otherwise. `--output` copies bytes to a caller path; the store remains the system of record. Artifact retention during sync is policy-driven and MUST NOT default to fetching all bytes. The store MUST support purge and disk accounting.
 

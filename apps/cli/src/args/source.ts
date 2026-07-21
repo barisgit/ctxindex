@@ -1,36 +1,5 @@
 import { compareStrings, type SourceDescription } from '@ctxindex/core/registry'
-import {
-  type FlagValue,
-  hasHelpFlag,
-  listFlag,
-  parseFlags,
-  stringFlag,
-} from './flags'
-
-export type SourceArgs =
-  | {
-      readonly kind: 'add'
-      readonly adapterId: string
-      readonly realmSlug?: string
-      readonly label?: string
-      readonly configJson?: string
-      readonly account?: string
-      readonly searchRouting?: 'indexed' | 'federated' | 'hybrid'
-      readonly syncEnabled?: boolean
-    }
-  | {
-      readonly kind: 'list'
-      readonly realmSlug?: string
-      readonly json: boolean
-      readonly format: 'table' | 'compact'
-    }
-  | { readonly kind: 'remove'; readonly sourceId: string }
-  | { readonly kind: 'help' }
-  | { readonly kind: 'unknown'; readonly message: string }
-
-export type SourceArgsPreflight =
-  | SourceArgs
-  | { readonly kind: 'needs-definitions' }
+import type { CtxParsedArgs } from '../command-model'
 
 export type SourceArgumentDescription = Pick<SourceDescription, 'id'> & {
   readonly configOptions: readonly {
@@ -43,30 +12,140 @@ export type SourceArgumentDescription = Pick<SourceDescription, 'id'> & {
   }[]
 }
 
-export const sourceUsage =
-  'source add <adapter-id> [--realm <slug>] [--label <label>] [--account <label|account-id>] [--config-json <json>|--config-* <value>] [--search-routing indexed|federated|hybrid] [--no-sync] | source list [--realm <slug>] [--format table|compact] [--json] | source remove <label|source-id>'
+export function needsDynamicSourceArgs(
+  invocationArgs: readonly string[],
+): boolean {
+  if (invocationArgs.includes('--help') || invocationArgs.includes('-h')) {
+    return true
+  }
+  return invocationArgs.some((token) => {
+    const name = token.split('=', 1)[0]
+    return name?.startsWith('--config-') === true && name !== '--config-json'
+  })
+}
+
+export const sourceAddBaseArgs = {
+  adapter: { type: 'string', description: 'Adapter ID' },
+  label: { type: 'string', description: 'Global Source label' },
+  account: {
+    type: 'string',
+    description: 'Account label or Account ID',
+  },
+  'config-json': { type: 'string', description: 'Adapter config JSON' },
+  'search-routing': {
+    type: 'enum',
+    options: ['indexed', 'federated', 'hybrid'] as [
+      'indexed',
+      'federated',
+      'hybrid',
+    ],
+    description: 'Source search routing override',
+  },
+  'no-sync': {
+    type: 'boolean',
+    description: 'Disable synchronization for this Source',
+  },
+  'adapter-id': {
+    type: 'positional',
+    required: false,
+    description: 'Adapter ID',
+  },
+  realm: { type: 'string', description: 'Realm slug' },
+} as const
+
+export const sourceListArgs = {
+  realm: { type: 'string', description: 'Realm slug' },
+  format: {
+    type: 'enum',
+    options: ['table', 'compact'] as ['table', 'compact'],
+    default: 'table',
+    description: 'Output format',
+  },
+  json: { type: 'boolean', description: 'Print JSON' },
+} as const
+
+export const sourceRemoveArgs = {
+  source: {
+    type: 'positional',
+    required: true,
+    description: 'Exact Source label or ID',
+  },
+} as const
+
+type GeneratedSourceConfigArg = {
+  readonly type: 'string'
+  readonly description: string
+  readonly multiple?: true
+}
 
 export function generatedSourceConfigArgs(
   sources: readonly SourceArgumentDescription[],
-): Record<string, { type: 'string'; description: string }> {
-  const byFlag = new Map<string, string[]>()
+): Record<string, GeneratedSourceConfigArg> {
+  const byFlag = new Map<
+    string,
+    { descriptions: string[]; multiple: boolean }
+  >()
   for (const source of [...sources].sort((left, right) =>
     compareStrings(left.id, right.id),
   )) {
     for (const option of source.configOptions) {
       const description = `${source.id}: ${option.property} (${option.type}${option.required ? ', required' : ''}${option.default !== undefined ? `, default ${JSON.stringify(option.default)}` : ''})`
       const flag = option.flag.slice(2)
-      byFlag.set(flag, [...(byFlag.get(flag) ?? []), description])
+      const existing = byFlag.get(flag)
+      byFlag.set(flag, {
+        descriptions: [...(existing?.descriptions ?? []), description],
+        multiple: (existing?.multiple ?? false) || option.type.endsWith('[]'),
+      })
     }
   }
   return Object.fromEntries(
     [...byFlag.entries()]
       .sort(([left], [right]) => compareStrings(left, right))
-      .map(([flag, descriptions]) => [
+      .map(([flag, value]) => [
         flag,
-        { type: 'string' as const, description: descriptions.join('; ') },
+        {
+          type: 'string' as const,
+          description: value.descriptions.join('; '),
+          ...(value.multiple ? { multiple: true as const } : {}),
+        },
       ]),
   )
+}
+
+export function sourceAddArgs(sources: readonly SourceArgumentDescription[]) {
+  return {
+    ...sourceAddBaseArgs,
+    ...generatedSourceConfigArgs(sources),
+  }
+}
+
+export type SourceAddCommandArgs = CtxParsedArgs<
+  ReturnType<typeof sourceAddArgs>
+>
+export type SourceListCommandArgs = CtxParsedArgs<typeof sourceListArgs>
+export type SourceRemoveCommandArgs = CtxParsedArgs<typeof sourceRemoveArgs>
+
+export interface ResolvedSourceAddArgs {
+  readonly adapterId: string
+  readonly realmSlug?: string
+  readonly label?: string
+  readonly configJson?: string
+  readonly account?: string
+  readonly searchRouting?: 'indexed' | 'federated' | 'hybrid'
+  readonly syncEnabled?: boolean
+}
+
+function invalid(message: string): never {
+  throw Object.assign(new Error(message), { code: 'invalid_args' })
+}
+
+export function resolveSourceAdapterId(args: SourceAddCommandArgs): string {
+  if (args.adapter !== undefined && args['adapter-id'] !== undefined) {
+    invalid('source add: cannot use both positional <adapter-id> and --adapter')
+  }
+  const adapterId = args.adapter ?? args['adapter-id']
+  if (!adapterId) invalid('source add: missing <adapter-id>')
+  return adapterId
 }
 
 function parsePrimitive(value: string, type: string): unknown {
@@ -74,305 +153,96 @@ function parsePrimitive(value: string, type: string): unknown {
     try {
       return JSON.parse(value)
     } catch {
-      throw new Error('invalid JSON')
+      invalid('source add: invalid JSON')
     }
   }
   if (type === 'string') return value
   if (type === 'boolean') {
     if (value === 'true') return true
     if (value === 'false') return false
-    throw new Error('invalid boolean')
+    invalid('source add: invalid boolean')
   }
   if (type === 'integer') {
-    if (!/^-?(0|[1-9]\d*)$/.test(value)) throw new Error('invalid integer')
+    if (!/^-?(0|[1-9]\d*)$/.test(value)) invalid('source add: invalid integer')
     const parsed = Number(value)
-    if (!Number.isSafeInteger(parsed)) throw new Error('invalid integer')
+    if (!Number.isSafeInteger(parsed)) invalid('source add: invalid integer')
     return parsed
   }
   if (type === 'number') {
     if (!/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(value)) {
-      throw new Error('invalid number')
+      invalid('source add: invalid number')
     }
     const parsed = Number(value)
-    if (!Number.isFinite(parsed)) throw new Error('invalid number')
+    if (!Number.isFinite(parsed)) invalid('source add: invalid number')
     return parsed
   }
-  throw new Error(`unsupported type ${type}`)
+  invalid(`source add: unsupported type ${type}`)
 }
 
-function configJson(
-  flags: Record<string, FlagValue>,
-  source: SourceArgumentDescription | undefined,
-): { value?: string; message?: string } {
-  const existing = stringFlag(flags, 'config-json')
-  const configFlags = Object.keys(flags).filter(
-    (flag) => flag.startsWith('config-') && flag !== 'config-json',
-  )
-  if (existing && configFlags.length > 0) {
-    return {
-      message:
-        'source add: cannot combine --config-json with generated config options',
+function suppliedConfigValues(
+  args: SourceAddCommandArgs,
+): ReadonlyMap<string, string | readonly string[]> {
+  const supplied = new Map<string, string | readonly string[]>()
+  for (const [name, value] of Object.entries(args)) {
+    if (name === 'config-json' || !name.startsWith('config-')) continue
+    if (typeof value === 'string') supplied.set(name, value)
+    else if (Array.isArray(value) && value.length > 0) {
+      supplied.set(name, value as readonly string[])
     }
   }
-  if (existing) return { value: existing }
-  if (configFlags.length === 0) return {}
-  const options = new Map(
-    (source?.configOptions ?? []).map((option) => [
-      option.flag.slice(2),
-      option,
-    ]),
-  )
-  const config: Record<string, unknown> = {}
-  for (const flag of configFlags) {
-    const option = options.get(flag)
-    if (!option) return { message: `source add: unknown option --${flag}` }
-    const isArray = option.type.endsWith('[]')
-    const type = isArray ? option.type.slice(0, -2) : option.type
-    const values = listFlag(flags, flag)
-    if (values.length === 0) {
-      return { message: `source add: --${flag} requires a value` }
-    }
-    if (!isArray && values.length > 1) {
-      return { message: `source add: --${flag} cannot be repeated` }
-    }
-    try {
-      const parsed = values.map((value) => parsePrimitive(value, type))
-      config[option.property] = isArray ? parsed : parsed.at(-1)
-    } catch (error) {
-      return {
-        message: `source add: ${String((error as Error).message)} for --${flag}`,
-      }
-    }
-  }
-  return { value: JSON.stringify(config) }
+  return supplied
 }
 
-function repeatedScalarOption(
-  flags: Record<string, FlagValue>,
-  keys: readonly string[],
-): string | undefined {
-  return keys.find((key) => Array.isArray(flags[key]))
-}
+export function resolveSourceAddArgs(
+  args: SourceAddCommandArgs,
+  sources: readonly SourceArgumentDescription[],
+): ResolvedSourceAddArgs {
+  const adapterId = resolveSourceAdapterId(args)
+  const source = sources.find((candidate) => candidate.id === adapterId)
+  if (!source) invalid(`source add: unknown adapter id "${adapterId}"`)
 
-export function parseSourceArgs(
-  args: string[],
-  sources: readonly SourceArgumentDescription[] = [],
-): SourceArgs {
-  if (hasHelpFlag(args)) return { kind: 'help' }
-  const [subcommand, ...rest] = args
-  const valueFlags = sources.flatMap((source) =>
-    source.configOptions.map((option) => option.flag.slice(2)),
-  )
-  if (subcommand === 'add') {
-    if (rest.some((arg) => arg.startsWith('--no-sync='))) {
-      return {
-        kind: 'unknown',
-        message: 'source add: --no-sync does not take a value',
-      }
-    }
-    if (rest.filter((arg) => arg === '--no-sync').length > 1) {
-      return {
-        kind: 'unknown',
-        message: 'source add: --no-sync cannot be repeated',
-      }
-    }
-    const { flags, positional } = parseFlags(rest, {
-      valueFlags,
-      booleanFlags: ['no-sync'],
-    })
-    if (positional.length > 1)
-      return {
-        kind: 'unknown',
-        message: `source add: unexpected positional argument "${positional[1]}"`,
-      }
-    const adapterFlag = stringFlag(flags, 'adapter')
-    if (adapterFlag !== undefined && positional[0] !== undefined)
-      return {
-        kind: 'unknown',
-        message:
-          'source add: cannot use both positional <adapter-id> and --adapter',
-      }
-    const rawAdapterId = adapterFlag ?? positional[0]
-    if (!rawAdapterId)
-      return { kind: 'unknown', message: 'source add: missing <adapter-id>' }
-    const adapterId = rawAdapterId
-    const source = sources.find((candidate) => candidate.id === adapterId)
-    const allowed = new Set([
-      'adapter',
-      'realm',
-      'label',
-      'account',
-      'config-json',
-      'search-routing',
-      'no-sync',
-      ...(source?.configOptions.map((option) => option.flag.slice(2)) ?? []),
-    ])
-    const unknown = Object.keys(flags).find((flag) => !allowed.has(flag))
-    if (unknown)
-      return {
-        kind: 'unknown',
-        message: `source add: unknown option --${unknown}`,
-      }
-    const valueFlag = Object.entries(flags).find(
-      ([flag, value]) =>
-        flag !== 'no-sync' &&
-        allowed.has(flag) &&
-        (value === true || value === ''),
+  const supplied = suppliedConfigValues(args)
+  if (args['config-json'] !== undefined && supplied.size > 0) {
+    invalid(
+      'source add: cannot combine --config-json with generated config options',
     )
-    if (valueFlag)
-      return {
-        kind: 'unknown',
-        message: `source add: --${valueFlag[0]} requires a value`,
-      }
-    const repeated = repeatedScalarOption(flags, [
-      'adapter',
-      'realm',
-      'label',
-      'account',
-      'config-json',
-      'search-routing',
-    ])
-    if (repeated)
-      return {
-        kind: 'unknown',
-        message: `source add: --${repeated} cannot be repeated`,
-      }
-    if (!source)
-      return {
-        kind: 'unknown',
-        message: `source add: unknown adapter id "${adapterId}"`,
-      }
-    const config = configJson(flags, source)
-    if (config.message) return { kind: 'unknown', message: config.message }
-    let result: Extract<SourceArgs, { kind: 'add' }> = {
-      kind: 'add',
-      adapterId,
-    }
-    const realmSlug = stringFlag(flags, 'realm')
-    const label = stringFlag(flags, 'label')
-    if (realmSlug) result = { ...result, realmSlug }
-    if (label) result = { ...result, label }
-    if (config.value) result = { ...result, configJson: config.value }
-    const account = stringFlag(flags, 'account')
-    if (account) result = { ...result, account }
-    const searchRouting = stringFlag(flags, 'search-routing')
-    if (
-      searchRouting !== undefined &&
-      searchRouting !== 'indexed' &&
-      searchRouting !== 'federated' &&
-      searchRouting !== 'hybrid'
-    ) {
-      return {
-        kind: 'unknown',
-        message: `source add: invalid --search-routing: ${searchRouting}`,
-      }
-    }
-    if (searchRouting) result = { ...result, searchRouting }
-    if (flags['no-sync'] === true) result = { ...result, syncEnabled: false }
-    return result
   }
-  const { flags, positional } = parseFlags(rest, { valueFlags })
-  if (subcommand === 'list') {
-    if (positional.length > 0)
-      return {
-        kind: 'unknown',
-        message: `source list: unexpected positional argument "${positional[0]}"`,
-      }
-    const allowed = new Set(['realm', 'format', 'json'])
-    const unknown = Object.keys(flags).find((flag) => !allowed.has(flag))
-    if (unknown)
-      return {
-        kind: 'unknown',
-        message: `source list: unknown option --${unknown}`,
-      }
-    const valueFlag = ['realm', 'format'].find(
-      (flag) => flags[flag] === true || flags[flag] === '',
+
+  let configJson = args['config-json']
+  if (supplied.size > 0) {
+    const options = new Map(
+      source.configOptions.map((option) => [option.flag.slice(2), option]),
     )
-    if (valueFlag)
-      return {
-        kind: 'unknown',
-        message: `source list: --${valueFlag} requires a value`,
+    const config: Record<string, unknown> = {}
+    for (const [flag, raw] of supplied) {
+      const option = options.get(flag)
+      if (!option) invalid(`source add: unknown option --${flag}`)
+      const isArray = option.type.endsWith('[]')
+      const type = isArray ? option.type.slice(0, -2) : option.type
+      const values = Array.isArray(raw) ? raw : [raw]
+      if (!isArray && values.length > 1) {
+        invalid(`source add: --${flag} cannot be repeated`)
       }
-    if (flags.json !== undefined && flags.json !== true)
-      return {
-        kind: 'unknown',
-        message: 'source list: --json does not take a value',
-      }
-    const repeated = repeatedScalarOption(flags, ['realm', 'format'])
-    if (repeated)
-      return {
-        kind: 'unknown',
-        message: `source list: --${repeated} cannot be repeated`,
-      }
-    const realmSlug = stringFlag(flags, 'realm')
-    const rawFormat = stringFlag(flags, 'format') ?? 'table'
-    if (rawFormat !== 'table' && rawFormat !== 'compact') {
-      return {
-        kind: 'unknown',
-        message: `source list: invalid --format: ${rawFormat}`,
+      try {
+        const parsed = values.map((value) => parsePrimitive(value, type))
+        config[option.property] = isArray ? parsed : parsed.at(-1)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        invalid(`${message} for --${flag}`)
       }
     }
-    return realmSlug
-      ? {
-          kind: 'list',
-          realmSlug,
-          json: flags.json === true,
-          format: rawFormat,
-        }
-      : { kind: 'list', json: flags.json === true, format: rawFormat }
+    configJson = JSON.stringify(config)
   }
-  if (subcommand === 'remove') {
-    const unknown = Object.keys(flags)[0]
-    if (unknown)
-      return {
-        kind: 'unknown',
-        message: `source remove: unknown option --${unknown}`,
-      }
-    if (positional.length > 1)
-      return {
-        kind: 'unknown',
-        message: `source remove: unexpected positional argument "${positional[1]}"`,
-      }
-    const sourceId = positional[0]
-    return sourceId
-      ? { kind: 'remove', sourceId }
-      : { kind: 'unknown', message: 'source remove: missing <label|source-id>' }
-  }
+
   return {
-    kind: 'unknown',
-    message: `source: unknown subcommand "${subcommand ?? ''}"`,
+    adapterId,
+    ...(args.realm === undefined ? {} : { realmSlug: args.realm }),
+    ...(args.label === undefined ? {} : { label: args.label }),
+    ...(configJson === undefined ? {} : { configJson }),
+    ...(args.account === undefined ? {} : { account: args.account }),
+    ...(args['search-routing'] === undefined
+      ? {}
+      : { searchRouting: args['search-routing'] }),
+    ...(args.sync === false ? { syncEnabled: false } : {}),
   }
-}
-
-export function preflightSourceArgs(args: string[]): SourceArgsPreflight {
-  if (args[0] !== 'add' || hasHelpFlag(args)) return parseSourceArgs(args)
-
-  const configFlags = args
-    .filter((arg) => arg.startsWith('--config-'))
-    .map((arg) => arg.slice(2).split('=', 1)[0])
-    .filter(
-      (flag): flag is string => flag !== undefined && flag !== 'config-json',
-    )
-  const { flags, positional } = parseFlags(args.slice(1), {
-    valueFlags: configFlags,
-    booleanFlags: ['no-sync'],
-  })
-  const adapterId = stringFlag(flags, 'adapter') ?? positional[0]
-  const parsed = parseSourceArgs(
-    args,
-    adapterId
-      ? [
-          {
-            id: adapterId,
-            configOptions: configFlags.map((flag) => ({
-              property: flag,
-              flag: `--${flag}`,
-              type: 'string[]',
-              required: false,
-            })),
-          },
-        ]
-      : [],
-  )
-  return parsed.kind === 'add' ? { kind: 'needs-definitions' } : parsed
 }

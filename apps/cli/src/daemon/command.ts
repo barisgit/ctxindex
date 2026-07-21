@@ -1,7 +1,6 @@
 import { accessSync, constants, statSync } from 'node:fs'
 import { basename, isAbsolute, join } from 'node:path'
-import { defineCommand } from 'citty'
-import { daemonUsage, parseDaemonArgs } from '../args/daemon'
+import { defineCtxCommand } from '../command-model'
 import { mapErrorToExit, runWithExit } from '../format/exit'
 import {
   type DaemonSelection,
@@ -95,6 +94,11 @@ export interface DaemonCommandDeps {
   readonly serve: () => Promise<number>
 }
 
+export type DaemonCommandInput =
+  | { readonly kind: 'serve' }
+  | { readonly kind: 'health'; readonly json: boolean }
+  | { readonly kind: 'shutdown'; readonly json: boolean }
+
 const defaultDeps: DaemonCommandDeps = {
   select: requireDaemonSelection,
   health: daemonHealth,
@@ -103,15 +107,9 @@ const defaultDeps: DaemonCommandDeps = {
 }
 
 export async function handleDaemonCommand(
-  args: string[],
+  parsed: DaemonCommandInput,
   deps: DaemonCommandDeps = defaultDeps,
 ): Promise<number> {
-  const parsed = parseDaemonArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(`${parsed.message}. Try: ${daemonUsage}`)
-    return 2
-  }
   if (parsed.kind === 'serve') return deps.serve()
 
   const controller = new AbortController()
@@ -134,25 +132,28 @@ export async function handleDaemonCommand(
   }
 }
 
-export const daemonCommand = defineCommand({
+export const daemonCommand = defineCtxCommand({
   meta: { name: 'daemon', description: 'Manage the foreground local daemon.' },
   subCommands: {
-    serve: defineCommand({
+    serve: defineCtxCommand({
       meta: { name: 'serve', description: 'Serve in the foreground.' },
-      run: ({ rawArgs }) =>
-        runWithExit(() => handleDaemonCommand(['serve', ...rawArgs])),
+      run: () => runWithExit(() => handleDaemonCommand({ kind: 'serve' })),
     }),
-    health: defineCommand({
+    health: defineCtxCommand({
       meta: { name: 'health', description: 'Inspect daemon health.' },
       args: { json: { type: 'boolean', description: 'Print JSON' } },
-      run: ({ rawArgs }) =>
-        runWithExit(() => handleDaemonCommand(['health', ...rawArgs])),
+      run: ({ args }) =>
+        runWithExit(() =>
+          handleDaemonCommand({ kind: 'health', json: args.json ?? false }),
+        ),
     }),
-    shutdown: defineCommand({
+    shutdown: defineCtxCommand({
       meta: { name: 'shutdown', description: 'Request graceful shutdown.' },
       args: { json: { type: 'boolean', description: 'Print JSON' } },
-      run: ({ rawArgs }) =>
-        runWithExit(() => handleDaemonCommand(['shutdown', ...rawArgs])),
+      run: ({ args }) =>
+        runWithExit(() =>
+          handleDaemonCommand({ kind: 'shutdown', json: args.json ?? false }),
+        ),
     }),
   },
 })

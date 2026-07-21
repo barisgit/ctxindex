@@ -38,7 +38,7 @@ test('init delegates retained database lifecycle outside commands', async () => 
 test('test fixtures may import commands and name provider URLs', async () => {
   const violations = await lintFiles([
     'apps/cli/src/commands/registry-interface.test.ts',
-    'apps/cli/src/args/oauth-app.test.ts',
+    'apps/cli/src/oauth-app/handle-oauth-app-command.test.ts',
   ])
 
   expect(violations).toEqual([])

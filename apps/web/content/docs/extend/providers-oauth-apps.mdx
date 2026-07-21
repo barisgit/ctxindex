@@ -1,0 +1,37 @@
+---
+title: Providers, authentication, and OAuth Apps
+description: Separate reusable provider policy, public App definitions, and local authorization state.
+---
+
+## Provider
+
+A Provider owns external-service identity, one current auth method (`auth.oauth2(...)` or `auth.none()`), registration policy, base scopes, and the allowed hosts its authentication flow may contact.
+
+Provider ids are stable semantic identity. At most one non-conflicting definition for an id can be active.
+
+## OAuth App
+
+`defineOAuthApp(exactProvider, { label, config })` binds one public registration definition to an exact imported OAuth2 Provider. Its identity is `(providerId, label)`.
+
+```ts
+export const publicDesktopApp = defineOAuthApp(microsoftProvider, {
+  label: 'desktop',
+  config: { clientId: 'provider-issued-public-application-id' },
+})
+```
+
+The label is Provider-scoped and may contain readable text allowed by the validated label contract; it is not a global definition id. Duplicate App identities always conflict, including repetition of the same object.
+
+An Extension App is permitted only when the Provider registration policy is public. Confidential Apps remain local secret-backed BYOA state.
+
+## Runtime state is separate
+
+- An **OAuth App** is public definition metadata or local BYOA configuration.
+- An **Account** is one stable authenticated provider identity.
+- A private **Grant** owns token references, permissions, and the selected App configuration snapshot.
+
+Removing an Extension App blocks future selection but does not invalidate existing Grant snapshots. Inventory intentionally omits App config and secret-bearing state.
+
+## Reuse across packages
+
+If another Extension needs the Provider, it imports the exact Provider value from its package. It does not copy a string ref. If a Git-only Extension wants type-safe reuse, package-manager Git dependencies work like any other dependency; npm publication is optional.

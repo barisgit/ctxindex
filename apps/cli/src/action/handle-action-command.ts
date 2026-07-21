@@ -1,11 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { describeAction, runAction } from '@ctxindex/core/action'
 import { CtxindexValidationError } from '@ctxindex/core/errors'
-import {
-  actionDescribeUsage,
-  actionRunUsage,
-  parseActionArgs,
-} from '../args/action'
 import { type CliDeps, openDeps } from '../deps'
 import { formatActionDescribeText, formatActionRunText } from '../format/action'
 import { mapErrorToExit } from '../format/exit'
@@ -25,6 +20,21 @@ const actionServices: ActionServices = {
   describe: describeAction,
   run: runAction,
 }
+
+export type ActionCommandInput =
+  | {
+      readonly kind: 'describe'
+      readonly actionId: string
+      readonly sourceId?: string
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'run'
+      readonly actionId: string
+      readonly sourceId: string
+      readonly input: string
+      readonly json: boolean
+    }
 
 function invalidInput(): CtxindexValidationError {
   return new CtxindexValidationError(
@@ -48,23 +58,14 @@ export async function parseActionInput(value: string): Promise<unknown> {
 }
 
 export async function handleActionCommand(
-  args: string[],
+  input: ActionCommandInput,
   open: OpenActionDeps = openDeps,
   services: ActionServices = actionServices,
 ): Promise<number> {
-  const parsed = parseActionArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(
-      `${parsed.message}. Try: ${args[0] === 'run' ? actionRunUsage : actionDescribeUsage}`,
-    )
-    return 2
-  }
-
   let actionInput: unknown
-  if (parsed.kind === 'run') {
+  if (input.kind === 'run') {
     try {
-      actionInput = await parseActionInput(parsed.input)
+      actionInput = await parseActionInput(input.input)
     } catch (error) {
       console.error(error instanceof Error ? error.message : String(error))
       return mapErrorToExit(error)
@@ -74,36 +75,36 @@ export async function handleActionCommand(
   let deps: ActionDeps | undefined
   try {
     deps = await open()
-    if (parsed.kind === 'describe') {
-      const sourceId = parsed.sourceId
-        ? deps.sourceService.resolveSourceId(parsed.sourceId)
+    if (input.kind === 'describe') {
+      const sourceId = input.sourceId
+        ? deps.sourceService.resolveSourceId(input.sourceId)
         : undefined
       const result = services.describe({
         db: deps.db,
         registry: deps.registry,
-        actionId: parsed.actionId,
+        actionId: input.actionId,
         ...(sourceId ? { sourceId } : {}),
       })
       console.log(
-        parsed.json ? JSON.stringify(result) : formatActionDescribeText(result),
+        input.json ? JSON.stringify(result) : formatActionDescribeText(result),
       )
       return 0
     }
 
-    const sourceId = deps.sourceService.resolveSourceId(parsed.sourceId)
+    const sourceId = deps.sourceService.resolveSourceId(input.sourceId)
     const result = await services.run({
       db: deps.db,
       registry: deps.registry,
       authService: deps.authService,
       logger: deps.logger,
-      actionId: parsed.actionId,
+      actionId: input.actionId,
       sourceId,
       actionInput,
       signal: new AbortController().signal,
-      confirmIrreversible: parsed.confirmIrreversible,
+      confirmIrreversible: false,
     })
     console.log(
-      parsed.json ? JSON.stringify(result) : formatActionRunText(result),
+      input.json ? JSON.stringify(result) : formatActionRunText(result),
     )
     for (const warning of result.warnings) {
       console.error(`${warning.code}\t${warning.message}`)

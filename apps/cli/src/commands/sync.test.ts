@@ -116,34 +116,6 @@ describe('sync command', () => {
     expect(mapRpcSyncFailureToExit(code)).toBe(exitCode)
   })
 
-  test('malformed sync performs zero discovery, transport, or direct open', async () => {
-    spyOn(console, 'error').mockImplementation(() => {})
-    let touched = 0
-    const routes: SyncRouteServices = {
-      selectDaemon: () => {
-        touched += 1
-        return null
-      },
-      daemonSync: async () => {
-        touched += 1
-        throw new Error('must not call transport')
-      },
-    }
-    const setup = harness({})
-    expect(
-      await handleSyncCommand(
-        ['--unknown'],
-        async () => {
-          touched += 1
-          return setup.open()
-        },
-        setup.services,
-        routes,
-      ),
-    ).toBe(2)
-    expect(touched).toBe(0)
-  })
-
   test('selected RPC preserves sync JSON values without an envelope or direct open', async () => {
     const log = spyOn(console, 'log').mockImplementation(() => {})
     let opened = false
@@ -169,7 +141,7 @@ describe('sync command', () => {
     }
     expect(
       await handleSyncCommand(
-        ['--json'],
+        { mode: 'sync', json: true, format: 'summary' },
         async () => {
           opened = true
           throw new Error('selected RPC must not open direct deps')
@@ -214,7 +186,7 @@ describe('sync command', () => {
     }
     expect(
       await handleSyncCommand(
-        ['--json'],
+        { mode: 'sync', json: true, format: 'summary' },
         async () => {
           throw new Error('selected RPC must not open direct deps')
         },
@@ -250,7 +222,7 @@ describe('sync command', () => {
     let opened = false
     await expect(
       handleSyncCommand(
-        [],
+        { mode: 'sync', json: false, format: 'summary' },
         async () => {
           opened = true
           throw new Error('must not open')
@@ -347,7 +319,7 @@ describe('sync command', () => {
 
     expect(
       await handleSyncCommand(
-        ['--source', 'source-a', '--mode', 'diff', '--json'],
+        { sourceId: 'source-a', mode: 'diff', json: true, format: 'summary' },
         setup.open,
         setup.services,
       ),
@@ -379,7 +351,7 @@ describe('sync command', () => {
 
     expect(
       await handleSyncCommand(
-        ['--source', 'missing'],
+        { sourceId: 'missing', mode: 'sync', json: false, format: 'summary' },
         setup.open,
         setup.services,
       ),
@@ -397,7 +369,12 @@ describe('sync command', () => {
 
     expect(
       await handleSyncCommand(
-        ['--source', 'source-disabled'],
+        {
+          sourceId: 'source-disabled',
+          mode: 'sync',
+          json: false,
+          format: 'summary',
+        },
         setup.open,
         setup.services,
       ),
@@ -421,7 +398,7 @@ describe('sync command', () => {
 
     expect(
       await handleSyncCommand(
-        ['--source', 'source-a', '--json'],
+        { sourceId: 'source-a', mode: 'sync', json: true, format: 'summary' },
         setup.open,
         setup.services,
       ),
@@ -469,7 +446,11 @@ describe('sync command', () => {
     })
 
     expect(
-      await handleSyncCommand(['--json'], setup.open, setup.services),
+      await handleSyncCommand(
+        { mode: 'sync', json: true, format: 'summary' },
+        setup.open,
+        setup.services,
+      ),
     ).toBe(50)
     expect(calls).toEqual(['source-b', 'source-c'])
     const output = JSON.parse(String(log.mock.calls[0]?.[0]))
@@ -506,7 +487,7 @@ describe('sync command', () => {
 
     expect(
       await handleSyncCommand(
-        ['--format', 'events'],
+        { mode: 'sync', json: false, format: 'events' },
         setup.open,
         setup.services,
       ),

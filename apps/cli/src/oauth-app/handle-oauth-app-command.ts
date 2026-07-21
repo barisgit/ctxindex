@@ -1,6 +1,5 @@
 import { readEnvironmentVariable } from '@ctxindex/core/config'
 import { CtxindexValidationError } from '@ctxindex/core/errors'
-import { oauthAppUsage, parseOAuthAppArgs } from '../args/oauth-app'
 import { assertInitialized } from '../commands/db'
 import { loadCliDefinitions } from '../definitions'
 import { openDeps } from '../deps'
@@ -23,6 +22,15 @@ export interface OAuthAppCommandDeps {
   readonly readEnvironmentVariable: typeof readEnvironmentVariable
 }
 
+export type OAuthAppCommandInput =
+  | { readonly kind: 'add'; readonly provider: string; readonly label: string }
+  | { readonly kind: 'list'; readonly json: boolean }
+  | {
+      readonly kind: 'remove'
+      readonly provider: string
+      readonly label: string
+    }
+
 const defaultDeps: OAuthAppCommandDeps = {
   acquireOwnership: acquireDirectDatabaseOwnership,
   loadDefinitions: loadCliDefinitions,
@@ -32,16 +40,9 @@ const defaultDeps: OAuthAppCommandDeps = {
 }
 
 export async function handleOAuthAppCommand(
-  args: string[],
+  parsed: OAuthAppCommandInput,
   services: OAuthAppCommandDeps = defaultDeps,
 ): Promise<number> {
-  const parsed = parseOAuthAppArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(`${parsed.message}. Try: ${oauthAppUsage}`)
-    return 2
-  }
-
   let deps: Awaited<ReturnType<typeof openDeps>> | undefined
   let ownership: DirectDatabaseOwnership | undefined
   try {

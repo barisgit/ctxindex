@@ -31,7 +31,7 @@ The `microsoft` OAuth provider SHALL use Microsoft identity platform authorizati
 
 #### Scenario: Conversation is traversed
 - **WHEN** multiple Outlook messages share provider conversation identity and reply metadata
-- **THEN** Profile Relations allow generic `thread get` to return their deterministic union
+- **THEN** Profile Relations allow generic `thread` retrieval to return their deterministic union
 
 ### Requirement: Outlook attachments use managed Artifacts
 Microsoft file attachment metadata SHALL become Profile-derived Artifact descriptors without eagerly storing bytes. Download SHALL use the canonical message/attachment identity through the linked Grant, stream exact bytes into the managed content-addressed store, and reuse cached bytes on later requests. Unsupported non-file attachment kinds SHALL be represented safely or warned without corrupting the parent Resource.

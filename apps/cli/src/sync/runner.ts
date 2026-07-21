@@ -8,7 +8,6 @@ import {
   type SyncRunResult,
   type SyncWarning,
 } from '@ctxindex/core/sync'
-import { parseSyncArgs, syncUsage } from '../args/sync'
 import { daemonSync, selectDaemon } from '../daemon/client'
 import { type CliDeps, openDeps } from '../deps'
 import { mapErrorToExit } from '../format/exit'
@@ -26,6 +25,13 @@ export interface SyncServices {
 export interface SyncRouteServices {
   readonly selectDaemon: typeof selectDaemon
   readonly daemonSync: typeof daemonSync
+}
+
+export interface SyncCommandInput {
+  readonly sourceId?: string
+  readonly mode: SyncRunResult['mode']
+  readonly json: boolean
+  readonly format: 'summary' | 'events' | 'compact'
 }
 
 interface SyncWarningOutput {
@@ -156,18 +162,11 @@ export function formatSyncOutput(
 }
 
 export async function handleSyncCommand(
-  args: string[],
+  parsed: SyncCommandInput,
   open: OpenSyncDeps = openDeps,
   services: SyncServices = defaultServices,
   routes: SyncRouteServices = defaultRouteServices,
 ): Promise<number> {
-  const parsed = parseSyncArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(`${parsed.message}. Try: ${syncUsage}`)
-    return 2
-  }
-
   const controller = new AbortController()
   const cancel = () => controller.abort()
   process.once('SIGINT', cancel)

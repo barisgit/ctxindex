@@ -70,6 +70,11 @@ test('shares generic state/materialization and reloads active validation state i
     services.genericInstaller.store,
   )
   expect(services.catalogInstallation.installer).toBe(services.genericInstaller)
+  expect(services.lifecycle.records).toBe(services.genericInstaller.store)
+  expect(services.lifecycle.installer).toBe(services.genericInstaller)
+  expect(services.lifecycle.catalogInstallation).toBe(
+    services.catalogInstallation,
+  )
   expect(services.genericInstaller.store.recordsPath).toBe(
     join('/tmp/ctxindex-cli-config', 'direct-extensions.json'),
   )

@@ -6,9 +6,9 @@ Contains private cross-capability implementation helpers that are not part of a 
 
 ## Design / flow
 
-- `code-point-order.ts` exports `compareUnicodeCodePoints()`, a locale-independent comparator used where persisted or presented ordering must be deterministic.
-- Callers pass two strings and receive their Unicode code-point lexical order; the module owns no state or I/O.
+- `code-point-order.ts` exports `compareUnicodeCodePoints()`, a locale-independent comparator used where persisted or presented ordering must be deterministic; callers pass two strings and receive their Unicode code-point lexical order.
+- `terminal-controls.ts` identifies terminal-active C0, DEL, C1, and standalone carriage-return characters while preserving ordinary Markdown tabs and line endings.
 
 ## Integration points
 
-Consumed by Account inventory/scope normalization, OAuth scope selection, and registry semantic comparison. It is intentionally absent from the public package export map.
+Consumed by deterministic ordering and passive text-validation boundaries across core. These helpers are intentionally absent from the public package export map.

@@ -178,7 +178,7 @@ test('implicit command keeps one fallback for exact App resolution failure', asy
   const error = spyOn(console, 'error').mockImplementation(() => {})
   let authorizations = 0
   const exit = await handleAccountCommand(
-    ['add', 'google'],
+    { kind: 'add', provider: 'google' },
     commandRuntime({
       openDeps: async () =>
         openedDeps(async () => {
@@ -206,7 +206,7 @@ test('implicit command does not attach selection fallback after exact App resolu
   const definition = completeRegistry.oauthApps.get('["google","ctxindex"]')
   if (definition === undefined) throw new Error('Google fixture App missing')
   const exit = await handleAccountCommand(
-    ['add', 'google'],
+    { kind: 'add', provider: 'google' },
     commandRuntime({
       openDeps: async () =>
         openedDeps(async () => ({
@@ -238,7 +238,7 @@ test('implicit command rejects a changed cached App authorization request', asyn
   const definition = completeRegistry.oauthApps.get('["google","ctxindex"]')
   if (definition === undefined) throw new Error('Google fixture App missing')
   const exit = await handleAccountCommand(
-    ['add', 'google'],
+    { kind: 'add', provider: 'google' },
     commandRuntime({
       openDeps: async () =>
         openedDeps(async () => ({

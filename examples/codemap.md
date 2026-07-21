@@ -2,13 +2,14 @@
 
 ## Responsibility
 
-Houses external Extension examples that demonstrate the public authoring contract with deterministic data. The current example is the tender fixture Extension detailed in `examples/tenders-extension/codemap.md`.
+Houses external Extension examples that demonstrate the public authoring contract with deterministic data. The providerless tender fixture is detailed in `examples/tenders-extension/codemap.md`; the OAuth provider-backed issue-search graph is detailed in `examples/issues-extension/codemap.md`.
 
 ## Design/patterns
 
 - Each example is a root workspace package: `package.json` declares ordered `ctxindex.extensions` module entries, runtime authoring dependencies, and any test-only public-package dependencies.
 - `examples/tenders-extension/extension.ts` exports ordinary SDK definition values and declares the adjacent `docs/` tree; `fixtures.ts` provides immutable typed inputs.
 - The example composes a strict schema, Profile, Adapter, and Extension under stable `enarocanje.*` IDs.
+- `examples/issues-extension/extension.ts` composes a strict issue Profile, OAuth Provider, public App, scoped remote-search Adapter, Extension root, and adjacent documentation tree under stable `example.*` IDs.
 
 ## Data & control flow
 
@@ -16,6 +17,7 @@ Houses external Extension examples that demonstrate the public authoring contrac
 2. Export collection selects the ordinary `enarocanje.proof` Extension root and reaches its exact Profile/Adapter values; `operations.sync(context)` iterates `TENDER_FIXTURES`.
 3. Sync emits source-scoped `upsertResource` operations and then a versioned `checkpoint` through `context.emit()`.
 4. The providerless Adapter performs no Account, Grant, token, or Provider egress resolution.
+5. The issue Adapter receives only host-scoped provider fetch, validates Source configuration and provider JSON, and normalizes remote results into `example.issue@1` Resources.
 
 ## Integration points
 
@@ -23,3 +25,4 @@ Houses external Extension examples that demonstrate the public authoring contrac
 - Public authoring API: `@ctxindex/extension-sdk` factories and SDK-exported `z`, declared as a runtime `workspace:*` dependency. `@ctxindex/core` and `@ctxindex/adapters` are test-only `workspace:*` dev dependencies for package discovery and built-in isolation checks.
 - Fixture input: `examples/tenders-extension/fixtures.ts` (`TENDER_FIXTURES`, `TenderFixture`).
 - Runtime boundary: package-entry discovery, exported-value collection, complete-registry validation, and sync `context.emit()`.
+- Provider-backed proof: `examples/issues-extension/` uses reserved `.invalid` endpoints and a test-injected fetch fixture; no live provider egress or secret state is required.

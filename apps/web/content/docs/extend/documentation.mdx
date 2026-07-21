@@ -1,0 +1,68 @@
+---
+title: Extension documentation and assets
+description: Ship one passive Markdown tree beside an Extension without changing its identity or behavior.
+---
+
+Only an Extension root declares documentation. Providers, Profiles, Adapters, and OAuth Apps remain documentation-free definitions.
+
+## Directory form
+
+```ts
+export default defineExtension({
+  id: 'acme.notes',
+  adapters: [notesAdapter],
+  docs: docs('./docs'),
+})
+```
+
+The package layout is conventional:
+
+```text
+acme-notes/
+├── package.json
+├── extension.ts
+└── docs/
+    ├── README.md
+    ├── providers/
+    │   └── acme.md
+    ├── adapters/
+    │   └── acme.notes.md
+    ├── profiles/
+    │   └── acme.note@1.md
+    ├── guides/
+    │   └── first-sync.md
+    └── assets/
+        └── source-settings.png
+```
+
+`README.md` is required. Provider and Adapter filenames bind to exact stable ids; Profile filenames bind to exact `(id, version)`.
+
+Markdown may reference contained relative files and byte-verified PNG, JPEG, GIF, or WebP assets. SVG, raw HTML, remote images, active URL schemes, symlinks, path traversal, and missing local targets reject the whole Extension before activation.
+
+## Generated virtual tree
+
+Build tooling can provide eager strings and bytes instead of a directory:
+
+```ts
+docs({
+  index: 'README.md',
+  files: [
+    {
+      path: 'README.md',
+      kind: 'markdown',
+      mediaType: 'text/markdown',
+      content: '# Acme notes',
+    },
+    {
+      path: 'assets/settings.png',
+      kind: 'asset',
+      mediaType: 'image/png',
+      content: generatedPngBytes,
+    },
+  ],
+})
+```
+
+Both forms pass through identical containment, size, media, reference, and binding validation. Loaded documentation retains portable Markdown strings and asset bytes—never host paths or lazy filesystem/network readers.
+
+Authored prose remains non-normative. Hosts project deterministic reference separately from validated definitions, so documentation cannot redefine schemas, capabilities, scopes, or Actions.

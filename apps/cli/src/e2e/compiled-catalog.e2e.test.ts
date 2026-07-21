@@ -147,7 +147,7 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       runProcess([relocatedPath, ...args], { cwd: '/', env })
 
     const built = await run([
-      'extensions',
+      'extension',
       'catalog',
       'build',
       repository,
@@ -214,7 +214,7 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
     await git(repository, ['init', '-b', 'main'])
     await commitAll(repository, 'compiled schema-v2 Catalog')
     const added = await run([
-      'extensions',
+      'extension',
       'catalog',
       'add',
       'fixture',
@@ -228,7 +228,8 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
     const initialCatalog = JSON.parse(added.stdout) as CatalogRecord
 
     const initialSearch = await run([
-      'extensions',
+      'extension',
+      'catalog',
       'search',
       'fixture.catalog',
       '--no-refresh',
@@ -252,11 +253,11 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       'fixture.catalog.local',
     ]) {
       const installed = await run([
-        'extensions',
+        'extension',
         'install',
+        'catalog',
         'fixture',
         extensionId,
-        '--trust',
         '--no-refresh',
         '--json',
       ])
@@ -282,7 +283,7 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       marker: 'compiled-v2',
     })
     const rebuilt = await run([
-      'extensions',
+      'extension',
       'catalog',
       'build',
       repository,
@@ -300,7 +301,7 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       'compiled replacement',
     )
     const refreshed = await run([
-      'extensions',
+      'extension',
       'catalog',
       'refresh',
       'fixture',
@@ -310,7 +311,8 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
     const replacementCatalog = JSON.parse(refreshed.stdout) as CatalogRecord
     expect(replacementCatalog.commit).toBe(replacementCommit)
     const refreshedSearch = await run([
-      'extensions',
+      'extension',
+      'catalog',
       'search',
       'fixture.catalog',
       '--no-refresh',
@@ -327,11 +329,11 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       ['fixture.catalog.local', replacementCommit],
     ])
     const replacement = await run([
-      'extensions',
+      'extension',
       'install',
+      'catalog',
       'fixture',
       'fixture.catalog.literal',
-      '--trust',
       '--no-refresh',
       '--json',
     ])
@@ -355,46 +357,45 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
     installedFinal.set('fixture.catalog.literal', replacementValue)
 
     const removedCuratedLocal = await run([
-      'extensions',
+      'extension',
       'uninstall',
       'fixture.catalog.local',
       '--json',
     ])
     expect(removedCuratedLocal.exitCode, removedCuratedLocal.stderr).toBe(0)
     const directLocal = await run([
-      'extensions',
+      'extension',
       'install',
       'local',
       join(repository, 'packages', 'local'),
-      '--extension',
       'fixture.catalog.local',
       '--json',
     ])
     expect(directLocal.exitCode, directLocal.stderr).toBe(0)
     const otherOriginCollision = await run([
-      'extensions',
+      'extension',
       'install',
+      'catalog',
       'fixture',
       'fixture.catalog.local',
-      '--trust',
       '--no-refresh',
       '--json',
     ])
     expect(otherOriginCollision.exitCode).toBe(50)
     expect(otherOriginCollision.stderr).toContain('another origin')
     const removedDirectLocal = await run([
-      'extensions',
+      'extension',
       'uninstall',
       'fixture.catalog.local',
       '--json',
     ])
     expect(removedDirectLocal.exitCode, removedDirectLocal.stderr).toBe(0)
     const restoredCuratedLocal = await run([
-      'extensions',
+      'extension',
       'install',
+      'catalog',
       'fixture',
       'fixture.catalog.local',
-      '--trust',
       '--no-refresh',
       '--json',
     ])
@@ -453,7 +454,7 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       PATH: offlineBin,
       BUN_CONFIG_REGISTRY: 'http://127.0.0.1:1',
     }
-    const loaded = await run(['extensions', 'list', '--json'], offlineEnv)
+    const loaded = await run(['extension', 'list', '--json'], offlineEnv)
     expect(loaded.exitCode, loaded.stderr).toBe(0)
     for (const extensionId of [
       'fixture.catalog.literal',
@@ -507,7 +508,7 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       })
     }
     const storedCatalog = await run(
-      ['extensions', 'catalog', 'show', 'fixture', '--no-refresh', '--json'],
+      ['extension', 'catalog', 'show', 'fixture', '--no-refresh', '--json'],
       offlineEnv,
     )
     expect(storedCatalog.exitCode, storedCatalog.stderr).toBe(0)
@@ -519,7 +520,7 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       'fixture.catalog.local',
     ]) {
       const uninstalled = await run(
-        ['extensions', 'uninstall', extensionId, '--json'],
+        ['extension', 'uninstall', extensionId, '--json'],
         offlineEnv,
       )
       expect(uninstalled.exitCode, uninstalled.stderr).toBe(0)
@@ -530,7 +531,7 @@ test('relocated compiled CLI builds and replays a mixed schema-v2 Catalog from m
       })
     }
     const removed = await run(
-      ['extensions', 'catalog', 'remove', 'fixture', '--json'],
+      ['extension', 'catalog', 'remove', 'fixture', '--json'],
       offlineEnv,
     )
     expect(removed.exitCode, removed.stderr).toBe(0)

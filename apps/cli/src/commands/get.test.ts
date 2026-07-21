@@ -39,10 +39,8 @@ describe('get output', () => {
   test('returns exit 2 for an invalid Ref before opening dependencies', async () => {
     const error = spyOn(console, 'error').mockImplementation(() => {})
 
-    expect(await handleGetCommand(['not-a-ref'])).toBe(2)
-    expect(error).toHaveBeenCalledWith(
-      'get: invalid <ref>: not-a-ref. Try: get <ref> [--json]',
-    )
+    expect(await handleGetCommand({ ref: 'not-a-ref', json: false })).toBe(2)
+    expect(error).toHaveBeenCalledWith('get: invalid <ref>: not-a-ref')
     error.mockRestore()
   })
 
@@ -50,14 +48,17 @@ describe('get output', () => {
     const log = spyOn(console, 'log').mockImplementation(() => {})
     let opened = false
     try {
-      const exit = await handleGetCommand(['--json', result.resource.ref], {
-        selectDaemon: () => ({}) as never,
-        get: async () => result as never,
-        open: async () => {
-          opened = true
-          throw new Error('direct dependencies opened')
+      const exit = await handleGetCommand(
+        { ref: result.resource.ref, json: true },
+        {
+          selectDaemon: () => ({}) as never,
+          get: async () => result as never,
+          open: async () => {
+            opened = true
+            throw new Error('direct dependencies opened')
+          },
         },
-      })
+      )
       expect(exit).toBe(0)
       expect(opened).toBe(false)
       expect(log).toHaveBeenCalledWith(formatGetJson(result))
@@ -69,18 +70,21 @@ describe('get output', () => {
   test('direct get normalizes SIGINT to cancelled before local retrieval', async () => {
     const error = spyOn(console, 'error').mockImplementation(() => {})
     try {
-      const exit = await handleGetCommand([result.resource.ref], {
-        selectDaemon: () => null,
-        get: async () => {
-          throw new Error('daemon transport invoked')
+      const exit = await handleGetCommand(
+        { ref: result.resource.ref, json: false },
+        {
+          selectDaemon: () => null,
+          get: async () => {
+            throw new Error('daemon transport invoked')
+          },
+          open: async () => {
+            process.emit('SIGINT')
+            return {
+              close: async () => {},
+            } as never
+          },
         },
-        open: async () => {
-          process.emit('SIGINT')
-          return {
-            close: async () => {},
-          } as never
-        },
-      })
+      )
 
       expect(exit).toBe(130)
     } finally {

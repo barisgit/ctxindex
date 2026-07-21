@@ -132,6 +132,9 @@ function services(
     catalogInstallation: {
       install: async () => unexpected('Catalog install'),
     } as unknown as ExtensionCommandServices['catalogInstallation'],
+    lifecycle: {
+      update: async () => unexpected('Extension update'),
+    } as unknown as ExtensionCommandServices['lifecycle'],
     genericInstaller: {} as ExtensionCommandServices['genericInstaller'],
     direct: {
       list: async () => [],
@@ -162,7 +165,12 @@ test('Catalog build prints trust notice, uses the default output, and forwards c
   const error = spyOn(console, 'error').mockImplementation(() => {})
   try {
     const exit = await handleExtensionsCommand(
-      ['catalog', 'build', '/tmp/catalog', '--trust', '--json'],
+      {
+        kind: 'catalog-build',
+        packageRoot: '/tmp/catalog',
+        trust: true,
+        json: true,
+      },
       services({
         buildCatalogSnapshot: async (input) => {
           received = input
@@ -218,7 +226,12 @@ test('Marketplace search maps stored refresh policy without falling through', as
   const output = spyOn(console, 'log').mockImplementation(() => {})
   try {
     const freshExit = await handleExtensionsCommand(
-      ['search', 'fixture', '--json'],
+      {
+        kind: 'catalog-search',
+        query: 'fixture',
+        noRefresh: false,
+        json: true,
+      },
       services({
         catalogs: {
           search: async (...args: unknown[]) => {
@@ -229,7 +242,12 @@ test('Marketplace search maps stored refresh policy without falling through', as
       }),
     )
     const storedExit = await handleExtensionsCommand(
-      ['search', 'fixture', '--no-refresh', '--json'],
+      {
+        kind: 'catalog-search',
+        query: 'fixture',
+        noRefresh: true,
+        json: true,
+      },
       services({
         catalogs: {
           search: async (...args: unknown[]) => {
@@ -259,7 +277,13 @@ test('Catalog show uses a versionless selector and maps default refresh', async 
   const output = spyOn(console, 'log').mockImplementation(() => {})
   try {
     const exit = await handleExtensionsCommand(
-      ['catalog', 'show', 'fixture', 'fixture.extension', '--json'],
+      {
+        kind: 'catalog-show',
+        name: 'fixture',
+        extensionId: 'fixture.extension',
+        noRefresh: false,
+        json: true,
+      },
       services({
         catalogs: {
           showExtension: async (...args: unknown[]) => {
@@ -277,14 +301,21 @@ test('Catalog show uses a versionless selector and maps default refresh', async 
   }
 })
 
-test('Catalog install delegates trust, refresh policy, and cancellation without eager definition loading', async () => {
+test('Catalog install invocation grants trust and delegates refresh policy without eager definition loading', async () => {
   let received: unknown
   let definitionLoads = 0
   const output = spyOn(console, 'log').mockImplementation(() => {})
   const error = spyOn(console, 'error').mockImplementation(() => {})
   try {
     const exit = await handleExtensionsCommand(
-      ['install', 'fixture', 'fixture.extension', '--trust', '--no-refresh'],
+      {
+        kind: 'install',
+        sourceKind: 'catalog',
+        target: 'fixture',
+        extensionId: 'fixture.extension',
+        noRefresh: true,
+        json: false,
+      },
       services({
         catalogInstallation: {
           install: async (input: unknown) => {
@@ -303,7 +334,6 @@ test('Catalog install delegates trust, refresh policy, and cancellation without 
     expect(received).toMatchObject({
       catalog: 'fixture',
       extensionId: 'fixture.extension',
-      trust: true,
       noRefresh: true,
     })
     expect((received as { signal?: unknown }).signal).toBeInstanceOf(
@@ -311,29 +341,158 @@ test('Catalog install delegates trust, refresh policy, and cancellation without 
     )
     expect(definitionLoads).toBe(0)
     expect(error).toHaveBeenCalledWith(expect.stringContaining('Trust notice'))
+    expect(error).toHaveBeenCalledTimes(1)
   } finally {
     output.mockRestore()
     error.mockRestore()
   }
 })
 
-test('missing Catalog install trust fails before services run', async () => {
+test('update delegates to the origin-neutral lifecycle and preserves Catalog provenance output', async () => {
+  let received: unknown
+  const output = spyOn(console, 'log').mockImplementation(() => {})
+  const error = spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    const exit = await handleExtensionsCommand(
+      {
+        kind: 'update',
+        extensionId: installed.id,
+        json: true,
+      },
+      services({
+        lifecycle: {
+          update: async (input: unknown) => {
+            received = input
+            return installed
+          },
+        } as ExtensionCommandServices['lifecycle'],
+      }),
+    )
+
+    expect(exit).toBe(0)
+    expect(received).toMatchObject({ extensionId: installed.id })
+    expect((received as { signal?: unknown }).signal).toBeInstanceOf(
+      AbortSignal,
+    )
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('Trust notice'))
+    expect(JSON.parse(String(output.mock.calls[0]?.[0]))).toMatchObject({
+      action: 'updated',
+      id: installed.id,
+      curation: { catalog_name: 'fixture' },
+    })
+  } finally {
+    output.mockRestore()
+    error.mockRestore()
+  }
+})
+
+test('install and update keep one generic JSON shape across direct and Catalog origins', async () => {
+  const { curation: _curation, ...directRecord } = installed
+  const output = spyOn(console, 'log').mockImplementation(() => {})
+  const error = spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    const cases = [
+      {
+        input: {
+          kind: 'install' as const,
+          sourceKind: 'catalog' as const,
+          target: 'fixture',
+          extensionId: installed.id,
+          noRefresh: false,
+          json: true,
+        },
+        record: installed,
+        action: 'installed',
+      },
+      {
+        input: {
+          kind: 'install' as const,
+          sourceKind: 'npm' as const,
+          target: '@fixture/extension@^1',
+          extensionId: directRecord.id,
+          noRefresh: false,
+          json: true,
+        },
+        record: directRecord,
+        action: 'installed',
+      },
+      {
+        input: {
+          kind: 'update' as const,
+          extensionId: installed.id,
+          json: true,
+        },
+        record: installed,
+        action: 'updated',
+      },
+      {
+        input: {
+          kind: 'update' as const,
+          extensionId: directRecord.id,
+          json: true,
+        },
+        record: directRecord,
+        action: 'updated',
+      },
+    ]
+
+    for (const item of cases) {
+      output.mockClear()
+      expect(
+        await handleExtensionsCommand(
+          item.input,
+          services({
+            catalogInstallation: {
+              install: async () => item.record,
+            } as unknown as ExtensionCommandServices['catalogInstallation'],
+            direct: {
+              install: async () => item.record,
+            } as unknown as DirectExtensionService,
+            lifecycle: {
+              update: async () => item.record,
+            } as unknown as ExtensionCommandServices['lifecycle'],
+          }),
+        ),
+      ).toBe(0)
+      const value = JSON.parse(String(output.mock.calls[0]?.[0]))
+      expect(value).toEqual({ action: item.action, ...item.record })
+      expect(value).not.toHaveProperty('sourceKind')
+      expect(value).not.toHaveProperty('materializationDigest')
+    }
+  } finally {
+    output.mockRestore()
+    error.mockRestore()
+  }
+})
+
+test('direct install rejects Catalog-only --no-refresh before acquisition or trust notice', async () => {
   let calls = 0
   const error = spyOn(console, 'error').mockImplementation(() => {})
   try {
     const exit = await handleExtensionsCommand(
-      ['install', 'fixture', 'fixture.extension'],
+      {
+        kind: 'install',
+        sourceKind: 'npm',
+        target: '@fixture/extension@^1',
+        extensionId: installed.id,
+        noRefresh: true,
+        json: false,
+      },
       services({
-        catalogInstallation: {
+        direct: {
           install: async () => {
             calls += 1
             return installed
           },
-        } as unknown as ExtensionCommandServices['catalogInstallation'],
+        } as unknown as DirectExtensionService,
       }),
     )
+
     expect(exit).toBe(2)
     expect(calls).toBe(0)
+    expect(error).not.toHaveBeenCalledWith(
+      expect.stringContaining('Trust notice'),
+    )
   } finally {
     error.mockRestore()
   }
@@ -353,7 +512,12 @@ test('origin-neutral uninstall always delegates to DirectExtensionService', asyn
   const output = spyOn(console, 'log').mockImplementation(() => {})
   try {
     const exit = await handleExtensionsCommand(
-      ['uninstall', 'fixture.extension', '--json'],
+      {
+        kind: 'uninstall',
+        extensionId: 'fixture.extension',
+        force: false,
+        json: true,
+      },
       services({
         direct: {
           uninstall: async (value: unknown) => {
@@ -390,13 +554,14 @@ test('direct install keeps explicit target parsing and reloadable validation con
   const error = spyOn(console, 'error').mockImplementation(() => {})
   try {
     const exit = await handleExtensionsCommand(
-      [
-        'install',
-        'npm',
-        '@fixture/extension@^1',
-        '--extension',
-        'fixture.extension',
-      ],
+      {
+        kind: 'install',
+        sourceKind: 'npm',
+        target: '@fixture/extension@^1',
+        extensionId: 'fixture.extension',
+        noRefresh: false,
+        json: false,
+      },
       services({
         direct: {
           install: async (input: {
@@ -428,6 +593,7 @@ test('direct install keeps explicit target parsing and reloadable validation con
     expect(received.signal).toBeInstanceOf(AbortSignal)
     expect(validationLoads).toBe(1)
     expect(error).toHaveBeenCalledWith(expect.stringContaining('Trust notice'))
+    expect(error).toHaveBeenCalledTimes(1)
   } finally {
     output.mockRestore()
     error.mockRestore()
@@ -438,7 +604,7 @@ test('database ownership conflict remains actionable and exits 50', async () => 
   const error = spyOn(console, 'error').mockImplementation(() => {})
   try {
     const exit = await handleExtensionsCommand(
-      ['catalog', 'list', '--no-refresh'],
+      { kind: 'catalog-list', noRefresh: true, json: false },
       services({
         catalogs: {
           list: async () => {

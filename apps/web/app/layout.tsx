@@ -20,11 +20,11 @@ const homeUrls = pageMetadataUrls('/')
 export const metadata: Metadata = {
   metadataBase: resolveSiteOrigin(),
   title: {
-    default: 'ctxindex — your context, one command away',
+    default: 'ctxindex — local typed context for agents',
     template: '%s | ctxindex',
   },
   description:
-    'A local personal-context gateway for agents. One deterministic CLI to discover, retrieve, and act on mail, calendars, and files across every account.',
+    'One local typed CLI for shell-capable agents to discover, retrieve, and act on mail, calendars, files, and Extension-defined context.',
   alternates: homeUrls ? { canonical: homeUrls.canonical } : undefined,
   openGraph: homeUrls ? { url: homeUrls.canonical } : undefined,
 }
