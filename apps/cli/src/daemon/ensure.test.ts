@@ -46,12 +46,44 @@ function dependencies(
   overrides: Partial<DaemonSelectionEnsurerDependencies> = {},
 ): DaemonSelectionEnsurerDependencies {
   return {
+    assertInitialized: async () => {},
     select: () => selection,
     status: async () => ({ status: 'running', health }),
     start: async () => ({ status: 'running', started: false, health }),
     ...overrides,
   }
 }
+
+test('checks initialization before reusing healthy discovery', async () => {
+  const order: string[] = []
+  const ensure = createDaemonSelectionEnsurer(
+    dependencies({
+      assertInitialized: async () => {
+        order.push('initialized')
+        throw Object.assign(
+          new Error('ctxindex is not initialized; run ctxindex init'),
+          {
+            code: 'invalid_args',
+          },
+        )
+      },
+      status: async () => {
+        order.push('status')
+        return { status: 'running', health }
+      },
+      select: () => {
+        order.push('select')
+        return selection
+      },
+    }),
+  )
+
+  await expect(ensure()).rejects.toMatchObject({
+    code: 'invalid_args',
+    message: 'ctxindex is not initialized; run ctxindex init',
+  })
+  expect(order).toEqual(['initialized'])
+})
 
 test('reuses an already-selected healthy daemon without lifecycle startup', async () => {
   const order: string[] = []

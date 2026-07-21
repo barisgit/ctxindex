@@ -78,6 +78,17 @@ export interface DaemonSelection {
   readonly selectedBy: 'metadata' | 'test_override'
 }
 
+type DaemonReconnect = (signal?: AbortSignal) => Promise<DaemonSelection>
+const daemonReconnects = new WeakMap<DaemonSelection, DaemonReconnect>()
+
+export function registerDaemonReconnect(
+  selection: DaemonSelection,
+  reconnect: DaemonReconnect,
+): DaemonSelection {
+  daemonReconnects.set(selection, reconnect)
+  return selection
+}
+
 function unavailable(selection?: DaemonSelection): DaemonCliError {
   const lifecycle = selection?.metadata?.lifecycle
   return new DaemonCliError({
@@ -229,15 +240,25 @@ function requestOptions(signal: AbortSignal | undefined) {
 
 async function invoke<T>(
   signal: AbortSignal | undefined,
-  call: (client: DaemonClient) => Promise<T>,
+  call: (client: DaemonClient, selection: DaemonSelection) => Promise<T>,
   selection: DaemonSelection,
   clientFactory: (selection: DaemonSelection) => DaemonClient = createClient,
 ): Promise<T> {
   let result: T
   try {
-    result = await call(clientFactory(selection))
+    result = await call(clientFactory(selection), selection)
   } catch (error) {
-    throw invocationError(error, signal, selection)
+    const failure = daemonFailureFromDeclaredError(error)
+    const reconnect = daemonReconnects.get(selection)
+    if (failure?.kind !== 'daemon_unavailable' || !reconnect) {
+      throw invocationError(error, signal, selection)
+    }
+    const replacement = await reconnect(signal)
+    try {
+      result = await call(clientFactory(replacement), replacement)
+    } catch (retryError) {
+      throw invocationError(retryError, signal, replacement)
+    }
   }
   if (signal?.aborted) {
     throw new DaemonCliError({
@@ -446,8 +467,8 @@ export async function daemonSync(
 ): Promise<RpcSyncResult> {
   const iterator = await invoke(
     signal,
-    () =>
-      services.createClient(selection).sync.run(input, requestOptions(signal)),
+    (_client, selected) =>
+      services.createClient(selected).sync.run(input, requestOptions(signal)),
     selection,
   )
   let completed = false

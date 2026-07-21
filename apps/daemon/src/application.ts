@@ -1333,13 +1333,6 @@ export class DaemonApplication implements DaemonRpcApplication {
     const controller = new AbortController()
     const rendezvous = new StreamRendezvous<TEvent, RpcResult<TResult>>()
     const cancellation = new CtxindexSyncError('Sync cancelled', 'cancelled')
-    const cancel = () => {
-      controller.abort(context.signal.reason)
-      rendezvous.close(cancellation)
-    }
-    if (context.signal.aborted) cancel()
-    else context.signal.addEventListener('abort', cancel, { once: true })
-
     const key = `${context.requestId}:${this.#requestSequence++}`
     let settle!: () => void
     const settled = new Promise<void>((resolve) => {
@@ -1348,6 +1341,15 @@ export class DaemonApplication implements DaemonRpcApplication {
     this.#active.set(key, { controller, settled })
     this.#touchIdle(true)
 
+    let finalized = false
+    const finalize = (): void => {
+      if (finalized) return
+      finalized = true
+      context.signal.removeEventListener('abort', cancel)
+      this.#active.delete(key)
+      settle()
+      this.#touchIdle(true)
+    }
     const producer = this.#withSecretAccess('shared', () => {
       controller.signal.throwIfAborted()
       return invoke(controller.signal, (event) => rendezvous.push(event))
@@ -1378,12 +1380,14 @@ export class DaemonApplication implements DaemonRpcApplication {
             : failure(error),
         }),
       )
-      .finally(() => {
-        context.signal.removeEventListener('abort', cancel)
-        this.#active.delete(key)
-        settle()
-        this.#touchIdle(true)
-      })
+
+    const cancel = () => {
+      controller.abort(context.signal.reason)
+      rendezvous.close(cancellation)
+      void producer.then(finalize, finalize)
+    }
+    if (context.signal.aborted) cancel()
+    else context.signal.addEventListener('abort', cancel, { once: true })
 
     let completed = false
     const cancelledResult: RpcResult<TResult> = {
@@ -1395,11 +1399,13 @@ export class DaemonApplication implements DaemonRpcApplication {
       },
     }
     const stop = async (): Promise<void> => {
-      if (completed) return
-      controller.abort()
-      rendezvous.close(cancellation)
-      await producer
-      completed = true
+      if (!completed) {
+        controller.abort()
+        rendezvous.close(cancellation)
+        await producer
+        completed = true
+      }
+      finalize()
     }
     const iterator: AsyncIteratorObject<TEvent, RpcResult<TResult>, void> = {
       [Symbol.asyncIterator]() {
@@ -1409,9 +1415,18 @@ export class DaemonApplication implements DaemonRpcApplication {
         await stop()
       },
       async next() {
-        const step = await rendezvous.next()
-        if (step.done) completed = true
-        return step
+        try {
+          const step = await rendezvous.next()
+          if (step.done) {
+            completed = true
+            finalize()
+          }
+          return step
+        } catch (error) {
+          await producer
+          finalize()
+          throw error
+        }
       },
       async return(value) {
         await stop()

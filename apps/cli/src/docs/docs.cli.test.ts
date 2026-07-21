@@ -8,6 +8,7 @@ import {
   createDocumentationService,
   createExtensionDocumentationSource,
 } from '@ctxindex/core/documentation'
+import { CtxindexError } from '@ctxindex/core/errors'
 import type { DocumentationProjection } from '@ctxindex/core/extension'
 import type { DaemonSelection } from '../daemon/client'
 import {
@@ -274,6 +275,54 @@ test('selected daemon supplies only Extension docs while bundled docs stay local
     (await loaded.search({ query: 'getting' })).map((row) => row.origin.kind),
   ).toEqual(['bundled', 'extension'])
   expect(directLoads).toBe(0)
+})
+
+test('pre-initialization documentation stays on the safe direct surface', async () => {
+  let ensures = 0
+  let directLoads = 0
+  const loaded = await loadDocsCommandService({
+    assertInitialized: async () => {
+      throw new CtxindexError(
+        'ctxindex is not initialized; run ctxindex init',
+        'invalid_args',
+      )
+    },
+    selectDaemon: () => {
+      throw new Error('pre-initialization docs must not inspect discovery')
+    },
+    ensureDaemonSelection: async () => {
+      ensures += 1
+      throw new Error('pre-initialization docs must not ensure a daemon')
+    },
+    loadCliDefinitions: async () => {
+      directLoads += 1
+      return {
+        documentation: {
+          list: () => [],
+          get: () => undefined,
+        },
+        diagnostics: [],
+      } as never
+    },
+    printExtensionDiagnostics: () => {},
+    resolveBundledDocumentation: () =>
+      createBundledDocumentationSource([markdown]),
+    daemonDocumentationList: async () => {
+      throw new Error('must not run')
+    },
+    daemonDocumentationGet: async () => {
+      throw new Error('must not run')
+    },
+    daemonDocumentationSearch: async () => {
+      throw new Error('must not run')
+    },
+  })
+
+  expect(await loaded.get({ path: 'getting-started.md' })).toMatchObject({
+    origin: { kind: 'bundled' },
+  })
+  expect(ensures).toBe(0)
+  expect(directLoads).toBe(1)
 })
 
 test('selected daemon failures never fall back to direct Extension loading', async () => {

@@ -470,6 +470,38 @@ test('streams bounded progress in order with one-item producer backpressure', as
   expect(app.activeRequestCount).toBe(0)
 })
 
+test('keeps stream activity admitted until the consumer observes its terminal result', async () => {
+  const clock = new TestIdleClock()
+  const app = application({
+    idleTimeoutMs: 1_000,
+    idleTimer: clock.hooks,
+  })
+  app.markReady()
+  const opened = await app.sync.run(
+    { mode: 'sync' },
+    context('terminal-pending'),
+  )
+  if (!opened.ok) throw new Error('Expected stream admission')
+
+  await Bun.sleep(0)
+  expect(app.activeRequestCount).toBe(1)
+  clock.advance(2_000)
+  expect(app.lifecycle).toBe('ready')
+
+  expect(await opened.value.next()).toEqual({
+    done: true,
+    value: {
+      ok: true,
+      value: { mode: 'sync', results: [], warnings: [] },
+    },
+  })
+  expect(app.activeRequestCount).toBe(0)
+  clock.advance(999)
+  expect(app.lifecycle).toBe('ready')
+  clock.advance(1)
+  expect(app.lifecycle).toBe('stopping')
+})
+
 test('returning the stream early cancels and settles the producer', async () => {
   let observed: AbortSignal | undefined
   const app = application({

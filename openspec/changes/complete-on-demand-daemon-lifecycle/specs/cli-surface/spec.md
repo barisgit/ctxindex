@@ -13,6 +13,10 @@ CLI formatting, warnings, typed progress presentation, and stable exit mapping M
 - **WHEN** a user invokes a valid initialized stateful command without first running `daemon start`
 - **THEN** the CLI ensures the compatible daemon and preserves the command's existing public output and exit behavior
 
+#### Scenario: Deleted initialization evidence rejects stale daemon reuse
+- **WHEN** required initialization evidence is absent while compatible ready discovery metadata still exists
+- **THEN** a stateful command returns the existing `ctxindex init` guidance before health reuse or business invocation
+
 #### Scenario: Safe filesystem-only command remains direct
 - **WHEN** a command on the tested safe-exception allowlist executes while no daemon is running
 - **THEN** it completes without starting a daemon and without opening SQLite or invoking provider behavior

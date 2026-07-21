@@ -1,4 +1,10 @@
-import { DaemonCliError, type DaemonSelection, selectDaemon } from './client'
+import { assertInitialized } from '../commands/db'
+import {
+  DaemonCliError,
+  type DaemonSelection,
+  registerDaemonReconnect,
+  selectDaemon,
+} from './client'
 import { type DaemonLifecycle, daemonStart, daemonStatus } from './lifecycle'
 
 export type DaemonSelectionEnsureResult =
@@ -10,12 +16,14 @@ export type DaemonSelectionEnsureResult =
   | { readonly status: 'unsupported' }
 
 export interface DaemonSelectionEnsurerDependencies {
+  readonly assertInitialized: () => Promise<void>
   readonly select: () => DaemonSelection | null
   readonly status: DaemonLifecycle['status']
   readonly start: DaemonLifecycle['start']
 }
 
 const defaultDependencies: DaemonSelectionEnsurerDependencies = {
+  assertInitialized,
   select: selectDaemon,
   status: daemonStatus,
   start: daemonStart,
@@ -94,6 +102,8 @@ export function createDaemonSelectionEnsurer(
 
   return async (signal) => {
     throwIfCancelled(signal)
+    await dependencies.assertInitialized()
+    throwIfCancelled(signal)
     if (!inFlight) {
       const pending = run()
       inFlight = pending
@@ -135,5 +145,15 @@ export async function resolveEnsuredDaemonSelection(
 ): Promise<DaemonSelection | null> {
   if (!ensure) return select()
   const result = await ensure(signal)
-  return result.status === 'selected' ? result.selection : null
+  if (result.status !== 'selected') return null
+  const reconnect = async (
+    retrySignal?: AbortSignal,
+  ): Promise<DaemonSelection> => {
+    const retried = await ensure(retrySignal)
+    if (retried.status !== 'selected') {
+      throw unavailable('The local daemon is unsupported on this platform.')
+    }
+    return registerDaemonReconnect(retried.selection, reconnect)
+  }
+  return registerDaemonReconnect(result.selection, reconnect)
 }

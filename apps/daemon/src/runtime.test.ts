@@ -584,7 +584,9 @@ test('non-cooperative request times out while ownership remains, then cleans up 
   })
   expect(events).toEqual([])
   settle()
-  await pending
+  const opened = await pending
+  if (!opened.ok) throw new Error('Expected stream admission')
+  await opened.value.next()
   await daemon.closed
   expect(events).toContain('close:db')
   expect(events).toContain('release:database')

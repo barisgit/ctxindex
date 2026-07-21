@@ -18,6 +18,7 @@ import {
   daemonHealth,
   daemonSync,
   daemonTransferToFile,
+  registerDaemonReconnect,
   selectDaemonForRuntime,
 } from './client'
 
@@ -317,6 +318,109 @@ test('daemon sync preserves live order, awaited delivery, and the iterator termi
       ),
     ).toEqual(terminal)
     expect(observed).toEqual(events)
+  } finally {
+    await setup.close()
+  }
+})
+
+test('reconnects once only when the daemon declares rejection before stream admission', async () => {
+  const setup = await fixture()
+  const terminal: RpcSyncResult = { mode: 'sync', results: [], warnings: [] }
+  const rejection: RpcFailure = {
+    kind: 'daemon_unavailable',
+    code: 'daemon_unavailable',
+    message: 'The daemon is stopping and is not accepting new work.',
+  }
+  let reconnects = 0
+  let calls = 0
+  try {
+    const base = selectDaemonForRuntime(setup.runtime, {
+      testEndpoint: '/tmp/ctxd-sync-reconnect.sock',
+    }) as DaemonSelection
+    const replacement = { ...base, endpoint: '/tmp/ctxd-sync-replacement.sock' }
+    const selection = registerDaemonReconnect(base, async () => {
+      reconnects += 1
+      return replacement
+    })
+    const result = await daemonSync(
+      selection,
+      { mode: 'sync' },
+      undefined,
+      undefined,
+      {
+        createClient: (selected) => {
+          calls += 1
+          if (selected === selection) {
+            return {
+              sync: {
+                run: async () => {
+                  throw new ORPCError(rejection.kind, {
+                    defined: true,
+                    message: rpcFailureRegistry[rejection.kind].message,
+                    data: rejection,
+                  })
+                },
+              },
+            } as unknown as DaemonClient
+          }
+          return syncClient(syncIterator([], terminal))
+        },
+      },
+    )
+
+    expect(result).toEqual(terminal)
+    expect(reconnects).toBe(1)
+    expect(calls).toBe(2)
+  } finally {
+    await setup.close()
+  }
+})
+
+test('never reconnects after ambiguous transport failure or a second rejection', async () => {
+  const setup = await fixture()
+  let reconnects = 0
+  try {
+    const base = selectDaemonForRuntime(setup.runtime, {
+      testEndpoint: '/tmp/ctxd-sync-no-replay.sock',
+    }) as DaemonSelection
+    const selection = registerDaemonReconnect(base, async () => {
+      reconnects += 1
+      return { ...base, endpoint: '/tmp/ctxd-sync-no-replay-2.sock' }
+    })
+    await expect(
+      daemonSync(selection, { mode: 'sync' }, undefined, undefined, {
+        createClient: () =>
+          ({
+            sync: {
+              run: async () => Promise.reject(new Error('socket reset')),
+            },
+          }) as unknown as DaemonClient,
+      }),
+    ).rejects.toMatchObject({ code: 'daemon_unavailable' })
+    expect(reconnects).toBe(0)
+
+    const rejection: RpcFailure = {
+      kind: 'daemon_unavailable',
+      code: 'daemon_unavailable',
+      message: 'The daemon is stopping and is not accepting new work.',
+    }
+    await expect(
+      daemonSync(selection, { mode: 'sync' }, undefined, undefined, {
+        createClient: () =>
+          ({
+            sync: {
+              run: async () => {
+                throw new ORPCError(rejection.kind, {
+                  defined: true,
+                  message: rpcFailureRegistry[rejection.kind].message,
+                  data: rejection,
+                })
+              },
+            },
+          }) as unknown as DaemonClient,
+      }),
+    ).rejects.toMatchObject({ code: 'daemon_unavailable' })
+    expect(reconnects).toBe(1)
   } finally {
     await setup.close()
   }
