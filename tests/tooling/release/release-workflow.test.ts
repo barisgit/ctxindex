@@ -8,9 +8,7 @@ test('release workflow is a protected tokenless exact-artifact pipeline', async 
   expect(workflow).toContain('cancel-in-progress: false')
   expect(workflow).toContain('bun-version: 1.3.14')
   expect(workflow).toContain('github.event.before')
-  expect(workflow).toContain('name: Fast repository gate')
-  expect(workflow).toContain('name: Integration tests')
-  expect(workflow).toContain('name: CLI and daemon E2E tests')
+  expect(workflow).toContain('name: Verify, build, pack, and smoke')
   expect(workflow).toContain('name: Build')
   expect(workflow).toContain('name: Pack')
   expect(workflow).toContain('name: Smoke')
@@ -23,18 +21,13 @@ test('release workflow is a protected tokenless exact-artifact pipeline', async 
   expect(workflow).toContain('release-gate.ts')
   expect(workflow).toContain('bun run smoke:cli-package')
   expect(workflow).toContain('run: bun run ci')
-  expect(workflow).toContain('run: bun run test:integration')
-  expect(workflow).toContain('run: bun run test:e2e')
-  expect(workflow).toContain('needs: [gate, ci, integration, e2e]')
+  expect(workflow).not.toContain('run: bun run test:integration')
+  expect(workflow).not.toContain('run: bun run test:e2e')
+  expect(workflow).toContain('needs: gate')
   expect(workflow).toContain(
     'actions/cache@5a3ec84eff668545956fd18022155c47e93e2684',
   )
-  for (const command of [
-    'bun install --frozen-lockfile',
-    'bun run ci',
-    'bun run test:integration',
-    'bun run test:e2e',
-  ]) {
+  for (const command of ['bun install --frozen-lockfile', 'bun run ci']) {
     expect(workflow).toContain(`run: ${command}`)
   }
   expect(workflow).not.toMatch(/NODE_AUTH_TOKEN|NPM_TOKEN|npm-token/)

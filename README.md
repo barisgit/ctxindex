@@ -114,9 +114,9 @@ trusted external Extensions remain explicit files loaded from configured paths.
 `bun run pack:cli-package` creates one allowlisted tarball, and the isolated
 smoke installs and runs that exact artifact outside the checkout.
 
-Pushes to `main` are release candidates only when `apps/cli/package.json` has a
-valid version strictly greater than the previous commit and that exact version
-is absent from npm. Existing versions are successful no-ops. See
+Pushes to `main` are release candidates when `apps/cli/package.json` has a valid
+version no lower than the previous commit and that exact version is absent from
+npm, allowing a failed publication to retry. Existing versions are successful no-ops. See
 [`docs/release/npm.md`](docs/release/npm.md) for the protected trusted-publishing
 setup and first-release checkpoint.
 

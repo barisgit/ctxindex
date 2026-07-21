@@ -75,9 +75,6 @@ export function evaluateReleaseGate(
     throw new Error(`Unexpected npm registry response ${input.registryStatus}`)
   }
   const comparison = compareSemver(current, previous)
-  if (comparison === 0) {
-    return { publish: false, version: input.currentVersion }
-  }
   if (comparison < 0) {
     throw new Error(
       'CLI version must be strictly greater than the previous version',
@@ -160,9 +157,7 @@ async function main(args: readonly string[]): Promise<number> {
     console.log(
       result.publish
         ? `ctxindex@${result.version} is eligible for publication`
-        : registry.status === 200
-          ? `ctxindex@${result.version} already exists; skipping publication`
-          : `ctxindex version is unchanged at ${result.version}; skipping publication`,
+        : `ctxindex@${result.version} already exists; skipping publication`,
     )
     return 0
   }

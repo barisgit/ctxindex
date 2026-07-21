@@ -14,15 +14,16 @@ install its native module.
 `.github/workflows/release.yml` runs on pushes to `main` and serializes release
 candidates. Before CI, it compares the current CLI version with the version at
 `github.event.before` and queries the exact `ctxindex@<version>` registry entry.
-A valid, strictly increased, unpublished semantic version proceeds. An already
-published exact version or unchanged unpublished version is a successful no-op.
-An invalid or reversed version, or any registry result other than an exact match
-or 404 fails closed.
+A valid unpublished semantic version that is no lower than the previous version
+proceeds, including a retry after failed publication. An already published exact
+version is a successful no-op. An invalid or reversed version, or any registry
+result other than an exact match or 404 fails closed.
 
-The cached fast repository gate, integration tests, and CLI/daemon E2E tests
-run in parallel after the version gate. Build, pack, and the isolated
-global-install smoke wait for all three and run without OIDC permission. The
-workflow uploads the exact verified tarball and its checksum.
+After the version gate, one cached job runs the fast repository gate, builds and
+packs the CLI, and performs the isolated global-install smoke without OIDC
+permission. Deeper integration and CLI/daemon E2E lanes remain required on pull
+requests rather than delaying the release pipeline. The workflow uploads the
+exact verified tarball and its checksum.
 Only the `Publish` job uses the protected `npm-production` environment and
 receives `id-token: write`; after approval it downloads and verifies that
 artifact, repeats the exact registry-absence check, and uses npm trusted

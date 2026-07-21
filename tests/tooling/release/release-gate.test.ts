@@ -23,14 +23,14 @@ describe('release gate', () => {
     ).toEqual({ publish: false, version: '1.2.3' })
   })
 
-  test('skips an unchanged unpublished version', () => {
+  test('retries an unchanged unpublished version after a failed release', () => {
     expect(
       evaluateReleaseGate({
         previousVersion: '1.2.3',
         currentVersion: '1.2.3',
         registryStatus: 404,
       }),
-    ).toEqual({ publish: false, version: '1.2.3' })
+    ).toEqual({ publish: true, version: '1.2.3' })
   })
 
   test.each([
