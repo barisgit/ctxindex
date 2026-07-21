@@ -23,6 +23,7 @@ import type {
 import type {
   RunSyncResult,
   SourceSyncResult,
+  SyncApplicationEvent,
   SyncApplicationService,
   SyncWarning,
 } from '@ctxindex/core/sync'
@@ -59,6 +60,7 @@ import type {
   RpcSourceSyncResult,
   RpcStatusInput,
   RpcStatusResult,
+  RpcSyncEvent,
   RpcSyncInput,
   RpcSyncResult,
   RpcThreadGetInput,
@@ -104,6 +106,67 @@ export interface DaemonApplicationOptions {
 interface ActiveRequest {
   readonly controller: AbortController
   readonly settled: Promise<void>
+}
+
+interface RendezvousItem<T> {
+  readonly value: T
+  readonly accept: () => void
+  readonly reject: (error: unknown) => void
+}
+
+class StreamRendezvous<T, TReturn> {
+  #item: RendezvousItem<T> | undefined
+  #terminal: TReturn | undefined
+  #terminalSet = false
+  #waiter: (() => void) | undefined
+  #closedError: unknown
+
+  push(value: T): Promise<void> {
+    if (this.#closedError !== undefined)
+      return Promise.reject(this.#closedError)
+    if (this.#terminalSet) return Promise.reject(new Error('Stream settled'))
+    if (this.#item) return Promise.reject(new Error('Stream buffer occupied'))
+    return new Promise<void>((accept, reject) => {
+      this.#item = { value, accept, reject }
+      this.#wake()
+    })
+  }
+
+  finish(value: TReturn): void {
+    if (this.#terminalSet) return
+    this.#terminal = value
+    this.#terminalSet = true
+    this.#wake()
+  }
+
+  close(error: unknown): void {
+    this.#closedError = error
+    const item = this.#item
+    this.#item = undefined
+    item?.reject(error)
+    this.#wake()
+  }
+
+  async next(): Promise<IteratorResult<T, TReturn>> {
+    while (!this.#item && !this.#terminalSet) {
+      await new Promise<void>((resolve) => {
+        this.#waiter = resolve
+      })
+    }
+    const item = this.#item
+    if (item) {
+      this.#item = undefined
+      item.accept()
+      return { done: false, value: item.value }
+    }
+    return { done: true, value: this.#terminal as TReturn }
+  }
+
+  #wake(): void {
+    const waiter = this.#waiter
+    this.#waiter = undefined
+    waiter?.()
+  }
 }
 
 class ResultTooLargeError extends Error {}
@@ -292,6 +355,40 @@ function syncResult(value: RunSyncResult): RpcSyncResult {
       ...presentWarning(entry),
     })),
   }
+}
+
+function syncEvent(value: SyncApplicationEvent): RpcSyncEvent {
+  if (value.type === 'source.started' || value.type === 'source.progress') {
+    return value
+  }
+  const result: SourceSyncResult =
+    value.type === 'source.completed'
+      ? {
+          sourceId: value.sourceId,
+          status: 'completed',
+          run: value.run,
+        }
+      : {
+          sourceId: value.sourceId,
+          status: 'failed',
+          error: value.error,
+          diagnostics: value.diagnostics,
+        }
+  const projected = syncSourceResult(result)
+  return projected.status === 'completed'
+    ? {
+        type: 'source.completed',
+        sequence: value.sequence,
+        sourceId: projected.sourceId,
+        run: projected.run,
+      }
+    : {
+        type: 'source.failed',
+        sequence: value.sequence,
+        sourceId: projected.sourceId,
+        failure: projected.failure,
+        diagnostics: projected.diagnostics,
+      }
 }
 
 function statusRow(value: StatusRow): RpcStatusResult['rows'][number] {
@@ -493,13 +590,14 @@ export class DaemonApplication implements DaemonRpcApplication {
   runSync(
     input: RpcSyncInput,
     context: RpcRequestContext,
-  ): Promise<RpcResult<RpcSyncResult>> {
-    return this.#business(context, async (signal) =>
+  ): ReturnType<DaemonRpcApplication['sync']['run']> {
+    return this.#businessStream(context, async (signal, emit) =>
       syncResult(
         await this.#options.syncService.run({
           ...(input.source ? { source: input.source } : {}),
           mode: input.mode,
           signal,
+          onEvent: (event) => emit(syncEvent(event)),
         }),
       ),
     )
@@ -814,5 +912,109 @@ export class DaemonApplication implements DaemonRpcApplication {
         this.#active.delete(key)
         settle()
       })
+  }
+
+  #businessStream<TEvent, TResult>(
+    context: RpcRequestContext,
+    invoke: (
+      signal: AbortSignal,
+      emit: (event: TEvent) => Promise<void>,
+    ) => Promise<TResult>,
+  ): Promise<RpcResult<AsyncIteratorObject<TEvent, RpcResult<TResult>, void>>> {
+    if (this.#lifecycle !== 'ready')
+      return Promise.resolve(unavailable(this.#lifecycle))
+    const controller = new AbortController()
+    const rendezvous = new StreamRendezvous<TEvent, RpcResult<TResult>>()
+    const cancellation = new CtxindexSyncError('Sync cancelled', 'cancelled')
+    const cancel = () => {
+      controller.abort(context.signal.reason)
+      rendezvous.close(cancellation)
+    }
+    if (context.signal.aborted) cancel()
+    else context.signal.addEventListener('abort', cancel, { once: true })
+
+    const key = `${context.requestId}:${this.#requestSequence++}`
+    let settle!: () => void
+    const settled = new Promise<void>((resolve) => {
+      settle = resolve
+    })
+    this.#active.set(key, { controller, settled })
+
+    const producer = invoke(controller.signal, (event) =>
+      rendezvous.push(event),
+    )
+      .then((value) =>
+        rendezvous.finish(
+          controller.signal.aborted
+            ? {
+                ok: false,
+                error: {
+                  kind: 'cancelled',
+                  code: 'cancelled',
+                  message: 'The request was cancelled.',
+                },
+              }
+            : { ok: true, value },
+        ),
+      )
+      .catch((error) =>
+        rendezvous.finish({
+          ok: false,
+          error: controller.signal.aborted
+            ? {
+                kind: 'cancelled',
+                code: 'cancelled',
+                message: 'The request was cancelled.',
+              }
+            : failure(error),
+        }),
+      )
+      .finally(() => {
+        context.signal.removeEventListener('abort', cancel)
+        this.#active.delete(key)
+        settle()
+      })
+
+    let completed = false
+    const cancelledResult: RpcResult<TResult> = {
+      ok: false,
+      error: {
+        kind: 'cancelled',
+        code: 'cancelled',
+        message: 'The request was cancelled.',
+      },
+    }
+    const stop = async (): Promise<void> => {
+      if (completed) return
+      controller.abort()
+      rendezvous.close(cancellation)
+      await producer
+      completed = true
+    }
+    const iterator: AsyncIteratorObject<TEvent, RpcResult<TResult>, void> = {
+      [Symbol.asyncIterator]() {
+        return this
+      },
+      async [Symbol.asyncDispose]() {
+        await stop()
+      },
+      async next() {
+        const step = await rendezvous.next()
+        if (step.done) completed = true
+        return step
+      },
+      async return(value) {
+        await stop()
+        return {
+          done: true,
+          value: value === undefined ? cancelledResult : await value,
+        }
+      },
+      async throw(error) {
+        await stop()
+        throw error
+      },
+    }
+    return Promise.resolve({ ok: true, value: iterator })
   }
 }

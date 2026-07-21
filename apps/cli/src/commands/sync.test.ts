@@ -121,23 +121,37 @@ describe('sync command', () => {
     let opened = false
     const routes: SyncRouteServices = {
       selectDaemon: () => ({}) as DaemonSelection,
-      daemonSync: async () => ({
-        mode: 'sync',
-        results: [
-          {
-            sourceId: 'source-a',
-            status: 'completed',
-            run: completed,
-          },
-        ],
-        warnings: [
-          {
-            sourceId: 'source-a',
-            code: 'binary',
-            message: 'Skipped binary file',
-          },
-        ],
-      }),
+      daemonSync: async (_daemon, _input, _signal, onEvent) => {
+        await onEvent?.({
+          type: 'source.started',
+          sequence: 0,
+          sourceId: 'source-a',
+          mode: 'sync',
+        })
+        await onEvent?.({
+          type: 'source.completed',
+          sequence: 1,
+          sourceId: 'source-a',
+          run: completed,
+        })
+        return {
+          mode: 'sync',
+          results: [
+            {
+              sourceId: 'source-a',
+              status: 'completed',
+              run: completed,
+            },
+          ],
+          warnings: [
+            {
+              sourceId: 'source-a',
+              code: 'binary',
+              message: 'Skipped binary file',
+            },
+          ],
+        }
+      },
     }
     expect(
       await handleSyncCommand(
@@ -163,6 +177,7 @@ describe('sync command', () => {
       ],
     })
     expect(String(log.mock.calls[0]?.[0])).not.toContain('"ok"')
+    expect(log).toHaveBeenCalledTimes(1)
   })
 
   test('selected RPC preserves the established failed-sync projection exactly', async () => {
@@ -473,7 +488,7 @@ describe('sync command', () => {
     expect(JSON.stringify(output)).not.toContain('private path')
   })
 
-  test('uses the worst stable exit and renders deterministic completed events', async () => {
+  test('uses the worst stable exit and renders deterministic live events', async () => {
     const log = spyOn(console, 'log').mockImplementation(() => {})
     const setup = harness({
       sources: [source('source-b'), source('source-a')],
@@ -492,11 +507,13 @@ describe('sync command', () => {
         setup.services,
       ),
     ).toBe(130)
-    expect(
-      String(log.mock.calls[0]?.[0])
-        .split('\n')
-        .map((line) => JSON.parse(line)),
-    ).toEqual([
+    expect(log.mock.calls.map((call) => JSON.parse(String(call[0])))).toEqual([
+      {
+        type: 'source.started',
+        sequence: 0,
+        sourceId: 'source-a',
+        mode: 'sync',
+      },
       {
         type: 'source.failed',
         sourceId: 'source-a',
@@ -509,6 +526,12 @@ describe('sync command', () => {
           message: 'Sync failed for Source "source-a" (cancelled)',
         },
         exitCode: 130,
+      },
+      {
+        type: 'source.started',
+        sequence: 2,
+        sourceId: 'source-b',
+        mode: 'sync',
       },
       {
         type: 'source.failed',

@@ -26,6 +26,7 @@ import {
   type RpcSourceListResult,
   type RpcSourceRemoveResult,
   type RpcStatusResult,
+  type RpcSyncEvent,
   type RpcSyncInput,
   type RpcSyncResult,
   type RpcThreadGetResult,
@@ -37,7 +38,7 @@ import { RPCLink } from '@orpc/client/fetch'
 
 export const CLI_DAEMON_PROTOCOL = {
   id: 'ctxindex.local',
-  version: 1,
+  version: 2,
 } as const
 
 export class DaemonCliError extends Error {
@@ -194,6 +195,12 @@ function createClient(selection: DaemonSelection): DaemonClient {
   return createORPCClient<DaemonClient>(link)
 }
 
+export interface DaemonSyncServices {
+  readonly createClient: (selection: DaemonSelection) => DaemonClient
+}
+
+const defaultDaemonSyncServices: DaemonSyncServices = { createClient }
+
 function requestOptions(signal: AbortSignal | undefined) {
   return signal ? { signal } : {}
 }
@@ -207,16 +214,7 @@ async function invoke<T>(
   try {
     result = await call(createClient(selection))
   } catch (error) {
-    if (signal?.aborted) {
-      throw new DaemonCliError({
-        kind: 'cancelled',
-        code: 'cancelled',
-        message: 'The daemon request was cancelled.',
-      })
-    }
-    const failure = daemonFailureFromDeclaredError(error)
-    if (failure) throw new DaemonCliError(failure)
-    throw unavailable(selection)
+    throw invocationError(error, signal, selection)
   }
   if (signal?.aborted) {
     throw new DaemonCliError({
@@ -226,6 +224,22 @@ async function invoke<T>(
     })
   }
   return result
+}
+
+function invocationError(
+  error: unknown,
+  signal: AbortSignal | undefined,
+  selection: DaemonSelection,
+): DaemonCliError {
+  if (signal?.aborted) {
+    return new DaemonCliError({
+      kind: 'cancelled',
+      code: 'cancelled',
+      message: 'The daemon request was cancelled.',
+    })
+  }
+  const failure = daemonFailureFromDeclaredError(error)
+  return failure ? new DaemonCliError(failure) : unavailable(selection)
 }
 
 export function daemonFailureFromDeclaredError(
@@ -260,12 +274,34 @@ export async function daemonSync(
   selection: DaemonSelection,
   input: RpcSyncInput,
   signal?: AbortSignal,
+  onEvent?: (event: RpcSyncEvent) => void | Promise<void>,
+  services: DaemonSyncServices = defaultDaemonSyncServices,
 ): Promise<RpcSyncResult> {
-  return invoke(
+  const iterator = await invoke(
     signal,
-    (client) => client.sync.run(input, requestOptions(signal)),
+    () =>
+      services.createClient(selection).sync.run(input, requestOptions(signal)),
     selection,
   )
+  let completed = false
+  try {
+    while (true) {
+      const step = await iterator.next()
+      if (step.done) {
+        completed = true
+        return step.value
+      }
+      await onEvent?.(step.value)
+    }
+  } catch (error) {
+    throw invocationError(error, signal, selection)
+  } finally {
+    if (!completed) {
+      try {
+        await iterator.return?.()
+      } catch {}
+    }
+  }
 }
 
 export async function daemonRealmAdd(

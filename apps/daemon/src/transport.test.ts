@@ -31,7 +31,7 @@ test('transport rejects absent runtime metadata before dispatch', () => {
   const request = new Request('http://daemon/rpc/system/health', {
     headers: {
       'x-ctxindex-protocol-id': 'ctxindex.local',
-      'x-ctxindex-protocol-version': '1',
+      'x-ctxindex-protocol-version': '2',
     },
   })
   expect(() => parseDaemonRequestContext(request)).toThrow(

@@ -74,6 +74,33 @@ export async function loadCliDefinitions(
 export async function runCli(args: string[]): Promise<number>;
 ```
 
+### @ctxindex/cli — streamed sync boundary
+
+```ts
+export interface SyncRouteServices {
+  readonly selectDaemon: typeof selectDaemon
+  readonly daemonSync: typeof daemonSync
+}
+
+export async function daemonSync(
+  selection: DaemonSelection,
+  input: RpcSyncInput,
+  signal?: AbortSignal,
+  onEvent?: (event: RpcSyncEvent) => void | Promise<void>,
+): Promise<RpcSyncResult>;
+
+export interface SyncCommandInput {
+  readonly sourceId?: string
+  readonly mode: SyncRunResult['mode']
+  readonly json: boolean
+  readonly format: 'summary' | 'events' | 'compact'
+}
+```
+
+The daemon client manually advances the typed iterator so its terminal return remains available after progress events. It awaits the event sink and returns the iterator during cleanup, allowing cancellation and consumer backpressure to reach the daemon. Once a daemon is selected, stream or transport failure never falls back to direct database access.
+
+The sync runner projects direct-core and daemon-RPC events into one CLI vocabulary. `--format events` writes each event as one JSON line when observed. Human summary and compact modes may write bounded live progress to stderr while preserving terminal stdout. `--json` suppresses all live writes and emits exactly one terminal JSON document. The terminal result remains the sole owner of stable exit selection.
+
 ### @ctxindex/cli — shared flag contracts
 
 ```ts

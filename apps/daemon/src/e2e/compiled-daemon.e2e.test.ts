@@ -596,6 +596,45 @@ describe.skipIf(process.platform !== 'darwin')(
           warnings: [],
         })
 
+        const streamed = await runCli(runtime, [
+          'sync',
+          '--source',
+          sourceId,
+          '--format',
+          'events',
+        ])
+        expect(streamed.exitCode, streamed.stderr).toBe(0)
+        const syncEvents = streamed.stdout
+          .trim()
+          .split('\n')
+          .map((line) => JSON.parse(line))
+        expect(syncEvents[0]).toMatchObject({
+          type: 'source.started',
+          sequence: 0,
+          sourceId,
+          mode: 'sync',
+        })
+        expect(syncEvents).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              type: 'source.progress',
+              sourceId,
+              processed: expect.any(Number),
+            }),
+          ]),
+        )
+        expect(syncEvents.at(-1)).toMatchObject({
+          type: 'source.completed',
+          sourceId,
+          run: { status: 'completed' },
+        })
+        const progressEvents = syncEvents.filter(
+          ({ sequence }) => sequence !== undefined,
+        )
+        expect(progressEvents.map(({ sequence }) => sequence)).toEqual(
+          progressEvents.map((_, sequence) => sequence),
+        )
+
         const searched = await runCli(runtime, [
           'search',
           'local daemon proof',
@@ -854,6 +893,71 @@ describe.skipIf(process.platform !== 'darwin')(
       } finally {
         if (sync?.process.exitCode === null) sync.process.kill('SIGKILL')
         if (sync) await waitForExit(sync, 'sync cleanup')
+        if (daemon) await stopDaemon(daemon, 'SIGKILL')
+        await cleanupRuntime(runtime)
+      }
+    }, 45_000)
+
+    test('abrupt client disconnect cancels streamed sync and drains request tracking', async () => {
+      const runtime = await createRuntime('ctxindex-daemon-disconnect-')
+      let daemon: RunningProcess | undefined
+      let sync: RunningProcess | undefined
+      try {
+        const { sourceId } = await initializeLocalSource(runtime, 8_000)
+        daemon = startDaemon(runtime)
+        await waitForReady(runtime, daemon)
+        sync = spawnProcess(
+          [cliExecutable, 'sync', '--source', sourceId, '--format', 'events'],
+          runtime.env,
+        )
+
+        await pollUntil(
+          'streamed sync admission before disconnect',
+          async () => {
+            const health = await runCli(runtime, ['daemon', 'health', '--json'])
+            if (health.exitCode !== 0) return null
+            return JSON.parse(health.stdout).activeRequestCount === 1
+              ? true
+              : null
+          },
+          sync.process,
+        )
+        sync.process.kill('SIGKILL')
+        await waitForExit(sync, 'disconnected CLI exit')
+        sync = undefined
+
+        const healthy = await pollUntil(
+          'daemon health after abrupt client disconnect',
+          async () => {
+            const result = await runCli(runtime, ['daemon', 'health', '--json'])
+            if (result.exitCode !== 0) return null
+            const value = JSON.parse(result.stdout)
+            return value.ready === true && value.activeRequestCount === 0
+              ? value
+              : null
+          },
+          daemon.process,
+        )
+        expect(healthy.lifecycle).toBe('ready')
+
+        const status = await runCli(runtime, [
+          'status',
+          '--source',
+          sourceId,
+          '--json',
+        ])
+        expect(status.exitCode, status.stderr).toBe(0)
+        expect(JSON.parse(status.stdout)).toEqual([
+          expect.objectContaining({
+            sourceId,
+            lastStatus: 'failed',
+            errorsCount: 1,
+            cursor: null,
+          }),
+        ])
+      } finally {
+        if (sync?.process.exitCode === null) sync.process.kill('SIGKILL')
+        if (sync) await waitForExit(sync, 'disconnected sync cleanup')
         if (daemon) await stopDaemon(daemon, 'SIGKILL')
         await cleanupRuntime(runtime)
       }

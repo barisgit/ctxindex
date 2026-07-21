@@ -22,6 +22,7 @@ import {
   rpcSourceRemoveInputSchema,
   rpcStatusInputSchema,
   rpcStatusResultSchema,
+  rpcSyncEventSchema,
   rpcSyncInputSchema,
   rpcSyncResultSchema,
   rpcThreadGetInputSchema,
@@ -206,6 +207,41 @@ describe('wire identity and common bounds', () => {
 })
 
 describe('sync/status and internal application results', () => {
+  test('accepts only bounded count-only sync stream events', () => {
+    const progress = {
+      type: 'source.progress',
+      sequence: 1,
+      sourceId,
+      processed: 4,
+      upserts: 2,
+      removals: 1,
+      checkpoints: 1,
+      warningsCount: 0,
+    } as const
+    expect(rpcSyncEventSchema.parse(progress)).toEqual(progress)
+    expect(() =>
+      rpcSyncEventSchema.parse({
+        ...progress,
+        processed: Number.MAX_SAFE_INTEGER + 1,
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcSyncEventSchema.parse({
+        ...progress,
+        cursor: { token: 'private' },
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcSyncEventSchema.parse({
+        type: 'source.completed',
+        sequence: 2,
+        sourceId,
+        run,
+        payload: { private: true },
+      }),
+    ).toThrow()
+  })
+
   test('accepts strict internal success and failure values', () => {
     expect(
       rpcResultSchema(rpcSyncResultSchema).parse({

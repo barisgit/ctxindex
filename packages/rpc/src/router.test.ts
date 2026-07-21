@@ -14,12 +14,18 @@ import type {
   RpcTransportContext,
 } from './router'
 import { createDaemonRouter } from './router'
-import { type RpcFailure, rpcFailureRegistry } from './schemas'
+import {
+  type RpcFailure,
+  type RpcResult,
+  type RpcSyncEvent,
+  type RpcSyncResult,
+  rpcFailureRegistry,
+} from './schemas'
 
 const digest = 'a'.repeat(64)
 const sourceId = '01ARZ3NDEKTSV4RRFFQ69G5FAV'
 const ref = `ctx://${sourceId}/item/one`
-const protocol = { id: 'ctxindex.local', version: 1 } as const
+const protocol = { id: 'ctxindex.local', version: 2 } as const
 const runtime = {
   tupleDigest: digest,
   configDigest: digest,
@@ -29,6 +35,17 @@ const runtime = {
   databaseDigest: digest,
 } as const
 const rpcErrorMessage = rpcFailureRegistry.ctxindex.message
+
+async function* syncStream(
+  events: readonly RpcSyncEvent[] = [],
+  terminal: RpcResult<RpcSyncResult> = {
+    ok: true,
+    value: { mode: 'sync', results: [], warnings: [] },
+  },
+): AsyncGenerator<RpcSyncEvent, RpcResult<RpcSyncResult>, void> {
+  for (const event of events) yield event
+  return terminal
+}
 
 function transportContext(
   overrides: Partial<RpcTransportContext> = {},
@@ -128,7 +145,7 @@ function createApplication() {
     sync: {
       async run(_input, context) {
         record('sync', context)
-        return { ok: true, value: { mode: 'sync', results: [], warnings: [] } }
+        return { ok: true, value: syncStream() }
       },
     },
     status: {
@@ -226,10 +243,10 @@ describe('pure daemon contract', () => {
     ).toBeUndefined()
   })
 
-  test('infers plain success outputs with no RpcResult wire envelope', () => {
+  test('infers a typed sync iterator and plain unary success outputs', () => {
     type Outputs = InferContractRouterOutputs<typeof daemonContract>
-    expectTypeOf<Outputs['sync']['run']['mode']>().toEqualTypeOf<
-      'sync' | 'resync' | 'diff'
+    expectTypeOf<Outputs['sync']['run']>().toExtend<
+      AsyncIterator<RpcSyncEvent, RpcSyncResult, void>
     >()
     expectTypeOf<Outputs['system']['health']>().not.toHaveProperty('ok')
   })
@@ -254,6 +271,13 @@ describe('pure daemon contract', () => {
     expectTypeOf<DaemonRpcApplication['source']>().toHaveProperty('list')
     expectTypeOf<DaemonRpcApplication['source']>().toHaveProperty('remove')
     expectTypeOf<DaemonRpcApplication['sync']>().toHaveProperty('run')
+    type SyncApplicationValue = Extract<
+      Awaited<ReturnType<DaemonRpcApplication['sync']['run']>>,
+      { readonly ok: true }
+    >['value']
+    expectTypeOf<SyncApplicationValue>().toExtend<
+      AsyncIterator<RpcSyncEvent, RpcResult<RpcSyncResult>, void>
+    >()
     expectTypeOf<DaemonRpcApplication['status']>().toHaveProperty('get')
     expectTypeOf<DaemonRpcApplication['search']>().toHaveProperty('query')
     expectTypeOf<DaemonRpcApplication['resource']>().toHaveProperty('get')
@@ -310,10 +334,14 @@ describe('contract implementation', () => {
     await client.source.definitions({})
     await client.source.list({})
     await client.source.remove({ source: 'source' })
-    expect(await client.sync.run({ mode: 'sync' })).toEqual({
-      mode: 'sync',
-      results: [],
-      warnings: [],
+    const sync = await client.sync.run({ mode: 'sync' })
+    expect(await sync.next()).toEqual({
+      done: true,
+      value: {
+        mode: 'sync',
+        results: [],
+        warnings: [],
+      },
     })
     await client.status.get({})
     await client.search.query({ text: 'query' })
@@ -342,7 +370,7 @@ describe('contract implementation', () => {
     const protocolError = await captureError(() =>
       clientFor(
         fixture.application,
-        transportContext({ clientProtocol: { ...protocol, version: 2 } }),
+        transportContext({ clientProtocol: { ...protocol, version: 3 } }),
       ).system.health({}),
     )
     expect(protocolError).toMatchObject({
@@ -366,6 +394,155 @@ describe('contract implementation', () => {
     expect(Object.values(fixture.calls).every((count) => count === 0)).toBe(
       true,
     )
+  })
+
+  test('validates ordered stream yields and its terminal return', async () => {
+    const fixture = createApplication()
+    const event: RpcSyncEvent = {
+      type: 'source.started',
+      sequence: 0,
+      sourceId,
+      mode: 'sync',
+    }
+    const application: DaemonRpcApplication = {
+      ...fixture.application,
+      sync: {
+        run: async () => ({ ok: true, value: syncStream([event]) }),
+      },
+    }
+    const iterator = await clientFor(application).sync.run({ mode: 'sync' })
+    expect(await iterator.next()).toEqual({ done: false, value: event })
+    expect(await iterator.next()).toEqual({
+      done: true,
+      value: { mode: 'sync', results: [], warnings: [] },
+    })
+  })
+
+  test('maps a terminal application failure after progress to its declared error', async () => {
+    const fixture = createApplication()
+    const event: RpcSyncEvent = {
+      type: 'source.started',
+      sequence: 0,
+      sourceId,
+      mode: 'sync',
+    }
+    const failure: RpcFailure = {
+      kind: 'cancelled',
+      code: 'cancelled',
+      message: 'The request was cancelled.',
+    }
+    const application: DaemonRpcApplication = {
+      ...fixture.application,
+      sync: {
+        run: async () => ({
+          ok: true,
+          value: syncStream([event], { ok: false, error: failure }),
+        }),
+      },
+    }
+    const iterator = await clientFor(application).sync.run({ mode: 'sync' })
+    expect(await iterator.next()).toEqual({ done: false, value: event })
+    const error = await captureError(() => iterator.next())
+    expect(error).toMatchObject({ code: 'cancelled', data: failure })
+  })
+
+  test('rejects malformed stream events and terminal values as bounded internal errors', async () => {
+    const fixture = createApplication()
+    async function* malformedEventStream() {
+      yield {
+        type: 'source.started',
+        sequence: 0,
+        sourceId,
+        mode: 'sync',
+        cursor: 'secret-canary',
+      } as never
+      return {
+        ok: true as const,
+        value: { mode: 'sync', results: [], warnings: [] },
+      }
+    }
+    let application: DaemonRpcApplication = {
+      ...fixture.application,
+      sync: {
+        run: async () => ({ ok: true, value: malformedEventStream() }),
+      },
+    }
+    let iterator = await clientFor(application).sync.run({ mode: 'sync' })
+    const malformedEvent = await captureError(() => iterator.next())
+    expect(malformedEvent).toMatchObject({
+      code: 'ctxindex',
+      data: { code: 'internal_error' },
+    })
+    expect(JSON.stringify(malformedEvent)).not.toContain('secret-canary')
+
+    application = {
+      ...fixture.application,
+      sync: {
+        run: async () => ({
+          ok: true,
+          value: syncStream([], {
+            ok: true,
+            value: {
+              mode: 'sync',
+              results: [],
+              warnings: [],
+              secret: 'secret-canary',
+            },
+          } as never),
+        }),
+      },
+    }
+    iterator = await clientFor(application).sync.run({ mode: 'sync' })
+    const malformedTerminal = await captureError(() => iterator.next())
+    expect(malformedTerminal.data).toEqual(malformedEvent.data)
+    expect(JSON.stringify(malformedTerminal)).not.toContain('secret-canary')
+  })
+
+  test('returns the application iterator when the consumer stops early', async () => {
+    const fixture = createApplication()
+    let returned = false
+    const stream = syncStream([
+      {
+        type: 'source.started',
+        sequence: 0,
+        sourceId,
+        mode: 'sync',
+      },
+    ])
+    const application: DaemonRpcApplication = {
+      ...fixture.application,
+      sync: {
+        run: async () => ({
+          ok: true,
+          value: {
+            [Symbol.asyncIterator]() {
+              return this
+            },
+            async [Symbol.asyncDispose]() {
+              returned = true
+            },
+            next: () => stream.next(),
+            async return() {
+              returned = true
+              return {
+                done: true as const,
+                value: {
+                  ok: false as const,
+                  error: {
+                    kind: 'cancelled' as const,
+                    code: 'cancelled' as const,
+                    message: 'Cancelled.',
+                  },
+                },
+              }
+            },
+          },
+        }),
+      },
+    }
+    const iterator = await clientFor(application).sync.run({ mode: 'sync' })
+    await iterator.return?.()
+    expect(returned).toBe(true)
   })
 
   test('round-trips every bounded failure variant as its declared error', async () => {

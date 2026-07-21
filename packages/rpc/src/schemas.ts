@@ -315,6 +315,47 @@ export const rpcSyncResultSchema = z
   .readonly()
 export type RpcSyncResult = z.infer<typeof rpcSyncResultSchema>
 
+export const rpcSyncEventSchema = z.discriminatedUnion('type', [
+  z
+    .strictObject({
+      type: z.literal('source.started'),
+      sequence: countSchema,
+      sourceId: identifierSchema,
+      mode: z.enum(['sync', 'resync', 'diff']),
+    })
+    .readonly(),
+  z
+    .strictObject({
+      type: z.literal('source.progress'),
+      sequence: countSchema,
+      sourceId: identifierSchema,
+      processed: countSchema,
+      upserts: countSchema,
+      removals: countSchema,
+      checkpoints: countSchema,
+      warningsCount: countSchema,
+    })
+    .readonly(),
+  z
+    .strictObject({
+      type: z.literal('source.completed'),
+      sequence: countSchema,
+      sourceId: identifierSchema,
+      run: rpcSyncRunSchema,
+    })
+    .readonly(),
+  z
+    .strictObject({
+      type: z.literal('source.failed'),
+      sequence: countSchema,
+      sourceId: identifierSchema,
+      failure: rpcSourceFailureSchema,
+      diagnostics: rpcSyncFailureDiagnosticsSchema,
+    })
+    .readonly(),
+])
+export type RpcSyncEvent = z.infer<typeof rpcSyncEventSchema>
+
 export type RpcJsonCursor =
   | null
   | boolean

@@ -7,7 +7,7 @@ import { handleDaemonCommand, resolveDaemonLaunch } from './command'
 const digest = 'a'.repeat(64)
 const selection = {} as DaemonSelection
 const health: RpcHealthResult = {
-  protocol: { id: 'ctxindex.local', version: 1 },
+  protocol: { id: 'ctxindex.local', version: 2 },
   runtime: {
     tupleDigest: digest,
     configDigest: digest,
