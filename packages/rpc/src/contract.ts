@@ -1,4 +1,4 @@
-import { type ContractRouterClient, oc } from '@orpc/contract'
+import { type ContractRouterClient, eventIterator, oc } from '@orpc/contract'
 import {
   rpcFailureRegistry,
   rpcHealthInputSchema,
@@ -23,6 +23,7 @@ import {
   rpcSourceRemoveResultSchema,
   rpcStatusInputSchema,
   rpcStatusResultSchema,
+  rpcSyncEventSchema,
   rpcSyncInputSchema,
   rpcSyncResultSchema,
   rpcThreadGetInputSchema,
@@ -61,7 +62,9 @@ export const daemonContract = {
       .output(rpcSourceRemoveResultSchema),
   },
   sync: {
-    run: procedure.input(rpcSyncInputSchema).output(rpcSyncResultSchema),
+    run: procedure
+      .input(rpcSyncInputSchema)
+      .output(eventIterator(rpcSyncEventSchema, rpcSyncResultSchema)),
   },
   status: {
     get: procedure.input(rpcStatusInputSchema).output(rpcStatusResultSchema),

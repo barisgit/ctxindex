@@ -58,7 +58,7 @@ import {
   type DaemonListener,
 } from './transport'
 
-export const DAEMON_PROTOCOL = { id: 'ctxindex.local', version: 1 } as const
+export const DAEMON_PROTOCOL = { id: 'ctxindex.local', version: 2 } as const
 const DEFAULT_OBSERVATION_TIMEOUT_MS = 5_000
 const PUBLIC_VERSION = /^[a-z0-9][a-z0-9.+_-]{0,63}$/i
 

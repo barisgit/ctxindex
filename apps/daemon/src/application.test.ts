@@ -11,7 +11,10 @@ import {
 import {
   createDaemonRouter,
   type RpcRequestContext,
+  type RpcResult,
   type RpcRuntimeIdentity,
+  type RpcSyncEvent,
+  type RpcSyncResult,
 } from '@ctxindex/rpc'
 import { createRouterClient, ORPCError } from '@orpc/server'
 import { DaemonApplication } from './application'
@@ -86,14 +89,14 @@ function context(
   return {
     requestId,
     signal,
-    clientProtocol: { id: 'ctxindex.local', version: 1 },
+    clientProtocol: { id: 'ctxindex.local', version: 2 },
     clientRuntime: runtime,
   }
 }
 
 function application(overrides: Record<string, unknown> = {}) {
   return new DaemonApplication({
-    protocol: { id: 'ctxindex.local', version: 1 },
+    protocol: { id: 'ctxindex.local', version: 2 },
     runtime,
     daemonVersion: '0.0.0',
     buildVersion: 'test',
@@ -113,6 +116,37 @@ function application(overrides: Record<string, unknown> = {}) {
   })
 }
 
+async function consumeApplicationSync(
+  promise: ReturnType<DaemonApplication['sync']['run']>,
+): Promise<{
+  readonly result: RpcResult<RpcSyncResult>
+  readonly events: readonly RpcSyncEvent[]
+}> {
+  const opened = await promise
+  if (!opened.ok) return { result: opened, events: [] }
+  const events: RpcSyncEvent[] = []
+  while (true) {
+    const step = await opened.value.next()
+    if (step.done) return { result: step.value, events }
+    events.push(step.value)
+  }
+}
+
+async function consumeRpcSync(
+  promise: ReturnType<ReturnType<typeof clientFor>['sync']['run']>,
+): Promise<{
+  readonly result: RpcSyncResult
+  readonly events: readonly RpcSyncEvent[]
+}> {
+  const iterator = await promise
+  const events: RpcSyncEvent[] = []
+  while (true) {
+    const step = await iterator.next()
+    if (step.done) return { result: step.value, events }
+    events.push(step.value)
+  }
+}
+
 test('tracks a business request and propagates request cancellation', async () => {
   let observed: AbortSignal | undefined
   const app = application({
@@ -130,14 +164,143 @@ test('tracks a business request and propagates request cancellation', async () =
   })
   app.markReady()
   const controller = new AbortController()
-  const pending = app.sync.run(
+  const opened = await app.sync.run(
     { mode: 'sync' },
     context('one', controller.signal),
   )
+  if (!opened.ok) throw new Error('Expected stream admission')
+  const pending = opened.value.next()
   await Promise.resolve()
   expect(app.activeRequestCount).toBe(1)
   controller.abort()
-  await pending
+  expect(await pending).toEqual({
+    done: true,
+    value: {
+      ok: false,
+      error: {
+        kind: 'cancelled',
+        code: 'cancelled',
+        message: 'The request was cancelled.',
+      },
+    },
+  })
+  expect(observed?.aborted).toBe(true)
+  expect(app.activeRequestCount).toBe(0)
+})
+
+test('streams bounded progress in order with one-item producer backpressure', async () => {
+  let firstAccepted = false
+  const app = application({
+    syncService: {
+      run: async ({
+        onEvent,
+      }: {
+        onEvent?: (event: {
+          type: 'source.started' | 'source.progress'
+          sequence: number
+          sourceId: string
+          mode?: 'sync'
+          processed?: number
+          upserts?: number
+          removals?: number
+          checkpoints?: number
+          warningsCount?: number
+        }) => Promise<void>
+      }) => {
+        await onEvent?.({
+          type: 'source.started',
+          sequence: 0,
+          sourceId: 'source-1',
+          mode: 'sync',
+        })
+        firstAccepted = true
+        await onEvent?.({
+          type: 'source.progress',
+          sequence: 1,
+          sourceId: 'source-1',
+          processed: 1,
+          upserts: 1,
+          removals: 0,
+          checkpoints: 0,
+          warningsCount: 0,
+        })
+        return { mode: 'sync' as const, results: [], warnings: [] }
+      },
+    },
+  })
+  app.markReady()
+  const opened = await app.sync.run({ mode: 'sync' }, context('stream'))
+  if (!opened.ok) throw new Error('Expected stream admission')
+  await Promise.resolve()
+  expect(firstAccepted).toBe(false)
+  expect(app.activeRequestCount).toBe(1)
+
+  expect(await opened.value.next()).toEqual({
+    done: false,
+    value: {
+      type: 'source.started',
+      sequence: 0,
+      sourceId: 'source-1',
+      mode: 'sync',
+    },
+  })
+  await Promise.resolve()
+  expect(firstAccepted).toBe(true)
+  expect(await opened.value.next()).toEqual({
+    done: false,
+    value: {
+      type: 'source.progress',
+      sequence: 1,
+      sourceId: 'source-1',
+      processed: 1,
+      upserts: 1,
+      removals: 0,
+      checkpoints: 0,
+      warningsCount: 0,
+    },
+  })
+  expect(await opened.value.next()).toEqual({
+    done: true,
+    value: {
+      ok: true,
+      value: { mode: 'sync', results: [], warnings: [] },
+    },
+  })
+  expect(app.activeRequestCount).toBe(0)
+})
+
+test('returning the stream early cancels and settles the producer', async () => {
+  let observed: AbortSignal | undefined
+  const app = application({
+    syncService: {
+      run: async ({
+        signal,
+        onEvent,
+      }: {
+        signal: AbortSignal
+        onEvent?: (event: {
+          type: 'source.started'
+          sequence: number
+          sourceId: string
+          mode: 'sync'
+        }) => Promise<void>
+      }) => {
+        observed = signal
+        await onEvent?.({
+          type: 'source.started',
+          sequence: 0,
+          sourceId: 'source-1',
+          mode: 'sync',
+        })
+        return { mode: 'sync', results: [], warnings: [] }
+      },
+    },
+  })
+  app.markReady()
+  const opened = await app.sync.run({ mode: 'sync' }, context('return-early'))
+  if (!opened.ok) throw new Error('Expected stream admission')
+  expect(app.activeRequestCount).toBe(1)
+  await opened.value.return?.()
   expect(observed?.aborted).toBe(true)
   expect(app.activeRequestCount).toBe(0)
 })
@@ -181,7 +344,9 @@ test('shutdown stops admission, cancels active work, and is idempotent', async (
     },
   })
   app.markReady()
-  const pending = app.sync.run({ mode: 'sync' }, context('active'))
+  const opened = await app.sync.run({ mode: 'sync' }, context('active'))
+  if (!opened.ok) throw new Error('Expected stream admission')
+  const pending = opened.value.next()
   await Promise.resolve()
   const first = await app.system.shutdown({}, context('shutdown-1'))
   const second = await app.system.shutdown({}, context('shutdown-2'))
@@ -228,8 +393,10 @@ test('maps core failures and diagnostics without leaking unsafe text', async () 
     },
   })
   app.markReady()
-  const result = await app.sync.run({ mode: 'sync' }, context('safe'))
-  const serialized = JSON.stringify(result)
+  const { result, events } = await consumeApplicationSync(
+    app.sync.run({ mode: 'sync' }, context('safe')),
+  )
+  const serialized = JSON.stringify({ result, events })
   expect(serialized).not.toContain('/Users')
   expect(serialized).not.toContain('/tmp')
   expect(serialized).not.toContain(canary)
@@ -270,17 +437,23 @@ test('sync preserves trusted unknown and disabled Source validation failures thr
       },
     }
     expect(
-      await app.sync.run(
-        { mode: 'sync', source: index === 0 ? 'missing' : 'disabled' },
-        context(`sync-validation-${index}`),
-      ),
+      (
+        await consumeApplicationSync(
+          app.sync.run(
+            { mode: 'sync', source: index === 0 ? 'missing' : 'disabled' },
+            context(`sync-validation-${index}`),
+          ),
+        )
+      ).result,
     ).toEqual(expected)
     expect(
       await rpcFailure(
-        clientFor(app).sync.run({
-          mode: 'sync',
-          source: index === 0 ? 'missing' : 'disabled',
-        }),
+        consumeRpcSync(
+          clientFor(app).sync.run({
+            mode: 'sync',
+            source: index === 0 ? 'missing' : 'disabled',
+          }),
+        ),
       ),
     ).toEqual(expected.error)
   }
@@ -376,14 +549,16 @@ test('sync failures preserve every validation taxonomy code through RPC', async 
       },
     })
     app.markReady()
-    expect(await rpcFailure(clientFor(app).sync.run({ mode: 'sync' }))).toEqual(
-      {
-        kind: 'ctxindex',
-        taxonomy: 'validation',
-        code,
-        message: code,
-      },
-    )
+    expect(
+      await rpcFailure(
+        consumeRpcSync(clientFor(app).sync.run({ mode: 'sync' })),
+      ),
+    ).toEqual({
+      kind: 'ctxindex',
+      taxonomy: 'validation',
+      code,
+      message: code,
+    })
   }
 })
 
@@ -422,7 +597,9 @@ test('raw errors cannot impersonate trusted public validation failures', async (
     },
   })
   app.markReady()
-  const result = await rpcFailure(clientFor(app).sync.run({ mode: 'sync' }))
+  const result = await rpcFailure(
+    consumeRpcSync(clientFor(app).sync.run({ mode: 'sync' })),
+  )
   expect(result).toEqual({
     kind: 'ctxindex',
     taxonomy: 'other',
@@ -468,7 +645,7 @@ function clientFor(app: DaemonApplication) {
   const requestContext = context('bounded-output')
   return createRouterClient(
     createDaemonRouter(app, {
-      protocol: { id: 'ctxindex.local', version: 1 },
+      protocol: { id: 'ctxindex.local', version: 2 },
       runtime,
     }),
     {
@@ -547,8 +724,13 @@ test('completed sync warnings and refs preserve direct output through RPC', asyn
     syncService: { run: async () => expected.value },
   })
   app.markReady()
-  const direct = await app.sync.run({ mode: 'sync' }, context('sync-direct'))
-  const rpc = await clientFor(app).sync.run({ mode: 'sync' })
+  const direct = (
+    await consumeApplicationSync(
+      app.sync.run({ mode: 'sync' }, context('sync-direct')),
+    )
+  ).result
+  const rpc = (await consumeRpcSync(clientFor(app).sync.run({ mode: 'sync' })))
+    .result
   expect(direct).toEqual(expected)
   if (!direct.ok) throw new Error('Expected direct sync success')
   expect(rpc).toEqual(direct.value)
@@ -608,8 +790,13 @@ test('failed sync uses the deterministic public CLI projection through RPC', asy
       warnings: [],
     },
   }
-  const direct = await app.sync.run({ mode: 'sync' }, context('failed-direct'))
-  const rpc = await clientFor(app).sync.run({ mode: 'sync' })
+  const direct = (
+    await consumeApplicationSync(
+      app.sync.run({ mode: 'sync' }, context('failed-direct')),
+    )
+  ).result
+  const rpc = (await consumeRpcSync(clientFor(app).sync.run({ mode: 'sync' })))
+    .result
   expect(direct).toEqual(expected)
   if (!direct.ok) throw new Error('Expected projected sync success')
   expect(rpc).toEqual(direct.value)
@@ -652,7 +839,9 @@ test('router rejects oversized sync results instead of returning partial success
     },
   })
   app.markReady()
-  const result = await rpcFailure(clientFor(app).sync.run({ mode: 'sync' }))
+  const result = await rpcFailure(
+    consumeRpcSync(clientFor(app).sync.run({ mode: 'sync' })),
+  )
   expect(result).toMatchObject({ code: 'internal_error' })
 })
 
@@ -691,7 +880,9 @@ test('router rejects oversized warning arrays instead of returning partial succe
       syncService: { run: async () => output },
     })
     app.markReady()
-    const result = await rpcFailure(clientFor(app).sync.run({ mode: 'sync' }))
+    const result = await rpcFailure(
+      consumeRpcSync(clientFor(app).sync.run({ mode: 'sync' })),
+    )
     expect(result).toMatchObject({ code: 'internal_error' })
   }
 })

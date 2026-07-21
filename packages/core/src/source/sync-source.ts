@@ -3,7 +3,11 @@ import type { AuthService } from '../auth'
 import { CtxindexError } from '../errors'
 import type { ExtensionRegistry } from '../registry'
 import type { CtxindexDatabase } from '../storage'
-import { SyncCoordinator, type SyncRunResult } from '../sync/sync-coordinator'
+import {
+  SyncCoordinator,
+  type SyncRunProgress,
+  type SyncRunResult,
+} from '../sync/sync-coordinator'
 import {
   createSourceProviderContext,
   type SourceProviderFetch,
@@ -17,13 +21,19 @@ export interface SyncSourceInput {
   readonly sourceId: string
   readonly mode: SyncMode
   readonly signal: AbortSignal
+  readonly onProgress?: (progress: SyncRunProgress) => void | Promise<void>
   readonly fetch?: SourceProviderFetch
 }
 
 export function syncSource(input: SyncSourceInput): Promise<SyncRunResult> {
   const coordinator = new SyncCoordinator(input.db, input.registry.profiles)
   return coordinator.run(
-    { sourceId: input.sourceId, mode: input.mode, signal: input.signal },
+    {
+      sourceId: input.sourceId,
+      mode: input.mode,
+      signal: input.signal,
+      ...(input.onProgress ? { onProgress: input.onProgress } : {}),
+    },
     async ({ cursor, mode, signal, emit }) => {
       const provider = await createSourceProviderContext({
         db: input.db,

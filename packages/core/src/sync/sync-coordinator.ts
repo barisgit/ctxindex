@@ -12,6 +12,15 @@ export interface SyncRunInput {
   readonly sourceId: string
   readonly mode: SyncMode
   readonly signal: AbortSignal
+  readonly onProgress?: (progress: SyncRunProgress) => void | Promise<void>
+}
+
+export interface SyncRunProgress {
+  readonly processed: number
+  readonly upserts: number
+  readonly removals: number
+  readonly checkpoints: number
+  readonly warningsCount: number
 }
 
 type BufferedEmission = Exclude<SyncEmission, { readonly type: 'warning' }>
@@ -223,6 +232,10 @@ export class SyncCoordinator {
     const emissions: BufferedEmission[] = []
     const warnings: SyncWarning[] = []
     let cursorAfterJson = cursorBeforeJson
+    let processed = 0
+    let upserts = 0
+    let removals = 0
+    let checkpoints = 0
 
     try {
       const cursor =
@@ -235,16 +248,29 @@ export class SyncCoordinator {
         emit: async (value) => {
           if (input.signal.aborted) throw cancelled()
           const emission = parseSyncEmission(value)
+          processed += 1
           if (emission.type === 'warning') {
             warnings.push({
               code: emission.code,
               message: emission.message,
               ...(emission.ref ? { ref: emission.ref } : {}),
             })
-          } else emissions.push(emission)
+          } else {
+            emissions.push(emission)
+            if (emission.type === 'upsertResource') upserts += 1
+            else if (emission.type === 'removeResource') removals += 1
+            else checkpoints += 1
+          }
           if (emission.type === 'checkpoint') {
             cursorAfterJson = JSON.stringify(emission.cursor)
           }
+          await input.onProgress?.({
+            processed,
+            upserts,
+            removals,
+            checkpoints,
+            warningsCount: warnings.length,
+          })
         },
       })
       if (input.signal.aborted) throw cancelled()
