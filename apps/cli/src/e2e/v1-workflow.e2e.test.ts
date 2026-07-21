@@ -31,8 +31,12 @@ function decodeDraft(request: MockGmailRecordedRequest): string {
   return Buffer.from(body.message.raw, 'base64url').toString('utf8')
 }
 
-async function addRealm(sandbox: Sandbox, slug: string): Promise<void> {
-  const result = await sandbox.run(['realm', 'add', slug])
+async function addRealm(
+  sandbox: Sandbox,
+  slug: string,
+  env: Record<string, string | undefined>,
+): Promise<void> {
+  const result = await sandbox.run(['realm', 'add', slug], { env })
   expect(result.exitCode, result.stderr).toBe(0)
 }
 
@@ -72,9 +76,9 @@ test('real binary proves the isolated complete V1 workflow', async () => {
     await mkdir(root, { recursive: true })
     await writeFile(join(root, 'workflow.txt'), 'local workflow needle only\n')
 
-    expect((await sandbox.run(['init'])).exitCode).toBe(0)
-    await addRealm(sandbox, 'mail')
-    await addRealm(sandbox, 'files')
+    expect((await sandbox.run(['init'], { env })).exitCode).toBe(0)
+    await addRealm(sandbox, 'mail', env)
+    await addRealm(sandbox, 'files', env)
 
     const app = await sandbox.run(
       ['oauth-app', 'add', 'google', 'google', '--from-env'],
