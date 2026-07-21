@@ -54,9 +54,9 @@ development or touching user state.
 
 - Consumes `apps/cli/package.json`, `apps/cli/bin/ctxindex.mjs`,
   `apps/cli/README.md`, and the root `LICENSE`.
-- Exposed through root `build:cli-package`, `pack:cli-package`, and
+- Exposed through root `build:cli`, `pack:cli-package`, and
   `smoke:cli-package` scripts and composed by the release workflow.
 - Exposed through the root Extension SDK package lifecycle scripts; its unit and
-  exact-archive integration tests live beside the packager.
-- Tests live beside the scripts; installed CLI state is confined to temporary
+  exact-archive integration tests live under `tests/tooling/release/`.
+- Tests live under `tests/tooling/release/`; installed CLI state is confined to temporary
   `BUN_INSTALL_*` and `CTXINDEX_*_HOME` directories.

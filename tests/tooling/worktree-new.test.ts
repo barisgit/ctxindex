@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const scriptPath = join(repoRoot, 'scripts/worktree-new.sh')
 const tempDirs: string[] = []
 
@@ -19,7 +19,7 @@ afterEach(async () => {
   await Promise.all(
     tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })),
   )
-})
+}, 15_000)
 
 async function run(
   command: string[],

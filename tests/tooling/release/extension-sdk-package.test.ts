@@ -3,7 +3,7 @@ import {
   assertSafeExtensionSdkPackageFiles,
   createExtensionSdkPublishManifest,
   type ExtensionSdkSourceManifest,
-} from './extension-sdk-package'
+} from '../../../scripts/release/extension-sdk-package'
 
 const sourceManifest: ExtensionSdkSourceManifest = {
   name: '@ctxindex/extension-sdk',

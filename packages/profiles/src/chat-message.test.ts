@@ -67,6 +67,12 @@ describe('chat.message Profile v1', () => {
       { ...textMessage, conversationKey: 'mail-like-unnamespaced-key' },
       { ...textMessage, sentAt: 'not-an-instant' },
       { ...textMessage, replyTo: { ref: 'not-a-ctxindex-ref' } },
+      {
+        ...textMessage,
+        replyTo: {
+          ref: `ctx://01K0CY8N1JK6SFM4Y35MBDTJ3E/${'a'.repeat(16 * 1024 + 1)}`,
+        },
+      },
     ]
 
     for (const payload of invalidPayloads) {

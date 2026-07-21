@@ -43,27 +43,66 @@
       "outputs": []
     },
     "//#verify:package-dependencies": {
+      "inputs": [
+        "scripts/verify/package-dependencies.ts",
+        "package.json",
+        "tsconfig*.json",
+        "{apps,packages,examples}/**/*.{ts,tsx,js,mjs,json}"
+      ],
       "outputs": []
     },
     "//#verify:architecture": {
+      "inputs": ["scripts/verify/architecture-lint.ts", "apps/cli/src/**/*.ts"],
       "outputs": []
     },
     "//#verify:cli-no-business-logic": {
+      "inputs": [
+        "scripts/verify/cli-no-business-logic.ts",
+        "apps/cli/src/**/*.ts"
+      ],
       "outputs": []
     },
     "//#verify:cli-framework": {
+      "inputs": [
+        "scripts/verify/cli-framework-citty.ts",
+        "apps/cli/src/**/*.ts",
+        "packages/{official,core,extension-sdk,profiles}/src/**/*.ts"
+      ],
       "outputs": []
     },
     "//#verify:cli-command-drift": {
+      "inputs": [
+        "scripts/verify/cli-command-drift.ts",
+        "**/*.{md,mdx,sh,ts,tsx}"
+      ],
       "outputs": []
     },
     "//#verify:cli-thin-lines": {
+      "inputs": ["scripts/verify/cli-thin-lines.ts", "apps/cli/src/**/*.ts"],
       "outputs": []
     },
     "//#verify:cli-reference": {
+      "inputs": [
+        "scripts/docs/generate-cli-reference.ts",
+        "apps/cli/src/**/*.ts",
+        "apps/web/content/docs/cli/index.mdx"
+      ],
       "outputs": []
     },
     "//#verify:exports-map": {
+      "inputs": [
+        "scripts/verify/exports-map.ts",
+        "{apps,packages}/**/package.json",
+        "{apps,packages}/**/src/**/*"
+      ],
+      "outputs": []
+    },
+    "//#verify:network-egress": {
+      "inputs": ["scripts/verify/network-egress.sh", "{apps,packages}/**/*.ts"],
+      "outputs": []
+    },
+    "//#verify:no-prompts-static": {
+      "inputs": ["scripts/verify/no-prompts-static.ts", "apps/cli/src/**/*.ts"],
       "outputs": []
     },
     "test:integration": {

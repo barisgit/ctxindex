@@ -17,8 +17,8 @@ import { z } from 'zod'
 import {
   type MockGraphServer,
   startMockGraph,
-} from '../../apps/cli/src/e2e/_mock-graph'
-import { microsoftOAuthProvider } from '../../packages/official/src/microsoft/provider'
+} from '../../../apps/cli/src/e2e/_mock-graph'
+import { microsoftOAuthProvider } from '../../../packages/official/src/microsoft/provider'
 
 class MemorySecretsStore implements SecretsStore {
   readonly values = new Map<string, string>()
@@ -113,7 +113,7 @@ test('one core OAuth flow supports Microsoft personal and work identities safely
         definition: extension,
         provenance: {
           origin: 'builtin',
-          entry: 'scripts/verify/microsoft-auth.integration.test.ts',
+          entry: 'tests/tooling/verify/microsoft-auth.integration.test.ts',
           exportName: 'extension',
         },
       },

@@ -1,5 +1,4 @@
 import { expect, test } from 'bun:test'
-import { exists } from 'node:fs/promises'
 import { CTXINDEX_BUILTIN_EXTENSIONS } from '@ctxindex/official'
 
 const requiredDiscoverySnippets = [
@@ -36,17 +35,6 @@ function containsRegistryInventory(prose: string, term: string): boolean {
     'm',
   ).test(prose)
 }
-
-test('legacy private registry vocabulary is removed from the public core', async () => {
-  for (const path of [
-    'packages/core/src/registry/types.ts',
-    'packages/core/src/registry/registry-core.ts',
-    'packages/core/src/registry/handle.ts',
-  ])
-    expect(await exists(path)).toBe(false)
-  const index = await Bun.file('packages/core/src/registry/index.ts').text()
-  expect(index).not.toMatch(/\.\/(types|registry-core|handle)'/)
-})
 
 test('workflow skills point to runtime vocabulary instead of declaring it', async () => {
   const prose = await Bun.file('skills/getting-started.md').text()

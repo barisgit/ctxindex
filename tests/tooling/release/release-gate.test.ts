@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { evaluateReleaseGate } from './release-gate'
+import { evaluateReleaseGate } from '../../../scripts/release/release-gate'
 
 describe('release gate', () => {
   test('publishes only a strictly increased unpublished semantic version', () => {

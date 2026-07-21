@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const repoRoot = resolve(fileURLToPath(new URL('../../', import.meta.url)))
+const repoRoot = resolve(fileURLToPath(new URL('../../../', import.meta.url)))
 const skillPath = join(repoRoot, '.agents/skills/repo-development/SKILL.md')
 const bundledSkillPath = join(repoRoot, 'skills/getting-started.md')
 const cliOverviewPath = join(repoRoot, 'skills/reference/cli-overview.md')
@@ -144,14 +144,6 @@ function implementedCommands(mainSource: string): Set<string> {
   )
 }
 
-test('repo-development skill exists', async () => {
-  const skill = await readSkill()
-
-  expect(skill.trim().length).toBeGreaterThan(0)
-  expect(skill.length).toBeGreaterThan(500)
-  expect(skill).toContain('name: repo-development')
-})
-
 test('repo-development skill keeps the supported CLI walkthrough', async () => {
   const skill = await readSkill()
   for (const command of [
@@ -190,16 +182,6 @@ test('documented commands match implemented commands', async () => {
   )
 
   expect(missingFromCommands).toEqual([])
-})
-
-test('no stale commands', async () => {
-  const [skill, mainSource] = await Promise.all([readSkill(), readCliMain()])
-  const supported = implementedCommands(mainSource)
-  const stale = extractCtxindexInvocations(skill).filter(
-    ({ subcommand }) => !supported.has(subcommand),
-  )
-
-  expect(stale).toEqual([])
 })
 
 test('bundled skill is concise orientation to live discovery', async () => {

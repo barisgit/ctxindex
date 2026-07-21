@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const lintStagedPath = join(
   repoRoot,
   'node_modules/lint-staged/bin/lint-staged.js',

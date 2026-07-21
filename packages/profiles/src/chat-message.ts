@@ -10,6 +10,10 @@ const resourceRefSchema = z
   .regex(
     /^ctx:\/\/[0-9A-HJKMNP-TV-Z]{26}\/(?:[A-Za-z0-9\-._~!$&'()*+,;=:@/]|%[0-9A-F]{2})+$/,
   )
+  .refine((ref) => {
+    const suffix = ref.slice(ref.indexOf('/', 'ctx://'.length) + 1)
+    return new TextEncoder().encode(suffix).length <= 16 * 1024
+  }, 'ctxindex Ref suffix exceeds 16 KiB')
 
 const chatParticipantSchema = z
   .object({

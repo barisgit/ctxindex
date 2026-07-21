@@ -6,7 +6,7 @@ import {
   packExtensionSdkPackage,
   readExtensionSdkPackageFiles,
   verifyExtensionSdkPackage,
-} from './extension-sdk-package'
+} from '../../../scripts/release/extension-sdk-package'
 
 test('packs and verifies the exact SDK artifact through a clean external install', async () => {
   const root = await mkdtemp(join(tmpdir(), 'ctxindex-sdk-package-test-'))
