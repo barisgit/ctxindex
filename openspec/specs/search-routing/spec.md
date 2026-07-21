@@ -149,3 +149,41 @@ Search planning:
 #### Scenario: Search planning combines local and provider origins safely
 - **WHEN** a conforming implementation exercises this contract
 - **THEN** it satisfies every applicable MUST and MUST NOT clause and treats SHOULD, SHOULD NOT, and MAY clauses according to their normative meanings
+
+### Requirement: Remote-search cache contention degradation
+Core SHALL materialize the verified Resources from each remote origin as one atomic optional cache batch. If cache materialization exhausts the bounded storage contention wait, search MUST preserve all verified provider Resources, MUST append one per-origin warning with code `storage_busy`, and MUST complete successfully when no other terminal failure occurs. Search MUST NOT expose raw SQLite busy or lock details. Cancellation MUST retain the existing cancelled outcome rather than being converted to cache degradation.
+
+#### Scenario: Optional cache contention preserves provider results
+- **WHEN** a remote origin returns verified Resources but its cache batch exhausts the storage contention bound
+- **THEN** search returns the complete provider result set with one actionable `storage_busy` warning and exits 0
+
+#### Scenario: Concurrent overlapping origins remain complete
+- **WHEN** separate search processes receive overlapping provider result sets and their cache batches contend within the supported bound
+- **THEN** each search returns its complete provider results and the cache contains deduplicated Resources with complete projections
+
+#### Scenario: Cancellation wins over cache degradation
+- **WHEN** remote search is cancelled before cache materialization or cancellation is observed when a contended write returns
+- **THEN** search reports the existing cancelled outcome without a `storage_busy` warning
+
+### Requirement: Search output preserves exact references and actionable paging guidance
+Search pretty and text output MUST preserve each complete Resource Ref without truncation or ellipsis. Text output MUST encode every result as deterministic escaped TSV. Pretty output MUST remain usable when Microsoft immutable ids or other Ref suffixes exceed the terminal width by switching to complete vertical records when needed.
+
+`--refs` is itself a text-only projection. It MAY be combined with omitted format selection or explicit `--format text`; combining it with `--format json`, `-f json`, or `--format pretty` MUST fail as invalid usage before application dependencies open.
+
+An exact one-Source remote result MAY expose the Adapter continuation through the result pagination envelope. A multi-Source remote result MUST NOT claim that it returned a continuation when its merged pagination contract exposes none. If one Source reports truncation in a multi-Source search, the warning MUST name that exact Source and instruct the caller to rerun the unchanged search with that exact Source selection; it MUST NOT instruct the caller to resume with a returned continuation.
+
+#### Scenario: Long Microsoft Ref remains copyable
+- **WHEN** search pretty output includes a Microsoft immutable-id Ref longer than a table column or terminal row
+- **THEN** the complete Ref is present verbatim in output without an ellipsis or removed suffix
+
+#### Scenario: Text search never ellipsizes
+- **WHEN** search runs with `--format text`
+- **THEN** each result is one escaped TSV row containing the complete Ref and deterministic result fields
+
+#### Scenario: Refs cannot conflict with a structured projection
+- **WHEN** a caller combines `--refs` with `--format json`, `-f json`, or `--format pretty`
+- **THEN** search exits `2` before opening application dependencies and explains that refs support only omitted/default text or explicit text
+
+#### Scenario: Multi-Source truncation does not promise an absent cursor
+- **WHEN** a multi-Source remote search receives a truncation warning from one Source and returns no merged continuation
+- **THEN** the warning tells the operator to rerun with that exact Source and does not claim that a continuation was returned

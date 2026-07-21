@@ -63,7 +63,7 @@ A profile declares, at minimum: an id, an integer version, and a payload schema.
 
 - **search mapping** — pure extractors for title, occurred-at, and FTS chunks;
 - **fields** — TYPED declarations (`type` + pure extractor) that populate the generic field index and define valid `--field` filters and aggregations;
-- **relations** — pure extractors producing edges to refs or natural keys ([Resource identity, deletion, and Relations](../core-model/spec.md));
+- **relations** — pure extractors producing edges to refs or natural keys ([Resource identity, deletion, and Relations](../../../../../openspec/specs/core-model/spec.md));
 - **artifacts** — pure extractor producing artifact descriptors (bytes fetched lazily);
 - **exports** — a map of format name to media type + render function;
 - **actions** — typed provider-mutation contracts (stable id, input schema, output contract, effect classification, docs, and examples) whose I/O implementations belong to adapters;
@@ -74,7 +74,7 @@ Vocabulary rules (normative):
 1. Vocabulary functions MUST be pure over the validated payload; no I/O. The one exception is export render functions, which MAY receive core-resolved declared dependencies (e.g. related resources by relation type). Action declarations are pure contracts; their provider I/O is never a profile vocabulary function.
 2. Vocabulary slots are versioned. An implementation encountering an unknown slot MUST ignore it with a diagnostic and continue.
 3. When an adapter emits a payload for an unknown profile id or version, core MUST accept the resource at envelope level, index what the envelope carries, and surface a warning (degraded acceptance). Sync MUST NOT fail on unknown profiles.
-4. The V1 bundled canonical Profiles MUST be `mail.message@1`, `chat.message@1`, `calendar.event@1`, and `file@1`. Bundled and extension-defined Profiles MUST be expressible through the same public Profile API; V1 MUST NOT require an `artifact` Profile because Artifacts are represented by Profile-extracted descriptors.
+4. The V1 bundled canonical Profiles MUST be `mail.message@1`, `calendar.event@1`, and `file@1`. Bundled and extension-defined Profiles MUST be expressible through the same public Profile API; V1 MUST NOT require an `artifact` Profile because Artifacts are represented by Profile-extracted descriptors.
 
 #### Scenario: A Profile supplies domain semantics through pure versioned vocabulary
 - **WHEN** a conforming implementation exercises this contract
@@ -118,3 +118,45 @@ The Profile MUST declare no Actions or exports in this slice. Core MUST consume 
 #### Scenario: Generic thread traversal needs no chat branch
 - **WHEN** core traverses `conversation` and `parent` Relations extracted from chat messages
 - **THEN** it uses the same relation storage and traversal primitives as any other Profile without inspecting `chat.message@1` payload fields
+
+### Requirement: Portable threaded reply Draft vocabulary
+`mail.message@1` SHALL expose optional ordered Reply-To addresses and RFC References needed to construct portable replies, and reply Draft Resources SHALL expose the immutable same-Source parent Ref as `replyToRef`. Existing message payloads and standalone Draft payloads without these optional fields MUST remain valid.
+
+Draft create and update Action inputs MUST be strict unions. The existing standalone create and update branches MUST remain unchanged. Reply create MUST accept exactly `replyToRef` and `bodyText`; reply update MUST accept exactly `ref`, `replyToRef`, and `bodyText`. A reply branch MUST reject recipient, subject, cc, bcc, attachment, provider-id, or other override fields.
+
+#### Scenario: Strict reply create input
+- **WHEN** a caller supplies `replyToRef` and `bodyText` without standalone fields
+- **THEN** the create input validates as a reply branch
+
+#### Scenario: Mixed reply input is rejected
+- **WHEN** a caller combines `replyToRef` with recipient, subject, cc, bcc, provider identifiers, or unknown properties
+- **THEN** schema validation fails before Adapter execution
+
+#### Scenario: Existing standalone input remains valid
+- **WHEN** a caller supplies an input accepted by the existing standalone Draft branch
+- **THEN** the unchanged standalone branch continues to validate
+
+#### Scenario: Reply Draft retains parent identity
+- **WHEN** a reply Draft Action returns a normalized Resource
+- **THEN** its payload contains the exact immutable same-Source `replyToRef`
+
+### Requirement: Portable managed Draft attachment vocabulary
+`mail.message@1` Draft create standalone and reply branches SHALL accept optional `attachments` as a non-empty ordered array of strict objects containing exactly one ctxindex Artifact `ref`. Callers MUST NOT supply paths, URLs, raw bytes, provider ids, filenames, media types, byte sizes, or other attachment overrides. Existing create inputs without attachments MUST remain valid.
+
+Draft update branches MUST remain strict and MUST reject any attachment field. A complete Draft Resource produced by a Draft Action SHALL expose ordered `managedAttachmentRefs`, including an empty array when the Action proves that the Draft has no managed attachments. Managed attachment provenance MUST NOT be exposed as a Profile-derived Draft Artifact descriptor without a provider-derived downloadable identity.
+
+#### Scenario: Standalone create accepts managed attachment Refs
+- **WHEN** a caller supplies valid standalone Draft content and one or more strict `{ ref }` attachment entries
+- **THEN** the portable create input validates and preserves their order
+
+#### Scenario: Reply create accepts managed attachment Refs
+- **WHEN** a caller supplies `replyToRef`, `bodyText`, and one or more strict `{ ref }` attachment entries
+- **THEN** the input validates without permitting recipient, subject, attachment metadata, or provider overrides
+
+#### Scenario: Update cannot mutate attachment collection
+- **WHEN** a caller supplies any attachment field to standalone or reply Draft update
+- **THEN** the complete input is schema-invalid before Action dispatch
+
+#### Scenario: Draft result records managed provenance
+- **WHEN** a Draft Action proves the ordered managed attachment set
+- **THEN** the complete normalized Draft payload records those Refs without inventing provider Artifact descriptors

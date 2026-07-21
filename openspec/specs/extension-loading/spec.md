@@ -2,9 +2,7 @@
 
 ## Purpose
 Define trusted Extension loading, validation, compiled-binary compatibility, and degraded behavior when an Extension is unavailable.
-
 ## Requirements
-
 ### Requirement: Definition ids have one route-safe grammar
 Extension, Provider, Profile, and Adapter ids MUST be at most 128 ASCII characters and consist of lowercase alphanumeric segments separated by a single `.`, `_`, or `-`. Registry validation MUST reject every other id before activation so authored and generated documentation paths use the exact id without lossy encoding or collision.
 
@@ -214,11 +212,11 @@ discovery or import any Catalog-controlled module.
 - **THEN** build and install ignore that file
 
 ### Requirement: Compiled binary resolves ordinary package dependencies
-The relocated Bun compiled-binary gate SHALL load a trusted external package whose `ctxindex.extensions` entry uses ordinary SDK imports, SDK-exported `z`, a relative TypeScript module, and a package-managed runtime dependency. The gate MUST run outside the repository under Bun 1.3.14 and prove common exported-value discovery without host injection or ctxindex dependency resolution.
+The relocated Bun compiled-binary gate SHALL load a trusted external package whose `ctxindex.extensions` entry uses ordinary imports from the packed public `@ctxindex/extension-sdk` artifact, SDK-exported `z`, a relative TypeScript module, and a package-managed runtime dependency. The gate MUST run outside the repository under Bun 1.3.14 and prove common exported-value discovery without workspace links, host injection, or ctxindex dependency resolution.
 
 #### Scenario: Relocated binary loads materialized package
-- **WHEN** the compiled gate activates the self-contained fixture
-- **THEN** its exported graph loads through the same collection and activation path as built-ins
+- **WHEN** the compiled gate activates a clean external package installed against the exact packed SDK artifact
+- **THEN** its exported graph loads through the same collection and activation path as built-ins without resolving the source workspace
 
 ### Requirement: Acquired Extensions share documentation loading
 Trusted built-in, explicit-path TypeScript/JavaScript, existing installed inline, and already-acquired external-package Extensions SHALL resolve and validate documentation through the same Extension loading and atomic registry activation path. The loader MUST bind a directory descriptor to its already-known definition-module URL before registry activation. This change MUST NOT add package acquisition, a Catalog package schema, caller inspection, macros, or a core-supplied Extension factory. A documentation failure MUST reject the Extension whole with a path-scoped diagnostic.
@@ -277,3 +275,25 @@ or mutate installed state.
   are absent
 - **THEN** startup reports that Extension as degraded and performs no recovery or
   acquisition
+
+### Requirement: Daemon-owned Extension registry lifetime
+The daemon SHALL complete the existing Extension loading and validation contract once during startup and SHALL establish one active registry before reporting ready. Business requests MUST use that daemon-owned registry and MUST NOT import, validate, or activate Extensions per request. Configuration or Extension-file changes made after readiness MUST NOT alter the active registry until a later daemon start.
+
+#### Scenario: Repeated requests reuse one registry
+- **WHEN** multiple business requests execute during one daemon lifetime
+- **THEN** they use the same validated active registry without reloading Extension modules
+
+#### Scenario: Extension change waits for restart
+- **WHEN** Extension configuration or local Extension files change after the daemon reports ready
+- **THEN** the active registry remains unchanged until the daemon is shut down and a later daemon starts
+
+### Requirement: Daemon startup performs no Extension acquisition
+Daemon startup and request handling MUST load only bundled Extensions and configured Extension material already present locally under the existing Extension loading contracts. They MUST NOT discover, fetch, install, update, or otherwise acquire Extension Catalogs or Extension code. Missing or invalid configured Extension material SHALL follow the existing diagnostic and degraded-availability contracts without triggering acquisition.
+
+#### Scenario: Installed Extension material is available locally
+- **WHEN** daemon startup resolves configured Extension material that is already present locally
+- **THEN** it loads and validates that material without contacting or updating a catalog
+
+#### Scenario: Configured Extension material is absent
+- **WHEN** configured Extension material is not present locally during daemon startup
+- **THEN** startup emits the existing loading diagnostic and performs no catalog or Extension acquisition

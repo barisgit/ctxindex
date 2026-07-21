@@ -2,9 +2,7 @@
 
 ## Purpose
 Define complete Resource and thread retrieval plus managed Artifact retention, download, and Profile-declared export behavior.
-
 ## Requirements
-
 ### Requirement: Complete Resource retrieval by Ref
 For V1, `get <ref>` SHALL return a complete Resource from local materialization when available and otherwise invoke the owning Source Adapter's `retrieve` capability. Provider-retrieved Resources MUST retain the requested Ref and SHALL be cached as purgeable `adhoc` materializations.
 
@@ -104,3 +102,42 @@ Search results, Source descriptions, and describe output SHOULD carry machine-re
 #### Scenario: Retrieval and Artifact operations follow Source capabilities and Profile formats
 - **WHEN** a conforming implementation exercises this contract
 - **THEN** it satisfies every applicable MUST and MUST NOT clause and treats SHOULD, SHOULD NOT, and MAY clauses according to their normative meanings
+
+### Requirement: Complete locally actionable message threading data
+Complete `mail.message@1` Resources emitted by Gmail and Microsoft mailbox retrieval SHALL retain the portable Reply-To addresses, RFC References, message identity, and provider conversation or thread identity available from the provider and required for reply Draft construction. Retrieval MUST preserve the Resource's stable Source-scoped Ref.
+
+#### Scenario: Retrieved parent becomes eligible for reply validation
+- **WHEN** a provider message supplies the recipient and threading fields required by its mailbox Adapter
+- **THEN** complete retrieval materializes those fields locally so a later reply Action needs no provider read before mutation
+
+#### Scenario: Provider omits required reply data
+- **WHEN** a complete provider response lacks fields required to construct a native reply safely
+- **THEN** the Resource remains retrievable but a later reply Action fails locally with actionable guidance rather than guessing or fetching during the Action
+
+### Requirement: Mailbox retrieval and Artifact contracts have deterministic cross-provider replay evidence
+Automated acceptance evidence SHALL apply one shared on-demand retrieval and Artifact lifecycle to `google.mailbox` and `microsoft.mailbox` using only obviously invented provider-shaped fixtures under reserved `.test` domains and loopback provider mocks. Every phase SHALL execute in a fresh compiled CLI process against one provider-local isolated state directory.
+
+The evidence SHALL verify a stable remote-search Ref; complete ad-hoc hydration with body, conversation and reply identities, and one safe file Artifact descriptor; byte-identical locally served retrieval without provider reads; exact first-download bytes and later output copies from the managed cache; explicit Artifact purge that preserves the owning Resource and descriptor followed by one exact provider re-fetch; deterministic EML and JSON exports without provider reads; and rejection of malformed or foreign message and Artifact Refs before provider I/O. Provider-specific replay code SHALL be limited to invented response setup, exact credential-free route inspection, and request counts.
+
+#### Scenario: Both mailbox providers complete the shared retrieval and Artifact lifecycle
+- **WHEN** the automated replay runs the shared lifecycle for Google and Microsoft mailbox Sources
+- **THEN** each provider satisfies the same stable Ref, complete ad-hoc Resource, Relation identity, Artifact descriptor, exact byte, cache, purge, re-fetch, and export assertions without live authentication or provider data
+
+#### Scenario: Invalid mailbox identities stop before provider I/O
+- **WHEN** the replay supplies malformed or foreign message and Artifact Refs for either mailbox Source
+- **THEN** each command fails through the existing validation and exit contracts before any provider request occurs
+
+### Requirement: Managed Artifact bytes are Action inputs only after verified caching
+A Profile-derived Artifact SHALL become eligible as a Draft attachment input only after its bytes have been materialized in the managed content-addressed store. Eligibility MUST require the descriptor to remain derivable from its complete, non-deleted origin Resource, its Ref and origin to belong to the selected Source, and its cached bytes, size, media type, and content hash to pass existing integrity checks. Action resolution MUST NOT download, copy from an arbitrary path, or otherwise acquire missing bytes.
+
+#### Scenario: Downloaded Artifact becomes eligible
+- **WHEN** `artifact download` has cached exact bytes for a valid same-Source descriptor
+- **THEN** a later Draft create may consume those verified bytes without provider read access
+
+#### Scenario: Purged Artifact is unavailable to an Action
+- **WHEN** a descriptor remains but its cached bytes were purged
+- **THEN** Draft attachment validation fails with download guidance before provider mutation
+
+#### Scenario: Descriptor drift invalidates cached input
+- **WHEN** a cached Artifact Ref is no longer emitted by its origin Resource's current Profile payload
+- **THEN** the Action rejects it even if orphaned cache metadata or bytes remain

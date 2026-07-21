@@ -2,9 +2,7 @@
 
 ## Purpose
 Define deterministic non-interactive CLI behavior, entity labels and resolution, machine-readable output, and bundled agent skills.
-
 ## Requirements
-
 ### Requirement: CLI commands, labels, and non-interactive output
 The reference CLI MUST provide a deterministic non-interactive OAuth App and Account lifecycle and SHOULD provide commands for initialization, Realm/Source configuration, sync, search, retrieval, typed Actions, status, and maintenance. The specific command set offered by a release is captured in that release's milestone document.
 
@@ -12,10 +10,10 @@ OAuth lifecycle commands MUST include exactly these public forms:
 
 ```text
 oauth-app add <provider> <label> --from-env
-oauth-app list [--format json]
+oauth-app list [--format pretty|text|json]
 oauth-app remove <provider> <label>
 account add <provider> --app <label> [--label <label>]
-account list [--format json]
+account list [--format pretty|text|json]
 account remove <label>
 ```
 
@@ -23,11 +21,17 @@ The CLI MUST NOT expose a `client` command, alias, flag, inventory entity, or co
 
 `oauth-app add --from-env` MUST use only the active Provider registration's typed top-level config-key-to-environment-variable-name mapping and the central environment loader. It MUST accept no literal config, client id, client secret, token, authorization code, generic JSON config, or secret value as argv. The assembled config MUST pass the Provider's complete config schema before any secret-store write or database mutation. Unknown Provider selection MUST fail before environment/secret reads, database mutation, browser launch, or Provider egress. Missing or invalid config MUST fail before secret-store writes, database mutation, browser launch, or Provider egress.
 
-`oauth-app list` MUST be deterministic and MUST project only Provider id, App label, origin, and safe provenance. Human and JSON output MUST NOT include App config, environment names or values, client ids, desktop-secret metadata, typed secret references, tokens, Grant state, or secret values. `oauth-app remove` MUST resolve exact `(providerId,label)` and MUST affect only future authorization; existing Grants continue from their snapshots.
+`oauth-app list` MUST be deterministic and MUST project only Provider id, App label, origin, and safe provenance. Pretty, text, and JSON output MUST NOT include App config, environment names or values, client ids, desktop-secret metadata, typed secret references, tokens, Grant state, or secret values. `oauth-app remove` MUST resolve exact `(providerId,label)` and MUST affect only future authorization; existing Grants continue from their snapshots.
 
 `account add` MUST require `--app <label>`, resolve exact `(providerId,label)`, and fail before secret/database/browser/network effects when the Provider or App is unknown. Authorization MUST use the selected active or persisted local App config and snapshot it into the private Grant. Authorization and refresh MUST NOT reread App config from environment variables.
 
-CLI output SHOULD be compact human-readable text by default, with verbose output and JSON opt-in. Every read command SHOULD support JSON. `--format` MUST be the sole output selector, `-f` MUST be its exact short alias, and the CLI MUST NOT expose a `--json` compatibility flag. Frequent unambiguous options MUST expose `-s` for `--source`, `-r` for `--realm`, `-l` for `--limit`, and `-o` for file `--output` wherever those long options exist. Generated Adapter configuration flags and ambiguous domain selectors MUST remain long-only. User-facing configuration SHOULD be reachable through CLI commands, while direct TOML MAY remain a power-user path.
+The launch-critical structured reads `search`, `get`, `thread`, `artifact list`, `status`, `source list`, `realm list`, `account list`, `oauth-app list`, and `extension list` MUST accept `--format pretty|text|json`. Frequent unambiguous options MUST expose these Citty aliases wherever the corresponding long option exists: `-f` for `--format`, `-s` for `--source`, `-r` for `--realm`, `-l` for `--limit`, and `-o` for file `--output`. Generated Adapter configuration flags and ambiguous domain selectors MUST remain long-only. This requirement makes no shared-format claim for any other command. If neither format flag is present, stdout attached to a TTY MUST select `pretty` and non-TTY stdout MUST select `text`. `--format` MUST be the sole output selector, with `-f` as its exact short alias. The CLI MUST NOT expose `--json`; JSON callers MUST use `--format json` or `-f json`. Pretty output MUST adapt to terminal display width, MUST use vertical records when a complete table is not usable, MUST constrain every physical rendered line to the available display columns, and MUST losslessly wrap rather than truncate, ellipsize, or omit semantic values. Text collection output MUST be deterministic escaped TSV: null MUST encode as reserved `\N`, while literal backslash, tab, carriage return, and newline MUST be escaped so every string remains distinct from null. Text singular-Resource output MUST include every envelope field and the complete payload, using compact JSON for nested values. JSON MUST be compact canonical structured output. Successful mutation receipts SHOULD remain terse.
+
+Warnings from those structured reads MUST be written only to stderr in pretty and text modes. In JSON mode warnings MUST remain only in the JSON stdout envelope where that envelope owns warnings. Format selection MUST NOT leak warnings or diagnostics into the opposite stream.
+
+`export --format <profile-format>` MUST retain Profile-declared payload format semantics and `describe --format text|markdown|json` MUST retain reference-document semantics as explicit exceptions. Sync and daemon lifecycle commands retain their separately specified output contracts and MUST NOT be presented as implementing this shared batch-read format contract.
+
+User-facing configuration SHOULD be reachable through CLI commands, while direct TOML MAY remain a power-user path.
 
 The CLI MUST NOT use interactive TTY prompts for required input. Required input MUST come from non-secret flags, Provider-declared environment names, typed secret references, or explicitly declared stdin. Missing input MUST fail clearly with a non-zero stable exit. The only permitted interactive surface is the browser during explicitly requested OAuth authorization. Long-lived tokens, App configuration secrets, and authorization codes MUST NOT be literal process arguments.
 
@@ -48,6 +52,34 @@ Unknown Realm, OAuth App, Account, Source, or Adapter references MUST fail fast 
 #### Scenario: OAuth App JSON inventory is safe
 - **WHEN** an agent runs `oauth-app list --format json`
 - **THEN** every row contains only Provider id, label, origin, and safe provenance
+
+#### Scenario: Omitted format follows stdout destination
+- **WHEN** a structured read is invoked without `--format`
+- **THEN** it selects pretty output for TTY stdout and deterministic text for non-TTY stdout
+
+#### Scenario: Removed JSON flag is rejected
+- **WHEN** a caller supplies the removed `--json` flag
+- **THEN** the CLI exits `2` before opening application dependencies and advertises `--format`
+
+#### Scenario: Narrow pretty output preserves complete values
+- **WHEN** pretty collection output contains a Ref longer than the available terminal width
+- **THEN** it renders a vertical record whose physical lines fit the available display width and whose wrapped cell chunks preserve every Ref character in order without ellipsis or semantic truncation
+
+#### Scenario: Text null is lossless
+- **WHEN** a text collection contains null, the strings `-` and `null`, a literal `\N`, and other backslash-bearing strings
+- **THEN** null is `\N`, literal backslashes are escaped, and every value has a distinct deterministic encoding
+
+#### Scenario: Get text is complete
+- **WHEN** a caller runs `get <ref> --format text`
+- **THEN** stdout contains the complete Resource envelope and payload and readable warnings appear only on stderr
+
+#### Scenario: JSON remains one compact document
+- **WHEN** a structured read runs with `--format json` or `-f json`
+- **THEN** stdout is one compact canonical JSON document and no warning from its result envelope is duplicated to stderr
+
+#### Scenario: Primary thread and Artifact reads share formats
+- **WHEN** a caller invokes `thread <ref>` or `artifact list <ref>`
+- **THEN** the command supports the same destination-aware pretty, escaped text, compact JSON, format-alias, and warning-stream rules
 
 ### Requirement: Bundled skills surface
 ctxindex MUST keep bundled skill guidance consistent with the public CLI and SHOULD ship that documentation alongside the binary so agents can discover usage without external docs. The skills surface SHOULD provide at least:
@@ -301,3 +333,129 @@ ctxindex action run <id> --source <source> --input <json-or-path> [--format json
 
 - **WHEN** an agent invokes `ctxindex describe action <id> --source <source> --format json`
 - **THEN** output combines the authoritative Action schema with exact Source availability and performs no Action
+
+### Requirement: Durable commands require explicit initialization
+Commands that open or mutate ctxindex's database-backed durable state MUST require durable evidence that both backend selection and database bootstrap completed, and MUST fail with the deterministic guidance `ctxindex is not initialized; run ctxindex init` when either is absent. The rejected path MUST NOT create config, database, secret-store, or Keychain state and MUST NOT read Provider-declared OAuth App configuration environment values. Initialization, help, argument validation, Provider validation, and pure definition-discovery surfaces SHALL remain available before initialization.
+
+#### Scenario: Agent adds a local OAuth App before initialization
+- **WHEN** an agent runs `oauth-app add <provider> <label> --from-env` with declared configuration environments but without completed initialization evidence
+- **THEN** the command exits 2 with guidance to run `ctxindex init`, does not expose or persist App configuration, and creates no durable ctxindex state
+
+#### Scenario: Backend selection persisted but database bootstrap did not complete
+- **WHEN** configuration exists but the initialized database does not
+- **THEN** a database-backed command exits 2 with initialization guidance before reading OAuth App configuration, opening SQLite, or creating the missing database
+
+#### Scenario: Agent opens another database-backed command before initialization
+- **WHEN** an agent runs a syntactically valid database-backed command without completed initialization evidence
+- **THEN** the command exits 2 with the same initialization guidance before opening SQLite
+
+#### Scenario: Agent requests help or validates a Provider before initialization
+- **WHEN** an agent requests command help, validates a Provider identifier, or runs `bun cli init` without completed initialization evidence
+- **THEN** help and Provider validation remain available, and initialization performs its existing backend-selection and database-bootstrap sequence
+
+### Requirement: Live sync output preserves machine-readable results
+When daemon sync is selected, the CLI MUST consume the typed stream without
+opening the client database or falling back to direct composition. `sync --format json`
+MUST emit exactly one final JSON document with the established aggregate result
+shape. `sync --format events` MUST emit progress as it arrives and MUST preserve
+the established Source completed/failed event shapes. Summary and compact output
+MUST preserve their terminal stdout shapes and MAY render bounded live progress
+to stderr. Final exit selection MUST remain derived from terminal Source results.
+
+#### Scenario: JSON sync receives progress
+- **WHEN** daemon sync yields multiple progress events and returns successfully under `--format json`
+- **THEN** stdout contains one valid final JSON document and no partial event documents
+
+#### Scenario: Event-formatted sync receives progress
+- **WHEN** daemon sync is invoked with `--format events`
+- **THEN** each progress event is written in arrival order before its Source terminal event and before command completion
+
+#### Scenario: Selected stream endpoint disappears
+- **WHEN** an exact daemon was selected and its stream fails or disconnects
+- **THEN** the CLI returns the declared bounded daemon/cancellation failure and never opens SQLite as fallback
+
+### Requirement: CLI remains the sole agent-facing interface across daemon transport
+The CLI MUST remain the only agent-facing integration surface when behavior is routed through the local daemon. It MUST continue to own argument parsing and validation, human-readable and JSON formatting, diagnostics, and final exit-code selection. The local RPC interface MUST NOT become a supported external agent integration surface.
+
+For daemon-routed commands, all input that can be validated without runtime state MUST be validated before any transport request. Successful results and structured domain failures MUST retain the command's existing output and exit behavior regardless of whether the operation executes in-process or through the daemon.
+
+For Realm add/list, Source add/list/remove and the Source-definition projection needed to parse Source configuration, sync/status, search, exact get, and local thread traversal, the CLI MUST select daemon routing when validated lifecycle/discovery metadata exists for the exact canonical runtime tuple or when a test endpoint override explicitly selects it. Once selected, the client process MUST NOT open SQLite, and an unreachable, stale, or lost endpoint MUST report daemon-unavailable with exit `50` without falling back to direct composition. Stateful command paths outside this implemented daemon-routed set are explicitly unconverted and MAY preserve their direct behavior only behind the database-lease fence.
+
+Before any unconverted stateful command composes a runtime or opens SQLite, the CLI MUST resolve the canonical SQLite path and attempt retained shared lease acquisition. Exclusive conflict MUST report `prototype_unsupported` through exit `50` before database open. Successful shared ownership MUST remain held until after SQLite close, while the command otherwise retains existing direct behavior. If the current platform has no retained-lease backend, daemon startup is impossible and the direct command MUST preserve its pre-prototype behavior without a lease; unsupported lock semantics on a platform that otherwise supplies the backend MUST still fail closed.
+
+#### Scenario: Malformed input fails before transport
+- **WHEN** an agent invokes a daemon-routed command with malformed arguments or an invalid locally checkable payload
+- **THEN** the CLI reports invalid usage through exit code 2 without connecting to or starting the daemon
+
+#### Scenario: Daemon-routed command preserves CLI contract
+- **WHEN** a valid daemon-routed command completes successfully
+- **THEN** the CLI emits the same documented human-readable or JSON result shape and success exit behavior as the command contract requires
+- **THEN** no transport-specific envelope is exposed in command output
+
+#### Scenario: Exact-tuple metadata selects RPC without fallback
+- **WHEN** validated lifecycle/discovery metadata exists for the command's exact canonical tuple and the endpoint is unreachable or stale
+- **THEN** the CLI reports daemon-unavailable through exit 50 and does not compose a direct runtime
+
+#### Scenario: Test override selects RPC
+- **WHEN** a test endpoint override explicitly selects daemon routing
+- **THEN** the CLI uses that endpoint and does not fall back to direct behavior on connection failure
+
+#### Scenario: Expanded daemon workflow does not open client storage
+- **WHEN** an agent creates or lists a Realm or Source, synchronizes, requests status, searches, retrieves an exact Ref, or traverses a local thread while exact-tuple metadata or a test override selects daemon routing
+- **THEN** the CLI delegates the operation through its semantic RPC procedure and does not compose a direct runtime or open SQLite
+
+#### Scenario: Unconverted stateful command cannot bypass daemon ownership
+- **WHEN** an agent invokes an unconverted stateful command while a daemon holds the canonical target database lease
+- **THEN** the CLI exits 50 with a prototype-unsupported diagnostic before composing a runtime or opening SQLite
+
+#### Scenario: Unconverted stateful command remains direct with shared ownership
+- **WHEN** the command acquires a shared lease for its canonical SQLite path
+- **THEN** it retains that lease until after close and otherwise preserves its existing direct behavior
+
+#### Scenario: Unsupported platform remains directly usable
+- **WHEN** no daemon route is selected and the operating system has no retained-lease backend
+- **THEN** an unconverted or directly implemented command preserves its prior SQLite behavior instead of failing with prototype-unsupported
+
+### Requirement: Deterministic daemon lifecycle surface
+The CLI SHALL provide background daemon `start`, `status`, and `stop` commands and MUST NOT expose a supported foreground serve command. These operations MUST be non-interactive, MUST support deterministic machine-readable output, and MUST keep readiness/startup and graceful-shutdown observation bounded.
+
+`start` MUST be idempotent and report whether it launched or reused a compatible daemon. `status` MUST NOT launch or mutate a daemon; it MUST distinguish stopped, starting, running, stopping, unavailable/stale, and unsupported state, and running state MUST be backed by a successful compatible health request. `stop` MUST be idempotent, MUST use graceful RPC shutdown for a live daemon, MUST NOT signal a discovery PID, and MUST report completion only after ownership settlement or safe stale-state cleanup.
+
+Ordinary commands MUST preserve the existing explicit selection behavior in this slice: they use a validated compatible daemon when discovery or a test endpoint override selects one and otherwise retain their current direct route. They MUST NOT trigger background startup until every stateful command is daemon-routed or admitted to a tested bootstrap/filesystem-only exception allowlist. After daemon selection, transport loss MUST NOT fall back to direct SQLite.
+
+#### Scenario: Agent explicitly starts twice
+- **WHEN** an agent invokes `ctxindex daemon start` twice for the same initialized runtime
+- **THEN** both invocations succeed deterministically and the second reports the already-running compatible instance without launching another owner
+
+#### Scenario: Agent inspects running status
+- **WHEN** an agent invokes `ctxindex daemon status --format json` for a compatible ready daemon
+- **THEN** the CLI reports deterministic running lifecycle, health, readiness, protocol, instance, and active-request state without a transport envelope
+
+#### Scenario: Agent inspects stopped status
+- **WHEN** no daemon or matching discovery metadata exists
+- **THEN** `ctxindex daemon status` reports stopped successfully and does not start a process
+
+#### Scenario: Agent stops twice
+- **WHEN** an agent invokes `ctxindex daemon stop` after the daemon is already stopped
+- **THEN** the command succeeds deterministically and reports that no live daemon remained
+
+#### Scenario: Ordinary malformed command has no lifecycle side effect
+- **WHEN** an ordinary daemon-backed command has malformed locally checkable input
+- **THEN** the CLI exits with invalid usage before discovery, spawn, or transport
+
+#### Scenario: Ordinary command does not start before parity
+- **WHEN** no daemon is selected and any stateful command family still requires direct SQLite access
+- **THEN** an ordinary command does not launch a daemon as a side effect
+- **THEN** the current direct route remains available subject to its ownership fence
+
+#### Scenario: Selected daemon is lost after readiness
+- **WHEN** transport becomes unavailable after the command selected or started its daemon
+- **THEN** the CLI returns daemon-unavailable through exit 50 and never composes a direct runtime
+
+#### Scenario: Test override is unavailable
+- **WHEN** a test endpoint override selects an unreachable endpoint
+- **THEN** the CLI returns daemon-unavailable without spawning or falling back
+
+#### Scenario: Unsupported platform runs ordinary command directly
+- **WHEN** an ordinary command runs where no retained daemon ownership backend exists
+- **THEN** it preserves its prior direct behavior and does not claim a background daemon was started

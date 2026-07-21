@@ -45,3 +45,7 @@ The OAuth host flow MAY bind a loopback-only socket and explicitly open a browse
 #### Scenario: CLI and daemon share infrastructure without application coupling
 - **WHEN** CLI discovers an endpoint or acquires a retained shared database lease and daemon acquires exclusive leases
 - **THEN** both use `@ctxindex/local-daemon`, while CLI does not import `apps/daemon` and `@ctxindex/rpc` contains no lifecycle/filesystem implementation
+
+#### Scenario: CLI commands delegate runtime behavior to core services
+- **WHEN** a conforming implementation exercises this contract
+- **THEN** it satisfies every applicable MUST and MUST NOT clause and treats SHOULD, SHOULD NOT, and MAY clauses according to their normative meanings
