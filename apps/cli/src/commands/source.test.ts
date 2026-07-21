@@ -1,7 +1,8 @@
 import { expect, test } from 'bun:test'
 import type { SourceDescription } from '@ctxindex/core/registry'
 import { generatedSourceConfigArgs } from '../args/source'
-import { sourceCommand } from './source'
+import type { SourceCommandDeps } from '../source/handle-source-command'
+import { createSourceCommandRuntime, sourceCommand } from './source'
 
 test('aggregates same-named generated options without losing Adapter ownership', () => {
   const source = (id: string, type: string): SourceDescription => ({
@@ -60,4 +61,54 @@ test('marks array-valued generated Adapter options as repeatable', () => {
     type: 'string',
     multiple: true,
   })
+})
+
+test('discovers dynamic config flags without resolving the durable route', async () => {
+  let routeResolutions = 0
+  const runtime = createSourceCommandRuntime(
+    ['add', 'fixture.adapter', '--config-value', 'one'],
+    {
+      selectDaemon: () => null,
+      ensureDaemonSelection: async () => {
+        routeResolutions += 1
+        throw new Error('durable route resolved during argument discovery')
+      },
+      loadDefinitions: async () =>
+        ({
+          description: {
+            sources: [
+              {
+                id: 'fixture.adapter',
+                configOptions: [
+                  {
+                    property: 'value',
+                    flag: '--config-value',
+                    type: 'string',
+                    required: true,
+                  },
+                ],
+              },
+            ],
+          },
+        }) as never,
+    } as unknown as SourceCommandDeps,
+  )
+  try {
+    const children =
+      typeof runtime.command.subCommands === 'function'
+        ? await runtime.command.subCommands()
+        : await runtime.command.subCommands
+    const addValue = children?.add
+    const add =
+      typeof addValue === 'function' ? await addValue() : await addValue
+    const args =
+      typeof add?.args === 'function'
+        ? await add.args()
+        : ((await add?.args) ?? {})
+
+    expect(args['config-value']).toMatchObject({ type: 'string' })
+    expect(routeResolutions).toBe(0)
+  } finally {
+    await runtime.close()
+  }
 })

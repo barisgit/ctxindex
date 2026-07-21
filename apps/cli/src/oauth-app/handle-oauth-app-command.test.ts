@@ -118,6 +118,7 @@ test('OAuth App ownership conflict fails before Extension definition loading', a
 })
 
 test('OAuth App add reads invocation-current environment then uses the ensured daemon', async () => {
+  const loaded = await loadCliDefinitions()
   const output = spyOn(console, 'log').mockImplementation(() => {})
   const events: string[] = []
   try {
@@ -128,7 +129,8 @@ test('OAuth App add reads invocation-current environment then uses the ensured d
           throw new Error('direct ownership acquired')
         },
         loadDefinitions: async () => {
-          throw new Error('CLI registry composed')
+          events.push('definitions')
+          return loaded
         },
         assertInitialized: async () => {
           events.push('initialized')
@@ -164,6 +166,7 @@ test('OAuth App add reads invocation-current environment then uses the ensured d
     )
     expect(exit).toBe(0)
     expect(events).toEqual([
+      'definitions',
       'initialized',
       'env:CTXINDEX_GOOGLE_CLIENT_ID',
       'env:CTXINDEX_GOOGLE_CLIENT_SECRET',

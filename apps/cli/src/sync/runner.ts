@@ -2,7 +2,6 @@ import { CtxindexValidationError } from '@ctxindex/core/errors'
 import { syncSource } from '@ctxindex/core/source'
 import {
   type FailedSourceSyncResult,
-  mapSyncErrorCode,
   type RunSyncResult,
   type SyncApplicationEvent,
   SyncApplicationService,
@@ -203,8 +202,7 @@ function renderLiveEvent(
 }
 
 export function mapRpcSyncFailureToExit(code: string): number {
-  return mapSyncErrorCode(code as Parameters<typeof mapSyncErrorCode>[0])
-    .exitCode
+  return mapErrorToExit({ code })
 }
 
 export function formatSyncOutput(

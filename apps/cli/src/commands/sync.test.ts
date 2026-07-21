@@ -109,6 +109,7 @@ afterEach(() => {
 
 describe('sync command', () => {
   test.each([
+    ['needs_auth', 10],
     ['auth_expired', 10],
     ['auth_revoked', 10],
     ['rate_limited', 20],
