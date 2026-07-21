@@ -34,15 +34,15 @@ export function createExtensionMutationCoordinator(
   return async <T>(operation: () => Promise<T>, signal?: AbortSignal) => {
     const initial = await dependencies.status(signal)
     const restoreDaemon = initial.status === 'running'
-    if (initial.status !== 'stopped' && initial.status !== 'unsupported') {
-      await dependencies.stop(signal)
-    }
 
     let result!: T
     let operationFailed = false
     let operationFailure: unknown
     let ownership: DirectDatabaseOwnership | undefined
     try {
+      if (initial.status !== 'stopped' && initial.status !== 'unsupported') {
+        await dependencies.stop(signal)
+      }
       ownership = dependencies.acquireOwnership()
       result = await operation()
     } catch (error) {

@@ -113,6 +113,36 @@ test('releases ownership and restores a running daemon after mutation failure', 
   expect(events).toEqual(['stop', 'mutate', 'release', 'start'])
 })
 
+test('restores a running daemon when shutdown observation is cancelled after acceptance', async () => {
+  const events: string[] = []
+  const cancellation = Object.assign(new Error('shutdown cancelled'), {
+    code: 'cancelled',
+  })
+  const coordinate = createExtensionMutationCoordinator({
+    status: async () => ({ status: 'running', health: {} as never }),
+    stop: async () => {
+      events.push('stop')
+      throw cancellation
+    },
+    start: async (signal) => {
+      expect(signal).toBeUndefined()
+      events.push('start')
+      return { status: 'running', started: true, health: {} as never }
+    },
+    acquireOwnership: () => {
+      events.push('acquire')
+      return ownership(events)
+    },
+  })
+
+  await expect(
+    coordinate(async () => {
+      events.push('mutate')
+    }),
+  ).rejects.toBe(cancellation)
+  expect(events).toEqual(['stop', 'start'])
+})
+
 test('keeps the mutation failure primary when restoration also fails', async () => {
   const mutationFailure = new Error('invalid extension')
   const coordinate = createExtensionMutationCoordinator({
