@@ -68,7 +68,7 @@ test('relocated compiled CLI serves product documentation offline', async () => 
     )
     const get = await run(['docs', 'get', 'getting-started.md'])
     expect(get.exitCode, get.stderr).toBe(0)
-    expect(get.stdout).toContain('Getting started')
+    expect(get.stdout).toContain('Install ctxindex')
     const getSkill = await run(['docs', 'get-skill'])
     expect(getSkill.exitCode, getSkill.stderr).toBe(0)
     expect(getSkill.stdout).toBe(expectedSkill)

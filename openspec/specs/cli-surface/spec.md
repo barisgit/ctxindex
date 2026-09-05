@@ -82,19 +82,27 @@ Unknown Realm, OAuth App, Account, Source, or Adapter references MUST fail fast 
 - **THEN** the command supports the same destination-aware pretty, escaped text, compact JSON, format-alias, and warning-stream rules
 
 ### Requirement: Bundled skills surface
-ctxindex MUST keep bundled skill guidance consistent with the public CLI and SHOULD ship that documentation alongside the binary so agents can discover usage without external docs. The skills surface SHOULD provide at least:
+ctxindex MUST ship exactly one portable Agent Skill from the canonical `skills/ctxindex/SKILL.md` source. The file MUST contain YAML frontmatter with exactly the agent-facing `name` and `description` fields followed by a concise Markdown body. The description MUST explain that ctxindex is a local personal-context gateway for configured mail, calendars, files, and Extension-defined Sources and identify the operations for which an agent should use it.
 
-- a list command that prints bundled skill names and summaries;
-- a get command that prints one skill's content, with an option to inline all referenced docs;
-- a path command that prints where bundled skills live.
+The body MUST direct agents to live installed discovery rather than duplicate loaded kinds, fields, Source options, formats, Action schemas, or provider-specific instructions. It MUST include between three and six authoritative `docs`, `describe`, or help commands and one programmatic composition example that checks command success before consuming machine-readable output. It MUST NOT claim that third-party Extension Actions are limited to the official Extensions' mutation policy.
 
-Bundled skill docs MUST be versioned with the ctxindex release that ships them. Agent-facing kinds, fields, filters, formats, Actions, and Adapter flags MUST be derived from loaded definitions and schemas rather than duplicated manually. Hand-written bundled skill prose MUST remain workflow guidance. Passive Extension documentation sidecars and their transport-neutral core projection are a separate contract; the current CLI and bundled agent skills MUST NOT present that projection until a dedicated consumer contract is accepted.
+The skill bytes MUST be versioned with and embedded in the CLI release. The CLI MUST NOT expose a generic `skills` command group, skill registry, skill installation workflow, or compatibility alias.
 
-Bundled workflow guidance MUST use OAuth App and Account vocabulary, the exact commands in this specification, and MUST NOT teach Client or public Grant concepts.
+#### Scenario: Agent retrieves concise orientation
+- **WHEN** an agent retrieves the bundled ctxindex skill
+- **THEN** it receives one standard `SKILL.md` that explains the product, teaches live discovery, and includes one programmatic composition without copied loaded vocabulary
+
+#### Scenario: Extension Action policy remains extension-defined
+- **WHEN** the skill describes Actions available through ctxindex
+- **THEN** it directs the agent to loaded Action declarations without claiming that every Extension is limited to reversible official-provider mutations
+
+#### Scenario: Removed generic skills command is invoked
+- **WHEN** a caller invokes `ctxindex skills`, `ctxindex skills list`, `ctxindex skills get`, or `ctxindex skills path`
+- **THEN** parsing rejects the removed command before application, provider, or network effects
 
 #### Scenario: Bundled skills use exact OAuth App workflow
-- **WHEN** an agent reads bundled authorization guidance
-- **THEN** it receives `oauth-app add ... --from-env` followed by `account add ... --app ...` and no Client command or Grant selector
+- **WHEN** the skill body touches Account authorization
+- **THEN** it points at live `docs` and command help using OAuth App and Account vocabulary and never teaches Client or public Grant concepts or copies provider-specific credential steps
 
 #### Scenario: Extension documentation is not implicit skill content
 - **WHEN** a loaded Extension contributes a passive documentation sidecar

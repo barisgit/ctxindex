@@ -92,13 +92,6 @@ Search SHALL accept `--offset <n>` (a non-negative integer, default 0) for local
 - **WHEN** a caller combines `--offset` with `--remote`, or with a queryful search that is not `--local-only`
 - **THEN** the CLI exits 2 with an actionable error explaining that pagination is local-only
 
-### Requirement: Skills teach enumeration and pagination
-The bundled skills defined by [the CLI surface](../cli-surface/spec.md) SHALL document filter-only enumeration and the local pagination idiom: `getting-started` and `reference/cli-overview` MUST show how to enumerate without query text using filters and how to page with `--limit`/`--offset` driven by `hasMore`.
-
-#### Scenario: Bundled skills document the pagination idiom
-- **WHEN** an agent reads the bundled `getting-started` or `reference/cli-overview` skill
-- **THEN** it finds guidance for filter-only enumeration and for advancing `--offset` by `--limit` while `hasMore` is true
-
 ### Requirement: Local search baseline and optional semantic search
 The system MUST preserve the following contract without changing the normative force of its MUST, SHOULD, and MAY clauses.
 

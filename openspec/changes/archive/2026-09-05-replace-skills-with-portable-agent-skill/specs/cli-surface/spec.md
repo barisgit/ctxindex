@@ -18,3 +18,11 @@ The skill bytes MUST be versioned with and embedded in the CLI release. The CLI 
 #### Scenario: Removed generic skills command is invoked
 - **WHEN** a caller invokes `ctxindex skills`, `ctxindex skills list`, `ctxindex skills get`, or `ctxindex skills path`
 - **THEN** parsing rejects the removed command before application, provider, or network effects
+
+#### Scenario: Bundled skills use exact OAuth App workflow
+- **WHEN** the skill body touches Account authorization
+- **THEN** it points at live `docs` and command help using OAuth App and Account vocabulary and never teaches Client or public Grant concepts or copies provider-specific credential steps
+
+#### Scenario: Extension documentation is not implicit skill content
+- **WHEN** a loaded Extension contributes a passive documentation sidecar
+- **THEN** the current bundled skills surface does not expose or inline that sidecar without a separately accepted consumer contract

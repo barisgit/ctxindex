@@ -1,13 +1,17 @@
 ## MODIFIED Requirements
 
 ### Requirement: All origins share one activation path
-Built-in, explicit-path, and installed Catalog Extensions MUST use the same factories, root collector, graph collector, conservative duplicate/conflict policy, complete-registry validation, and atomic activation. Manifest-backed explicit-path and Catalog packages MUST additionally use the same declared-entry resolver. An already acquired bundled module namespace MAY enter directly at the namespace root collector, but no origin MAY bypass collection/validation, pre-register or preselect roots/leaves, shadow by priority, or win by load order.
+Built-in, explicit-path, installed Catalog, and directly installed Extensions MUST use the same factories, declared-entry resolver, root collector, graph collector, conservative duplicate/conflict policy, complete-registry validation, and atomic activation. Built-ins MAY be bundled and acquisition MAY differ, but no origin MAY bypass collection/validation, pre-register leaves, shadow by priority, or win by load order.
 
 The exact same imported non-App definition object MAY coalesce when encountered repeatedly. Distinct same-identity values containing any function or Zod schema MUST conflict. Distinct genuinely pure declarative values MAY coalesce only through canonical structural equality. OAuth App duplicates MUST always conflict. Separate physical SDK/Zod copies remain valid authoring inputs, but their executable/schema-bearing definitions MUST NOT coalesce from matching version, integrity, commit, path, provenance, source text, or `Function#toString`. Root provenance MUST NOT participate in leaf identity, equivalence, conflict, or winner selection. It MAY be retained for diagnostics and matched separately against immutable host release policy solely to decide whether one already valid active OAuth App is eligible for managed-default selection. Conflicts MUST reject atomically.
 
 #### Scenario: Built-in uses common activation after distribution
 - **WHEN** a bundled module namespace is already available
 - **THEN** its exported roots still pass through the common collectors and complete-registry validator
+
+#### Scenario: Direct materialization uses common activation after acquisition
+- **WHEN** a direct installer supplies an immutable materialized package and exact Extension id
+- **THEN** the selected root passes through the same collectors and complete-registry validator as every other origin
 
 #### Scenario: Independent executable copies conflict in either order
 - **WHEN** separate materialized packages contribute distinct same-id definitions containing functions or Zod schemas and are loaded in either order
