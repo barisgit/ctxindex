@@ -18,6 +18,7 @@ import { mapErrorToExit } from '../format/exit'
 import { formatExtensionLifecycle } from '../format/extension-lifecycle'
 import type { OutputFormat } from '../format/output'
 import { formatExtensions } from '../format/registry'
+import { loadExtensionInventory } from '../registry-service'
 import {
   createExtensionCommandServices,
   type ExtensionCommandServices,
@@ -109,14 +110,14 @@ export async function handleExtensionsCommand(
   try {
     switch (parsed.kind) {
       case 'list': {
-        const loaded = await services.loadDefinitions()
+        const loaded = await loadExtensionInventory(services)
         printExtensionDiagnostics(loaded.diagnostics)
         console.log(
           formatExtensions(
             loaded.registry,
             parsed.format,
             loaded.provenance,
-            await services.direct.list(),
+            loaded.installed,
           ),
         )
         return 0

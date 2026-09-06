@@ -88,3 +88,13 @@ No domain schema migration is added. Pre-alpha configuration/path state may be r
 ## Open Questions
 
 None block artifact creation. The exact Linux/Windows backend selection and local byte-transfer mechanism are explicit implementation checkpoints that must be resolved with focused prototypes before their dependent slices begin.
+
+## Bounded registry-read parity slice — approved decisions
+
+The user approved both registry-read clarifications for issue #79. Ordinary `describe` and `extension list` retain their existing state-free direct definition discovery before initialization, as a narrow explicit pre-initialization surface required by canonical `cli-surface`. Once initialized, both ensure the daemon on supported platforms and never fall back after ensure/selection. Existing documentation pre-init behavior is unchanged; no pre-init daemon lifecycle or broader direct exception is introduced.
+
+Two contract-derived reads return the existing core registry description and loaded Extension identities plus installed inventory/provenance. Source-aware Action description keeps its existing route. CLI owns filtering, compact/detail/full presentation, formats, diagnostics, time-dependent acquisition age, and exits. The unsupported-platform conditional path and accepted Extension stop/lease/mutate/release/restart coordinator remain unchanged.
+
+The approved output policy permits only named Extension-location business fields needed for current CLI output: `diagnostics[].path`, explicit-path `provenance[].path`, installed `requestedTarget` and `resolvedIdentity`, Catalog `repository`, and literal `sourceLocator.module` (including equivalent installed `curation.repository` and `curation.source_locator.module`). These are bounded location values, not arbitrary runtime paths. Diagnostics carry only core host-generated safe messages. Database/socket/runtime roots, secrets, credentials, backend errors, stacks and causes remain excluded. Canonical structured failure taxonomy is unchanged. No registry/function serialization or generic tunnel is permitted.
+
+Adding `registry.describe` and `extension.list` advances the private protocol from 2 to 3. A client must reject an older running daemon during health compatibility checks instead of accepting it and later receiving an undeclared missing-procedure error. Existing exact-version mismatch behavior remains fail-closed; this slice does not automatically stop or replace an incompatible daemon. `tests/tooling/cli/registry-protocol.test.ts` exercises the old protocol over a real private Unix socket and checks that client and daemon production identities match.

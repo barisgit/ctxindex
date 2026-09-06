@@ -27,6 +27,8 @@ import {
   rpcDocumentationSearchResultSchema,
   rpcExportInputSchema,
   rpcExportResultSchema,
+  rpcExtensionListInputSchema,
+  rpcExtensionListResultSchema,
   rpcFailureRegistry,
   rpcHealthInputSchema,
   rpcHealthResultSchema,
@@ -42,6 +44,8 @@ import {
   rpcRealmAddResultSchema,
   rpcRealmListInputSchema,
   rpcRealmListResultSchema,
+  rpcRegistryDescribeInputSchema,
+  rpcRegistryDescribeResultSchema,
   rpcResourceGetInputSchema,
   rpcResourceGetResultSchema,
   rpcSearchInputSchema,
@@ -77,6 +81,16 @@ export const daemonContract = {
     shutdown: procedure
       .input(rpcShutdownInputSchema)
       .output(rpcShutdownAcceptedSchema),
+  },
+  extension: {
+    list: procedure
+      .input(rpcExtensionListInputSchema)
+      .output(rpcExtensionListResultSchema),
+  },
+  registry: {
+    describe: procedure
+      .input(rpcRegistryDescribeInputSchema)
+      .output(rpcRegistryDescribeResultSchema),
   },
   realm: {
     add: procedure

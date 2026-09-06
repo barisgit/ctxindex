@@ -45,6 +45,9 @@ flowchart LR
 Use default output for people, `--format text` for low-token pipelines, and
 `--format json` for agents. `sync --format events` streams JSON lines. Discover
 the live interface with `ctxindex describe` and `ctxindex docs get-skill`.
+Before initialization, `describe` and `extension list` work without creating
+state. After initialization, they read the daemon's active registry on supported
+platforms and do not fall back to client-side discovery.
 
 ## 2. Overview and value proposition
 
@@ -83,8 +86,10 @@ canonical. Secret values live in the selected Keychain or encrypted-file
 backend; config and SQLite store typed references. Backend moves are explicit
 and copy, verify, commit, then clean up.
 
-Provider requests use declared hosts. Diagnostics redact secrets, provider
-bodies, paths, stacks, and transport internals. Realms are not security bounds.
+Provider requests use declared hosts. Failures redact secrets, provider bodies,
+runtime paths, stacks, and transport internals. Extension inventory and load
+diagnostics may show explicitly declared package locations. Realms are not
+security bounds.
 
 Extensions are trusted in-process code. Repository, author-build, and install
 trust are separate. Startup uses immutable bytes and performs no refresh.

@@ -183,6 +183,7 @@ test('startup owns leases before one load/open and publishes ready last', async 
         return {
           registry: {} as never,
           completeRegistry: {} as never,
+          provenance: [],
           diagnostics: [],
           documentation: {
             list: () => [
@@ -351,6 +352,7 @@ test.each([
           loadExtensions: async () => ({
             registry: {} as never,
             completeRegistry: {} as never,
+            provenance: [],
             diagnostics: [],
             documentation: emptyDocumentation,
           }),
@@ -480,6 +482,7 @@ test('a lifecycle-lease loser cannot remove the live daemon endpoint or discover
     loadExtensions: async () => ({
       registry: {} as never,
       completeRegistry: {} as never,
+      provenance: [],
       diagnostics: [],
       documentation: emptyDocumentation,
     }),
@@ -559,6 +562,7 @@ test('non-cooperative request times out while ownership remains, then cleans up 
       loadExtensions: async () => ({
         registry: {} as never,
         completeRegistry: {} as never,
+        provenance: [],
         diagnostics: [],
         documentation: emptyDocumentation,
       }),
@@ -629,6 +633,7 @@ test('startup rollback closes opened resources and releases both leases', async 
         loadExtensions: async () => ({
           registry: {} as never,
           completeRegistry: {} as never,
+          provenance: [],
           diagnostics: [],
           documentation: emptyDocumentation,
         }),
@@ -688,6 +693,7 @@ test('post-open database target assertion closes SQLite before rollback', async 
         loadExtensions: async () => ({
           registry: {} as never,
           completeRegistry: {} as never,
+          provenance: [],
           diagnostics: [],
           documentation: emptyDocumentation,
         }),
@@ -821,7 +827,8 @@ test('daemon startup fails managed loading closed for an invalid record document
         openDatabase: async () => ({ close: () => {} }) as never,
         runMigrations: async () => {},
         listLocalOAuthAppIdentities: () => [],
-        composeServices: () => ({
+        composeServices: ({ registry }) => ({
+          registry,
           syncService: {
             run: async () => ({ mode: 'sync', results: [], warnings: [] }),
           },
@@ -845,6 +852,21 @@ test('daemon startup fails managed loading closed for an invalid record document
         ok: true,
         value: expect.objectContaining({ extensionDiagnosticsCount: 1 }),
       }),
+    )
+    const described = await daemon.application.registry.describe(
+      {},
+      daemon.testContext(),
+    )
+    const listed = await daemon.application.extension.list(
+      {},
+      daemon.testContext(),
+    )
+    if (!health.ok || !described.ok || !listed.ok)
+      throw new Error('Expected ready registry reads')
+    expect(described.value.diagnostics).toHaveLength(1)
+    expect(listed.value.diagnostics).toEqual(described.value.diagnostics)
+    expect(health.value.extensionDiagnosticsCount).toBe(
+      listed.value.diagnostics.length,
     )
     await daemon.close(100)
   } finally {

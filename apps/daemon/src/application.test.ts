@@ -13,6 +13,7 @@ import {
   CtxindexValidationError,
   type CtxindexValidationErrorCode,
 } from '@ctxindex/core/errors'
+import { createExtensionRegistry } from '@ctxindex/core/registry'
 import { CtxindexSecretsError } from '@ctxindex/core/secrets'
 import { syncError } from '@ctxindex/extension-sdk'
 import { gmailAdapterDefinition } from '@ctxindex/official'
@@ -111,7 +112,6 @@ function application(overrides: Record<string, unknown> = {}) {
     instanceId: 'instance-test',
     startedAt: '2026-07-18T00:00:00.000Z',
     pid: 123,
-    extensionDiagnosticsCount: 0,
     documentationService: createDocumentationService([]),
     observationTimeoutMs: 25,
     syncService: {
@@ -122,6 +122,48 @@ function application(overrides: Record<string, unknown> = {}) {
       getStatus: () => [],
     },
     ...overrides,
+  })
+}
+
+for (const { diagnostics, count } of [
+  { diagnostics: undefined, count: 0 },
+  { diagnostics: [], count: 0 },
+  {
+    diagnostics: [
+      {
+        path: '/extension/one',
+        message: 'Extension package manifest could not be read',
+      },
+      {
+        path: '/extension/two',
+        message: 'Extension package manifest could not be read',
+      },
+    ],
+    count: 2,
+  },
+]) {
+  test(`health diagnostics count matches both registry read projections: ${diagnostics === undefined ? 'omitted' : count}`, async () => {
+    const app = application({
+      registry: createExtensionRegistry([]),
+      ...(diagnostics === undefined
+        ? {}
+        : { extensionDiagnostics: diagnostics }),
+    })
+    app.markReady()
+    const health = await app.system.health({}, context('diagnostic-health'))
+    const described = await app.registry.describe(
+      {},
+      context('diagnostic-description'),
+    )
+    const listed = await app.extension.list({}, context('diagnostic-inventory'))
+    if (!health.ok || !described.ok || !listed.ok)
+      throw new Error('Expected ready registry reads')
+    expect(described.value.diagnostics).toEqual(diagnostics ?? [])
+    expect(listed.value.diagnostics).toEqual(described.value.diagnostics)
+    expect(health.value.extensionDiagnosticsCount).toBe(count)
+    expect(health.value.extensionDiagnosticsCount).toBe(
+      listed.value.diagnostics.length,
+    )
   })
 }
 

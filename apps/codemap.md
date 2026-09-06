@@ -17,7 +17,7 @@ User argv enters `apps/cli/bin/ctxindex.mjs`, flows to `apps/cli/src/main.ts#run
 
 For the web workspace, Fumadocs compiles `content/docs/` into the generated `collections/server` source. Next.js routes load that source to render the documentation tree, provide search, produce per-page Markdown and aggregate LLM text, and generate Open Graph images; content negotiation rewrites Markdown-preferring `/docs` requests to the page representation route.
 
-The daemon entry `apps/daemon/src/main.ts#main` derives ctxindex roots, calls `startDaemon()`, acquires retained lifecycle/database leases, loads unified direct and Catalog-curated installation records offline, composes core services, binds the Unix-socket RPC transport, publishes readiness, and drains/cleans up on shutdown. Promoted stateful CLI commands ensure the exact source or packaged sibling as a detached process and monitor it through health-backed selection; explicit lifecycle commands remain available.
+The daemon entry `apps/daemon/src/main.ts#main` derives ctxindex roots, calls `startDaemon()`, acquires retained lifecycle/database leases, loads unified direct and Catalog-curated installation records offline, composes core services, binds the Unix-socket RPC transport, publishes readiness, and drains/cleans up on shutdown. Promoted stateful CLI commands ensure the exact source or packaged sibling as a detached process and monitor it through health-backed selection; explicit lifecycle commands remain available. Initialized registry description and Extension inventory use semantic daemon reads; their narrow pre-init discovery surface remains state-free.
 
 ## Integration points
 

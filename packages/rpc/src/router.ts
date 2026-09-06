@@ -25,6 +25,7 @@ import {
   rpcDocumentationListResultSchema,
   rpcDocumentationSearchResultSchema,
   rpcExportResultSchema,
+  rpcExtensionListResultSchema,
   type rpcFailureRegistry,
   rpcFailureSchema,
   rpcHealthResultSchema,
@@ -35,6 +36,7 @@ import {
   rpcProtocolIdentitySchema,
   rpcRealmAddResultSchema,
   rpcRealmListResultSchema,
+  rpcRegistryDescribeResultSchema,
   rpcResourceGetResultSchema,
   rpcResultSchema,
   rpcRuntimeIdentitySchema,
@@ -333,6 +335,36 @@ export function createDaemonRouter(
                 applicationContext(context, signal),
               ),
             rpcShutdownAcceptedSchema,
+            errors,
+          ),
+        ),
+    },
+    extension: {
+      list: os.extension.list
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.extension.list(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcExtensionListResultSchema,
+            errors,
+          ),
+        ),
+    },
+    registry: {
+      describe: os.registry.describe
+        .use(compatibility)
+        .handler(({ input, context, signal, errors }) =>
+          invokeApplication(
+            () =>
+              application.registry.describe(
+                input,
+                applicationContext(context, signal),
+              ),
+            rpcRegistryDescribeResultSchema,
             errors,
           ),
         ),
