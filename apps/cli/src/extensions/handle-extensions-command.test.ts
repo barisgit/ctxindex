@@ -722,14 +722,14 @@ test('database ownership conflict remains actionable and exits 50', async () => 
       services({
         catalogs: {
           list: async () => {
-            throw new DirectDatabaseLeaseConflictError()
+            throw new DirectDatabaseLeaseConflictError('a'.repeat(64))
           },
         } as unknown as ExtensionCommandServices['catalogs'],
       }),
     )
     expect(exit).toBe(50)
     expect(error).toHaveBeenCalledWith(
-      expect.stringContaining('unavailable while the local daemon owns'),
+      expect.stringContaining('held by another local process/runtime'),
     )
   } finally {
     error.mockRestore()

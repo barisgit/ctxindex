@@ -84,11 +84,17 @@ export class FileLeaseConflictError extends Error {
   }
 }
 
+// Reasons: 'platform' means no retained-ownership backend exists for this OS,
+// so no daemon can own the database and direct callers may stay unleased.
+// 'primitive' (a supported platform whose locking primitive is unavailable)
+// and 'filesystem' must fail closed: a daemon could still own the database.
+type FileLeaseUnsupportedReason = 'platform' | 'primitive' | 'filesystem'
+
 export class FileLeaseUnsupportedError extends Error {
-  readonly reason: 'platform' | 'filesystem'
+  readonly reason: FileLeaseUnsupportedReason
 
   constructor(
-    reason: 'platform' | 'filesystem' = 'filesystem',
+    reason: FileLeaseUnsupportedReason = 'filesystem',
     message = 'Retained file leases are unsupported on this platform or filesystem',
   ) {
     super(message)
@@ -427,19 +433,19 @@ class LinuxFileLeaseBackend implements FileLeaseBackend {
       }
       validateDatabaseTarget(request)
 
+      // Linux is a supported ownership platform, so a missing or untrusted
+      // helper is an unavailable primitive rather than an unsupported
+      // platform: it must not let direct openers bypass a daemon owner.
       let executable: string | null
       try {
         executable = this.#resolveFlock()
       } catch {
-        throw new FileLeaseUnsupportedError(
-          'platform',
-          'Retained file leases are unsupported on this platform',
-        )
+        executable = null
       }
       if (executable === null || !isAbsolute(executable)) {
         throw new FileLeaseUnsupportedError(
-          'platform',
-          'Retained file leases are unsupported on this platform',
+          'primitive',
+          'Retained file leases require a trusted system flock helper, which is unavailable',
         )
       }
       let result: FlockSpawnResult
