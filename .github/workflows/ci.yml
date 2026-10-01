@@ -97,8 +97,11 @@ jobs:
             ${{ runner.os }}-bun-turbo-
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      # One package at a time: the CLI and daemon compiled suites each spawn
+      # many processes, and sharing the runner pushes the CLI package past its
+      # 300s per-package budget. Each package keeps that budget on its own.
       - name: Run CLI and daemon E2E tests
-        run: bun run test:e2e
+        run: bun run test:e2e -- --concurrency=1
         env:
           TURBO_TEAM: team_UNQzjxlqcykMPTv2liMAAqCJ
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
