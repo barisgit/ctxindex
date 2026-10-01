@@ -12,6 +12,8 @@ export interface CliResult {
 }
 
 export interface CompiledCliHarness {
+  /** Relocated compiled CLI, for journeys that must signal a live child. */
+  readonly executable: string
   run(
     args: readonly string[],
     env: Readonly<Record<string, string | undefined>>,
@@ -101,6 +103,7 @@ export async function buildCompiledCliHarness(
   }
 
   return {
+    executable: cliPath,
     async run(args, env) {
       const child = Bun.spawn([cliPath, ...args], {
         cwd: '/',
