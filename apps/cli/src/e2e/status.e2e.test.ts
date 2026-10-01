@@ -108,6 +108,18 @@ function syncRunErrorCount(sandbox: Sandbox, sourceId: string): number {
   }
 }
 
+function syncRunCount(sandbox: Sandbox, sourceId: string): number {
+  const db = new Database(dbPath(sandbox), { readonly: true })
+  try {
+    const row = db
+      .prepare('SELECT COUNT(*) AS count FROM sync_runs WHERE source_id = ?')
+      .get(sourceId) as { count: number }
+    return row.count
+  } finally {
+    db.close()
+  }
+}
+
 function sourceCount(sandbox: Sandbox): number {
   const db = new Database(dbPath(sandbox), { readonly: true })
   try {
@@ -299,6 +311,9 @@ test('sync selection and status distinguish never-run, disabled, and unsupported
     expect(statusAfter.get(eligibleId)).toBe('idle')
     expect(statusAfter.get(disabledId)).toBe('disabled')
     expect(statusAfter.get(unsupportedId)).toBe('unsupported')
+    // Neither the skipped Sources nor the rejected targeted run left a Sync Run.
+    expect(syncRunCount(sandbox, disabledId)).toBe(0)
+    expect(syncRunCount(sandbox, unsupportedId)).toBe(0)
   } finally {
     await sandbox.cleanup()
   }
