@@ -39,8 +39,10 @@ test('ctxindex init creates XDG layout, config, sqlite, and PRAGMAs', async () =
   const stateHome = join(xdgState, 'ctxindex')
   const cacheHome = join(xdgCache, 'ctxindex')
 
-  await mkdir(configHome, { recursive: true })
-  await mkdir(dataHome, { recursive: true })
+  // Private modes keep the setup independent of the caller's umask: init
+  // rejects group/other-writable lease parent directories.
+  await mkdir(configHome, { recursive: true, mode: 0o700 })
+  await mkdir(dataHome, { recursive: true, mode: 0o700 })
   await writeFile(join(configHome, 'secret.key'), 'not-a-real-secret')
   await writeFile(join(dataHome, 'secrets.box'), 'not-a-real-secret')
   await chmod(join(configHome, 'secret.key'), 0o644)

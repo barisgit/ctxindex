@@ -2,6 +2,8 @@
 linker = "hoisted"
 
 [test]
+# Isolate tests from the developer's real ctxindex runtime; see the preload.
+preload = ["./scripts/testing/isolate-ctxindex-state.ts"]
 pathIgnorePatterns = [
   "**/*.integration.test.ts",
   "**/*.e2e.test.ts",
