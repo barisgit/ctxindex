@@ -125,6 +125,79 @@ test('status includes never-synced Sources with pending sync status', () => {
   ])
 })
 
+test('status distinguishes never-run, disabled, unsupported, and recorded sync states', () => {
+  const realmService = createRealmService({ db, logger })
+  realmService.createRealm({ slug: 'work' })
+  const service = createSourceService({ db, logger, realmService, registry })
+  db.prepare(
+    "INSERT INTO accounts (id, provider, label, external_user_id, created_at, updated_at) VALUES ('account-google', 'google', 'google', 'subject-google', 1, 1)",
+  ).run()
+  db.prepare(
+    "INSERT INTO grants (id, account_id, provider, scopes_json, app_config_ref, created_at, updated_at) VALUES ('grant-google', 'account-google', 'google', ?, 'secret://test/app', 1, 1)",
+  ).run(JSON.stringify([gmailScope]))
+  const addLocal = (label: string, syncEnabled: boolean) =>
+    service.addSource({
+      adapterId: 'local.directory',
+      realmSlug: 'work',
+      label,
+      configJson: '{"root_path":"/tmp"}',
+      syncEnabled,
+    }).sourceId
+  const addMailbox = (label: string, syncEnabled: boolean) =>
+    service.addSource({
+      adapterId: 'google.mailbox',
+      realmSlug: 'work',
+      label,
+      grantId: 'grant-google',
+      syncEnabled,
+    }).sourceId
+  const ids = {
+    pending: addLocal('pending', true),
+    disabled: addLocal('disabled', false),
+    idle: addLocal('idle', true),
+    mailbox: addMailbox('mailbox', true),
+    mailboxDisabled: addMailbox('mailbox-disabled', false),
+    mailboxNeedsAuth: addMailbox('mailbox-needs-auth', true),
+  }
+  const recordState = db.prepare(
+    'INSERT INTO source_sync_state (source_id, last_status, updated_at) VALUES (?, ?, 1)',
+  )
+  recordState.run(ids.idle, 'idle')
+  recordState.run(ids.mailbox, 'failed')
+  recordState.run(ids.mailboxNeedsAuth, 'needs_auth')
+  const before = db.prepare('SELECT * FROM source_sync_state').all()
+
+  const statusById = Object.fromEntries(
+    service.getStatus().map((row) => [row.sourceId, row.lastStatus]),
+  )
+
+  expect(statusById).toEqual({
+    [ids.pending]: 'pending',
+    [ids.disabled]: 'disabled',
+    [ids.idle]: 'idle',
+    [ids.mailbox]: 'unsupported',
+    [ids.mailboxDisabled]: 'unsupported',
+    [ids.mailboxNeedsAuth]: 'needs_auth',
+  })
+  expect(service.getStatus({ sourceId: ids.disabled })[0]?.lastStatus).toBe(
+    'disabled',
+  )
+  expect(db.prepare('SELECT * FROM source_sync_state').all()).toEqual(before)
+
+  const missingService = createSourceService({
+    db,
+    logger,
+    realmService,
+    registry: createExtensionRegistry(),
+  })
+  const missingStatusById = Object.fromEntries(
+    missingService.getStatus().map((row) => [row.sourceId, row.lastStatus]),
+  )
+  expect(missingStatusById[ids.mailbox]).toBe('failed')
+  expect(missingStatusById[ids.mailboxDisabled]).toBe('disabled')
+  expect(missingStatusById[ids.pending]).toBe('pending')
+})
+
 test('status and Source inventory project separate warning and error diagnostics', () => {
   const realmService = createRealmService({ db, logger })
   realmService.createRealm({ slug: 'work' })

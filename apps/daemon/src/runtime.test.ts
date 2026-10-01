@@ -234,7 +234,12 @@ test('startup owns leases before one load/open and publishes ready last', async 
             }),
           },
           syncService: {
-            run: async () => ({ mode: 'sync', results: [], warnings: [] }),
+            run: async () => ({
+              mode: 'sync',
+              results: [],
+              skipped: [],
+              warnings: [],
+            }),
           },
           sourceService: {
             resolveSourceId: (value: string) => value,
@@ -362,6 +367,7 @@ test.each([
               run: async () => ({
                 mode: 'sync' as const,
                 results: [],
+                skipped: [],
                 warnings: [],
               }),
             },
@@ -488,7 +494,12 @@ test('a lifecycle-lease loser cannot remove the live daemon endpoint or discover
     listLocalOAuthAppIdentities: () => [],
     composeServices: () => ({
       syncService: {
-        run: async () => ({ mode: 'sync' as const, results: [], warnings: [] }),
+        run: async () => ({
+          mode: 'sync' as const,
+          results: [],
+          skipped: [],
+          warnings: [],
+        }),
       },
       sourceService: {
         resolveSourceId: (value: string) => value,
@@ -571,7 +582,12 @@ test('non-cooperative request times out while ownership remains, then cleans up 
           run: () =>
             new Promise((resolve) => {
               settle = () =>
-                resolve({ mode: 'sync', results: [], warnings: [] })
+                resolve({
+                  mode: 'sync',
+                  results: [],
+                  skipped: [],
+                  warnings: [],
+                })
             }),
         },
         sourceService: {
@@ -749,7 +765,12 @@ test('daemon startup loads local Extensions without network acquisition', async 
         listLocalOAuthAppIdentities: () => [],
         composeServices: () => ({
           syncService: {
-            run: async () => ({ mode: 'sync', results: [], warnings: [] }),
+            run: async () => ({
+              mode: 'sync',
+              results: [],
+              skipped: [],
+              warnings: [],
+            }),
           },
           sourceService: {
             resolveSourceId: (value: string) => value,
@@ -823,7 +844,12 @@ test('daemon startup fails managed loading closed for an invalid record document
         listLocalOAuthAppIdentities: () => [],
         composeServices: () => ({
           syncService: {
-            run: async () => ({ mode: 'sync', results: [], warnings: [] }),
+            run: async () => ({
+              mode: 'sync',
+              results: [],
+              skipped: [],
+              warnings: [],
+            }),
           },
           sourceService: {
             resolveSourceId: (value: string) => value,

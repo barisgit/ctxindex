@@ -101,6 +101,8 @@ The daemon client manually advances the typed iterator so its terminal return re
 
 The sync runner projects direct-core and daemon-RPC events into one CLI vocabulary. `--format events` writes each event as one JSON line when observed. Human summary and compact modes may write bounded live progress to stderr while preserving terminal stdout. `--format json` suppresses all live writes and emits exactly one terminal JSON document. The terminal result remains the sole owner of stable exit selection.
 
+Both routes map the terminal result into one `SyncOutput` carrying core's `skipped` list; the CLI adds no selection logic. Summary and compact formats write result lines, then `No Sources are eligible for sync.` when no Source ran, then one `skipped` line per skipped Source with its reason, then warnings. JSON carries `skipped` beside `results` and `warnings`.
+
 ### @ctxindex/cli — background daemon lifecycle
 
 ```ts

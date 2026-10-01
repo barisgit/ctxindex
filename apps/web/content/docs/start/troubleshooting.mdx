@@ -43,6 +43,10 @@ ctxindex extension list --format json
 ctxindex describe adapter <adapter-id> --format json
 ```
 
+## Sync skips a Source
+
+`status` reports `lastStatus` `pending` for a Source that can sync but has not run yet, `disabled` for a Source added with `--no-sync`, and `unsupported` when its Adapter has no local sync, such as a mailbox. `sync` without `--source` lists disabled and unsupported Sources under `skipped` instead of running them.
+
 ## Search returns nothing
 
 - Confirm the Source belongs to the Realm you filtered.

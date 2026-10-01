@@ -732,10 +732,19 @@ export const rpcSourceSyncResultSchema = z.discriminatedUnion('status', [
 ])
 export type RpcSourceSyncResult = z.infer<typeof rpcSourceSyncResultSchema>
 
+export const rpcSkippedSourceSyncSchema = z
+  .strictObject({
+    sourceId: identifierSchema,
+    reason: z.enum(['disabled', 'unsupported']),
+  })
+  .readonly()
+export type RpcSkippedSourceSync = z.infer<typeof rpcSkippedSourceSyncSchema>
+
 export const rpcSyncResultSchema = z
   .strictObject({
     mode: z.enum(['sync', 'resync', 'diff']),
     results: z.array(rpcSourceSyncResultSchema).max(1_024).readonly(),
+    skipped: z.array(rpcSkippedSourceSyncSchema).max(1_024).readonly(),
     warnings: z.array(rpcSourceWarningSchema).max(256).readonly(),
   })
   .readonly()

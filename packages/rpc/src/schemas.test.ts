@@ -493,13 +493,50 @@ describe('sync/status and internal application results', () => {
     ).toThrow()
   })
 
+  test('carries only closed skipped-Source selection entries', () => {
+    const value = {
+      mode: 'sync',
+      results: [],
+      skipped: [
+        { sourceId: 'source-a', reason: 'unsupported' },
+        { sourceId: 'source-b', reason: 'disabled' },
+      ],
+      warnings: [],
+    } as const
+    expect(rpcSyncResultSchema.parse(value)).toEqual(value)
+    expect(() =>
+      rpcSyncResultSchema.parse({
+        ...value,
+        skipped: [{ sourceId: 'source-a', reason: 'paused' }],
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcSyncResultSchema.parse({
+        ...value,
+        skipped: [{ sourceId: 'source-a', reason: 'disabled', label: 'x' }],
+      }),
+    ).toThrow()
+    expect(() =>
+      rpcSyncResultSchema.parse({
+        ...value,
+        skipped: Array.from({ length: 1_025 }, (_, index) => ({
+          sourceId: `source-${index}`,
+          reason: 'disabled',
+        })),
+      }),
+    ).toThrow()
+  })
+
   test('accepts strict internal success and failure values', () => {
     expect(
       rpcResultSchema(rpcSyncResultSchema).parse({
         ok: true,
-        value: { mode: 'sync', results: [], warnings: [] },
+        value: { mode: 'sync', results: [], skipped: [], warnings: [] },
       }),
-    ).toEqual({ ok: true, value: { mode: 'sync', results: [], warnings: [] } })
+    ).toEqual({
+      ok: true,
+      value: { mode: 'sync', results: [], skipped: [], warnings: [] },
+    })
     expect(
       rpcResultSchema(rpcSyncResultSchema).parse({
         ok: false,
@@ -515,7 +552,7 @@ describe('sync/status and internal application results', () => {
     expect(() =>
       rpcResultSchema(rpcSyncResultSchema).parse({
         ok: true,
-        value: { mode: 'sync', results: [], warnings: [] },
+        value: { mode: 'sync', results: [], skipped: [], warnings: [] },
         exitCode: 50,
       }),
     ).toThrow()
@@ -530,6 +567,7 @@ describe('sync/status and internal application results', () => {
           status: 'completed',
           run,
         })),
+        skipped: [],
         warnings: [],
       }),
     ).toThrow()
@@ -537,6 +575,7 @@ describe('sync/status and internal application results', () => {
       rpcSyncResultSchema.parse({
         mode: 'sync',
         results: [],
+        skipped: [],
         warnings: Array.from({ length: 257 }, () => ({
           ...warning,
           sourceId: 'source',
@@ -563,6 +602,7 @@ describe('sync/status and internal application results', () => {
             },
           },
         ],
+        skipped: [],
         warnings: [],
       }),
     ).toThrow()

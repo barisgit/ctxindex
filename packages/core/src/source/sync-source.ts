@@ -1,4 +1,4 @@
-import type { SyncMode } from '@ctxindex/extension-sdk'
+import type { AnyAdapterDefinition, SyncMode } from '@ctxindex/extension-sdk'
 import type { AuthService } from '../auth'
 import { CtxindexError } from '../errors'
 import type { ExtensionRegistry } from '../registry'
@@ -25,6 +25,19 @@ export interface SyncSourceInput {
   readonly fetch?: SourceProviderFetch
 }
 
+/**
+ * Whether a loaded Adapter can run local sync. Sync selection, targeted sync
+ * rejection, and Source status all use this one predicate so they agree.
+ */
+export function adapterSupportsSync(
+  adapter: Pick<AnyAdapterDefinition, 'capabilities' | 'operations'>,
+): boolean {
+  return (
+    adapter.capabilities.includes('sync') &&
+    adapter.operations.sync !== undefined
+  )
+}
+
 export function syncSource(input: SyncSourceInput): Promise<SyncRunResult> {
   const coordinator = new SyncCoordinator(input.db, input.registry.profiles)
   return coordinator.run(
@@ -44,7 +57,8 @@ export function syncSource(input: SyncSourceInput): Promise<SyncRunResult> {
         ...(input.fetch ? { fetch: input.fetch } : {}),
       })
       const sync = provider.adapter.operations.sync
-      if (!provider.adapter.capabilities.includes('sync') || !sync) {
+      // Selection rejects unsupported Sources first; this guards direct callers.
+      if (!adapterSupportsSync(provider.adapter) || !sync) {
         throw new CtxindexError(
           `Adapter "${provider.adapter.id}" does not support sync`,
           'sync_unsupported',

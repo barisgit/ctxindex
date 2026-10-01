@@ -59,7 +59,7 @@ async function* syncStream(
   events: readonly RpcSyncEvent[] = [],
   terminal: RpcResult<RpcSyncResult> = {
     ok: true,
-    value: { mode: 'sync', results: [], warnings: [] },
+    value: { mode: 'sync', results: [], skipped: [], warnings: [] },
   },
 ): AsyncGenerator<RpcSyncEvent, RpcResult<RpcSyncResult>, void> {
   for (const event of events) yield event
@@ -622,6 +622,7 @@ describe('contract implementation', () => {
       value: {
         mode: 'sync',
         results: [],
+        skipped: [],
         warnings: [],
       },
     })
@@ -732,7 +733,7 @@ describe('contract implementation', () => {
     expect(await iterator.next()).toEqual({ done: false, value: event })
     expect(await iterator.next()).toEqual({
       done: true,
-      value: { mode: 'sync', results: [], warnings: [] },
+      value: { mode: 'sync', results: [], skipped: [], warnings: [] },
     })
   })
 

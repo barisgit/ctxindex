@@ -10,6 +10,7 @@ Runs one-Source or all-eligible-Source sync, aggregates outcomes, formats result
 - `commands/sync.ts` owns the typed Citty definition, including bounded `mode` and output `format` enums with defaults; the runner receives `SyncCommandInput` rather than argv.
 - `SyncDeps` and `SyncServices` inject unsupported-platform direct infrastructure/core execution; exact-tuple ensure selects the typed daemon client on supported platforms. An `AbortController` converts SIGINT to request-scoped cancellation in either route.
 - Status-discriminated results support summary, compact, events, and JSON output. Direct and daemon routes project into one live event vocabulary.
+- Core decides eligibility; the runner only renders core's `skipped` list (`disabled`/`unsupported`) and a `No Sources are eligible for sync.` line when nothing ran.
 
 ## Data & control flow
 
