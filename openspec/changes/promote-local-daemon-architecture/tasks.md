@@ -21,10 +21,10 @@
 
 ## 4. Extension path identity and activation
 
-- [ ] 4.1 Add failing tests that persist a relative Extension from an explicit configuration origin, start the daemon from unrelated working directories/path aliases, and require the same complete registry or the same bounded failure.
-- [ ] 4.2 Implement validated atomic canonical path persistence/projection with pre-alpha rewrite behavior; pass Extension loader, relocated compiled-Extension, no-network-startup, and security gates.
-- [ ] 4.3 Add failing Catalog/install/uninstall tests that distinguish filesystem-only acquisition from active-provenance changes, use the runtime-complete registry for validation, preserve prior activation on failure, and never let CLI output claim an unobserved in-process registry replacement.
-- [ ] 4.4 Implement daemon-coordinated installed-Extension activation or explicit bounded restart-required behavior; pass Catalog concurrency, OAuth App collision, immutable-registry, restart, and compiled multi-process gates.
+- [x] 4.1 Add failing tests that persist a relative Extension from an explicit configuration origin, start the daemon from unrelated working directories/path aliases, and require the same complete registry or the same bounded failure.
+- [x] 4.2 Implement validated atomic canonical path persistence/projection with pre-alpha rewrite behavior; pass Extension loader, relocated compiled-Extension, no-network-startup, and security gates.
+- [x] 4.3 Add failing Catalog/install/uninstall tests that distinguish filesystem-only acquisition from active-provenance changes, use the runtime-complete registry for validation, preserve prior activation on failure, and never let CLI output claim an unobserved in-process registry replacement.
+- [x] 4.4 Implement daemon-coordinated installed-Extension activation or explicit bounded restart-required behavior; pass Catalog concurrency, OAuth App collision, immutable-registry, restart, and compiled multi-process gates.
 
 ## 5. Supported-platform ownership
 

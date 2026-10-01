@@ -1,5 +1,5 @@
 import { readFile, realpath } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { isAbsolute, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { CtxindexConfig } from '../config'
 import {
@@ -194,6 +194,16 @@ export async function loadExtensions(
   )
 
   for (const configuredPath of input.config.extensions.paths) {
+    // Config reads project paths against the configuration file. A relative
+    // path here would depend on the launching process's working directory.
+    if (!isAbsolute(configuredPath)) {
+      diagnostics.push({
+        path: configuredPath,
+        message:
+          'Extension path must be absolute; relative paths resolve against the configuration file',
+      })
+      continue
+    }
     const extensionPath = resolve(configuredPath)
     try {
       const roots = await importExtensionPackageRoots(extensionPath)
