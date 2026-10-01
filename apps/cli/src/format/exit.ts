@@ -134,7 +134,6 @@ export function mapErrorToExit(err: unknown): number {
     code === 'protocol_incompatible' ||
     code === 'runtime_identity_mismatch' ||
     code === 'database_lease_conflict' ||
-    code === 'prototype_unsupported' ||
     code === 'shutdown_timeout' ||
     code === 'result_too_large'
   )
