@@ -1,7 +1,8 @@
 # local-daemon Specification
 
 ## Purpose
-TBD - created by archiving change prototype-local-daemon-orpc. Update Purpose after archive.
+Define the local daemon that owns one canonical ctxindex runtime: its process boundary, canonical identity and retained ownership leases, startup and readiness, health, protocol compatibility, request cancellation, graceful shutdown, and lifecycle recovery. The CLI remains the only agent-facing surface.
+
 ## Requirements
 ### Requirement: Local daemon process boundary
 ctxindex SHALL serve daemon-backed operations through a local-only daemon associated with one canonical config/data/state/cache runtime tuple and canonical SQLite path. A ready daemon MUST own that composed application runtime and database, and local clients MUST invoke migrated daemon-backed behavior through it rather than composing another production runtime. The daemon endpoint MUST NOT be exposed to non-local peers.
