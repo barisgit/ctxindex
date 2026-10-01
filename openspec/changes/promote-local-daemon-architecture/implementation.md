@@ -75,7 +75,7 @@ Installed-Extension activation uses one staged complete registry candidate. The 
 
 The daemon acquires lifecycle identity and exclusive canonical database ownership before runtime composition, opens/migrates SQLite once, and releases ownership only after admission stops, active work settles, and SQLite closes. Any allowlisted direct database opener uses the same `FileLeaseBackend` with retained shared ownership over open/use/close. Unsupported platform backends fail before open.
 
-The active Extension registry is staged once and immutable for the daemon lifetime. Persisted Extension paths are resolved against a recorded configuration origin and normalized before validation/activation so the daemon working directory is irrelevant.
+The active Extension registry is staged once and immutable for the daemon lifetime. Persisted Extension paths are resolved against a recorded configuration origin and normalized before validation/activation so the daemon working directory is irrelevant. `readConfig`/`writeConfig` in `@ctxindex/core/config` own that projection (origin: the real directory of `config.toml`); `loadExtensions` accepts only absolute configured paths.
 
 Authorization stage state and byte-transfer tickets are ephemeral daemon-owned state with bounded lifetime and deterministic shutdown cleanup. Durable Account, Grant, secret, Artifact-cache, installed-provenance, and Action results continue to use their existing core stores; RPC introduces no provider-specific tables or domain schema.
 
