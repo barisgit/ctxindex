@@ -103,7 +103,8 @@ export const DAEMON_IDLE_TIMEOUT_MS = 5 * 60_000
 const PUBLIC_VERSION = /^[a-z0-9][a-z0-9.+_-]{0,63}$/i
 
 const productionIdleTimer: DaemonIdleTimer = {
-  now: Date.now,
+  // Monotonic, so wall-clock adjustments cannot shorten or extend idle expiry.
+  now: () => performance.now(),
   setTimeout(callback, delayMs) {
     const timer = setTimeout(callback, delayMs)
     timer.unref?.()
