@@ -6,7 +6,7 @@
  * 2. When called with missing required input and stdin=/dev/null,
  *    fail fast (non-zero exit) with an actionable error — never hang.
  */
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, setDefaultTimeout, test } from 'bun:test'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -14,6 +14,11 @@ import { join } from 'node:path'
 const repoRoot = new URL('../../../', import.meta.url).pathname
 const cliBin = join(repoRoot, 'apps/cli/bin/ctxindex.mjs')
 const TIMEOUT_MS = 5000
+
+// TIMEOUT_MS bounds each CLI spawn as the hang detector. A test spawns several
+// (init, the command, daemon stop), which can exceed bun's 5s per-test default
+// on loaded CI runners. setDefaultTimeout is file-scoped in bun:test.
+setDefaultTimeout(30_000)
 
 async function spawnCli(
   args: string[],

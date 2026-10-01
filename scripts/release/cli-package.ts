@@ -697,9 +697,20 @@ export async function smokeCliPackage(
     join(configDirectory, 'config.toml'),
     `[extensions]\npaths = ${JSON.stringify([extensionPath])}\n\n[secrets]\nbackend = "file"\n\n[log]\nlevel = "info"\n\n[log.file]\nrotate = "daily"\nretain_days = 14\ncompress = true\n`,
   )
-  const extensions = JSON.parse(
-    (await cli(['extension', 'list', '--format', 'json'])).stdout,
-  ) as readonly { readonly id?: string }[]
+  // On supported hosts this initialized registry read ensures an on-demand
+  // daemon; stop it so the smoke run leaves no detached process behind.
+  let listed: string
+  try {
+    listed = (await cli(['extension', 'list', '--format', 'json'])).stdout
+  } finally {
+    if (process.platform === 'darwin' || process.platform === 'linux') {
+      await runWithExit([executable, 'daemon', 'stop', '--format', 'json'], {
+        cwd: outsideDirectory,
+        env,
+      })
+    }
+  }
+  const extensions = JSON.parse(listed) as readonly { readonly id?: string }[]
   if (!extensions.some(({ id }) => id === 'fixture.installed-package')) {
     throw new Error(
       'Installed CLI could not load a package-root TypeScript Extension',

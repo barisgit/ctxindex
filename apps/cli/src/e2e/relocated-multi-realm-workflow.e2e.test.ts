@@ -178,6 +178,12 @@ test('relocated compiled CLI runs the complete multi-Realm provider workflow', a
       CTXINDEX_OAUTH_MOCK_BASE_URL: graph.baseUrl,
       CTXINDEX_LOOPBACK_TIMEOUT_SECS: '5',
       PATH: `${bin}:${process.env.PATH ?? ''}`,
+      // The XDG roots above own this workflow; drop the inherited explicit
+      // roots, which take precedence over XDG.
+      CTXINDEX_CONFIG_HOME: undefined,
+      CTXINDEX_DATA_HOME: undefined,
+      CTXINDEX_STATE_HOME: undefined,
+      CTXINDEX_CACHE_HOME: undefined,
     }
     daemonEnv = { ...process.env, ...baseEnv }
     const run = async (
