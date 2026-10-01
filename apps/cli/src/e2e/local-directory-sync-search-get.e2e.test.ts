@@ -314,4 +314,8 @@ test('binary CLI syncs local files through generic search, get, and Ref contract
     egress.stop(true)
     await sandbox.cleanup()
   }
-})
+  // Fourteen sequential full-binary CLI processes each pay a fresh Bun cold
+  // start of the CLI module graph (about 0.4-1 s on CI runners), and the first
+  // stateful command also starts the on-demand daemon. That fixed command count
+  // exceeds Bun's 5 s default; 30 s matches sibling binary E2E budgets.
+}, 30_000)

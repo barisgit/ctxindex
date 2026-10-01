@@ -168,4 +168,8 @@ test('binary CLI enumerates filter-only searches locally and paginates determini
   } finally {
     await sandbox.cleanup()
   }
-})
+  // Thirteen sequential full-binary CLI processes each pay a fresh Bun cold
+  // start of the CLI module graph (about 0.4-1 s on CI runners), and the first
+  // stateful command also starts the on-demand daemon. That fixed command count
+  // exceeds Bun's 5 s default; 30 s matches sibling binary E2E budgets.
+}, 30_000)
