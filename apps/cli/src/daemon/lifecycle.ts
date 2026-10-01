@@ -5,6 +5,7 @@ import {
   constants,
   fchmodSync,
   fstatSync,
+  ftruncateSync,
   lstatSync,
   mkdirSync,
   openSync,
@@ -111,25 +112,21 @@ export function openDaemonDiagnostics(stateRoot: string): number {
     throw new Error('Daemon diagnostics directory is unsafe')
   }
   chmodSync(directory, 0o700)
+  // Open without O_TRUNC: a pre-existing log may be a hardlink to durable
+  // state, so the descriptor is validated before truncation or chmod can
+  // touch the shared inode.
   const fd = openSync(
     join(directory, 'startup.log'),
-    constants.O_WRONLY |
-      constants.O_CREAT |
-      constants.O_TRUNC |
-      constants.O_NOFOLLOW,
+    constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW,
     0o600,
   )
   try {
-    fchmodSync(fd, 0o600)
     const stat = fstatSync(fd)
-    if (
-      !stat.isFile() ||
-      stat.nlink !== 1 ||
-      stat.uid !== userInfo().uid ||
-      (stat.mode & 0o777) !== 0o600
-    ) {
+    if (!stat.isFile() || stat.nlink !== 1 || stat.uid !== userInfo().uid) {
       throw new Error('Daemon diagnostics target is unsafe')
     }
+    fchmodSync(fd, 0o600)
+    ftruncateSync(fd, 0)
     return fd
   } catch (error) {
     closeSync(fd)
@@ -270,6 +267,8 @@ export interface DaemonLifecycleDependencies {
   readonly shutdown: typeof daemonShutdown
   readonly launch: () => void
   readonly cleanupStale: (selection: DaemonSelection) => StaleCleanupResult
+  // True while another process retains exclusive lifecycle ownership.
+  readonly lifecycleRetained: () => boolean
   readonly now: () => number
   readonly sleep: (milliseconds: number) => Promise<void>
   readonly timeoutSignal: (milliseconds: number) => AbortSignal
@@ -329,6 +328,25 @@ function staleEndpointStat(path: string) {
   }
 }
 
+// Lifecycle ownership is the retained lease, not discovery metadata: the
+// runtime removes metadata before releasing its leases. A shared probe
+// conflicts only with an exclusive owner and is released immediately.
+export function lifecycleOwnershipRetained(stateRoot: string): boolean {
+  let probe: FileLease
+  try {
+    probe = acquireFileLease({
+      canonicalTarget: stateRoot,
+      purpose: 'lifecycle',
+      mode: 'shared',
+    })
+  } catch (error) {
+    if (error instanceof FileLeaseConflictError) return true
+    throw error
+  }
+  probe.release()
+  return false
+}
+
 export function removeStaleDaemonEndpoint(path: string): void {
   if (staleEndpointStat(path) === null) return
   rmSync(path)
@@ -375,6 +393,8 @@ const defaultDependencies: DaemonLifecycleDependencies = {
     launchBackgroundDaemon(resolveDaemonLaunch(), runtime.stateRoot)
   },
   cleanupStale: cleanupStaleDaemon,
+  lifecycleRetained: () =>
+    lifecycleOwnershipRetained(currentRuntime().stateRoot),
   now: () => performance.now(),
   sleep: Bun.sleep,
   timeoutSignal: (milliseconds) => AbortSignal.timeout(milliseconds),
@@ -530,7 +550,11 @@ export function createDaemonLifecycle(
     while (dependencies.now() <= deadline) {
       throwIfCancelled(signal)
       const current = dependencies.select()
-      if (!current) return { status: 'released' }
+      if (!current) {
+        if (!dependencies.lifecycleRetained()) return { status: 'released' }
+        await dependencies.sleep(POLL_INTERVAL_MS)
+        continue
+      }
       const remaining = deadline - dependencies.now()
       const observed = await healthOrNull(
         current,
@@ -559,6 +583,10 @@ export function createDaemonLifecycle(
     throwIfCancelled(signal)
     const deadline = dependencies.now() + STARTUP_TIMEOUT_MS
     const existing = dependencies.select()
+    // Without discovery metadata, a retained lifecycle lease still means an
+    // owner is starting or finishing shutdown; a replacement launched now
+    // would lose lifecycle acquisition and exit.
+    let awaitOwner = existing === null && dependencies.lifecycleRetained()
     if (existing) {
       const ready = await healthOrNull(existing, signal)
       if (ready?.ready)
@@ -568,24 +596,24 @@ export function createDaemonLifecycle(
       }
       // A draining owner still holds lifecycle ownership; health reports it
       // even when its metadata could not be rewritten to stopping.
-      if (
+      awaitOwner =
         existing.metadata?.lifecycle === 'starting' ||
         existing.metadata?.lifecycle === 'stopping' ||
         ready?.lifecycle === 'stopping'
-      ) {
-        const transition = await waitForOwnerReleaseOrReady(deadline, signal)
-        if (transition.status === 'ready') {
-          return {
-            status: 'running',
-            started: false,
-            health: transition.health,
-          }
+    }
+    if (awaitOwner) {
+      const transition = await waitForOwnerReleaseOrReady(deadline, signal)
+      if (transition.status === 'ready') {
+        return {
+          status: 'running',
+          started: false,
+          health: transition.health,
         }
-        if (transition.status === 'timeout') {
-          throw unavailable(
-            'The local daemon did not become ready. Inspect `ctxindex daemon status` and the private daemon startup log.',
-          )
-        }
+      }
+      if (transition.status === 'timeout') {
+        throw unavailable(
+          'The local daemon did not become ready. Inspect `ctxindex daemon status` and the private daemon startup log.',
+        )
       }
     }
     try {
