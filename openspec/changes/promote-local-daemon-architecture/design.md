@@ -27,6 +27,8 @@ Promotion must preserve the CLI as the sole agent integration surface, the pure 
 
 The existing foreground daemon and explicit selection remain available while migration proceeds. Daemon ownership becomes the normal path only after every stateful command is either represented by a semantic procedure or classified as a safe exception, compiled coverage proves the complete inventory, and supported-platform gates pass. This avoids turning a successful architecture proof into a partially unusable default.
 
+Current state: ensure-by-default already routes commands on Darwin and Linux in development builds. It is not yet accepted for release: that waits for the Darwin gates (5.1), the Windows spike and Human platform checkpoint (5.2), and the live Human checkpoint (6.4).
+
 A generic `runCommand(argv)` tunnel is rejected. It would duplicate CLI parsing inside the daemon, erase procedure-level typing, and move formatting or exit policy across the boundary.
 
 ### 2. The accepted package boundaries become canonical doctrine
@@ -37,7 +39,7 @@ Batching and OpenAPI generation remain deferred because a local Unix-socket prot
 
 ### 3. Stateful families migrate by semantic application service
 
-OAuth App, Account, secret-backend, Artifact, export, Action, purge, and installed-Extension operations receive bounded semantic procedures. Business rules stay in existing or extracted core application services. Interactive OAuth is a staged application flow: the daemon owns provider-neutral authorization state, the loopback callback listener, provider exchange, and persistence, while the CLI owns explicit operator consent, browser launch, and the hidden manual authorization response.
+OAuth App, Account, secret-backend, Artifact, export, Action, purge, and installed-Extension inventory operations receive bounded semantic procedures. Installed-Extension install, update, and uninstall instead use the direct maintenance coordinator: stop the daemon, retain shared database ownership for the mutation, release, then restore the daemon. Business rules stay in existing or extracted core application services. Interactive OAuth is a staged application flow: the daemon owns provider-neutral authorization state, the loopback callback listener, provider exchange, and persistence, while the CLI owns explicit operator consent, browser launch, and the hidden manual authorization response.
 
 `oauth-app add --from-env` retains its invocation semantics: the CLI reads the exact Provider-declared bounded mapping from its invocation environment and sends it only as the dedicated write-only sensitive input over the existing owner-private local socket. The router validates and delegates it once; middleware, diagnostics, traces, results, and errors never retain or reflect it. The daemon consumes it directly into the configured secret backend and holds no retryable or persistent staging copy. This narrow ingress wins over a second secret-transfer protocol or asking the long-lived daemon to inherit command-specific environment state.
 

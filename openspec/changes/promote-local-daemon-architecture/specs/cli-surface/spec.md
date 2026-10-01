@@ -6,8 +6,12 @@ After promotion, every CLI command that reads or mutates SQLite, secrets, Accoun
 Only an explicit tested allowlist MAY remain direct: pre-daemon `init` bootstrap, which creates initial configuration, secret-backend, and SQLite state before any daemon can own it; filesystem-only Catalog and documentation commands that neither open SQLite nor change installed activation; explicit daemon lifecycle controls; and installed-Extension maintenance that first verifies a stopped daemon and retains shared database ownership for the whole mutation as required by the local-daemon direct Extension maintenance requirement. Every other command MUST NOT open SQLite or mutate secrets, the installed registry, or provider state outside the daemon. A platform without a verified daemon ownership backend retains its existing conditional direct route because no daemon can own its database.
 
 #### Scenario: Remaining stateful command runs while daemon is active
-- **WHEN** an agent invokes OAuth App, Account, secret-backend, Artifact, export, Action, purge, or installed-Extension behavior
+- **WHEN** an agent invokes OAuth App, Account, secret-backend, Artifact, export, Action, purge, or installed-Extension inventory behavior
 - **THEN** the CLI delegates a semantic request without composing the runtime or opening SQLite
+
+#### Scenario: Installed-Extension maintenance runs while daemon is active
+- **WHEN** an agent installs, updates, or uninstalls an Extension while a daemon owns the database
+- **THEN** the CLI stops that daemon, retains shared database ownership for the whole mutation, releases it, and restores the daemon, and never mutates the active daemon registry in place
 
 #### Scenario: Safe direct exception runs
 - **WHEN** a direct bootstrap or filesystem-only command is allowlisted
