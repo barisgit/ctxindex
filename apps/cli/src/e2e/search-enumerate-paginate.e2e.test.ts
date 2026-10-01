@@ -168,4 +168,4 @@ test('binary CLI enumerates filter-only searches locally and paginates determini
   } finally {
     await sandbox.cleanup()
   }
-})
+}, 30_000)

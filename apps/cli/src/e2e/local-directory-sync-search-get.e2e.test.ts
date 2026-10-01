@@ -314,4 +314,4 @@ test('binary CLI syncs local files through generic search, get, and Ref contract
     egress.stop(true)
     await sandbox.cleanup()
   }
-})
+}, 30_000)

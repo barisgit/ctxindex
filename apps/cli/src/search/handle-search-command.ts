@@ -60,6 +60,9 @@ export function formatSearchPretty(
   result: SearchResult,
   environment?: Pick<OutputEnvironment, 'columns'>,
 ): string {
+  // Silence looks like a hung command to humans, so pretty output states the
+  // empty outcome. Text, refs, and JSON stay unchanged for pipelines.
+  if (result.results.length === 0) return 'No results.'
   return formatPrettyCollection(searchColumns, searchRows(result), environment)
 }
 
