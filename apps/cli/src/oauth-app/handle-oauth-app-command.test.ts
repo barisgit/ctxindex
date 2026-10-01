@@ -96,7 +96,7 @@ test('OAuth App ownership conflict fails before Extension definition loading', a
       { kind: 'add', provider: 'google', label: 'work' },
       {
         acquireOwnership: () => {
-          throw new DirectDatabaseLeaseConflictError()
+          throw new DirectDatabaseLeaseConflictError('a'.repeat(64))
         },
         loadDefinitions: async () => {
           loadedDefinitions = true
