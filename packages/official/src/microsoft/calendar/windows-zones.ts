@@ -1,7 +1,9 @@
+import { canonicalizeIanaTimeZone } from '@ctxindex/profiles'
+
 // CLDR windowsZones.xml territory="001" primary mappings (Windows -> canonical IANA).
 // Source: unicode-org/cldr common/supplemental/windowsZones.xml, with CLDR's
 // deprecated aliases replaced by their current canonical IANA names.
-const WINDOWS_TO_IANA = new Map<string, string>([
+export const WINDOWS_TO_IANA = new Map<string, string>([
   ['Dateline Standard Time', 'Etc/GMT+12'],
   ['UTC-11', 'Etc/GMT+11'],
   ['Aleutian Standard Time', 'America/Adak'],
@@ -26,7 +28,7 @@ const WINDOWS_TO_IANA = new Map<string, string>([
   ['Eastern Standard Time', 'America/New_York'],
   ['Haiti Standard Time', 'America/Port-au-Prince'],
   ['Cuba Standard Time', 'America/Havana'],
-  ['US Eastern Standard Time', 'America/Indianapolis'],
+  ['US Eastern Standard Time', 'America/Indiana/Indianapolis'],
   ['Turks And Caicos Standard Time', 'America/Grand_Turk'],
   ['Paraguay Standard Time', 'America/Asuncion'],
   ['Atlantic Standard Time', 'America/Halifax'],
@@ -38,7 +40,7 @@ const WINDOWS_TO_IANA = new Map<string, string>([
   ['Tocantins Standard Time', 'America/Araguaina'],
   ['E. South America Standard Time', 'America/Sao_Paulo'],
   ['SA Eastern Standard Time', 'America/Cayenne'],
-  ['Argentina Standard Time', 'America/Buenos_Aires'],
+  ['Argentina Standard Time', 'America/Argentina/Buenos_Aires'],
   ['Greenland Standard Time', 'America/Nuuk'],
   ['Montevideo Standard Time', 'America/Montevideo'],
   ['Magallanes Standard Time', 'America/Punta_Arenas'],
@@ -47,7 +49,7 @@ const WINDOWS_TO_IANA = new Map<string, string>([
   ['UTC-02', 'Etc/GMT+2'],
   ['Azores Standard Time', 'Atlantic/Azores'],
   ['Cape Verde Standard Time', 'Atlantic/Cape_Verde'],
-  ['UTC', 'Etc/UTC'],
+  ['UTC', 'UTC'],
   ['GMT Standard Time', 'Europe/London'],
   ['Greenwich Standard Time', 'Atlantic/Reykjavik'],
   ['Sao Tome Standard Time', 'Africa/Sao_Tome'],
@@ -143,21 +145,14 @@ const WINDOWS_TO_IANA = new Map<string, string>([
   ['Line Islands Standard Time', 'Pacific/Kiritimati'],
 ])
 
-function isIanaTimeZone(name: string): boolean {
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: name })
-    return true
-  } catch {
-    return false
-  }
-}
-
 /**
  * Resolve a Graph-provided time zone name (IANA or Windows) to an IANA zone.
  * Returns undefined when the name resolves through neither route.
  */
 export function resolveTimeZone(name: string | undefined): string | undefined {
   if (!name) return undefined
-  if (isIanaTimeZone(name)) return name
-  return WINDOWS_TO_IANA.get(name)
+  const iana = canonicalizeIanaTimeZone(name)
+  if (iana) return iana
+  const windows = WINDOWS_TO_IANA.get(name)
+  return windows ? canonicalizeIanaTimeZone(windows) : undefined
 }

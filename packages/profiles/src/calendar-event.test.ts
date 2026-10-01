@@ -3,7 +3,9 @@ import {
   calendarEventProfile,
   calendarEventRef,
   calendarEventSchema,
+  canonicalizeIanaTimeZone,
 } from './calendar-event'
+import { ianaTimeZoneAliases } from './iana-time-zone-links'
 
 const sourceId = '01KXHBNECDAH1T4MJ38X88EPFJ'
 
@@ -41,6 +43,51 @@ const timedPayload = {
 }
 
 describe('calendarEventProfile', () => {
+  test('canonicalizes known IANA links and rejects aliases in Profile payloads', () => {
+    for (const [alias, canonical] of new Map(ianaTimeZoneAliases))
+      expect(canonicalizeIanaTimeZone(alias)).toBe(canonical)
+
+    expect(canonicalizeIanaTimeZone('US/Pacific')).toBe('America/Los_Angeles')
+    expect(canonicalizeIanaTimeZone('Europe/Kiev')).toBe('Europe/Kyiv')
+    expect(canonicalizeIanaTimeZone('Etc/UTC')).toBe('UTC')
+    expect(canonicalizeIanaTimeZone('America/Godthab')).toBe('America/Nuuk')
+    expect(canonicalizeIanaTimeZone('Asia/Katmandu')).toBe('Asia/Kathmandu')
+    expect(canonicalizeIanaTimeZone('Africa/Asmera')).toBe('Africa/Asmara')
+    expect(canonicalizeIanaTimeZone('America/Nuuk')).toBe('America/Nuuk')
+    expect(canonicalizeIanaTimeZone('Asia/Kathmandu')).toBe('Asia/Kathmandu')
+    expect(canonicalizeIanaTimeZone('Europe/Ljubljana')).toBe(
+      'Europe/Ljubljana',
+    )
+    expect(canonicalizeIanaTimeZone('America/Shiprock')).toBe('America/Denver')
+    expect(canonicalizeIanaTimeZone('Canada/Eastern')).toBe('America/Toronto')
+    expect(canonicalizeIanaTimeZone('Brazil/East')).toBe('America/Sao_Paulo')
+    expect(canonicalizeIanaTimeZone('US/East-Indiana')).toBe(
+      'America/Indiana/Indianapolis',
+    )
+    expect(canonicalizeIanaTimeZone('Synthetic/Unknown')).toBeUndefined()
+
+    expect(() =>
+      calendarEventSchema.parse({
+        ...timedPayload,
+        timing: { ...timedPayload.timing, startTimeZone: 'US/Pacific' },
+      }),
+    ).toThrow()
+    expect(() =>
+      calendarEventSchema.parse({
+        ...timedPayload,
+        series: {
+          providerEventId: 'series',
+          ref: calendarEventRef(sourceId, 'series'),
+          originalStart: {
+            kind: 'timed',
+            at: '2026-07-20T09:00:00Z',
+            timeZone: 'Etc/UTC',
+          },
+        },
+      }),
+    ).toThrow()
+  })
+
   test('validates and deterministically projects a timed Calendar Event', () => {
     const parsed = calendarEventSchema.parse(timedPayload)
     const fields = Object.fromEntries(
@@ -73,6 +120,8 @@ describe('calendarEventProfile', () => {
       allDay: false,
       startsAt: new Date('2026-07-20T07:00:00.000Z'),
       endsAt: new Date('2026-07-20T08:30:00.000Z'),
+      startTimeZone: 'Europe/Ljubljana',
+      endTimeZone: 'Europe/Ljubljana',
       startDate: undefined,
       endDate: undefined,
       organizer: 'ada@example.com',
@@ -104,6 +153,8 @@ describe('calendarEventProfile', () => {
     expect(fields.allDay?.extract(parsed)).toBe(true)
     expect(fields.startsAt?.extract(parsed)).toBeUndefined()
     expect(fields.endsAt?.extract(parsed)).toBeUndefined()
+    expect(fields.startTimeZone?.extract(parsed)).toBeUndefined()
+    expect(fields.endTimeZone?.extract(parsed)).toBeUndefined()
     expect(fields.startDate?.extract(parsed)).toBe('2026-07-20')
     expect(fields.endDate?.extract(parsed)).toBe('2026-07-23')
   })
@@ -152,6 +203,8 @@ describe('calendarEventProfile', () => {
       allDay: 'boolean',
       startsAt: 'datetime',
       endsAt: 'datetime',
+      startTimeZone: 'string',
+      endTimeZone: 'string',
       startDate: 'string',
       endDate: 'string',
       organizer: 'string',

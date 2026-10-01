@@ -28,10 +28,24 @@ const attendeeSchema = participantSchema
     status: absentable(z.object({ response: z.string().min(1) }).passthrough()),
   })
   .passthrough()
+const microsoftCalendarKnownEventTypeSchema = z.enum([
+  'singleInstance',
+  'occurrence',
+  'exception',
+  'seriesMaster',
+])
+const microsoftCalendarEventTypeSchema =
+  microsoftCalendarKnownEventTypeSchema.or(
+    z
+      .string()
+      .min(1)
+      .transform(() => undefined),
+  )
 
 export const microsoftCalendarEventSchema = z
   .object({
     id: z.string().min(1),
+    type: absentable(microsoftCalendarEventTypeSchema),
     '@removed': z
       .object({ reason: z.string().optional() })
       .passthrough()
@@ -127,7 +141,7 @@ function zoneOffsetMs(date: Date, timeZone: string): number {
     part('minute'),
     part('second'),
   )
-  return asUtc - date.getTime()
+  return asUtc - date.getTime() + date.getUTCMilliseconds()
 }
 // Convert a Graph datetime to a UTC instant using a resolved IANA zone for
 // offset-less local wall times. Returns undefined when neither an explicit
@@ -358,23 +372,25 @@ export function normalizeMicrosoftCalendarEvent(
     )
       timing = { kind: 'all-day', startDate, endDate }
   } else {
-    const start = instant(event.start?.dateTime, event.start?.timeZone)
-    const end = instant(event.end?.dateTime, event.end?.timeZone)
+    const startValueZone = resolveTimeZone(event.start?.timeZone)
+    const endValueZone = resolveTimeZone(event.end?.timeZone)
+    const startDisplayZone =
+      event.originalStartTimeZone === undefined
+        ? startValueZone
+        : resolveTimeZone(event.originalStartTimeZone)
+    const endDisplayZone =
+      event.originalEndTimeZone === undefined
+        ? endValueZone
+        : resolveTimeZone(event.originalEndTimeZone)
+    const start = instantInZone(event.start?.dateTime, startValueZone)
+    const end = instantInZone(event.end?.dateTime, endValueZone)
     if (start && end)
       timing = {
         kind: 'timed',
         start,
         end,
-        ...(event.originalStartTimeZone
-          ? { startTimeZone: event.originalStartTimeZone }
-          : event.start?.timeZone
-            ? { startTimeZone: event.start.timeZone }
-            : {}),
-        ...(event.originalEndTimeZone
-          ? { endTimeZone: event.originalEndTimeZone }
-          : event.end?.timeZone
-            ? { endTimeZone: event.end.timeZone }
-            : {}),
+        ...(startDisplayZone ? { startTimeZone: startDisplayZone } : {}),
+        ...(endDisplayZone ? { endTimeZone: endDisplayZone } : {}),
       }
   }
   const providerUrl = safeUrl(event.webLink)
@@ -407,14 +423,28 @@ export function normalizeMicrosoftCalendarEvent(
         ref,
       ),
     )
-  const originalZone = resolveTimeZone(
-    event.originalStartTimeZone ?? event.start?.timeZone,
-  )
+  const occurrenceStartFallback =
+    event.type === 'occurrence' && event.originalStart === undefined
+      ? event.start?.dateTime
+      : undefined
+  const originalStart = event.originalStart ?? occurrenceStartFallback
+  const originalZoneSource =
+    occurrenceStartFallback !== undefined
+      ? event.start?.timeZone
+      : event.originalStartTimeZone === undefined
+        ? event.start?.timeZone
+        : event.originalStartTimeZone
+  const originalZone = resolveTimeZone(originalZoneSource)
   const originalInstant = event.isAllDay
     ? undefined
-    : instantInZone(event.originalStart, originalZone)
+    : instantInZone(originalStart, originalZone)
   const originalDate = event.isAllDay
-    ? dateInTimeZone(event.originalStart, originalZone)
+    ? occurrenceStartFallback
+      ? dateInTimeZone(
+          instantInZone(occurrenceStartFallback, originalZone),
+          originalZone,
+        )
+      : dateInTimeZone(event.originalStart, originalZone)
     : undefined
   if (event.seriesMasterId && !originalInstant && !originalDate)
     warnings.push(
@@ -459,7 +489,7 @@ export function normalizeMicrosoftCalendarEvent(
               : {
                   kind: 'timed' as const,
                   at: originalInstant,
-                  ...(event.originalStartTimeZone && originalZone
+                  ...(originalZoneSource && originalZone
                     ? { timeZone: originalZone }
                     : {}),
                 },

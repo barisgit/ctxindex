@@ -29,6 +29,10 @@ const entryNames = [
   'mail-message',
   'file',
 ] as const
+// tsc emits a declaration for every source module; these are private
+// implementation modules with no export path, so they may ship but are never
+// required entry points.
+const internalDeclarationNames = ['iana-time-zone-links'] as const
 
 export interface ProfilesSourceManifest {
   readonly name: string
@@ -180,6 +184,9 @@ function isAllowedPackagePath(path: string): boolean {
       (name) =>
         path === `package/dist/${name}.js` ||
         path === `package/dist/${name}.d.ts`,
+    ) ||
+    internalDeclarationNames.some(
+      (name) => path === `package/dist/${name}.d.ts`,
     )
   )
 }

@@ -3,6 +3,7 @@ export {
   calendarEventProfile,
   calendarEventRef,
   calendarEventSchema,
+  canonicalizeIanaTimeZone,
 } from './calendar-event'
 export type { ChatMessage } from './chat-message'
 export {

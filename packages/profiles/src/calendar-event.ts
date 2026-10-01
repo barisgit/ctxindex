@@ -1,10 +1,51 @@
 import { defineProfile } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
+import { ianaTimeZoneAliases } from './iana-time-zone-links'
 
 const sourceIdPattern = /^[0-9A-HJKMNP-TV-Z]{26}$/
 const providerIdPattern = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/
 const instantSchema = z.iso.datetime({ offset: true })
 const dateSchema = z.iso.date()
+
+const canonicalTimeZoneAliases = new Map<string, string>(ianaTimeZoneAliases)
+const canonicalTimeZones = new Set(Intl.supportedValuesOf('timeZone'))
+const modernCanonicalTimeZones = new Set(canonicalTimeZoneAliases.values())
+
+export function canonicalizeIanaTimeZone(value: string): string | undefined {
+  const alias = canonicalTimeZoneAliases.get(value)
+  if (alias) return alias
+  if (
+    value === 'UTC' ||
+    modernCanonicalTimeZones.has(value) ||
+    canonicalTimeZones.has(value)
+  )
+    return value
+  if (/^Etc\/GMT(?:[+-](?:[1-9]|1[0-4]))?$/.test(value)) {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: value })
+      return value
+    } catch {
+      return undefined
+    }
+  }
+  try {
+    const resolved = new Intl.DateTimeFormat('en-US', {
+      timeZone: value,
+    }).resolvedOptions().timeZone
+    if (resolved === value) return undefined
+    return canonicalTimeZoneAliases.get(resolved) ?? resolved
+  } catch {
+    return undefined
+  }
+}
+
+const canonicalTimeZoneSchema = z
+  .string()
+  .min(1)
+  .refine(
+    (value) => canonicalizeIanaTimeZone(value) === value,
+    'Calendar time zone must be a canonical IANA name',
+  )
 
 const participantShape = {
   displayName: z.string().min(1).optional(),
@@ -47,8 +88,8 @@ const timedTimingSchema = z
     kind: z.literal('timed'),
     start: instantSchema,
     end: instantSchema,
-    startTimeZone: z.string().min(1).optional(),
-    endTimeZone: z.string().min(1).optional(),
+    startTimeZone: canonicalTimeZoneSchema.optional(),
+    endTimeZone: canonicalTimeZoneSchema.optional(),
   })
   .strict()
   .refine(
@@ -73,7 +114,7 @@ const occurrenceStartSchema = z.discriminatedUnion('kind', [
     .object({
       kind: z.literal('timed'),
       at: instantSchema,
-      timeZone: z.string().min(1).optional(),
+      timeZone: canonicalTimeZoneSchema.optional(),
     })
     .strict(),
   z.object({ kind: z.literal('all-day'), date: dateSchema }).strict(),
@@ -231,6 +272,18 @@ export const calendarEventProfile = defineProfile({
           event.timing.kind === 'timed'
             ? new Date(event.timing.end)
             : undefined,
+      },
+      startTimeZone: {
+        type: 'string',
+        extract: (event) =>
+          event.timing.kind === 'timed'
+            ? event.timing.startTimeZone
+            : undefined,
+      },
+      endTimeZone: {
+        type: 'string',
+        extract: (event) =>
+          event.timing.kind === 'timed' ? event.timing.endTimeZone : undefined,
       },
       startDate: {
         type: 'string',
