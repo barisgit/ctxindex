@@ -12,8 +12,9 @@
 > `cli-surface`, and `oauth-client-management`. The active changes
 > `complete-on-demand-daemon-lifecycle`, `promote-local-daemon-architecture`,
 > `provide-official-oauth-apps`, and `ship-installable-npm-cli` were read only
-> to label planned work. Other sections carry forward from the 2026-07-22
-> refresh.
+> to label work that is not yet canonical. Code on `main` was spot-checked for
+> the daemon and managed-App statements. Other sections carry forward from the
+> 2026-07-22 refresh.
 
 ## 1. 10-minute tour
 
