@@ -24,4 +24,4 @@ Provides the private local-daemon infrastructure boundary: canonical runtime ide
 
 - Consumed by daemon and CLI composition for identity, discovery, and retained lease ownership; it contains no RPC, storage composition, provider, Extension, or CLI behavior.
 - Depends only on Node built-ins (`crypto`, `fs`, `os`, and `path`).
-- File leases support Darwin and Linux and fail closed (`FileLeaseUnsupportedError`) on other platforms, such as Windows, or unsupported filesystems.
+- File leases support Darwin and Linux and fail closed with `FileLeaseUnsupportedError`: `'platform'` on other operating systems such as Windows, `'primitive'` when the Linux `flock(1)` helper is missing or untrusted, and `'filesystem'` on unsupported filesystems.
