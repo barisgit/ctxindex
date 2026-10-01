@@ -21,7 +21,8 @@ publishing from ordinary local development or touching user state.
   `keytar` when the host supplies its platform library, OAuth App help and pre-init
   isolation with package-appropriate `ctxindex init` guidance, bundled skills,
   embedded SQLite migrations, detached packaged daemon start/status/stop, and manifest-declared
-  package-root TypeScript Extension loading. A Linux probe failure that reports
+  package-root TypeScript Extension loading; because that initialized `extension list` ensures a
+  daemon on Darwin and Linux, the smoke always stops it afterwards. A Linux probe failure that reports
   unavailable `libsecret-1.so.0` is classified as `host-libsecret-unavailable`;
   every other native-load failure remains fatal.
 - `release-gate.ts` separates a pure strict-semver/registry decision from Git and

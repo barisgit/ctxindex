@@ -69,7 +69,7 @@ Artifact download and export metadata remain unary contract procedures. Bytes fl
 
 The local adapter is one daemon-owned in-memory ticket registry and an exact `GET /transfer/<ticket>` route on the existing Unix listener. The shared RPC descriptor contains a 256-bit lowercase-hex ticket, byte size bounded to 64 MiB, and epoch-millisecond expiry only. Creation copies the bytes, consumption deletes before return, expiry is 30 seconds, shutdown clears the registry, and no filesystem path enters the descriptor. The CLI verifies the exact byte count and either writes stdout directly or uses a private adjacent staging file plus no-overwrite hard link for atomic destination publication.
 
-Installed-Extension activation uses one staged complete registry candidate. The daemon application either atomically activates it at a defined restart boundary or returns bounded restart-required guidance; request handlers never mutate the active registry in place.
+Installed-Extension activation happens only at a daemon restart boundary. Install, update, and uninstall run in the CLI's direct maintenance coordinator (stop the daemon, retain shared database ownership through the mutation, release, restore the daemon); the restarted daemon stages one complete immutable registry. Request handlers never mutate the active registry in place.
 
 ## Storage and State
 

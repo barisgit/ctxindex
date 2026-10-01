@@ -11,6 +11,8 @@ Provides repository-level executable tooling: policy verification gates under `s
 
 - `with-timeout.ts` is a process-supervisor wrapper. It runs a command in a detached process group where supported, forwards terminal streams/signals, and applies TERM-then-KILL timeout escalation.
 
+- `testing/isolate-ctxindex-state.ts` is the Bun test preload named by the root and every workspace `bunfig.toml`. It unconditionally points the four `CTXINDEX_*_HOME` roots at a fresh per-process temporary directory (removed on exit), so no test or inherited CLI/daemon child can ensure a daemon against real user state.
+
 - Worktree isolation uses an ignored `.ctxindex/worktree` marker. The shared CLI launcher detects that marker and overrides both `CTXINDEX_*_HOME` and `XDG_*_HOME` to worktree-local config, data, state, and cache directories; without it, caller-provided paths are preserved.
 
 ## Data & control flow

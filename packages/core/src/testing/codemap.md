@@ -16,7 +16,7 @@ Provides reusable test infrastructure: a black-box CLI sandbox plus a provider-n
 
 1. `createSandbox()` allocates `ctxindex-sandbox-*` under the OS temp directory, builds isolated environment paths plus a file-backed Keychain mock, and preserves `PATH` when present; spawned CLI tests therefore cannot reach the user's native Keychain.
 2. `sandbox.run(args, opts)` launches `bun apps/cli/bin/ctxindex.mjs ...args`, merges per-run environment overrides, converts string stdin to a `Blob`, and reads both output streams concurrently with process exit.
-3. The caller inspects the captured result and calls `cleanup()`, which recursively removes the sandbox exactly once.
+3. The caller inspects the captured result and calls `cleanup()`, which first sends SIGTERM to any daemon recorded in the sandbox's own discovery metadata (initialized registry reads ensure one) and then recursively removes the sandbox exactly once.
 
 ## Integration points
 

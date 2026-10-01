@@ -7,7 +7,7 @@ Constructs the process logger, applies mandatory secret redaction, routes record
 ## Design
 
 - `createLogger()` is the configurable factory; `logger()` is a memoized async singleton and `child()` adds typed operational bindings.
-- Pino multistream separates the durable file destination from TTY-only `pino-pretty` output.
+- Pino multistream separates the durable file destination from TTY-only `pino-pretty` output; `pino-pretty` is imported lazily only for a TTY stderr because importing it touches `process.stdout`, which on Bun 1.3.14 can silently drop later piped writes.
 - `redaction.ts` owns Pino paths plus recursive field/canary sanitization; `rotation.ts` owns synchronous or `pino-roll` streams and scheduled inactive-log compression.
 - `index.ts` keeps the stable logger Interface and coordinates those private Modules with Pino multistream and optional TTY presentation.
 
