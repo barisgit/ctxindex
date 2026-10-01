@@ -438,17 +438,11 @@ describe.skipIf(!nativePlatform)('compiled first-command sync', () => {
     }
   }, 120_000)
 
-  // Known defect: daemon-operation-streams requires consumer progress to
-  // backpressure the producer, but Bun 1.3.14's Bun.serve keeps pulling a
-  // streamed response body regardless of socket pressure. A stopped consumer
-  // therefore lets the whole operation buffer in the daemon, and once the
-  // producer settles the daemon may idle-exit before the consumer has read the
-  // stream, which then fails with exit 50. Bun 1.4.2 stalls as required.
-  // node:http in Bun 1.3.14 is no substitute: it honours 'drain' only after
-  // the request body is read to its end, and once it is, it stops reporting
-  // client disconnects, which cancellation depends on. When the defect is
-  // fixed this test passes, so `test.failing` reports it and it becomes `test`.
-  test.failing('a stopped consumer bounds the producer and keeps its stream past the idle timeout', async () => {
+  // Known defect: daemon-operation-streams "Backpressure and stream cleanup"
+  // requires consumer progress to backpressure the producer, but Bun 1.3.14's
+  // Bun.serve keeps pulling a streamed response body regardless of socket
+  // pressure (Bun 1.4.2 stalls correctly). Once fixed, this becomes `test`.
+  test.failing('known defect (Bun 1.3.14 Bun.serve): a stopped consumer bounds the producer and keeps its stream past the idle timeout', async () => {
     const runtime = await isolatedRuntime()
     let sync: ReturnType<typeof spawnSync> | undefined
     try {
