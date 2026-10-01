@@ -31,6 +31,6 @@
 
 ## 6. Doctrine, documentation, and final verification
 
-- [ ] 6.1 Promote the exact implementation doctrine from `implementation.md` into `local-daemon`, `cli-surface`, `generic-storage`, and `daemon-operation-streams` canonical implementation sidecars.
-- [ ] 6.2 Refresh affected CLI/daemon/local-daemon codemaps through cartography and refresh `SYSTEM.md` through system-reference; update user documentation to state zero-administration on-demand lifecycle, five-minute idle exit, explicit lifecycle controls, and exact Darwin/Linux support without presenting service installation or remote RPC.
+- [x] 6.1 Promote the exact implementation doctrine from `implementation.md` into `local-daemon`, `cli-surface`, `generic-storage`, and `daemon-operation-streams` canonical implementation sidecars.
+- [x] 6.2 Refresh affected CLI/daemon/local-daemon codemaps through cartography and refresh `SYSTEM.md` through system-reference; update user documentation to state zero-administration on-demand lifecycle, five-minute idle exit, explicit lifecycle controls, and exact Darwin/Linux support without presenting service installation or remote RPC.
 - [ ] 6.3 Run all focused slice gates, `bun run ci`, `bun run test:integration`, `bun run test:e2e`, `bunx openspec validate --all --strict`, `git diff --check`, and `openspec-verify-change`; obtain independent lifecycle/storage review and resolve all critical or important findings before archive.

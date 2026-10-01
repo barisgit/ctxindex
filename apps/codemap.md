@@ -2,7 +2,7 @@
 
 ## Responsibility
 
-Contains application-facing workspace packages: the public `ctxindex` CLI, the Next.js documentation/landing site, and the background local Bun daemon prototype.
+Contains application-facing workspace packages: the public `ctxindex` CLI, the Next.js documentation/landing site, and the on-demand background local Bun daemon.
 
 ## Design / patterns
 

@@ -135,6 +135,10 @@ specified by
 and
 [Safe removal, uninstall, and retained state](spec.md#requirement-safe-removal-uninstall-and-retained-state).
 
+## Daemon coordination
+
+Catalog build, add, list, show, search, refresh, and remove are direct filesystem-only exceptions: they read and write Catalog configuration and snapshots, never open SQLite, and never change the active registry. Catalog-selected `extension install`, `update`, and origin-neutral `uninstall` change installed activation, so they run through the stop–lease–mutate–release–restore coordinator described in [local-daemon](../local-daemon/implementation.md#direct-maintenance-exclusion). Validation uses the runtime-complete registry and its OAuth App identities, a failure preserves the prior activation, and the new registry becomes active only when the daemon next starts. CLI output never claims an in-process registry replacement.
+
 ## Verification
 
 Focused core tests cover closed schemas, size/count/path bounds, symlink containment, strict TOML, repository/ref policy, committed-object snapshots, concurrent publication, add/refresh atomicity, unique Catalog IDs, independent installed pins, runtime-complete identity validation, idempotence, removal guards, timestamped age provenance, and snapshot retention. CLI and compiled relocation tests use absolute local Git fixtures only.
