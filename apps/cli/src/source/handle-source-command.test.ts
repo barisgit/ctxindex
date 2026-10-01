@@ -7,8 +7,8 @@ import { defineCtxCommand, projectCommandReference } from '../command-model'
 import { createSourceCommand } from '../commands/source'
 import { loadCliDefinitions } from '../definitions'
 import {
+  DirectDatabaseLeaseConflictError,
   type DirectDatabaseOwnership,
-  PrototypeUnsupportedError,
 } from '../direct-database'
 import { runCli } from '../main'
 import {
@@ -485,7 +485,7 @@ test('direct Source ownership conflict fails before definition loading', async (
         sourceList: async () => ({ rows: [] }),
         sourceRemove: async () => ({ sourceId: 'unused' }),
         acquireOwnership: () => {
-          throw new PrototypeUnsupportedError()
+          throw new DirectDatabaseLeaseConflictError()
         },
         loadDefinitions: async () => {
           loadedDefinitions = true
@@ -504,7 +504,7 @@ test('direct Source ownership conflict fails before definition loading', async (
   }
 })
 
-test('Source add ownership conflict maps to prototype unsupported before dynamic definitions', async () => {
+test('Source add ownership conflict maps to a database lease conflict before dynamic definitions', async () => {
   const error = spyOn(console, 'error').mockImplementation(() => {})
   let loadedDefinitions = false
   try {
@@ -516,7 +516,7 @@ test('Source add ownership conflict maps to prototype unsupported before dynamic
         sourceList: async () => ({ rows: [] }),
         sourceRemove: async () => ({ sourceId: 'unused' }),
         acquireOwnership: () => {
-          throw new PrototypeUnsupportedError()
+          throw new DirectDatabaseLeaseConflictError()
         },
         loadDefinitions: async () => {
           loadedDefinitions = true

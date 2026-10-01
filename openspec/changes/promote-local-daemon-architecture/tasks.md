@@ -1,8 +1,8 @@
 ## 1. Lock the promoted boundary and complete inventory
 
-- [ ] 1.1 Add failing architecture and contract-derivation tests that reject a generic command tunnel, a second procedure/application signature list, business logic in `@ctxindex/rpc`, and any stateful CLI path absent from either the daemon procedure inventory or the explicit safe-exception allowlist.
+- [x] 1.1 Add failing architecture and contract-derivation tests that reject a generic command tunnel, a second procedure/application signature list, business logic in `@ctxindex/rpc`, and any stateful CLI path absent from either the daemon procedure inventory or the explicit safe-exception allowlist.
 - [x] 1.2 Inventory every CLI entrypoint that touches SQLite, secrets, Accounts/Grants/OAuth Apps, provider runtime, managed Artifact state, installed activation, or the active registry; classify the approved state-free pre-initialization discovery, bootstrap, and Catalog-only operations separately from explicit lifecycle controls and coordinated Extension mutation; retain unsupported-platform direct execution only as a conditional route.
-- [ ] 1.3 Replace prototype terminology in normal lifecycle/application interfaces while retaining exact private protocol compatibility, bounded declared errors, native cancellation, and stable CLI exits; pass focused RPC, daemon, CLI, package-dependency, and module-architecture gates.
+- [x] 1.3 Replace prototype terminology in normal lifecycle/application interfaces while retaining exact private protocol compatibility, bounded declared errors, native cancellation, and stable CLI exits; pass focused RPC, daemon, CLI, package-dependency, and module-architecture gates.
 
 ## 2. OAuth App, Account, and secret lifecycle
 
@@ -21,10 +21,10 @@
 
 ## 4. Extension path identity and activation
 
-- [ ] 4.1 Add failing tests that persist a relative Extension from an explicit configuration origin, start the daemon from unrelated working directories/path aliases, and require the same complete registry or the same bounded failure.
-- [ ] 4.2 Implement validated atomic canonical path persistence/projection with pre-alpha rewrite behavior; pass Extension loader, relocated compiled-Extension, no-network-startup, and security gates.
-- [ ] 4.3 Add failing Catalog/install/uninstall tests that distinguish filesystem-only acquisition from active-provenance changes, use the runtime-complete registry for validation, preserve prior activation on failure, and never let CLI output claim an unobserved in-process registry replacement.
-- [ ] 4.4 Implement daemon-coordinated installed-Extension activation or explicit bounded restart-required behavior; pass Catalog concurrency, OAuth App collision, immutable-registry, restart, and compiled multi-process gates.
+- [x] 4.1 Add failing tests that persist a relative Extension from an explicit configuration origin, start the daemon from unrelated working directories/path aliases, and require the same complete registry or the same bounded failure.
+- [x] 4.2 Implement validated atomic canonical path persistence/projection with pre-alpha rewrite behavior; pass Extension loader, relocated compiled-Extension, no-network-startup, and security gates.
+- [x] 4.3 Add failing Catalog/install/uninstall tests that distinguish filesystem-only acquisition from active-provenance changes, use the runtime-complete registry for validation, preserve prior activation on failure, and never let CLI output claim an unobserved in-process registry replacement.
+- [x] 4.4 Implement daemon-coordinated installed-Extension activation or explicit bounded restart-required behavior; pass Catalog concurrency, OAuth App collision, immutable-registry, restart, and compiled multi-process gates.
 
 ## 5. Supported-platform ownership
 

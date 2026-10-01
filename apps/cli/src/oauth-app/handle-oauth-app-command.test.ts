@@ -1,8 +1,8 @@
 import { expect, spyOn, test } from 'bun:test'
 import { loadCliDefinitions } from '../definitions'
 import {
+  DirectDatabaseLeaseConflictError,
   type DirectDatabaseOwnership,
-  PrototypeUnsupportedError,
 } from '../direct-database'
 import { handleOAuthAppCommand } from './handle-oauth-app-command'
 
@@ -96,7 +96,7 @@ test('OAuth App ownership conflict fails before Extension definition loading', a
       { kind: 'add', provider: 'google', label: 'work' },
       {
         acquireOwnership: () => {
-          throw new PrototypeUnsupportedError()
+          throw new DirectDatabaseLeaseConflictError()
         },
         loadDefinitions: async () => {
           loadedDefinitions = true
