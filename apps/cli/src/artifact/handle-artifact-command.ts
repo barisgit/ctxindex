@@ -8,6 +8,7 @@ import {
   daemonArtifactDownload,
   daemonArtifactList,
   daemonArtifactPurge,
+  daemonCancelledError,
   daemonTransferToFile,
   selectDaemon,
 } from '../daemon/client'
@@ -157,6 +158,9 @@ export async function handleArtifactCommand(
             input.outputPath,
             controller.signal,
           )
+          // A late cancellation (e.g. during staging cleanup) must not be
+          // reported as a successful download.
+          if (controller.signal.aborted) throw daemonCancelledError()
           return { ...receipt, outputPath: input.outputPath }
         })()
       : await (async () => {

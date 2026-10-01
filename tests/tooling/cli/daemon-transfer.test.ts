@@ -1,4 +1,5 @@
 import { afterEach, expect, spyOn, test } from 'bun:test'
+import * as fsPromises from 'node:fs/promises'
 import {
   mkdtemp,
   readdir,
@@ -607,4 +608,146 @@ test('cancellation during a transfer body read is bounded cancellation with no o
 
   expect(await pending).toMatchObject({ code: 'cancelled' })
   expect(await readdir(partial.outputs)).toEqual([])
+})
+
+// A barrier inside one staging step lets SIGINT land after the body was fully
+// consumed but before (or just after) the destination link publishes it.
+function stagingBarrier(
+  step: 'writeFile' | 'chmod' | 'rm',
+  matches: (path: string) => boolean = () => true,
+) {
+  let entered!: () => void
+  let release!: () => void
+  const reached = new Promise<void>((resolve) => {
+    entered = resolve
+  })
+  const released = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const originals = {
+    writeFile: fsPromises.writeFile,
+    chmod: fsPromises.chmod,
+    rm: fsPromises.rm,
+  }
+  const original = originals[step] as (...args: unknown[]) => Promise<void>
+  const spy = spyOn(fsPromises, step).mockImplementation((async (
+    ...args: unknown[]
+  ) => {
+    if (matches(String(args[0]))) {
+      entered()
+      await released
+    }
+    return original(...args)
+  }) as never)
+  cleanups.push(() => spy.mockRestore())
+  return { reached, release }
+}
+
+function transferringHarness() {
+  return harness({
+    artifactService: {
+      downloadForTransfer: async () => ({
+        download: { artifact, cache: 'miss' },
+        bytes: payload,
+      }),
+    } as unknown as ArtifactFake,
+  })
+}
+
+test('cancellation while staging a transferred file publishes nothing and reports cancelled', async () => {
+  // writeFile receives the signal; chmod is the last step before the link,
+  // so it proves the explicit pre-publication check.
+  for (const step of ['writeFile', 'chmod'] as const) {
+    const h = await transferringHarness()
+    const barrier = stagingBarrier(step)
+    const output = captureConsole()
+    const destination = join(h.outputs, 'staged.bin')
+    const pending = handleArtifactCommand(
+      {
+        kind: 'download',
+        ref: artifactRef,
+        outputPath: destination,
+        json: true,
+      },
+      artifactDeps(h.selection),
+    )
+    await barrier.reached
+    process.emit('SIGINT')
+    barrier.release()
+
+    expect(await pending, step).toBe(130)
+    expect(output.stdout).toEqual([])
+    expect(output.stderr).toEqual(['The daemon request was cancelled.'])
+    expect(await readdir(h.outputs)).toEqual([])
+    expect(h.store.created).toHaveLength(1)
+    for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
+  }
+})
+
+test('a staging failure observed after cancellation reports cancelled, not the filesystem error', async () => {
+  const h = await harness({})
+  const descriptor = h.store.create(payload)
+  const controller = new AbortController()
+  const mkdtemp = spyOn(fsPromises, 'mkdtemp').mockImplementation((async () => {
+    controller.abort()
+    throw Object.assign(new Error('ENOENT: output directory removed'), {
+      code: 'ENOENT',
+    })
+  }) as never)
+  cleanups.push(() => mkdtemp.mockRestore())
+
+  await expect(
+    daemonTransferToFile(
+      h.selection,
+      descriptor,
+      join(h.outputs, 'gone.bin'),
+      controller.signal,
+    ),
+  ).rejects.toMatchObject({ code: 'cancelled' })
+  expect(await readdir(h.outputs)).toEqual([])
+})
+
+test('cancellation after publication is not reported as a successful download', async () => {
+  const h = await transferringHarness()
+  const barrier = stagingBarrier('rm', (path) =>
+    path.includes('.ctxindex-transfer-'),
+  )
+  const output = captureConsole()
+  const destination = join(h.outputs, 'published.bin')
+  const pending = handleArtifactCommand(
+    { kind: 'download', ref: artifactRef, outputPath: destination, json: true },
+    artifactDeps(h.selection),
+  )
+  await barrier.reached
+  process.emit('SIGINT')
+  barrier.release()
+
+  expect(await pending).toBe(130)
+  expect(output.stdout).toEqual([])
+  expect(output.stderr).toEqual(['The daemon request was cancelled.'])
+  // The link already published the complete file atomically; it is left in
+  // place rather than deleted from an operator-owned path, but no success
+  // receipt is reported and the staging directory is still removed.
+  expect(await readdir(h.outputs)).toEqual(['published.bin'])
+  expect(new Uint8Array(await readFile(destination))).toEqual(payload)
+})
+
+test('a transfer GET from a mismatched runtime is rejected without consuming the ticket', async () => {
+  const h = await harness({})
+  const descriptor = h.store.create(payload)
+  const mismatched: DaemonSelection = {
+    ...h.selection,
+    roots: {
+      ...h.selection.roots,
+      identity: {
+        ...h.selection.roots.identity,
+        databaseDigest: 'f'.repeat(64),
+      },
+    },
+  }
+
+  await expect(
+    daemonTransferBytes(mismatched, descriptor),
+  ).rejects.toMatchObject({ code: 'runtime_identity_mismatch' })
+  expect(await daemonTransferBytes(h.selection, descriptor)).toEqual(payload)
 })
