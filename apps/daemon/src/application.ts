@@ -1813,11 +1813,19 @@ export class DaemonApplication implements DaemonRpcApplication {
         }),
       )
 
-    const cancel = () => {
-      controller.abort(context.signal.reason)
-      rendezvous.close(cancellation)
-      void producer.then(finalize, finalize)
-    }
+    // Every abort path (client cancellation, iterator return, and daemon
+    // shutdown through `beginStopping`) must also close the rendezvous: a
+    // producer parked handing off an unconsumed event never polls its signal,
+    // so only the closure releases it. Tracking settles once it unwinds.
+    controller.signal.addEventListener(
+      'abort',
+      () => {
+        rendezvous.close(cancellation)
+        void producer.then(finalize, finalize)
+      },
+      { once: true },
+    )
+    const cancel = () => controller.abort(context.signal.reason)
     if (context.signal.aborted) cancel()
     else context.signal.addEventListener('abort', cancel, { once: true })
 
