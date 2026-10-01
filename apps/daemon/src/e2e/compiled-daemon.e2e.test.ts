@@ -103,8 +103,12 @@ async function createRuntime(prefix: string): Promise<TestRuntime> {
     cacheRoot: join(dir, 'cache'),
   }
   const runtimeRoot = await mkdtemp('/tmp/ctxd-e2e-')
+  // Owner-private roots keep the lease parent checks umask-independent (for
+  // example the Linux user-private-group umask 0002).
   await Promise.all(
-    Object.values(roots).map((path) => mkdir(path, { recursive: true })),
+    Object.values(roots).map((path) =>
+      mkdir(path, { recursive: true, mode: 0o700 }),
+    ),
   )
   return {
     dir,

@@ -6,8 +6,8 @@
 
 ## 2. Linux retained ownership
 
-- [ ] 2.1 Add failing Linux retained-lease tests for shared/exclusive contention, canonical path aliases, permanent `0600` regular files, symlink/wrong-owner/unsafe-mode rejection, holder-neutral conflict reporting, release on close and process death, immediate reacquisition, and lifecycle/database lease separation.
-- [ ] 2.2 Implement the injected Linux retained `flock(2)` backend behind `FileLeaseBackend` without changing Darwin flags or callers; retain each lease for the complete open/use/close lifetime and fail closed before SQLite open when the primitive or filesystem is unsafe.
+- [x] 2.1 Add failing Linux retained-lease tests for shared/exclusive contention, canonical path aliases, permanent `0600` regular files, symlink/wrong-owner/unsafe-mode rejection, holder-neutral conflict reporting, release on close and process death, immediate reacquisition, and lifecycle/database lease separation.
+- [x] 2.2 Implement the injected Linux retained `flock(2)` backend behind `FileLeaseBackend` without changing Darwin flags or callers; retain each lease for the complete open/use/close lifetime and fail closed before SQLite open when the primitive or filesystem is unsafe.
 - [ ] 2.3 Pass Linux and Darwin unit plus compiled multi-process lease gates, including SIGKILL/crash release, concurrent contenders, packaged executable behavior, alias contention, privacy checks, and no lease-file unlink.
 
 ## 3. Shared on-demand ensure
