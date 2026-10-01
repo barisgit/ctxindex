@@ -70,7 +70,7 @@ import { RPCLink } from '@orpc/client/fetch'
 
 export const CLI_DAEMON_PROTOCOL = {
   id: 'ctxindex.local',
-  version: 3,
+  version: 4,
 } as const
 
 export class DaemonCliError extends Error {

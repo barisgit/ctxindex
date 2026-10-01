@@ -241,14 +241,6 @@ export const rpcFailureRegistry = defineRpcFailureRegistry({
       databaseDigest: digestSchema,
     },
   },
-  prototype_unsupported: {
-    message: RPC_ERROR_MESSAGE,
-    data: {
-      code: z.literal('prototype_unsupported'),
-      message: publicMessageSchema,
-      command: identifierSchema,
-    },
-  },
   shutdown_timeout: {
     message: RPC_ERROR_MESSAGE,
     data: {

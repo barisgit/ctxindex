@@ -13,7 +13,16 @@ import { DAEMON_PROTOCOL } from '../../../apps/daemon/src/runtime'
 import { ByteTransferStore } from '../../../apps/daemon/src/transfer'
 import { bindDaemonTransport } from '../../../apps/daemon/src/transport'
 
-test('registry-read clients reject the older daemon protocol before reusing its runtime', async () => {
+// Version 2 predates registry.describe and extension.list. Version 3 still
+// declared the removed prototype_unsupported failure. A health-only
+// compatibility check must not accept either for current clients.
+for (const version of [2, 3] as const) {
+  test(`clients reject older daemon protocol ${version} before reusing its runtime`, async () => {
+    await expectProtocolRejected(version)
+  })
+}
+
+async function expectProtocolRejected(version: number): Promise<void> {
   const root = await mkdtemp('/tmp/ctxi-protocol-')
   const runtime = resolveRuntimeIdentity({
     configRoot: join(root, 'config'),
@@ -22,9 +31,7 @@ test('registry-read clients reject the older daemon protocol before reusing its 
     cacheRoot: join(root, 'cache'),
   })
   const endpoint = join(root, 'daemon.sock')
-  // Version 2 predates registry.describe and extension.list. A health-only
-  // compatibility check must not accept it for clients needing those reads.
-  const protocol = { id: 'ctxindex.local', version: 2 } as const
+  const protocol = { id: 'ctxindex.local', version }
   const application = new DaemonApplication({
     protocol,
     runtime: runtime.identity,
@@ -61,4 +68,4 @@ test('registry-read clients reject the older daemon protocol before reusing its 
     await listener.stop()
     await rm(root, { recursive: true, force: true })
   }
-})
+}

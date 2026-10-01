@@ -8,6 +8,7 @@ import { loadExtensions } from '@ctxindex/core/extension'
 import { describeRegistry } from '@ctxindex/core/registry'
 import * as CTXINDEX_BUILTIN_MODULE from '@ctxindex/official'
 import type { RpcExtensionListResult } from '@ctxindex/rpc'
+import { Glob } from 'bun'
 import { projectCommandReference } from '../../../apps/cli/src/command-model'
 import {
   CLI_DAEMON_PROTOCOL,
@@ -429,4 +430,170 @@ test('daemon inventory preserves installed-but-unloaded entries, formatting and 
   } finally {
     await daemon.listener.stop()
   }
+})
+
+// Static companion to the runtime ownership proofs above. Only these modules may
+// reach direct SQLite or secret-store ownership. Each is the shared-lease owner
+// itself, an allowlisted exception, or the conditional direct route used only
+// after daemon ensure/selection declines ownership (no platform backend).
+const leaseOwner = 'retained shared database lease owner'
+const unsupportedPlatformRoute = 'conditional unsupported-platform direct route'
+const directOwnershipModules: Readonly<Record<string, string>> = {
+  'apps/cli/src/direct-database.ts': leaseOwner,
+  'apps/cli/src/commands/init.ts': 'init',
+  'apps/cli/src/extensions/services.ts': 'extension install',
+  'apps/cli/src/extensions/daemon-coordination.ts': 'extension install',
+  'apps/cli/src/deps.ts': unsupportedPlatformRoute,
+  'apps/cli/src/source/handle-source-command.ts': unsupportedPlatformRoute,
+  'apps/cli/src/oauth-app/handle-oauth-app-command.ts':
+    unsupportedPlatformRoute,
+}
+const directDatabaseOwners = new Set([
+  'acquireDirectDatabaseOwnership',
+  'acquireSharedDatabaseLease',
+  'getDb',
+  'initializeDirectStorage',
+  'openLeasedDatabase',
+  'readLeasedDirectExtensionSourceBindings',
+  'readLeasedLocalOAuthAppIdentities',
+])
+const directRuntimeOpeners = new Set([
+  'openAccountDeps',
+  'openDeps',
+  'openSecretDeps',
+])
+
+// Value imports and re-exports (`export { x } from`, `export * from`) both
+// make a module a path to the imported owner, so both count as reaching it.
+function valueImports(
+  source: string,
+): { specifier: string; names: string[] }[] {
+  const imports = source.matchAll(
+    /(?:import|export)\s+(?!type\s)(?:\{([^}]*)\}|(\*)(?:\s+as\s+\w+)?|(\w+))?\s*(?:from\s*)?'([^']+)'/g,
+  )
+  return [...imports].map(([, named, namespace, fallback, specifier]) => ({
+    specifier: specifier ?? '',
+    names: named
+      ? named
+          .split(',')
+          .map((name) => name.trim())
+          .filter((name) => name && !name.startsWith('type '))
+          .map((name) => name.split(/\s+as\s+/)[0] ?? name)
+      : [namespace ? '*' : (fallback ?? 'side-effect')],
+  }))
+}
+
+function reachesDirectOwnership(source: string): boolean {
+  return valueImports(source).some(({ specifier, names }) => {
+    if (/(^|\/)direct-database$/.test(specifier))
+      return names.some(
+        (name) => name === '*' || directDatabaseOwners.has(name),
+      )
+    if (specifier === 'bun:sqlite' || specifier === '@ctxindex/core/storage')
+      return names.length > 0
+    if (specifier === '@ctxindex/core/secrets')
+      return names.some((name) => !name.endsWith('Error'))
+    return false
+  })
+}
+
+async function productionCliSources(): Promise<Map<string, string>> {
+  const sources = new Map<string, string>()
+  for await (const path of new Glob('apps/cli/src/**/*.ts').scan('.')) {
+    if (path.endsWith('.test.ts') || path.includes('/e2e/')) continue
+    sources.set(path, await Bun.file(path).text())
+  }
+  return sources
+}
+
+test('direct SQLite and secret ownership is reachable only from classified modules', async () => {
+  const sources = await productionCliSources()
+  const actual = [...sources]
+    .filter(([, source]) => reachesDirectOwnership(source))
+    .map(([path]) => path)
+    .sort()
+  expect(actual).toEqual(Object.keys(directOwnershipModules).sort())
+  for (const reason of Object.values(directOwnershipModules)) {
+    if (reason === leaseOwner || reason === unsupportedPlatformRoute) continue
+    expect(Object.keys(exceptions)).toContain(reason)
+  }
+})
+
+function composesDirectRuntime(source: string): boolean {
+  return valueImports(source).some(
+    ({ specifier, names }) =>
+      /(^|\/)deps$/.test(specifier) &&
+      names.some((name) => name === '*' || directRuntimeOpeners.has(name)),
+  )
+}
+
+// A module that composes a direct runtime must value-import a daemon ensure
+// entry point and actually call it, directly or through its injected services
+// seam; a mention in a comment or type position is not a guard.
+const daemonEnsureEntryPoints = [
+  'ensureDaemonSelection',
+  'selectEnsuredDaemonRoute',
+  'resolveEnsuredDaemonSelection',
+]
+
+function callsDaemonEnsure(source: string): boolean {
+  const imported = valueImports(source)
+    .filter(({ specifier }) => /(^|\/)daemon\/ensure$/.test(specifier))
+    .flatMap(({ names }) => names)
+  return daemonEnsureEntryPoints.some(
+    (name) =>
+      imported.includes(name) &&
+      new RegExp(`\\b${name}\\s*\\(`).test(source.replace(/\/\/.*$/gm, '')),
+  )
+}
+
+test('direct runtime composition is reachable only behind daemon ensure', async () => {
+  const sources = await productionCliSources()
+  const unguarded = [...sources]
+    .filter(([, source]) => composesDirectRuntime(source))
+    .filter(([, source]) => !callsDaemonEnsure(source))
+    .map(([path]) => path)
+  expect(unguarded).toEqual([])
+})
+
+test('direct runtime guard detects namespace imports and requires an ensure call', () => {
+  expect(
+    [
+      "import { openDeps } from '../deps'",
+      "import * as deps from '../deps'",
+      "export { openSecretDeps } from './deps'",
+      "import { formatDeps } from '../format/deps-view'",
+    ].map(composesDirectRuntime),
+  ).toEqual([true, true, true, false])
+  expect(
+    [
+      "import { ensureDaemonSelection } from '../daemon/ensure'\nawait ensureDaemonSelection()",
+      "import { selectEnsuredDaemonRoute } from '../daemon/ensure'\nawait selectEnsuredDaemonRoute(services)",
+      "import { ensureDaemonSelection } from '../daemon/ensure'\n// ensureDaemonSelection() later",
+      "import type { ensureDaemonSelection } from '../daemon/ensure'\nensureDaemonSelection()",
+      "import { ensureDaemonSelection } from '../daemon/ensure'\nawait services.ensureDaemonSelection(signal)",
+      "import { ensureDaemonSelection } from '../daemon/ensure'\nconst ensure = ensureDaemonSelection",
+    ].map(callsDaemonEnsure),
+  ).toEqual([true, true, false, false, true, false])
+})
+
+test('direct ownership guard detects owners, storage, and secret constructors', () => {
+  expect(
+    [
+      "import { getDb } from '../direct-database'",
+      "import * as direct from './direct-database'",
+      "import { openDatabase } from '@ctxindex/core/storage'",
+      "import { Database } from 'bun:sqlite'",
+      "import { createSecretVault } from '@ctxindex/core/secrets'",
+      "export { getDb } from '../direct-database'",
+      "export * from './direct-database'",
+    ].map(reachesDirectOwnership),
+  ).toEqual([true, true, true, true, true, true, true])
+  expect(
+    [
+      "import { directDatabasePath } from '../direct-database'",
+      "import type { CtxindexDatabase } from '@ctxindex/core/storage'",
+      "import { CtxindexSecretsError } from '@ctxindex/core/secrets'",
+    ].map(reachesDirectOwnership),
+  ).toEqual([false, false, false])
 })
