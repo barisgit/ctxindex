@@ -406,7 +406,8 @@ async function expectStartFailure(runtime: TestRuntime, pattern: RegExp) {
   expect(result.stderr).toMatch(pattern)
 }
 
-describe.skipIf(process.platform !== 'darwin')(
+// Every platform with a retained-lease backend (Darwin and Linux) runs these.
+describe.skipIf(process.platform !== 'darwin' && process.platform !== 'linux')(
   'compiled local daemon multi-process workflow',
   () => {
     test('background start survives its CLI, converges concurrently, stops idempotently, and recovers after SIGKILL', async () => {

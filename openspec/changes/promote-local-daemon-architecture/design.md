@@ -65,6 +65,8 @@ The retained ownership abstraction must expose platform-specific implementations
 
 Foreground serve, health, and shutdown are sufficient to promote architecture ownership. User service installation/autostart, supervisor escalation, automatic backup, and any capability-token or peer-credential layer beyond owner-private local transport are distinct security and lifecycle products. This change records their required seams and follow-up issues but does not invent cross-platform service behavior inside command migration.
 
+Follow-ups: #89 (service installation, login autostart, and supervisor policy), #90 (enhanced local-client authentication for the daemon socket), and #91 (backup automation).
+
 ## Risks / Trade-offs
 
 - [The migration creates a large contract surface] → Land command families in independently gated slices and derive application/client types from the one contract.

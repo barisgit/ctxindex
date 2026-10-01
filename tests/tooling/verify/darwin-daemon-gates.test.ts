@@ -15,6 +15,31 @@ const expectedGates = [
     'apps/daemon',
     'src/e2e/compiled-daemon.e2e.test.ts',
   ],
+  [
+    'Compiled Extension registry journeys',
+    'apps/daemon',
+    'src/e2e/compiled-extension-registry.e2e.test.ts',
+  ],
+  [
+    'Compiled daemon ownership journey',
+    'apps/daemon',
+    'src/e2e/compiled-daemon-ownership.e2e.test.ts',
+  ],
+  [
+    'Compiled Action and Artifact journey',
+    'apps/cli',
+    'src/e2e/compiled-daemon-action-artifact.e2e.test.ts',
+  ],
+  [
+    'Compiled OAuth Account journey',
+    'apps/cli',
+    'src/e2e/compiled-oauth-account-lifecycle.e2e.test.ts',
+  ],
+  [
+    'Compiled daemon idle exit journey',
+    'apps/daemon',
+    'src/e2e/compiled-idle-exit.e2e.test.ts',
+  ],
 ] as const
 
 async function run(command: string[]) {

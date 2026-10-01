@@ -34,10 +34,10 @@
 
 ## 6. Normal ownership cutover
 
-- [ ] 6.1 Extend the compiled daemon journey across the complete stateful-command inventory and safe-exception allowlist, proving one immutable runtime, no selected-daemon fallback, no client SQLite open, stable output/exits, cancellation, restart, shutdown timeout ownership, crash recovery, and no live provider/network dependence.
+- [x] 6.1 Extend the compiled daemon journey across the complete stateful-command inventory and safe-exception allowlist, proving one immutable runtime, no selected-daemon fallback, no client SQLite open, stable output/exits, cancellation, restart, shutdown timeout ownership, crash recovery, and no live provider/network dependence.
 - [ ] 6.2 Remove `prototype_unsupported` from normal command behavior, make daemon ownership the normal stateful path only after every prior slice passes, and retain a deterministic explicit foreground/debug serve path.
-- [ ] 6.3 Open separate issue/OpenSpec follow-ups for service installation/autostart and supervisor policy, enhanced local-client authentication, and backup automation; keep remote access, batching, OpenAPI/SDK generation, queues, and scheduling explicitly deferred.
-- [ ] 6.4 Run the isolated private live workflow across setup, authorization, sync/search/get/thread, Draft Action, Artifact/export, Extension activation boundary, cancellation, shutdown/restart, and direct exceptions; pause for Human acceptance before archive.
+- [x] 6.3 Open separate issue/OpenSpec follow-ups for service installation/autostart and supervisor policy, enhanced local-client authentication, and backup automation; keep remote access, batching, OpenAPI/SDK generation, queues, and scheduling explicitly deferred.
+- [ ] 6.4 Run the isolated private live workflow across setup, authorization, sync/search/get/thread, Draft Action, Artifact/export, Extension activation boundary, cancellation, shutdown/restart, and direct exceptions; pause for Human acceptance before archive. Runbook: `live-checkpoint.md`.
 
 ## 7. Doctrine and final verification
 
