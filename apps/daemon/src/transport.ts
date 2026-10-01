@@ -3,6 +3,8 @@ import {
   createDaemonRouter,
   type DaemonRouterExpectations,
   type DaemonRpcApplication,
+  type RpcTransportContext,
+  rpcCompatibilityFailure,
   rpcPresentedProtocolIdentitySchema,
   rpcRuntimeIdentitySchema,
 } from '@ctxindex/rpc'
@@ -24,6 +26,8 @@ const TRANSFER_PATH = /^\/transfer\/([a-f0-9]{64})$/
 
 export function serveByteTransfer(
   request: Request,
+  context: RpcTransportContext,
+  expectations: DaemonRouterExpectations,
   store: ByteTransferConsumer,
 ): Response | null {
   const path = new URL(request.url).pathname
@@ -32,6 +36,10 @@ export function serveByteTransfer(
     return new Response('Method not allowed.', { status: 405 })
   const match = TRANSFER_PATH.exec(path)
   if (!match) return new Response('Not found.', { status: 404 })
+  // Ticket GETs bypass the oRPC router, so they apply the same compatibility
+  // rule here; an incompatible client must not consume a one-use ticket.
+  const failure = rpcCompatibilityFailure(context, expectations)
+  if (failure) return Response.json(failure, { status: 409 })
   const bytes = store.consume(match[1] as string)
   if (!bytes) return new Response('Not found.', { status: 404 })
   return new Response(bytes, {
@@ -81,7 +89,12 @@ export function bindDaemonTransport(
       } catch {
         return new Response('Invalid daemon request.', { status: 400 })
       }
-      const transfer = serveByteTransfer(request, input.transferStore)
+      const transfer = serveByteTransfer(
+        request,
+        context,
+        input.expectations,
+        input.transferStore,
+      )
       if (transfer) return transfer
       const result = await handler.handle(request, { prefix: '/rpc', context })
       return result.matched
