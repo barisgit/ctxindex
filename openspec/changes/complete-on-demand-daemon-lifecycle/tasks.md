@@ -1,8 +1,8 @@
 ## 1. Lock prerequisites and lifecycle boundaries
 
 - [x] 1.1 Reconcile this change with `promote-local-daemon-architecture`: require its complete stateful-command inventory and tested bootstrap/filesystem-only exception allowlist before default ensure routing, and add failing architecture tests that reject stateful direct fallback, ensure-before-local-validation, public foreground serve, or lifecycle probes counted as business activity.
-- [ ] 1.2 Add failing lifecycle/application tests for shared same-process ensure, multi-process convergence, pre-invocation stopping races, no post-invocation replay, the fixed five-minute production default, an internal injected clock/timeout for tests, and one idempotent shutdown coordinator shared by idle, explicit, and signal paths.
-- [ ] 1.3 Pass focused RPC, daemon application, CLI daemon-client/lifecycle, command-inventory, and module-dependency gates before platform or cutover work continues.
+- [x] 1.2 Add failing lifecycle/application tests for shared same-process ensure, multi-process convergence, pre-invocation stopping races, no post-invocation replay, the fixed five-minute production default, an internal injected clock/timeout for tests, and one idempotent shutdown coordinator shared by idle, explicit, and signal paths.
+- [x] 1.3 Pass focused RPC, daemon application, CLI daemon-client/lifecycle, command-inventory, and module-dependency gates before platform or cutover work continues.
 
 ## 2. Linux retained ownership
 
