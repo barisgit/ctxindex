@@ -1,6 +1,7 @@
 import { readEnvironmentVariable } from '@ctxindex/core/config'
 import { CtxindexValidationError } from '@ctxindex/core/errors'
 import type { OAuthAppInventoryItem } from '@ctxindex/core/oauth-app'
+import { rpcOAuthAppAddInputSchema } from '@ctxindex/rpc'
 import { assertInitialized } from '../commands/db'
 import {
   daemonOAuthAppAdd,
@@ -109,9 +110,23 @@ export async function handleOAuthAppCommand(
             const value = services.readEnvironmentVariable(name)
             if (value !== undefined) config[field] = value
           }
+          const input = {
+            provider: parsed.provider,
+            label: parsed.label,
+            config,
+          }
+          // Check the RPC bounds locally: a transport-level rejection would
+          // surface as daemon unavailability, and the values must never be
+          // echoed, so out-of-bounds input fails as ordinary validation.
+          if (!rpcOAuthAppAddInputSchema.safeParse(input).success) {
+            throw new CtxindexValidationError(
+              'invalid_filter',
+              'OAuth App configuration is invalid for the selected Provider',
+            )
+          }
           await (services.daemonOAuthAppAdd ?? daemonOAuthAppAdd)(
             daemon,
-            { provider: parsed.provider, label: parsed.label, config },
+            input,
             controller.signal,
           )
           console.log(formatOAuthAppAdded(parsed.provider, parsed.label))

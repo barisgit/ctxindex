@@ -6,10 +6,10 @@
 
 ## 2. OAuth App, Account, and secret lifecycle
 
-- [ ] 2.1 Add failing contract/application/CLI tests for OAuth App list/add/remove and secret status/backend switching, including strict safe inventory, the exact bounded write-only environment input, secret canaries absent from middleware/results/errors/traces/logs/retry or staging state, exactly-once consumption, copy-verify-commit-cleanup behavior, malformed zero-side-effect input, cancellation, and no client SQLite/runtime open.
-- [ ] 2.2 Implement daemon-owned OAuth App and secret-backend application services and semantic procedures; permit secret values only in the dedicated owner-private write-only input, consume them directly without automatic retry or staging, and exclude them plus backend-native errors from every output/observability surface; pass focused core/RPC/daemon/CLI/security gates.
-- [ ] 2.3 Add failing staged-authorization tests for Account add/reauthorize/list/remove, explicit browser consent, loopback state/code handling, one-use expiry, serialized Grant mutation, stable CLI output/exits, and token/App/provider-payload exclusion.
-- [ ] 2.4 Implement daemon-owned Account/Grant lifecycle with CLI-owned explicit browser/loopback interaction and provider-neutral core orchestration; pass loopback-only compiled acceptance with synthetic credentials and no live provider access.
+- [x] 2.1 Add failing contract/application/CLI tests for OAuth App list/add/remove and secret status/backend switching, including strict safe inventory, the exact bounded write-only environment input, secret canaries absent from middleware/results/errors/traces/logs/retry or staging state, exactly-once consumption, copy-verify-commit-cleanup behavior, malformed zero-side-effect input, cancellation, and no client SQLite/runtime open.
+- [x] 2.2 Implement daemon-owned OAuth App and secret-backend application services and semantic procedures; permit secret values only in the dedicated owner-private write-only input, consume them directly without automatic retry or staging, and exclude them plus backend-native errors from every output/observability surface; pass focused core/RPC/daemon/CLI/security gates.
+- [x] 2.3 Add failing staged-authorization tests for Account add/reauthorize/list/remove, explicit browser consent, loopback state/code handling, one-use expiry, serialized Grant mutation, stable CLI output/exits, and token/App/provider-payload exclusion.
+- [x] 2.4 Implement daemon-owned Account/Grant lifecycle with a daemon-owned loopback listener, CLI-owned explicit browser launch and manual response, and provider-neutral core orchestration; pass loopback-only compiled acceptance with synthetic credentials and no live provider access.
 
 ## 3. Actions, Artifacts, exports, and purge
 
