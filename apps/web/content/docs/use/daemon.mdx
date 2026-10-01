@@ -3,14 +3,14 @@ title: Local daemon lifecycle
 description: Let stateful commands manage the daemon automatically, and use lifecycle commands only for observation or recovery.
 ---
 
-You normally do not manage the daemon. A stateful command such as `search`, `sync`, `get`, or `source add` verifies the exact local runtime, starts it when absent, and uses typed local RPC. The daemon keeps the registry and SQLite ownership in one process, streams long-running work such as sync, and exits after five idle minutes.
+You do not install, configure, or manage the daemon. A stateful command such as `search`, `sync`, `get`, or `source add` verifies the exact local runtime, starts it when absent, and uses typed local RPC. The daemon keeps the registry and SQLite ownership in one process, streams long-running work such as sync, and exits after five idle minutes. It is not a system service and does not start at login.
 
 ```text
 ctxindex command -> ensure exact daemon -> local RPC -> result
                                       └-> idle for five minutes -> exit
 ```
 
-Active business requests suppress idle shutdown. Completing a business request refreshes the deadline. Status observation does not keep an otherwise idle daemon alive.
+The five minutes count from the moment the last running command finishes. While any command is in flight, including a long `sync`, the daemon stays up however long it takes. `ctxindex daemon status` does not count as activity, so polling it never keeps an otherwise idle daemon alive. After an idle exit, the next stateful command starts the daemon again; a command that races with the shutdown waits for it and retries the start once.
 
 ## Observe or stop it
 

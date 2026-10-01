@@ -27,7 +27,7 @@ OAuth App ──> Account ──> Grant ──explicit binding──> Source
 The main boundaries are deliberate:
 
 - the CLI parses, formats, maps final exits, and automatically ensures the exact local daemon for stateful work;
-- the daemon owns the long-lived registry, database, background sync streams, and coordinated provider operations, then exits after an idle period;
+- the daemon owns the long-lived registry, database, background sync streams, and coordinated provider operations, then exits five minutes after its last request settles;
 - core owns provider-neutral orchestration, validation, SQLite, and cache state;
 - Profiles own portable domain vocabulary;
 - Providers own reusable authentication, registration, identity, and allowed-host declarations;

@@ -27,9 +27,12 @@ ctxindex search "project plan" --realm personal
 ctxindex get 'ctx://<source-id>/<adapter-owned-suffix>'
 ```
 
-Stateful commands ensure one compatible local daemon automatically. The daemon
-owns SQLite, the active Extension registry, provider access, and long-running
-work; it exits after five idle minutes and restarts on demand. `daemon
+Stateful commands ensure one compatible local daemon automatically; there is
+nothing to install or keep running. The daemon owns SQLite, the active
+Extension registry, provider access, and long-running work. Any in-flight
+business request, including an open sync stream, keeps it alive; it exits five
+minutes after the last one settles, and the next stateful command starts it
+again. `daemon status` checks do not count as activity. `daemon
 start|status|stop` remain explicit operational controls; there is no public
 foreground `serve` command.
 

@@ -97,7 +97,7 @@ export interface SyncCommandInput {
 }
 ```
 
-The daemon client manually advances the typed iterator so its terminal return remains available after progress events. It awaits the event sink and returns the iterator during cleanup, allowing cancellation and consumer backpressure to reach the daemon. Once a daemon is selected, stream or transport failure never falls back to direct database access.
+The daemon client manually advances the typed iterator so its terminal return remains available after progress events. It awaits the event sink and returns the iterator during cleanup, allowing cancellation to reach the daemon. Consumer backpressure is required to reach the producer too, but on pinned Bun 1.3.14 the daemon's `Bun.serve` stream transport buffers instead (a known open defect). Once a daemon is selected, stream or transport failure never falls back to direct database access.
 
 The sync runner projects direct-core and daemon-RPC events into one CLI vocabulary. `--format events` writes each event as one JSON line when observed. Human summary and compact modes may write bounded live progress to stderr while preserving terminal stdout. `--format json` suppresses all live writes and emits exactly one terminal JSON document. The terminal result remains the sole owner of stable exit selection.
 
@@ -143,6 +143,33 @@ The CLI lifecycle facade resolves only the pinned Bun source entrypoint or an ex
 The lifecycle facade's outer action boundary preserves validated daemon failures, cancellation, and typed pre-init `invalid_args` guidance. Unexpected runtime canonicalization, discovery, or filesystem exceptions are converted to fixed action-specific `daemon_unavailable` messages before command rendering, so raw host paths and OS errors never cross the CLI boundary.
 
 Lifecycle commands are exactly `daemon start`, `daemon status`, and `daemon stop`; there is no public foreground serve command. Once selected, transport loss never falls back to direct SQLite.
+
+#### Command-triggered ensure
+
+```ts
+// apps/cli/src/daemon/ensure.ts
+export type DaemonSelectionEnsureResult =
+  | {
+      readonly status: 'selected'
+      readonly selection: DaemonSelection
+      readonly started: boolean
+    }
+  | { readonly status: 'unsupported' }
+
+export function createDaemonSelectionEnsurer(
+  dependencies?: DaemonSelectionEnsurerDependencies,
+): (signal?: AbortSignal) => Promise<DaemonSelectionEnsureResult>;
+
+export async function resolveEnsuredDaemonSelection(
+  ensure: typeof ensureDaemonSelection | undefined,
+  select: () => DaemonSelection | null,
+  signal?: AbortSignal,
+): Promise<DaemonSelection | null>;
+```
+
+Command flow is parse and validate locally, classify through the stateful/safe-exception inventory, then ensure, select, and invoke one semantic procedure. Invalid arguments, inline-or-file JSON, and other local input errors therefore fail before any daemon starts. The ensurer first requires initialization evidence, then reuses a running compatible daemon or runs the explicit `daemon start` path (stale recovery, detached launch, bounded readiness) and selects its published discovery; it returns `unsupported` without starting anything on a platform without a retained-ownership backend. Same-process callers share one in-flight ensure per canonical runtime key while keeping caller-local cancellation; cross-process convergence comes only from retained lifecycle ownership. Safe pre-initialization surfaces bypass ensure.
+
+`resolveEnsuredDaemonSelection()` registers one reconnect on the selection. If the first call is rejected with the declared `daemon_unavailable` failure before admission (for example an owner that is stopping on idle expiry), the client re-runs ensure once and repeats that call against the replacement. Ambiguous transport failures are not retried, and calls that must not be repeated (`account.add`, `account.respond`, and `oauthApp.add` with its write-only input) use `invokeOnce()`. Streamed `sync.run` may reconnect only while opening the iterator; after the stream is admitted it is never replayed. All failures normalize through the daemon failure registry and the CLI exit mapper.
 
 ### @ctxindex/cli — daemon routing and safe exceptions
 
