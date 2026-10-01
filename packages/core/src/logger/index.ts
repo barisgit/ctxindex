@@ -1,5 +1,4 @@
 import pino from 'pino'
-import pinoPretty from 'pino-pretty'
 import { type CtxindexConfig, type LogLevel, readConfig } from '../config'
 import { getEnv } from '../config/env-loader'
 import { logDir as defaultLogDir } from '../paths'
@@ -52,6 +51,10 @@ export async function createLogger(
   const file = await createFileLogStream(directory, config, options.roll)
   const streams: pino.StreamEntry[] = [{ level, stream: file.stream }]
   if (process.stderr.isTTY === true) {
+    // Loaded only here: pino-pretty reads `process.stdout` when imported, and
+    // in Bun 1.3.14 touching it makes later console.log writes to a full
+    // stdout pipe drop silently, truncating piped command output.
+    const { default: pinoPretty } = await import('pino-pretty')
     streams.unshift({
       level,
       stream: pinoPretty({ destination: 2, colorize: true, singleLine: true }),

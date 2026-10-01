@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test'
+import { isatty } from 'node:tty'
 import {
   escapeTsv,
   formatPrettyCollection,
   formatTsv,
+  outputEnvironment,
   resolveOutputFormat,
   wrapDisplayText,
 } from './output'
@@ -22,6 +24,26 @@ function cardValue(output: string, label: string): string {
 }
 
 describe('structured output selection', () => {
+  // Touching process.stdout makes Bun 1.3.14 drop console.log writes to a full
+  // pipe, so a non-terminal destination must be detected without it.
+  test.skipIf(isatty(1))(
+    'detects a non-terminal destination without reading process.stdout',
+    () => {
+      const stdout = Object.getOwnPropertyDescriptor(process, 'stdout')
+      Object.defineProperty(process, 'stdout', {
+        configurable: true,
+        get() {
+          throw new Error('process.stdout was read')
+        },
+      })
+      try {
+        expect(outputEnvironment()).toEqual({ isTTY: false })
+      } finally {
+        if (stdout) Object.defineProperty(process, 'stdout', stdout)
+      }
+    },
+  )
+
   test('resolves explicit modes and destination-aware defaults', () => {
     expect(resolveOutputFormat({ format: 'pretty' }, { isTTY: false })).toBe(
       'pretty',
