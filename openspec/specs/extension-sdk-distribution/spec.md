@@ -1,7 +1,8 @@
 # extension-sdk-distribution Specification
 
 ## Purpose
-TBD - created by archiving change publish-extension-sdk. Update Purpose after archive.
+Define how the public Extension SDK is published as a real, minimal, relocatable installable package, and how its exact artifact is verified before first publication.
+
 ## Requirements
 ### Requirement: Public Extension SDK is a real installable package
 The repository SHALL produce `@ctxindex/extension-sdk@0.1.0` as a public npm package containing executable ESM and TypeScript declarations for the complete supported authoring surface. The package MUST export the same factories, definition types, operation-context types, documentation helper, authentication helper, and `z` convenience value as the workspace entry. It MUST NOT be an empty reservation package.

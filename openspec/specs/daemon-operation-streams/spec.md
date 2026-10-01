@@ -1,7 +1,8 @@
 # daemon-operation-streams Specification
 
 ## Purpose
-TBD - created by archiving change stream-daemon-operations. Update Purpose after archive.
+Define how long-running daemon operations, such as sync, deliver typed, ordered progress events and one terminal outcome to the CLI over the private local protocol. Covers backpressure, cancellation, and exactly-once stream cleanup.
+
 ## Requirements
 ### Requirement: Typed daemon operation event streams
 Long-running daemon procedures that declare streaming MUST expose a closed typed
