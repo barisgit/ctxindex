@@ -1,5 +1,5 @@
 import { handleActionCommand } from '../action/handle-action-command'
-import { loadCliDefinitions, printExtensionDiagnostics } from '../definitions'
+import { printExtensionDiagnostics } from '../definitions'
 import { mapErrorToExit } from '../format/exit'
 import {
   filterRegistryDescription,
@@ -7,6 +7,7 @@ import {
   formatRegistryText,
   registryJsonValue,
 } from '../format/registry'
+import { loadRegistryDescription } from '../registry-service'
 
 type DescribeSelector = 'profile' | 'adapter' | 'action'
 type DescribeFormat = 'text' | 'markdown' | 'json'
@@ -54,7 +55,7 @@ export async function handleDescribeCommand(
   }
 
   try {
-    const loaded = await loadCliDefinitions()
+    const loaded = await loadRegistryDescription()
     printExtensionDiagnostics(loaded.diagnostics)
     const selected = filterRegistryDescription(
       loaded.description,

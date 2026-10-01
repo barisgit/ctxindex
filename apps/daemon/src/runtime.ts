@@ -17,7 +17,10 @@ import {
   readEnvironmentVariable,
   writeConfig,
 } from '@ctxindex/core/config'
-import { DirectExtensionStore } from '@ctxindex/core/direct-extension'
+import {
+  DirectExtensionStore,
+  projectDirectExtensionRecord,
+} from '@ctxindex/core/direct-extension'
 import {
   createDocumentationService,
   createExtensionDocumentationSource,
@@ -93,7 +96,7 @@ import {
   type DaemonListener,
 } from './transport'
 
-export const DAEMON_PROTOCOL = { id: 'ctxindex.local', version: 2 } as const
+export const DAEMON_PROTOCOL = { id: 'ctxindex.local', version: 3 } as const
 const DEFAULT_OBSERVATION_TIMEOUT_MS = 5_000
 const DEFAULT_IDLE_TIMEOUT_MS = 5 * 60_000
 const PUBLIC_VERSION = /^[a-z0-9][a-z0-9.+_-]{0,63}$/i
@@ -200,7 +203,11 @@ export interface DaemonRuntimeHooks {
   }) => Promise<
     Pick<
       LoadExtensionsResult,
-      'completeRegistry' | 'diagnostics' | 'documentation' | 'registry'
+      | 'completeRegistry'
+      | 'diagnostics'
+      | 'documentation'
+      | 'registry'
+      | 'provenance'
     >
   >
   readonly openDatabase: (path: string) => Promise<CtxindexDatabase>
@@ -758,7 +765,9 @@ export async function startDaemon(
       instanceId,
       startedAt,
       pid: process.pid,
-      extensionDiagnosticsCount: loaded.diagnostics.length,
+      extensionDiagnostics: loaded.diagnostics,
+      extensionProvenance: loaded.provenance,
+      installedExtensions: installed.records.map(projectDirectExtensionRecord),
       documentationService: createDocumentationService([
         createExtensionDocumentationSource(loaded.documentation),
       ]),

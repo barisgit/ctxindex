@@ -86,6 +86,8 @@ function transportContext(
 
 function createApplication() {
   const calls = {
+    registryDescribe: 0,
+    extensionList: 0,
     health: 0,
     realmAdd: 0,
     realmList: 0,
@@ -125,6 +127,27 @@ function createApplication() {
     contexts.push(context)
   }
   const application: DaemonRpcApplication = {
+    registry: {
+      async describe(_input, context) {
+        record('registryDescribe', context)
+        return {
+          ok: true,
+          value: {
+            description: { kinds: [], sources: [], actions: [] },
+            diagnostics: [],
+          },
+        }
+      },
+    },
+    extension: {
+      async list(_input, context) {
+        record('extensionList', context)
+        return {
+          ok: true,
+          value: { rows: [], provenance: [], installed: [], diagnostics: [] },
+        }
+      },
+    },
     system: {
       async health(_input, context) {
         record('health', context)
@@ -613,6 +636,8 @@ describe('contract implementation', () => {
     })
     await client.documentation.search({ query: 'fixture' })
     await client.source.add({ adapterId: 'local.directory' })
+    await client.registry.describe({})
+    await client.extension.list({})
     await client.source.definitions({})
     await client.source.list({})
     await client.source.remove({ source: 'source' })
@@ -649,6 +674,8 @@ describe('contract implementation', () => {
     await client.artifact.purge({})
     await client.system.shutdown({})
     expect(fixture.calls).toEqual({
+      registryDescribe: 1,
+      extensionList: 1,
       health: 1,
       realmAdd: 1,
       realmList: 1,

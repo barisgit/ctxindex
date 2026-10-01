@@ -123,6 +123,8 @@ import type {
 } from '@ctxindex/rpc'
 import {
   RPC_BYTE_TRANSFER_MAX_BYTES,
+  type RpcExtensionListResult,
+  type RpcRegistryDescribeResult,
   rpcActionDescribeResultSchema,
   rpcActionRunResultSchema,
   rpcArtifactDownloadResultSchema,
@@ -132,8 +134,10 @@ import {
   rpcDocumentationListResultSchema,
   rpcDocumentationSearchResultSchema,
   rpcExportResultSchema,
+  rpcExtensionListResultSchema,
   rpcJsonCursorSchema,
   rpcJsonDefaultSchema,
+  rpcRegistryDescribeResultSchema,
   rpcResourceGetResultSchema,
   rpcSafeJsonSchema,
   rpcSearchResultSchema,
@@ -152,7 +156,9 @@ export interface DaemonApplicationOptions {
   readonly instanceId: string
   readonly startedAt: string
   readonly pid: number
-  readonly extensionDiagnosticsCount: number
+  readonly extensionProvenance?: RpcExtensionListResult['provenance']
+  readonly installedExtensions?: RpcExtensionListResult['installed']
+  readonly extensionDiagnostics?: RpcRegistryDescribeResult['diagnostics']
   readonly documentationService: Pick<
     DocumentationService,
     'list' | 'get' | 'search'
@@ -834,6 +840,34 @@ export class DaemonApplication implements DaemonRpcApplication {
     get: (input, context) => this.documentationGet(input, context),
     search: (input, context) => this.documentationSearch(input, context),
   }
+  readonly extension: DaemonRpcApplication['extension'] = {
+    list: (_input, context) =>
+      this.#business(context, async () => {
+        if (!this.#options.registry) throw new Error('Registry missing')
+        return rpcExtensionListResultSchema.parse({
+          rows: this.#options.registry
+            .list()
+            .map(({ id, profiles, adapters }) => ({
+              id,
+              profiles: profiles.map(({ id, version }) => ({ id, version })),
+              adapters: adapters.map(({ id }) => ({ id })),
+            })),
+          provenance: this.#options.extensionProvenance ?? [],
+          installed: this.#options.installedExtensions ?? [],
+          diagnostics: this.#options.extensionDiagnostics ?? [],
+        })
+      }),
+  }
+  readonly registry: DaemonRpcApplication['registry'] = {
+    describe: (_input, context) =>
+      this.#business(context, async () => {
+        if (!this.#options.registry) throw new Error('Registry missing')
+        return rpcRegistryDescribeResultSchema.parse({
+          description: describeRegistry(this.#options.registry),
+          diagnostics: this.#options.extensionDiagnostics ?? [],
+        })
+      }),
+  }
   readonly source: DaemonRpcApplication['source'] = {
     definitions: (input, context) => this.sourceDefinitions(input, context),
     add: (input, context) => this.sourceAdd(input, context),
@@ -923,7 +957,8 @@ export class DaemonApplication implements DaemonRpcApplication {
         startedAt: this.#options.startedAt,
         lifecycle: this.#lifecycle,
         ready: this.#lifecycle === 'ready',
-        extensionDiagnosticsCount: this.#options.extensionDiagnosticsCount,
+        extensionDiagnosticsCount:
+          this.#options.extensionDiagnostics?.length ?? 0,
         activeRequestCount: this.#active.size,
       },
     }

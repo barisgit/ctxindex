@@ -1762,3 +1762,307 @@ export type RpcTransportContext = z.infer<typeof rpcTransportContextSchema>
 export interface RpcRequestContext extends RpcTransportContext {
   readonly signal: AbortSignal
 }
+
+const registryStringsSchema = z
+  .array(longPublicStringSchema)
+  .max(1_024)
+  .readonly()
+const registryJsonPathSchema = z
+  .tuple([longPublicStringSchema])
+  .rest(longPublicStringSchema)
+  .refine((value) => value.length <= 256)
+  .readonly()
+const registryStringMapSchema = z
+  .record(identifierSchema, longPublicStringSchema)
+  .refine((value) => Object.keys(value).length <= 256)
+  .readonly()
+
+// Only these named business locators may carry Extension paths, never runtime roots.
+const extensionLocationSchema = boundedString(16_384).refine(
+  (value) => {
+    if (/^[^/@\s]+@[^/\s]+:/.test(value)) return value.startsWith('git@')
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) return true
+    try {
+      const url = new URL(value.replace(/^git\+/, ''))
+      return (
+        url.password === '' &&
+        (url.username === '' ||
+          (url.protocol === 'ssh:' && url.username === 'git'))
+      )
+    } catch {
+      return false
+    }
+  },
+  { message: 'Extension locations must not contain credentials' },
+)
+
+export const rpcExtensionDiagnosticSchema = z
+  .strictObject({
+    path: extensionLocationSchema,
+    message: longPublicStringSchema,
+  })
+  .readonly()
+
+const registryIdentitySchema = z
+  .strictObject({
+    kind: identifierSchema,
+    path: registryJsonPathSchema,
+    verifiedPath: registryJsonPathSchema.optional(),
+  })
+  .transform(({ verifiedPath, ...value }) => ({
+    ...value,
+    ...(verifiedPath === undefined ? {} : { verifiedPath }),
+  }))
+  .readonly()
+
+const registryProviderAuthSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('none') }).readonly(),
+  z
+    .strictObject({
+      kind: z.literal('oauth2'),
+      authorizationUrl: longPublicStringSchema,
+      tokenUrl: longPublicStringSchema,
+      identity: z
+        .strictObject({
+          url: longPublicStringSchema,
+          subjectPath: registryJsonPathSchema,
+          labelPaths: z
+            .tuple([registryJsonPathSchema])
+            .rest(registryJsonPathSchema)
+            .refine((value) => value.length <= 256)
+            .readonly(),
+          identities: z
+            .tuple([registryIdentitySchema])
+            .rest(registryIdentitySchema)
+            .refine((value) => value.length <= 256)
+            .readonly(),
+        })
+        .readonly(),
+      pkce: z
+        .strictObject({ method: z.literal('S256'), required: z.literal(true) })
+        .readonly(),
+      registration: z
+        .strictObject({
+          type: z.enum(['public', 'confidential']),
+          configSchema: rpcActionInputDescriptionSchema,
+          environment: registryStringMapSchema,
+        })
+        .readonly(),
+      baseScopes: registryStringsSchema,
+      allowedHosts: registryStringsSchema,
+      fixedAuthorizationParams: registryStringMapSchema.optional(),
+    })
+    .transform(({ fixedAuthorizationParams, ...value }) => ({
+      ...value,
+      ...(fixedAuthorizationParams === undefined
+        ? {}
+        : { fixedAuthorizationParams }),
+    }))
+    .readonly(),
+])
+
+export const rpcRegistryDescribeInputSchema = z.strictObject({})
+export const rpcRegistryDescribeResultSchema = z
+  .strictObject({
+    description: z
+      .strictObject({
+        kinds: z
+          .array(
+            z
+              .strictObject({
+                ...rpcActionProfileSchema.unwrap().shape,
+                fields: z
+                  .array(
+                    z
+                      .strictObject({
+                        name: identifierSchema,
+                        type: identifierSchema,
+                      })
+                      .readonly(),
+                  )
+                  .max(1_024)
+                  .readonly(),
+                formats: z
+                  .array(
+                    z
+                      .strictObject({
+                        name: identifierSchema,
+                        mediaType: longPublicStringSchema,
+                      })
+                      .readonly(),
+                  )
+                  .max(1_024)
+                  .readonly(),
+              })
+              .readonly(),
+          )
+          .max(1_024)
+          .readonly(),
+        sources: z
+          .array(
+            z
+              .strictObject({
+                id: identifierSchema,
+                profiles: z.array(rpcActionProfileSchema).max(1_024).readonly(),
+                routing: identifierSchema,
+                provider: z
+                  .strictObject({
+                    id: identifierSchema,
+                    auth: registryProviderAuthSchema,
+                  })
+                  .readonly()
+                  .optional(),
+                access: z
+                  .strictObject({ scopes: registryStringsSchema })
+                  .readonly()
+                  .optional(),
+                providerApiHosts: registryStringsSchema,
+                capabilities: registryStringsSchema,
+                config: rpcActionInputDescriptionSchema,
+                configOptions: z
+                  .array(
+                    rpcSourceConfigOptionSchema.transform(
+                      ({ docs, ...value }) => ({
+                        ...value,
+                        ...(docs === undefined ? {} : { docs }),
+                      }),
+                    ),
+                  )
+                  .max(256)
+                  .readonly(),
+              })
+              .transform(
+                ({ id, profiles, routing, provider, access, ...value }) => ({
+                  id,
+                  profiles,
+                  routing,
+                  ...(provider === undefined ? {} : { provider }),
+                  ...(access === undefined ? {} : { access }),
+                  ...value,
+                }),
+              )
+              .readonly(),
+          )
+          .max(1_024)
+          .readonly(),
+        actions: z
+          .array(
+            z
+              .strictObject({
+                id: identifierSchema,
+                profile: rpcActionProfileSchema,
+                effect: z.enum(['reversible', 'irreversible']),
+                input: rpcActionInputDescriptionSchema,
+                output: rpcActionProfileSchema,
+                adapters: z.array(rpcActionAdapterSchema).max(1_024).readonly(),
+              })
+              .readonly(),
+          )
+          .max(1_024)
+          .readonly(),
+      })
+      .readonly(),
+    diagnostics: z.array(rpcExtensionDiagnosticSchema).max(1_024).readonly(),
+  })
+  .readonly()
+export type RpcRegistryDescribeResult = z.infer<
+  typeof rpcRegistryDescribeResultSchema
+>
+
+const extensionInstalledFields = {
+  id: identifierSchema,
+  sourceKind: z.enum(['npm', 'git', 'local']),
+  requestedTarget: extensionLocationSchema,
+  resolvedIdentity: extensionLocationSchema,
+  materializationDigest: z.string().regex(/^[0-9a-f]{64}$/),
+  installedAt: countSchema,
+  updatedAt: countSchema,
+}
+const extensionSourceLocatorSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('package'),
+    entryIndex: z.number().int().min(0).max(255),
+  }),
+  z.strictObject({
+    kind: z.literal('literal'),
+    module: extensionLocationSchema,
+    catalogId: identifierSchema,
+    entryIndex: z.number().int().min(0).max(255),
+    extensionId: identifierSchema,
+  }),
+])
+const extensionCommitSchema = z.string().regex(/^[0-9a-f]{40,64}$/)
+const extensionProvenanceSchema = z.discriminatedUnion('kind', [
+  z
+    .strictObject({ id: identifierSchema, kind: z.literal('builtin') })
+    .readonly(),
+  z
+    .strictObject({
+      id: identifierSchema,
+      kind: z.literal('path'),
+      path: extensionLocationSchema,
+    })
+    .readonly(),
+  z
+    .strictObject({ ...extensionInstalledFields, kind: z.literal('direct') })
+    .readonly(),
+  z
+    .strictObject({
+      ...extensionInstalledFields,
+      kind: z.literal('catalog'),
+      catalog: identifierSchema,
+      catalogId: identifierSchema,
+      repository: extensionLocationSchema,
+      commit: extensionCommitSchema,
+      snapshotAcquiredAt: countSchema,
+      sourceLocator: extensionSourceLocatorSchema,
+    })
+    .readonly(),
+])
+
+export const rpcExtensionListInputSchema = z.strictObject({})
+export const rpcExtensionListResultSchema = z
+  .strictObject({
+    rows: z
+      .array(
+        z
+          .strictObject({
+            id: identifierSchema,
+            profiles: z.array(rpcActionProfileSchema).max(1_024).readonly(),
+            adapters: z.array(rpcActionAdapterSchema).max(1_024).readonly(),
+          })
+          .readonly(),
+      )
+      .max(1_024)
+      .readonly(),
+    provenance: z.array(extensionProvenanceSchema).max(1_024).readonly(),
+    installed: z
+      .array(
+        z
+          .strictObject({
+            ...extensionInstalledFields,
+            curation: z
+              .strictObject({
+                extension_id: identifierSchema,
+                catalog_name: identifierSchema,
+                catalog_id: identifierSchema,
+                repository: extensionLocationSchema,
+                commit: extensionCommitSchema,
+                snapshot_acquired_at: countSchema,
+                source_locator: extensionSourceLocatorSchema,
+                execution_materialization_digest: z
+                  .string()
+                  .regex(/^[0-9a-f]{64}$/),
+              })
+              .optional(),
+          })
+          .readonly(),
+      )
+      .max(1_024)
+      .readonly(),
+    diagnostics: z.array(rpcExtensionDiagnosticSchema).max(1_024).readonly(),
+  })
+  .readonly()
+export type RpcExtensionListResult = z.infer<
+  typeof rpcExtensionListResultSchema
+>

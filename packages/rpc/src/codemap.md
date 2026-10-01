@@ -7,6 +7,7 @@ Defines the owner-private local daemon's schema-first oRPC contract, strict boun
 ## Design / patterns
 
 - `schemas.ts` is the authoritative strict Zod boundary for protocol/runtime identity, inputs, outputs, failures, count-only sync events, safe aggregate secret-backend status/switch results, bounded source-aware Action describe/run values, and opaque size-bounded byte-transfer descriptors.
+- `registry.describe` and `extension.list` use closed bounded declarative schemas, with explicit Extension-location fields for business provenance/diagnostics. Schema normalization preserves optional-field omission and core projection order without serializing registries or functions.
 - `contract.ts` composes procedures without handlers; `sync.run` uses oRPC `eventIterator` for typed yields plus one typed terminal result.
 - `router.ts` recursively derives the daemon application interface from the contract. Unary and stream adapters validate application results and map only the shared registry's declared failures.
 - Stream yields and terminal values are parsed again at the application boundary. Unsafe or malformed values collapse to one bounded internal error rather than entering transport serialization.

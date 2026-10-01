@@ -32,6 +32,7 @@ import {
   type RpcDocumentationSearchResult,
   type RpcExportInput,
   type RpcExportResult,
+  type RpcExtensionListResult,
   type RpcFailure,
   type RpcHealthResult,
   type RpcOAuthAppAddInput,
@@ -42,6 +43,7 @@ import {
   type RpcRealmAddInput,
   type RpcRealmAddResult,
   type RpcRealmListResult,
+  type RpcRegistryDescribeResult,
   type RpcResourceGetResult,
   type RpcSearchInput,
   type RpcSearchResult,
@@ -68,7 +70,7 @@ import { RPCLink } from '@orpc/client/fetch'
 
 export const CLI_DAEMON_PROTOCOL = {
   id: 'ctxindex.local',
-  version: 2,
+  version: 3,
 } as const
 
 export class DaemonCliError extends Error {
@@ -971,4 +973,26 @@ export function requireDaemonSelection(): DaemonSelection {
   const selection = selectDaemon()
   if (selection === null) throw unavailable()
   return selection
+}
+
+export async function daemonExtensionList(
+  selection: DaemonSelection,
+  signal?: AbortSignal,
+): Promise<RpcExtensionListResult> {
+  return invoke(
+    signal,
+    (client) => client.extension.list({}, requestOptions(signal)),
+    selection,
+  )
+}
+
+export async function daemonRegistryDescribe(
+  selection: DaemonSelection,
+  signal?: AbortSignal,
+): Promise<RpcRegistryDescribeResult> {
+  return invoke(
+    signal,
+    (client) => client.registry.describe({}, requestOptions(signal)),
+    selection,
+  )
 }
