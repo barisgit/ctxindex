@@ -539,6 +539,13 @@ export async function runMailboxRetrievalArtifactReplay(
     }
     expect(providerRequests(driver, active)).toEqual([])
   } finally {
+    // Stop the on-demand daemon before deleting its roots so it does not
+    // linger detached until idle exit.
+    if (active) {
+      await harness
+        .run(['daemon', 'stop', '--format', 'json'], active.env)
+        .catch(() => undefined)
+    }
     active?.stop()
     await rm(stateDir, { recursive: true, force: true })
   }
