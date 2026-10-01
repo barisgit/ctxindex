@@ -97,6 +97,7 @@ test('binary CLI syncs local files through generic search, get, and Ref contract
           },
         },
       ],
+      skipped: [],
       warnings: [
         expect.objectContaining({ sourceId, code: 'binary_skipped' }),
         expect.objectContaining({ sourceId, code: 'oversize_skipped' }),
