@@ -366,7 +366,14 @@ export async function daemonTransferBytes(
     throw invocationError(error, signal, selection)
   }
   if (!response.ok) throw unavailable(selection)
-  const bytes = new Uint8Array(await response.arrayBuffer())
+  let bytes: Uint8Array
+  try {
+    // Cancellation or a dropped daemon connection can reject while the body
+    // is still streaming; both must stay bounded daemon client failures.
+    bytes = new Uint8Array(await response.arrayBuffer())
+  } catch (error) {
+    throw invocationError(error, signal, selection)
+  }
   if (signal?.aborted)
     throw invocationError(new Error('cancelled'), signal, selection)
   if (bytes.byteLength !== transfer.byteSize) {
