@@ -774,6 +774,7 @@ describe.skipIf(process.platform !== 'darwin')(
               }),
             },
           ],
+          skipped: [],
           warnings: [],
         })
 

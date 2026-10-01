@@ -41,6 +41,7 @@ function parseSourceId(stdout: string): string {
 async function addSource(
   sandbox: Sandbox,
   name: string = crypto.randomUUID(),
+  extraArgs: string[] = [],
 ): Promise<string> {
   const root = join(sandbox.dir, name)
   await mkdir(root, { recursive: true })
@@ -55,6 +56,7 @@ async function addSource(
     name,
     '--config-root-path',
     root,
+    ...extraArgs,
   ])
   expect(result.exitCode, result.stderr).toBe(0)
   expect(result.stderr).toBe('')
@@ -72,15 +74,24 @@ async function syncSource(sandbox: Sandbox, sourceId: string): Promise<void> {
   expect(result.exitCode, result.stderr).toBe(0)
 }
 
-function markAdapterUnavailable(sandbox: Sandbox, sourceId: string): void {
+function setAdapterId(
+  sandbox: Sandbox,
+  sourceId: string,
+  adapterId: string,
+): void {
   const db = new Database(dbPath(sandbox))
   try {
-    db.prepare(
-      "UPDATE sources SET adapter_id = 'missing.adapter' WHERE id = ?",
-    ).run(sourceId)
+    db.prepare('UPDATE sources SET adapter_id = ? WHERE id = ?').run(
+      adapterId,
+      sourceId,
+    )
   } finally {
     db.close()
   }
+}
+
+function markAdapterUnavailable(sandbox: Sandbox, sourceId: string): void {
+  setAdapterId(sandbox, sourceId, 'missing.adapter')
 }
 
 function syncRunErrorCount(sandbox: Sandbox, sourceId: string): number {
@@ -232,6 +243,80 @@ test('no sources still exits 0', async () => {
     expect(result.exitCode).toBe(0)
     expect(result.stderr).toBe('')
     expect(parseStatusRows(result.stdout)).toEqual([])
+  } finally {
+    await sandbox.cleanup()
+  }
+})
+
+test('sync selection and status distinguish never-run, disabled, and unsupported Sources', async () => {
+  const sandbox = await initSandbox()
+  try {
+    const eligibleId = await addSource(sandbox, 'eligible')
+    const neverRunId = await addSource(sandbox, 'never-run')
+    const disabledId = await addSource(sandbox, 'disabled', ['--no-sync'])
+    // A loaded built-in Adapter without local sync; mailbox Sources are
+    // federated-only, so selection must skip them rather than run them.
+    const unsupportedId = await addSource(sandbox, 'unsupported')
+    setAdapterId(sandbox, unsupportedId, 'google.mailbox')
+
+    const before = parseStatusRows(
+      (await sandbox.run(['status', '--format', 'json'])).stdout,
+    )
+    const statusBefore = new Map(
+      before.map((row) => [row.sourceId, row.lastStatus]),
+    )
+    expect(statusBefore.get(eligibleId)).toBe('pending')
+    expect(statusBefore.get(neverRunId)).toBe('pending')
+    expect(statusBefore.get(disabledId)).toBe('disabled')
+    expect(statusBefore.get(unsupportedId)).toBe('unsupported')
+
+    const targeted = await sandbox.run(['sync', '--source', unsupportedId])
+    expect(targeted.exitCode).toBe(2)
+    expect(targeted.stderr).toContain('Source Adapter does not support sync')
+
+    const all = await sandbox.run(['sync', '--format', 'json'])
+    expect(all.exitCode, all.stderr).toBe(0)
+    const output = JSON.parse(all.stdout) as {
+      results: { sourceId: string; status: string }[]
+      skipped: { sourceId: string; reason: string }[]
+    }
+    expect(output.results.map((result) => result.sourceId).sort()).toEqual(
+      [eligibleId, neverRunId].sort(),
+    )
+    expect(output.skipped).toEqual(
+      [
+        { sourceId: disabledId, reason: 'disabled' },
+        { sourceId: unsupportedId, reason: 'unsupported' },
+      ].sort((left, right) => left.sourceId.localeCompare(right.sourceId)),
+    )
+
+    const after = parseStatusRows(
+      (await sandbox.run(['status', '--format', 'json'])).stdout,
+    )
+    const statusAfter = new Map(
+      after.map((row) => [row.sourceId, row.lastStatus]),
+    )
+    expect(statusAfter.get(eligibleId)).toBe('idle')
+    expect(statusAfter.get(disabledId)).toBe('disabled')
+    expect(statusAfter.get(unsupportedId)).toBe('unsupported')
+  } finally {
+    await sandbox.cleanup()
+  }
+})
+
+test('global sync with zero eligible Sources says so', async () => {
+  const sandbox = await initSandbox()
+  try {
+    const unsupportedId = await addSource(sandbox, 'unsupported')
+    setAdapterId(sandbox, unsupportedId, 'google.mailbox')
+
+    const result = await sandbox.run(['sync'])
+
+    expect(result.exitCode, result.stderr).toBe(0)
+    expect(result.stdout).toContain('No Sources are eligible for sync.')
+    expect(result.stdout).toContain(
+      `${unsupportedId}\tskipped\treason=unsupported`,
+    )
   } finally {
     await sandbox.cleanup()
   }

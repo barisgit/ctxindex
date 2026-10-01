@@ -7,7 +7,9 @@ import {
 } from '../errors'
 import { compareStrings, type ExtensionRegistry } from '../registry'
 import {
+  adapterSupportsSync,
   syncSource as defaultSyncSource,
+  type SourceRow,
   type SourceService,
   type SyncSourceInput,
 } from '../source'
@@ -50,6 +52,12 @@ export type SourceSyncResult =
   | CompletedSourceSyncResult
   | FailedSourceSyncResult
 
+/** A configured Source that an all-Source sync did not select, and why. */
+export interface SkippedSourceSync {
+  readonly sourceId: string
+  readonly reason: 'disabled' | 'unsupported'
+}
+
 export type SyncApplicationEvent =
   | {
       readonly type: 'source.started'
@@ -79,6 +87,7 @@ export type SyncApplicationEvent =
 export interface RunSyncResult {
   readonly mode: SyncMode
   readonly results: readonly SourceSyncResult[]
+  readonly skipped: readonly SkippedSourceSync[]
   readonly warnings: readonly SourceSyncWarning[]
 }
 
@@ -144,22 +153,20 @@ export class SyncApplicationService {
   }
 
   async run(input: RunSyncInput): Promise<RunSyncResult> {
-    const sources = input.source
-      ? [this.resolveTarget(input.source)]
-      : this.deps.sourceService
-          .listSources()
-          .filter((source) => source.sync_enabled)
-          .filter((source) => {
-            const adapter = this.deps.registry.adapters.get({
-              id: source.adapter_id,
-            })
-            return (
-              !adapter ||
-              (adapter.capabilities.includes('sync') &&
-                adapter.operations.sync !== undefined)
-            )
-          })
-          .sort((left, right) => compareStrings(left.id, right.id))
+    const sources: SourceRow[] = []
+    const skipped: SkippedSourceSync[] = []
+    if (input.source) {
+      sources.push(this.resolveTarget(input.source))
+    } else {
+      const listed = [...this.deps.sourceService.listSources()].sort(
+        (left, right) => compareStrings(left.id, right.id),
+      )
+      for (const source of listed) {
+        const reason = this.ineligibility(source)
+        if (reason) skipped.push({ sourceId: source.id, reason })
+        else sources.push(source)
+      }
+    }
 
     const results: SourceSyncResult[] = []
     let sequence = 0
@@ -228,8 +235,22 @@ export class SyncApplicationService {
     return {
       mode: input.mode,
       results,
+      skipped,
       warnings: results.flatMap(warningsFor),
     }
+  }
+
+  /**
+   * Why a Source cannot be synchronized, or null when it is eligible.
+   * Unsupported outranks disabled because enabling sync could not help. A
+   * Source whose Adapter is not loaded stays eligible so its unavailability is
+   * reported as that Source's failure instead of being hidden.
+   */
+  private ineligibility(source: SourceRow): SkippedSourceSync['reason'] | null {
+    const adapter = this.deps.registry.adapters.get({ id: source.adapter_id })
+    if (adapter && !adapterSupportsSync(adapter)) return 'unsupported'
+    if (!source.sync_enabled) return 'disabled'
+    return null
   }
 
   private resolveTarget(reference: string) {
@@ -244,7 +265,14 @@ export class SyncApplicationService {
         `Source not found: "${reference}"`,
       )
     }
-    if (!source.sync_enabled) {
+    const reason = this.ineligibility(source)
+    if (reason === 'unsupported') {
+      throw new CtxindexValidationError(
+        'invalid_filter',
+        `Source Adapter does not support sync: "${reference}"`,
+      )
+    }
+    if (reason === 'disabled') {
       throw new CtxindexValidationError(
         'invalid_filter',
         `Source is not sync-enabled: "${reference}"`,

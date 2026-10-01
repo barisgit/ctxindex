@@ -3,6 +3,7 @@ import { syncSource } from '@ctxindex/core/source'
 import {
   type FailedSourceSyncResult,
   type RunSyncResult,
+  type SkippedSourceSync,
   type SyncApplicationEvent,
   SyncApplicationService,
   type SyncRunResult,
@@ -93,6 +94,7 @@ type SyncLiveEvent =
 export interface SyncOutput {
   readonly mode: SyncRunResult['mode']
   readonly results: readonly SourceSyncOutput[]
+  readonly skipped: readonly SkippedSourceSync[]
   readonly warnings: readonly SyncWarningOutput[]
 }
 
@@ -211,9 +213,6 @@ export function formatSyncOutput(
   json: boolean,
 ): string {
   if (json) return JSON.stringify(output)
-  if (output.results.length === 0 && output.warnings.length === 0) {
-    return format === 'events' ? '' : 'No sync-enabled Sources are available.'
-  }
   if (format === 'events') {
     return output.results
       .map((result) =>
@@ -249,6 +248,16 @@ export function formatSyncOutput(
       ? `${result.sourceId} completed +${run.added} ~${run.updated} -${run.deleted} warnings=${run.warningsCount} errors=${run.errorsCount}`
       : `${result.sourceId}\tcompleted\tadded=${run.added}\tupdated=${run.updated}\tdeleted=${run.deleted}\twarnings=${run.warningsCount}\terrors=${run.errorsCount}`
   })
+  if (output.results.length === 0) {
+    lines.push('No Sources are eligible for sync.')
+  }
+  for (const skipped of output.skipped) {
+    lines.push(
+      format === 'compact'
+        ? `${skipped.sourceId} skipped reason=${skipped.reason}`
+        : `${skipped.sourceId}\tskipped\treason=${skipped.reason}`,
+    )
+  }
   for (const warning of output.warnings) {
     lines.push(
       format === 'compact'
@@ -311,6 +320,7 @@ export async function handleSyncCommand(
       const output: SyncOutput = {
         mode: result.mode,
         results,
+        skipped: result.skipped,
         warnings: result.warnings.map((warning) => ({
           sourceId: warning.sourceId,
           ...rpcWarning(warning),
@@ -363,6 +373,7 @@ export async function handleSyncCommand(
     const output: SyncOutput = {
       mode: result.mode,
       results,
+      skipped: result.skipped,
       warnings: result.warnings,
     }
     const rendered =

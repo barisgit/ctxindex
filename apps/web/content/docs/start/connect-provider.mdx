@@ -73,8 +73,10 @@ ctxindex source add microsoft.mailbox \
   --realm company \
   --account work \
   --label work-mail
-ctxindex sync --source work-mail --format json
+ctxindex status --source work-mail --format json
 ```
+
+Mailbox Sources are searched at the provider and report sync status `unsupported`; calendar Sources sync locally with `ctxindex sync --source <label>`.
 
 Repeat with a calendar Adapter only when you need that collection. Accounts can back multiple compatible Sources; a Source always belongs to exactly one Realm.
 

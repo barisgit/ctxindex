@@ -9,7 +9,7 @@ Source status MUST report one effective sync status per Source that distinguishe
 4. the recorded sync state (`idle` or `failed`) when one exists;
 5. `pending` otherwise, meaning an eligible Source that has never completed or failed a sync.
 
-A Source whose Adapter definition is not loaded MUST use only steps 1, 4, and 5 and MUST continue to report its unavailability through Source availability. Reading status MUST NOT change Source sync state. Daemon-routed and direct status MUST report the same effective status.
+A Source whose Adapter definition is not loaded MUST skip step 2 and MUST continue to report its unavailability through Source availability. Reading status MUST NOT change Source sync state. Daemon-routed and direct status MUST report the same effective status.
 
 #### Scenario: Never-run eligible Source is pending
 - **WHEN** status is read for a sync-enabled Source whose Adapter supports sync and that has never been synchronized

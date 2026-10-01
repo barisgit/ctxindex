@@ -7,6 +7,7 @@ import {
   CtxindexValidationError,
 } from '../errors'
 import type { SyncWarning } from '../sync'
+import { adapterSupportsSync } from './sync-source'
 import type {
   AddSourceInput,
   AddSourceResult,
@@ -146,7 +147,8 @@ interface StatusDbRow {
   readonly sourceId: string
   readonly adapterId: string
   readonly realmSlug: string
-  readonly lastStatus: string
+  readonly syncEnabled: number
+  readonly recordedStatus: string | null
   readonly lastRunAt: number | null
   readonly warningsCount: number | null
   readonly lastWarningJson: string | null
@@ -162,6 +164,24 @@ function sourceAvailability(
   return deps.registry.adapters.get({ id: source.adapter_id })
     ? 'available'
     : 'extension_unavailable'
+}
+
+/**
+ * Effective Source sync status. Recorded `needs_auth` stays first because it
+ * also blocks federated operations; otherwise an Adapter that cannot sync or a
+ * disabled policy outranks run history, so `pending` only ever means an
+ * eligible Source that has never run. Capability is unknown when the Adapter
+ * is not loaded; availability reports that case separately.
+ */
+function effectiveSyncStatus(
+  deps: SourceServiceDeps,
+  row: Pick<StatusDbRow, 'adapterId' | 'syncEnabled' | 'recordedStatus'>,
+): string {
+  if (row.recordedStatus === 'needs_auth') return 'needs_auth'
+  const adapter = deps.registry.adapters.get({ id: row.adapterId })
+  if (adapter && !adapterSupportsSync(adapter)) return 'unsupported'
+  if (!row.syncEnabled) return 'disabled'
+  return row.recordedStatus ?? 'pending'
 }
 
 function withAvailability(
@@ -439,7 +459,8 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
         SELECT s.id AS sourceId,
                s.adapter_id AS adapterId,
                r.slug AS realmSlug,
-               COALESCE(sss.last_status, 'pending') AS lastStatus,
+               s.sync_enabled AS syncEnabled,
+               sss.last_status AS recordedStatus,
                sr.completed_at AS lastRunAt,
                sss.warnings_count AS warningsCount,
                sss.last_warning_json AS lastWarningJson,
@@ -468,7 +489,7 @@ export function createSourceService(deps: SourceServiceDeps): SourceService {
         availability: sourceAvailability(deps, {
           adapter_id: row.adapterId,
         }),
-        lastStatus: row.lastStatus,
+        lastStatus: effectiveSyncStatus(deps, row),
         lastRunAt: row.lastRunAt,
         warningsCount: row.warningsCount ?? 0,
         lastWarning: parseLastWarning(row.lastWarningJson),
