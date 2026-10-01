@@ -55,6 +55,8 @@ Exceptions are an allowlist enforced by architecture tests, not a fallback. Once
 
 Any persisted Extension path is resolved against the explicit configuration origin and stored or projected in a launch-directory-independent form. Daemon startup must produce the same Extension registry regardless of its current working directory. Existing pre-alpha configuration may be rewritten in place after validation; no compatibility migration is promised before release.
 
+The configuration origin is the real (symlink-resolved) directory containing the `config.toml` being read or written. Config reads project every relative Extension path to a normalized absolute path against that origin, and config writes persist the same canonical form through the existing validated atomic rename; files are not rewritten merely because they were read. The loader itself never resolves against the process working directory: a relative path that reaches it without a configuration origin is reported as a bounded Extension diagnostic.
+
 ### 6. Platform support is a release gate, not an assumption
 
 The retained ownership abstraction must expose platform-specific implementations with the same safety properties: process-retained shared/exclusive ownership, owner-private permanent metadata, death release, no stale-file attribution, and fail-closed acquisition. Darwin keeps its proven backend. Linux and Windows support are decided and implemented in explicit task checkpoints before each platform is advertised. Until a backend passes its compiled multi-process suite, daemon mode fails closed there and documentation must not claim support.
