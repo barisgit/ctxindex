@@ -98,7 +98,8 @@ import {
 
 export const DAEMON_PROTOCOL = { id: 'ctxindex.local', version: 4 } as const
 const DEFAULT_OBSERVATION_TIMEOUT_MS = 5_000
-const DEFAULT_IDLE_TIMEOUT_MS = 5 * 60_000
+/** Fixed production idle lifetime; not user configuration. */
+export const DAEMON_IDLE_TIMEOUT_MS = 5 * 60_000
 const PUBLIC_VERSION = /^[a-z0-9][a-z0-9.+_-]{0,63}$/i
 
 const productionIdleTimer: DaemonIdleTimer = {
@@ -647,7 +648,7 @@ export async function startDaemon(
   const observationTimeoutMs = requireObservationTimeout(
     options.observationTimeoutMs ?? DEFAULT_OBSERVATION_TIMEOUT_MS,
   )
-  const idleTimeoutMs = options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS
+  const idleTimeoutMs = options.idleTimeoutMs ?? DAEMON_IDLE_TIMEOUT_MS
   if (!Number.isSafeInteger(idleTimeoutMs) || idleTimeoutMs < 1) {
     throw new RangeError('Daemon idle timeout must be a positive integer')
   }
@@ -794,8 +795,11 @@ export async function startDaemon(
       expectations: { protocol: DAEMON_PROTOCOL, runtime: roots.identity },
       transferStore,
     })
-    application.markReady()
+    // Publish ready metadata before admission opens (synchronously, so no client
+    // can observe the gap). A failed publication then rolls back without an
+    // armed idle timer or an application that believes it is ready.
     writeLifecycle('ready')
+    application.markReady()
   } catch (error) {
     transferStore.close()
     const ownedLifecycle = lifecycleLease !== undefined
