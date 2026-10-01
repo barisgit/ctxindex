@@ -3,7 +3,7 @@
 ### Requirement: All runtime-owning commands use semantic daemon services
 After promotion, every CLI command that reads or mutates SQLite, secrets, Accounts, Grants, OAuth Apps, the active Extension registry, managed Artifact bookkeeping, or provider-backed runtime state MUST use a bounded semantic daemon application procedure. The CLI MUST continue to own argument validation possible without runtime state, explicit browser interaction, formatting, diagnostics, and final exit mapping.
 
-Pre-daemon initialization and proven filesystem-only Catalog inspection MAY remain direct only through an explicit tested allowlist. The allowlist MUST NOT permit SQLite open, secret mutation, installed-registry activation, or provider I/O.
+Only an explicit tested allowlist MAY remain direct: pre-daemon `init` bootstrap, which creates initial configuration, secret-backend, and SQLite state before any daemon can own it; filesystem-only Catalog and documentation commands that neither open SQLite nor change installed activation; explicit daemon lifecycle controls; and installed-Extension maintenance that first verifies a stopped daemon and retains shared database ownership for the whole mutation as required by the local-daemon direct Extension maintenance requirement. Every other command MUST NOT open SQLite or mutate secrets, the installed registry, or provider state outside the daemon. A platform without a verified daemon ownership backend retains its existing conditional direct route because no daemon can own its database.
 
 #### Scenario: Remaining stateful command runs while daemon is active
 - **WHEN** an agent invokes OAuth App, Account, secret-backend, Artifact, export, Action, purge, or installed-Extension behavior
@@ -11,7 +11,7 @@ Pre-daemon initialization and proven filesystem-only Catalog inspection MAY rema
 
 #### Scenario: Safe direct exception runs
 - **WHEN** a direct bootstrap or filesystem-only command is allowlisted
-- **THEN** architecture tests prove it cannot access daemon-owned state or mutate the active registry
+- **THEN** architecture tests prove only allowlisted bootstrap, verified-stopped Extension maintenance, or the unsupported-platform conditional route can reach direct SQLite or secret ownership, and no exception mutates an active daemon registry
 
 ### Requirement: Registry discovery uses semantic read projections
 On an advertised platform with initialized state, ordinary `describe` (including Profile, Adapter, and Action discovery without `--source`) and `extension list` MUST read the daemon-owned immutable registry through bounded semantic procedures. Neither command is a filesystem-only exception. Selecting an unavailable daemon MUST fail closed without client registry composition.

@@ -131,10 +131,9 @@ describe('mapErrorToExit', () => {
     'protocol_incompatible',
     'runtime_identity_mismatch',
     'database_lease_conflict',
-    'prototype_unsupported',
     'shutdown_timeout',
     'result_too_large',
-  ])('maps prototype daemon failure %s to exit 50', (code) => {
+  ])('maps daemon failure %s to exit 50', (code) => {
     expect(mapErrorToExit({ code })).toBe(50)
   })
 

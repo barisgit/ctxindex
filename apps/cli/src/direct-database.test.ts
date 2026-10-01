@@ -10,9 +10,9 @@ import {
   FileLeaseUnsupportedError,
 } from '@ctxindex/local-daemon'
 import {
+  DirectDatabaseLeaseConflictError,
   initializeDirectStorage,
   openLeasedDatabase,
-  PrototypeUnsupportedError,
   readLeasedDirectExtensionSourceBindings,
   readLeasedLocalOAuthAppIdentities,
 } from './direct-database'
@@ -57,7 +57,7 @@ test('retains the shared lease from before open until after database close', asy
   ])
 })
 
-test('maps exclusive ownership to prototype unsupported before database open', async () => {
+test('maps exclusive ownership to a database lease conflict before database open', async () => {
   let opened = false
   await expect(
     openLeasedDatabase({
@@ -70,7 +70,12 @@ test('maps exclusive ownership to prototype unsupported before database open', a
         return {} as CtxindexDatabase
       },
     }),
-  ).rejects.toBeInstanceOf(PrototypeUnsupportedError)
+  ).rejects.toMatchObject({
+    constructor: DirectDatabaseLeaseConflictError,
+    code: 'database_lease_conflict',
+    message:
+      'This command is unavailable while the local daemon owns the database.',
+  })
   expect(opened).toBe(false)
 })
 
@@ -149,7 +154,7 @@ test('local OAuth App identity reads fail closed behind exclusive ownership', as
           throw new FileLeaseConflictError('a'.repeat(64))
         },
       }),
-    ).rejects.toBeInstanceOf(PrototypeUnsupportedError)
+    ).rejects.toBeInstanceOf(DirectDatabaseLeaseConflictError)
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -166,7 +171,7 @@ test('local OAuth App identity reads acquire before checking a missing database'
           throw new FileLeaseConflictError('a'.repeat(64))
         },
       }),
-    ).rejects.toBeInstanceOf(PrototypeUnsupportedError)
+    ).rejects.toBeInstanceOf(DirectDatabaseLeaseConflictError)
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -268,7 +273,7 @@ test('Source binding reads fail closed before SQLite open under daemon ownership
           return {} as CtxindexDatabase
         },
       }),
-    ).rejects.toBeInstanceOf(PrototypeUnsupportedError)
+    ).rejects.toBeInstanceOf(DirectDatabaseLeaseConflictError)
     expect(opened).toBe(false)
   } finally {
     await rm(root, { recursive: true, force: true })

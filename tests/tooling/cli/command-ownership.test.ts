@@ -8,6 +8,7 @@ import { loadExtensions } from '@ctxindex/core/extension'
 import { describeRegistry } from '@ctxindex/core/registry'
 import * as CTXINDEX_BUILTIN_MODULE from '@ctxindex/official'
 import type { RpcExtensionListResult } from '@ctxindex/rpc'
+import { Glob } from 'bun'
 import { projectCommandReference } from '../../../apps/cli/src/command-model'
 import {
   CLI_DAEMON_PROTOCOL,
@@ -429,4 +430,123 @@ test('daemon inventory preserves installed-but-unloaded entries, formatting and 
   } finally {
     await daemon.listener.stop()
   }
+})
+
+// Static companion to the runtime ownership proofs above. Only these modules may
+// reach direct SQLite or secret-store ownership. Each is the shared-lease owner
+// itself, an allowlisted exception, or the conditional direct route used only
+// after daemon ensure/selection declines ownership (no platform backend).
+const leaseOwner = 'retained shared database lease owner'
+const unsupportedPlatformRoute = 'conditional unsupported-platform direct route'
+const directOwnershipModules: Readonly<Record<string, string>> = {
+  'apps/cli/src/direct-database.ts': leaseOwner,
+  'apps/cli/src/commands/init.ts': 'init',
+  'apps/cli/src/extensions/services.ts': 'extension install',
+  'apps/cli/src/extensions/daemon-coordination.ts': 'extension install',
+  'apps/cli/src/deps.ts': unsupportedPlatformRoute,
+  'apps/cli/src/source/handle-source-command.ts': unsupportedPlatformRoute,
+  'apps/cli/src/oauth-app/handle-oauth-app-command.ts':
+    unsupportedPlatformRoute,
+}
+const directDatabaseOwners = new Set([
+  'acquireDirectDatabaseOwnership',
+  'acquireSharedDatabaseLease',
+  'getDb',
+  'initializeDirectStorage',
+  'openLeasedDatabase',
+  'readLeasedDirectExtensionSourceBindings',
+  'readLeasedLocalOAuthAppIdentities',
+])
+const directRuntimeOpeners = new Set([
+  'openAccountDeps',
+  'openDeps',
+  'openSecretDeps',
+])
+
+function valueImports(
+  source: string,
+): { specifier: string; names: string[] }[] {
+  const imports = source.matchAll(
+    /import\s+(?!type\s)(?:\{([^}]*)\}|\*\s+as\s+(\w+)|(\w+))?\s*(?:from\s*)?'([^']+)'/g,
+  )
+  return [...imports].map(([, named, namespace, fallback, specifier]) => ({
+    specifier: specifier ?? '',
+    names: named
+      ? named
+          .split(',')
+          .map((name) => name.trim())
+          .filter((name) => name && !name.startsWith('type '))
+          .map((name) => name.split(/\s+as\s+/)[0] ?? name)
+      : [namespace ? '*' : (fallback ?? 'side-effect')],
+  }))
+}
+
+function reachesDirectOwnership(source: string): boolean {
+  return valueImports(source).some(({ specifier, names }) => {
+    if (/(^|\/)direct-database$/.test(specifier))
+      return names.some(
+        (name) => name === '*' || directDatabaseOwners.has(name),
+      )
+    if (specifier === 'bun:sqlite' || specifier === '@ctxindex/core/storage')
+      return names.length > 0
+    if (specifier === '@ctxindex/core/secrets')
+      return names.some((name) => !name.endsWith('Error'))
+    return false
+  })
+}
+
+async function productionCliSources(): Promise<Map<string, string>> {
+  const sources = new Map<string, string>()
+  for await (const path of new Glob('apps/cli/src/**/*.ts').scan('.')) {
+    if (path.endsWith('.test.ts') || path.includes('/e2e/')) continue
+    sources.set(path, await Bun.file(path).text())
+  }
+  return sources
+}
+
+test('direct SQLite and secret ownership is reachable only from classified modules', async () => {
+  const sources = await productionCliSources()
+  const actual = [...sources]
+    .filter(([, source]) => reachesDirectOwnership(source))
+    .map(([path]) => path)
+    .sort()
+  expect(actual).toEqual(Object.keys(directOwnershipModules).sort())
+  for (const reason of Object.values(directOwnershipModules)) {
+    if (reason === leaseOwner || reason === unsupportedPlatformRoute) continue
+    expect(Object.keys(exceptions)).toContain(reason)
+  }
+})
+
+test('direct runtime composition is reachable only behind daemon ensure', async () => {
+  const sources = await productionCliSources()
+  const unguarded = [...sources]
+    .filter(([, source]) =>
+      valueImports(source).some(
+        ({ specifier, names }) =>
+          /(^|\/)deps$/.test(specifier) &&
+          names.some((name) => directRuntimeOpeners.has(name)),
+      ),
+    )
+    .filter(([, source]) => !source.includes('ensureDaemonSelection'))
+    .map(([path]) => path)
+  expect(unguarded).toEqual([])
+})
+
+test('direct ownership guard detects owners, storage, and secret constructors', () => {
+  expect(
+    [
+      "import { getDb } from '../direct-database'",
+      "import * as direct from './direct-database'",
+      "import { openDatabase } from '@ctxindex/core/storage'",
+      "import { Database } from 'bun:sqlite'",
+      "import { createSecretVault } from '@ctxindex/core/secrets'",
+    ].map(reachesDirectOwnership),
+  ).toEqual([true, true, true, true, true])
+  expect(
+    [
+      "import { directDatabasePath } from '../direct-database'",
+      "import type { CtxindexDatabase } from '@ctxindex/core/storage'",
+      "import { CtxindexSecretsError } from '@ctxindex/core/secrets'",
+    ].map(reachesDirectOwnership),
+  ).toEqual([false, false, false])
 })
