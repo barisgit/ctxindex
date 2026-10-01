@@ -142,7 +142,26 @@ The CLI lifecycle facade resolves only the pinned Bun source entrypoint or an ex
 
 The lifecycle facade's outer action boundary preserves validated daemon failures, cancellation, and typed pre-init `invalid_args` guidance. Unexpected runtime canonicalization, discovery, or filesystem exceptions are converted to fixed action-specific `daemon_unavailable` messages before command rendering, so raw host paths and OS errors never cross the CLI boundary.
 
-Lifecycle commands are exactly `daemon start`, `daemon status`, and `daemon stop`; no foreground serve alias remains. Ordinary commands preserve the existing explicit discovery/test-override routing and do not autostart until the complete stateful inventory is daemon-routed or admitted to the tested bootstrap/filesystem-only exception allowlist. Once selected, transport loss never falls back to direct SQLite.
+Lifecycle commands are exactly `daemon start`, `daemon status`, and `daemon stop`; there is no public foreground serve command. Once selected, transport loss never falls back to direct SQLite.
+
+### @ctxindex/cli — daemon routing and safe exceptions
+
+```ts
+export interface DaemonSelection {
+  readonly endpoint: string
+  readonly roots: ReturnType<typeof resolveRuntimeIdentity>
+  readonly metadata: DiscoveryMetadata | null
+  readonly selectedBy: 'metadata' | 'test_override'
+}
+
+export function selectDaemon(): DaemonSelection | null;
+```
+
+Every initialized stateful command leaf invokes one semantic procedure through the private client facade in `apps/cli/src/daemon/client.ts`; handlers never import the daemon application, runtime composition, or the RPC contract as a public API. The client selects only exact matching discovery metadata (or the test endpoint override), sends explicit protocol and runtime headers, returns plain typed values, and converts only declared registry failures; unknown transport or protocol failures become `daemon_unavailable`.
+
+The safe-exception allowlist in `tests/tooling/cli/command-ownership.test.ts` is the only direct route on an advertised platform: `init` (pre-daemon bootstrap), `docs get-skill` (embedded release content), the `extension catalog` build/add/list/show/search/refresh/remove leaves (Catalog configuration and snapshots only), `extension install|update|uninstall` (the stop–lease–mutate–release–restore coordinator in [local-daemon](../local-daemon/implementation.md#direct-maintenance-exclusion)), and `daemon start|status|stop`. Before initialization, `describe`, `extension list`, and documentation reads keep state-free direct definition discovery. On a platform without a retained-ownership backend (anything but Darwin and Linux, including Windows) ensure reports `unsupported` before any daemon selection, and the same commands take a conditional direct route; `acquireSharedDatabaseLease()` returns no lease there because no daemon can own that database. That route is never a fallback after selection. Static guards restrict direct SQLite and secret-store reach to the classified modules.
+
+The CLI owns interaction and presentation: local argument validation, authorization URL presentation and browser launch, the hidden one-use manual authorization response, one read of Provider-declared `oauth-app add --from-env` values sent only as the dedicated write-only input, readable/JSON formatting, stderr diagnostics, and final exits. For Artifact download and export it consumes the opaque transfer ticket once over the selected socket, verifies the exact byte count, and either writes stdout or publishes through a private adjacent staging file and a no-overwrite hard link.
 
 ### @ctxindex/cli — shared flag contracts
 
@@ -557,7 +576,7 @@ export function parsePurgeArtifactsArgs(args: string[]): PurgeArtifactsArgs;
 
 ## Implementation doctrine
 
-`@ctxindex/cli` is the composition root. It opens core services, loads the current registry once per command flow, parses non-interactively, invokes deep-module services through focused handlers, and owns readable/JSON output plus exit mapping.
+`@ctxindex/cli` is the command and presentation boundary. It parses non-interactively, validates locally, routes initialized stateful work to semantic daemon procedures, and owns readable/JSON output plus exit mapping. It opens core services and loads the registry once per command flow only for the allowlisted exceptions, pre-initialization discovery, and the unsupported-platform route.
 
 Database-backed command dependency setup requires both the persisted config and database created by explicit `init` before opening SQLite. The shared preflight fails with the fixed exit-2 guidance `ctxindex is not initialized; run ctxindex init` and no durable side effects when either is absent. OAuth App add preserves loaded-Provider validation, then invokes the preflight before declared configuration environments are read; list/remove check before dependencies. `init` retains backend selection before database bootstrap. Help, argument parsing, Provider validation, and pure definition discovery remain available on fresh state.
 
@@ -582,4 +601,4 @@ boundary.
 
 ## Verification
 
-Argument tests cover every discriminated parser and invalid form, including optional managed App selection, explicit exact App labels, exact direct source-kind and Extension selection, Catalog/direct separation, zero-effect invalid selection, static BYOA guidance, and rejection of every Client compatibility route. Command tests inject dependency/service interfaces. CLI e2e tests cover empty and config-only initialization guards with no OAuth App configuration or durable-state side effects, readable/JSON stream separation, stable exits, registry-derived help/describe behavior, the portable bundled Agent Skill, local Catalog trust, direct package trust, default command-time refresh, stored-snapshot age and `--no-refresh`, observable refresh failure, offline pinned startup/loading, guarded removal, and relocated compiled execution.
+`tests/tooling/cli/command-ownership.test.ts` gives every public command leaf exactly one daemon-routed or allowlisted classification, proves no fallback after selection, and restricts direct SQLite and secret ownership to classified modules; `tests/tooling/cli/compiled-command-coverage.test.ts` keeps compiled journeys aligned with that inventory. Argument tests cover every discriminated parser and invalid form, including optional managed App selection, explicit exact App labels, exact direct source-kind and Extension selection, Catalog/direct separation, zero-effect invalid selection, static BYOA guidance, and rejection of every Client compatibility route. Command tests inject dependency/service interfaces. CLI e2e tests cover empty and config-only initialization guards with no OAuth App configuration or durable-state side effects, readable/JSON stream separation, stable exits, registry-derived help/describe behavior, the portable bundled Agent Skill, local Catalog trust, direct package trust, default command-time refresh, stored-snapshot age and `--no-refresh`, observable refresh failure, offline pinned startup/loading, guarded removal, and relocated compiled execution.

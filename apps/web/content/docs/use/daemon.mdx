@@ -33,4 +33,12 @@ Explicit start is useful for smoke tests and lifecycle diagnosis. It is not an i
   Once a command selects the daemon, it never falls back to opening the same database directly. A startup, protocol, or shutdown failure is reported with a stable exit instead of creating competing owners.
 </Callout>
 
+## Commands that stay client-side
+
+`init`, `docs get-skill`, and the `extension catalog` commands never start the daemon. `extension install`, `update`, and `uninstall` stop a running daemon, change installed Extension records while holding the database, and start the daemon again so it loads the new registry. Before `init`, `describe` and `extension list` read bundled definitions without creating state.
+
+## Supported platforms
+
+The daemon runs on macOS and Linux. Other platforms, including Windows, are not supported for it: `daemon status` prints `unsupported`, `daemon start` fails with exit `50`, and stateful commands open the local database directly because no daemon can own it there.
+
 For malformed config or startup diagnostics, see [Troubleshooting](/docs/start/troubleshooting). For the process boundary, see [Architecture](/docs/concepts/architecture).

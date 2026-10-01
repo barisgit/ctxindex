@@ -3,10 +3,11 @@
 > **NON-NORMATIVE.** This is a readable projection of the current system. If it
 > conflicts with `openspec/specs/<capability>/spec.md`, the capability spec wins.
 >
-> **Last refreshed:** 2026-07-22
+> **Last refreshed:** 2026-10-01
 >
-> **Sources consulted:** `CONTEXT.md`; current specs/sidecars; active daemon,
-> managed-App, portable-skill, and npm-distribution changes; affected codemaps.
+> **Sources consulted:** `CONTEXT.md`; current specs and implementation
+> sidecars; the `promote-local-daemon-architecture` and
+> `complete-on-demand-daemon-lifecycle` changes; affected codemaps.
 
 ## 1. 10-minute tour
 
@@ -29,7 +30,12 @@ ctxindex get 'ctx://<source-id>/<adapter-owned-suffix>'
 Stateful commands ensure one compatible local daemon automatically. The daemon
 owns SQLite, the active Extension registry, provider access, and long-running
 work; it exits after five idle minutes and restarts on demand. `daemon
-start|status|stop` remain explicit operational controls.
+start|status|stop` remain explicit operational controls; there is no public
+foreground `serve` command.
+
+A few commands never need the daemon: `init`, `docs get-skill`, and `extension
+catalog` management. `extension install|update|uninstall` stop a running
+daemon, mutate installed records under database ownership, and restart it.
 
 Two data paths return the same Resource and Ref model:
 
@@ -94,8 +100,10 @@ security bounds.
 Extensions are trusted in-process code. Repository, author-build, and install
 trust are separate. Startup uses immutable bytes and performs no refresh.
 
-The owner-private daemon uses retained leases on Darwin/Linux. Unsupported
-platforms retain explicit direct behavior rather than unsafe ownership.
+The owner-private daemon uses retained kernel leases on Darwin and Linux only.
+Other platforms, including Windows, are not supported for the daemon: status
+reports `unsupported`, explicit start fails, and stateful commands use a direct
+local route because no daemon can own the database there.
 
 ## 5. Extension architecture
 
@@ -195,13 +203,17 @@ truncated and diagnostics stay off JSON stdout.
 
 Stable exits are `0` success, `2` invalid usage, `10` authorization required,
 `20` rate-limited, `30` network/provider/acquisition failure, `40` permission
-denied, `50` other bounded failure, and `130` cancellation.
+denied, `50` other bounded failure, and `130` cancellation. A command that
+finds the database owned by another process reports `database_lease_conflict`
+(exit `50`).
 
 ## 12. Known limitations and deferrals
 
 - No email sending, calendar mutation, or arbitrary provider mutation.
-- No remote/public RPC, batching, OpenAPI SDK, service installation, queue,
-  scheduler, semantic retrieval, or cross-source identity merging.
+- No remote/public RPC, batching, OpenAPI SDK, service installation or login
+  startup, queue, scheduler, semantic retrieval, or cross-source identity
+  merging.
+- The daemon supports Darwin and Linux only; Windows is not supported.
 - No automatic Artifact eviction by age, quota, or storage pressure.
 - Extension updates are explicit; Catalog refresh never changes installed bytes.
 - The runtime is currently Bun-based; Node compatibility is not promised.

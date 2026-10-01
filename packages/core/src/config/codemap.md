@@ -12,8 +12,8 @@ Owns runtime environment capture, TOML configuration persistence, schema validat
 
 ## Data & control flow
 
-1. `readConfig()` returns `defaultConfig()` when absent or parses and validates persisted TOML and secret references.
-2. `writeConfig()` validates and normalizes configuration, writes a mode-`0600` temporary file, then atomically renames it; backend switching commits only after copied secrets and database refs are usable.
+1. `readConfig()` returns `defaultConfig()` when absent or parses and validates persisted TOML and secret references, then projects every relative `extensions.paths` entry to an absolute path against the configuration origin (the real directory of `config.toml`) so the CLI and a daemon started anywhere load the same Extensions; reads never rewrite the file.
+2. `writeConfig()` validates and normalizes configuration, persists Extension paths in the same origin-relative absolute form, writes a mode-`0600` temporary file, then atomically renames it; backend switching commits only after copied secrets and database refs are usable.
 3. Environment consumers call `getEnv()` for one immutable process snapshot; `oauth-app add --from-env` reads Provider-declared registration keys once before persisting a typed config ref, and `resolveEnvUri()` maps an `env:` URI to that snapshot.
 4. Provider test transports read their central mock-base keys, then apply provider-specific production and loopback guards before constructing request URLs.
 

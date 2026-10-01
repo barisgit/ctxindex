@@ -42,7 +42,7 @@ CLI input is parsed and dispatched by `apps/cli/` into core services. Realm, Sou
 | Directory | Responsibility | Detailed map |
 | --- | --- | --- |
 | `.github/` | GitHub pull-request gates and protected npm trusted-publishing automation. | Workflow-local configuration. |
-| `apps/` | Deployable application workspaces: the public CLI, documentation site, and background local-daemon prototype. | [`apps/codemap.md`](apps/codemap.md) |
+| `apps/` | Deployable application workspaces: the public CLI, documentation site, and on-demand background local daemon. | [`apps/codemap.md`](apps/codemap.md) |
 | `packages/` | Core/runtime libraries, local RPC and daemon infrastructure, extension contracts, Profiles, and built-in Adapters. | [`packages/codemap.md`](packages/codemap.md) |
 | `scripts/` | Repository policy gates, helper-created worktree isolation, and bounded command tooling. | [`scripts/codemap.md`](scripts/codemap.md) |
 | `tests/tooling/` | Repository-level CI, release, architecture, and developer-tooling contract tests. | [`tests/tooling/codemap.md`](tests/tooling/codemap.md) |
