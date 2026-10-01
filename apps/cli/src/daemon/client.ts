@@ -396,11 +396,12 @@ export async function daemonTransferToFile(
 ): Promise<void> {
   const bytes = await daemonTransferBytes(selection, transfer, signal, services)
   const directory = dirname(outputPath)
-  const temporaryDirectory = await mkdtemp(
-    join(directory, `.${basename(outputPath)}.ctxindex-transfer-`),
-  )
-  const temporaryPath = join(temporaryDirectory, 'content')
+  let temporaryDirectory: string | undefined
   try {
+    temporaryDirectory = await mkdtemp(
+      join(directory, `.${basename(outputPath)}.ctxindex-transfer-`),
+    )
+    const temporaryPath = join(temporaryDirectory, 'content')
     await writeFile(temporaryPath, bytes, {
       mode: 0o600,
       ...(signal ? { signal } : {}),
@@ -421,9 +422,12 @@ export async function daemonTransferToFile(
       throw error
     }
   } catch (error) {
+    // Once the user has cancelled, any staging failure reports cancellation:
+    // nothing was published, and the cancelled outcome and exit stay stable.
     throw signal?.aborted ? daemonCancelledError() : error
   } finally {
-    await rm(temporaryDirectory, { recursive: true, force: true })
+    if (temporaryDirectory)
+      await rm(temporaryDirectory, { recursive: true, force: true })
   }
 }
 

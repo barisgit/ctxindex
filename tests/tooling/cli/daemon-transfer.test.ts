@@ -624,7 +624,12 @@ function stagingBarrier(
   const released = new Promise<void>((resolve) => {
     release = resolve
   })
-  const original = fsPromises[step] as (...args: unknown[]) => Promise<void>
+  const originals = {
+    writeFile: fsPromises.writeFile,
+    chmod: fsPromises.chmod,
+    rm: fsPromises.rm,
+  }
+  const original = originals[step] as (...args: unknown[]) => Promise<void>
   const spy = spyOn(fsPromises, step).mockImplementation((async (
     ...args: unknown[]
   ) => {
@@ -677,6 +682,29 @@ test('cancellation while staging a transferred file publishes nothing and report
     expect(h.store.created).toHaveLength(1)
     for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
   }
+})
+
+test('a staging failure observed after cancellation reports cancelled, not the filesystem error', async () => {
+  const h = await harness({})
+  const descriptor = h.store.create(payload)
+  const controller = new AbortController()
+  const mkdtemp = spyOn(fsPromises, 'mkdtemp').mockImplementation((async () => {
+    controller.abort()
+    throw Object.assign(new Error('ENOENT: output directory removed'), {
+      code: 'ENOENT',
+    })
+  }) as never)
+  cleanups.push(() => mkdtemp.mockRestore())
+
+  await expect(
+    daemonTransferToFile(
+      h.selection,
+      descriptor,
+      join(h.outputs, 'gone.bin'),
+      controller.signal,
+    ),
+  ).rejects.toMatchObject({ code: 'cancelled' })
+  expect(await readdir(h.outputs)).toEqual([])
 })
 
 test('cancellation after publication is not reported as a successful download', async () => {
