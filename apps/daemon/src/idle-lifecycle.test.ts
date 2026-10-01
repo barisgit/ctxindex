@@ -318,6 +318,62 @@ describe('activity-aware idle lifetime', () => {
     expect(clock.pending).toBe(0)
   })
 
+  test('unary domain failure and cancellation each settle activity once', async () => {
+    const clock = new TestIdleClock()
+    let calls = 0
+    const { app, stops } = idleApplication(clock, 1_000, {
+      secretBackendManager: {
+        getStatus: async () => {
+          calls += 1
+          throw new Error('backend unavailable')
+        },
+      },
+      sourceService: {
+        resolveSourceId: (value: string) => value,
+        getStatus: () => [],
+      },
+    })
+    app.markReady()
+
+    clock.advance(400)
+    expect((await app.secrets.status({}, context('failure'))).ok).toBe(false)
+    expect(calls).toBe(1)
+    expect(clock.pending).toBe(1)
+
+    clock.advance(400)
+    const request = new AbortController()
+    request.abort()
+    expect(
+      await app.status.get({}, context('cancelled', request.signal)),
+    ).toMatchObject({ ok: false, error: { kind: 'cancelled' } })
+
+    expectFreshInterval(clock, app, stops, 1_000)
+  })
+
+  test('shutdown with admitted work drains it without rearming the idle timer', async () => {
+    const clock = new TestIdleClock()
+    const unary = controlledUnary()
+    const { app, stops } = idleApplication(clock, 1_000, {
+      secretBackendManager: unary.secretBackendManager,
+    })
+    app.markReady()
+    const pending = app.secrets.status({}, context('draining'))
+    await Bun.sleep(0)
+
+    await app.system.shutdown({}, context('stop'))
+    unary.calls[0]?.gate.resolve()
+    expect(await pending).toMatchObject({
+      ok: false,
+      error: { kind: 'cancelled' },
+    })
+    await app.whenDrained()
+
+    expect(app.activeRequestCount).toBe(0)
+    expect(clock.pending).toBe(0)
+    clock.advance(10_000)
+    expect(stops).toEqual([0])
+  })
+
   test('explicit shutdown before expiry stops immediately and cancels the idle deadline', async () => {
     const clock = new TestIdleClock()
     const { app, stops } = idleApplication(clock, 1_000)
@@ -515,9 +571,18 @@ describe('typed stream idle suppression and exactly-once settlement', () => {
     expectHeldAcrossIdle(clock, app, stops)
 
     expect(await iterator.return?.()).toEqual({ done: true, value: cancelled })
+    const settledAt = clock.now
+    // A repeated return after settlement must not settle activity again or
+    // restart the idle interval.
+    clock.advance(idleTimeoutMs / 2)
     expect(await iterator.return?.()).toEqual({ done: true, value: cancelled })
-
-    expectFreshInterval(clock, app, stops, idleTimeoutMs)
+    expect(await iterator.next()).toMatchObject({ done: true })
+    clock.advance(idleTimeoutMs / 2 - 1)
+    expect(app.lifecycle).toBe('ready')
+    clock.advance(1)
+    expect(app.lifecycle).toBe('stopping')
+    expect(stops).toEqual([settledAt + idleTimeoutMs])
+    expect(clock.pending).toBe(0)
   })
 
   test('producer failure settles activity once after the declared failure is consumed', async () => {
