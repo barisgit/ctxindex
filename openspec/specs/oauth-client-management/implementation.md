@@ -72,6 +72,10 @@ Account authorization with an explicit App label bypasses managed selection. Wit
 
 Both paths then use the same exact `(providerId,label)` resolver, validate the App against the active semantic Provider, request the unchanged Provider-base plus all-active-Adapter scope union, and create a private Grant-owned snapshot. Removing an App affects future authorization only.
 
+## Daemon ownership
+
+On an advertised platform OAuth App list, add, and remove run in the daemon through `oauthApp.list|add|remove`, delegating to the same core services. For `oauth-app add --from-env`, the CLI first obtains the selected Provider's environment-variable mapping through `oauthApp.registration`, reads those values once from its own invocation environment, and checks them against the RPC input bounds locally. It sends them only as the dedicated write-only `config` input over the owner-private socket. The router validates and delegates once; the daemon writes them directly through the secret application service. The input is excluded from middleware, logging, and tracing, never appears in success or failure data, is never retried automatically, and has no persistent staging record. Inventory crosses RPC only as the safe projection.
+
 ## Verification
 
-Service, registry, secret, and CLI tests cover App policy, safe deterministic inventory, exact selection, environment import, zero-effect validation, duplicate rejection, snapshot independence, removal, cleanup, and absence of Client compatibility.
+`tests/tooling/cli/oauth-app-secrets-daemon.test.ts` and daemon application tests inject secret canaries and prove one consumption with no canary in results, errors, middleware, or logs; `apps/cli/src/e2e/compiled-oauth-account-lifecycle.e2e.test.ts` covers the packaged daemon route. Service, registry, secret, and CLI tests cover App policy, safe deterministic inventory, exact selection, environment import, zero-effect validation, duplicate rejection, snapshot independence, removal, cleanup, and absence of Client compatibility.

@@ -8,7 +8,7 @@ Provides the private local-daemon infrastructure boundary: canonical runtime ide
 
 - `package.json` exposes one ESM facade through `src/index.ts` and has no runtime dependencies.
 - Canonical filesystem roots and domain-separated SHA-256 digests identify one ctxindex runtime tuple and SQLite database without exposing raw paths.
-- The `FileLeaseBackend` strategy has a Darwin implementation using retained, non-blocking `open(2)` shared/exclusive locks through `node:fs`.
+- The `FileLeaseBackend` strategy has a Darwin implementation using retained, non-blocking `open(2)` `O_SHLOCK`/`O_EXLOCK` locks through `node:fs`, and a Linux implementation that takes a non-blocking `flock(2)` lock on the retained open file description through a trusted system `flock(1)` helper given the descriptor as fd 3.
 - Discovery and lease files reject symlinks, hardlinks, non-private modes, foreign ownership, unsafe parents, and pathname substitution. Discovery writes use create-exclusive temporary files, `fsync`, and atomic rename; reads use one bounded no-follow descriptor. Lease-file contents never identify an owner; retained kernel locks are the only ownership authority.
 
 ## Data & control flow
@@ -24,4 +24,4 @@ Provides the private local-daemon infrastructure boundary: canonical runtime ide
 
 - Consumed by daemon and CLI composition for identity, discovery, and retained lease ownership; it contains no RPC, storage composition, provider, Extension, or CLI behavior.
 - Depends only on Node built-ins (`crypto`, `fs`, `os`, and `path`).
-- File leases support Darwin and fail closed on unsupported platforms or filesystems.
+- File leases support Darwin and Linux and fail closed (`FileLeaseUnsupportedError`) on other platforms, such as Windows, or unsupported filesystems.

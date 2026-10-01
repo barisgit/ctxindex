@@ -8,7 +8,7 @@ Implements process-independent filesystem coordination primitives for the local 
 
 - `index.ts`: public facade over the identity, discovery, and lease APIs.
 - `identity.ts`: canonicalizes existing and not-yet-created paths through their longest existing directory ancestor, rejects dangling symlinks and impossible regular-file ancestry, and derives versioned domain-separated SHA-256 identities.
-- `lease.ts`: `FileLeaseBackend` strategy with a Darwin retained-file-descriptor implementation; snapshots validated requests, rejects unsafe parents and hard-linked databases, validates the target/pathname/inode after acquisition, and treats retained kernel locks rather than lock-file contents as the ownership authority.
+- `lease.ts`: `FileLeaseBackend` strategy selected by `createFileLeaseBackend()`: Darwin retains `O_SHLOCK`/`O_EXLOCK | O_NONBLOCK` descriptors; Linux retains the opened descriptor and takes a non-blocking `flock(2)` lock on it through an absolute, root-owned system `flock(1)` helper (exit 73 is the holder-neutral conflict; a missing or untrusted helper fails closed); any other platform throws `FileLeaseUnsupportedError('platform')`. Both backends snapshot validated requests, reject unsafe parents and hard-linked databases, validate the target/pathname/inode after acquisition, and treat retained kernel locks rather than lock-file contents as the ownership authority.
 - `discovery.ts`: validates a closed, versioned metadata schema and owns private runtime-directory checks, deterministic endpoint naming, atomic metadata persistence, descriptor-only reads, exact identity matching, and lifecycle-lease-bound owner cleanup.
 
 ## Data & control flow
@@ -24,4 +24,4 @@ Implements process-independent filesystem coordination primitives for the local 
 
 - Discovery uses `RuntimeIdentity` and `canonicalizePath()` from `identity.ts`.
 - Lifecycle locks live at `<stateRoot>/daemon/lifecycle.owner.lock`; database locks live at `<databasePath>.owner.lock` and are never unlinked.
-- Test-only subprocess helpers live under `src/testing/` and are not exported.
+- Test-only subprocess helpers live under `src/testing/` (including the cross-process `lease-holder.ts`) and are not exported.

@@ -41,6 +41,6 @@
 
 ## 7. Doctrine and final verification
 
-- [ ] 7.1 Promote the accepted doctrine into `local-daemon/implementation.md` and the canonical `module-architecture`, `cli-surface`, `error-taxonomy`, `generic-storage`, `extension-loading`, `oauth-client-management`, `account-grant-management`, `secret-backend-operations`, `retrieval-and-artifacts`, `extension-catalogs`, and `provider-actions` implementation sidecars exactly as listed in `implementation.md`.
-- [ ] 7.2 Refresh affected codemaps through cartography and the readable system projection through system-reference; double-check user/developer documentation against the exact supported platforms and command ownership.
+- [x] 7.1 Promote the accepted doctrine into `local-daemon/implementation.md` and the canonical `module-architecture`, `cli-surface`, `error-taxonomy`, `generic-storage`, `extension-loading`, `oauth-client-management`, `account-grant-management`, `secret-backend-operations`, `retrieval-and-artifacts`, `extension-catalogs`, and `provider-actions` implementation sidecars exactly as listed in `implementation.md`.
+- [x] 7.2 Refresh affected codemaps through cartography and the readable system projection through system-reference; double-check user/developer documentation against the exact supported platforms and command ownership.
 - [ ] 7.3 Run all focused slice gates, `bun run ci`, `bunx openspec validate --all --strict`, `git diff --check`, `openspec-verify-change`, and independent security/architecture reviews; resolve every critical or important finding before archive.
