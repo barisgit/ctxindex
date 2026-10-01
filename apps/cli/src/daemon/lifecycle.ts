@@ -114,10 +114,14 @@ export function openDaemonDiagnostics(stateRoot: string): number {
   chmodSync(directory, 0o700)
   // Open without O_TRUNC: a pre-existing log may be a hardlink to durable
   // state, so the descriptor is validated before truncation or chmod can
-  // touch the shared inode.
+  // touch the shared inode. O_NONBLOCK keeps a planted FIFO from blocking
+  // the open before validation; it does not affect regular-file writes.
   const fd = openSync(
     join(directory, 'startup.log'),
-    constants.O_WRONLY | constants.O_CREAT | constants.O_NOFOLLOW,
+    constants.O_WRONLY |
+      constants.O_CREAT |
+      constants.O_NOFOLLOW |
+      constants.O_NONBLOCK,
     0o600,
   )
   try {

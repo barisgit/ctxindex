@@ -271,6 +271,28 @@ test('daemon diagnostics reject a linked target without truncating or chmodding 
   expect(statSync(target).mode & 0o777).toBe(0o644)
 })
 
+test('daemon diagnostics reject a FIFO without blocking the open', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ctxindex-daemon-diagnostics-'))
+  cleanup.push(root)
+  mkdirSync(join(root, 'daemon'), { mode: 0o700 })
+  const fifo = Bun.spawnSync(['mkfifo', join(root, 'daemon', 'startup.log')])
+  expect(fifo.exitCode).toBe(0)
+  // A blocking open of a reader-less FIFO would hang the whole process, so
+  // the attempt runs in a bounded child process.
+  const probe = Bun.spawnSync({
+    cmd: [
+      process.execPath,
+      '-e',
+      `import { openDaemonDiagnostics } from ${JSON.stringify(join(import.meta.dir, 'lifecycle.ts'))}
+       try { openDaemonDiagnostics(${JSON.stringify(root)}); console.log('opened') }
+       catch { console.log('rejected') }`,
+    ],
+    timeout: 10_000,
+  })
+  expect(probe.stdout.toString().trim()).toBe('rejected')
+  expect(probe.exitCode).toBe(0)
+}, 20_000)
+
 test('daemon diagnostics truncate a previous private log only after validation', () => {
   const root = mkdtempSync(join(tmpdir(), 'ctxindex-daemon-diagnostics-'))
   cleanup.push(root)
