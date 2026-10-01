@@ -1,7 +1,8 @@
 # module-architecture Specification
 
 ## Purpose
-TBD - created by archiving change deepen-module-architecture. Update Purpose after archive.
+Define module and package ownership boundaries across the CLI, daemon, provider-neutral core, Extension SDK, and tooling, and the architecture checks that enforce them.
+
 ## Requirements
 ### Requirement: Implementation follows explicit module ownership
 The repository MUST organize behavior by its domain owner, keep composition roots free of provider-specific implementations, use package manifests/imports for dependencies, and use one Extension activation boundary for every origin. The `@ctxindex/official` package MUST distribute official Provider, OAuth App, Source Adapter, transport, documentation-tree, and Extension-root implementations, while generic Adapter authoring contracts remain owned by `@ctxindex/extension-sdk`.
