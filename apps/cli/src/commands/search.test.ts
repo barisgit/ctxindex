@@ -224,3 +224,141 @@ describe('search JSON output', () => {
     )
   })
 })
+
+describe('search output for empty and nonempty results', () => {
+  const item = {
+    ref: 'ctx://source/message/1',
+    profile: { id: 'mail.message', version: 1 },
+    sourceId: 'source',
+    origin: 'provider' as const,
+    originRank: 0,
+    title: 'Invoice',
+    summary: null,
+    occurredAt: null,
+    chunks: [],
+  }
+  const textHeader =
+    'ref\tprofile\tsourceId\torigin\toriginRank\ttitle\tsummary\toccurredAt\tchunks'
+
+  type Projection = { format: 'pretty' | 'text' | 'json'; refs: boolean }
+  const projections: readonly (Projection & { name: string })[] = [
+    { name: 'pretty', format: 'pretty', refs: false },
+    { name: 'text', format: 'text', refs: false },
+    { name: 'refs', format: 'text', refs: true },
+    { name: 'json', format: 'json', refs: false },
+  ]
+
+  // Runs one search through either the daemon or the direct route and
+  // captures what reaches stdout and stderr.
+  async function runSearch(
+    route: 'daemon' | 'direct',
+    projection: Projection,
+    result: Awaited<ReturnType<SearchPlanner['search']>>,
+  ) {
+    const log = spyOn(console, 'log').mockImplementation(() => {})
+    const error = spyOn(console, 'error').mockImplementation(() => {})
+    const planner = spyOn(SearchPlanner.prototype, 'search').mockImplementation(
+      async () => result,
+    )
+    try {
+      const exit = await handleSearchCommand(
+        { input: { text: 'needle' }, ...projection },
+        {
+          selectDaemon: () => (route === 'daemon' ? ({} as never) : null),
+          search: async () => result,
+          open: async () =>
+            ({
+              db: {},
+              registry: { profiles: {} },
+              authService: {},
+              logger: {},
+              sourceService: { resolveSourceId: (id: string) => id },
+              close: async () => {},
+            }) as never,
+        },
+      )
+      return {
+        exit,
+        stdout: log.mock.calls.map((call) => String(call[0])),
+        stderr: error.mock.calls.map((call) => String(call[0])),
+      }
+    } finally {
+      log.mockRestore()
+      error.mockRestore()
+      planner.mockRestore()
+    }
+  }
+
+  for (const route of ['daemon', 'direct'] as const) {
+    test(`${route} empty search is explicit only in pretty output`, async () => {
+      const empty = { results: [], warnings: [] }
+      // Sequential: each run replaces the console spies.
+      const outputs: Record<string, Awaited<ReturnType<typeof runSearch>>> = {}
+      for (const { name, ...projection } of projections)
+        outputs[name] = await runSearch(route, projection, empty)
+
+      expect(outputs.pretty).toEqual({
+        exit: 0,
+        stdout: ['No results.'],
+        stderr: [],
+      })
+      expect(outputs.text).toEqual({
+        exit: 0,
+        stdout: [textHeader],
+        stderr: [],
+      })
+      expect(outputs.refs).toEqual({ exit: 0, stdout: [], stderr: [] })
+      expect(outputs.json).toEqual({
+        exit: 0,
+        stdout: ['{"results":[],"warnings":[]}'],
+        stderr: [],
+      })
+    })
+
+    test(`${route} nonempty search output is unchanged`, async () => {
+      const found = { results: [item], warnings: [] }
+      const pretty = await runSearch(
+        route,
+        { format: 'pretty', refs: false },
+        found,
+      )
+      expect(pretty.stdout).toEqual([formatSearchPretty(found)])
+      expect(pretty.stdout[0]).not.toContain('No results.')
+
+      const text = await runSearch(
+        route,
+        { format: 'text', refs: false },
+        found,
+      )
+      expect(text.stdout).toEqual([formatSearchText(found)])
+
+      const refs = await runSearch(route, { format: 'text', refs: true }, found)
+      expect(refs.stdout).toEqual([item.ref])
+
+      const json = await runSearch(
+        route,
+        { format: 'json', refs: false },
+        found,
+      )
+      expect(json.stdout).toEqual([formatSearchJson(found)])
+    })
+  }
+
+  test('empty pretty output keeps warnings on stderr', async () => {
+    const output = await runSearch(
+      'daemon',
+      { format: 'pretty', refs: false },
+      {
+        results: [],
+        warnings: [
+          { sourceId: 'source', code: 'degraded', message: 'provider down' },
+        ],
+      },
+    )
+    expect(output).toEqual({
+      exit: 0,
+      stdout: ['No results.'],
+      stderr: ['source\tdegraded\tprovider down'],
+    })
+  })
+})

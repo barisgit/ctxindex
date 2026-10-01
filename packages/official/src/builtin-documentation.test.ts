@@ -79,3 +79,19 @@ test('the collected built-in namespace exposes embedded documentation', async ()
     definition: { kind: 'adapter', id: 'local.directory' },
   })
 })
+
+test('mailbox documentation explains federated search routing', async () => {
+  const loaded = await loadExtensions({
+    config: defaultConfig(),
+    builtins: builtinModule,
+  })
+
+  for (const extensionId of ['ctxindex.google', 'ctxindex.microsoft']) {
+    const readme = loaded.documentation.get(extensionId, 'README.md')
+    const content = String(readme?.content)
+    expect(content).toContain('## Mailbox search')
+    expect(content).toContain('federated')
+    expect(content).toContain('`--local-only`')
+    expect(content).toContain('`No results.`')
+  }
+})
