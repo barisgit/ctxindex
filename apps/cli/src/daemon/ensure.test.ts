@@ -47,6 +47,7 @@ function dependencies(
 ): DaemonSelectionEnsurerDependencies {
   return {
     assertInitialized: async () => {},
+    runtimeKey: () => digest,
     select: () => selection,
     status: async () => ({ status: 'running', health }),
     start: async () => ({ status: 'running', started: false, health }),
@@ -251,5 +252,48 @@ test('missing discovery after successful startup fails closed', async () => {
 
   await expect(ensure()).rejects.toMatchObject({
     code: 'daemon_unavailable',
+  })
+})
+
+test('same-process ensures share one in-flight start per canonical runtime', async () => {
+  const gates = new Map<string, () => void>()
+  let runtime = 'runtime-a'
+  const published = new Map<string, DaemonSelection>()
+  const starts: string[] = []
+  const ensure = createDaemonSelectionEnsurer(
+    dependencies({
+      runtimeKey: () => runtime,
+      select: () => published.get(runtime) ?? null,
+      status: async () => ({ status: 'stopped' }),
+      start: async () => {
+        const key = runtime
+        starts.push(key)
+        await new Promise<void>((resolve) => gates.set(key, resolve))
+        published.set(key, { ...selection, endpoint: `/tmp/${key}.sock` })
+        return { status: 'running', started: true, health }
+      },
+    }),
+  )
+
+  // Two callers for one runtime share a start; another runtime in the same
+  // process must not be handed the first runtime's selection.
+  const firstA = ensure()
+  const secondA = ensure()
+  await Bun.sleep(0)
+  runtime = 'runtime-b'
+  const onlyB = ensure()
+  await Bun.sleep(0)
+  expect(starts).toEqual(['runtime-a', 'runtime-b'])
+
+  runtime = 'runtime-a'
+  gates.get('runtime-a')?.()
+  const [a1, a2] = await Promise.all([firstA, secondA])
+  expect(a1).toBe(a2)
+  expect(a1).toMatchObject({ selection: { endpoint: '/tmp/runtime-a.sock' } })
+
+  runtime = 'runtime-b'
+  gates.get('runtime-b')?.()
+  await expect(onlyB).resolves.toMatchObject({
+    selection: { endpoint: '/tmp/runtime-b.sock' },
   })
 })

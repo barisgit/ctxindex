@@ -2,7 +2,10 @@ import { readFile } from 'node:fs/promises'
 import { describeAction, runAction } from '@ctxindex/core/action'
 import { CtxindexValidationError } from '@ctxindex/core/errors'
 import { daemonActionDescribe, daemonActionRun } from '../daemon/client'
-import { ensureDaemonSelection } from '../daemon/ensure'
+import {
+  ensureDaemonSelection,
+  resolveEnsuredDaemonSelection,
+} from '../daemon/ensure'
 import { type CliDeps, openDeps } from '../deps'
 import { formatActionDescribeText, formatActionRunText } from '../format/action'
 import { mapErrorToExit } from '../format/exit'
@@ -89,17 +92,21 @@ export async function handleActionCommand(
   process.once('SIGINT', cancel)
   let deps: ActionDeps | undefined
   try {
-    const ensured =
-      services.ensureDaemonSelection &&
-      (input.kind === 'run' || input.sourceId !== undefined)
-        ? await services.ensureDaemonSelection(controller.signal)
-        : undefined
-    if (ensured?.status === 'selected') {
+    // Without an ensure service there is no daemon route; with one, the
+    // selection carries the bounded pre-admission reconnect.
+    const selection = services.ensureDaemonSelection
+      ? await resolveEnsuredDaemonSelection(
+          services.ensureDaemonSelection,
+          () => null,
+          controller.signal,
+        )
+      : null
+    if (selection) {
       if (input.kind === 'describe') {
         if (!services.daemonDescribe)
           throw new Error('Selected daemon Action service missing')
         const result = await services.daemonDescribe(
-          ensured.selection,
+          selection,
           { actionId: input.actionId, source: input.sourceId },
           controller.signal,
         )
@@ -113,7 +120,7 @@ export async function handleActionCommand(
       if (!services.daemonRun)
         throw new Error('Selected daemon Action service missing')
       const result = await services.daemonRun(
-        ensured.selection,
+        selection,
         {
           actionId: input.actionId,
           source: input.sourceId,

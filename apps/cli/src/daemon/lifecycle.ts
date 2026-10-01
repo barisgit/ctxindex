@@ -283,6 +283,16 @@ function currentRuntime() {
   })
 }
 
+// Canonical runtime identity that keys same-process start/ensure sharing.
+// Resolution failures stay bounded instead of exposing host paths.
+export function daemonRuntimeKey(): string {
+  try {
+    return currentRuntime().identity.tupleDigest
+  } catch (error) {
+    lifecycleFailure('start', error)
+  }
+}
+
 function supportsDaemonOwnership(): boolean {
   try {
     createFileLeaseBackend({ platform: platform() })
@@ -355,7 +365,7 @@ function cleanupStaleDaemon(selection: DaemonSelection): StaleCleanupResult {
 const defaultDependencies: DaemonLifecycleDependencies = {
   supported: supportsDaemonOwnership,
   assertInitialized,
-  runtimeKey: () => currentRuntime().identity.tupleDigest,
+  runtimeKey: daemonRuntimeKey,
   select: selectDaemon,
   health: daemonHealth,
   shutdown: daemonShutdown,
@@ -555,9 +565,12 @@ export function createDaemonLifecycle(
       if (existing.selectedBy === 'test_override') {
         throw unavailable('The selected daemon test endpoint is unavailable.')
       }
+      // A draining owner still holds lifecycle ownership; health reports it
+      // even when its metadata could not be rewritten to stopping.
       if (
         existing.metadata?.lifecycle === 'starting' ||
-        existing.metadata?.lifecycle === 'stopping'
+        existing.metadata?.lifecycle === 'stopping' ||
+        ready?.lifecycle === 'stopping'
       ) {
         const transition = await waitForOwnerReleaseOrReady(deadline, signal)
         if (transition.status === 'ready') {

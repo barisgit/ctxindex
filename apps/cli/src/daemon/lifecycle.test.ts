@@ -343,6 +343,45 @@ test('start waits for a stopping owner to release before launching its replaceme
   expect(launches).toBe(1)
 })
 
+test('start waits for release when health reports stopping before metadata does', async () => {
+  // The owner may fail to rewrite metadata to stopping; its health response
+  // still proves the old instance is draining and owns the lifecycle lease.
+  let current: DaemonSelection | null = selection
+  let clock = 0
+  let launches = 0
+  const lifecycle = createDaemonLifecycle(
+    dependencies({
+      select: () => current,
+      health: async () =>
+        current === selection
+          ? { ...health, lifecycle: 'stopping', ready: false }
+          : health,
+      cleanupStale: () => {
+        if (clock < 500) return 'busy'
+        current = null
+        return 'removed'
+      },
+      launch: () => {
+        launches += 1
+        if (current === null) {
+          current = {
+            ...selection,
+            metadata: { ...metadata, instanceId: 'instance-2' },
+          }
+        }
+      },
+      now: () => clock,
+      sleep: async (milliseconds) => {
+        clock += milliseconds
+      },
+    }),
+  )
+
+  await expect(lifecycle.start()).resolves.toMatchObject({ started: true })
+  expect(clock).toBeGreaterThanOrEqual(500)
+  expect(launches).toBe(1)
+})
+
 test.each([
   'start',
   'status',
