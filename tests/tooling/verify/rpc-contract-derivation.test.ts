@@ -212,7 +212,8 @@ test('production code declares no parallel daemon procedure or application signa
     )
   }
   expect(violations).toEqual([])
-})
+  // A TypeScript AST scan of every production source; 5s is too tight on CI.
+}, 30_000)
 
 test('parallel signature guard rejects a handwritten application interface and path table', () => {
   expect(

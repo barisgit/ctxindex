@@ -20,6 +20,7 @@ const daemonJourneys = 'apps/daemon/src/e2e/compiled-daemon.e2e.test.ts'
 const extensionRegistry =
   'apps/daemon/src/e2e/compiled-extension-registry.e2e.test.ts'
 const idleExit = 'apps/daemon/src/e2e/compiled-idle-exit.e2e.test.ts'
+const firstSync = 'apps/daemon/src/e2e/compiled-first-command-sync.e2e.test.ts'
 
 const compiledLeafJourneys: Readonly<Record<string, readonly string[]>> = {
   // Daemon-owned leaves.
@@ -41,7 +42,7 @@ const compiledLeafJourneys: Readonly<Record<string, readonly string[]>> = {
   'source add': [ownership, daemonJourneys],
   'source list': [ownership, daemonJourneys],
   'source remove': [ownership, daemonJourneys],
-  sync: [ownership, daemonJourneys],
+  sync: [ownership, daemonJourneys, firstSync],
   get: [ownership, actionArtifact],
   export: [ownership, actionArtifact],
   thread: [ownership, daemonJourneys],
@@ -104,6 +105,15 @@ const compiledPropertyJourneys: Readonly<
   'automatic idle exit followed by on-demand restart': [
     idleExit,
     'the test-only short idle timeout exits a packaged daemon despite status polling, then it restarts',
+  ],
+  'first-command sync streams ordered typed progress, then idle exit and restart by the next stateful command':
+    [
+      firstSync,
+      'the first sync starts the daemon and streams ordered typed progress with one terminal before idle exit',
+    ],
+  'first-command sync cancellation and declared provider failure exits': [
+    firstSync,
+    'a first sync cancelled by SIGINT exits 130 and a declared provider failure keeps its stable exit and presentation',
   ],
 }
 
