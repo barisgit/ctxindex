@@ -40,6 +40,11 @@ const expectedGates = [
     'apps/daemon',
     'src/e2e/compiled-idle-exit.e2e.test.ts',
   ],
+  [
+    'Compiled first-command sync journey',
+    'apps/daemon',
+    'src/e2e/compiled-first-command-sync.e2e.test.ts',
+  ],
 ] as const
 
 async function run(command: string[]) {
