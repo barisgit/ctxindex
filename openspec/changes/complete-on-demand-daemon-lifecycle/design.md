@@ -36,9 +36,9 @@ Direct fallback is rejected after ensure begins. Falling back would reintroduce 
 
 ### 2. Five-minute activity-aware idle lifetime
 
-The default idle timeout is five minutes. It is fixed product behavior for this pre-alpha slice rather than a new user configuration surface. Tests may inject a shorter clock/timeout through internal composition.
+The default idle timeout is five minutes. It is fixed product behavior for this pre-alpha slice rather than a new user configuration surface. Tests may inject a shorter clock/timeout through internal composition. Packaged journeys use the internal, undocumented `CTXINDEX_TEST_DAEMON_IDLE_TIMEOUT_MS` control, which the CLI forwards to the detached daemon and which can only shorten the fixed lifetime; malformed or longer values are ignored.
 
-The idle deadline begins when the daemon becomes ready and resets only after the last admitted business request settles. An admitted unary request, an admitted stream until its iterator settles, and any other tracked business request suppress automatic shutdown regardless of duration. Health, status, ensure probes, and lifecycle control do not extend the business idle lifetime.
+The idle deadline begins when the daemon becomes ready and resets only after the last admitted business request settles. An admitted unary request, an admitted stream until its iterator settles, and any other tracked business request suppress automatic shutdown regardless of duration. Health, status, ensure probes, and lifecycle control do not extend the business idle lifetime. Here "status" means daemon lifecycle status (`daemon status`, served by health); the Source `status.get` procedure is an ordinary business request and starts a fresh interval after it settles.
 
 Expiry atomically changes admission from ready to stopping before graceful drain begins. A command that races after that transition may wait for the old owner to release and perform one bounded ensure/reconnect before invoking its business procedure; it must never replay a procedure that may already have executed. Explicit `daemon stop` retains its current cancellation-and-drain semantics and does not wait for the idle deadline.
 
