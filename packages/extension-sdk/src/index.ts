@@ -20,9 +20,16 @@ export {
   docs,
 } from './documentation'
 export {
+  type AnyCatalogDefinition,
   type AnyExtensionDefinition,
+  type CatalogDefinition,
+  type CatalogEntry,
+  defineCatalog,
   defineExtension,
   type ExtensionDefinition,
+  type ExtensionPackageTarget,
+  type PackageExtensionDescriptor,
+  packageExtension,
 } from './extension'
 export {
   type AnyOAuthAppDefinition,
@@ -75,3 +82,10 @@ export {
   type ProviderAuth,
   type ProviderDefinition,
 } from './provider'
+export {
+  isSyncError,
+  type SyncError,
+  type SyncErrorCode,
+  type SyncErrorOptions,
+  syncError,
+} from './sync-error'

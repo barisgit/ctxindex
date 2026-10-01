@@ -1,4 +1,4 @@
-import { configPath } from '@ctxindex/core/config'
+import { configPath, readConfig } from '@ctxindex/core/config'
 import { CtxindexError } from '@ctxindex/core/errors'
 import { directDatabasePath } from '../direct-database'
 
@@ -7,9 +7,11 @@ export async function assertInitialized(): Promise<void> {
     Bun.file(configPath()).exists(),
     Bun.file(directDatabasePath()).exists(),
   ])
-  if (hasConfig && hasDatabase) return
-  throw new CtxindexError(
-    'ctxindex is not initialized; run ctxindex init',
-    'invalid_args',
-  )
+  if (!hasConfig || !hasDatabase) {
+    throw new CtxindexError(
+      'ctxindex is not initialized; run ctxindex init',
+      'invalid_args',
+    )
+  }
+  await readConfig()
 }

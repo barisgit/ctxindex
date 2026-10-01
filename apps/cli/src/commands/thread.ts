@@ -1,23 +1,31 @@
-import { defineCommand } from 'citty'
+import { defineCtxCommand } from '../command-model'
 import { runWithExit } from '../format/exit'
+import { resolveOutputFormat, structuredOutputArgs } from '../format/output'
 import {
   formatThreadJson,
+  formatThreadPretty,
+  formatThreadText,
+} from '../format/thread'
+import { handleThreadGetCommand } from '../thread/handle-thread-get-command'
+
+export {
+  formatThreadJson,
+  formatThreadPretty,
   formatThreadText,
   handleThreadGetCommand,
-} from '../thread/handle-thread-get-command'
+}
 
-export { formatThreadJson, formatThreadText, handleThreadGetCommand }
-
-export const threadGetCommand = defineCommand({
-  meta: { name: 'get', description: 'Get a local related Resource thread.' },
+export const threadCommand = defineCtxCommand({
+  meta: { name: 'thread', description: 'Get a local related Resource thread.' },
   args: {
-    ref: { type: 'positional', required: false, description: 'Resource Ref' },
-    json: { type: 'boolean', description: 'Print deterministic JSON' },
+    ref: { type: 'positional', required: true, description: 'Resource Ref' },
+    ...structuredOutputArgs,
   },
-  run: ({ rawArgs }) => runWithExit(() => handleThreadGetCommand(rawArgs)),
-})
-
-export const threadCommand = defineCommand({
-  meta: { name: 'thread', description: 'Traverse local Resource Relations.' },
-  subCommands: { get: threadGetCommand },
+  run: ({ args }) =>
+    runWithExit(() =>
+      handleThreadGetCommand({
+        ref: args.ref,
+        format: resolveOutputFormat(args),
+      }),
+    ),
 })

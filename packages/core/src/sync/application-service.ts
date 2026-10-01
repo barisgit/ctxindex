@@ -1,6 +1,10 @@
 import type { SyncMode } from '@ctxindex/extension-sdk'
 import type { AuthService } from '../auth'
-import { CtxindexError, CtxindexValidationError } from '../errors'
+import {
+  CtxindexError,
+  CtxindexValidationError,
+  normalizeSyncError,
+} from '../errors'
 import { compareStrings, type ExtensionRegistry } from '../registry'
 import {
   syncSource as defaultSyncSource,
@@ -11,6 +15,7 @@ import type { CtxindexDatabase } from '../storage'
 import {
   getSyncRunFailureDiagnostics,
   type SyncRunFailureDiagnostics,
+  type SyncRunProgress,
   type SyncRunResult,
   type SyncWarning,
 } from './sync-coordinator'
@@ -21,6 +26,7 @@ export interface RunSyncInput {
   readonly source?: string
   readonly mode: SyncMode
   readonly signal: AbortSignal
+  readonly onEvent?: (event: SyncApplicationEvent) => void | Promise<void>
 }
 
 export interface SourceSyncWarning extends SyncWarning {
@@ -44,6 +50,32 @@ export type SourceSyncResult =
   | CompletedSourceSyncResult
   | FailedSourceSyncResult
 
+export type SyncApplicationEvent =
+  | {
+      readonly type: 'source.started'
+      readonly sequence: number
+      readonly sourceId: string
+      readonly mode: SyncMode
+    }
+  | ({
+      readonly type: 'source.progress'
+      readonly sequence: number
+      readonly sourceId: string
+    } & SyncRunProgress)
+  | {
+      readonly type: 'source.completed'
+      readonly sequence: number
+      readonly sourceId: string
+      readonly run: SyncRunResult
+    }
+  | {
+      readonly type: 'source.failed'
+      readonly sequence: number
+      readonly sourceId: string
+      readonly error: CtxindexError
+      readonly diagnostics: SyncRunFailureDiagnostics
+    }
+
 export interface RunSyncResult {
   readonly mode: SyncMode
   readonly results: readonly SourceSyncResult[]
@@ -63,6 +95,8 @@ export interface SyncApplicationServiceDeps {
 }
 
 function typedFailure(error: unknown): CtxindexError {
+  const syncFailure = normalizeSyncError(error)
+  if (syncFailure) return syncFailure
   if (error instanceof CtxindexError) return error
   const code = (error as { readonly code?: unknown })?.code
   const message = error instanceof Error ? error.message : 'Sync failed'
@@ -128,7 +162,15 @@ export class SyncApplicationService {
           .sort((left, right) => compareStrings(left.id, right.id))
 
     const results: SourceSyncResult[] = []
+    let sequence = 0
     for (const source of sources) {
+      await input.onEvent?.({
+        type: 'source.started',
+        sequence: sequence++,
+        sourceId: source.id,
+        mode: input.mode,
+      })
+      let result: SourceSyncResult
       try {
         const run = await this.#syncSource({
           db: this.deps.db,
@@ -138,15 +180,47 @@ export class SyncApplicationService {
           sourceId: source.id,
           mode: input.mode,
           signal: input.signal,
+          ...(input.onEvent
+            ? {
+                onProgress: (progress) =>
+                  input.onEvent?.({
+                    type: 'source.progress',
+                    sequence: sequence++,
+                    sourceId: source.id,
+                    ...progress,
+                  }),
+              }
+            : {}),
         })
-        results.push({ sourceId: source.id, status: 'completed', run })
+        result = {
+          sourceId: source.id,
+          status: 'completed' as const,
+          run,
+        }
       } catch (original) {
         const error = typedFailure(original)
-        results.push({
+        result = {
           sourceId: source.id,
-          status: 'failed',
+          status: 'failed' as const,
           error,
           diagnostics: failureDiagnostics(original, error),
+        }
+      }
+      results.push(result)
+      if (result.status === 'completed') {
+        await input.onEvent?.({
+          type: 'source.completed',
+          sequence: sequence++,
+          sourceId: source.id,
+          run: result.run,
+        })
+      } else {
+        await input.onEvent?.({
+          type: 'source.failed',
+          sequence: sequence++,
+          sourceId: source.id,
+          error: result.error,
+          diagnostics: result.diagnostics,
         })
       }
     }

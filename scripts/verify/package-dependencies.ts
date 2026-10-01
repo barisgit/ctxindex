@@ -235,7 +235,7 @@ async function extractRpcBoundaryUses(
     const builtinRoot = specifier.replace(/^node:/, '').split('/')[0]
     if (
       packageName === '@ctxindex/core' ||
-      packageName === '@ctxindex/adapters' ||
+      packageName === '@ctxindex/official' ||
       packageName === '@ctxindex/local-daemon' ||
       (packageName !== undefined && applicationPackages.has(packageName))
     )
@@ -287,6 +287,9 @@ async function extractLocalDaemonBoundaryUses(
     const builtinRoot = specifier.replace(/^node:/, '').split('/')[0]
     const allowedTestProcessImport =
       allowTestRuntimePrimitives && builtinRoot === 'process'
+    const allowedLeaseChildProcessImport =
+      relative(packageDirectory, fileName).replaceAll('\\', '/') ===
+        'src/lease.ts' && builtinRoot === 'child_process'
     if (packageName !== undefined)
       uses.add(
         rpcForbiddenStoragePackages.has(packageName) ? specifier : packageName,
@@ -305,7 +308,8 @@ async function extractLocalDaemonBoundaryUses(
         !specifier.startsWith('/') &&
         !specifier.startsWith('#') &&
         !localDaemonAllowedBuiltinRoots.has(builtinRoot) &&
-        !allowedTestProcessImport) ||
+        !allowedTestProcessImport &&
+        !allowedLeaseChildProcessImport) ||
       (packageName !== undefined && applicationPackages.has(packageName)) ||
       /(?:^|\/)apps\//.test(specifier) ||
       /(?:^|\/)(?:format|formatter|formatters)(?:\/|$)/.test(specifier)
@@ -554,10 +558,7 @@ function allowedWorkspaceDependencies(
   workspacePackages: readonly WorkspacePackage[],
 ): Set<string> {
   const relativeDirectory = workspacePackage.directory.replaceAll('\\', '/')
-  if (
-    relativeDirectory.includes('/apps/') ||
-    relativeDirectory.includes('/examples/')
-  ) {
+  if (relativeDirectory.includes('/apps/')) {
     return new Set(
       workspacePackages
         .filter((candidate) =>
@@ -568,7 +569,7 @@ function allowedWorkspaceDependencies(
   }
 
   const allowed: Record<string, string[]> = {
-    '@ctxindex/adapters': [
+    '@ctxindex/official': [
       '@ctxindex/core',
       '@ctxindex/extension-sdk',
       '@ctxindex/profiles',

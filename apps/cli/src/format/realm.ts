@@ -1,4 +1,11 @@
 import type { RealmRow } from '@ctxindex/core/realm'
+import {
+  compactJson,
+  formatPrettyCollection,
+  formatTsv,
+  type OutputColumn,
+  type OutputFormat,
+} from './output'
 
 export function formatRealmAdded(slug: string): string {
   return `realm added: ${slug}`
@@ -6,17 +13,22 @@ export function formatRealmAdded(slug: string): string {
 
 export function formatRealms(
   realms: readonly RealmRow[],
-  opts: { readonly json: boolean },
+  format: OutputFormat,
 ): string {
-  if (opts.json) {
-    // camelCase keys for consistency with status / search / auth JSON output.
-    const rows = realms.map((realm) => ({
-      id: realm.id,
-      slug: realm.slug,
-      label: realm.label,
-      createdAt: realm.created_at,
-    }))
-    return JSON.stringify(rows, null, 2)
-  }
-  return realms.map((realm) => realm.slug).join('\n')
+  const rows = realms.map((realm) => ({
+    id: realm.id,
+    slug: realm.slug,
+    label: realm.label,
+    createdAt: realm.created_at,
+  }))
+  if (format === 'json') return compactJson(rows)
+  const columns = [
+    { key: 'slug', label: 'Realm' },
+    { key: 'label', label: 'Label' },
+    { key: 'createdAt', label: 'Created at' },
+    { key: 'id', label: 'ID' },
+  ] satisfies readonly OutputColumn[]
+  return format === 'pretty'
+    ? formatPrettyCollection(columns, rows)
+    : formatTsv(columns, rows)
 }

@@ -1,47 +1,43 @@
-# npm release
+# npm releases
 
-The repository root remains private. `apps/cli` supplies the public, unscoped
-`ctxindex` package, while `scripts/release/cli-package.ts` constructs a minimal
-staging package containing only `package.json`, `README.md`, `LICENSE`, and the
-bundled CLI entrypoint `dist/ctxindex.mjs` plus its private sibling
-`dist/ctxindex-daemon` executable. The generated manifest exposes only the
-`ctxindex` command and has no
-`workspace:*` runtime dependency; only `keytar@7.9.0` remains external so Bun can
-install its native module.
+The initial npm publications and trusted-publisher setup are complete. Three packages are released from this repository:
 
-## Automated release contract
+| Package | Version source | Workflow |
+|---|---|---|
+| [`ctxindex`](https://www.npmjs.com/package/ctxindex) | `apps/cli/package.json` | `.github/workflows/release.yml` |
+| [`@ctxindex/extension-sdk`](https://www.npmjs.com/package/@ctxindex/extension-sdk) | `packages/extension-sdk/package.json` | `.github/workflows/publish-packages.yml` |
+| [`@ctxindex/profiles`](https://www.npmjs.com/package/@ctxindex/profiles) | `packages/profiles/package.json` | `.github/workflows/publish-packages.yml` |
 
-`.github/workflows/release.yml` runs on pushes to `main` and serializes release
-candidates. Before CI, it compares the current CLI version with the version at
-`github.event.before` and queries the exact `ctxindex@<version>` registry entry.
-A valid, strictly increased, unpublished semantic version proceeds. An already
-published exact version is a successful no-op. An unchanged unpublished version,
-an invalid or reversed version, or any registry result other than an exact match
-or 404 fails closed.
+Do not publish these packages manually during normal releases. Bump the intended package version, merge to `main`, and let the matching workflow build and publish the exact artifact.
 
-CI, build, pack, and the isolated global-install smoke run without OIDC
-permission. The workflow uploads the exact verified tarball and its checksum.
-Only the `Publish` job uses the protected `npm-production` environment and
-receives `id-token: write`; after approval it downloads and verifies that
-artifact, repeats the exact registry-absence check, and uses npm trusted
-publishing without `NODE_AUTH_TOKEN` or another long-lived npm credential.
+## CLI release
 
-## First publication: Human checkpoint
+`release.yml` runs on pushes to `main`:
 
-npm trusted publishing cannot create a package that does not yet exist. Do not
-enable the automated publish path until a package owner has completed all of
-these steps:
+1. Validate the current semantic version against the previous commit and query the exact npm version.
+2. Run `bun run ci`, build the CLI, create the allowlisted tarball, verify its SHA-256 checksum, and smoke-install that exact archive.
+3. In the protected `npm-production` environment, download and re-verify the artifact, repeat the registry preflight, and publish with npm trusted publishing.
+4. Tag the published commit as `v<version>` and attach the same tarball and checksum to its GitHub Release.
 
-1. Inspect the final tarball and its extracted manifest/files. Confirm the MIT
-   `LICENSE` notice and the exact artifact checksum produced by CI.
-2. Confirm the unscoped `ctxindex` name and exact version are available on npm.
-3. Manually publish that exact inspected tarball with the owner's required 2FA.
-4. In npm package settings, add a GitHub Actions trusted publisher for repository
-   `barisgit/ctxindex`, workflow filename `release.yml`, and environment
-   `npm-production`. Set Allowed actions: `npm publish`.
-5. In GitHub, create and protect the `npm-production` environment with required
-   reviewers before approving later OIDC publication.
+The public archive contains the generated manifest, `README.md`, `LICENSE`, `dist/ctxindex.mjs`, and its adjacent `dist/ctxindex-daemon`. `keytar@7.9.0` remains an external runtime dependency so Bun installs the native module for the destination host.
 
-No npm token belongs in repository secrets or workflow configuration. Live name
-ownership, the bootstrap publication, trusted-publisher configuration, and
-environment approval remain maintainer actions.
+## Library releases
+
+`publish-packages.yml` detects version changes for `@ctxindex/extension-sdk` and `@ctxindex/profiles`. It builds, packs, verifies, and smoke-tests only changed packages, then publishes them in dependency order: Extension SDK before Profiles.
+
+The publish job re-verifies downloaded checksums and registry state. On a workflow retry, an existing exact version is accepted only when npm's published archive integrity matches the prepared artifact; mismatches fail closed.
+
+## Trusted publishing
+
+Both workflows use npm's GitHub Actions OIDC trusted publishing. Only their publish jobs receive `id-token: write`, and both use the protected `npm-production` GitHub environment. No npm token belongs in repository secrets or workflow configuration.
+
+Each npm trusted-publisher record must keep **Allowed actions: `npm publish`**.
+
+The npm trusted-publisher records are:
+
+| Packages | Repository | Workflow filename | Environment |
+|---|---|---|---|
+| `ctxindex` | `barisgit/ctxindex` | `release.yml` | `npm-production` |
+| `@ctxindex/extension-sdk`, `@ctxindex/profiles` | `barisgit/ctxindex` | `publish-packages.yml` | `npm-production` |
+
+If a publisher record, workflow filename, or environment changes, update npm and GitHub together before merging a version bump. Keep the environment protected and preserve exact-artifact verification, registry fail-closed behavior, and dependency ordering.

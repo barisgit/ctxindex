@@ -1,45 +1,27 @@
-import { join } from 'node:path'
 import {
-  BunPackageMaterializer,
-  DirectExtensionService,
-  DirectExtensionStore,
   parseDirectExtensionTarget,
-  projectDirectExtensionRecord,
   validateDirectExtensionId,
   validateDirectPackageTarget,
 } from '@ctxindex/core'
-import { CatalogService } from '@ctxindex/core/catalog'
 import { safeExtensionDiagnostic } from '@ctxindex/core/extension'
-import { dataDir } from '@ctxindex/core/paths'
-import { parseExtensionsArgs } from '../args/extensions'
-import { loadCliDefinitions, printExtensionDiagnostics } from '../definitions'
-import {
-  PrototypeUnsupportedError,
-  readLeasedDirectExtensionSourceBindings,
-  readLeasedLocalOAuthAppIdentities,
-} from '../direct-database'
+import { printExtensionDiagnostics } from '../definitions'
+import { PrototypeUnsupportedError } from '../direct-database'
 import {
   formatCatalog,
+  formatCatalogBuild,
   formatCatalogExtension,
   formatCatalogs,
-  formatInstalledExtension,
+  formatMarketplace,
 } from '../format/catalog'
-import {
-  formatDirectExtension,
-  formatDirectExtensionUninstall,
-} from '../format/direct-extension'
+import { formatDirectExtensionUninstall } from '../format/direct-extension'
 import { mapErrorToExit } from '../format/exit'
+import { formatExtensionLifecycle } from '../format/extension-lifecycle'
+import type { OutputFormat } from '../format/output'
 import { formatExtensions } from '../format/registry'
-
-function createDirectExtensionService(): DirectExtensionService {
-  const root = dataDir()
-  return new DirectExtensionService({
-    store: new DirectExtensionStore({ dataRoot: root }),
-    materializer: new BunPackageMaterializer({
-      stagingParent: join(root, 'direct-extensions', 'staging'),
-    }),
-  })
-}
+import {
+  createExtensionCommandServices,
+  type ExtensionCommandServices,
+} from './services'
 
 export async function runWithSigintCancellation<T>(
   operation: (signal: AbortSignal) => Promise<T>,
@@ -54,239 +36,304 @@ export async function runWithSigintCancellation<T>(
   }
 }
 
+export type ExtensionCommandInput =
+  | { readonly kind: 'list'; readonly format: OutputFormat }
+  | {
+      readonly kind: 'catalog-build'
+      readonly packageRoot: string
+      readonly catalogId?: string
+      readonly output?: string
+      readonly trust: boolean
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'catalog-add'
+      readonly name: string
+      readonly repository: string
+      readonly ref: string
+      readonly trust: boolean
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'catalog-list'
+      readonly noRefresh: boolean
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'catalog-show'
+      readonly name: string
+      readonly extensionId?: string
+      readonly noRefresh: boolean
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'catalog-refresh'
+      readonly name: string
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'catalog-remove'
+      readonly name: string
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'catalog-search'
+      readonly query?: string
+      readonly noRefresh: boolean
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'install'
+      readonly sourceKind: 'catalog' | 'npm' | 'git' | 'local'
+      readonly target: string
+      readonly extensionId: string
+      readonly noRefresh: boolean
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'update'
+      readonly extensionId: string
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'uninstall'
+      readonly extensionId: string
+      readonly force: boolean
+      readonly json: boolean
+    }
+
 export async function handleExtensionsCommand(
-  args: string[],
-  catalogs: CatalogService = new CatalogService(),
-  direct: DirectExtensionService = createDirectExtensionService(),
-  loadDefinitions: typeof loadCliDefinitions = loadCliDefinitions,
-  readOAuthAppIdentities: typeof readLeasedLocalOAuthAppIdentities = readLeasedLocalOAuthAppIdentities,
-  readSourceBindings: typeof readLeasedDirectExtensionSourceBindings = readLeasedDirectExtensionSourceBindings,
+  parsed: ExtensionCommandInput,
+  services: ExtensionCommandServices = createExtensionCommandServices(),
 ): Promise<number> {
-  const parsed = parseExtensionsArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(parsed.message)
-    return 2
-  }
   try {
-    if (parsed.kind === 'list') {
-      const loaded = await loadDefinitions()
-      printExtensionDiagnostics(loaded.diagnostics)
-      console.log(
-        formatExtensions(
-          loaded.registry,
-          parsed.json,
-          loaded.provenance,
-          await direct.list(),
-        ),
-      )
-      return 0
-    }
-    if (parsed.kind === 'catalog-add') {
-      const result = await catalogs.add({
-        name: parsed.name,
-        repository: parsed.repository,
-        ref: parsed.ref,
-        trust: parsed.trust,
-      })
-      console.log(formatCatalog(result, parsed.json))
-      return 0
-    }
-    if (parsed.kind === 'catalog-list') {
-      console.log(
-        formatCatalogs(
-          await catalogs.list({ refresh: !parsed.noRefresh }),
-          parsed.json,
-        ),
-      )
-      return 0
-    }
-    if (parsed.kind === 'catalog-show') {
-      if (parsed.extension === undefined) {
+    switch (parsed.kind) {
+      case 'list': {
+        const loaded = await services.loadDefinitions()
+        printExtensionDiagnostics(loaded.diagnostics)
+        console.log(
+          formatExtensions(
+            loaded.registry,
+            parsed.format,
+            loaded.provenance,
+            await services.direct.list(),
+          ),
+        )
+        return 0
+      }
+      case 'catalog-build': {
+        console.error(
+          'Trust notice: Catalog build acquires packages and evaluates trusted author-controlled Extension code in-process; validation is not a sandbox.',
+        )
+        const result = await runWithSigintCancellation((signal) =>
+          services.buildCatalogSnapshot({
+            packageRoot: parsed.packageRoot,
+            outputPath: parsed.output ?? 'ctxindex-catalog.json',
+            ...(parsed.catalogId === undefined
+              ? {}
+              : { catalogId: parsed.catalogId }),
+            trusted: parsed.trust,
+            installer: services.genericInstaller,
+            signal,
+          }),
+        )
+        console.log(formatCatalogBuild(result, parsed.json))
+        return 0
+      }
+      case 'catalog-add': {
         console.log(
           formatCatalog(
-            await catalogs.show(parsed.name, {
+            await services.catalogs.add({
+              name: parsed.name,
+              repository: parsed.repository,
+              ref: parsed.ref,
+              trust: parsed.trust,
+            }),
+            parsed.json,
+          ),
+        )
+        return 0
+      }
+      case 'catalog-list': {
+        console.log(
+          formatCatalogs(
+            await services.catalogs.list({
               refresh: !parsed.noRefresh,
             }),
             parsed.json,
           ),
         )
-      } else {
-        const shown = await catalogs.showExtension(
-          parsed.name,
-          parsed.extension.id,
-          parsed.extension.version,
-          { refresh: !parsed.noRefresh },
-        )
-        console.log(
-          formatCatalogExtension(shown.catalog, shown.extension, parsed.json),
-        )
+        return 0
       }
-      return 0
-    }
-    if (parsed.kind === 'catalog-refresh') {
-      console.log(
-        formatCatalog(
-          await catalogs.refresh({ name: parsed.name }),
-          parsed.json,
-        ),
-      )
-      return 0
-    }
-    if (parsed.kind === 'catalog-remove') {
-      console.log(
-        formatCatalog(await catalogs.remove(parsed.name), parsed.json),
-      )
-      return 0
-    }
-    if (parsed.kind === 'catalog-install') {
-      const localOAuthAppIdentities = await readOAuthAppIdentities()
-      const loaded = await loadDefinitions({ localOAuthAppIdentities })
-      printExtensionDiagnostics(loaded.diagnostics)
-      const replaceableCatalog = loaded.provenance.find(
-        (provenance) =>
-          provenance.kind === 'catalog' &&
-          provenance.id === parsed.extension.id,
-      )
-      console.log(
-        formatInstalledExtension(
-          'Installed',
-          await catalogs.install({
-            catalog: parsed.catalog,
-            id: parsed.extension.id,
-            version: parsed.extension.version,
-            trust: parsed.trust,
-            registry: loaded.registry,
-            localOAuthAppIdentities,
-            refresh: !parsed.noRefresh,
-            ...(replaceableCatalog?.kind === 'catalog'
-              ? {
-                  replaceableCatalog: {
-                    catalog: replaceableCatalog.catalog,
-                    commit: replaceableCatalog.commit,
-                  },
-                }
-              : {}),
-          }),
-          parsed.json,
-        ),
-      )
-      return 0
-    }
-    if (parsed.kind === 'catalog-uninstall') {
-      console.log(
-        formatInstalledExtension(
-          'Uninstalled',
-          await catalogs.uninstall(parsed.extension),
-          parsed.json,
-        ),
-      )
-      return 0
-    }
-    const directTarget =
-      parsed.kind === 'direct-install'
-        ? parseDirectExtensionTarget(parsed.sourceKind, parsed.target, {
+      case 'catalog-show': {
+        if (parsed.extensionId === undefined) {
+          console.log(
+            formatCatalog(
+              await services.catalogs.show(parsed.name, {
+                refresh: !parsed.noRefresh,
+              }),
+              parsed.json,
+            ),
+          )
+        } else {
+          const shown = await services.catalogs.showExtension(
+            parsed.name,
+            parsed.extensionId,
+            { refresh: !parsed.noRefresh },
+          )
+          console.log(
+            formatCatalogExtension(shown.catalog, shown.extension, parsed.json),
+          )
+        }
+        return 0
+      }
+      case 'catalog-refresh': {
+        console.log(
+          formatCatalog(
+            await services.catalogs.refresh({ name: parsed.name }),
+            parsed.json,
+          ),
+        )
+        return 0
+      }
+      case 'catalog-remove': {
+        console.log(
+          formatCatalog(
+            await services.catalogs.remove(parsed.name),
+            parsed.json,
+          ),
+        )
+        return 0
+      }
+      case 'catalog-search': {
+        console.log(
+          formatMarketplace(
+            await services.catalogs.search(parsed.query, {
+              refresh: !parsed.noRefresh,
+            }),
+            parsed.json,
+          ),
+        )
+        return 0
+      }
+      case 'install': {
+        if (parsed.sourceKind !== 'catalog' && parsed.noRefresh) {
+          console.error(
+            'extension install: --no-refresh is valid only for Catalog installation',
+          )
+          return 2
+        }
+        validateDirectExtensionId(parsed.extensionId)
+        console.error(
+          'Trust notice: this command acquires and executes third-party Extension code in-process; validation is not a sandbox.',
+        )
+        if (parsed.sourceKind === 'catalog') {
+          const installed = await runWithSigintCancellation((signal) =>
+            services.coordinateMutation(
+              () =>
+                services.catalogInstallation.install({
+                  catalog: parsed.target,
+                  extensionId: parsed.extensionId,
+                  noRefresh: parsed.noRefresh,
+                  signal,
+                }),
+              signal,
+            ),
+          )
+          console.log(
+            formatExtensionLifecycle('Installed', installed, parsed.json),
+          )
+          return 0
+        }
+        const target = parseDirectExtensionTarget(
+          parsed.sourceKind,
+          parsed.target,
+          {
             cwd: process.cwd(),
             validatePackageTarget: validateDirectPackageTarget,
-          })
-        : undefined
-    validateDirectExtensionId(parsed.extensionId)
-    if (parsed.kind === 'direct-install' || parsed.kind === 'direct-update') {
-      console.error(
-        'Trust notice: this command acquires and executes third-party Extension code in-process; validation is not a sandbox.',
-      )
-    }
-    const localOAuthAppIdentities = await readOAuthAppIdentities()
-    const loaded = await loadDefinitions({ localOAuthAppIdentities })
-    printExtensionDiagnostics(loaded.diagnostics)
-    if (parsed.kind === 'direct-install') {
-      if (directTarget === undefined) {
-        throw new TypeError('Direct Extension target was not parsed')
+          },
+        )
+        validateDirectExtensionId(parsed.extensionId)
+        const installed = await runWithSigintCancellation((signal) =>
+          services.coordinateMutation(
+            () =>
+              services.direct.install({
+                target,
+                extensionId: parsed.extensionId,
+                loadValidationContext: async () => {
+                  const localOAuthAppIdentities =
+                    await services.readOAuthAppIdentities()
+                  const fresh = await services.loadDefinitions({
+                    localOAuthAppIdentities,
+                  })
+                  return {
+                    registry: fresh.registry,
+                    roots: fresh.roots,
+                    localOAuthAppIdentities,
+                  }
+                },
+                signal,
+              }),
+            signal,
+          ),
+        )
+        console.log(
+          formatExtensionLifecycle('Installed', installed, parsed.json),
+        )
+        return 0
       }
-      const result = await runWithSigintCancellation((signal) =>
-        direct.install({
-          target: directTarget,
-          extensionId: parsed.extensionId,
-          loadValidationContext: async () => {
-            const freshLocalOAuthAppIdentities = await readOAuthAppIdentities()
-            const fresh = await loadDefinitions({
-              localOAuthAppIdentities: freshLocalOAuthAppIdentities,
-            })
-            return {
-              registry: fresh.registry,
-              roots: fresh.roots,
-              localOAuthAppIdentities: freshLocalOAuthAppIdentities,
-            }
-          },
-          signal,
-        }),
-      )
-      console.log(
-        formatDirectExtension(
-          'Installed',
-          projectDirectExtensionRecord(result),
-          parsed.json,
-        ),
-      )
-      return 0
+      case 'update': {
+        validateDirectExtensionId(parsed.extensionId)
+        console.error(
+          'Trust notice: this command acquires and executes third-party Extension code in-process; validation is not a sandbox.',
+        )
+        const updated = await runWithSigintCancellation((signal) =>
+          services.coordinateMutation(
+            () =>
+              services.lifecycle.update({
+                extensionId: parsed.extensionId,
+                signal,
+              }),
+            signal,
+          ),
+        )
+        console.log(formatExtensionLifecycle('Updated', updated, parsed.json))
+        return 0
+      }
+      case 'uninstall': {
+        validateDirectExtensionId(parsed.extensionId)
+        console.log(
+          formatDirectExtensionUninstall(
+            await services.coordinateMutation(() =>
+              services.direct.uninstall({
+                extensionId: parsed.extensionId,
+                loadValidationContext: async () => {
+                  const localOAuthAppIdentities =
+                    await services.readOAuthAppIdentities()
+                  const fresh = await services.loadDefinitions({
+                    localOAuthAppIdentities,
+                  })
+                  return {
+                    registry: fresh.registry,
+                    roots: fresh.roots,
+                    localOAuthAppIdentities,
+                    alternateOriginAvailable: fresh.provenance.some(
+                      (entry) =>
+                        entry.id === parsed.extensionId &&
+                        entry.kind !== 'direct',
+                    ),
+                    sources: await services.readSourceBindings(),
+                  }
+                },
+                force: parsed.force,
+              }),
+            ),
+            parsed.json,
+          ),
+        )
+        return 0
+      }
     }
-    if (parsed.kind === 'direct-update') {
-      const result = await runWithSigintCancellation((signal) =>
-        direct.update({
-          extensionId: parsed.extensionId,
-          loadValidationContext: async () => {
-            const freshLocalOAuthAppIdentities = await readOAuthAppIdentities()
-            const fresh = await loadDefinitions({
-              localOAuthAppIdentities: freshLocalOAuthAppIdentities,
-            })
-            return {
-              registry: fresh.registry,
-              roots: fresh.roots,
-              localOAuthAppIdentities: freshLocalOAuthAppIdentities,
-              alternateOriginAvailable: fresh.provenance.some(
-                (entry) =>
-                  entry.id === parsed.extensionId && entry.kind !== 'direct',
-              ),
-            }
-          },
-          signal,
-        }),
-      )
-      console.log(
-        formatDirectExtension(
-          'Updated',
-          projectDirectExtensionRecord(result),
-          parsed.json,
-        ),
-      )
-      return 0
-    }
-    console.log(
-      formatDirectExtensionUninstall(
-        await direct.uninstall({
-          extensionId: parsed.extensionId,
-          loadValidationContext: async () => {
-            const freshLocalOAuthAppIdentities = await readOAuthAppIdentities()
-            const fresh = await loadDefinitions({
-              localOAuthAppIdentities: freshLocalOAuthAppIdentities,
-            })
-            return {
-              registry: fresh.registry,
-              roots: fresh.roots,
-              localOAuthAppIdentities: freshLocalOAuthAppIdentities,
-              alternateOriginAvailable: fresh.provenance.some(
-                (entry) =>
-                  entry.id === parsed.extensionId && entry.kind !== 'direct',
-              ),
-              sources: await readSourceBindings(),
-            }
-          },
-          force: parsed.force,
-        }),
-        parsed.json,
-      ),
-    )
-    return 0
   } catch (error) {
     const caught = error ?? {}
     const code = (caught as { code?: unknown }).code

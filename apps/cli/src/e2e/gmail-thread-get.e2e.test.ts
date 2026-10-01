@@ -22,9 +22,9 @@ async function initialize(
     PATH: `${bin}:${process.env.PATH ?? ''}`,
     CTXINDEX_LOOPBACK_TIMEOUT_SECS: '5',
   })
-  const init = await sandbox.run(['init'])
+  const init = await sandbox.run(['init'], { env })
   expect(init.exitCode, init.stderr).toBe(0)
-  const realm = await sandbox.run(['realm', 'add', 'mail'])
+  const realm = await sandbox.run(['realm', 'add', 'mail'], { env })
   expect(realm.exitCode, realm.stderr).toBe(0)
   const app = await sandbox.run(
     ['oauth-app', 'add', 'google', 'google', '--from-env'],
@@ -135,7 +135,15 @@ test('mocked Gmail search materializes local thread trees without provider hydra
     mock.resetRequests()
 
     const searched = await sandbox.run(
-      ['search', '--remote', '--json', '--limit', '5', 'thread fixture'],
+      [
+        'search',
+        '--remote',
+        '--format',
+        'json',
+        '--limit',
+        '5',
+        'thread fixture',
+      ],
       { env },
     )
     expect(searched.exitCode, searched.stderr).toBe(0)
@@ -145,8 +153,10 @@ test('mocked Gmail search materializes local thread trees without provider hydra
 
     const ref = (id: string) => `ctx://${sourceId}/message/${id}`
     const tree = await sandbox.run(
-      ['thread', 'get', ref('grandchild'), '--json'],
-      { env },
+      ['thread', ref('grandchild'), '--format', 'json'],
+      {
+        env,
+      },
     )
     expect(tree.exitCode, tree.stderr).toBe(0)
     const treeJson = JSON.parse(tree.stdout) as {
@@ -190,8 +200,10 @@ test('mocked Gmail search materializes local thread trees without provider hydra
     expect(mock.readRequests()).toEqual([])
 
     const flat = await sandbox.run(
-      ['thread', 'get', '--json', ref('flat-late')],
-      { env },
+      ['thread', '--format', 'json', ref('flat-late')],
+      {
+        env,
+      },
     )
     expect(flat.exitCode, flat.stderr).toBe(0)
     const flatJson = JSON.parse(flat.stdout) as {
@@ -212,13 +224,17 @@ test('mocked Gmail search materializes local thread trees without provider hydra
     expect(mock.readRequests()).toEqual([])
 
     const malformed = await sandbox.run(
-      ['thread', 'get', '--json', 'not-a-ref'],
-      { env },
+      ['thread', '--format', 'json', 'not-a-ref'],
+      {
+        env,
+      },
     )
     expect(malformed.exitCode).toBe(2)
     const unknown = await sandbox.run(
-      ['thread', 'get', '--json', ref('unknown')],
-      { env },
+      ['thread', '--format', 'json', ref('unknown')],
+      {
+        env,
+      },
     )
     expect(unknown.exitCode).toBe(2)
     expect(mock.readRequests()).toEqual([])

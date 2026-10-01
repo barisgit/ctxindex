@@ -107,47 +107,54 @@ function openDiscoveryMetadata(
   options: DiscoveryReadOptions = {},
 ): OpenDiscoveryMetadata | null {
   const path = discoveryMetadataPath(stateRoot)
-  let fd: number
-  try {
-    fd = (options.openFile ?? openSync)(
-      path,
-      constants.O_RDONLY | constants.O_NOFOLLOW,
-    )
-  } catch (error) {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
-      return null
-    throw error
-  }
-
-  try {
-    const stat = fstatSync(fd)
-    validateOwnedPrivateFile(stat)
-    if (stat.size > 8192) throw new Error('Discovery metadata is oversized')
-    const buffer = Buffer.allocUnsafe(8193)
-    const readBytes = options.readBytes ?? readSync
-    let byteLength = 0
-    while (byteLength < buffer.byteLength) {
-      const count = readBytes(
-        fd,
-        buffer,
-        byteLength,
-        buffer.byteLength - byteLength,
-        null,
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    let fd: number
+    try {
+      fd = (options.openFile ?? openSync)(
+        path,
+        constants.O_RDONLY | constants.O_NOFOLLOW,
       )
-      if (count === 0) break
-      byteLength += count
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
+        return null
+      throw error
     }
-    if (byteLength > 8192) throw new Error('Discovery metadata is oversized')
-    const content = buffer.subarray(0, byteLength).toString('utf8')
-    return {
-      fd,
-      stat,
-      metadata: parseDiscoveryMetadata(JSON.parse(content) as unknown),
+
+    try {
+      const stat = fstatSync(fd)
+      if (stat.nlink === 0) {
+        closeSync(fd)
+        continue
+      }
+      validateOwnedPrivateFile(stat)
+      if (stat.size > 8192) throw new Error('Discovery metadata is oversized')
+      const buffer = Buffer.allocUnsafe(8193)
+      const readBytes = options.readBytes ?? readSync
+      let byteLength = 0
+      while (byteLength < buffer.byteLength) {
+        const count = readBytes(
+          fd,
+          buffer,
+          byteLength,
+          buffer.byteLength - byteLength,
+          null,
+        )
+        if (count === 0) break
+        byteLength += count
+      }
+      if (byteLength > 8192) throw new Error('Discovery metadata is oversized')
+      const content = buffer.subarray(0, byteLength).toString('utf8')
+      return {
+        fd,
+        stat,
+        metadata: parseDiscoveryMetadata(JSON.parse(content) as unknown),
+      }
+    } catch (error) {
+      closeSync(fd)
+      throw error
     }
-  } catch (error) {
-    closeSync(fd)
-    throw error
   }
+  throw new Error('Discovery metadata changed too frequently to read safely')
 }
 
 function ensurePrivateDirectory(input: string): string {

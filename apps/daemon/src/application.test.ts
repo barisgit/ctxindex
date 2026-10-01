@@ -1,17 +1,28 @@
 import { expect, test } from 'bun:test'
 import {
+  createDocumentationService,
+  type DocumentationService,
+} from '@ctxindex/core/documentation'
+import {
   CtxindexAuthError,
   type CtxindexAuthErrorCode,
+  CtxindexError,
   CtxindexNotFoundError,
   CtxindexSyncError,
   type CtxindexSyncErrorCode,
   CtxindexValidationError,
   type CtxindexValidationErrorCode,
 } from '@ctxindex/core/errors'
+import { CtxindexSecretsError } from '@ctxindex/core/secrets'
+import { syncError } from '@ctxindex/extension-sdk'
+import { gmailAdapterDefinition } from '@ctxindex/official'
 import {
   createDaemonRouter,
   type RpcRequestContext,
+  type RpcResult,
   type RpcRuntimeIdentity,
+  type RpcSyncEvent,
+  type RpcSyncResult,
 } from '@ctxindex/rpc'
 import { createRouterClient, ORPCError } from '@orpc/server'
 import { DaemonApplication } from './application'
@@ -86,14 +97,14 @@ function context(
   return {
     requestId,
     signal,
-    clientProtocol: { id: 'ctxindex.local', version: 1 },
+    clientProtocol: { id: 'ctxindex.local', version: 2 },
     clientRuntime: runtime,
   }
 }
 
 function application(overrides: Record<string, unknown> = {}) {
   return new DaemonApplication({
-    protocol: { id: 'ctxindex.local', version: 1 },
+    protocol: { id: 'ctxindex.local', version: 2 },
     runtime,
     daemonVersion: '0.0.0',
     buildVersion: 'test',
@@ -101,6 +112,7 @@ function application(overrides: Record<string, unknown> = {}) {
     startedAt: '2026-07-18T00:00:00.000Z',
     pid: 123,
     extensionDiagnosticsCount: 0,
+    documentationService: createDocumentationService([]),
     observationTimeoutMs: 25,
     syncService: {
       run: async () => ({ mode: 'sync', results: [], warnings: [] }),
@@ -112,6 +124,350 @@ function application(overrides: Record<string, unknown> = {}) {
     ...overrides,
   })
 }
+
+class TestIdleClock {
+  now = 0
+  #nextId = 0
+  readonly #timers = new Map<
+    number,
+    { readonly deadline: number; readonly callback: () => void }
+  >()
+
+  readonly hooks = {
+    now: () => this.now,
+    setTimeout: (callback: () => void, delayMs: number): number => {
+      const id = this.#nextId++
+      this.#timers.set(id, { deadline: this.now + delayMs, callback })
+      return id
+    },
+    clearTimeout: (id: unknown): void => {
+      if (typeof id === 'number') this.#timers.delete(id)
+    },
+  }
+
+  advance(milliseconds: number, run = true): void {
+    this.now += milliseconds
+    if (run) this.runDue()
+  }
+
+  runDue(): void {
+    while (true) {
+      const due = [...this.#timers.entries()]
+        .filter(([, timer]) => timer.deadline <= this.now)
+        .sort((left, right) => left[1].deadline - right[1].deadline)[0]
+      if (!due) return
+      this.#timers.delete(due[0])
+      due[1].callback()
+    }
+  }
+
+  takeDue(): () => void {
+    const due = [...this.#timers.entries()]
+      .filter(([, timer]) => timer.deadline <= this.now)
+      .sort((left, right) => left[1].deadline - right[1].deadline)[0]
+    if (!due) throw new Error('Expected a due timer')
+    this.#timers.delete(due[0])
+    return due[1].callback
+  }
+}
+
+async function consumeApplicationSync(
+  promise: ReturnType<DaemonApplication['sync']['run']>,
+): Promise<{
+  readonly result: RpcResult<RpcSyncResult>
+  readonly events: readonly RpcSyncEvent[]
+}> {
+  const opened = await promise
+  if (!opened.ok) return { result: opened, events: [] }
+  const events: RpcSyncEvent[] = []
+  while (true) {
+    const step = await opened.value.next()
+    if (step.done) return { result: step.value, events }
+    events.push(step.value)
+  }
+}
+
+async function consumeRpcSync(
+  promise: ReturnType<ReturnType<typeof clientFor>['sync']['run']>,
+): Promise<{
+  readonly result: RpcSyncResult
+  readonly events: readonly RpcSyncEvent[]
+}> {
+  const iterator = await promise
+  const events: RpcSyncEvent[] = []
+  while (true) {
+    const step = await iterator.next()
+    if (step.done) return { result: step.value, events }
+    events.push(step.value)
+  }
+}
+
+test('Account authorization streams one URL and accepts one hidden response without echoing it', async () => {
+  const observed: string[] = []
+  const app = application({
+    createAuthorizationRequestId: () => 'authorization-request',
+    accountService: {
+      authorize: async (
+        _input: unknown,
+        interaction: {
+          readonly readAuthorizationResponse: (prompt: {
+            readonly authorizationUrl: string
+            readonly redirectUri: string
+            readonly signal: AbortSignal
+          }) => Promise<string | undefined>
+        },
+      ) => {
+        const response = await interaction.readAuthorizationResponse({
+          authorizationUrl:
+            'https://accounts.example/authorize?state=opaque-state',
+          redirectUri: 'http://localhost/callback',
+          signal: new AbortController().signal,
+        })
+        if (response !== undefined) observed.push(response)
+        return { accountId: 'account-id' }
+      },
+      list: () => [],
+      remove: async () => {},
+    },
+  })
+  app.markReady()
+  const opened = await app.account.add(
+    { provider: 'google', app: 'desktop', label: 'personal' },
+    context('account-add'),
+  )
+  if (!opened.ok) throw new Error('Expected Account stream admission')
+  expect(await opened.value.next()).toEqual({
+    done: false,
+    value: {
+      type: 'authorization.required',
+      requestId: 'authorization-request',
+      authorizationUrl: 'https://accounts.example/authorize?state=opaque-state',
+    },
+  })
+  const accepted = await app.account.respond(
+    {
+      requestId: 'authorization-request',
+      response:
+        'http://localhost/callback?code=private-code&state=opaque-state',
+    },
+    context('account-respond'),
+  )
+  expect(accepted).toEqual({ ok: true, value: { accepted: true } })
+  const terminal = await opened.value.next()
+  expect(terminal).toEqual({
+    done: true,
+    value: { ok: true, value: { accountId: 'account-id' } },
+  })
+  expect(observed).toEqual([
+    'http://localhost/callback?code=private-code&state=opaque-state',
+  ])
+  expect(JSON.stringify(accepted)).not.toContain('private-code')
+  expect(JSON.stringify(terminal)).not.toContain('private-code')
+})
+
+test('Account response bypasses an exclusive secret switch queued behind authorization', async () => {
+  const calls: string[] = []
+  const app = application({
+    createAuthorizationRequestId: () => 'authorization-request',
+    accountService: {
+      authorize: async (
+        _input: unknown,
+        interaction: {
+          readonly readAuthorizationResponse: (prompt: {
+            readonly authorizationUrl: string
+            readonly redirectUri: string
+            readonly signal: AbortSignal
+          }) => Promise<string | undefined>
+        },
+      ) => {
+        await interaction.readAuthorizationResponse({
+          authorizationUrl: 'https://accounts.example/authorize',
+          redirectUri: 'http://localhost/callback',
+          signal: new AbortController().signal,
+        })
+        calls.push('authorized')
+        return { accountId: 'account-id' }
+      },
+      list: () => [],
+      remove: async () => {},
+    },
+    secretBackendManager: {
+      async getStatus() {
+        throw new Error('unused')
+      },
+      async switchBackend(target: 'keychain' | 'file') {
+        calls.push(`switched:${target}`)
+        return {
+          backend: target,
+          copied: 0,
+          cleaned: 0,
+          cleanupPending: false,
+          warnings: [],
+        }
+      },
+    },
+  })
+  app.markReady()
+  const opened = await app.account.add(
+    { provider: 'google' },
+    context('account-add'),
+  )
+  if (!opened.ok) throw new Error('Expected Account stream admission')
+  expect((await opened.value.next()).done).toBe(false)
+  const switching = app.secrets.backend.set(
+    { target: 'file' },
+    context('secrets-switch'),
+  )
+  await Promise.resolve()
+  expect(calls).toEqual([])
+  const response = app.account.respond(
+    { requestId: 'authorization-request', response: 'private-code' },
+    context('account-respond'),
+  )
+  const outcome = await Promise.race([
+    response.then(() => 'responded' as const),
+    Bun.sleep(20).then(() => 'timeout' as const),
+  ])
+  if (outcome === 'timeout') await opened.value.return?.()
+  expect(outcome).toBe('responded')
+  expect(await response).toEqual({ ok: true, value: { accepted: true } })
+  expect((await opened.value.next()).done).toBe(true)
+  expect(await switching).toMatchObject({ ok: true })
+  expect(calls).toEqual(['authorized', 'switched:file'])
+})
+
+test('automatic loopback completion aborts and removes pending manual input', async () => {
+  const app = application({
+    createAuthorizationRequestId: () => 'automatic-request',
+    accountService: {
+      authorize: async (
+        _input: unknown,
+        interaction: {
+          readonly readAuthorizationResponse: (prompt: {
+            readonly authorizationUrl: string
+            readonly redirectUri: string
+            readonly signal: AbortSignal
+          }) => Promise<string | undefined>
+        },
+      ) => {
+        const manual = new AbortController()
+        const response = interaction.readAuthorizationResponse({
+          authorizationUrl: 'https://accounts.example/authorize',
+          redirectUri: 'http://localhost/callback',
+          signal: manual.signal,
+        })
+        manual.abort()
+        expect(await response).toBeUndefined()
+        return { accountId: 'account-id' }
+      },
+      list: () => [],
+      remove: async () => {},
+    },
+  })
+  app.markReady()
+  const opened = await app.account.add(
+    { provider: 'google' },
+    context('automatic-account'),
+  )
+  if (!opened.ok) throw new Error('Expected Account stream admission')
+  expect((await opened.value.next()).done).toBe(false)
+  expect(await opened.value.next()).toEqual({
+    done: true,
+    value: { ok: true, value: { accountId: 'account-id' } },
+  })
+  expect(
+    await app.account.respond(
+      { requestId: 'automatic-request', response: 'late-private-code' },
+      context('late-response'),
+    ),
+  ).toMatchObject({ ok: false, error: { taxonomy: 'lookup' } })
+})
+
+test('Account and OAuth App inventory mutations delegate with safe result shapes', async () => {
+  const events: string[] = []
+  const app = application({
+    accountService: {
+      authorize: async () => ({ accountId: 'unused' }),
+      list: () => [
+        {
+          id: 'account-id',
+          provider: 'google',
+          label: 'personal',
+          expiresAt: null,
+          expiryState: 'unknown',
+          sources: [],
+        },
+      ],
+      remove: async (label: string) => events.push(`account:${label}`),
+    },
+    oauthAppService: {
+      registration: () => ({ clientId: 'CTXINDEX_GOOGLE_CLIENT_ID' }),
+      add: async (input: { provider: string; label: string }) =>
+        events.push(`app-add:${input.provider}:${input.label}`),
+      list: () => [
+        {
+          providerId: 'google',
+          label: 'desktop',
+          origin: 'local',
+          provenance: { kind: 'local' },
+        },
+      ],
+      remove: async (provider: string, label: string) =>
+        events.push(`app-remove:${provider}:${label}`),
+    },
+  })
+  app.markReady()
+  expect(await app.account.list({}, context('account-list'))).toMatchObject({
+    ok: true,
+    value: { rows: [{ id: 'account-id' }] },
+  })
+  expect(
+    await app.account.remove({ label: 'personal' }, context('account-remove')),
+  ).toEqual({ ok: true, value: { label: 'personal' } })
+  expect(
+    await app.oauthApp.registration(
+      { provider: 'google' },
+      context('app-registration'),
+    ),
+  ).toEqual({
+    ok: true,
+    value: { environment: { clientId: 'CTXINDEX_GOOGLE_CLIENT_ID' } },
+  })
+  const secret = 'private-client-secret'
+  expect(
+    await app.oauthApp.add(
+      {
+        provider: 'google',
+        label: 'desktop',
+        config: { clientId: 'public-id', clientSecret: secret },
+      },
+      context('app-add'),
+    ),
+  ).toEqual({
+    ok: true,
+    value: { providerId: 'google', label: 'desktop' },
+  })
+  const listed = await app.oauthApp.list({}, context('app-list'))
+  expect(listed).toMatchObject({
+    ok: true,
+    value: { rows: [{ providerId: 'google', label: 'desktop' }] },
+  })
+  expect(JSON.stringify(listed)).not.toContain(secret)
+  expect(
+    await app.oauthApp.remove(
+      { provider: 'google', label: 'desktop' },
+      context('app-remove'),
+    ),
+  ).toEqual({
+    ok: true,
+    value: { providerId: 'google', label: 'desktop' },
+  })
+  expect(events).toEqual([
+    'account:personal',
+    'app-add:google:desktop',
+    'app-remove:google:desktop',
+  ])
+})
 
 test('tracks a business request and propagates request cancellation', async () => {
   let observed: AbortSignal | undefined
@@ -130,14 +486,437 @@ test('tracks a business request and propagates request cancellation', async () =
   })
   app.markReady()
   const controller = new AbortController()
-  const pending = app.sync.run(
+  const opened = await app.sync.run(
     { mode: 'sync' },
     context('one', controller.signal),
   )
+  if (!opened.ok) throw new Error('Expected stream admission')
+  const pending = opened.value.next()
   await Promise.resolve()
   expect(app.activeRequestCount).toBe(1)
   controller.abort()
-  await pending
+  expect(await pending).toEqual({
+    done: true,
+    value: {
+      ok: false,
+      error: {
+        kind: 'cancelled',
+        code: 'cancelled',
+        message: 'The request was cancelled.',
+      },
+    },
+  })
+  expect(observed?.aborted).toBe(true)
+  expect(app.activeRequestCount).toBe(0)
+})
+
+test('serves safe secret status and backend switching as serialized business work', async () => {
+  const calls: string[] = []
+  let releaseSwitch!: () => void
+  const switchBlocked = new Promise<void>((resolve) => {
+    releaseSwitch = resolve
+  })
+  const app = application({
+    secretBackendManager: {
+      async getStatus() {
+        calls.push('status')
+        return {
+          backend: 'keychain' as const,
+          backends: {
+            file: { available: true, referenceCount: 2 },
+            keychain: { available: true, referenceCount: 0 },
+          },
+        }
+      },
+      async switchBackend(target: 'keychain' | 'file') {
+        calls.push(`set:${target}`)
+        await switchBlocked
+        return {
+          backend: target,
+          copied: 2,
+          cleaned: 1,
+          cleanupPending: true,
+          warnings: ['secret-canary keychain:ctxindex/private/token'],
+        }
+      },
+    },
+  })
+  app.markReady()
+
+  const switching = app.secrets.backend.set(
+    { target: 'file' },
+    context('secrets-set'),
+  )
+  await Promise.resolve()
+  const status = app.secrets.status({}, context('secrets-status'))
+  await Promise.resolve()
+  expect(calls).toEqual(['set:file'])
+  expect(app.activeRequestCount).toBe(2)
+
+  releaseSwitch()
+  expect(await switching).toEqual({
+    ok: true,
+    value: {
+      backend: 'file',
+      copied: 2,
+      cleaned: 1,
+      cleanupPending: true,
+      warnings: ['Secret backend cleanup remains pending.'],
+    },
+  })
+  expect(await status).toEqual({
+    ok: true,
+    value: {
+      backend: 'keychain',
+      backends: {
+        file: { available: true, referenceCount: 2 },
+        keychain: { available: true, referenceCount: 0 },
+      },
+    },
+  })
+  expect(calls).toEqual(['set:file', 'status'])
+  expect(JSON.stringify(await switching)).not.toContain('secret-canary')
+})
+
+test('maps secret backend failures to bounded messages without references', async () => {
+  const app = application({
+    secretBackendManager: {
+      async getStatus() {
+        throw new CtxindexSecretsError(
+          'keychain:ctxindex/private/token secret-canary',
+          'backend_unavailable',
+        )
+      },
+      async switchBackend() {
+        throw new Error('unused')
+      },
+    },
+  })
+  app.markReady()
+  const result = await app.secrets.status({}, context('secrets-failure'))
+  expect(result).toEqual({
+    ok: false,
+    error: {
+      kind: 'ctxindex',
+      taxonomy: 'other',
+      code: 'backend_unavailable',
+      message: 'The configured secret backend is unavailable.',
+    },
+  })
+  expect(JSON.stringify(result)).not.toMatch(/secret-canary|keychain:ctxindex/)
+})
+
+test('backend migration waits for active secret-using business work', async () => {
+  const calls: string[] = []
+  let releaseSearch!: () => void
+  const searchBlocked = new Promise<void>((resolve) => {
+    releaseSearch = resolve
+  })
+  const app = application({
+    searchService: {
+      async search() {
+        calls.push('search')
+        await searchBlocked
+        return { results: [], warnings: [] }
+      },
+    },
+    secretBackendManager: {
+      async getStatus() {
+        throw new Error('unused')
+      },
+      async switchBackend(target: 'keychain' | 'file') {
+        calls.push(`set:${target}`)
+        return {
+          backend: target,
+          copied: 0,
+          cleaned: 0,
+          cleanupPending: false,
+          warnings: [],
+        }
+      },
+    },
+  })
+  app.markReady()
+
+  const search = app.search.query(
+    { text: 'fixture' },
+    context('search-before-secret-migration'),
+  )
+  await Promise.resolve()
+  const switching = app.secrets.backend.set(
+    { target: 'keychain' },
+    context('secret-migration-after-search'),
+  )
+  await Promise.resolve()
+  expect(calls).toEqual(['search'])
+
+  releaseSearch()
+  expect(await search).toMatchObject({ ok: true })
+  expect(await switching).toMatchObject({
+    ok: true,
+    value: { backend: 'keychain' },
+  })
+  expect(calls).toEqual(['search', 'set:keychain'])
+})
+
+test('routes Artifact listing and explicit purge through tracked daemon business work', async () => {
+  const calls: unknown[] = []
+  const listed = {
+    resourceRef: 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/one',
+    artifacts: [],
+    warnings: [],
+  }
+  const purged = {
+    artifactCountRemoved: 1,
+    objectCountRemoved: 1,
+    logicalBytesFreed: 14,
+    physicalBytesFreed: 14,
+    diskAccounting: {
+      artifactCount: 0,
+      objectCount: 0,
+      logicalBytes: 0,
+      physicalBytes: 0,
+    },
+  }
+  const app = application({
+    artifactService: {
+      async list(ref: string) {
+        calls.push(['list', ref])
+        return listed
+      },
+      async purge() {
+        calls.push(['purge'])
+        return purged
+      },
+      async download(ref: string, options: unknown) {
+        calls.push(['download', ref, options])
+        return {
+          artifact: {
+            ref,
+            originRef: listed.resourceRef,
+            contentHash: `sha256:${'a'.repeat(64)}`,
+            mediaType: 'application/octet-stream',
+            byteSize: 4,
+            retentionClass: 'cached' as const,
+            createdAt: 1,
+          },
+          cache: 'hit' as const,
+        }
+      },
+      async downloadForTransfer(ref: string, max: number, signal: AbortSignal) {
+        calls.push(['downloadForTransfer', ref, max, signal])
+        return {
+          download: {
+            artifact: {
+              ref,
+              originRef: listed.resourceRef,
+              contentHash: `sha256:${'a'.repeat(64)}`,
+              mediaType: 'application/octet-stream',
+              byteSize: 4,
+              retentionClass: 'cached' as const,
+              createdAt: 1,
+            },
+            cache: 'miss' as const,
+          },
+          bytes: new Uint8Array([1, 2, 3, 4]),
+        }
+      },
+    },
+    transferStore: {
+      create(bytes: Uint8Array) {
+        calls.push(['transfer', bytes])
+        return { ticket: 'b'.repeat(64), byteSize: 4, expiresAt: 10 }
+      },
+    },
+  })
+
+  expect(
+    await app.artifact.purge({}, context('artifact-starting')),
+  ).toMatchObject({ ok: false, error: { kind: 'daemon_unavailable' } })
+  app.markReady()
+  expect(
+    await app.artifact.list(
+      { ref: listed.resourceRef },
+      context('artifact-list'),
+    ),
+  ).toEqual({ ok: true, value: listed })
+  expect(await app.artifact.purge({}, context('artifact-purge'))).toEqual({
+    ok: true,
+    value: purged,
+  })
+  const artifactRef = `${listed.resourceRef}/attachment/file`
+  expect(
+    await app.artifact.download(
+      { ref: artifactRef, transfer: false },
+      context('artifact-download-cache'),
+    ),
+  ).toMatchObject({ ok: true, value: { cache: 'hit' } })
+  expect(
+    await app.artifact.download(
+      { ref: artifactRef, transfer: true },
+      context('artifact-download-transfer'),
+    ),
+  ).toMatchObject({
+    ok: true,
+    value: {
+      cache: 'miss',
+      transfer: { ticket: 'b'.repeat(64), byteSize: 4, expiresAt: 10 },
+    },
+  })
+  expect(calls.map((call) => (call as unknown[])[0])).toEqual([
+    'list',
+    'purge',
+    'download',
+    'downloadForTransfer',
+    'transfer',
+  ])
+})
+
+test('streams bounded progress in order with one-item producer backpressure', async () => {
+  let firstAccepted = false
+  const app = application({
+    syncService: {
+      run: async ({
+        onEvent,
+      }: {
+        onEvent?: (event: {
+          type: 'source.started' | 'source.progress'
+          sequence: number
+          sourceId: string
+          mode?: 'sync'
+          processed?: number
+          upserts?: number
+          removals?: number
+          checkpoints?: number
+          warningsCount?: number
+        }) => Promise<void>
+      }) => {
+        await onEvent?.({
+          type: 'source.started',
+          sequence: 0,
+          sourceId: 'source-1',
+          mode: 'sync',
+        })
+        firstAccepted = true
+        await onEvent?.({
+          type: 'source.progress',
+          sequence: 1,
+          sourceId: 'source-1',
+          processed: 1,
+          upserts: 1,
+          removals: 0,
+          checkpoints: 0,
+          warningsCount: 0,
+        })
+        return { mode: 'sync' as const, results: [], warnings: [] }
+      },
+    },
+  })
+  app.markReady()
+  const opened = await app.sync.run({ mode: 'sync' }, context('stream'))
+  if (!opened.ok) throw new Error('Expected stream admission')
+  await Promise.resolve()
+  expect(firstAccepted).toBe(false)
+  expect(app.activeRequestCount).toBe(1)
+
+  expect(await opened.value.next()).toEqual({
+    done: false,
+    value: {
+      type: 'source.started',
+      sequence: 0,
+      sourceId: 'source-1',
+      mode: 'sync',
+    },
+  })
+  await Promise.resolve()
+  expect(firstAccepted).toBe(true)
+  expect(await opened.value.next()).toEqual({
+    done: false,
+    value: {
+      type: 'source.progress',
+      sequence: 1,
+      sourceId: 'source-1',
+      processed: 1,
+      upserts: 1,
+      removals: 0,
+      checkpoints: 0,
+      warningsCount: 0,
+    },
+  })
+  expect(await opened.value.next()).toEqual({
+    done: true,
+    value: {
+      ok: true,
+      value: { mode: 'sync', results: [], warnings: [] },
+    },
+  })
+  expect(app.activeRequestCount).toBe(0)
+})
+
+test('keeps stream activity admitted until the consumer observes its terminal result', async () => {
+  const clock = new TestIdleClock()
+  const app = application({
+    idleTimeoutMs: 1_000,
+    idleTimer: clock.hooks,
+  })
+  app.markReady()
+  const opened = await app.sync.run(
+    { mode: 'sync' },
+    context('terminal-pending'),
+  )
+  if (!opened.ok) throw new Error('Expected stream admission')
+
+  await Bun.sleep(0)
+  expect(app.activeRequestCount).toBe(1)
+  clock.advance(2_000)
+  expect(app.lifecycle).toBe('ready')
+
+  expect(await opened.value.next()).toEqual({
+    done: true,
+    value: {
+      ok: true,
+      value: { mode: 'sync', results: [], warnings: [] },
+    },
+  })
+  expect(app.activeRequestCount).toBe(0)
+  clock.advance(999)
+  expect(app.lifecycle).toBe('ready')
+  clock.advance(1)
+  expect(app.lifecycle).toBe('stopping')
+})
+
+test('returning the stream early cancels and settles the producer', async () => {
+  let observed: AbortSignal | undefined
+  const app = application({
+    syncService: {
+      run: async ({
+        signal,
+        onEvent,
+      }: {
+        signal: AbortSignal
+        onEvent?: (event: {
+          type: 'source.started'
+          sequence: number
+          sourceId: string
+          mode: 'sync'
+        }) => Promise<void>
+      }) => {
+        observed = signal
+        await onEvent?.({
+          type: 'source.started',
+          sequence: 0,
+          sourceId: 'source-1',
+          mode: 'sync',
+        })
+        return { mode: 'sync', results: [], warnings: [] }
+      },
+    },
+  })
+  app.markReady()
+  const opened = await app.sync.run({ mode: 'sync' }, context('return-early'))
+  if (!opened.ok) throw new Error('Expected stream admission')
+  expect(app.activeRequestCount).toBe(1)
+  await opened.value.return?.()
   expect(observed?.aborted).toBe(true)
   expect(app.activeRequestCount).toBe(0)
 })
@@ -167,6 +946,172 @@ test('unavailable business requests describe starting and stopping lifecycle', a
   })
 })
 
+test('projects loaded Extension documentation as bounded content-safe RPC values', async () => {
+  const markdown = {
+    origin: { kind: 'extension' as const, extensionId: 'fixture.docs' },
+    path: 'README.md',
+    kind: 'markdown' as const,
+    mediaType: 'text/markdown',
+    byteSize: 9,
+    title: 'Fixture',
+    content: '# Fixture',
+  }
+  const asset = {
+    origin: { kind: 'extension' as const, extensionId: 'fixture.docs' },
+    path: 'assets/pixel.png',
+    kind: 'asset' as const,
+    mediaType: 'image/png',
+    byteSize: 8,
+    content: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10]),
+  }
+  const documentationService: DocumentationService = {
+    list: () => [markdown, asset],
+    get: ({ path }) => (path === asset.path ? asset : markdown),
+    search: () => [
+      {
+        origin: markdown.origin,
+        path: markdown.path,
+        title: markdown.title,
+        snippet: '# Fixture',
+      },
+    ],
+  }
+  const app = application({ documentationService })
+  expect(
+    await app.documentation.list({}, context('docs-starting')),
+  ).toMatchObject({ ok: false, error: { kind: 'daemon_unavailable' } })
+  app.markReady()
+
+  expect(await app.documentation.list({}, context('docs-list'))).toEqual({
+    ok: true,
+    value: {
+      rows: [
+        {
+          extensionId: 'fixture.docs',
+          path: 'README.md',
+          kind: 'markdown',
+          mediaType: 'text/markdown',
+          byteSize: 9,
+          title: 'Fixture',
+        },
+        {
+          extensionId: 'fixture.docs',
+          path: 'assets/pixel.png',
+          kind: 'asset',
+          mediaType: 'image/png',
+          byteSize: 8,
+        },
+      ],
+    },
+  })
+  expect(
+    await app.documentation.get(
+      { extensionId: 'fixture.docs', path: 'assets/pixel.png' },
+      context('docs-get'),
+    ),
+  ).toEqual({
+    ok: true,
+    value: {
+      item: {
+        extensionId: 'fixture.docs',
+        path: 'assets/pixel.png',
+        kind: 'asset',
+        mediaType: 'image/png',
+        byteSize: 8,
+        contentBase64: 'iVBORw0KGgo=',
+      },
+    },
+  })
+  expect(
+    await app.documentation.search(
+      { query: 'fixture' },
+      context('docs-search'),
+    ),
+  ).toEqual({
+    ok: true,
+    value: {
+      rows: [
+        {
+          extensionId: 'fixture.docs',
+          path: 'README.md',
+          title: 'Fixture',
+          snippet: '# Fixture',
+        },
+      ],
+    },
+  })
+  expect(
+    await clientFor(app).documentation.get({
+      extensionId: 'fixture.docs',
+      path: 'README.md',
+    }),
+  ).toMatchObject({ item: { content: '# Fixture' } })
+})
+
+test('rejects oversized documentation output without truncation', async () => {
+  const content = 'x'.repeat(256 * 1_024 + 1)
+  const app = application({
+    documentationService: {
+      list: () => [],
+      get: () => ({
+        origin: { kind: 'extension', extensionId: 'fixture.docs' },
+        path: 'README.md',
+        kind: 'markdown',
+        mediaType: 'text/markdown',
+        byteSize: content.length,
+        content,
+      }),
+      search: () => [],
+    },
+  })
+  app.markReady()
+  expect(
+    await app.documentation.get(
+      { extensionId: 'fixture.docs', path: 'README.md' },
+      context('docs-too-large'),
+    ),
+  ).toEqual({
+    ok: false,
+    error: {
+      kind: 'result_too_large',
+      code: 'result_too_large',
+      message: 'The daemon result exceeds the local protocol bounds.',
+    },
+  })
+})
+
+test('rejects terminal-active documentation output at the RPC boundary', async () => {
+  const content = '# Fixture\u001b]0;unsafe\u0007'
+  const app = application({
+    documentationService: {
+      list: () => [],
+      get: () => ({
+        origin: { kind: 'extension', extensionId: 'fixture.docs' },
+        path: 'README.md',
+        kind: 'markdown',
+        mediaType: 'text/markdown',
+        byteSize: new TextEncoder().encode(content).byteLength,
+        content,
+      }),
+      search: () => [],
+    },
+  })
+  app.markReady()
+  expect(
+    await app.documentation.get(
+      { extensionId: 'fixture.docs', path: 'README.md' },
+      context('docs-terminal-control'),
+    ),
+  ).toEqual({
+    ok: false,
+    error: {
+      kind: 'result_too_large',
+      code: 'result_too_large',
+      message: 'The daemon result exceeds the local protocol bounds.',
+    },
+  })
+})
+
 test('shutdown stops admission, cancels active work, and is idempotent', async () => {
   let settle!: () => void
   let operationSignal: AbortSignal | undefined
@@ -181,7 +1126,9 @@ test('shutdown stops admission, cancels active work, and is idempotent', async (
     },
   })
   app.markReady()
-  const pending = app.sync.run({ mode: 'sync' }, context('active'))
+  const opened = await app.sync.run({ mode: 'sync' }, context('active'))
+  if (!opened.ok) throw new Error('Expected stream admission')
+  const pending = opened.value.next()
   await Promise.resolve()
   const first = await app.system.shutdown({}, context('shutdown-1'))
   const second = await app.system.shutdown({}, context('shutdown-2'))
@@ -192,6 +1139,84 @@ test('shutdown stops admission, cancels active work, and is idempotent', async (
   settle()
   await pending
   await app.whenDrained()
+})
+
+test('idle shutdown waits for active work and resets from admission and settlement', async () => {
+  const clock = new TestIdleClock()
+  const stopping: number[] = []
+  let settle!: () => void
+  const app = application({
+    idleTimeoutMs: 1_000,
+    idleTimer: clock.hooks,
+    onStopping: () => stopping.push(clock.now),
+    syncService: {
+      run: () =>
+        new Promise((resolve) => {
+          settle = () => resolve({ mode: 'sync', results: [], warnings: [] })
+        }),
+    },
+  })
+  app.markReady()
+  clock.advance(900)
+
+  const opened = await app.sync.run({ mode: 'sync' }, context('idle-active'))
+  if (!opened.ok) throw new Error('Expected stream admission')
+  const pending = opened.value.next()
+
+  clock.advance(1_100)
+  expect(app.lifecycle).toBe('ready')
+  settle()
+  await pending
+  await app.whenDrained()
+
+  clock.advance(999)
+  expect(app.lifecycle).toBe('ready')
+  clock.advance(1)
+  expect(app.lifecycle).toBe('stopping')
+  expect(stopping).toEqual([3_000])
+})
+
+test('health and status observation do not extend the idle deadline', async () => {
+  const clock = new TestIdleClock()
+  const app = application({
+    idleTimeoutMs: 1_000,
+    idleTimer: clock.hooks,
+  })
+  app.markReady()
+  clock.advance(900)
+
+  expect((await app.system.health({}, context('idle-health'))).ok).toBe(true)
+  expect((await app.status.get({}, context('idle-status'))).ok).toBe(true)
+  clock.advance(100)
+
+  expect(app.lifecycle).toBe('stopping')
+})
+
+test('business admission at the idle deadline wins atomically over shutdown', async () => {
+  const clock = new TestIdleClock()
+  let settle!: () => void
+  const app = application({
+    idleTimeoutMs: 1_000,
+    idleTimer: clock.hooks,
+    syncService: {
+      run: () =>
+        new Promise((resolve) => {
+          settle = () => resolve({ mode: 'sync', results: [], warnings: [] })
+        }),
+    },
+  })
+  app.markReady()
+  clock.advance(1_000, false)
+  const staleDeadline = clock.takeDue()
+
+  const opened = await app.sync.run({ mode: 'sync' }, context('idle-race'))
+  if (!opened.ok) throw new Error('Expected stream admission')
+  const pending = opened.value.next()
+  settle()
+  await pending
+  staleDeadline()
+
+  expect(app.lifecycle).toBe('ready')
 })
 
 test('maps core failures and diagnostics without leaking unsafe text', async () => {
@@ -228,8 +1253,10 @@ test('maps core failures and diagnostics without leaking unsafe text', async () 
     },
   })
   app.markReady()
-  const result = await app.sync.run({ mode: 'sync' }, context('safe'))
-  const serialized = JSON.stringify(result)
+  const { result, events } = await consumeApplicationSync(
+    app.sync.run({ mode: 'sync' }, context('safe')),
+  )
+  const serialized = JSON.stringify({ result, events })
   expect(serialized).not.toContain('/Users')
   expect(serialized).not.toContain('/tmp')
   expect(serialized).not.toContain(canary)
@@ -270,17 +1297,23 @@ test('sync preserves trusted unknown and disabled Source validation failures thr
       },
     }
     expect(
-      await app.sync.run(
-        { mode: 'sync', source: index === 0 ? 'missing' : 'disabled' },
-        context(`sync-validation-${index}`),
-      ),
+      (
+        await consumeApplicationSync(
+          app.sync.run(
+            { mode: 'sync', source: index === 0 ? 'missing' : 'disabled' },
+            context(`sync-validation-${index}`),
+          ),
+        )
+      ).result,
     ).toEqual(expected)
     expect(
       await rpcFailure(
-        clientFor(app).sync.run({
-          mode: 'sync',
-          source: index === 0 ? 'missing' : 'disabled',
-        }),
+        consumeRpcSync(
+          clientFor(app).sync.run({
+            mode: 'sync',
+            source: index === 0 ? 'missing' : 'disabled',
+          }),
+        ),
       ),
     ).toEqual(expected.error)
   }
@@ -333,7 +1366,10 @@ test('resource failures preserve every auth and sync taxonomy code through RPC',
       kind: 'ctxindex',
       taxonomy: 'auth',
       code,
-      message: 'The daemon could not complete the request.',
+      message:
+        code === 'loopback_timeout'
+          ? 'OAuth authorization failed: loopback_timeout (callback timed out)'
+          : `OAuth authorization failed: ${code}`,
     })
   }
 
@@ -358,7 +1394,10 @@ test('resource failures preserve every auth and sync taxonomy code through RPC',
       kind: 'ctxindex',
       taxonomy: 'sync',
       code,
-      message: 'The daemon could not complete the request.',
+      message:
+        code === 'not_found'
+          ? 'The provider resource was not found (status 404).'
+          : 'The daemon could not complete the request.',
       ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
     })
   }
@@ -376,14 +1415,16 @@ test('sync failures preserve every validation taxonomy code through RPC', async 
       },
     })
     app.markReady()
-    expect(await rpcFailure(clientFor(app).sync.run({ mode: 'sync' }))).toEqual(
-      {
-        kind: 'ctxindex',
-        taxonomy: 'validation',
-        code,
-        message: code,
-      },
-    )
+    expect(
+      await rpcFailure(
+        consumeRpcSync(clientFor(app).sync.run({ mode: 'sync' })),
+      ),
+    ).toEqual({
+      kind: 'ctxindex',
+      taxonomy: 'validation',
+      code,
+      message: code,
+    })
   }
 })
 
@@ -422,7 +1463,9 @@ test('raw errors cannot impersonate trusted public validation failures', async (
     },
   })
   app.markReady()
-  const result = await rpcFailure(clientFor(app).sync.run({ mode: 'sync' }))
+  const result = await rpcFailure(
+    consumeRpcSync(clientFor(app).sync.run({ mode: 'sync' })),
+  )
   expect(result).toEqual({
     kind: 'ctxindex',
     taxonomy: 'other',
@@ -430,6 +1473,105 @@ test('raw errors cannot impersonate trusted public validation failures', async (
     message: 'The daemon could not complete the request.',
   })
   expect(JSON.stringify(result)).not.toContain(canary)
+})
+
+test('Artifact download preserves trusted failure parity without exposing private diagnostics', async () => {
+  for (const [code, taxonomy, privateMessage, publicMessage] of [
+    [
+      'unsupported_capability',
+      'other',
+      'Unsupported Artifact operation at /Users/private/cache',
+      'The Source Adapter does not support the requested capability.',
+    ],
+    [
+      'network',
+      'sync',
+      'Provider request failed with raw response body',
+      'The provider network request failed.',
+    ],
+    [
+      'data_integrity',
+      'other',
+      'Artifact CAS object is unreadable: /Users/private/cache/object',
+      'Stored data failed integrity validation.',
+    ],
+    [
+      'output_exists',
+      'other',
+      'Output path already exists: /Users/private/output.bin',
+      'The requested output already exists.',
+    ],
+  ] as const) {
+    const app = application({
+      artifactService: {
+        download: async () => {
+          throw new CtxindexError(privateMessage, code)
+        },
+      } as never,
+    })
+    app.markReady()
+    expect(
+      await rpcFailure(
+        clientFor(app).artifact.download({
+          ref: 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/one/attachment/file',
+          transfer: false,
+        }),
+      ),
+    ).toEqual({ kind: 'ctxindex', taxonomy, code, message: publicMessage })
+  }
+
+  const raw = application({
+    artifactService: {
+      download: async () => {
+        throw Object.assign(new Error('raw network canary'), {
+          code: 'network',
+        })
+      },
+    } as never,
+  })
+  raw.markReady()
+  expect(
+    await rpcFailure(
+      clientFor(raw).artifact.download({
+        ref: 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/one/attachment/file',
+        transfer: false,
+      }),
+    ),
+  ).toEqual({
+    kind: 'ctxindex',
+    taxonomy: 'other',
+    code: 'internal_error',
+    message: 'The daemon could not complete the request.',
+  })
+})
+
+test('projects an explicitly public portable SDK sync failure and bounds retry metadata', async () => {
+  const app = application({
+    resourceService: {
+      get: async () => {
+        throw syncError(
+          'rate_limited',
+          'GitHub rate limit reached; retry later.',
+          { retryAfterMs: 30_000 },
+        )
+      },
+    },
+  })
+  app.markReady()
+
+  expect(
+    await rpcFailure(
+      clientFor(app).resource.get({
+        ref: 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/one',
+      }),
+    ),
+  ).toEqual({
+    kind: 'ctxindex',
+    taxonomy: 'sync',
+    code: 'rate_limited',
+    message: 'GitHub rate limit reached; retry later.',
+    retryAfterMs: 30_000,
+  })
 })
 
 test('status preserves established public warning and status fields through RPC', async () => {
@@ -468,7 +1610,7 @@ function clientFor(app: DaemonApplication) {
   const requestContext = context('bounded-output')
   return createRouterClient(
     createDaemonRouter(app, {
-      protocol: { id: 'ctxindex.local', version: 1 },
+      protocol: { id: 'ctxindex.local', version: 2 },
       runtime,
     }),
     {
@@ -547,8 +1689,13 @@ test('completed sync warnings and refs preserve direct output through RPC', asyn
     syncService: { run: async () => expected.value },
   })
   app.markReady()
-  const direct = await app.sync.run({ mode: 'sync' }, context('sync-direct'))
-  const rpc = await clientFor(app).sync.run({ mode: 'sync' })
+  const direct = (
+    await consumeApplicationSync(
+      app.sync.run({ mode: 'sync' }, context('sync-direct')),
+    )
+  ).result
+  const rpc = (await consumeRpcSync(clientFor(app).sync.run({ mode: 'sync' })))
+    .result
   expect(direct).toEqual(expected)
   if (!direct.ok) throw new Error('Expected direct sync success')
   expect(rpc).toEqual(direct.value)
@@ -608,8 +1755,13 @@ test('failed sync uses the deterministic public CLI projection through RPC', asy
       warnings: [],
     },
   }
-  const direct = await app.sync.run({ mode: 'sync' }, context('failed-direct'))
-  const rpc = await clientFor(app).sync.run({ mode: 'sync' })
+  const direct = (
+    await consumeApplicationSync(
+      app.sync.run({ mode: 'sync' }, context('failed-direct')),
+    )
+  ).result
+  const rpc = (await consumeRpcSync(clientFor(app).sync.run({ mode: 'sync' })))
+    .result
   expect(direct).toEqual(expected)
   if (!direct.ok) throw new Error('Expected projected sync success')
   expect(rpc).toEqual(direct.value)
@@ -652,7 +1804,9 @@ test('router rejects oversized sync results instead of returning partial success
     },
   })
   app.markReady()
-  const result = await rpcFailure(clientFor(app).sync.run({ mode: 'sync' }))
+  const result = await rpcFailure(
+    consumeRpcSync(clientFor(app).sync.run({ mode: 'sync' })),
+  )
   expect(result).toMatchObject({ code: 'internal_error' })
 })
 
@@ -691,7 +1845,9 @@ test('router rejects oversized warning arrays instead of returning partial succe
       syncService: { run: async () => output },
     })
     app.markReady()
-    const result = await rpcFailure(clientFor(app).sync.run({ mode: 'sync' }))
+    const result = await rpcFailure(
+      consumeRpcSync(clientFor(app).sync.run({ mode: 'sync' })),
+    )
     expect(result).toMatchObject({ code: 'internal_error' })
   }
 })
@@ -795,7 +1951,7 @@ test('search forwards query-less and resumed exact-Source remote pagination', as
   const first = await app.search.query(
     {
       sourceIds: ['work-outlook'],
-      kind: 'communication.message',
+      kind: 'mail.message',
       limit: 50,
       remote: true,
     },
@@ -813,7 +1969,7 @@ test('search forwards query-less and resumed exact-Source remote pagination', as
   })
   expect(inputs[0]).toMatchObject({
     sourceIds: ['01ARZ3NDEKTSV4RRFFQ69G5FAV'],
-    kind: 'communication.message',
+    kind: 'mail.message',
     limit: 50,
     remote: true,
   })
@@ -821,7 +1977,7 @@ test('search forwards query-less and resumed exact-Source remote pagination', as
   const resumed = await app.search.query(
     {
       sourceIds: ['work-outlook'],
-      kind: 'communication.message',
+      kind: 'mail.message',
       limit: 50,
       remote: true,
       continuation: 'opaque-next-page',
@@ -836,7 +1992,7 @@ test('search forwards query-less and resumed exact-Source remote pagination', as
   })
   expect(inputs[1]).toMatchObject({
     sourceIds: ['01ARZ3NDEKTSV4RRFFQ69G5FAV'],
-    kind: 'communication.message',
+    kind: 'mail.message',
     limit: 50,
     remote: true,
     continuation: 'opaque-next-page',
@@ -906,4 +2062,295 @@ test('Source add checks cancellation after asynchronous Grant resolution', async
     error: { code: 'cancelled' },
   })
   expect(adds).toBe(0)
+})
+
+test('Source add matches a real Adapter definition to its compatible Account Grant', async () => {
+  let grantId: string | undefined
+  const app = application({
+    registry: {
+      adapters: {
+        get: ({ id }: { id: string }) =>
+          id === gmailAdapterDefinition.id ? gmailAdapterDefinition : undefined,
+        list: () => [gmailAdapterDefinition],
+      },
+    } as never,
+    authService: {
+      listGrants: async () => [
+        {
+          id: 'grant-1',
+          provider: 'google',
+          scopes: gmailAdapterDefinition.access.scopes,
+          accountLabel: 'personal',
+          accountId: 'account-1',
+        } as never,
+      ],
+    },
+    sourceService: {
+      resolveSourceId: (value: string) => value,
+      getStatus: () => [],
+      addSource: (input: { readonly grantId?: string }) => {
+        grantId = input.grantId
+        return { sourceId: 'source-1', realmId: 'personal' }
+      },
+    },
+  })
+  app.markReady()
+  await expect(
+    app.source.add(
+      {
+        adapterId: gmailAdapterDefinition.id,
+        realmSlug: 'personal',
+        account: 'personal',
+      },
+      context('source-add-real-adapter'),
+    ),
+  ).resolves.toMatchObject({ ok: true })
+  expect(grantId).toBe('grant-1')
+})
+
+test('Source add matches direct Account selection and rejects providerless selection or Grant ids', async () => {
+  const grants = [
+    {
+      id: 'grant-by-label',
+      provider: 'test',
+      scopes: ['read'],
+      accountLabel: 'work',
+      accountId: 'account-by-label',
+    },
+    {
+      id: 'work',
+      provider: 'test',
+      scopes: ['read'],
+      accountLabel: 'other',
+      accountId: 'account-by-id',
+    },
+  ] as never
+  const additions: unknown[] = []
+  const adapters = {
+    authenticated: {
+      id: 'test.authenticated',
+      provider: { id: 'test', auth: { kind: 'oauth2' } },
+      access: { scopes: ['read'] },
+      configSchema: { safeParse: () => ({ success: true, data: {} }) },
+    },
+    providerless: {
+      id: 'test.providerless',
+      configSchema: { safeParse: () => ({ success: true, data: {} }) },
+    },
+  }
+  const app = application({
+    registry: {
+      adapters: {
+        get: ({ id }: { id: string }) =>
+          id === adapters.authenticated.id
+            ? adapters.authenticated
+            : id === adapters.providerless.id
+              ? adapters.providerless
+              : undefined,
+        list: () => Object.values(adapters),
+      },
+    } as never,
+    authService: { listGrants: async () => grants },
+    sourceService: {
+      resolveSourceId: (value: string) => value,
+      getStatus: () => [],
+      addSource: (input: unknown) => {
+        additions.push(input)
+        return { sourceId: `source-${additions.length}`, realmId: 'work' }
+      },
+    },
+  })
+  app.markReady()
+
+  expect(
+    await app.source.add(
+      {
+        adapterId: adapters.providerless.id,
+        realmSlug: 'work',
+        account: 'work',
+      },
+      context('providerless-account'),
+    ),
+  ).toMatchObject({
+    ok: false,
+    error: { code: 'invalid_filter' },
+  })
+  expect(
+    await app.source.add(
+      {
+        adapterId: adapters.authenticated.id,
+        realmSlug: 'work',
+        account: 'grant-by-label',
+      },
+      context('grant-id'),
+    ),
+  ).toMatchObject({
+    ok: false,
+    error: { code: 'invalid_filter' },
+  })
+  expect(
+    await app.source.add(
+      {
+        adapterId: adapters.authenticated.id,
+        realmSlug: 'work',
+        account: 'work',
+      },
+      context('account-label'),
+    ),
+  ).toMatchObject({ ok: true })
+  expect(
+    await app.source.add(
+      {
+        adapterId: adapters.authenticated.id,
+        realmSlug: 'work',
+        account: 'account-by-id',
+      },
+      context('account-id'),
+    ),
+  ).toMatchObject({ ok: true })
+  expect(additions).toEqual([
+    expect.objectContaining({ grantId: 'grant-by-label' }),
+    expect.objectContaining({ grantId: 'work' }),
+  ])
+})
+
+test('Action describe and run resolve one Source and preserve cancellation and output', async () => {
+  const sourceId = '01ARZ3NDEKTSV4RRFFQ69G5FAV'
+  const actionId = 'example.item.create'
+  let described: unknown
+  let run: unknown
+  const app = application({
+    sourceService: {
+      resolveSourceId: (source: string) => {
+        expect(source).toBe('notes')
+        return sourceId
+      },
+      getStatus: () => [],
+    },
+    actionService: {
+      describe(input: unknown) {
+        described = input
+        return {
+          id: actionId,
+          profile: { id: 'example.item', version: 1 },
+          effect: 'reversible',
+          input: { type: 'object' },
+          output: { id: 'example.item', version: 1 },
+          adapters: [{ id: 'example.adapter' }],
+          sources: [
+            {
+              id: sourceId,
+              adapter: { id: 'example.adapter' },
+              available: true,
+            },
+          ],
+        }
+      },
+      async run(input: {
+        actionId: string
+        sourceId: string
+        actionInput: unknown
+        signal: AbortSignal
+        confirmIrreversible: boolean
+      }) {
+        run = input
+        return {
+          resource: {
+            id: 'resource-id',
+            ref: `ctx://${sourceId}/item/one`,
+            sourceId,
+            realmId: 'work',
+            profile: { id: 'example.item', version: 1 },
+            origin: 'adhoc',
+            title: 'One',
+            summary: null,
+            occurredAt: null,
+            providerUpdatedAt: null,
+            deletedAt: null,
+            hydratedAt: 1,
+            payload: { title: 'One' },
+            createdAt: 1,
+            updatedAt: 1,
+          },
+          warnings: [],
+        }
+      },
+    },
+  })
+  app.markReady()
+  const request = context('action-request')
+
+  expect(
+    await app.action.describe({ actionId, source: 'notes' }, request),
+  ).toMatchObject({ ok: true, value: { id: actionId } })
+  const result = await app.action.run(
+    {
+      actionId,
+      source: 'notes',
+      actionInput: { title: 'One' },
+      confirmIrreversible: false,
+    },
+    request,
+  )
+  expect(result).toMatchObject({
+    ok: true,
+    value: { resource: { ref: `ctx://${sourceId}/item/one` }, warnings: [] },
+  })
+  expect(described).toEqual({ actionId, sourceId })
+  expect(run).toMatchObject({
+    actionId,
+    sourceId,
+    actionInput: { title: 'One' },
+    confirmIrreversible: false,
+  })
+  expect((run as { signal: unknown }).signal).toBeInstanceOf(AbortSignal)
+})
+
+test('export prepares one bounded transfer without exposing bytes in RPC', async () => {
+  const ref = 'ctx://01ARZ3NDEKTSV4RRFFQ69G5FAV/item/one'
+  let exportInput: unknown
+  let retained: Uint8Array | undefined
+  const app = application({
+    exportService: {
+      async prepare(input: unknown) {
+        exportInput = input
+        return {
+          bytes: Uint8Array.of(0, 255, 1),
+          mediaType: 'application/octet-stream',
+          format: 'binary',
+          ref,
+          warnings: [],
+        }
+      },
+    },
+    transferStore: {
+      create(bytes: Uint8Array) {
+        retained = bytes
+        return { ticket: 'a'.repeat(64), byteSize: 3, expiresAt: 1_000 }
+      },
+    },
+  })
+  app.markReady()
+  const result = await app.export.prepare(
+    { ref, format: 'binary' },
+    context('export-request'),
+  )
+
+  expect(result).toEqual({
+    ok: true,
+    value: {
+      transfer: { ticket: 'a'.repeat(64), byteSize: 3, expiresAt: 1_000 },
+      mediaType: 'application/octet-stream',
+      format: 'binary',
+      ref,
+      warnings: [],
+    },
+  })
+  expect(result).not.toHaveProperty('value.bytes')
+  expect(retained).toEqual(Uint8Array.of(0, 255, 1))
+  expect(exportInput).toMatchObject({
+    ref,
+    format: 'binary',
+    signal: expect.any(AbortSignal),
+  })
 })

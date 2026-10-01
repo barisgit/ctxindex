@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test'
+import type { AuthService, GrantRow } from '@ctxindex/core/auth'
 import {
   gmailAdapterDefinition,
   localDirectoryAdapterDefinition,
-} from '@ctxindex/adapters'
-import type { AuthService, GrantRow } from '@ctxindex/core/auth'
+} from '@ctxindex/official'
 import { resolveSourceGrant } from './resolve-source-grant'
 
 const requiredScopes = gmailAdapterDefinition.access?.scopes ?? []

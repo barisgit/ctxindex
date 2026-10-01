@@ -1,133 +1,70 @@
 # Product backlog
 
-This document records plausible future directions, not committed scope or
-accepted behavior. Current behavior remains owned by `openspec/specs/`, while
-confirmed defects and selected work belong in GitHub issues.
+This is a list of plausible next investments, not committed scope. Current
+behavior lives in [`openspec/specs/`](openspec/specs/); accepted defects and
+selected work belong in GitHub issues. Promote one item at a time into an issue
+with an observable outcome, explicit non-goals, and an OpenSpec change when it
+alters a stable contract.
 
-When a backlog item is selected, narrow it into a focused issue with an
-observable outcome and explicit boundaries. Non-trivial work then proceeds on
-that issue's branch through an OpenSpec change, implementation, verification,
-and archive. Backlog entries may be split, combined, reordered, or dropped
-before promotion. The sections below are ordered by the current recommended
-sequence, from foundational work to more speculative directions.
+## Reliability before breadth
 
-## Provider replay and sync endurance testing
+- Build privacy-safe provider replay fixtures for pagination, cursors,
+  reconciliation, tombstones, attachments, and repeated-sync idempotency.
+- Add longer daemon, sync, and storage endurance runs without making live
+  accounts part of normal CI.
+- Improve failure recovery and diagnostics using bounded, redacted evidence.
 
-Build reusable, privacy-safe regression coverage from sanitized provider
-responses. It should exercise pagination, incremental cursors, reconciliation,
-tombstones, warnings, attachment hydration, and repeated-sync idempotency
-without requiring live accounts in normal automated tests. An opt-in live soak
-can complement deterministic replay when longer-running provider validation is
-useful.
+## More useful Sources
 
-## Git-backed extension marketplaces
+Prioritize adapters that validate the portability of the existing Provider,
+Profile, and Source Adapter model:
 
-Allow users to add Git repositories that publish discoverable ctxindex
-Extensions through a small catalog convention. An official repository could
-host reusable Extensions that are useful to multiple users but too specific to
-bundle, while teams and individuals could use the same mechanism for their own
-repositories.
+- cloud files: Google Drive and OneDrive;
+- standards-based mail and calendars: IMAP and CalDAV;
+- contacts; and
+- collaboration and notifications: GitHub, Slack, Discord, and similar tools.
 
-Catalog entries may host Extension source inline in the catalog repository or
-reference Extensions published in other repositories or marketplaces, and users
-may configure multiple explicitly trusted catalog repositories without nested
-catalog-to-catalog resolution. Catalog entries should point to human setup
-guidance, including provider-console steps for obtaining required credentials.
-Exact authentication requirements, scopes, and configuration should continue
-to come from Adapter definitions rather than parallel marketplace metadata.
-Explicitly added repositories can initially be treated as trusted; hosted
-marketplace infrastructure, social or commercial features, and a package
-ecosystem are separate concerns. A future UI may render the same catalog and
-setup information without becoming its own source of truth.
+Each adapter should ship independently unless shared groundwork genuinely makes
+a combined change smaller.
 
-## Single-owner local daemon
+## Fresher local context
 
-Run the stateful ctxindex runtime in a long-lived local daemon that is the only
-production process to open SQLite. The daemon should own runtime composition,
-loaded Extensions, provider access, and background synchronization, while the
-CLI communicates with it through a typed local RPC interface. Bundled skills
-remain small orientation files that point agents to the CLI's live help; they
-contain no runtime integration.
+Explore provider webhooks or change notifications after cursor,
+reconciliation, locking, and recovery are dependable. Push delivery should wake
+daemon-owned synchronization; it must remain an optimization over provider
+state, not a second source of truth.
 
-This removes cross-process database contention and creates one interface that a
-future local web UI could also consume. The initial change should establish
-single-instance ownership, local-only communication, lifecycle and health
-handling, graceful cancellation, and parity with existing CLI behavior. A web
-UI, remote access, and operating-system-specific service installation remain
-separate work.
+## Better retrieval and interoperability
 
-## Indexed mailbox synchronization
+- Add Profile-owned exports when a concrete workflow needs them, such as
+  calendar interchange or mailbox archives.
+- Evaluate semantic retrieval only after indexed and provider search are
+  reliable and measurable.
+- Treat cross-source identity resolution as a separate, provenance-preserving
+  concern; never silently merge Resources.
 
-Allow mailbox Sources to maintain local projections rather than relying only
-on provider-side discovery. The eventual design should cover incremental
-updates, deletions, reconciliation, threads, attachments, and clear consistency
-semantics between local and remote retrieval.
+## Daemon operations beyond one machine
 
-## Agent orientation guidance
+The local daemon, automatic lifecycle, typed streaming, and single-owner storage
+are current architecture. Separate future changes may add:
 
-Keep bundled skills lightweight: briefly explain what ctxindex is, when it is
-useful, and direct agents to the CLI's live help and discovery surfaces. Do not
-duplicate commands, schemas, provider setup, or workflow logic in skill files.
+- service-manager installation or login startup;
+- backup automation and stronger local-client authentication;
+- remote authenticated access, batching, or an OpenAPI-generated SDK; and
+- background scheduling or a durable job queue, if concrete workloads require
+  one.
 
-## Additional provider coverage
+## Consequential Actions
 
-Extend the existing Profile and Adapter model where new Sources provide clear
-user value or test an important portability boundary. Likely candidates
-include:
+Sending mail, mutating calendars, and other externally visible operations are a
+new trust milestone. Promotion requires least-privilege authorization, explicit
+confirmation, idempotency and retry semantics, auditability, and evidence that
+reversible Draft workflows are insufficient.
 
-- cloud files, beginning with either Google Drive or OneDrive;
-- contacts;
-- standards-based mail and calendar access such as IMAP and CalDAV; and
-- collaboration or notification sources such as GitHub, Slack, or Discord.
+## Hosted conveniences
 
-Each provider should be promoted independently unless shared groundwork makes
-a combined change genuinely smaller.
-
-## Push-assisted synchronization
-
-Explore provider webhooks or change notifications to reduce polling and keep
-local projections fresher. This should follow dependable cursor,
-reconciliation, locking, and recovery behavior so push delivery remains an
-optimization rather than a second source of truth. Notifications should wake
-daemon-owned synchronization rather than introduce another write path.
-
-## Interoperability and export formats
-
-Add profile-owned export formats when they unlock a concrete external workflow,
-such as calendar interchange or mailbox archives. Prefer focused formats over a
-general conversion framework, and keep export semantics with the owning
-Profile.
-
-## Documentation site and landing page
-
-Replace the shrinking `docs/` folder with a hosted documentation site and a
-presentable landing page, using fumadocs or a comparable framework, or plain
-React/Next.js if that yields a better landing page. Repository files remain
-the source of truth: capability specs, `SYSTEM.md`, `CONTEXT.md`, and skills
-should feed the site through projection or import rather than hand-duplicated
-pages. The site owns presentation only — getting-started narrative, provider
-setup guides, and marketing surface. Selection of framework, hosting, and how
-much of `SYSTEM.md` is rendered verbatim versus rewritten for the web remain
-open until this item is promoted.
-
-## Advanced retrieval and identity
-
-Consider semantic retrieval after indexed and provider-side search are reliable
-and measurable. Cross-source identity resolution and deduplication are a
-separate concern: matching rules are domain-specific and should preserve source
-provenance rather than silently merging resources.
-
-## Easier authentication onboarding
-
-Explore ways to reduce the work required to configure provider credentials,
-including clearer setup guidance and, if justified later, hosted OAuth clients.
-Any hosted path introduces operational and security responsibilities and should
-remain optional for a local-first deployment.
-
-## Consequential provider Actions
-
-Treat sending mail, mutating calendars, and other externally visible operations
-as a distinct trust milestone. Promotion requires an explicit safety model,
-least-privilege authorization, confirmation and retry semantics, and strong
-evidence that reversible Draft workflows are insufficient for the intended use
-case.
+The website, local Catalog marketplace, installable CLI, and managed Google and
+Microsoft OAuth App definitions already exist. Hosted account services,
+cross-device state, or a hosted marketplace would change the local-first trust
+model and must be justified and specified independently rather than growing out
+of those features by accident.

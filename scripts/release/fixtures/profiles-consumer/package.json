@@ -1,0 +1,10 @@
+{
+  "name": "@ctxindex/profiles-consumer-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@ctxindex/extension-sdk": "0.0.0",
+    "@ctxindex/profiles": "0.0.0"
+  }
+}

@@ -7,10 +7,14 @@ An OAuth2 Account authorization request MUST resolve exactly one active Extensio
 - **WHEN** a Provider has several Apps with distinct labels and `--app work` is supplied
 - **THEN** Account authorization resolves only the exact `work` label and never consults managed-default priority
 
+#### Scenario: Multiple Apps require exact label
+- **WHEN** a Provider has several Apps with distinct labels and none is the single host-designated managed App
+- **THEN** Account authorization requires one exact label and never guesses from load order, config, or the number of Apps
+
 #### Scenario: One managed App permits omission
 - **WHEN** `--app` is omitted and one active App exactly matches host managed-App policy for the Provider
 - **THEN** its exact label is resolved before credential reads or network effects
 
-#### Scenario: Unknown or unavailable App fails before effects
+#### Scenario: Unknown App fails before effects
 - **WHEN** an explicit App label is unknown, or `--app` is omitted and managed-default resolution finds no exact eligible App
 - **THEN** it fails before secret reads/writes, persistence, browser launch, or Provider egress

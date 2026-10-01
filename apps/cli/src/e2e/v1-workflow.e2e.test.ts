@@ -5,8 +5,8 @@ import { createSandbox, type Sandbox } from '@ctxindex/core/testing'
 import { type MockGmailRecordedRequest, startMockGmail } from './_mock-gmail'
 import { installLoopbackBrowser } from './_oauth-account'
 
-const createDraftAction = 'communication.message.draft.create'
-const updateDraftAction = 'communication.message.draft.update'
+const createDraftAction = 'mail.message.draft.create'
+const updateDraftAction = 'mail.message.draft.update'
 
 function parseSourceId(stdout: string): string {
   const match = /^source added: (.+)$/m.exec(stdout)
@@ -31,8 +31,12 @@ function decodeDraft(request: MockGmailRecordedRequest): string {
   return Buffer.from(body.message.raw, 'base64url').toString('utf8')
 }
 
-async function addRealm(sandbox: Sandbox, slug: string): Promise<void> {
-  const result = await sandbox.run(['realm', 'add', slug])
+async function addRealm(
+  sandbox: Sandbox,
+  slug: string,
+  env: Record<string, string | undefined>,
+): Promise<void> {
+  const result = await sandbox.run(['realm', 'add', slug], { env })
   expect(result.exitCode, result.stderr).toBe(0)
 }
 
@@ -72,9 +76,9 @@ test('real binary proves the isolated complete V1 workflow', async () => {
     await mkdir(root, { recursive: true })
     await writeFile(join(root, 'workflow.txt'), 'local workflow needle only\n')
 
-    expect((await sandbox.run(['init'])).exitCode).toBe(0)
-    await addRealm(sandbox, 'mail')
-    await addRealm(sandbox, 'files')
+    expect((await sandbox.run(['init'], { env })).exitCode).toBe(0)
+    await addRealm(sandbox, 'mail', env)
+    await addRealm(sandbox, 'files', env)
 
     const app = await sandbox.run(
       ['oauth-app', 'add', 'google', 'google', '--from-env'],
@@ -134,9 +138,12 @@ test('real binary proves the isolated complete V1 workflow', async () => {
     expect(gmailSource).not.toBe(localSource)
 
     const synced = jsonOutput(
-      await sandbox.run(['sync', '--source', 'workflow-files', '--json'], {
-        env,
-      }),
+      await sandbox.run(
+        ['sync', '--source', 'workflow-files', '--format', 'json'],
+        {
+          env,
+        },
+      ),
     ) as { results: { sourceId: string; status: string }[] }
     expect(synced.results).toEqual([
       expect.objectContaining({ sourceId: localSource, status: 'completed' }),
@@ -153,7 +160,8 @@ test('real binary proves the isolated complete V1 workflow', async () => {
           '--remote',
           '--limit',
           '2',
-          '--json',
+          '--format',
+          'json',
         ],
         { env },
       ),
@@ -171,7 +179,8 @@ test('real binary proves the isolated complete V1 workflow', async () => {
         '--realm',
         'mail',
         '--local-only',
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -193,7 +202,8 @@ test('real binary proves the isolated complete V1 workflow', async () => {
             '--realm',
             'mail',
             '--local-only',
-            '--json',
+            '--format',
+            'json',
           ],
           { env },
         )
@@ -207,7 +217,8 @@ test('real binary proves the isolated complete V1 workflow', async () => {
         '--realm',
         'files',
         '--local-only',
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -227,7 +238,8 @@ test('real binary proves the isolated complete V1 workflow', async () => {
             '--realm',
             'files',
             '--local-only',
-            '--json',
+            '--format',
+            'json',
           ],
           { env },
         )
@@ -240,7 +252,9 @@ test('real binary proves the isolated complete V1 workflow', async () => {
       ]),
     ).toEqual(new Set([gmailSource, localSource]))
 
-    const localGet = await sandbox.run(['get', localRef, '--json'], { env })
+    const localGet = await sandbox.run(['get', localRef, '--format', 'json'], {
+      env,
+    })
     expect(jsonOutput(localGet)).toMatchObject({
       resource: {
         ref: localRef,
@@ -257,12 +271,15 @@ test('real binary proves the isolated complete V1 workflow', async () => {
     const messageRef = `ctx://${gmailSource}/message/workflow-root`
     const replyRef = `ctx://${gmailSource}/message/workflow-reply`
     mock.resetRequests()
-    const gmailGet = await sandbox.run(['get', messageRef, '--json'], { env })
+    const gmailGet = await sandbox.run(
+      ['get', messageRef, '--format', 'json'],
+      { env },
+    )
     expect(jsonOutput(gmailGet)).toMatchObject({
       resource: {
         ref: messageRef,
         sourceId: gmailSource,
-        profile: { id: 'communication.message', version: 1 },
+        profile: { id: 'mail.message', version: 1 },
         payload: {
           providerMessageId: 'workflow-root',
           bodyText: 'Gmail workflow body\nsecond line',
@@ -281,7 +298,7 @@ test('real binary proves the isolated complete V1 workflow', async () => {
     ).toHaveLength(1)
 
     mock.resetRequests()
-    const thread = await sandbox.run(['thread', 'get', replyRef, '--json'], {
+    const thread = await sandbox.run(['thread', replyRef, '--format', 'json'], {
       env,
     })
     const threadJson = jsonOutput(thread) as {
@@ -306,7 +323,7 @@ test('real binary proves the isolated complete V1 workflow', async () => {
 
     const artifactRef = `${messageRef}/attachment/workflow-root-attachment`
     const listed = await sandbox.run(
-      ['artifact', 'list', messageRef, '--json'],
+      ['artifact', 'list', messageRef, '--format', 'json'],
       { env },
     )
     expect(jsonOutput(listed)).toEqual({
@@ -325,7 +342,15 @@ test('real binary proves the isolated complete V1 workflow', async () => {
     mock.resetRequests()
     const firstOutput = join(sandbox.dir, 'first-attachment.txt')
     const firstDownload = await sandbox.run(
-      ['artifact', 'download', artifactRef, '--output', firstOutput, '--json'],
+      [
+        'artifact',
+        'download',
+        artifactRef,
+        '--output',
+        firstOutput,
+        '--format',
+        'json',
+      ],
       { env },
     )
     const firstDownloadJson = jsonOutput(firstDownload) as {
@@ -353,7 +378,15 @@ test('real binary proves the isolated complete V1 workflow', async () => {
 
     const secondOutput = join(sandbox.dir, 'second-attachment.txt')
     const secondDownload = await sandbox.run(
-      ['artifact', 'download', artifactRef, '--output', secondOutput, '--json'],
+      [
+        'artifact',
+        'download',
+        artifactRef,
+        '--output',
+        secondOutput,
+        '--format',
+        'json',
+      ],
       { env },
     )
     const secondDownloadJson = jsonOutput(
@@ -409,7 +442,7 @@ test('real binary proves the isolated complete V1 workflow', async () => {
     expect(unsupported.exitCode).toBe(2)
     expect(unsupported.stdout).toBe('')
     expect(unsupported.stderr).toBe(
-      'Unsupported export format "mbox" for communication.message@1; valid formats: eml, json\n',
+      'Unsupported export format "mbox" for mail.message@1; valid formats: eml, json\n',
     )
 
     mock.resetRequests()
@@ -429,7 +462,8 @@ test('real binary proves the isolated complete V1 workflow', async () => {
         'workflow-mail',
         '--input',
         JSON.stringify(createInput),
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -466,7 +500,8 @@ test('real binary proves the isolated complete V1 workflow', async () => {
         'workflow-mail',
         '--input',
         JSON.stringify(updateInput),
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )

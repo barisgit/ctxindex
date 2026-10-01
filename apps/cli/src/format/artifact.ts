@@ -2,22 +2,42 @@ import type {
   ArtifactDownloadResult,
   ArtifactListResult,
 } from '@ctxindex/core/artifact'
+import {
+  compactJson,
+  formatPrettyCollection,
+  formatTsv,
+  type OutputColumn,
+  type OutputEnvironment,
+} from './output'
+
+const artifactColumns = [
+  { key: 'ref', label: 'Ref' },
+  { key: 'filename', label: 'Filename' },
+  { key: 'mediaType', label: 'Media type' },
+  { key: 'byteSize', label: 'Bytes', align: 'right' },
+] satisfies readonly OutputColumn[]
+
+function artifactRows(result: ArtifactListResult) {
+  return result.artifacts.map((artifact) => ({ ...artifact }))
+}
 
 export function formatArtifactListJson(result: ArtifactListResult): string {
-  return JSON.stringify(result)
+  return compactJson(result)
 }
 
 export function formatArtifactListText(result: ArtifactListResult): string {
-  return result.artifacts
-    .map((artifact) =>
-      [
-        artifact.ref,
-        artifact.filename ?? '',
-        artifact.mediaType ?? '',
-        artifact.byteSize?.toString() ?? '',
-      ].join('\t'),
-    )
-    .join('\n')
+  return formatTsv(artifactColumns, artifactRows(result))
+}
+
+export function formatArtifactListPretty(
+  result: ArtifactListResult,
+  environment?: Pick<OutputEnvironment, 'columns'>,
+): string {
+  return formatPrettyCollection(
+    artifactColumns,
+    artifactRows(result),
+    environment,
+  )
 }
 
 export function formatArtifactDownloadJson(

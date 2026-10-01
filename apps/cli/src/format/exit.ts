@@ -84,6 +84,13 @@ function codeOnlyErrorExit(code: string): number | undefined {
   // A top-level code-only not_found is the lookup taxonomy. Sync transports
   // carry the explicit sync taxonomy so their not_found remains exit 50.
   if (code === 'not_found') return 2
+  if (
+    code === 'unsupported_capability' ||
+    code === 'output_exists' ||
+    code === 'sync_unsupported'
+  )
+    return 2
+  if (code === 'conflict') return 20
   return authErrorExit(code) ?? syncErrorExit(code)
 }
 

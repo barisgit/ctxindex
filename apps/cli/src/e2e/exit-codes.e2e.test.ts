@@ -109,10 +109,21 @@ describe('exit codes e2e', () => {
         '[secrets\nbackend = "file"\n',
       )
 
-      const result = await sandbox.run(['secrets', 'status', '--json'])
+      const result = await sandbox.run([
+        'secrets',
+        'status',
+        '--format',
+        'json',
+      ])
 
       expect(result.exitCode).toBe(40)
       expect(result.stderr).toContain('failed to parse config.toml')
+      expect(result.durationMs).toBeLessThan(2_000)
+      expect(
+        await Bun.file(
+          join(sandbox.env.CTXINDEX_STATE_HOME, 'daemon', 'startup.log'),
+        ).exists(),
+      ).toBe(false)
     } finally {
       await sandbox.cleanup()
     }

@@ -1,0 +1,94 @@
+---
+title: Providerless Extension quickstart
+description: Define a Profile, local Source Adapter, Extension root, documentation sidecar, and package entry without authentication or provider egress.
+---
+
+The standalone [`barisgit/ctxindex-extensions`](https://github.com/barisgit/ctxindex-extensions) repository is the complete checked public-SDK reference. A providerless Adapter simply omits `provider`, `access`, and `providerApiHosts`.
+
+## `index.ts`
+
+```ts
+import {
+  defineAdapter,
+  defineExtension,
+  defineProfile,
+  docs,
+  z,
+} from '@ctxindex/extension-sdk'
+
+export const noteProfile = defineProfile({
+  id: 'acme.note',
+  version: 1,
+  schema: z.object({
+    path: z.string(),
+    title: z.string(),
+    body: z.string(),
+    modifiedAt: z.string().datetime(),
+  }).strict(),
+  search: {
+    title: (note) => note.title,
+    occurredAt: (note) => new Date(note.modifiedAt),
+    chunks: (note) => [note.body],
+    fields: {
+      path: {
+        type: 'string',
+        extract: (note) => note.path,
+      },
+    },
+  },
+})
+
+export const notesAdapter = defineAdapter({
+  id: 'acme.notes',
+  configSchema: z.object({ directory: z.string().min(1) }).strict(),
+  profiles: [noteProfile],
+  routing: 'indexed',
+  capabilities: ['sync'],
+  operations: {
+    sync: async (context) => {
+      for (const payload of await loadNotes(context.source.config.directory)) {
+        await context.emit({
+          type: 'upsertResource',
+          resource: {
+            ref: `ctx://${context.source.id}/note/${encodeURIComponent(payload.path)}`,
+            profile: { id: noteProfile.id, version: noteProfile.version },
+            completeness: 'complete',
+            title: payload.title,
+            occurredAt: Date.parse(payload.modifiedAt),
+            payload,
+          },
+        })
+      }
+      await context.emit({ type: 'checkpoint', cursor: { version: 1 } })
+    },
+  },
+  actions: {},
+})
+
+export default defineExtension({
+  id: 'acme.notes',
+  adapters: [notesAdapter],
+  docs: docs('./docs'),
+})
+```
+
+`loadNotes()` is ordinary package code. The external reference repository demonstrates the same authoring boundary with a credential-free GitHub Adapter and synthetic HTTP tests. Operation contexts expose only the facilities for that capability.
+
+## `package.json`
+
+```json
+{
+  "name": "@acme/ctxindex-notes",
+  "type": "module",
+  "ctxindex": {
+    "extensions": ["./index.ts"]
+  },
+  "dependencies": {
+    "@ctxindex/extension-sdk": "0.1.1"
+  }
+}
+```
+
+Each entry names an ESM module, not an export symbol. ctxindex imports the module once and collects every plain exported Extension root. Supporting Profile and Adapter exports do not activate independently.
+
+Providerless operation synthesizes no Provider, OAuth App, Account, Grant, provider access, or provider egress state.

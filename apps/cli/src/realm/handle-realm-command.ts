@@ -1,7 +1,12 @@
-import { parseRealmArgs, realmUsage } from '../args/realm'
+import { assertValidRealmSlug } from '@ctxindex/core/realm'
 import { daemonRealmAdd, daemonRealmList, selectDaemon } from '../daemon/client'
+import {
+  ensureDaemonSelection,
+  selectEnsuredDaemonRoute,
+} from '../daemon/ensure'
 import { openDeps } from '../deps'
 import { mapErrorToExit } from '../format/exit'
+import type { OutputFormat } from '../format/output'
 import { formatRealmAdded, formatRealms } from '../format/realm'
 
 function printOutput(output: string): void {
@@ -10,35 +15,40 @@ function printOutput(output: string): void {
 
 export interface RealmCommandDeps {
   readonly selectDaemon: typeof selectDaemon
+  readonly ensureDaemonSelection?: typeof ensureDaemonSelection
   readonly realmAdd: typeof daemonRealmAdd
   readonly realmList: typeof daemonRealmList
   readonly open: typeof openDeps
 }
 
+export type RealmCommandInput =
+  | { readonly kind: 'add'; readonly slug: string; readonly name?: string }
+  | { readonly kind: 'list'; readonly format: OutputFormat }
+
 const defaultDeps: RealmCommandDeps = {
   selectDaemon,
+  ensureDaemonSelection,
   realmAdd: daemonRealmAdd,
   realmList: daemonRealmList,
   open: openDeps,
 }
 
 export async function handleRealmCommand(
-  args: string[],
+  parsed: RealmCommandInput,
   services: RealmCommandDeps = defaultDeps,
 ): Promise<number> {
-  const parsed = parseRealmArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(`${parsed.message}. Try: ${realmUsage}`)
-    return 2
+  try {
+    if (parsed.kind === 'add') assertValidRealmSlug(parsed.slug)
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    return mapErrorToExit(error)
   }
-
   let deps: Awaited<ReturnType<typeof openDeps>> | undefined
   const controller = new AbortController()
   const cancel = () => controller.abort()
   process.once('SIGINT', cancel)
   try {
-    const daemon = services.selectDaemon()
+    const daemon = await selectEnsuredDaemonRoute(services, controller.signal)
     if (daemon) {
       if (parsed.kind === 'add') {
         await services.realmAdd(
@@ -52,7 +62,7 @@ export async function handleRealmCommand(
         console.log(formatRealmAdded(parsed.slug))
       } else {
         const result = await services.realmList(daemon, controller.signal)
-        printOutput(formatRealms(result.rows, { json: parsed.json }))
+        printOutput(formatRealms(result.rows, parsed.format))
       }
       return 0
     }
@@ -65,9 +75,7 @@ export async function handleRealmCommand(
       console.log(formatRealmAdded(parsed.slug))
       return 0
     }
-    printOutput(
-      formatRealms(deps.realmService.listRealms(), { json: parsed.json }),
-    )
+    printOutput(formatRealms(deps.realmService.listRealms(), parsed.format))
     return 0
   } catch (err) {
     console.error(err instanceof Error ? err.message : String(err))

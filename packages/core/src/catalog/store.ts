@@ -1,14 +1,9 @@
-import { mkdir, rename, writeFile } from 'node:fs/promises'
+import { mkdir, open, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import * as TOML from '@iarna/toml'
 import { compareUnicodeCodePoints } from '../internal/code-point-order'
 import { configDir } from '../paths'
-import {
-  type CatalogRecord,
-  catalogsDocumentSchema,
-  type InstalledExtensionRecord,
-  installedExtensionsDocumentSchema,
-} from './schema'
+import { type CatalogRecord, catalogsDocumentSchema } from './schema'
 
 export interface CatalogStoreOptions {
   readonly configRoot?: string
@@ -24,25 +19,37 @@ async function readToml(path: string): Promise<unknown> {
   }
 }
 
+async function fsync(path: string): Promise<void> {
+  const handle = await open(path, 'r')
+  try {
+    await handle.sync()
+  } finally {
+    await handle.close()
+  }
+}
+
 async function writeToml(path: string, value: unknown): Promise<void> {
-  const temporary = `${path}.${process.pid}.${Date.now()}.tmp`
+  const temporary = `${path}.${process.pid}.${crypto.randomUUID()}.tmp`
   await mkdir(dirname(path), { recursive: true, mode: 0o700 })
-  await writeFile(
-    temporary,
-    TOML.stringify(value as Parameters<typeof TOML.stringify>[0]),
-    { mode: 0o600 },
-  )
-  await rename(temporary, path)
+  try {
+    await writeFile(
+      temporary,
+      TOML.stringify(value as Parameters<typeof TOML.stringify>[0]),
+      { mode: 0o600 },
+    )
+    await fsync(temporary)
+    await rename(temporary, path)
+    await fsync(dirname(path))
+  } finally {
+    await rm(temporary, { force: true })
+  }
 }
 
 export class CatalogStore {
   readonly catalogsPath: string
-  readonly installedPath: string
 
   constructor(options: CatalogStoreOptions = {}) {
-    const root = options.configRoot ?? configDir()
-    this.catalogsPath = join(root, 'catalogs.toml')
-    this.installedPath = join(root, 'installed-extensions.toml')
+    this.catalogsPath = join(options.configRoot ?? configDir(), 'catalogs.toml')
   }
 
   async readCatalogs(): Promise<readonly CatalogRecord[]> {
@@ -52,32 +59,12 @@ export class CatalogStore {
   }
 
   async writeCatalogs(records: readonly CatalogRecord[]): Promise<void> {
-    const catalogs = [...records].sort((a, b) =>
-      compareUnicodeCodePoints(a.name, b.name),
-    )
     const document = catalogsDocumentSchema.parse({
-      schema_version: 1,
-      catalogs,
+      schema_version: 2,
+      catalogs: [...records].sort((left, right) =>
+        compareUnicodeCodePoints(left.name, right.name),
+      ),
     })
     await writeToml(this.catalogsPath, document)
-  }
-
-  async readInstalled(): Promise<readonly InstalledExtensionRecord[]> {
-    const parsed = await readToml(this.installedPath)
-    if (parsed === undefined) return []
-    return installedExtensionsDocumentSchema.parse(parsed).extensions
-  }
-
-  async writeInstalled(
-    records: readonly InstalledExtensionRecord[],
-  ): Promise<void> {
-    const extensions = [...records].sort(
-      (a, b) => compareUnicodeCodePoints(a.id, b.id) || a.version - b.version,
-    )
-    const document = installedExtensionsDocumentSchema.parse({
-      schema_version: 1,
-      extensions,
-    })
-    await writeToml(this.installedPath, document)
   }
 }

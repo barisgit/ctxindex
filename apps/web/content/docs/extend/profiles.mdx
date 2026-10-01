@@ -1,0 +1,67 @@
+---
+title: Profiles
+description: Define stable versioned Resource semantics independently of providers and storage.
+---
+
+A Profile is the portable contract for one Resource kind. Its identity is `(id, version)`; changing payload meaning requires a new version.
+
+```ts
+import { defineProfile, z } from '@ctxindex/extension-sdk'
+
+export const noteProfile = defineProfile({
+  id: 'acme.note',
+  version: 1,
+  schema: z.object({
+    title: z.string(),
+    body: z.string(),
+    pinned: z.boolean(),
+  }).strict(),
+  search: {
+    title: (note) => note.title,
+    chunks: (note) => [note.body],
+    fields: {
+      pinned: { type: 'boolean', extract: (note) => note.pinned },
+    },
+  },
+  exports: {
+    markdown: {
+      mediaType: 'text/markdown',
+      render: (note) => `# ${note.title}\n\n${note.body}\n`,
+    },
+  },
+})
+```
+
+Profiles may define:
+
+- validated payload schema and derived search title, summary, time, chunks, and typed fields;
+- Relations to other Refs or natural-key fields;
+- Artifact descriptors for bytes an Adapter can download on demand;
+- deterministic export renderers;
+- typed Action declarations with reversible or irreversible effect metadata.
+
+The Profile never performs provider I/O and does not own Source configuration. Import it into every Adapter that emits that Resource shape.
+
+## Reuse before redefining
+
+Canonical portable Profiles are published from `@ctxindex/profiles`:
+
+```ts
+import { chatMessageProfile, mailMessageProfile } from '@ctxindex/profiles'
+```
+
+Import the exact Profile object when its semantics fit. Do not create another `mail.message@1` with a similar schema: the complete registry accepts one compatible definition for an identity and rejects conflicting executable/schema-bearing leaves.
+
+Create a new Profile when the domain really has different identity, payload meaning, search fields, Relations, Artifacts, exports, or Actions. Telegram messages and email can share generic conversation relationships without pretending their entire payloads are the same kind.
+
+## Design a Profile for retrieval, not a provider response
+
+- Keep the payload provider-neutral and strict; validate provider DTOs separately inside each Adapter.
+- Store information needed to render a complete Resource, not every field returned by an API.
+- Derive search text and typed fields purely from the payload.
+- Use Relations for navigable edges and natural-key resolution instead of embedding local database ids.
+- Describe downloadable bytes as Artifacts; do not download them during projection.
+- Make export renderers deterministic and free of provider I/O.
+- Version semantics deliberately. A breaking payload or vocabulary change gets a new numeric version.
+
+The external example defines `software.issue@1` and reuses `chat.message@1` from `@ctxindex/profiles`; read the [checked source](https://github.com/barisgit/ctxindex-extensions/blob/main/index.ts) to see both patterns together.

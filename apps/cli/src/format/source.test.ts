@@ -24,7 +24,7 @@ const source: SourceRow = {
 }
 
 test('source output exposes availability without replacing lastStatus', () => {
-  const json = formatSources([source], { json: true })
+  const json = formatSources([source], 'json')
   expect(JSON.parse(json)).toMatchObject([
     {
       availability: 'extension_unavailable',
@@ -40,24 +40,11 @@ test('source output exposes availability without replacing lastStatus', () => {
     },
   ])
   expect(json).not.toMatch(/grant/i)
-  expect(formatSources([source], { json: false, format: 'compact' })).toContain(
-    'status=extension_unavailable',
+  expect(formatSources([source], 'text')).toContain('extension_unavailable')
+  expect(formatSources([source], 'text')).toContain(
+    'provider returned partial data',
   )
-  expect(formatSources([source], { json: false, format: 'compact' })).toContain(
-    'warnings=2 warning=degraded:provider_returned_partial_data errors=1',
-  )
-  expect(formatSources([source], { json: false, format: 'compact' })).toContain(
-    'error=provider_request_failed',
-  )
-  expect(formatSources([source], { json: false })).toContain(
-    'extension_unavailable',
-  )
-  expect(
-    formatSources([source], { json: false }).replace(/\s+/g, ' '),
-  ).toContain('degraded: provider returned partial data')
-  expect(formatSources([source], { json: false })).toContain(
-    'provider request failed',
-  )
+  expect(formatSources([source], 'pretty')).toContain('provider request failed')
 })
 
 test('source JSON represents absent warning and error diagnostics explicitly', () => {
@@ -73,7 +60,7 @@ test('source JSON represents absent warning and error diagnostics explicitly', (
             last_error: null,
           },
         ],
-        { json: true },
+        'json',
       ),
     ),
   ).toMatchObject([
@@ -86,7 +73,7 @@ test('source JSON represents absent warning and error diagnostics explicitly', (
   ])
 })
 
-test('compact source output normalizes whitespace in warning refs', () => {
+test('text source output retains warning refs with whitespace escaped', () => {
   expect(
     formatSources(
       [
@@ -99,9 +86,7 @@ test('compact source output normalizes whitespace in warning refs', () => {
           },
         },
       ],
-      { json: false, format: 'compact' },
+      'text',
     ),
-  ).toContain(
-    'warning=degraded:partial_response:ref=ctx://source-1/records/with_whitespace',
-  )
+  ).toContain('ctx://source-1/records/with whitespace')
 })

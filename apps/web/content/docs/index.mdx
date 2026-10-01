@@ -1,51 +1,101 @@
 ---
-title: ctxindex
-description: A local personal-context gateway with one deterministic CLI for agents.
+title: Start with ctxindex
+description: Install ctxindex, index one local file without an Account, and return a useful result.
 ---
 
-ctxindex gives agents one command vocabulary for context spread across providers and local files. Mail, Calendar Events, files, and extension-defined domains become **Resources** with stable `ctx://` **Refs**. Providers and the filesystem remain canonical; local projections and caches support search, retrieval, Relations, export, and narrowly typed **Actions**.
+ctxindex gives shell-capable agents one local, typed interface over mail, calendars, files, and Extension-defined context. The shortest trustworthy path starts with a local directory: no Account, OAuth flow, or provider traffic.
 
-## Mental model in five lines
+<Callout>
+  ctxindex requires Bun 1.3.14. The CLI is published as `ctxindex`; Extension authors use `@ctxindex/extension-sdk` and `@ctxindex/profiles`.
+</Callout>
 
-1. A **Realm** is a user-defined operating context whose Sources should be searched and reasoned about together.
-2. A **Source** is one configured connection to one provider collection or local directory, and belongs to exactly one Realm.
-3. A **Profile** defines a Resource's portable shape, searchable vocabulary, exports, Relations, Artifacts, and Actions.
-4. A **Source Adapter** performs provider or filesystem I/O and emits Resources that conform to Profiles.
-5. A **Resource** is one addressable unit of context; its stable **Ref** identifies it independently of local materialization.
+<Tabs items={["Released package", "Source checkout"]}>
+  <Tab value="Released package">
+    ```bash
+    bun add --global ctxindex
+    ctxindex --help
+    ```
+  </Tab>
+  <Tab value="Source checkout">
+    ```bash
+    git clone https://github.com/barisgit/ctxindex.git
+    cd ctxindex
+    bun install
+    bun cli --help
+    ```
 
-The CLI is the agent integration surface. Agents compose commands such as `search`, `get`, `thread`, `export`, and `action`, request deterministic JSON where available, and use stable exit codes instead of provider-specific integrations.
+    Replace `ctxindex` with `bun cli` in the remaining commands.
+  </Tab>
+</Tabs>
 
-## Start here
+## Create local context
 
-<Cards>
-  <Card
-    title="Getting started"
-    description="Install with Bun, configure a local Source, and run search, get, and export."
-    href="/docs/getting-started"
-  />
-  <Card
-    title="Concepts"
-    description="Understand Realms, Sources, Resources, Refs, Profiles, Actions, and materialization."
-    href="/docs/concepts/realms-and-sources"
-  />
-  <Card
-    title="CLI reference"
-    description="Look up commands, arguments, output contracts, and stable exit behavior."
-    href="/docs/cli"
-  />
-  <Card
-    title="Guides"
-    description="Follow focused workflows for agents, mail, calendars, and configured providers."
-    href="/docs/guides/agent-integration"
-  />
-  <Card
-    title="Examples"
-    description="See practical command sequences built on the provider-neutral CLI."
-    href="/docs/examples"
-  />
-  <Card
-    title="Local Git Catalog"
-    description="Discover and install trusted Profiles and Source Adapters from merged local Catalogs."
-    href="/docs/examples/marketplace"
-  />
-</Cards>
+<Steps>
+  <Step>
+    Create one file and initialize local state.
+
+    ```bash
+    mkdir -p "$HOME/context"
+    printf 'Project Aurora kickoff is Tuesday at 10:00.\nOwner: Maya Chen.\n' \
+      > "$HOME/context/aurora.txt"
+    ctxindex init
+    ```
+  </Step>
+  <Step>
+    Create a Realm, then connect the directory as one Source.
+
+    ```bash
+    ctxindex realm add work --name "Work"
+    ctxindex source add local.directory \
+      --realm work \
+      --label work-files \
+      --config-root-path "$HOME/context"
+    ```
+  </Step>
+  <Step>
+    Materialize the Source and search it.
+
+    ```bash
+    ctxindex sync --source work-files --format json
+    ctxindex search "Aurora kickoff" \
+      --realm work \
+      --kind file \
+      --local-only \
+      --format json
+    ```
+  </Step>
+</Steps>
+
+A successful search returns a stable Ref in a bounded result envelope:
+
+```json
+{
+  "results": [
+    {
+      "ref": "ctx://01J00000000000000000000000/file/aurora.txt",
+      "profile": { "id": "file", "version": 1 },
+      "sourceId": "01J00000000000000000000000",
+      "origin": "local",
+      "title": "aurora.txt"
+    }
+  ],
+  "warnings": [],
+  "pagination": { "offset": 0, "limit": 20, "hasMore": false }
+}
+```
+
+Pass the returned Ref through unchanged:
+
+```bash
+ctxindex get 'ctx://01J00000000000000000000000/file/aurora.txt' --format json
+ctxindex export 'ctx://01J00000000000000000000000/file/aurora.txt' --format json
+```
+
+Do not reconstruct provider-owned Ref suffixes. Copy the Ref returned by ctxindex.
+
+## Next
+
+- [Connect Google or Microsoft](/docs/start/connect-provider)
+- [Use ctxindex from an agent](/docs/start/agent-usage)
+- [Install the public GitHub Issues example](/docs/use/extensions)
+- [Understand the core workflow](/docs/use)

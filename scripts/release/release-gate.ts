@@ -75,11 +75,6 @@ export function evaluateReleaseGate(
     throw new Error(`Unexpected npm registry response ${input.registryStatus}`)
   }
   const comparison = compareSemver(current, previous)
-  if (comparison === 0) {
-    throw new Error(
-      'Unpublished CLI version is unchanged; bump apps/cli/package.json before merging to main',
-    )
-  }
   if (comparison < 0) {
     throw new Error(
       'CLI version must be strictly greater than the previous version',

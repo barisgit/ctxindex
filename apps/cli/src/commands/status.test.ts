@@ -22,27 +22,6 @@ afterEach(() => {
   spyOn(console, 'error').mockRestore()
 })
 
-test('malformed status performs zero discovery, transport, or direct open', async () => {
-  spyOn(console, 'error').mockImplementation(() => {})
-  let touched = 0
-  expect(
-    await handleStatusCommand(
-      ['--unknown'],
-      deps({
-        selectDaemon: () => {
-          touched += 1
-          return null
-        },
-        open: async () => {
-          touched += 1
-          throw new Error('must not open')
-        },
-      }),
-    ),
-  ).toBe(2)
-  expect(touched).toBe(0)
-})
-
 test('selected RPC status preserves JSON shape and never opens direct deps', async () => {
   const log = spyOn(console, 'log').mockImplementation(() => {})
   const rows = [
@@ -66,9 +45,16 @@ test('selected RPC status preserves JSON shape and never opens direct deps', asy
   ]
   expect(
     await handleStatusCommand(
-      ['--json'],
+      { format: 'json' },
       deps({
-        selectDaemon: () => selection,
+        selectDaemon: () => {
+          throw new Error('legacy selection invoked')
+        },
+        ensureDaemonSelection: async () => ({
+          status: 'selected',
+          selection,
+          started: true,
+        }),
         daemonStatus: async () => ({ rows }),
         open: async () => {
           throw new Error('selected RPC must not fall back')
@@ -84,7 +70,7 @@ test('selected unreachable status fails unavailable without direct fallback', as
   let opened = false
   expect(
     await handleStatusCommand(
-      [],
+      { format: 'text' },
       deps({
         selectDaemon: () => selection,
         daemonStatus: async () => {
@@ -114,7 +100,7 @@ test.each([
   const error = spyOn(console, 'error').mockImplementation(() => {})
   expect(
     await handleStatusCommand(
-      ['--source', 'source-a'],
+      { sourceId: 'source-a', format: 'text' },
       deps({
         selectDaemon: () => selection,
         daemonStatus: async () => {
@@ -136,7 +122,7 @@ test('no selector retains the direct status path and closes it', async () => {
   let closed = false
   expect(
     await handleStatusCommand(
-      ['--json'],
+      { format: 'json' },
       deps({
         open: async () =>
           ({

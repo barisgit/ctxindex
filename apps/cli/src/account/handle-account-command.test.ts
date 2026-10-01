@@ -1,5 +1,4 @@
 import { afterEach, expect, spyOn, test } from 'bun:test'
-import * as builtinModule from '@ctxindex/adapters'
 import { defaultConfig } from '@ctxindex/core/config'
 import {
   CtxindexAuthError,
@@ -11,6 +10,7 @@ import type {
   ManagedOAuthAppResolution,
 } from '@ctxindex/core/oauth-app'
 import type { CompleteRegistry } from '@ctxindex/core/registry'
+import * as builtinModule from '@ctxindex/official'
 import {
   type AccountCommandRuntime,
   formatAccountCommandError,
@@ -174,11 +174,63 @@ test('authorization failure after implicit App resolution does not add BYOA guid
   ).toBe('Provider denied the requested scopes')
 })
 
+test('Account add uses the ensured daemon and preserves authorization URL presentation', async () => {
+  const output = spyOn(console, 'log').mockImplementation(() => {})
+  const events: string[] = []
+  try {
+    const exit = await handleAccountCommand(
+      {
+        kind: 'add',
+        provider: 'google',
+        app: 'desktop',
+        label: 'personal',
+      },
+      commandRuntime({
+        assertInitialized: async () => {
+          events.push('initialized')
+        },
+        selectDaemon: () => ({ selectedBy: 'test_override' }) as never,
+        ensureDaemonSelection: async () => ({
+          status: 'selected',
+          selection: { selectedBy: 'test_override' } as never,
+          started: true,
+        }),
+        daemonAccountAdd: async (_selection, input, interaction) => {
+          events.push(`add:${input.provider}:${input.app}:${input.label}`)
+          await interaction.emitAuthorizationUrl(
+            'https://accounts.example/authorize',
+          )
+          return { accountId: 'account-id' }
+        },
+        launchOAuthBrowser: async (url) => {
+          events.push(`browser:${url}`)
+        },
+        readEnvironmentVariable: () => undefined,
+        openDeps: async () => {
+          throw new Error('direct dependencies opened')
+        },
+      }),
+    )
+    expect(exit).toBe(0)
+    expect(events).toEqual([
+      'initialized',
+      'add:google:desktop:personal',
+      'browser:https://accounts.example/authorize',
+    ])
+    expect(output.mock.calls.map((call) => call[0])).toEqual([
+      'Open this URL: https://accounts.example/authorize',
+      'account added: account-id',
+    ])
+  } finally {
+    output.mockRestore()
+  }
+})
+
 test('implicit command keeps one fallback for exact App resolution failure', async () => {
   const error = spyOn(console, 'error').mockImplementation(() => {})
   let authorizations = 0
   const exit = await handleAccountCommand(
-    ['add', 'google'],
+    { kind: 'add', provider: 'google' },
     commandRuntime({
       openDeps: async () =>
         openedDeps(async () => {
@@ -206,7 +258,7 @@ test('implicit command does not attach selection fallback after exact App resolu
   const definition = completeRegistry.oauthApps.get('["google","ctxindex"]')
   if (definition === undefined) throw new Error('Google fixture App missing')
   const exit = await handleAccountCommand(
-    ['add', 'google'],
+    { kind: 'add', provider: 'google' },
     commandRuntime({
       openDeps: async () =>
         openedDeps(async () => ({
@@ -216,6 +268,7 @@ test('implicit command does not attach selection fallback after exact App resolu
           definition,
         })),
       authorizeProvider: async (_input, deps) => {
+        expect(deps.readAuthorizationResponse).toBeFunction()
         await expect(
           deps.resolveApp('google', 'ctxindex'),
         ).resolves.toMatchObject({ label: 'ctxindex' })
@@ -238,7 +291,7 @@ test('implicit command rejects a changed cached App authorization request', asyn
   const definition = completeRegistry.oauthApps.get('["google","ctxindex"]')
   if (definition === undefined) throw new Error('Google fixture App missing')
   const exit = await handleAccountCommand(
-    ['add', 'google'],
+    { kind: 'add', provider: 'google' },
     commandRuntime({
       openDeps: async () =>
         openedDeps(async () => ({

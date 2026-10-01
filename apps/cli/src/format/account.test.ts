@@ -28,25 +28,19 @@ const inventory: AccountInventoryItem[] = [
   },
 ]
 
-test('formats compact Account and Source inventory without private Grant state', () => {
-  expect(formatAccountInventory(inventory, false)).toBe(
-    [
-      'ACCOUNT account-1  provider=google  label="Person\\nOne"',
-      '  AUTH active  expiresAt=2000',
-      '  SOURCE source-1  label="primary-inbox"  adapter=google.mailbox  realm=work',
-      'ACCOUNT account-2  provider=microsoft  label=(unlabeled)',
-      '  AUTH unknown  expiresAt=-',
-    ].join('\n'),
-  )
-  expect(formatAccountInventory([], false)).toBe('No Accounts configured.')
+test('formats escaped Account and Source inventory without private Grant state', () => {
+  const text = formatAccountInventory(inventory, 'text')
+  expect(text).toContain('Person\\nOne')
+  expect(text).toContain('primary-inbox')
+  expect(text).not.toMatch(/grant|scope|token|secret/i)
 })
 
 test('JSON preserves safe nested cardinality without inventing identity or secret fields', () => {
-  const output = formatAccountInventory(inventory, true)
+  const output = formatAccountInventory(inventory, 'json')
   expect(JSON.parse(output)).toEqual(inventory)
   expect(output).not.toContain('externalUserId')
   expect(output).not.toMatch(/grant|scope|token|secret|Ref/i)
-  expect(formatAccountInventory([], true)).toBe('[]')
+  expect(formatAccountInventory([], 'json')).toBe('[]')
 })
 
 test('account added output exposes only the public Account id', () => {

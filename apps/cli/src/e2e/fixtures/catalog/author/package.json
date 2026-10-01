@@ -1,0 +1,14 @@
+{
+  "name": "@fixture/catalog-author",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@fixture/catalog-local-extension": "file:./packages/local"
+  },
+  "ctxindex": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  }
+}

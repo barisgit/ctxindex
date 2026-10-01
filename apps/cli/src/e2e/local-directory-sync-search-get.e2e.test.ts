@@ -65,9 +65,12 @@ test('binary CLI syncs local files through generic search, get, and Ref contract
     expect(added.exitCode, added.stderr).toBe(0)
     const sourceId = parseSourceId(added.stdout)
 
-    const first = await sandbox.run(['sync', '--source', sourceId, '--json'], {
-      env,
-    })
+    const first = await sandbox.run(
+      ['sync', '--source', sourceId, '--format', 'json'],
+      {
+        env,
+      },
+    )
     expect(first.exitCode, first.stderr).toBe(0)
     expect(JSON.parse(first.stdout)).toEqual({
       mode: 'sync',
@@ -101,7 +104,7 @@ test('binary CLI syncs local files through generic search, get, and Ref contract
     })
 
     const status = await sandbox.run(
-      ['status', '--source', sourceId, '--json'],
+      ['status', '--source', sourceId, '--format', 'json'],
       {
         env,
       },
@@ -118,7 +121,10 @@ test('binary CLI syncs local files through generic search, get, and Ref contract
       }),
     ])
 
-    const inventory = await sandbox.run(['source', 'list', '--json'], { env })
+    const inventory = await sandbox.run(
+      ['source', 'list', '--format', 'json'],
+      { env },
+    )
     expect(inventory.exitCode, inventory.stderr).toBe(0)
     expect(JSON.parse(inventory.stdout)).toEqual([
       expect.objectContaining({
@@ -140,7 +146,8 @@ test('binary CLI syncs local files through generic search, get, and Ref contract
         sourceId,
         '--field',
         'path=nested/a b%.txt',
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -164,7 +171,7 @@ test('binary CLI syncs local files through generic search, get, and Ref contract
       warnings: [],
     })
 
-    const got = await sandbox.run(['get', '--json', ref], { env })
+    const got = await sandbox.run(['get', '--format', 'json', ref], { env })
     expect(got.exitCode, got.stderr).toBe(0)
     const getJson = JSON.parse(got.stdout)
     expect(getJson).toMatchObject({
@@ -206,7 +213,7 @@ test('binary CLI syncs local files through generic search, get, and Ref contract
     expect(getJson.resource).not.toHaveProperty('provider')
 
     const unchanged = await sandbox.run(
-      ['sync', '--source', sourceId, '--json'],
+      ['sync', '--source', sourceId, '--format', 'json'],
       { env },
     )
     expect(unchanged.exitCode, unchanged.stderr).toBe(0)
@@ -221,7 +228,7 @@ test('binary CLI syncs local files through generic search, get, and Ref contract
       join(root, 'nested', 'renamed.txt'),
     )
     const diff = await sandbox.run(
-      ['sync', '--source', sourceId, '--mode', 'diff', '--json'],
+      ['sync', '--source', sourceId, '--mode', 'diff', '--format', 'json'],
       { env },
     )
     expect(diff.exitCode, diff.stderr).toBe(0)
@@ -231,12 +238,12 @@ test('binary CLI syncs local files through generic search, get, and Ref contract
       updated: 0,
       deleted: 1,
     })
-    expect((await sandbox.run(['get', '--json', ref], { env })).stdout).toBe(
-      got.stdout,
-    )
+    expect(
+      (await sandbox.run(['get', '--format', 'json', ref], { env })).stdout,
+    ).toBe(got.stdout)
 
     const reconciled = await sandbox.run(
-      ['sync', '--source', sourceId, '--json'],
+      ['sync', '--source', sourceId, '--format', 'json'],
       { env },
     )
     expect(reconciled.exitCode, reconciled.stderr).toBe(0)
@@ -246,7 +253,7 @@ test('binary CLI syncs local files through generic search, get, and Ref contract
       deleted: 1,
     })
     const old = JSON.parse(
-      (await sandbox.run(['get', '--json', ref], { env })).stdout,
+      (await sandbox.run(['get', '--format', 'json', ref], { env })).stdout,
     )
     expect(old.resource).toMatchObject({ ref, deletedAt: expect.any(Number) })
     const renamedRef = `ctx://${sourceId}/file/${encodeURIComponent('nested/renamed.txt')}`
@@ -260,7 +267,8 @@ test('binary CLI syncs local files through generic search, get, and Ref contract
             'file',
             '--source',
             sourceId,
-            '--json',
+            '--format',
+            'json',
           ],
           { env },
         )

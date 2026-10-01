@@ -1,9 +1,9 @@
 import { expect } from 'bun:test'
-import { chmod, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import type { Sandbox } from '@ctxindex/core/testing'
+import type { CliResult, CompiledCliHarness } from './_compiled-cli-harness'
 import { startMockGmail } from './_mock-gmail'
 import { startMockGraph } from './_mock-graph'
 import { installLoopbackBrowser } from './_oauth-account'
@@ -12,20 +12,6 @@ import {
   mailboxReplayFixture,
   microsoftMailboxReplayMessages,
 } from './fixtures/mailbox-retrieval-artifact-replay'
-
-interface CliResult {
-  readonly stdout: string
-  readonly stderr: string
-  readonly exitCode: number
-}
-
-export interface CompiledCliHarness {
-  run(
-    args: readonly string[],
-    env: Readonly<Record<string, string | undefined>>,
-  ): Promise<CliResult>
-  cleanup(): Promise<void>
-}
 
 interface SafeRequest {
   readonly method: string
@@ -52,7 +38,6 @@ export interface MailboxReplayDriver {
   start(stateDir: string): Promise<ActiveMailboxReplayDriver>
 }
 
-const repoRoot = fileURLToPath(new URL('../../../../', import.meta.url))
 const unreachableLoopback = 'http://127.0.0.1:1'
 const realm = 'invented-mailbox-replay'
 const foreignSourceId = '01ARZ3NDEKTSV4RRFFQ69G5FAV'
@@ -227,70 +212,6 @@ export const mailboxReplayDrivers: readonly MailboxReplayDriver[] = [
   microsoftDriver,
 ]
 
-export function isolatedChildEnvironment(
-  env: Readonly<Record<string, string | undefined>>,
-): Record<string, string> {
-  return Object.fromEntries(
-    Object.entries(env).filter(
-      (entry): entry is [string, string] => entry[1] !== undefined,
-    ),
-  )
-}
-
-export async function buildCompiledCliHarness(): Promise<CompiledCliHarness> {
-  const dir = await mkdtemp(join(tmpdir(), 'ctxindex-mailbox-replay-bin-'))
-  const buildDir = join(dir, 'build')
-  const relocatedDir = join(dir, 'relocated')
-  const buildPath = join(buildDir, 'ctxindex')
-  const relocatedPath = join(relocatedDir, 'ctxindex')
-  await mkdir(buildDir, { recursive: true })
-  await mkdir(relocatedDir, { recursive: true })
-
-  const build = Bun.spawn(
-    [
-      'bun',
-      'build',
-      '--compile',
-      'apps/cli/bin/ctxindex.mjs',
-      '--outfile',
-      buildPath,
-    ],
-    { cwd: repoRoot, stdout: 'pipe', stderr: 'pipe' },
-  )
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(build.stdout).text(),
-    new Response(build.stderr).text(),
-    build.exited,
-  ])
-  expect(exitCode, `${stdout}\n${stderr}`).toBe(0)
-  await Bun.write(relocatedPath, Bun.file(buildPath))
-  await chmod(relocatedPath, 0o755)
-  await rm(buildDir, { recursive: true })
-
-  return {
-    async run(args, env) {
-      const child = Bun.spawn([relocatedPath, ...args], {
-        cwd: '/',
-        env: isolatedChildEnvironment(env),
-        stdin: null,
-        stdout: 'pipe',
-        stderr: 'pipe',
-      })
-      const [childStdout, childStderr, childExitCode] = await Promise.all([
-        new Response(child.stdout).text(),
-        new Response(child.stderr).text(),
-        child.exited,
-      ])
-      return {
-        stdout: childStdout,
-        stderr: childStderr,
-        exitCode: childExitCode,
-      }
-    },
-    cleanup: () => rm(dir, { recursive: true, force: true }),
-  }
-}
-
 async function runOk(
   harness: CompiledCliHarness,
   env: Readonly<Record<string, string | undefined>>,
@@ -384,7 +305,8 @@ export async function runMailboxRetrievalArtifactReplay(
       '--source',
       sourceLabel,
       '--remote',
-      '--json',
+      '--format',
+      'json',
     ])
     const searchJson = JSON.parse(searched.stdout) as {
       results: Array<{ ref: string }>
@@ -401,7 +323,8 @@ export async function runMailboxRetrievalArtifactReplay(
     const firstGet = await runOk(harness, active.env, [
       'get',
       replyRef,
-      '--json',
+      '--format',
+      'json',
     ])
     const getJson = JSON.parse(firstGet.stdout) as {
       resource: {
@@ -453,16 +376,17 @@ export async function runMailboxRetrievalArtifactReplay(
     const secondGet = await runOk(harness, active.env, [
       'get',
       replyRef,
-      '--json',
+      '--format',
+      'json',
     ])
     expect(secondGet.stdout).toBe(firstGet.stdout)
     expect(providerRequests(driver, active)).toEqual([])
 
     const thread = await runOk(harness, active.env, [
       'thread',
-      'get',
       replyRef,
-      '--json',
+      '--format',
+      'json',
     ])
     expect(flattenThreadRefs(JSON.parse(thread.stdout))).toEqual([
       rootRef,
@@ -478,7 +402,8 @@ export async function runMailboxRetrievalArtifactReplay(
       artifactRef,
       '--output',
       firstOutput,
-      '--json',
+      '--format',
+      'json',
     ])
     expect(JSON.parse(firstDownload.stdout)).toMatchObject({ cache: 'miss' })
     expect(await readFile(firstOutput, 'utf8')).toBe(
@@ -496,7 +421,8 @@ export async function runMailboxRetrievalArtifactReplay(
       artifactRef,
       '--output',
       secondOutput,
-      '--json',
+      '--format',
+      'json',
     ])
     expect(JSON.parse(secondDownload.stdout)).toMatchObject({ cache: 'hit' })
     expect(await readFile(secondOutput, 'utf8')).toBe(
@@ -505,9 +431,10 @@ export async function runMailboxRetrievalArtifactReplay(
     expect(providerRequests(driver, active)).toEqual([])
 
     const purged = await runOk(harness, active.env, [
+      'artifact',
       'purge',
-      'artifacts',
-      '--json',
+      '--format',
+      'json',
     ])
     expect(JSON.parse(purged.stdout)).toMatchObject({
       artifactCountRemoved: 1,
@@ -516,14 +443,16 @@ export async function runMailboxRetrievalArtifactReplay(
     const afterPurge = await runOk(harness, active.offlineEnv(), [
       'get',
       replyRef,
-      '--json',
+      '--format',
+      'json',
     ])
     expect(afterPurge.stdout).toBe(firstGet.stdout)
     const listed = await runOk(harness, active.offlineEnv(), [
       'artifact',
       'list',
       replyRef,
-      '--json',
+      '--format',
+      'json',
     ])
     expect(JSON.parse(listed.stdout)).toMatchObject({
       resourceRef: replyRef,
@@ -538,7 +467,8 @@ export async function runMailboxRetrievalArtifactReplay(
       artifactRef,
       '--output',
       thirdOutput,
-      '--json',
+      '--format',
+      'json',
     ])
     expect(JSON.parse(thirdDownload.stdout)).toMatchObject({ cache: 'miss' })
     expect(await readFile(thirdOutput, 'utf8')).toBe(
@@ -586,18 +516,20 @@ export async function runMailboxRetrievalArtifactReplay(
     expect(providerRequests(driver, active)).toEqual([])
 
     const invalidCases = [
-      ['get', 'not-a-ref', '--json'],
+      ['get', 'not-a-ref', '--format', 'json'],
       [
         'get',
         `ctx://${foreignSourceId}/message/${mailboxReplayFixture.replyProviderId}`,
-        '--json',
+        '--format',
+        'json',
       ],
-      ['artifact', 'download', 'not-a-ref', '--json'],
+      ['artifact', 'download', 'not-a-ref', '--format', 'json'],
       [
         'artifact',
         'download',
         `ctx://${foreignSourceId}/message/${mailboxReplayFixture.replyProviderId}/attachment/foreign`,
-        '--json',
+        '--format',
+        'json',
       ],
     ] as const
     active.resetRequests()

@@ -1,4 +1,7 @@
+export * from './authoring'
 export * from './git'
+export * from './installation'
+export * from './marketplace'
 export * from './paths'
 export * from './repository'
 export * from './schema'

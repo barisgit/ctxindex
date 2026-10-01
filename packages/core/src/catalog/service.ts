@@ -1,23 +1,12 @@
-import { join } from 'node:path'
-import {
-  createExtensionHostDiagnostic,
-  safeExtensionDiagnostic,
-} from '../extension/diagnostics'
-import { importExtensionPackageRoot } from '../extension/import'
-import { dataDir } from '../paths'
-import {
-  buildCompleteCandidateRegistry,
-  type ExtensionRegistry,
-  type OAuthAppIdentity,
-} from '../registry'
+import type { GenericExtensionInstallationRecord } from '../direct-extension/schema'
+import { DirectExtensionStore } from '../direct-extension/store'
+import { createExtensionHostDiagnostic } from '../extension/diagnostics'
+import { compareUnicodeCodePoints } from '../internal/code-point-order'
+import { configDir, dataDir } from '../paths'
 import { acquireCatalogSnapshot } from './git'
-import { catalogSnapshotPath, validateCatalogSnapshot } from './paths'
+import { type MarketplaceExtension, searchMarketplace } from './marketplace'
 import { validateCatalogRef, validateCatalogRepository } from './repository'
-import type {
-  CatalogManifest,
-  CatalogRecord,
-  InstalledExtensionRecord,
-} from './schema'
+import type { CatalogManifest, CatalogRecord } from './schema'
 import { validateCatalogName } from './schema'
 import { CatalogStore } from './store'
 
@@ -26,7 +15,9 @@ function invalid(message: string): never {
 }
 
 function conflict(message: string): never {
-  throw createExtensionHostDiagnostic(message, { code: 'invalid_args' })
+  throw createExtensionHostDiagnostic(message, {
+    code: 'extension_conflict',
+  })
 }
 
 function recordFromManifest(input: {
@@ -44,23 +35,28 @@ function recordFromManifest(input: {
     commit: input.commit,
     snapshot_acquired_at: input.snapshotAcquiredAt,
     catalog_id: input.manifest.catalog.id,
-    catalog_name: input.manifest.catalog.name,
+    catalog_label: input.manifest.catalog.label,
     ...(input.manifest.catalog.summary === undefined
       ? {}
       : { summary: input.manifest.catalog.summary }),
-    extensions: input.manifest.extensions.map((entry) => ({
-      id: entry.id,
-      version: entry.version,
-      source_path: entry.source.path,
-      ...(entry.setup === undefined ? {} : { setup_path: entry.setup.path }),
-    })),
+    generated: input.manifest.generated,
+    extensions: input.manifest.extensions,
   }
+}
+
+export interface CatalogInstallationRecordReader {
+  withLifecycleLock<T>(operation: () => Promise<T>): Promise<T>
+  readRecords(): Promise<
+    readonly Pick<GenericExtensionInstallationRecord, 'id' | 'curation'>[]
+  >
 }
 
 export interface CatalogServiceOptions {
   readonly configRoot?: string
   readonly dataRoot?: string
   readonly now?: () => number
+  readonly installationRecords?: CatalogInstallationRecordReader
+  readonly acquireSnapshot?: typeof acquireCatalogSnapshot
 }
 
 export interface CatalogReadOptions {
@@ -71,21 +67,27 @@ export class CatalogService {
   readonly store: CatalogStore
   readonly dataRoot: string
   readonly now: () => number
+  readonly installationRecords: CatalogInstallationRecordReader
+  readonly acquireSnapshot: NonNullable<
+    CatalogServiceOptions['acquireSnapshot']
+  >
 
   constructor(options: CatalogServiceOptions = {}) {
-    this.store = new CatalogStore({
-      ...(options.configRoot === undefined
-        ? {}
-        : { configRoot: options.configRoot }),
-    })
-    this.dataRoot = options.dataRoot ?? dataDir()
+    const configRoot = options.configRoot ?? configDir()
+    const dataRoot = options.dataRoot ?? dataDir()
+    this.store = new CatalogStore({ configRoot })
+    this.dataRoot = dataRoot
     this.now = options.now ?? Date.now
+    this.installationRecords =
+      options.installationRecords ??
+      new DirectExtensionStore({ configRoot, dataRoot })
+    this.acquireSnapshot = options.acquireSnapshot ?? acquireCatalogSnapshot
   }
 
   async list(
     options: CatalogReadOptions = {},
   ): Promise<readonly CatalogRecord[]> {
-    if (options.refresh === true) {
+    if (options.refresh !== false) {
       for (const catalog of await this.store.readCatalogs()) {
         await this.refresh({ name: catalog.name })
       }
@@ -97,7 +99,7 @@ export class CatalogService {
     name: string,
     options: CatalogReadOptions = {},
   ): Promise<CatalogRecord> {
-    if (options.refresh === true) return this.refresh({ name })
+    if (options.refresh !== false) return this.refresh({ name })
     const record = (await this.store.readCatalogs()).find(
       (catalog) => catalog.name === name,
     )
@@ -108,7 +110,6 @@ export class CatalogService {
   async showExtension(
     name: string,
     id: string,
-    version: number,
     options: CatalogReadOptions = {},
   ): Promise<{
     readonly catalog: CatalogRecord
@@ -116,12 +117,19 @@ export class CatalogService {
   }> {
     const catalog = await this.show(name, options)
     const extension = catalog.extensions.find(
-      (candidate) => candidate.id === id && candidate.version === version,
+      (candidate) => candidate.id === id,
     )
     if (extension === undefined) {
-      invalid(`Catalog ${name} does not contain ${id}@${version}`)
+      invalid(`Catalog ${name} does not contain ${id}`)
     }
     return { catalog, extension }
+  }
+
+  async search(
+    query?: string,
+    options: CatalogReadOptions = {},
+  ): Promise<readonly MarketplaceExtension[]> {
+    return searchMarketplace(await this.list(options), query, this.now())
   }
 
   async add(input: {
@@ -138,7 +146,7 @@ export class CatalogService {
     if (existing.some((catalog) => catalog.name === name)) {
       conflict(`Catalog ${name} is already registered`)
     }
-    const acquired = await acquireCatalogSnapshot({
+    const acquired = await this.acquireSnapshot({
       repository,
       ref,
       name,
@@ -152,23 +160,29 @@ export class CatalogService {
       snapshotAcquiredAt: this.now(),
       manifest: acquired.manifest,
     })
-    const duplicateId = existing.find(
-      (catalog) => catalog.catalog_id === record.catalog_id,
-    )
-    if (duplicateId !== undefined) {
-      conflict(
-        `Catalog id ${record.catalog_id} is already registered as ${duplicateId.name}`,
+    return this.installationRecords.withLifecycleLock(async () => {
+      const current = await this.store.readCatalogs()
+      if (current.some((catalog) => catalog.name === name)) {
+        conflict(`Catalog ${name} is already registered`)
+      }
+      const duplicateId = current.find(
+        (catalog) => catalog.catalog_id === record.catalog_id,
       )
-    }
-    await this.store.writeCatalogs([...existing, record])
-    return record
+      if (duplicateId !== undefined) {
+        conflict(
+          `Catalog id ${record.catalog_id} is already registered as ${duplicateId.name}`,
+        )
+      }
+      await this.store.writeCatalogs([...current, record])
+      return record
+    })
   }
 
   async refresh(input: { readonly name: string }): Promise<CatalogRecord> {
     const existing = await this.store.readCatalogs()
     const current = existing.find((catalog) => catalog.name === input.name)
     if (current === undefined) invalid(`Unknown Catalog ${input.name}`)
-    const acquired = await acquireCatalogSnapshot({
+    const acquired = await this.acquireSnapshot({
       repository: validateCatalogRepository(current.repository),
       ref: validateCatalogRef(current.ref),
       name: validateCatalogName(current.name),
@@ -179,198 +193,61 @@ export class CatalogService {
       repository: current.repository,
       ref: current.ref,
       commit: acquired.commit,
-      snapshotAcquiredAt: this.now(),
+      snapshotAcquiredAt:
+        acquired.commit === current.commit
+          ? current.snapshot_acquired_at
+          : this.now(),
       manifest: acquired.manifest,
     })
-    const duplicateId = existing.find(
-      (catalog) =>
-        catalog.name !== current.name &&
-        catalog.catalog_id === replacement.catalog_id,
-    )
-    if (duplicateId !== undefined) {
-      conflict(
-        `Catalog id ${replacement.catalog_id} is already registered as ${duplicateId.name}`,
+    return this.installationRecords.withLifecycleLock(async () => {
+      const latest = await this.store.readCatalogs()
+      const configured = latest.find((catalog) => catalog.name === input.name)
+      if (configured === undefined) invalid(`Unknown Catalog ${input.name}`)
+      if (JSON.stringify(configured) !== JSON.stringify(current)) {
+        conflict(`Catalog ${input.name} changed during refresh; retry`)
+      }
+      if (replacement.catalog_id !== configured.catalog_id) {
+        conflict(
+          `Catalog ${input.name} changed stable id from ${configured.catalog_id} to ${replacement.catalog_id}`,
+        )
+      }
+      const duplicateId = latest.find(
+        (catalog) =>
+          catalog.name !== configured.name &&
+          catalog.catalog_id === replacement.catalog_id,
       )
-    }
-    await this.store.writeCatalogs(
-      existing.map((catalog) =>
-        catalog.name === current.name ? replacement : catalog,
-      ),
-    )
-    return replacement
+      if (duplicateId !== undefined) {
+        conflict(
+          `Catalog id ${replacement.catalog_id} is already registered as ${duplicateId.name}`,
+        )
+      }
+      await this.store.writeCatalogs(
+        latest.map((catalog) =>
+          catalog.name === configured.name ? replacement : catalog,
+        ),
+      )
+      return replacement
+    })
   }
 
   async remove(name: string): Promise<CatalogRecord> {
-    const existing = await this.store.readCatalogs()
-    const current = existing.find((catalog) => catalog.name === name)
-    if (current === undefined) invalid(`Unknown Catalog ${name}`)
-    const installed = await this.store.readInstalled()
-    if (installed.some((extension) => extension.catalog_name === name)) {
-      conflict(
-        `Catalog ${name} cannot be removed while Extensions are still installed`,
+    return this.installationRecords.withLifecycleLock(async () => {
+      const existing = await this.store.readCatalogs()
+      const current = existing.find((catalog) => catalog.name === name)
+      if (current === undefined) invalid(`Unknown Catalog ${name}`)
+      const blockingIds = (await this.installationRecords.readRecords())
+        .filter((record) => record.curation?.catalog_name === name)
+        .map((record) => record.id)
+        .sort(compareUnicodeCodePoints)
+      if (blockingIds.length > 0) {
+        conflict(
+          `Catalog ${name} cannot be removed while Extensions are installed: ${blockingIds.join(', ')}`,
+        )
+      }
+      await this.store.writeCatalogs(
+        existing.filter((catalog) => catalog.name !== name),
       )
-    }
-    await this.store.writeCatalogs(
-      existing.filter((catalog) => catalog.name !== name),
-    )
-    return current
-  }
-
-  async install(input: {
-    readonly catalog: string
-    readonly id: string
-    readonly version: number
-    readonly trust: boolean
-    readonly registry: ExtensionRegistry
-    readonly localOAuthAppIdentities: readonly OAuthAppIdentity[]
-    readonly refresh?: boolean
-    readonly replaceableCatalog?: {
-      readonly catalog: string
-      readonly commit: string
-    }
-  }): Promise<InstalledExtensionRecord> {
-    if (input.trust !== true) invalid('Extension install requires --trust')
-    const catalog = await this.show(input.catalog, {
-      refresh: input.refresh === true,
+      return current
     })
-    const recordedEntry = catalog.extensions.find(
-      (entry) => entry.id === input.id && entry.version === input.version,
-    )
-    if (recordedEntry === undefined) {
-      invalid(
-        `Catalog ${catalog.name} does not contain ${input.id}@${input.version}`,
-      )
-    }
-    const snapshot = catalogSnapshotPath(
-      this.dataRoot,
-      catalog.name,
-      catalog.commit,
-    )
-    const manifest = await validateCatalogSnapshot(snapshot)
-    if (manifest.catalog.id !== catalog.catalog_id) {
-      throw createExtensionHostDiagnostic(
-        'Catalog snapshot identity does not match persisted record',
-      )
-    }
-    const entry = manifest.extensions.find(
-      (candidate) =>
-        candidate.id === input.id && candidate.version === input.version,
-    )
-    if (
-      entry === undefined ||
-      entry.source.path !== recordedEntry.source_path ||
-      entry.setup?.path !== recordedEntry.setup_path
-    ) {
-      throw createExtensionHostDiagnostic(
-        'Catalog snapshot entry does not match persisted record',
-      )
-    }
-    let selected: Awaited<ReturnType<typeof importExtensionPackageRoot>>
-    try {
-      selected = await importExtensionPackageRoot(
-        join(snapshot, entry.source.path),
-        entry.id,
-        {
-          origin: 'catalog',
-          commit: catalog.commit,
-        },
-      )
-    } catch (cause) {
-      throw createExtensionHostDiagnostic(
-        `Catalog Extension ${entry.id}: ${safeExtensionDiagnostic(
-          cause,
-          'package could not be loaded',
-        )}`,
-      )
-    }
-    const current = await this.store.readInstalled()
-    const existing = current.find(
-      (candidate) =>
-        candidate.id === entry.id && candidate.version === entry.version,
-    )
-    const replacesLoadedCatalog =
-      existing !== undefined &&
-      input.replaceableCatalog?.catalog === existing.catalog_name &&
-      input.replaceableCatalog.commit === existing.commit
-    const runtimeDefinitions = input.registry
-      .list()
-      .filter(
-        (candidate) => !replacesLoadedCatalog || candidate.id !== entry.id,
-      )
-    if (runtimeDefinitions.some((candidate) => candidate.id === entry.id)) {
-      throw createExtensionHostDiagnostic(
-        `Catalog Extension ${entry.id}: Extension definition conflict`,
-      )
-    }
-    try {
-      buildCompleteCandidateRegistry({
-        roots: [
-          ...runtimeDefinitions.map((runtimeDefinition, index) => ({
-            definition: runtimeDefinition,
-            provenance: {
-              origin: 'builtin' as const,
-              entry: `runtime:${index}`,
-              exportName: 'default',
-            },
-          })),
-          selected,
-        ],
-        localOAuthAppIdentities: input.localOAuthAppIdentities,
-      })
-    } catch (cause) {
-      throw createExtensionHostDiagnostic(
-        `Catalog Extension ${entry.id}: ${safeExtensionDiagnostic(
-          cause,
-          'definition validation failed',
-        )}`,
-      )
-    }
-    const installed: InstalledExtensionRecord = {
-      id: entry.id,
-      version: entry.version,
-      catalog_name: catalog.name,
-      catalog_id: catalog.catalog_id,
-      repository: catalog.repository,
-      commit: catalog.commit,
-      snapshot_acquired_at: catalog.snapshot_acquired_at,
-      source_path: entry.source.path,
-      ...(entry.setup === undefined ? {} : { setup_path: entry.setup.path }),
-    }
-    if (
-      existing !== undefined &&
-      JSON.stringify(existing) === JSON.stringify(installed)
-    ) {
-      return existing
-    }
-    await this.store.writeInstalled([
-      ...current.filter(
-        (candidate) =>
-          candidate.id !== installed.id ||
-          candidate.version !== installed.version,
-      ),
-      installed,
-    ])
-    return installed
-  }
-
-  async uninstall(input: {
-    readonly id: string
-    readonly version: number
-  }): Promise<InstalledExtensionRecord> {
-    const current = await this.store.readInstalled()
-    const installed = current.find(
-      (candidate) =>
-        candidate.id === input.id && candidate.version === input.version,
-    )
-    if (installed === undefined) {
-      invalid(`Extension ${input.id}@${input.version} is not installed`)
-    }
-    await this.store.writeInstalled(
-      current.filter(
-        (candidate) =>
-          candidate.id !== input.id || candidate.version !== input.version,
-      ),
-    )
-    return installed
   }
 }

@@ -1,25 +1,28 @@
 {
   "name": "@ctxindex/profiles",
-  "version": "0.0.0",
+  "version": "0.1.1",
+  "description": "Portable domain Profiles for ctxindex Resources.",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./calendar-event": "./src/calendar-event.ts",
-    "./communication-message": "./src/communication-message.ts",
+    "./chat-message": "./src/chat-message.ts",
+    "./mail-message": "./src/mail-message.ts",
     "./file": "./src/file.ts"
   },
   "scripts": {
-    "build": "tsgo --noEmit -p tsconfig.json",
+    "build": "bun ../../scripts/release/profiles-package.ts build",
     "lint": "biome check .",
     "typecheck": "tsgo --noEmit -p tsconfig.json",
-    "test": "bun test",
+    "test": "NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-unit.json bun test --path-ignore-patterns '**/*.integration.test.ts' --path-ignore-patterns '**/*.e2e.test.ts'",
     "format": "biome format --write .",
     "clean": "rm -rf .turbo dist coverage",
     "fullclean": "rm -rf .turbo dist coverage node_modules"
   },
   "dependencies": {
-    "@ctxindex/extension-sdk": "workspace:*",
-    "zod": "latest"
+    "@ctxindex/extension-sdk": "0.1.1",
+    "zod": "^4.4.3"
   }
 }

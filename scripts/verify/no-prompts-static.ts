@@ -22,7 +22,11 @@ function isFile(path: string): boolean {
 }
 
 function isExcluded(path: string): boolean {
-  return path.endsWith('.test.ts') || path.endsWith('.spec.ts')
+  return (
+    path.endsWith('.test.ts') ||
+    path.endsWith('.spec.ts') ||
+    path === 'account/read-hidden-oauth-response.ts'
+  )
 }
 
 async function promptMatches(): Promise<string[]> {
@@ -57,7 +61,7 @@ async function main(): Promise<number> {
     return 1
   }
 
-  console.log('no interactive prompt imports or stdin reads found')
+  console.log('no unapproved interactive prompt imports or stdin reads found')
   return 0
 }
 

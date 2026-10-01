@@ -144,6 +144,84 @@ async function failureWithWarning(): Promise<CtxindexSyncError> {
 }
 
 describe('SyncApplicationService', () => {
+  test('reports ordered Source lifecycle and count-only progress events', async () => {
+    const setup = harness({
+      sources: [source('source-b'), source('source-a')],
+      run: async (input) => {
+        await input.onProgress?.({
+          processed: 1,
+          upserts: 1,
+          removals: 0,
+          checkpoints: 0,
+          warningsCount: 0,
+        })
+        if (input.sourceId === 'source-b') {
+          throw new CtxindexError('private failure', 'network')
+        }
+        return completed
+      },
+    })
+    const events: unknown[] = []
+
+    const result = await setup.service.run({
+      mode: 'sync',
+      signal: new AbortController().signal,
+      onEvent: async (event) => {
+        events.push(event)
+      },
+    })
+
+    expect(result.results.map((item) => item.status)).toEqual([
+      'completed',
+      'failed',
+    ])
+    expect(events).toEqual([
+      {
+        type: 'source.started',
+        sequence: 0,
+        sourceId: 'source-a',
+        mode: 'sync',
+      },
+      {
+        type: 'source.progress',
+        sequence: 1,
+        sourceId: 'source-a',
+        processed: 1,
+        upserts: 1,
+        removals: 0,
+        checkpoints: 0,
+        warningsCount: 0,
+      },
+      {
+        type: 'source.completed',
+        sequence: 2,
+        sourceId: 'source-a',
+        run: completed,
+      },
+      {
+        type: 'source.started',
+        sequence: 3,
+        sourceId: 'source-b',
+        mode: 'sync',
+      },
+      {
+        type: 'source.progress',
+        sequence: 4,
+        sourceId: 'source-b',
+        processed: 1,
+        upserts: 1,
+        removals: 0,
+        checkpoints: 0,
+        warningsCount: 0,
+      },
+      expect.objectContaining({
+        type: 'source.failed',
+        sequence: 5,
+        sourceId: 'source-b',
+      }),
+    ])
+  })
+
   test('resolves one Source by exact label or id and forwards the request signal', async () => {
     const setup = harness({
       sources: [source('source-id', { label: 'source-label' })],

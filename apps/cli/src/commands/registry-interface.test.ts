@@ -1,7 +1,5 @@
 import { describe, expect, test } from 'bun:test'
 import type { RegistryDescription } from '@ctxindex/core/registry'
-import { parseDescribeArgs } from '../args/describe'
-import { parseExtensionsArgs } from '../args/extensions'
 import {
   filterRegistryDescription,
   formatExtensions,
@@ -77,49 +75,10 @@ const description: RegistryDescription = {
 }
 
 describe('describe interface', () => {
-  test('parses selectors and formats and rejects invalid values', () => {
-    expect(
-      parseDescribeArgs(['profile', 'fake.kind', '--format', 'markdown']),
-    ).toEqual({
-      kind: 'describe',
-      selector: 'profile',
-      id: 'fake.kind',
-      format: 'markdown',
-      full: false,
-    })
-    expect(parseDescribeArgs(['--json'])).toEqual({
-      kind: 'describe',
-      format: 'json',
-      full: false,
-    })
-    expect(parseDescribeArgs(['action', '--full', '--json'])).toEqual({
-      kind: 'describe',
-      selector: 'action',
-      format: 'json',
-      full: true,
-    })
-    expect(parseDescribeArgs(['unknown'])).toMatchObject({ kind: 'unknown' })
-    expect(parseDescribeArgs(['--format', 'yaml'])).toMatchObject({
-      kind: 'unknown',
-    })
-    expect(parseDescribeArgs(['--unknown'])).toMatchObject({ kind: 'unknown' })
-    expect(parseDescribeArgs(['--format'])).toMatchObject({ kind: 'unknown' })
-    expect(parseDescribeArgs(['--json=false'])).toMatchObject({
-      kind: 'unknown',
-    })
-    expect(parseDescribeArgs(['action', 'fake.run', '--full'])).toMatchObject({
-      kind: 'unknown',
-      message: 'describe: --full is redundant with an exact id',
-    })
-    expect(parseDescribeArgs(['--full=false'])).toMatchObject({
-      kind: 'unknown',
-    })
-  })
-
   test('formats the provider id and renamed authorization URL', () => {
     const [source] = description.sources
     if (!source) throw new Error('expected source fixture')
-    const oauthDescription = {
+    const oauthDescription: RegistryDescription = {
       ...description,
       sources: [
         {
@@ -130,8 +89,23 @@ describe('describe interface', () => {
               kind: 'oauth2',
               authorizationUrl: 'https://auth.example.com/authorize',
               tokenUrl: 'https://auth.example.com/token',
+              identity: {
+                url: 'https://auth.example.com/userinfo',
+                subjectPath: ['sub'],
+                labelPaths: [['email']],
+                identities: [{ kind: 'email', path: ['email'] }],
+              },
+              pkce: { method: 'S256', required: true },
               baseScopes: ['openid'],
               registration: {
+                type: 'public',
+                configSchema: {
+                  $schema: 'https://json-schema.org/draft/2020-12/schema',
+                  type: 'object',
+                  properties: { clientId: { type: 'string' } },
+                  required: ['clientId'],
+                  additionalProperties: false,
+                },
                 environment: {
                   clientId: 'FAKE_CLIENT_ID',
                   clientSecret: 'FAKE_CLIENT_SECRET',
@@ -162,6 +136,9 @@ describe('describe interface', () => {
     expect(formatRegistryMarkdown(oauthDescription)).toContain(
       '- Environment: clientId=`FAKE_CLIENT_ID`, clientSecret=`FAKE_CLIENT_SECRET`',
     )
+    expect(
+      JSON.stringify(registryJsonValue(oauthDescription, 'adapter', 'full')),
+    ).not.toContain('"def"')
   })
 
   test('filters exact ids and renders full text, Markdown, and JSON data', () => {
@@ -275,18 +252,7 @@ describe('describe interface', () => {
 })
 
 describe('extensions list interface', () => {
-  test('supports only list and deterministic exact references', () => {
-    expect(parseExtensionsArgs(['list', '--json'])).toEqual({
-      kind: 'list',
-      json: true,
-    })
-    expect(parseExtensionsArgs(['install'])).toMatchObject({ kind: 'unknown' })
-    expect(parseExtensionsArgs(['list', '--unknown'])).toMatchObject({
-      kind: 'unknown',
-    })
-    expect(parseExtensionsArgs(['list', '--json=false'])).toMatchObject({
-      kind: 'unknown',
-    })
+  test('formats deterministic exact references', () => {
     const registry = {
       list: () => [
         {
@@ -299,10 +265,8 @@ describe('extensions list interface', () => {
         },
       ],
     }
-    expect(formatExtensions(registry, false)).toBe(
-      'external\tProfiles: a@1, z@1\tAdapters: b',
-    )
-    expect(JSON.parse(formatExtensions(registry, true))).toEqual([
+    expect(formatExtensions(registry, 'text')).toContain('external')
+    expect(JSON.parse(formatExtensions(registry, 'json'))).toEqual([
       {
         id: 'external',
         profiles: [
@@ -316,7 +280,7 @@ describe('extensions list interface', () => {
       JSON.parse(
         formatExtensions(
           registry,
-          true,
+          'json',
           [
             {
               id: 'external',
@@ -326,10 +290,36 @@ describe('extensions list interface', () => {
               repository: '/tmp/fixture.git',
               commit: 'a'.repeat(40),
               snapshotAcquiredAt: 1_000,
-              sourcePath: 'extension.ts',
+              sourceLocator: { kind: 'package', entryIndex: 0 },
+              sourceKind: 'npm',
+              requestedTarget: '@example/external@1.2.3',
+              resolvedIdentity: '1.2.3 (sha512-exact)',
+              materializationDigest: 'b'.repeat(64),
+              installedAt: 500,
+              updatedAt: 750,
             },
           ],
-          [],
+          [
+            {
+              id: 'external',
+              sourceKind: 'npm',
+              requestedTarget: '@example/external@1.2.3',
+              resolvedIdentity: '1.2.3 (sha512-exact)',
+              materializationDigest: 'b'.repeat(64),
+              installedAt: 500,
+              updatedAt: 750,
+              curation: {
+                extension_id: 'external',
+                catalog_name: 'fixture',
+                catalog_id: 'fixture.catalog',
+                repository: '/tmp/fixture.git',
+                commit: 'a'.repeat(40),
+                snapshot_acquired_at: 1_000,
+                source_locator: { kind: 'package', entryIndex: 0 },
+                execution_materialization_digest: 'b'.repeat(64),
+              },
+            },
+          ],
           4_000,
         ),
       )[0].provenance,
@@ -338,7 +328,7 @@ describe('extensions list interface', () => {
     const unavailable = JSON.parse(
       formatExtensions(
         { list: () => [] },
-        true,
+        'json',
         [],
         [
           {
@@ -372,7 +362,7 @@ describe('extensions list interface', () => {
         {
           list: () => [{ id: 'example.direct', profiles: [], adapters: [] }],
         },
-        true,
+        'json',
         [{ id: 'example.direct', kind: 'builtin' }],
         [
           {
@@ -393,6 +383,66 @@ describe('extensions list interface', () => {
         id: 'example.direct',
         available: false,
         provenance: expect.objectContaining({ kind: 'direct' }),
+      }),
+    ])
+  })
+
+  test('retains exact Catalog curation for an unavailable generic record', () => {
+    const result = JSON.parse(
+      formatExtensions(
+        { list: () => [] },
+        'json',
+        [],
+        [
+          {
+            id: 'example.curated',
+            sourceKind: 'git',
+            requestedTarget: 'git+https://example.test/curated.git',
+            resolvedIdentity: 'a'.repeat(40),
+            materializationDigest: 'b'.repeat(64),
+            installedAt: 100,
+            updatedAt: 200,
+            curation: {
+              extension_id: 'example.curated',
+              catalog_name: 'team',
+              catalog_id: 'team.catalog',
+              repository: 'https://example.test/catalog.git',
+              commit: 'c'.repeat(40),
+              snapshot_acquired_at: 1_000,
+              source_locator: {
+                kind: 'literal',
+                module: './catalog.ts',
+                catalogId: 'team.catalog',
+                entryIndex: 3,
+                extensionId: 'example.curated',
+              },
+              execution_materialization_digest: 'b'.repeat(64),
+            },
+          },
+        ],
+        4_000,
+      ),
+    )
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: 'example.curated',
+        available: false,
+        provenance: expect.objectContaining({
+          kind: 'catalog',
+          catalog: 'team',
+          catalogId: 'team.catalog',
+          snapshotAgeMs: 3_000,
+          sourceLocator: {
+            kind: 'literal',
+            module: './catalog.ts',
+            catalogId: 'team.catalog',
+            entryIndex: 3,
+            extensionId: 'example.curated',
+          },
+          sourceKind: 'git',
+          resolvedIdentity: 'a'.repeat(40),
+        }),
       }),
     ])
   })

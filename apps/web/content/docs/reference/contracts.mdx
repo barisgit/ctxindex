@@ -1,0 +1,43 @@
+---
+title: Public command contracts
+description: Stable Ref, JSON, warning, pagination, and exit behavior used by shell-capable agents.
+---
+
+## Refs
+
+A Ref is an opaque stable ctxindex locator:
+
+```text
+ctx://<source-ulid>/<adapter-owned-suffix>
+```
+
+Copy returned Refs through `search`, `get`, `thread`, `export`, Artifact, and Action workflows. Do not reconstruct the suffix from provider ids.
+
+## Structured output
+
+Search, get, thread, Artifact list, status, and Source, Realm, Account, OAuth App, and Extension inventories accept `--format pretty|text|json`. Omit the flag in a terminal for width-aware tables or vertical cards; redirected output defaults to deterministic low-token text. Text collections use escaped TSV (`\\`, `\t`, `\r`, and `\n`) and reserve `\N` for null; because literal backslashes are escaped first, the string `\N` is encoded as `\\N`. Singular Resource text labels every complete envelope field and prints nested values as compact JSON. Values and Refs are losslessly wrapped rather than ellipsized.
+
+`--format json` (or `-f json`) writes one compact machine-readable result to stdout. Read warnings stay on stderr for pretty/text and inside an owning JSON result envelope for JSON. Byte-stream export uses its separate `--format json` Profile payload contract; `describe --format` independently selects reference text, Markdown, or JSON.
+
+`sync` and daemon lifecycle commands retain their separate output contracts. Profile export and reference describe formats are also separate domains; none silently inherit this batch layout.
+
+Search results include a `results` array, pagination, and bounded warnings. Remote continuations are opaque and cannot be combined with local offsets. A merged multi-Source result has no global continuation; when one Source truncates, rerun the unchanged search with that exact Source instead of expecting a returned cursor.
+
+## Warnings and errors
+
+Warnings do not automatically make a successful command fail. Sync status reports warning and error accounting separately. Read structured fields instead of parsing human prose.
+
+## Stable exits
+
+| Exit | Meaning |
+| ---: | --- |
+| `0` | success |
+| `2` | invalid usage |
+| `10` | authentication required |
+| `20` | rate limited |
+| `30` | provider/network or external package acquisition failure |
+| `40` | permission denied |
+| `50` | validation, Extension conflict, or internal failure |
+| `130` | cancelled by SIGINT |
+
+Use `ctxindex <command> --help` for exact current syntax and capability specs in the repository for normative behavior.

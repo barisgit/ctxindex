@@ -1,191 +1,110 @@
-import { describe, expect, test } from 'bun:test'
-import { parseExtensionsArgs } from './extensions'
+import { afterEach, expect, spyOn, test } from 'bun:test'
+import { runCommand } from 'citty'
+import { prepareCommandTree, projectCommandReference } from '../command-model'
+import { extensionCommand } from '../extensions/command'
 
-describe('parseExtensionsArgs Catalog surface', () => {
-  test('parses Catalog lifecycle commands exactly', () => {
-    expect(
-      parseExtensionsArgs([
-        'catalog',
-        'add',
-        'team',
-        '/tmp/catalog.git',
-        '--ref',
-        'refs/heads/main',
-        '--trust',
-        '--json',
-      ]),
-    ).toEqual({
-      kind: 'catalog-add',
-      name: 'team',
-      repository: '/tmp/catalog.git',
-      ref: 'refs/heads/main',
-      trust: true,
-      json: true,
-    })
-    expect(
-      parseExtensionsArgs([
-        'install',
-        'npm',
-        '@example/mail@^2',
-        '--extension=example.mail',
-      ]),
-    ).toEqual({
-      kind: 'direct-install',
-      sourceKind: 'npm',
-      target: '@example/mail@^2',
-      extensionId: 'example.mail',
-      json: false,
-    })
-    expect(parseExtensionsArgs(['catalog', 'list', '--json'])).toEqual({
-      kind: 'catalog-list',
-      noRefresh: false,
-      json: true,
-    })
-    expect(
-      parseExtensionsArgs([
-        'catalog',
-        'show',
-        'team',
-        'fixture.extension@2',
-        '--json',
-      ]),
-    ).toEqual({
-      kind: 'catalog-show',
-      name: 'team',
-      extension: { id: 'fixture.extension', version: 2 },
-      noRefresh: false,
-      json: true,
-    })
-    expect(parseExtensionsArgs(['catalog', 'refresh', 'team'])).toEqual({
-      kind: 'catalog-refresh',
-      name: 'team',
-      json: false,
-    })
-    expect(parseExtensionsArgs(['catalog', 'remove', 'team'])).toEqual({
-      kind: 'catalog-remove',
-      name: 'team',
-      json: false,
-    })
+afterEach(() => {
+  process.exitCode = 0
+  spyOn(console, 'error').mockRestore()
+})
+
+test('declares the singular Extension command tree and uniform install grammar', async () => {
+  const root = {
+    meta: { name: 'ctxindex' },
+    subCommands: { extension: extensionCommand },
+  }
+  const projection = await projectCommandReference(root)
+  const commands = new Map(
+    projection.commands.map((command) => [command.path.join(' '), command]),
+  )
+
+  expect([...commands.keys()]).toEqual(
+    expect.arrayContaining([
+      'ctxindex extension',
+      'ctxindex extension list',
+      'ctxindex extension catalog build',
+      'ctxindex extension catalog add',
+      'ctxindex extension catalog list',
+      'ctxindex extension catalog show',
+      'ctxindex extension catalog search',
+      'ctxindex extension catalog refresh',
+      'ctxindex extension catalog remove',
+      'ctxindex extension install',
+      'ctxindex extension update',
+      'ctxindex extension uninstall',
+    ]),
+  )
+  expect(commands.has('ctxindex extension search')).toBe(false)
+
+  const install = commands.get('ctxindex extension install')
+  expect(install?.usage).toContain('SOURCE-KIND=<catalog|npm|git|local>')
+  expect(install?.arguments).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        name: 'source-kind',
+        required: true,
+        choices: ['catalog', 'npm', 'git', 'local'],
+      }),
+      expect.objectContaining({ name: 'target', required: true }),
+      expect.objectContaining({ name: 'extension-id', required: true }),
+      expect.objectContaining({ name: 'refresh', required: false }),
+      expect.objectContaining({
+        name: 'format',
+        aliases: ['f'],
+        required: false,
+        choices: ['pretty', 'text', 'json'],
+      }),
+    ]),
+  )
+  expect(install?.arguments.map(({ name }) => name)).not.toContain('trust')
+  expect(
+    commands
+      .get('ctxindex extension update')
+      ?.arguments.map(({ name }) => name),
+  ).not.toContain('trust')
+  expect(
+    commands
+      .get('ctxindex extension catalog add')
+      ?.arguments.map(({ name }) => name),
+  ).toContain('trust')
+  expect(
+    commands
+      .get('ctxindex extension catalog build')
+      ?.arguments.map(({ name }) => name),
+  ).toContain('trust')
+  expect(
+    commands
+      .get('ctxindex extension catalog search')
+      ?.arguments.find(({ name }) => name === 'query'),
+  ).toEqual(
+    expect.objectContaining({
+      description: 'Optional text to match Extension names and descriptions',
+    }),
+  )
+})
+
+test('rejects an invalid install source kind from the command definition before effects', async () => {
+  const root = {
+    meta: { name: 'ctxindex' },
+    subCommands: { extension: extensionCommand },
+  }
+  await prepareCommandTree(root)
+  const subCommands = await Promise.resolve(
+    typeof extensionCommand.subCommands === 'function'
+      ? extensionCommand.subCommands()
+      : extensionCommand.subCommands,
+  )
+  const installValue = subCommands?.install
+  const install = await Promise.resolve(
+    typeof installValue === 'function' ? installValue() : installValue,
+  )
+  if (install === undefined) throw new Error('install command is missing')
+  const error = spyOn(console, 'error').mockImplementation(() => {})
+
+  await runCommand(install, {
+    rawArgs: ['fixture', 'fixture.target', 'fixture.extension'],
   })
 
-  test('parses install and uninstall exact selectors', () => {
-    expect(
-      parseExtensionsArgs([
-        'install',
-        'team',
-        'fixture.extension@1',
-        '--trust',
-        '--json',
-      ]),
-    ).toEqual({
-      kind: 'catalog-install',
-      catalog: 'team',
-      extension: { id: 'fixture.extension', version: 1 },
-      trust: true,
-      noRefresh: false,
-      json: true,
-    })
-    expect(
-      parseExtensionsArgs(['uninstall', 'fixture.extension@1', '--json']),
-    ).toEqual({
-      kind: 'catalog-uninstall',
-      extension: { id: 'fixture.extension', version: 1 },
-      json: true,
-    })
-  })
-
-  test('parses explicit stored-snapshot discovery and install', () => {
-    expect(
-      parseExtensionsArgs(['catalog', 'list', '--no-refresh', '--json']),
-    ).toEqual({ kind: 'catalog-list', noRefresh: true, json: true })
-    expect(
-      parseExtensionsArgs(['catalog', 'show', 'team', '--no-refresh']),
-    ).toEqual({
-      kind: 'catalog-show',
-      name: 'team',
-      noRefresh: true,
-      json: false,
-    })
-    expect(
-      parseExtensionsArgs([
-        'install',
-        'team',
-        'fixture.extension@1',
-        '--trust',
-        '--no-refresh',
-      ]),
-    ).toEqual({
-      kind: 'catalog-install',
-      catalog: 'team',
-      extension: { id: 'fixture.extension', version: 1 },
-      trust: true,
-      noRefresh: true,
-      json: false,
-    })
-  })
-
-  test('parses direct lifecycle commands without guessing target kinds', () => {
-    expect(
-      parseExtensionsArgs([
-        'install',
-        'npm',
-        '@example/mail@^2',
-        '--extension',
-        'example.mail',
-        '--json',
-      ]),
-    ).toEqual({
-      kind: 'direct-install',
-      sourceKind: 'npm',
-      target: '@example/mail@^2',
-      extensionId: 'example.mail',
-      json: true,
-    })
-    expect(parseExtensionsArgs(['update', 'example.mail', '--json'])).toEqual({
-      kind: 'direct-update',
-      extensionId: 'example.mail',
-      json: true,
-    })
-    expect(
-      parseExtensionsArgs(['uninstall', 'example.mail', '--force', '--json']),
-    ).toEqual({
-      kind: 'direct-uninstall',
-      extensionId: 'example.mail',
-      force: true,
-      json: true,
-    })
-  })
-
-  test.each([
-    'npm',
-    'git',
-    'local',
-  ])('keeps %s available as a Catalog name', (catalog) => {
-    expect(
-      parseExtensionsArgs([
-        'install',
-        catalog,
-        'fixture.extension@1',
-        '--trust',
-      ]),
-    ).toMatchObject({ kind: 'catalog-install', catalog })
-  })
-
-  test.each([
-    ['catalog', 'add', 'team', '/tmp/repo', '--ref', 'refs/heads/main'],
-    ['install', 'team', 'fixture.extension@1'],
-    ['install', 'team', 'fixture.extension'],
-    ['uninstall', 'fixture.extension@0'],
-    ['catalog', 'show', 'team', 'fixture.extension@x'],
-    ['catalog', 'list', '--unknown'],
-    ['install', 'npm', '@example/mail'],
-    ['install', '@example/mail'],
-    ['uninstall', 'fixture.extension@1', '--force'],
-  ])('rejects malformed or untrusted arguments: %j', (...args) => {
-    expect(
-      parseExtensionsArgs(
-        Array.from(args).filter((item) => typeof item === 'string') as string[],
-      ),
-    ).toMatchObject({ kind: 'unknown' })
-  })
+  expect(process.exitCode).toBe(2)
+  expect(error.mock.calls.flat().join(' ')).toContain('source-kind')
 })

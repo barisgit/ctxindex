@@ -20,5 +20,5 @@ Owns runtime environment capture, TOML configuration persistence, schema validat
 ## Integration points
 
 - Exported by `index.ts`, the `@ctxindex/core/config` subpath, and `packages/core/src/index.ts`; CLI OAuth App import, definitions, paths, logging, secrets, storage, and built-in Adapters consume this seam.
-- Microsoft provider and mailbox consumers live under `packages/adapters/src/microsoft/`; Google counterparts consume the existing Google keys.
+- Microsoft provider and mailbox consumers live under `packages/official/src/microsoft/`; Google counterparts consume the existing Google keys.
 - Depends on `@iarna/toml`, Zod, Bun file I/O, paths, and `packages/core/src/errors.ts`.

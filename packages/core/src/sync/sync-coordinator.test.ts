@@ -1,8 +1,8 @@
 import { Database } from 'bun:sqlite'
 import { afterEach, expect, test } from 'bun:test'
-import { defineProfile } from '@ctxindex/extension-sdk'
+import { defineProfile, syncError } from '@ctxindex/extension-sdk'
 import { z } from 'zod'
-import { CtxindexAuthError } from '../errors'
+import { CtxindexAuthError, CtxindexSyncError } from '../errors'
 import { createProfileRegistry } from '../registry/profile-registry'
 import { applyPragmas } from '../storage/db'
 import { runMigrations } from '../storage/migrator'
@@ -229,6 +229,78 @@ test('warnings complete with separate bounded warning accounting', async () => {
   })
 })
 
+test('reports cumulative count-only progress in validated emission order with backpressure', async () => {
+  const { coordinator } = await setup()
+  const events: unknown[] = []
+  let release!: () => void
+  const blocked = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let observerEntered!: () => void
+  const entered = new Promise<void>((resolve) => {
+    observerEntered = resolve
+  })
+  let secondEmissionReached = false
+
+  const pending = coordinator.run(
+    {
+      sourceId,
+      mode: 'sync',
+      signal: new AbortController().signal,
+      onProgress: async (event) => {
+        events.push(event)
+        if (events.length === 1) {
+          observerEntered()
+          await blocked
+        }
+      },
+    },
+    async ({ emit }) => {
+      await emit({ type: 'upsertResource', resource: resource() })
+      secondEmissionReached = true
+      await emit({ type: 'checkpoint', cursor: { page: 2 } })
+      await emit({ type: 'warning', code: 'partial', message: 'Partial scan' })
+      await emit({ type: 'removeResource', ref })
+    },
+  )
+
+  await entered
+  expect(secondEmissionReached).toBe(false)
+  release()
+  await pending
+
+  expect(events).toEqual([
+    {
+      processed: 1,
+      upserts: 1,
+      removals: 0,
+      checkpoints: 0,
+      warningsCount: 0,
+    },
+    {
+      processed: 2,
+      upserts: 1,
+      removals: 0,
+      checkpoints: 1,
+      warningsCount: 0,
+    },
+    {
+      processed: 3,
+      upserts: 1,
+      removals: 0,
+      checkpoints: 1,
+      warningsCount: 1,
+    },
+    {
+      processed: 4,
+      upserts: 1,
+      removals: 1,
+      checkpoints: 1,
+      warningsCount: 1,
+    },
+  ])
+})
+
 test('bounds the persisted warning snapshot without changing runtime diagnostics', async () => {
   const { db, coordinator } = await setup()
   const warning = {
@@ -353,6 +425,40 @@ test('drive failure preserves resources and cursor and releases lock', async () 
   ).toEqual({ cursor_json: '{ "page": 1 }', last_status: 'failed' })
   expect(db.prepare('SELECT count(*) AS count FROM sync_locks').get()).toEqual({
     count: 0,
+  })
+})
+
+test('normalizes a portable SDK sync failure without instanceof identity', async () => {
+  const { db, coordinator } = await setup()
+  const portable = syncError(
+    'rate_limited',
+    'GitHub rate limit reached; retry later.',
+    { retryAfterMs: 30_000 },
+  )
+  let caught: unknown
+  try {
+    await coordinator.run(
+      { sourceId, mode: 'sync', signal: new AbortController().signal },
+      async () => {
+        throw { ...portable }
+      },
+    )
+  } catch (error) {
+    caught = error
+  }
+
+  expect(caught).toBeInstanceOf(CtxindexSyncError)
+  expect(caught).toMatchObject({
+    code: 'rate_limited',
+    message: 'GitHub rate limit reached; retry later.',
+    retryAfterMs: 30_000,
+    publicMessage: true,
+  })
+  expect(
+    db.prepare('SELECT status, error_summary FROM sync_runs').get(),
+  ).toEqual({
+    status: 'failed',
+    error_summary: 'GitHub rate limit reached; retry later.',
   })
 })
 

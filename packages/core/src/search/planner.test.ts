@@ -35,13 +35,13 @@ const signals: AbortSignal[] = []
 let timeoutSource: string | undefined
 let failureSource: string | undefined
 const timeoutSources = new Set<string>()
-const startedAt = new Map<string, number>()
 let barrierSource: string | undefined
 let barrierPeer: string | undefined
 let releaseBarrier: (() => void) | undefined
 let continuationSource: string | undefined
 let validationFailureSource: string | undefined
 let continuationValidationFailureSource: string | undefined
+let truncatedSource: string | undefined
 
 const profile = defineProfile({
   id: 'fake.item',
@@ -63,7 +63,6 @@ async function remote({ source, query, signal }: SearchContext) {
   calls.push(source.id)
   remoteQueries.push(query)
   signals.push(signal)
-  startedAt.set(source.id, Date.now())
   if (source.id === barrierSource) {
     await new Promise<void>((resolve, reject) => {
       releaseBarrier = resolve
@@ -118,7 +117,15 @@ async function remote({ source, query, signal }: SearchContext) {
         payload: { title: query.text, sender: ['alice@example.com'] },
       },
     ],
-    warnings: [],
+    warnings:
+      source.id === truncatedSource
+        ? [
+            {
+              code: 'truncated',
+              message: 'resume with the returned continuation',
+            },
+          ]
+        : [],
     ...(source.id === continuationSource && query.continuation === undefined
       ? { continuation: 'adapter-next-page' }
       : {}),
@@ -240,13 +247,13 @@ afterEach(() => {
   timeoutSource = undefined
   failureSource = undefined
   timeoutSources.clear()
-  startedAt.clear()
   barrierSource = undefined
   barrierPeer = undefined
   releaseBarrier = undefined
   continuationSource = undefined
   validationFailureSource = undefined
   continuationValidationFailureSource = undefined
+  truncatedSource = undefined
   for (const db of dbs.splice(0)) db.close()
 })
 
@@ -422,23 +429,18 @@ describe('SearchPlanner', () => {
     expect(barrier.warnings).toEqual([])
 
     calls.length = 0
+    signals.length = 0
     barrierSource = undefined
     barrierPeer = undefined
     releaseBarrier = undefined
     timeoutSources.add(ids.federated)
     timeoutSources.add(ids.federated2)
-    const started = Date.now()
     const timedOut = await planner(db).search({ text: 'x', timeoutMs: 40 })
-    const elapsed = Date.now() - started
 
     expect(calls).toEqual([ids.federated, ids.federated2])
-    expect(
-      Math.abs(
-        (startedAt.get(ids.federated) ?? 0) -
-          (startedAt.get(ids.federated2) ?? 0),
-      ),
-    ).toBeLessThan(20)
-    expect(elapsed).toBeLessThan(70)
+    expect(signals).toHaveLength(2)
+    expect(signals[0]).not.toBe(signals[1])
+    expect(signals.every((signal) => signal.aborted)).toBe(true)
     expect(timedOut.warnings.map((warning) => warning.code)).toEqual([
       'timeout',
       'timeout',
@@ -639,6 +641,27 @@ describe('SearchPlanner', () => {
       service.search({ remote: true, includeDeleted: true }),
     ).rejects.toMatchObject({ code: 'invalid_filter' })
     expect(calls).toHaveLength(2)
+  })
+
+  test('replaces unusable multi-Source continuation guidance with an exact Source rerun', async () => {
+    const db = await database()
+    addSource(db, ids.federated, 'fake.federated')
+    addSource(db, ids.federated2, 'fake.federated')
+    truncatedSource = ids.federated
+    continuationSource = ids.federated
+
+    const result = await planner(db).search({
+      text: 'shipment',
+      remote: true,
+      sourceIds: [ids.federated, ids.federated2],
+    })
+
+    expect(result.pagination).toBeUndefined()
+    expect(result.warnings).toContainEqual({
+      sourceId: ids.federated,
+      code: 'truncated',
+      message: `Remote results were truncated; rerun the unchanged search with exact Source ${ids.federated}`,
+    })
   })
 
   test('rejects invalid continuation modes before provider execution', async () => {

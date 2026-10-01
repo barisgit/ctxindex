@@ -5,8 +5,8 @@ import { createSandbox, type Sandbox } from '@ctxindex/core/testing'
 import { type MockGmailServer, startMockGmail } from './_mock-gmail'
 import { installLoopbackBrowser } from './_oauth-account'
 
-const createActionId = 'communication.message.draft.create'
-const updateActionId = 'communication.message.draft.update'
+const createActionId = 'mail.message.draft.create'
+const updateActionId = 'mail.message.draft.update'
 const sourceLabel = 'gmail-mailbox'
 
 function parseSourceId(stdout: string): string {
@@ -60,9 +60,9 @@ async function initialize(
     PATH: `${bin}:${process.env.PATH ?? ''}`,
     CTXINDEX_LOOPBACK_TIMEOUT_SECS: '5',
   })
-  const init = await sandbox.run(['init'])
+  const init = await sandbox.run(['init'], { env })
   expect(init.exitCode, init.stderr).toBe(0)
-  const realm = await sandbox.run(['realm', 'add', 'mail'])
+  const realm = await sandbox.run(['realm', 'add', 'mail'], { env })
   expect(realm.exitCode, realm.stderr).toBe(0)
   const app = await sandbox.run(
     ['oauth-app', 'add', 'google', 'google', '--from-env'],
@@ -129,7 +129,15 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
       ],
     ] as const) {
       const described = await sandbox.run(
-        ['action', 'describe', actionId, '--source', sourceLabel, '--json'],
+        [
+          'describe',
+          'action',
+          actionId,
+          '--source',
+          sourceLabel,
+          '--format',
+          'json',
+        ],
         { env },
       )
       expect(described.exitCode, described.stderr).toBe(0)
@@ -146,9 +154,9 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
         sources: description.sources,
       }).toEqual({
         id: actionId,
-        profile: { id: 'communication.message', version: 1 },
+        profile: { id: 'mail.message', version: 1 },
         effect: 'reversible',
-        output: { id: 'communication.message', version: 1 },
+        output: { id: 'mail.message', version: 1 },
         requiredBranches,
         sources: [
           {
@@ -174,7 +182,8 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
           subject: 'Invalid',
           bodyText: 'Must not persist',
         }),
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -190,7 +199,8 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
         sourceLabel,
         '--input',
         '{not-json',
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -216,7 +226,8 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
         sourceLabel,
         '--input',
         JSON.stringify(createInput),
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -228,7 +239,7 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
       resource: {
         ref,
         sourceId,
-        profile: { id: 'communication.message', version: 1 },
+        profile: { id: 'mail.message', version: 1 },
         origin: 'adhoc',
         title: 'Original subject',
         payload: {
@@ -280,7 +291,8 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
         sourceLabel,
         '--input',
         JSON.stringify(updateInput),
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -291,7 +303,7 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
       resource: {
         ref,
         sourceId,
-        profile: { id: 'communication.message', version: 1 },
+        profile: { id: 'mail.message', version: 1 },
         origin: 'adhoc',
         title: 'Replacement subject',
         payload: {
@@ -334,7 +346,7 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
     mutationRequests.push(...mock.readRecordedRequests())
 
     mock.resetRequests()
-    const cached = await sandbox.run(['get', ref, '--json'], { env })
+    const cached = await sandbox.run(['get', ref, '--format', 'json'], { env })
     expect(cached.exitCode, cached.stderr).toBe(0)
     expect(cached.stderr).toBe('')
     expect(JSON.parse(cached.stdout)).toMatchObject({
@@ -355,9 +367,12 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
     expect(mock.readRecordedRequests()).toEqual([])
 
     const parentRef = `ctx://${sourceId}/message/msg-1`
-    const completeParent = await sandbox.run(['get', parentRef, '--json'], {
-      env,
-    })
+    const completeParent = await sandbox.run(
+      ['get', parentRef, '--format', 'json'],
+      {
+        env,
+      },
+    )
     expect(completeParent.exitCode, completeParent.stderr).toBe(0)
     mock.resetRequests()
     mock.resetDraftState()
@@ -370,7 +385,8 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
         sourceLabel,
         '--input',
         JSON.stringify({ replyToRef: parentRef, bodyText: 'Reply body' }),
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -402,12 +418,13 @@ test('compiled CLI creates and completely replaces a mocked Gmail Draft without 
 
     const unknown = await sandbox.run(
       [
-        'action',
         'describe',
-        'communication.message.draft.send',
+        'action',
+        'mail.message.draft.send',
         '--source',
         sourceLabel,
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )

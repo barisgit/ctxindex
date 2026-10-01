@@ -8,7 +8,7 @@
 
 `@ctxindex/profiles` continues to own the strict provider-neutral Calendar Event payload and pure field projections. Its timed timing union remains the only public payload seam for start/end instants and optional zones; the change extends declarative search vocabulary rather than adding provider logic or a second time-zone model.
 
-`@ctxindex/adapters` owns provider DTO tolerance, date-time conversion, Source-scoped Ref construction, warnings, and sync/retrieve normalization. Google and Microsoft calendar normalization reuse the Profile-owned IANA canonicalizer; Microsoft additionally maps Windows labels before that seam. The Microsoft calendar normalizer remains the single mapping path shared by Sync and Retrieve. Core, storage, search, and CLI consume only Profile definitions and generic Resource emissions and gain no provider-specific branch.
+`@ctxindex/official` owns provider DTO tolerance, date-time conversion, Source-scoped Ref construction, warnings, and sync/retrieve normalization. Google and Microsoft calendar normalization reuse the Profile-owned IANA canonicalizer; Microsoft additionally maps Windows labels before that seam. The Microsoft calendar normalizer remains the single mapping path shared by Sync and Retrieve. Core, storage, search, and CLI consume only Profile definitions and generic Resource emissions and gain no provider-specific branch.
 
 ## Interfaces and Data Flow
 

@@ -1,44 +1,52 @@
-import {
-  getSourceResource,
-  type SourceResourceResult,
-} from '@ctxindex/core/source'
-import type { RpcResourceGetResult } from '@ctxindex/rpc'
-import { defineCommand } from 'citty'
-import { getUsage, parseGetArgs } from '../args/get'
+import { parseRef } from '@ctxindex/core'
+import { getSourceResource } from '@ctxindex/core/source'
+import { defineCtxCommand } from '../command-model'
 import { daemonResourceGet, selectDaemon } from '../daemon/client'
+import {
+  type DaemonRouteSelector,
+  ensureDaemonSelection,
+  selectEnsuredDaemonRoute,
+} from '../daemon/ensure'
 import { openDeps } from '../deps'
 import { mapErrorToExit, runWithExit } from '../format/exit'
+import {
+  type OutputFormat,
+  resolveOutputFormat,
+  structuredOutputArgs,
+} from '../format/output'
+import {
+  formatGetJson,
+  formatGetPretty,
+  formatGetText,
+} from '../format/resource'
 
-type GetResult = SourceResourceResult | RpcResourceGetResult
+export { formatGetJson, formatGetPretty, formatGetText }
 
-export function formatGetJson(result: GetResult): string {
-  return JSON.stringify(result)
-}
-
-export function formatGetText(result: GetResult): string {
-  return `${result.resource.ref}${result.resource.title ? `\t${result.resource.title}` : ''}`
-}
-
-export interface GetCommandDeps {
-  readonly selectDaemon: typeof selectDaemon
+export interface GetCommandDeps extends DaemonRouteSelector {
   readonly get: typeof daemonResourceGet
   readonly open: typeof openDeps
 }
 
+export type GetCommandInput = {
+  readonly ref: string
+  readonly format: OutputFormat
+}
+
 const defaultDeps: GetCommandDeps = {
   selectDaemon,
+  ensureDaemonSelection,
   get: daemonResourceGet,
   open: openDeps,
 }
 
 export async function handleGetCommand(
-  args: string[],
+  parsed: GetCommandInput,
   services: GetCommandDeps = defaultDeps,
 ): Promise<number> {
-  const parsed = parseGetArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(`${parsed.message}. Try: ${getUsage}`)
+  try {
+    parseRef(parsed.ref)
+  } catch {
+    console.error(`get: invalid <ref>: ${parsed.ref}`)
     return 2
   }
 
@@ -47,7 +55,7 @@ export async function handleGetCommand(
   process.once('SIGINT', cancel)
   let deps: Awaited<ReturnType<typeof openDeps>> | undefined
   try {
-    const daemon = services.selectDaemon()
+    const daemon = await selectEnsuredDaemonRoute(services, controller.signal)
     const result = daemon
       ? await services.get(daemon, parsed.ref, controller.signal)
       : await (async () => {
@@ -64,9 +72,17 @@ export async function handleGetCommand(
           controller.signal.throwIfAborted()
           return directResult
         })()
-    console.log(parsed.json ? formatGetJson(result) : formatGetText(result))
-    for (const warning of result.warnings) {
-      console.error(`${warning.code}\t${warning.message}`)
+    console.log(
+      parsed.format === 'json'
+        ? formatGetJson(result)
+        : parsed.format === 'pretty'
+          ? formatGetPretty(result)
+          : formatGetText(result),
+    )
+    if (parsed.format !== 'json') {
+      for (const warning of result.warnings) {
+        console.error(`${warning.code}\t${warning.message}`)
+      }
     }
     return 0
   } catch (error) {
@@ -78,11 +94,14 @@ export async function handleGetCommand(
   }
 }
 
-export const getCommand = defineCommand({
+export const getCommand = defineCtxCommand({
   meta: { name: 'get', description: 'Get a Resource by exact Ref.' },
   args: {
-    ref: { type: 'positional', required: false, description: 'Resource Ref' },
-    json: { type: 'boolean', description: 'Print deterministic JSON' },
+    ref: { type: 'positional', required: true, description: 'Resource Ref' },
+    ...structuredOutputArgs,
   },
-  run: ({ rawArgs }) => runWithExit(() => handleGetCommand(rawArgs)),
+  run: ({ args }) =>
+    runWithExit(() =>
+      handleGetCommand({ ref: args.ref, format: resolveOutputFormat(args) }),
+    ),
 })

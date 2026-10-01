@@ -180,7 +180,9 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
       'personal@example.test',
     )
 
-    const listed = await sandbox.run(['account', 'list', '--json'], { env })
+    const listed = await sandbox.run(['account', 'list', '--format', 'json'], {
+      env,
+    })
     expect(listed.exitCode, listed.stderr).toBe(0)
     expect(listed.stdout).not.toContain('canary')
     expect(listed.stdout).not.toContain('mock-google-subject')
@@ -195,7 +197,10 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
       [mailboxSourceLabel, personalSourceLabel, teamSourceLabel].sort(),
     )
 
-    const sourceList = await sandbox.run(['source', 'list', '--json'], { env })
+    const sourceList = await sandbox.run(
+      ['source', 'list', '--format', 'json'],
+      { env },
+    )
     expect(sourceList.exitCode, sourceList.stderr).toBe(0)
     expect(sourceList.stdout).not.toContain('canary')
     expect(sourceList.stdout).not.toMatch(/grant/i)
@@ -232,7 +237,7 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
     calendar.resetRequests()
 
     const teamInitial = await sandbox.run(
-      ['sync', '--source', teamSourceLabel, '--json'],
+      ['sync', '--source', teamSourceLabel, '--format', 'json'],
       { env },
     )
     expect(teamInitial.exitCode, teamInitial.stderr).toBe(0)
@@ -244,7 +249,7 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
       deleted: 0,
     })
     const personalInitial = await sandbox.run(
-      ['sync', '--source', personalSourceLabel, '--json'],
+      ['sync', '--source', personalSourceLabel, '--format', 'json'],
       { env },
     )
     expect(personalInitial.exitCode, personalInitial.stderr).toBe(0)
@@ -262,7 +267,8 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
         'calendar.event',
         '--realm',
         'work',
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -291,7 +297,8 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
         'calendar.event',
         '--realm',
         'personal',
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )
@@ -302,7 +309,9 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
       ),
     ).toEqual([personalSourceId])
 
-    const got = await sandbox.run(['get', '--json', roadmapRef], { env })
+    const got = await sandbox.run(['get', '--format', 'json', roadmapRef], {
+      env,
+    })
     expect(got.exitCode, got.stderr).toBe(0)
     expect(JSON.parse(got.stdout)).toMatchObject({
       resource: {
@@ -328,7 +337,7 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
     })
 
     const unchanged = await sandbox.run(
-      ['sync', '--source', teamSourceLabel, '--json'],
+      ['sync', '--source', teamSourceLabel, '--format', 'json'],
       { env },
     )
     expect(unchanged.exitCode, unchanged.stderr).toBe(0)
@@ -357,7 +366,15 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
     calendar.upsertEvent('team@example.test', releaseEvent)
 
     const diff = await sandbox.run(
-      ['sync', '--source', teamSourceLabel, '--mode', 'diff', '--json'],
+      [
+        'sync',
+        '--source',
+        teamSourceLabel,
+        '--mode',
+        'diff',
+        '--format',
+        'json',
+      ],
       { env },
     )
     expect(diff.exitCode, diff.stderr).toBe(0)
@@ -369,12 +386,13 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
     })
     expect(
       JSON.parse(
-        (await sandbox.run(['get', '--json', roadmapRef], { env })).stdout,
+        (await sandbox.run(['get', '--format', 'json', roadmapRef], { env }))
+          .stdout,
       ).resource.payload.title,
     ).toBe('Roadmap planning')
 
     const reconciled = await sandbox.run(
-      ['sync', '--source', teamSourceLabel, '--json'],
+      ['sync', '--source', teamSourceLabel, '--format', 'json'],
       { env },
     )
     expect(reconciled.exitCode, reconciled.stderr).toBe(0)
@@ -385,13 +403,15 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
     })
     expect(
       JSON.parse(
-        (await sandbox.run(['get', '--json', roadmapRef], { env })).stdout,
+        (await sandbox.run(['get', '--format', 'json', roadmapRef], { env }))
+          .stdout,
       ).resource.payload.title,
     ).toBe('Roadmap planning updated')
     const deletedRef = `ctx://${teamSourceId}/event/${encodeURIComponent(teamOffsite.id)}`
     expect(
       JSON.parse(
-        (await sandbox.run(['get', '--json', deletedRef], { env })).stdout,
+        (await sandbox.run(['get', '--format', 'json', deletedRef], { env }))
+          .stdout,
       ).resource,
     ).toMatchObject({ ref: deletedRef, deletedAt: expect.any(Number) })
 
@@ -403,7 +423,15 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
       end: { dateTime: '2035-01-01T10:00:00Z' },
     })
     const windowReconcile = await sandbox.run(
-      ['sync', '--source', teamSourceLabel, '--mode', 'resync', '--json'],
+      [
+        'sync',
+        '--source',
+        teamSourceLabel,
+        '--mode',
+        'resync',
+        '--format',
+        'json',
+      ],
       { env },
     )
     expect(windowReconcile.exitCode, windowReconcile.stderr).toBe(0)
@@ -415,7 +443,8 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
     })
     expect(
       JSON.parse(
-        (await sandbox.run(['get', '--json', releaseRef], { env })).stdout,
+        (await sandbox.run(['get', '--format', 'json', releaseRef], { env }))
+          .stdout,
       ).resource,
     ).toMatchObject({ ref: releaseRef, deletedAt: expect.any(Number) })
 
@@ -466,7 +495,8 @@ test('compiled CLI shares one Google Account across labeled mailbox and Calendar
         teamSourceLabel,
         '--input',
         '{}',
-        '--json',
+        '--format',
+        'json',
       ],
       { env },
     )

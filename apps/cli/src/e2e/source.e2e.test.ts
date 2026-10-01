@@ -81,7 +81,7 @@ describe('source e2e', () => {
       await writeFile(
         join(packageRoot, 'entry.ts'),
         `import { defineAdapter, defineExtension, defineOAuthApp, z } from ${JSON.stringify(join(repoRoot, 'packages/extension-sdk/src/index.ts'))}
-import { googleOAuthProvider } from ${JSON.stringify(join(repoRoot, 'packages/adapters/src/google-oauth-provider.ts'))}
+import { googleOAuthProvider } from ${JSON.stringify(join(repoRoot, 'packages/official/src/google-oauth-provider.ts'))}
 
 const shadowedApp = defineOAuthApp(googleOAuthProvider, {
   label: 'shadowed',
@@ -356,13 +356,13 @@ export default defineExtension({
       } finally {
         db.close()
       }
-      const list = await sandbox.run(['source', 'list', '--json'])
+      const list = await sandbox.run(['source', 'list', '--format', 'json'])
       expect(list.exitCode).toBe(0)
       expect(JSON.parse(list.stdout)).toMatchObject([
         { id: sourceId, syncEnabled: false },
       ])
 
-      const allSync = await sandbox.run(['sync', '--json'])
+      const allSync = await sandbox.run(['sync', '--format', 'json'])
       expect(allSync.exitCode).toBe(0)
       expect(JSON.parse(allSync.stdout)).toMatchObject({ results: [] })
 
@@ -407,16 +407,13 @@ export default defineExtension({
 
       expect(list.stderr).toBe('')
       expect(list.exitCode).toBe(0)
-      expect(list.stdout).toContain('Source')
-      expect(list.stdout).toContain('Adapter')
-      expect(list.stdout).toContain('Realm')
+      expect(list.stdout).toContain('label\tadapterId\trealmSlug\tref')
       expect(list.stdout).toContain(sourceId)
       expect(list.stdout).toContain('repo-under-test')
       expect(list.stdout).toContain('local.directory')
-      // Ref path is asserted exactly via --json below; the table cell may
-      // wrap long paths mid-word, so no substring assertion on the table.
+      // Ref path is asserted exactly via --format json below.
 
-      const json = await sandbox.run(['source', 'list', '--json'])
+      const json = await sandbox.run(['source', 'list', '--format', 'json'])
       expect(json.stderr).toBe('')
       expect(json.exitCode).toBe(0)
       const rows = JSON.parse(json.stdout) as Array<{
@@ -436,18 +433,12 @@ export default defineExtension({
         syncEnabled: true,
       })
 
-      const compact = await sandbox.run([
-        'source',
-        'list',
-        '--format',
-        'compact',
-      ])
-      expect(compact.stderr).toBe('')
-      expect(compact.exitCode).toBe(0)
-      expect(compact.stdout).toContain(sourceId)
-      expect(compact.stdout).toContain('label=repo-under-test')
-      expect(compact.stdout).toContain('adapter=local.directory')
-      expect(compact.stdout).toContain('items=1')
+      const text = await sandbox.run(['source', 'list', '--format', 'text'])
+      expect(text.stderr).toBe('')
+      expect(text.exitCode).toBe(0)
+      expect(text.stdout).toContain(sourceId)
+      expect(text.stdout).toContain('repo-under-test\tlocal.directory')
+      expect(text.stdout).toContain('\t1\t1\t0\t')
     })
   })
 

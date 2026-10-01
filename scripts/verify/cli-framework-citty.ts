@@ -1,150 +1,91 @@
 #!/usr/bin/env bun
-import { spawnSync } from 'node:child_process'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
+import { projectCommandReference } from '../../apps/cli/src/command-model'
+import { rootCommand, runCli } from '../../apps/cli/src/main'
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-process.chdir(repoRoot)
+const repoRoot = resolve(import.meta.dir, '../..')
 
-const mainFile = 'apps/cli/src/main.ts'
-const commandFiles = [
-  'apps/cli/src/commands/account.ts',
-  'apps/cli/src/commands/oauth-app.ts',
-  'apps/cli/src/commands/describe.ts',
-  'apps/cli/src/commands/extensions.ts',
-  'apps/cli/src/commands/init.ts',
-  'apps/cli/src/commands/realm.ts',
-  'apps/cli/src/commands/source.ts',
-  'apps/cli/src/commands/sync.ts',
-  'apps/cli/src/commands/search.ts',
-  'apps/cli/src/commands/status.ts',
-  'apps/cli/src/commands/secrets.ts',
-  'apps/cli/src/commands/skills.ts',
-]
-
-async function containsPattern(
-  file: string,
-  pattern: RegExp,
-): Promise<boolean> {
-  const source = await Bun.file(resolve(repoRoot, file)).text()
-  return pattern.test(source)
-}
-
-async function requireGrep(
-  patternText: string,
-  pattern: RegExp,
-  file: string,
-): Promise<number> {
-  if (!(await containsPattern(file, pattern))) {
-    console.error(`cli-framework-citty: missing ${patternText} in ${file}`)
-    return 1
+async function commandSourceFiles(): Promise<readonly string[]> {
+  const patterns = [
+    'apps/cli/src/commands/**/*.ts',
+    'apps/cli/src/daemon/command.ts',
+    'apps/cli/src/extensions/command.ts',
+  ]
+  const paths = new Set<string>()
+  for (const pattern of patterns) {
+    const glob = new Bun.Glob(pattern)
+    for await (const path of glob.scan({ cwd: repoRoot, onlyFiles: true })) {
+      if (!path.endsWith('.test.ts')) paths.add(path)
+    }
   }
-  return 0
+  return [...paths].sort()
 }
 
-async function rejectGrep(
-  patternText: string,
-  pattern: RegExp,
-  file: string,
-): Promise<number> {
-  if (await containsPattern(file, pattern)) {
-    console.error(`cli-framework-citty: forbidden ${patternText} in ${file}`)
-    return 1
+async function validateSourceOwnership(): Promise<readonly string[]> {
+  const failures: string[] = []
+  for (const path of await commandSourceFiles()) {
+    const source = await Bun.file(resolve(repoRoot, path)).text()
+    if (/\bdefineCommand\b[\s\S]*from 'citty'/u.test(source)) {
+      failures.push(`${path}: import commands through defineCtxCommand`)
+    }
+    if (/\brawArgs\b/.test(source)) {
+      failures.push(`${path}: handlers must consume typed Citty args`)
+    }
   }
-  return 0
+  return failures
 }
 
-function exitStatus(status: number | null): number {
-  return typeof status === 'number' ? status : 1
-}
-
-function runNonemptyStdout(label: string, command: string[]): number {
-  const [executable, ...args] = command
-  if (executable === undefined) return 1
-
-  const result = spawnSync(executable, args, {
-    cwd: repoRoot,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'inherit'],
-  })
-  const status = exitStatus(result.status)
-  const stdout = typeof result.stdout === 'string' ? result.stdout : ''
-
-  if (status !== 0) {
-    process.stdout.write(stdout)
-    console.error(`cli-framework-citty: ${label} failed with exit ${status}`)
-    return status
+async function validateProjection(): Promise<readonly string[]> {
+  const failures: string[] = []
+  const projection = await projectCommandReference(rootCommand)
+  const paths = new Set<string>()
+  for (const command of projection.commands) {
+    const path = command.path.join(' ')
+    if (paths.has(path)) failures.push(`${path}: duplicate command path`)
+    paths.add(path)
+    if (!command.description?.trim()) {
+      failures.push(`${path}: missing description`)
+    }
+    if (!command.usage.includes(path)) {
+      failures.push(`${path}: help omits complete command path`)
+    }
   }
-
-  if (stdout.length === 0) {
-    console.error(`cli-framework-citty: ${label} produced empty stdout`)
-    return 1
+  if (projection.commands.length < 2) {
+    failures.push('command projection did not discover nested commands')
   }
-
-  process.stdout.write(stdout)
-  return 0
-}
-
-function checkUnknownCommand(): number {
-  const result = spawnSync(
-    'bun',
-    ['apps/cli/bin/ctxindex.mjs', 'definitely-not-a-real-command'],
-    {
-      cwd: repoRoot,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
-  )
-  const status = exitStatus(result.status)
-  if (status !== 0) return 0
-
-  if (typeof result.stdout === 'string') process.stdout.write(result.stdout)
-  if (typeof result.stderr === 'string') process.stderr.write(result.stderr)
-  console.error('cli-framework-citty: unknown command exited 0')
-  return 1
+  return failures
 }
 
 async function main(): Promise<number> {
-  const mainChecks = [
-    await requireGrep("from 'citty'", /from 'citty'/, mainFile),
-    await requireGrep('defineCommand\\(', /defineCommand\(/, mainFile),
-    await requireGrep('subCommands:', /subCommands:/, mainFile),
-    await rejectGrep(
-      'helpText|helpByCommand|hasHelpFlag',
-      /helpText|helpByCommand|hasHelpFlag/,
-      mainFile,
-    ),
+  const failures = [
+    ...(await validateSourceOwnership()),
+    ...(await validateProjection()),
   ]
-  for (const status of mainChecks) {
-    if (status !== 0) return status
+  if (failures.length > 0) {
+    for (const failure of failures)
+      console.error(`cli-framework-citty: ${failure}`)
+    return 1
   }
 
-  for (const file of commandFiles) {
-    const status = await requireGrep(
-      'defineCommand\\(',
-      /defineCommand\(/,
-      file,
-    )
-    if (status !== 0) return status
+  const log = console.log
+  const error = console.error
+  console.log = () => {}
+  console.error = () => {}
+  try {
+    if ((await runCli(['--help'])) !== 0) {
+      error('cli-framework-citty: root help failed')
+      return 1
+    }
+    if ((await runCli(['definitely-not-a-real-command'])) !== 2) {
+      error('cli-framework-citty: unknown command did not return exit 2')
+      return 1
+    }
+  } finally {
+    console.log = log
+    console.error = error
   }
 
-  for (const [label, command] of [
-    ['help', ['bun', 'apps/cli/bin/ctxindex.mjs', '--help']],
-    ['version', ['bun', 'apps/cli/bin/ctxindex.mjs', '--version']],
-    [
-      'oauth-app-help',
-      ['bun', 'apps/cli/bin/ctxindex.mjs', 'oauth-app', '--help'],
-    ],
-    ['account-help', ['bun', 'apps/cli/bin/ctxindex.mjs', 'account', '--help']],
-  ] as const) {
-    const status = runNonemptyStdout(label, command)
-    if (status !== 0) return status
-  }
-
-  const unknownStatus = checkUnknownCommand()
-  if (unknownStatus !== 0) return unknownStatus
-
-  console.log('cli-framework-citty: citty framework checks passed')
+  console.log('cli-framework-citty: declarative command checks passed')
   return 0
 }
 

@@ -101,17 +101,17 @@ test('per-workspace env keys', async () => {
   const [cliTurbo, coreTurbo, adaptersTurbo] = await Promise.all([
     readTurbo('apps/cli/turbo.json'),
     readTurbo('packages/core/turbo.json'),
-    readTurbo('packages/adapters/turbo.json'),
+    readTurbo('packages/official/turbo.json'),
   ])
 
   expectExtendsRoot(cliTurbo, 'apps/cli/turbo.json')
   expectExtendsRoot(coreTurbo, 'packages/core/turbo.json')
-  expectExtendsRoot(adaptersTurbo, 'packages/adapters/turbo.json')
+  expectExtendsRoot(adaptersTurbo, 'packages/official/turbo.json')
 
   for (const [label, turbo] of [
     ['apps/cli/turbo.json', cliTurbo],
     ['packages/core/turbo.json', coreTurbo],
-    ['packages/adapters/turbo.json', adaptersTurbo],
+    ['packages/official/turbo.json', adaptersTurbo],
   ] as const) {
     for (const taskName of workspaceTaskNames) {
       taskEnv(turbo, taskName, label)
@@ -127,7 +127,7 @@ test('workspace lane scripts back turbo tasks', async () => {
   const packageJsons = await Promise.all([
     readJson<PackageJson>('apps/cli/package.json'),
     readJson<PackageJson>('packages/core/package.json'),
-    readJson<PackageJson>('packages/adapters/package.json'),
+    readJson<PackageJson>('packages/official/package.json'),
   ])
 
   for (const packageJson of packageJsons) {

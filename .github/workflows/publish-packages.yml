@@ -1,0 +1,107 @@
+name: Publish packages
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-library-production
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: Discover changed packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.gate.outputs.matrix }}
+      publish: ${{ steps.gate.outputs.publish }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Check package versions and registry
+        id: gate
+        run: bun scripts/release/library-release-gate.ts discover "${{ github.event.before }}"
+
+  artifact:
+    name: Build and verify package artifacts
+    needs: gate
+    if: needs.gate.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RELEASE_MATRIX: ${{ needs.gate.outputs.matrix }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Restore Bun cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Build, pack, verify, and smoke exact artifact
+        run: bun scripts/release/library-release-gate.ts prepare "$RELEASE_MATRIX"
+      - name: Upload exact artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: library-packages-${{ github.sha }}
+          path: |
+            dist/npm/artifacts/*.tgz
+            dist/npm/artifacts/*.tgz.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish package artifacts
+    needs: [gate, artifact]
+    if: needs.gate.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: npm-production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      RELEASE_MATRIX: ${{ needs.gate.outputs.matrix }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: 1.3.14
+      - name: Set up Node for trusted publishing
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - name: Install trusted-publishing npm CLI
+        run: npm install --global npm@11.5.1
+      - name: Download exact artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: library-packages-${{ github.sha }}
+          path: dist/npm/publish
+      - name: Verify, preflight, and publish exact artifacts in order
+        run: bun scripts/release/library-release-gate.ts publish "$RELEASE_MATRIX" dist/npm/publish

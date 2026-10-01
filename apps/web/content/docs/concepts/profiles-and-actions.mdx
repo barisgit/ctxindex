@@ -69,7 +69,7 @@ A **Draft** is a reversible, provider-persisted proposed change. Text composed o
 
 V1 exposes exactly two provider-independent email Actions:
 
-- `communication.message.draft.create`
-- `communication.message.draft.update`
+- `mail.message.draft.create`
+- `mail.message.draft.update`
 
-Both produce a `communication.message` Resource. Standalone updates replace complete addressed content while preserving the Ref. Threaded reply branches derive recipient, subject, and thread state from a complete local parent; updates preserve the immutable parent and replace only body text. ctxindex does not send email: no send, reply-send, forward-send, calendar mutation, or other provider mutation ships in V1.
+Both produce a `mail.message` Resource. Standalone updates replace complete addressed content while preserving the Ref. Threaded reply branches derive recipient, subject, and thread state from a complete local parent; updates preserve the immutable parent and replace only body text. ctxindex does not send email: no send, reply-send, forward-send, calendar mutation, or other provider mutation ships in V1.

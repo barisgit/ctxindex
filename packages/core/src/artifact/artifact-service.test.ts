@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite'
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterEach, describe, expect, spyOn, test } from 'bun:test'
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -46,6 +46,7 @@ async function fixture(
     download?: boolean
     downloadStarted?: () => void
     waitForDownload?: Promise<void>
+    waitAfterAbort?: Promise<void>
     purgeId?: () => string
   } = {},
 ) {
@@ -65,6 +66,7 @@ async function fixture(
   )
 
   let calls = 0
+  let aborts = 0
   const profile = defineProfile({
     id: 'fake.message',
     version: 1,
@@ -89,7 +91,30 @@ async function fixture(
   const download = async (context: DownloadContext) => {
     calls += 1
     options.downloadStarted?.()
-    await options.waitForDownload
+    if (options.waitForDownload) {
+      await new Promise<void>((resolve, reject) => {
+        const onAbort = () => {
+          aborts += 1
+          const reason = context.signal.reason
+          void (options.waitAfterAbort ?? Promise.resolve()).then(
+            () => reject(reason),
+            reject,
+          )
+        }
+        context.signal.addEventListener('abort', onAbort, { once: true })
+        void options.waitForDownload?.then(
+          () => {
+            if (context.signal.aborted) return
+            context.signal.removeEventListener('abort', onAbort)
+            resolve()
+          },
+          (error: unknown) => {
+            context.signal.removeEventListener('abort', onAbort)
+            reject(error)
+          },
+        )
+      })
+    }
     await context.write(bytes.subarray(0, 4))
     if (options.fail) throw options.fail
     await context.write(bytes.subarray(4))
@@ -128,10 +153,88 @@ async function fixture(
     logger,
     store,
   })
-  return { db, root, store, service, calls: () => calls }
+  return {
+    db,
+    root,
+    store,
+    service,
+    calls: () => calls,
+    aborts: () => aborts,
+  }
 }
 
 describe('ArtifactService', () => {
+  test('reads only verified cached bytes within an explicit transfer bound', async () => {
+    const f = await fixture({ declaredSize: bytes.length })
+    expect(await f.service.readCached(artifactRef, bytes.length)).toBeNull()
+
+    await f.service.download(artifactRef)
+    const first = await f.service.readCached(artifactRef, bytes.length)
+    expect(first).toEqual({
+      artifact: expect.objectContaining({
+        ref: artifactRef,
+        originRef,
+        byteSize: bytes.length,
+      }),
+      bytes: new Uint8Array(bytes),
+    })
+    if (!first) throw new Error('expected cached Artifact bytes')
+    expect(first.artifact).not.toHaveProperty('localPath')
+    first.bytes[0] = 255
+    expect(
+      (await f.service.readCached(artifactRef, bytes.length))?.bytes,
+    ).toEqual(new Uint8Array(bytes))
+    expect(f.calls()).toBe(1)
+
+    await expect(
+      f.service.readCached(artifactRef, bytes.length - 1),
+    ).rejects.toMatchObject({ code: 'invalid_artifact_ref' })
+  })
+
+  test('keeps purge excluded through materialization and verified transfer-byte copying', async () => {
+    const f = await fixture({ declaredSize: bytes.length })
+    await f.service.download(artifactRef)
+    let enterRead = () => {}
+    const readStarted = new Promise<void>((resolve) => {
+      enterRead = resolve
+    })
+    let releaseRead = () => {}
+    const readReleased = new Promise<void>((resolve) => {
+      releaseRead = resolve
+    })
+    const originalRead = f.store.read.bind(f.store)
+    const read = spyOn(f.store, 'read').mockImplementation(async (...args) => {
+      enterRead()
+      await readReleased
+      return originalRead(...args)
+    })
+
+    const transfer = f.service.downloadForTransfer(
+      artifactRef,
+      bytes.length,
+      new AbortController().signal,
+    )
+    await readStarted
+    await expect(f.service.purge()).rejects.toMatchObject({ code: 'conflict' })
+    releaseRead()
+    const result = await transfer
+    expect(result.download).toMatchObject({ cache: 'hit' })
+    expect(result.bytes).toEqual(new Uint8Array(bytes))
+    result.bytes[0] = 255
+    expect((await f.store.read(artifactRef))?.bytes).toEqual(
+      new Uint8Array(bytes),
+    )
+    read.mockRestore()
+
+    await expect(
+      f.service.downloadForTransfer(
+        artifactRef,
+        bytes.length - 1,
+        new AbortController().signal,
+      ),
+    ).rejects.toMatchObject({ code: 'invalid_artifact_ref' })
+  })
+
   test('resolves only current same-Source verified cached bytes for Actions', async () => {
     const f = await fixture({ declaredSize: bytes.length })
     expect(await f.service.resolveCached(artifactRef, sourceId)).toBeNull()
@@ -311,6 +414,119 @@ describe('ArtifactService', () => {
     ])
     expect(results.map((result) => result.cache)).toEqual(['miss', 'miss'])
     expect(f.calls()).toBe(1)
+  })
+
+  test('cancelling one same-Ref waiter does not abort another waiter', async () => {
+    let releaseDownload = () => {}
+    const waitForDownload = new Promise<void>((resolve) => {
+      releaseDownload = resolve
+    })
+    let markStarted = () => {}
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve
+    })
+    const f = await fixture({
+      downloadStarted: markStarted,
+      waitForDownload,
+    })
+    const firstController = new AbortController()
+    const secondController = new AbortController()
+    const first = f.service.download(artifactRef, {
+      signal: firstController.signal,
+    })
+    await started
+    const second = f.service.download(artifactRef, {
+      signal: secondController.signal,
+    })
+    await Promise.resolve()
+
+    firstController.abort()
+    await expect(first).rejects.toBeDefined()
+    expect(f.aborts()).toBe(0)
+    releaseDownload()
+    await expect(second).resolves.toMatchObject({ cache: 'miss' })
+    expect(f.calls()).toBe(1)
+    expect(f.aborts()).toBe(0)
+  })
+
+  test('aborts one same-Ref materialization after its final waiter cancels', async () => {
+    const waitForDownload = new Promise<void>(() => {})
+    let markStarted = () => {}
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve
+    })
+    const f = await fixture({
+      downloadStarted: markStarted,
+      waitForDownload,
+    })
+    const firstController = new AbortController()
+    const secondController = new AbortController()
+    const first = f.service.download(artifactRef, {
+      signal: firstController.signal,
+    })
+    await started
+    const second = f.service.download(artifactRef, {
+      signal: secondController.signal,
+    })
+    await Promise.resolve()
+
+    firstController.abort()
+    await expect(first).rejects.toBeDefined()
+    expect(f.aborts()).toBe(0)
+    secondController.abort()
+    await expect(second).rejects.toBeDefined()
+    expect(f.calls()).toBe(1)
+    expect(f.aborts()).toBe(1)
+    expect(await f.store.get(artifactRef)).toBeUndefined()
+  })
+
+  test('a new waiter replaces an aborted materialization while its provider unwinds', async () => {
+    let releaseDownload = () => {}
+    const waitForDownload = new Promise<void>((resolve) => {
+      releaseDownload = resolve
+    })
+    let releaseAbort = () => {}
+    const waitAfterAbort = new Promise<void>((resolve) => {
+      releaseAbort = resolve
+    })
+    let starts = 0
+    let markFirstStarted = () => {}
+    const firstStarted = new Promise<void>((resolve) => {
+      markFirstStarted = resolve
+    })
+    let markSecondStarted = () => {}
+    const secondStarted = new Promise<void>((resolve) => {
+      markSecondStarted = resolve
+    })
+    const f = await fixture({
+      waitForDownload,
+      waitAfterAbort,
+      downloadStarted: () => {
+        starts += 1
+        if (starts === 1) markFirstStarted()
+        if (starts === 2) markSecondStarted()
+      },
+    })
+    const firstController = new AbortController()
+    const first = f.service.download(artifactRef, {
+      signal: firstController.signal,
+    })
+    await firstStarted
+    firstController.abort()
+    await expect(first).rejects.toBeDefined()
+    expect(f.aborts()).toBe(1)
+
+    const second = f.service.download(artifactRef)
+    await Promise.race([
+      secondStarted,
+      Bun.sleep(100).then(() => {
+        throw new Error('new waiter joined the stale aborted materialization')
+      }),
+    ])
+    expect(f.calls()).toBe(2)
+    releaseDownload()
+    await expect(second).resolves.toMatchObject({ cache: 'miss' })
+    releaseAbort()
   })
 
   test('rejects same-process purge while a download is in flight', async () => {

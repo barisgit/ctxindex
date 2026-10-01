@@ -1,105 +1,91 @@
 # ctxindex
 
-ctxindex is a local personal-context gateway for agents. It provides one deterministic interface to discover, retrieve, and materialize context across mail, files, calendars, tasks, and extension-defined domains, then perform typed provider Actions through the same configured Source and authentication. Indexing is a strategy for fast local discovery, not the product boundary.
+**Give any shell-capable agent one local, typed interface to your email, calendars, files, and extension-defined context.**
 
-```text
-Agent ───── CLI ────> ctxindex ──> Sources ──> providers/files
-                         │
-                         ├── Realms: personal / company / university
-                         ├── Profiles: portable domain semantics
-                         ├── Adapters: provider operations
-                         └── Resources / Refs / Relations / Artifacts
-```
+ctxindex turns provider-specific data into searchable Resources with stable `ctx://` references. Agents use the same deterministic CLI across Gmail, Outlook, Google Calendar, Microsoft Calendar, local files, and Extensions—without an MCP server or agent-specific integration.
 
-## Agent integration
+- **Local-first:** configuration, credentials, indexes, and cached content stay on your machine.
+- **Agent-ready:** compact JSON, low-token text, stable exit codes, and discoverable schemas.
+- **Extensible:** add Providers, Profiles, Adapters, Actions, and documentation through the type-safe Extension SDK.
 
-The CLI is the integration surface: any code-executing agent can use ctxindex
-with zero integration work. Codex CLI, OpenClaw, Claude Code, and similar
-agents compose `search`, `get`, `thread`, `export`, and `action` directly from
-a shell, including from Hermes-driven OpenClaw sessions. There is no MCP
-server and none is required; deterministic commands, `--json` output, and
-stable exit codes are the contract. ctxindex was originally built to give a
-personal OpenClaw agent governed, realm-scoped access to mail and calendar
-across multiple accounts.
+## Quick start
 
-V1 and V1.1 are shipped. The project remains pre-alpha but functional: it provides multi-provider mail and calendar workflows through `search`, `sync`, `get`, `thread`, and `export`, plus reversible Draft actions. The implementation receives no schema or CLI compatibility treatment until a released version creates that obligation. Current behavior is owned by the capability specs under `openspec/specs/`; use `openspec list` for the authoritative active-change inventory.
-
-## Development
-
-Install once, then run workspace commands from the repository root. Turborepo
-dispatches package-owned tasks and keeps their cache and dependency ordering
-consistent.
-
-```sh
-bun install
-bun dev                 # web development server
-bun cli --help          # development CLI
-
-bun build               # all workspace builds
-bun build:web           # web only
-bun build:cli           # CLI only
-bun lint
-bun typecheck
-bun test
-bun test:integration
-bun test:e2e
-bun ci                  # complete repository gate
-```
-
-Use `bun clean` to remove workspace build output and caches while preserving
-installed dependencies and `bun.lock`. Use `bun fullclean` when dependency
-state itself must be rebuilt; run `bun install` afterward. `bun start` builds
-and starts the production web app. Package scripts remain independently
-runnable through Bun filters when a narrower command is needed.
-
-To exercise the package executable through Bun's global bin directory:
-
-```sh
-cd apps/cli
-bun run build:package
-bun link
-ctxindex --help
-```
-
-`bun link` registers the CLI workspace in Bun's global link directory and
-exposes its `ctxindex` bin. The root `bun cli` path remains available and
-isolates state in helper-created worktrees.
-
-## Installation
-
-ctxindex requires Bun 1.3.14. After the first public release:
+ctxindex requires Bun 1.3.14 and is published as [`ctxindex`](https://www.npmjs.com/package/ctxindex).
 
 ```sh
 bun add --global ctxindex
-ctxindex --help
+ctxindex init
+
+ctxindex realm add work --name "Work"
+ctxindex account add microsoft --label work
+ctxindex source add microsoft.mailbox \
+  --realm work \
+  --account work \
+  --label work-mail
+
+ctxindex sync --source work-mail --format json
+ctxindex search "quarterly planning" --source work-mail --format json
+ctxindex get '<ref from results[0].ref>' --format json
 ```
 
-## Packaging and release
+`account add` opens the provider authorization flow. If the bundled managed OAuth App is unavailable for your identity or organization, follow the [bring-your-own-app setup](https://ctxindex.com/docs/start/connect-provider).
 
-The public package is a Bun-target bundle plus the native `keytar` runtime
-dependency. Bundled workflow skills and canonical migrations are embedded;
-trusted external Extensions remain explicit files loaded from configured paths.
-`bun run pack:cli-package` creates one allowlisted tarball, and the isolated
-smoke installs and runs that exact artifact outside the checkout.
+The returned Ref is opaque: pass it unchanged to `get`, `thread`, `export`, or a typed Action. Use `--format json` for structured agent workflows, `--format text` for lower token usage, and `ctxindex <command> --help` as the exact CLI reference.
 
-Pushes to `main` are release candidates only when `apps/cli/package.json` has a
-valid version strictly greater than the previous commit and that exact version
-is absent from npm. Existing versions are successful no-ops. See
-[`docs/release/npm.md`](docs/release/npm.md) for the protected trusted-publishing
-setup and first-release checkpoint.
+## What agents can do
 
-## Documentation map
+```sh
+# Search across every configured Source
+ctxindex search "renewal notice" --kind mail.message --format json
 
-| Document | Owns |
-|---|---|
-| `CONTRIBUTING.md` | Issue taxonomy and branch, OpenSpec, verification, and pull-request workflow |
-| `BACKLOG.md` | Non-normative candidate roadmap and promotion into issues and OpenSpec changes |
-| `CONTEXT.md` | Ubiquitous language and domain relationships |
-| `SYSTEM.md` | Non-normative, agent-synthesized readable system projection |
-| `openspec/specs/` | Canonical normative capability behavior and selective non-normative interface-first implementation doctrine |
-| `docs/milestones/` | Completed V1 and V1.1 historical milestone records |
-| `docs/design/2026-07-13-context-access-layer.md` | Decisions D1–D22 and cross-cutting rationale |
+# Inspect the loaded, extension-aware interface
+ctxindex describe --full --format json
 
-| `openspec/changes/` | Active and archived change proposals, artifacts, and tasks |
-| `.agents/skills/repo-development/SKILL.md` | Triggered repository development and CLI walkthrough |
-| `skills/` | Agent-facing usage docs shipped with the CLI |
+# Retrieve a complete Resource and its related thread
+ctxindex get '<ctx://ref>' --format json
+ctxindex thread '<ctx://ref>' --format json
+
+# Inspect a typed Action before invoking it
+ctxindex describe action mail.message.draft.create \
+  --source work-mail \
+  --format json
+```
+
+Provider mutations currently stop at reversible email Draft creation and update. ctxindex never sends email.
+
+## Extensions
+
+Built-in functionality uses the same SDK as external Extensions. Start with the public examples and demo Extensions in [`barisgit/ctxindex-extensions`](https://github.com/barisgit/ctxindex-extensions), then see the [Extension SDK guide](https://ctxindex.com/docs/extend) for provider-backed and providerless designs, Profiles, Adapters, Actions, documentation, packaging, and publishing.
+
+## How I used Codex and GPT-5.6 for OpenAI Build Week
+
+For OpenAI Build Week, I used GPT-5.6 first in Pi and later in Codex to build and harden the submitted version of ctxindex. I want to keep that distinction clear rather than describing the earlier Pi work as Codex work.
+
+In Codex, I kept one large thread open as a meta-session. I used the root agent to plan the work, make product and architecture decisions, and review what came back. Focused subagents handled specific implementation, testing, research, and review tasks in parallel. This was especially useful for changes that crossed the CLI, daemon, core, provider adapters, and Extension SDK.
+
+I made the main product decisions in that root session: keep provider data canonical, use the CLI as the agent interface, make Extensions the way new context is added, and stop provider mutations at reversible email Drafts. Codex helped turn those decisions into implementation and tests without losing the boundaries between packages.
+
+Codex's browser and computer tools also helped with the less glamorous part of the project: navigating Google Cloud Console and Microsoft Entra while setting up and checking real OAuth applications.
+
+ctxindex had an early foundation before OpenAI Build Week. The public commit history and dated Pi and Codex sessions show what was added and changed during the submission period.
+
+## Documentation
+
+- [Start with ctxindex](https://ctxindex.com/docs)
+- [Connect Google or Microsoft](https://ctxindex.com/docs/start/connect-provider)
+- [Use ctxindex from an agent](https://ctxindex.com/docs/start/agent-usage)
+- [Mail workflows](https://ctxindex.com/docs/use/mail) and [calendar workflows](https://ctxindex.com/docs/use/calendar)
+- [Trust and local data](https://ctxindex.com/docs/use/trust)
+- [Contributing](CONTRIBUTING.md)
+
+## Development
+
+```sh
+bun install --frozen-lockfile
+bun cli --help
+bun ci
+bun test:integration
+bun test:e2e
+```
+
+ctxindex is licensed under the [MIT License](LICENSE).

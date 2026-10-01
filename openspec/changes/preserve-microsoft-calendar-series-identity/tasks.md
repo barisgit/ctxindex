@@ -16,7 +16,7 @@
 - [x] 3.2 Add/strengthen mixed Microsoft Calendar fixtures for Windows and IANA zones, explicit UTC/offset original starts, all-day occurrences, unknown required zones, nonexistent DST-gap local times, null/absent optional fields, and malformed input; valid cases retain series without warnings and only genuinely unrepresentable cases emit `microsoft_calendar_unresolved_series_start`
 - [x] 3.3 Recognize Graph event type and use current start only for an unmodified `occurrence` whose `originalStart` is omitted; canonicalize Microsoft event start/end zone labels through the existing resolver without applying the fallback to exceptions or adding provider I/O
 - [x] 3.4 Verify Sync and Retrieve continue to share normalization, stable Source-scoped ids, transactional cursor behavior, and bounded warnings
-- [x] 3.5 Slice gate: run `bun test packages/adapters/src/microsoft/calendar packages/profiles/src/calendar-event.test.ts scripts/verify/calendar-event-profile.integration.test.ts`
+- [x] 3.5 Slice gate: run `bun test packages/official/src/microsoft/calendar packages/profiles/src/calendar-event.test.ts scripts/verify/calendar-event-profile.integration.test.ts`
 
 ## 4. Compiled and private live verification (Slice: packaged replay and actual resync)
 

@@ -35,11 +35,11 @@
 - **WHEN** Graph returns `type: exception` and a provider-supplied series-master id but omits `originalStart`
 - **THEN** the Adapter does not substitute the potentially moved current start, omits series linkage, and emits `microsoft_calendar_unresolved_series_start`
 
-#### Scenario: Windows event zone becomes canonical
+#### Scenario: Occurrence start uses a Windows zone name
 - **WHEN** a Microsoft timed event or occurrence start uses a recognized Windows zone name such as `Greenwich Standard Time`
 - **THEN** the Adapter emits the mapped canonical IANA zone in the Calendar Event payload and preserves valid series identity
 
-#### Scenario: IANA event zone remains canonical
+#### Scenario: Occurrence start uses an IANA zone name
 - **WHEN** a Microsoft timed event or occurrence start uses an IANA name such as `Europe/Belgrade`
 - **THEN** the Adapter emits that canonical IANA zone and preserves valid series identity
 

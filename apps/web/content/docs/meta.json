@@ -1,4 +1,4 @@
 {
   "title": "ctxindex",
-  "pages": ["index", "getting-started", "concepts", "cli", "guides", "examples"]
+  "pages": ["index", "start", "use", "extend", "reference", "contribute"]
 }

@@ -23,6 +23,7 @@ export async function fetchOAuthIdentity(input: {
   provider: OAuthProviderDefinition
   endpoint: string
   accessToken: string
+  signal?: AbortSignal
 }): Promise<Omit<UpsertAccountInput, 'provider'>> {
   assertOAuthProviderHost(input.provider, input.endpoint)
   let response: Response
@@ -32,6 +33,7 @@ export async function fetchOAuthIdentity(input: {
       {
         headers: { authorization: `Bearer ${input.accessToken}` },
         redirect: 'manual',
+        ...(input.signal ? { signal: input.signal } : {}),
       },
       input.provider.auth.allowedHosts,
     )

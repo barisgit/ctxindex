@@ -20,7 +20,7 @@ test('account list is a safe empty inventory and malformed input initializes not
 
     const init = await sandbox.run(['init'])
     expect(init.exitCode, init.stderr).toBe(0)
-    const listed = await sandbox.run(['account', 'list', '--json'])
+    const listed = await sandbox.run(['account', 'list', '--format', 'json'])
     expect(listed.exitCode, listed.stderr).toBe(0)
     expect(listed.stderr).toBe('')
     expect(JSON.parse(listed.stdout)).toEqual([])

@@ -42,6 +42,10 @@ test('loads a valid direct pin offline and degrades a missing pin per Extension'
       origin_path: '/deleted/original',
       content_digest: digest,
     },
+    dependency_resolution: {
+      format: 'bun.lock@1.3.14',
+      digest: 'e'.repeat(64),
+    },
     materialization_digest: digest,
     package_root: 'package',
     installed_at: 1,
@@ -77,7 +81,7 @@ test('loads a valid direct pin offline and degrades a missing pin per Extension'
   const loaded = await loadExtensions({
     config: defaultConfig(),
     builtins: {},
-    directInstalled: [valid, missing, corrupt],
+    installed: [valid, missing, corrupt],
     dataRoot,
   })
   expect(loaded.registry.list().map(({ id }) => id)).toEqual(['example.direct'])
@@ -91,8 +95,8 @@ test('loads a valid direct pin offline and degrades a missing pin per Extension'
   ])
   expect(loaded.diagnostics).toEqual(
     expect.arrayContaining([
-      expect.objectContaining({ path: 'direct:example.missing' }),
-      expect.objectContaining({ path: 'direct:example.corrupt' }),
+      expect.objectContaining({ path: 'installed:example.missing' }),
+      expect.objectContaining({ path: 'installed:example.corrupt' }),
     ]),
   )
 })
@@ -122,8 +126,13 @@ test('preserves npm integrity in loaded direct provenance', async () => {
     source: {
       kind: 'npm',
       requested_target: '@example/npm@^1',
+      package: '@example/npm',
       exact_version: '1.2.3',
       integrity: 'sha512-exact',
+    },
+    dependency_resolution: {
+      format: 'bun.lock@1.3.14',
+      digest: 'e'.repeat(64),
     },
     materialization_digest: digest,
     package_root: 'package',
@@ -134,7 +143,7 @@ test('preserves npm integrity in loaded direct provenance', async () => {
   const loaded = await loadExtensions({
     config: defaultConfig(),
     builtins: {},
-    directInstalled: [installed],
+    installed: [installed],
     dataRoot,
   })
 

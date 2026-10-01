@@ -21,7 +21,7 @@ export function calendarEventRef(
 ): string;
 ```
 
-### @ctxindex/adapters — Google Calendar normalization
+### @ctxindex/official — Google Calendar normalization
 
 ```ts
 export interface GoogleCalendarWarning {
@@ -43,7 +43,7 @@ export function normalizeGoogleCalendarEvent(
 ): NormalizedGoogleCalendarEvent;
 ```
 
-### @ctxindex/adapters — Microsoft Calendar normalization
+### @ctxindex/official — Microsoft Calendar normalization
 
 ```ts
 export interface MicrosoftCalendarWarning {
@@ -69,10 +69,10 @@ export function normalizeMicrosoftCalendarEvent(
 
 ## Implementation doctrine
 
-`@ctxindex/profiles` owns provider-neutral event validation, canonical IANA zone vocabulary, and pure projections. Timed Calendar Events retain optional canonical IANA zones in the schema-derived timing union and project them through the optional string fields `startTimeZone` and `endTimeZone`; all-day events project neither field. The Profile-owned canonicalizer applies pinned replacements first, then the runtime canonical inventory, and finally `Intl.DateTimeFormat(...).resolvedOptions().timeZone` for valid unlisted links before rejecting unknown labels. Google and Microsoft modules in `@ctxindex/adapters` normalize provider responses through that seam and construct Source-scoped Refs; core storage, search, retrieval, and CLI code stay provider-neutral.
+`@ctxindex/profiles` owns provider-neutral event validation, canonical IANA zone vocabulary, and pure projections. Timed Calendar Events retain optional canonical IANA zones in the schema-derived timing union and project them through the optional string fields `startTimeZone` and `endTimeZone`; all-day events project neither field. The Profile-owned canonicalizer applies pinned replacements first, then the runtime canonical inventory, and finally `Intl.DateTimeFormat(...).resolvedOptions().timeZone` for valid unlisted links before rejecting unknown labels. Google and Microsoft modules in `@ctxindex/official` normalize provider responses through that seam and construct Source-scoped Refs; core storage, search, retrieval, and CLI code stay provider-neutral.
 
 Calendar sync uses generic operation contexts. Adapter cursors retain an anchored window, provider cursor, and Source-local manifest; changing the window requires complete reconciliation before cursor replacement or removal emission. Calendar definitions bind no Actions.
 
 ## Verification
 
-Profile tests cover timed/all-day validation and deterministic projections. Provider normalization, sync reconciliation, exact retrieval, and `scripts/verify/calendar-event-profile.integration.test.ts` prove both Adapters use the same generic seam.
+Profile tests cover timed/all-day validation and deterministic projections. Provider normalization, sync reconciliation, exact retrieval, and `tests/tooling/verify/calendar-event-profile.integration.test.ts` prove both Adapters use the same generic seam.

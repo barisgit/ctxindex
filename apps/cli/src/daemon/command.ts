@@ -1,129 +1,93 @@
-import { accessSync, constants, statSync } from 'node:fs'
-import { basename, isAbsolute, join } from 'node:path'
-import { defineCommand } from 'citty'
-import { daemonUsage, parseDaemonArgs } from '../args/daemon'
+import { defineCtxCommand } from '../command-model'
 import { mapErrorToExit, runWithExit } from '../format/exit'
+import { outputFormatArg } from '../format/output'
 import {
-  type DaemonSelection,
-  daemonHealth,
-  daemonShutdown,
-  requireDaemonSelection,
-} from './client'
+  type DaemonLifecycle,
+  type DaemonStartResult,
+  type DaemonStatusResult,
+  type DaemonStopResult,
+  daemonStart,
+  daemonStatus,
+  daemonStop,
+} from './lifecycle'
 
-declare const __CTXINDEX_PACKAGED__: boolean | undefined
+function printJson(value: unknown): void {
+  console.log(JSON.stringify(value, null, 2))
+}
 
-function printHealth(
-  health: Awaited<ReturnType<typeof daemonHealth>>,
-  json: boolean,
-): void {
+function printStart(result: DaemonStartResult, json: boolean): void {
   if (json) {
-    console.log(JSON.stringify(health, null, 2))
+    printJson(result)
     return
   }
   console.log(
-    `${health.lifecycle}\tready=${health.ready}\tinstance=${health.instanceId}\tprotocol=${health.protocol.id}@${health.protocol.version}\tactive=${health.activeRequestCount}`,
+    `running\tstarted=${result.started}\tinstance=${result.health.instanceId}\tpid=${result.health.pid}\tprotocol=${result.health.protocol.id}@${result.health.protocol.version}`,
   )
 }
 
-function printShutdown(instanceId: string, json: boolean): void {
+function printStatus(result: DaemonStatusResult, json: boolean): void {
   if (json) {
-    console.log(JSON.stringify({ status: 'complete', instanceId }, null, 2))
+    printJson(result)
     return
   }
-  console.log(`shutdown complete\tinstance=${instanceId}`)
-}
-
-export interface DaemonLaunchResolutionOptions {
-  readonly sourceMode?: boolean
-  readonly processExecutable?: string
-  readonly compiledDaemonOverride?: string
-}
-
-export function resolveDaemonLaunch(
-  options: DaemonLaunchResolutionOptions = {},
-): string[] {
-  const processExecutable = options.processExecutable ?? process.execPath
-  const sourceMode =
-    options.sourceMode ??
-    (typeof __CTXINDEX_PACKAGED__ === 'undefined' &&
-      basename(processExecutable) === 'bun')
-  if (sourceMode) {
-    return [
-      processExecutable,
-      join(import.meta.dir, '..', '..', '..', 'daemon', 'src', 'main.ts'),
-    ]
-  }
-  const executable =
-    options.compiledDaemonOverride ??
-    process.env.CTXINDEX_DAEMON_EXECUTABLE ??
-    join(import.meta.dir, 'ctxindex-daemon')
-  try {
-    if (!isAbsolute(executable) || !statSync(executable).isFile()) throw null
-    accessSync(executable, constants.X_OK)
-  } catch {
-    throw new Error(
-      'The compiled daemon executable is unavailable beside ctxindex.',
+  if (result.status === 'running') {
+    console.log(
+      `running\tready=${result.health.ready}\tinstance=${result.health.instanceId}\tpid=${result.health.pid}\tprotocol=${result.health.protocol.id}@${result.health.protocol.version}\tactive=${result.health.activeRequestCount}`,
     )
+    return
   }
-  return [executable]
-}
-
-async function serveForeground(): Promise<number> {
-  const launch = resolveDaemonLaunch()
-  const child = Bun.spawn(launch, {
-    stdin: 'inherit',
-    stdout: 'inherit',
-    stderr: 'inherit',
-    env: process.env,
-  })
-  const forwardInterrupt = () => child.kill('SIGINT')
-  const forwardTerminate = () => child.kill('SIGTERM')
-  process.once('SIGINT', forwardInterrupt)
-  process.once('SIGTERM', forwardTerminate)
-  try {
-    return await child.exited
-  } finally {
-    process.removeListener('SIGINT', forwardInterrupt)
-    process.removeListener('SIGTERM', forwardTerminate)
+  if (
+    result.status === 'starting' ||
+    result.status === 'stopping' ||
+    result.status === 'unavailable'
+  ) {
+    console.log(
+      `${result.status}\tinstance=${result.instanceId}\tpid=${result.pid}\tstarted=${result.startedAt}`,
+    )
+    return
   }
+  console.log(result.status)
 }
 
-export interface DaemonCommandDeps {
-  readonly select: typeof requireDaemonSelection
-  readonly health: typeof daemonHealth
-  readonly shutdown: typeof daemonShutdown
-  readonly serve: () => Promise<number>
+function printStop(result: DaemonStopResult, json: boolean): void {
+  if (json) {
+    printJson(result)
+    return
+  }
+  if (result.status === 'unsupported') {
+    console.log('unsupported')
+    return
+  }
+  console.log(
+    `stopped\talreadyStopped=${result.alreadyStopped}${result.instanceId ? `\tinstance=${result.instanceId}` : ''}`,
+  )
 }
 
-const defaultDeps: DaemonCommandDeps = {
-  select: requireDaemonSelection,
-  health: daemonHealth,
-  shutdown: daemonShutdown,
-  serve: serveForeground,
+export type DaemonCommandInput =
+  | { readonly kind: 'start'; readonly json: boolean }
+  | { readonly kind: 'status'; readonly json: boolean }
+  | { readonly kind: 'stop'; readonly json: boolean }
+
+const defaultLifecycle: DaemonLifecycle = {
+  start: daemonStart,
+  status: daemonStatus,
+  stop: daemonStop,
 }
 
 export async function handleDaemonCommand(
-  args: string[],
-  deps: DaemonCommandDeps = defaultDeps,
+  parsed: DaemonCommandInput,
+  lifecycle: DaemonLifecycle = defaultLifecycle,
 ): Promise<number> {
-  const parsed = parseDaemonArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(`${parsed.message}. Try: ${daemonUsage}`)
-    return 2
-  }
-  if (parsed.kind === 'serve') return deps.serve()
-
   const controller = new AbortController()
   const cancel = () => controller.abort()
   process.once('SIGINT', cancel)
   try {
-    const selection: DaemonSelection = deps.select()
-    if (parsed.kind === 'health') {
-      printHealth(await deps.health(selection, controller.signal), parsed.json)
+    if (parsed.kind === 'start') {
+      printStart(await lifecycle.start(controller.signal), parsed.json)
+    } else if (parsed.kind === 'status') {
+      printStatus(await lifecycle.status(controller.signal), parsed.json)
     } else {
-      const accepted = await deps.shutdown(selection, controller.signal)
-      printShutdown(accepted.instanceId, parsed.json)
+      printStop(await lifecycle.stop(controller.signal), parsed.json)
     }
     return 0
   } catch (error) {
@@ -134,25 +98,49 @@ export async function handleDaemonCommand(
   }
 }
 
-export const daemonCommand = defineCommand({
-  meta: { name: 'daemon', description: 'Manage the foreground local daemon.' },
+const outputArgs = { format: outputFormatArg }
+
+export const daemonCommand = defineCtxCommand({
+  meta: { name: 'daemon', description: 'Manage the background local daemon.' },
   subCommands: {
-    serve: defineCommand({
-      meta: { name: 'serve', description: 'Serve in the foreground.' },
-      run: ({ rawArgs }) =>
-        runWithExit(() => handleDaemonCommand(['serve', ...rawArgs])),
+    start: defineCtxCommand({
+      meta: { name: 'start', description: 'Start the background daemon.' },
+      args: outputArgs,
+      run: ({ args }) =>
+        runWithExit(() =>
+          handleDaemonCommand({
+            kind: 'start',
+            json: args.format === 'json',
+          }),
+        ),
     }),
-    health: defineCommand({
-      meta: { name: 'health', description: 'Inspect daemon health.' },
-      args: { json: { type: 'boolean', description: 'Print JSON' } },
-      run: ({ rawArgs }) =>
-        runWithExit(() => handleDaemonCommand(['health', ...rawArgs])),
+    status: defineCtxCommand({
+      meta: {
+        name: 'status',
+        description: 'Inspect daemon lifecycle and health.',
+      },
+      args: outputArgs,
+      run: ({ args }) =>
+        runWithExit(() =>
+          handleDaemonCommand({
+            kind: 'status',
+            json: args.format === 'json',
+          }),
+        ),
     }),
-    shutdown: defineCommand({
-      meta: { name: 'shutdown', description: 'Request graceful shutdown.' },
-      args: { json: { type: 'boolean', description: 'Print JSON' } },
-      run: ({ rawArgs }) =>
-        runWithExit(() => handleDaemonCommand(['shutdown', ...rawArgs])),
+    stop: defineCtxCommand({
+      meta: {
+        name: 'stop',
+        description: 'Stop the background daemon gracefully.',
+      },
+      args: outputArgs,
+      run: ({ args }) =>
+        runWithExit(() =>
+          handleDaemonCommand({
+            kind: 'stop',
+            json: args.format === 'json',
+          }),
+        ),
     }),
   },
 })

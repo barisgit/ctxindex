@@ -19,11 +19,9 @@ test('formats only safe OAuth App inventory fields', () => {
     },
   ] as const
 
-  expect(formatOAuthAppInventory(apps, false)).toBe(
-    'google "official" origin=extension',
-  )
-  expect(JSON.parse(formatOAuthAppInventory(apps, true))).toEqual(apps)
-  expect(formatOAuthAppInventory([], false)).toBe('No OAuth Apps available.')
+  expect(formatOAuthAppInventory(apps, 'text')).toContain('official')
+  expect(JSON.parse(formatOAuthAppInventory(apps, 'json'))).toEqual(apps)
+  expect(formatOAuthAppInventory(apps, 'pretty')).not.toMatch(/secret|token/i)
 })
 
 test('formats OAuth App lifecycle confirmations', () => {

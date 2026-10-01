@@ -1,6 +1,6 @@
 {
   "name": "ctxindex",
-  "version": "0.0.0",
+  "version": "0.1.3",
   "description": "Local personal-context gateway CLI for agents",
   "license": "MIT",
   "homepage": "https://ctxindex.com",
@@ -33,16 +33,16 @@
     "build:package": "bun ../../scripts/release/build-cli-package.ts",
     "lint": "biome check .",
     "typecheck": "tsgo --noEmit -p tsconfig.json",
-    "test": "bun test",
-    "test:integration": "bun test --path-ignore-patterns '__none__' --pass-with-no-tests integration.test",
-    "test:e2e": "bun run ../../scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' --pass-with-no-tests e2e.test",
+    "test": "NO_COLOR=1 NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-unit.json bun test --path-ignore-patterns '**/*.integration.test.ts' --path-ignore-patterns '**/*.e2e.test.ts'",
+    "test:integration": "NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-integration.json bun test --path-ignore-patterns '__none__' --pass-with-no-tests integration.test",
+    "test:e2e": "NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-e2e.json bun run ../../scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' --pass-with-no-tests e2e.test",
     "cli": "bash ../../scripts/cli.sh",
     "format": "biome format --write .",
     "clean": "rm -rf .turbo dist coverage",
     "fullclean": "rm -rf .turbo dist coverage node_modules"
   },
   "devDependencies": {
-    "@ctxindex/adapters": "workspace:*",
+    "@ctxindex/official": "workspace:*",
     "@ctxindex/core": "workspace:*",
     "@ctxindex/extension-sdk": "workspace:*",
     "@ctxindex/local-daemon": "workspace:*",

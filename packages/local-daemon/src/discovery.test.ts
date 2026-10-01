@@ -152,6 +152,31 @@ test('reads metadata from one no-follow descriptor even when its pathname is rep
   expect(readDiscoveryMetadata(stateRoot)).toEqual(replacement)
 })
 
+test('retries when an atomically replaced discovery descriptor is unlinked before stat', () => {
+  const root = temporaryDirectory()
+  const metadata = fixture(root)
+  const stateRoot = join(root, 'state')
+  const replacement = {
+    ...metadata,
+    instanceId: 'instance-2',
+    ownerToken: 'b'.repeat(64),
+  }
+  writeDiscoveryMetadata(stateRoot, metadata)
+  let replaced = false
+  const replacingOpen: typeof openSync = (path, flags, mode) => {
+    const fd = openSync(path, flags, mode)
+    if (!replaced) {
+      replaced = true
+      writeDiscoveryMetadata(stateRoot, replacement)
+    }
+    return fd
+  }
+
+  expect(readDiscoveryMetadata(stateRoot, { openFile: replacingOpen })).toEqual(
+    replacement,
+  )
+})
+
 test('rejects metadata that grows beyond the bound after descriptor stat', () => {
   const root = temporaryDirectory()
   const metadata = fixture(root)

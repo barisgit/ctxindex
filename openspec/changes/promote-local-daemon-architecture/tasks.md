@@ -15,7 +15,7 @@
 
 - [ ] 3.1 Add failing Action describe/run contract/application/CLI tests for active-registry resolution, local validation, exactly-once invocation, cancellation, bounded Resource output, existing Draft-only safety, and no client runtime composition.
 - [ ] 3.2 Implement Action description/invocation through daemon-owned services and pass focused provider-neutral, Adapter-mock, RPC, daemon, CLI, and architecture gates.
-- [ ] 3.3 Prototype the bounded owner-private byte-transfer adapter against cancellation, maximum size, concurrent tickets, expiry, atomic destination replacement, daemon shutdown, crash cleanup, and path/secret leakage; record the selected mechanism in design/implementation and pause at a Human architecture checkpoint before adopting it.
+- [x] 3.3 Prototype the bounded owner-private byte-transfer adapter against cancellation, maximum size, concurrent tickets, expiry, atomic destination replacement, daemon shutdown, crash cleanup, and path/secret leakage; record the selected mechanism in design/implementation and pause at a Human architecture checkpoint before adopting it.
 - [ ] 3.4 Add failing Artifact list/download, export, and purge tests over the approved transfer boundary, including cache hit/miss, provider-stream failure, partial-output cleanup, safe metadata, unchanged CLI behavior, and no byte arrays or raw host paths in ordinary RPC DTOs.
 - [ ] 3.5 Implement daemon-coordinated Artifact/export/purge application services and byte transfer; pass focused core/RPC/daemon/CLI, package smoke, and compiled multi-process gates.
 

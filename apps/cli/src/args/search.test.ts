@@ -1,26 +1,49 @@
 import { describe, expect, test } from 'bun:test'
-import { parseSearchArgs } from './search'
+import { runCommand } from 'citty'
+import { defineCtxCommand } from '../command-model'
+import { resolveSearchArgs, searchArgs } from './search'
+
+async function resolve(rawArgs: string[]) {
+  let resolved: ReturnType<typeof resolveSearchArgs> | undefined
+  const command = defineCtxCommand({
+    meta: { name: 'search' },
+    args: searchArgs,
+    run: ({ args }) => {
+      resolved = resolveSearchArgs(args)
+    },
+  })
+  await runCommand(command, { rawArgs })
+  return resolved
+}
 
 describe('search CLI arguments', () => {
-  test('parses repeated typed fields and JSON search output', () => {
+  test('resolves repeatable Realm, Source, and typed field filters in order', async () => {
     expect(
-      parseSearchArgs([
+      await resolve([
         'project',
+        '--realm',
+        'work',
+        '--realm=personal',
+        '-s',
+        'mail',
+        '--source=calendar',
         '--kind',
-        'communication.message',
+        'mail.message',
         '--field',
         'sender=alice@example.com',
         '--field=unread=true',
         '--remote',
-        '--json',
+        '-f',
+        'json',
       ]),
     ).toEqual({
-      kind: 'search',
-      json: true,
+      format: 'json',
       refs: false,
       input: {
         text: 'project',
-        kind: 'communication.message',
+        realms: ['work', 'personal'],
+        sourceIds: ['mail', 'calendar'],
+        kind: 'mail.message',
         fields: [
           { name: 'sender', value: 'alice@example.com' },
           { name: 'unread', value: 'true' },
@@ -30,81 +53,14 @@ describe('search CLI arguments', () => {
     })
   })
 
-  test('keeps a query after leading boolean flags', () => {
-    expect(parseSearchArgs(['--json', '--remote', 'project'])).toEqual({
-      kind: 'search',
-      json: true,
-      refs: false,
-      input: { text: 'project', remote: true },
-    })
-  })
-
-  test('parses the include-deleted local search flag', () => {
-    expect(parseSearchArgs(['project', '--include-deleted', '--json'])).toEqual(
-      {
-        kind: 'search',
-        json: true,
-        refs: false,
-        input: { text: 'project', includeDeleted: true },
-      },
-    )
-    expect(parseSearchArgs(['--include-deleted', '--json'])).toEqual({
-      kind: 'search',
-      json: true,
-      refs: false,
-      input: { includeDeleted: true },
-    })
-  })
-
-  test('rejects fields without kind and conflicting routing overrides', () => {
-    expect(parseSearchArgs(['x', '--field', 'sender=a'])).toMatchObject({
-      kind: 'unknown',
-    })
-    expect(parseSearchArgs(['x', '--remote', '--local-only'])).toMatchObject({
-      kind: 'unknown',
-    })
-  })
-
-  test('accepts filter-only enumeration without query text', () => {
-    expect(
-      parseSearchArgs(['--realm', 'work', '--limit', '20', '--json']),
-    ).toEqual({
-      kind: 'search',
-      json: true,
+  test('accepts filter-only enumeration and exact remote continuation', async () => {
+    expect(await resolve(['-r', 'work', '-l', '20', '-f', 'json'])).toEqual({
+      format: 'json',
       refs: false,
       input: { realms: ['work'], limit: 20 },
     })
     expect(
-      parseSearchArgs(['--kind', 'communication.message', '--offset', '20']),
-    ).toEqual({
-      kind: 'search',
-      json: false,
-      refs: false,
-      input: { kind: 'communication.message', offset: 20 },
-    })
-  })
-
-  test('accepts constrained query-less remote search and opaque continuation', () => {
-    expect(
-      parseSearchArgs([
-        '--remote',
-        '--source',
-        'work-outlook',
-        '--kind',
-        'communication.message',
-      ]),
-    ).toEqual({
-      kind: 'search',
-      json: false,
-      refs: false,
-      input: {
-        sourceIds: ['work-outlook'],
-        kind: 'communication.message',
-        remote: true,
-      },
-    })
-    expect(
-      parseSearchArgs([
+      await resolve([
         'quarterly',
         '--remote',
         '--source',
@@ -113,7 +69,6 @@ describe('search CLI arguments', () => {
         'opaque-next-page',
       ]),
     ).toMatchObject({
-      kind: 'search',
       input: {
         text: 'quarterly',
         sourceIds: ['work-outlook'],
@@ -123,54 +78,11 @@ describe('search CLI arguments', () => {
     })
   })
 
-  test('rejects bare search and invalid pagination combinations', () => {
-    expect(parseSearchArgs([])).toMatchObject({
-      kind: 'unknown',
-      message:
-        'search: provide <query> or at least one filter (--realm/--adapter/--source/--kind/--field/--since/--until/--include-deleted)',
-    })
-    expect(parseSearchArgs(['--json'])).toMatchObject({ kind: 'unknown' })
-    for (const args of [
-      ['x', '--remote', '--source', 'a', '--continuation='],
-      ['x', '--remote', '--source', 'a', '--continuation', '   '],
-    ]) {
-      expect(parseSearchArgs(args)).toMatchObject({
-        kind: 'unknown',
-        message: 'search: --continuation requires a token',
-      })
-    }
-    expect(parseSearchArgs(['--remote', '--include-deleted'])).toMatchObject({
-      kind: 'unknown',
-      message:
-        'search: query-less --remote requires a narrowing Realm, Adapter, Source, kind, field, or time filter',
-    })
-    expect(parseSearchArgs(['--realm', 'work', '--remote'])).toMatchObject({
-      kind: 'search',
-      input: { realms: ['work'], remote: true },
-    })
-    expect(parseSearchArgs(['x', '--offset', '5'])).toMatchObject({
-      kind: 'unknown',
-      message:
-        'search: --offset requires local execution; omit <query> or add --local-only',
-    })
-    expect(
-      parseSearchArgs(['x', '--local-only', '--offset', '5']),
-    ).toMatchObject({
-      kind: 'search',
-      input: { text: 'x', localOnly: true, offset: 5 },
-    })
-    for (const bad of ['-1', '1.5', 'abc']) {
-      expect(
-        parseSearchArgs(['--realm', 'work', '--offset', bad]),
-      ).toMatchObject({
-        kind: 'unknown',
-        message: `search: invalid --offset: ${bad}`,
-      })
-    }
-    expect(parseSearchArgs(['--realm', 'work', '--limit', '-1'])).toMatchObject(
-      { kind: 'unknown', message: 'search: invalid --limit: -1' },
-    )
-    for (const args of [
+  test('rejects semantic filter and pagination conflicts', async () => {
+    for (const rawArgs of [
+      [],
+      ['x', '--field', 'sender=a'],
+      ['x', '--remote', '--local-only'],
       ['x', '--continuation', 'next'],
       ['x', '--remote', '--continuation', 'next'],
       [
@@ -193,9 +105,37 @@ describe('search CLI arguments', () => {
         '--continuation',
         'next',
       ],
-      ['x', '--local-only', '--source', 'a', '--continuation', 'next'],
+      ['x', '--offset', '5'],
+      ['x', '--refs', '--format', 'json'],
+      ['x', '--refs', '--format', 'pretty'],
     ]) {
-      expect(parseSearchArgs(args)).toMatchObject({ kind: 'unknown' })
+      await expect(resolve(rawArgs)).rejects.toMatchObject({
+        code: 'invalid_args',
+      })
+    }
+  })
+
+  test('keeps refs as a text projection with omitted or explicit text format', async () => {
+    expect(await resolve(['x', '--refs'])).toMatchObject({
+      format: 'text',
+      refs: true,
+    })
+    expect(await resolve(['x', '--refs', '--format', 'text'])).toMatchObject({
+      format: 'text',
+      refs: true,
+    })
+  })
+
+  test('rejects invalid dates and counts before execution', async () => {
+    for (const rawArgs of [
+      ['--realm', 'work', '--since', 'not-a-date'],
+      ['--realm', 'work', '--limit', '-1'],
+      ['--realm', 'work', '--offset', '1.5'],
+      ['x', '--remote', '--source', 'a', '--continuation', '   '],
+    ]) {
+      await expect(resolve(rawArgs)).rejects.toMatchObject({
+        code: 'invalid_args',
+      })
     }
   })
 })

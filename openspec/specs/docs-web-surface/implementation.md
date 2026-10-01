@@ -10,9 +10,13 @@ Repository verification owns workspace dependency policy. Applications may depen
 
 The docs source loader is the single index of MDX pages and produces navigation, page lookup, generated Markdown paths, image paths, and search records. Representation route handlers validate their exact terminal filename before removing it and resolving the remaining page slug. Unknown pages and malformed paths terminate through the framework not-found boundary.
 
+Primary navigation follows reader intent through Start, Use, Extend, Reference, and Contribute. Usage-oriented onboarding precedes Reference; the generated CLI subtree owns exact command lookup while authored product and workflow pages orient readers and link into it. Legacy authored routes may remain addressable outside the primary tree.
+
 A shared origin resolver parses the deployment-provided canonical origin for root metadata and absolute social URLs. Origin-dependent metadata is absent when no public origin is configured. Repository configuration provides owner, repository, and branch; source links root page-relative MDX paths under the web workspace from the monorepo root.
 
 Documentation examples project the generated CLI command tree and JSON contracts. They do not introduce wrappers, hosted APIs, or provider-specific command families.
+
+The landing page consumes semantic design tokens and static reviewed command/result artifacts derived from tested behavior. It does not read user state or simulate a hosted product. Its first viewport pairs the product boundary with direct onboarding, while flat divider-led structures replace repeated marketing-card grids.
 
 The workspace dependency verifier discovers authored source extensions recursively while excluding dependency, build, framework-generated, and configured generated directories. It classifies Node/Bun built-ins, configured path aliases, narrowly recognized framework imports, and declared peers before comparing remaining external imports with runtime dependencies.
 
@@ -25,3 +29,5 @@ The site accepts no credentials or provider data and creates no new ctxindex pro
 ## Verification
 
 Focused tests cover canonical-origin and source-link construction, exact accepted and malformed representation suffixes, recognized framework imports, and an undeclared ordinary web import. CLI examples are audited against current help, Action schemas, and JSON e2e contracts. Web typecheck and production build verify generated routes and metadata integration. Cross-cutting gates remain repository CI and strict OpenSpec validation.
+
+Content-contract tests also enforce task-oriented root navigation, checked Extension-example links, and authored absolute-docs link resolution. Representative desktop and narrow-mobile browser review covers first-viewport comprehension, command overflow, both themes, reduced motion, keyboard-visible focus, and one clear main landmark/heading structure.

@@ -1,0 +1,89 @@
+---
+title: Try an external Extension
+description: Install the public GitHub Issues example directly or through its Catalog, then sync and search real data.
+---
+
+The standalone [`barisgit/ctxindex-extensions`](https://github.com/barisgit/ctxindex-extensions) repository proves that an Extension and Catalog can live outside ctxindex and use only the published SDK packages. Its `barisgit.github-issues` Extension needs no credentials: it indexes public GitHub issues and comments through the anonymous API.
+
+<Callout type="warn">
+  Extensions execute trusted package code in-process. Read the repository before installing it. GitHub's anonymous API limit is 60 requests per hour per IP, so use a small public repository for the first run.
+</Callout>
+
+## Install directly from Git
+
+```bash
+ctxindex extension install git \
+  'git+https://github.com:443/barisgit/ctxindex-extensions.git#main' \
+  barisgit.github-issues \
+  --format json
+```
+
+The explicit `:443` keeps Bun 1.3.14 on the verifiable Git transport instead of its GitHub archive shorthand. ctxindex resolves the mutable `main` request once, records the exact commit, validates the complete resulting registry, and installs immutable managed bytes.
+
+## Or discover it through the Catalog
+
+The same repository exports the `barisgit.ctxindex-extensions` Catalog and commits its inert snapshot:
+
+```bash
+ctxindex extension catalog add community \
+  https://github.com/barisgit/ctxindex-extensions.git \
+  --ref refs/heads/main \
+  --trust
+
+ctxindex extension catalog search github --format json
+ctxindex extension install catalog community barisgit.github-issues --format json
+```
+
+Catalog search refreshes configured Catalogs by default. Add `--no-refresh` to use stored snapshots offline. The Catalog is optional curation; direct npm, Git, and local installation remain first-class.
+
+## Add a Source and use it
+
+```bash
+ctxindex realm add demo --name "Demo"
+ctxindex source add github.issues \
+  --realm demo \
+  --label gh-issues \
+  --config-owner barisgit \
+  --config-repository ctxindex
+
+ctxindex sync --source gh-issues --format json
+ctxindex search issue \
+  --source gh-issues \
+  --local-only \
+  --limit 5 \
+  --format json
+
+ctxindex search \
+  --source gh-issues \
+  --kind software.issue \
+  --field state=open \
+  --local-only \
+  --format json
+```
+
+Copy a returned Ref through unchanged:
+
+```bash
+ctxindex get 'ctx://<source-id>/issue/42' --format json
+ctxindex thread 'ctx://<source-id>/issue/42' --format json
+```
+
+The checked implementation, Catalog, synthetic HTTP tests, and package manifest are all in the [external repository](https://github.com/barisgit/ctxindex-extensions). To understand how it is authored, continue with the [Extension SDK guide](/docs/extend).
+
+## Update, inspect, and remove
+
+```bash
+ctxindex extension list --format json
+ctxindex extension update barisgit.github-issues --format json
+ctxindex extension uninstall barisgit.github-issues --format json
+```
+
+Updates explicitly reacquire and re-pin installed code. Uninstall is blocked while configured Sources depend on the Extension unless `--force` preserves those Sources and their materialized data as unavailable.
+
+Installed documentation stays offline and agent-readable:
+
+```bash
+ctxindex docs list --extension barisgit.github-issues --format json
+ctxindex docs search "first sync" --extension barisgit.github-issues --format json
+ctxindex docs get README.md --extension barisgit.github-issues
+```

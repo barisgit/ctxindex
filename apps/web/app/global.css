@@ -150,6 +150,43 @@
   text-decoration-line: underline;
 }
 
+.ctx-copy-button {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-ctx-control);
+  border: 1px solid var(--ctx-terminal-muted);
+  padding-inline: 0.875rem;
+  color: var(--ctx-terminal-foreground);
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  transition:
+    border-color 160ms ease-out,
+    background-color 160ms ease-out;
+}
+
+.ctx-copy-button:hover {
+  border-color: var(--ctx-terminal-muted-foreground);
+  background: var(--ctx-terminal-muted);
+}
+
+.ctx-copy-button:focus-visible {
+  outline: 2px solid var(--color-fd-ring);
+  outline-offset: 2px;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
 .legal-document code {
   border-radius: 0.25rem;
   background: var(--color-fd-muted);
@@ -170,6 +207,7 @@
 
 html {
   scrollbar-gutter: stable;
+  scroll-behavior: smooth;
 }
 
 html > body[data-scroll-locked] {
@@ -231,12 +269,10 @@ html > body[data-scroll-locked] {
   }
 }
 
-.ctx-hero-glow {
-  background: radial-gradient(
-    ellipse 60% 50% at 50% 0%,
-    color-mix(in oklab, var(--ctx-signal) 9%, transparent),
-    transparent 70%
-  );
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
 
 /* Keep docs navigation anchored to the viewport on wide displays. Fumadocs'
@@ -251,5 +287,74 @@ html > body[data-scroll-locked] {
 @media (min-width: 80rem) {
   #nd-docs-layout.ctx-docs-layout {
     --fd-toc-width: 240px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes ctx-graph-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-4px);
+    }
+  }
+
+  .ctx-graph-float {
+    animation: ctx-graph-float 5.5s ease-in-out infinite;
+    transform-box: fill-box;
+  }
+
+  @keyframes ctx-graph-ring {
+    0% {
+      transform: scale(1);
+      opacity: 0.55;
+    }
+    70%,
+    100% {
+      transform: scale(1.45);
+      opacity: 0;
+    }
+  }
+
+  .ctx-graph-ring {
+    animation: ctx-graph-ring 3.2s ease-out infinite;
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+
+  @keyframes ctx-graph-dash {
+    to {
+      stroke-dashoffset: -20;
+    }
+  }
+
+  .ctx-graph-dash {
+    animation: ctx-graph-dash 1.6s linear infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ctx-graph-pulses,
+  .ctx-graph-ring {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes ctx-morph-swap {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .ctx-morph-swap {
+    animation: ctx-morph-swap 0.35s ease-out both;
   }
 }

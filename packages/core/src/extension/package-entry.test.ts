@@ -12,7 +12,10 @@ import { join } from 'node:path'
 import { importExtensionDefinition } from './import'
 import {
   importPackageEntries,
+  inspectPackageEntries,
   resolvePackageEntries,
+  selectCatalogLiteral,
+  selectExactCatalog,
   selectExactExtension,
 } from './package-entry'
 
@@ -35,6 +38,148 @@ afterEach(async () => {
 })
 
 describe('package Extension entries', () => {
+  test('inspects Extension and Catalog roots without export-name selection', async () => {
+    const root = await sandbox()
+    const counter = `__ctxindex_catalog_entry_${Date.now()}_${Math.random()}`
+    await writeFile(
+      join(root, 'entry.mjs'),
+      `globalThis[${JSON.stringify(counter)}] = (globalThis[${JSON.stringify(counter)}] ?? 0) + 1
+const extension = (id) => ({ kind: 'extension', id, providers: [], oauthApps: [], profiles: [], adapters: [] })
+const literal = extension('fixture.literal')
+export const extensionRoot = extension('fixture.top-level')
+export const catalogRoot = { kind: 'catalog', id: 'fixture.catalog', label: 'Fixture', extensions: [literal] }
+export const futureRoot = { kind: 'future-definition', id: 'fixture.future' }
+`,
+    )
+    const resolved = await resolvePackageEntries(
+      root,
+      { ctxindex: { extensions: ['./entry.mjs'] } },
+      provenance,
+    )
+
+    const inspected = await inspectPackageEntries(resolved)
+    expect(
+      inspected.map(({ definition, modulePath }) => ({
+        kind: definition.kind,
+        id: definition.id,
+        modulePath,
+      })),
+    ).toEqual([
+      {
+        kind: 'catalog',
+        id: 'fixture.catalog',
+        modulePath: await realpath(join(root, 'entry.mjs')),
+      },
+      {
+        kind: 'extension',
+        id: 'fixture.top-level',
+        modulePath: await realpath(join(root, 'entry.mjs')),
+      },
+    ])
+    expect(Object.keys(inspected[0] ?? {})).not.toContain('exportName')
+    expect((globalThis as Record<string, unknown>)[counter]).toBe(1)
+
+    const selected = selectExactCatalog(inspected, 'fixture.catalog')
+    const literal = selected.definition.extensions[0]
+    if (literal === undefined || literal.kind !== 'extension')
+      throw new Error('missing literal fixture')
+    expect(
+      selectCatalogLiteral(selected.definition, 0, 'fixture.literal'),
+    ).toBe(literal)
+    expect(() =>
+      selectCatalogLiteral(selected.definition, 1, 'fixture.literal'),
+    ).toThrow('entry index')
+    expect(() =>
+      selectCatalogLiteral(selected.definition, 0, 'fixture.other'),
+    ).toThrow('identity')
+    delete (globalThis as Record<string, unknown>)[counter]
+  })
+
+  test('inspects Catalog entry summaries for literal and package entries', async () => {
+    const root = await sandbox()
+    await writeFile(
+      join(root, 'entry.mjs'),
+      `const literal = { kind: 'extension', id: 'fixture.literal', providers: [], oauthApps: [], profiles: [], adapters: [] }
+const packageEntry = { kind: 'package-extension', source: { kind: 'npm', target: '@fixture/package@^1' }, extensionId: 'fixture.package' }
+export default {
+  kind: 'catalog',
+  id: 'fixture.catalog',
+  label: 'Fixture',
+  summary: 'Catalog summary.',
+  entrySummaries: {
+    'fixture.literal': 'Literal summary.',
+    'fixture.package': 'Package summary.',
+  },
+  extensions: [literal, packageEntry],
+}
+`,
+    )
+    const resolved = await resolvePackageEntries(
+      root,
+      { ctxindex: { extensions: ['./entry.mjs'] } },
+      provenance,
+    )
+
+    const inspected = await inspectPackageEntries(resolved)
+
+    expect(inspected).toHaveLength(1)
+    expect(inspected[0]?.definition).toMatchObject({
+      kind: 'catalog',
+      summary: 'Catalog summary.',
+      entrySummaries: {
+        'fixture.literal': 'Literal summary.',
+        'fixture.package': 'Package summary.',
+      },
+    })
+  })
+
+  test.each([
+    ['non-object map', '[]'],
+    ['unknown entry id', `{ 'fixture.missing': 'Missing.' }`],
+    ['empty summary', `{ 'fixture.literal': '' }`],
+    ['non-string summary', `{ 'fixture.literal': 1 }`],
+  ])('rejects Catalog entry summaries with an invalid %s', async (_label, map) => {
+    const root = await sandbox()
+    await writeFile(
+      join(root, 'entry.mjs'),
+      `const literal = { kind: 'extension', id: 'fixture.literal', providers: [], oauthApps: [], profiles: [], adapters: [] }
+export default {
+  kind: 'catalog',
+  id: 'fixture.catalog',
+  label: 'Fixture',
+  entrySummaries: ${map},
+  extensions: [literal],
+}
+`,
+    )
+    const resolved = await resolvePackageEntries(
+      root,
+      { ctxindex: { extensions: ['./entry.mjs'] } },
+      provenance,
+    )
+
+    await expect(inspectPackageEntries(resolved)).rejects.toThrow(
+      'Invalid Catalog export',
+    )
+  })
+
+  test.each([
+    ['malformed Extension', `{ kind: 'extension', id: 'fixture.invalid' }`],
+    [
+      'malformed Catalog',
+      `{ kind: 'catalog', id: 'fixture.invalid', label: 'Invalid', extensions: ['fixture.ref'] }`,
+    ],
+  ])('rejects a %s root', async (_label, value) => {
+    const root = await sandbox()
+    await writeFile(join(root, 'entry.mjs'), `export default ${value}\n`)
+    const resolved = await resolvePackageEntries(
+      root,
+      { ctxindex: { extensions: ['./entry.mjs'] } },
+      provenance,
+    )
+    await expect(inspectPackageEntries(resolved)).rejects.toThrow()
+  })
+
   test('resolves ordered unique contained module paths', async () => {
     const root = await sandbox()
     await mkdir(join(root, 'dist'))

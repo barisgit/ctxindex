@@ -5,19 +5,12 @@ export {
   calendarEventSchema,
   canonicalizeIanaTimeZone,
 } from './calendar-event'
-export type { CommunicationMessage } from './communication-message'
+export type { ChatMessage } from './chat-message'
 export {
-  communicationMessageDraftAttachmentSchema,
-  communicationMessageDraftCreateInputSchema,
-  communicationMessageDraftUpdateInputSchema,
-  communicationMessageProfile,
-  communicationMessageSchema,
-  deriveCommunicationMessageReplyRecipient,
-  deriveCommunicationMessageReplyReferences,
-  deriveCommunicationMessageReplySubject,
-  MAX_DRAFT_ATTACHMENT_BYTES,
-  MAX_DRAFT_ATTACHMENT_COUNT,
-} from './communication-message'
+  chatMessageNaturalKey,
+  chatMessageProfile,
+  chatMessageSchema,
+} from './chat-message'
 export type { FileChunk } from './file'
 export {
   chunkText,
@@ -25,3 +18,16 @@ export {
   fileSchema,
   isNormalizedRelativeFilePath,
 } from './file'
+export type { MailMessage } from './mail-message'
+export {
+  deriveMailMessageReplyRecipient,
+  deriveMailMessageReplyReferences,
+  deriveMailMessageReplySubject,
+  MAX_DRAFT_ATTACHMENT_BYTES,
+  MAX_DRAFT_ATTACHMENT_COUNT,
+  mailMessageDraftAttachmentSchema,
+  mailMessageDraftCreateInputSchema,
+  mailMessageDraftUpdateInputSchema,
+  mailMessageProfile,
+  mailMessageSchema,
+} from './mail-message'

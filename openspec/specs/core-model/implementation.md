@@ -43,6 +43,10 @@ OAuth Apps bind one exact imported OAuth2 Provider. Accounts use one exact App l
 
 `@ctxindex/profiles` remains an ordinary private workspace library. Provider, Profile, Adapter, and OAuth App values contain no embedded documentation contract. An Extension root may carry one pure directory or virtual-tree declaration; core resolves and validates it, strips it from runtime definition identity, and exposes authored and generated entries through a separate passive list/get projection.
 
+## Relation-driven threading
+
+Core thread traversal consumes only stored `conversation` and `parent` Relations and generic Profile-registry validation. It never imports or branches on `mail.message` or any other Profile id, so any loaded Profile can participate by declaring the same structural relation vocabulary.
+
 ## Verification
 
-SDK type fixtures cover exact imported-value inference and reject reference, dependency, documentation, and providerless authorization escape hatches. Registry tests cover reachable leaves, duplicate policy, physical-copy compatibility, Providerless behavior, OAuth App collisions, provenance-only diagnostics, and atomic activation.
+SDK type fixtures cover exact imported-value inference and reject reference, dependency, documentation, and providerless authorization escape hatches. Registry tests cover reachable leaves, duplicate policy, physical-copy compatibility, Providerless behavior, OAuth App collisions, provenance-only diagnostics, and atomic activation. Thread-service tests cover relation closure, multiple roots, cross-Source natural-key matches, cycles, tombstones, unknown Profiles, and deterministic ordering without Profile-specific paths.

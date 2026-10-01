@@ -14,8 +14,8 @@ const sourceRef = `ctx://${sourceA}/messages/source`
 const targetRef = `ctx://${sourceB}/messages/target`
 const dbs: Database[] = []
 
-const communicationMessageTestProfile = defineProfile({
-  id: 'communication.message',
+const mailMessageTestProfile = defineProfile({
+  id: 'mail.message',
   version: 1,
   schema: z.object({
     providerMessageId: z.string(),
@@ -62,7 +62,7 @@ const profile = defineProfile({
   },
 })
 
-test('communication.message Relations resolve lazily without collapsing cross-Source identities', async () => {
+test('mail.message Relations resolve lazily without collapsing cross-Source identities', async () => {
   const db = new Database(':memory:', { create: true })
   applyPragmas(db)
   await runMigrations(db)
@@ -76,7 +76,7 @@ test('communication.message Relations resolve lazily without collapsing cross-So
   dbs.push(db)
   const resources = new ResourceStore(
     db,
-    createProfileRegistry([communicationMessageTestProfile]),
+    createProfileRegistry([mailMessageTestProfile]),
   )
   const relations = new RelationStore(db)
   const upsert = (
@@ -91,7 +91,7 @@ test('communication.message Relations resolve lazily without collapsing cross-So
     resources.upsert({
       ref: `ctx://${sourceId}/message/${providerMessageId}`,
       sourceId,
-      profile: { id: 'communication.message', version: 1 },
+      profile: { id: 'mail.message', version: 1 },
       origin: 'synced',
       completeness: 'complete',
       payload: { providerMessageId, ...payload },

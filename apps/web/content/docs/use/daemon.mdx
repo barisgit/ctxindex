@@ -1,0 +1,36 @@
+---
+title: Local daemon lifecycle
+description: Let stateful commands manage the daemon automatically, and use lifecycle commands only for observation or recovery.
+---
+
+You normally do not manage the daemon. A stateful command such as `search`, `sync`, `get`, or `source add` verifies the exact local runtime, starts it when absent, and uses typed local RPC. The daemon keeps the registry and SQLite ownership in one process, streams long-running work such as sync, and exits after five idle minutes.
+
+```text
+ctxindex command -> ensure exact daemon -> local RPC -> result
+                                      └-> idle for five minutes -> exit
+```
+
+Active business requests suppress idle shutdown. Completing a business request refreshes the deadline. Status observation does not keep an otherwise idle daemon alive.
+
+## Observe or stop it
+
+```bash
+ctxindex daemon status
+ctxindex daemon stop
+```
+
+Use `status` to inspect readiness, process identity, protocol version, and active request count. Use `stop` before diagnosing a stuck local runtime or when you explicitly want no background process; the next normal stateful command starts it again.
+
+## Start it explicitly only when useful
+
+```bash
+ctxindex daemon start
+```
+
+Explicit start is useful for smoke tests and lifecycle diagnosis. It is not an installation step and there is no foreground `serve` mode to keep running in another terminal.
+
+<Callout>
+  Once a command selects the daemon, it never falls back to opening the same database directly. A startup, protocol, or shutdown failure is reported with a stable exit instead of creating competing owners.
+</Callout>
+
+For malformed config or startup diagnostics, see [Troubleshooting](/docs/start/troubleshooting). For the process boundary, see [Architecture](/docs/concepts/architecture).

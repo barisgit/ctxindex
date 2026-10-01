@@ -1,65 +1,46 @@
-import { defineCommand } from 'citty'
-import { parseSecretsArgs, secretsUsage } from '../args/secrets'
-import { openSecretDeps } from '../deps'
-import { mapErrorToExit, runWithExit } from '../format/exit'
-import {
-  formatSecretBackendStatus,
-  formatSecretBackendSwitch,
-} from '../format/secrets'
+import { defineCtxCommand } from '../command-model'
+import { runWithExit } from '../format/exit'
+import { outputFormatArg } from '../format/output'
+import { handleSecretsCommand } from '../secrets/handle-secrets-command'
 
-export async function handleSecretsCommand(args: string[]): Promise<number> {
-  const parsed = parseSecretsArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(`${parsed.message}. Try: ${secretsUsage}`)
-    return 2
-  }
+export {
+  handleSecretsCommand,
+  type SecretsCommandDeps,
+  type SecretsCommandInput,
+} from '../secrets/handle-secrets-command'
 
-  let deps: Awaited<ReturnType<typeof openSecretDeps>> | undefined
-  try {
-    deps = await openSecretDeps()
-    if (parsed.kind === 'status') {
-      console.log(
-        formatSecretBackendStatus(
-          await deps.secretBackendManager.getStatus(),
-          parsed.json,
-        ),
-      )
-      return 0
-    }
-
-    const result = await deps.secretBackendManager.switchBackend(parsed.target)
-    console.log(formatSecretBackendSwitch(result))
-    for (const warning of result.warnings) console.error(`warning: ${warning}`)
-    return 0
-  } catch (err) {
-    console.error(err instanceof Error ? err.message : String(err))
-    return mapErrorToExit(err)
-  } finally {
-    await deps?.close()
-  }
-}
-
-export const secretsCommand = defineCommand({
+export const secretsCommand = defineCtxCommand({
   meta: { name: 'secrets', description: 'Inspect and select secret storage.' },
   subCommands: {
-    status: defineCommand({
+    status: defineCtxCommand({
       meta: { name: 'status', description: 'Show safe backend status.' },
-      args: { json: { type: 'boolean', description: 'Print JSON' } },
-      run: ({ rawArgs }) =>
-        runWithExit(() => handleSecretsCommand(['status', ...rawArgs])),
+      args: { format: outputFormatArg },
+      run: ({ args }) =>
+        runWithExit(() =>
+          handleSecretsCommand({
+            kind: 'status',
+            json: args.format === 'json',
+          }),
+        ),
     }),
-    backend: defineCommand({
+    backend: defineCtxCommand({
       meta: { name: 'backend', description: 'Manage the active backend.' },
       subCommands: {
-        set: defineCommand({
+        set: defineCtxCommand({
           meta: { name: 'set', description: 'Set keychain or file backend.' },
           args: {
-            target: { type: 'positional', required: true },
+            target: {
+              type: 'positional',
+              required: true,
+              options: ['keychain', 'file'],
+            },
           },
-          run: ({ rawArgs }) =>
+          run: ({ args }) =>
             runWithExit(() =>
-              handleSecretsCommand(['backend', 'set', ...rawArgs]),
+              handleSecretsCommand({
+                kind: 'set',
+                target: args.target,
+              }),
             ),
         }),
       },

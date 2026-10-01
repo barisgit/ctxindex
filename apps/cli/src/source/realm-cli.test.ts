@@ -3,12 +3,12 @@ import { describe, expect, test } from 'bun:test'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { CTXINDEX_BUILTIN_EXTENSIONS } from '@ctxindex/adapters'
 import type { Logger } from '@ctxindex/core/logger'
 import { createRealmService } from '@ctxindex/core/realm'
 import { createExtensionRegistry } from '@ctxindex/core/registry'
 import { createSourceService } from '@ctxindex/core/source'
 import { applyPragmas, runMigrations } from '@ctxindex/core/storage'
+import { CTXINDEX_BUILTIN_EXTENSIONS } from '@ctxindex/official'
 
 const repoRoot = new URL('../../../../', import.meta.url).pathname
 const cliBin = join(repoRoot, 'apps/cli/bin/ctxindex.mjs')

@@ -1,26 +1,38 @@
-import { defineCommand } from 'citty'
+import { defineCtxCommand } from '../command-model'
 import { runWithExit } from '../format/exit'
+import { resolveOutputFormat, structuredOutputArgs } from '../format/output'
 import { handleRealmCommand } from '../realm/handle-realm-command'
 
 export { handleRealmCommand }
 
-export const realmCommand = defineCommand({
+export const realmCommand = defineCtxCommand({
   meta: { name: 'realm', description: 'Manage indexing realms.' },
   subCommands: {
-    add: defineCommand({
+    add: defineCtxCommand({
       meta: { name: 'add', description: 'Add a realm.' },
       args: {
-        slug: { type: 'positional', required: false },
+        slug: { type: 'positional', required: true },
         name: { type: 'string', description: 'Realm display name' },
       },
-      run: ({ rawArgs }) =>
-        runWithExit(() => handleRealmCommand(['add', ...rawArgs])),
+      run: ({ args }) =>
+        runWithExit(() =>
+          handleRealmCommand({
+            kind: 'add',
+            slug: args.slug,
+            ...(args.name !== undefined ? { name: args.name } : {}),
+          }),
+        ),
     }),
-    list: defineCommand({
+    list: defineCtxCommand({
       meta: { name: 'list', description: 'List existing realms.' },
-      args: { json: { type: 'boolean', description: 'Print JSON' } },
-      run: ({ rawArgs }) =>
-        runWithExit(() => handleRealmCommand(['list', ...rawArgs])),
+      args: structuredOutputArgs,
+      run: ({ args }) =>
+        runWithExit(() =>
+          handleRealmCommand({
+            kind: 'list',
+            format: resolveOutputFormat(args),
+          }),
+        ),
     }),
   },
 })

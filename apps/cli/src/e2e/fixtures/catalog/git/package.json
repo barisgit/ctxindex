@@ -1,0 +1,11 @@
+{
+  "name": "@fixture/catalog-git-extension",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "ctxindex": {
+    "extensions": [
+      "./extension.js"
+    ]
+  }
+}

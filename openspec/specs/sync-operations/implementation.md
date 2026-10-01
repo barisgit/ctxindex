@@ -52,6 +52,15 @@ export interface SyncRunInput {
   readonly sourceId: string
   readonly mode: SyncMode
   readonly signal: AbortSignal
+  readonly onProgress?: (progress: SyncRunProgress) => void | Promise<void>
+}
+
+export interface SyncRunProgress {
+  readonly processed: number
+  readonly upserts: number
+  readonly removals: number
+  readonly checkpoints: number
+  readonly warningsCount: number
 }
 
 export interface SyncDriveContext {
@@ -124,10 +133,28 @@ export interface SyncSourceInput {
   readonly sourceId: string
   readonly mode: SyncMode
   readonly signal: AbortSignal
+  readonly onProgress?: (progress: SyncRunProgress) => void | Promise<void>
   readonly fetch?: SourceProviderFetch
 }
 
 export function syncSource(input: SyncSourceInput): Promise<SyncRunResult>;
+```
+
+### @ctxindex/core — multi-Source application stream
+
+```ts
+export interface RunSyncInput {
+  readonly source?: string
+  readonly mode: SyncMode
+  readonly signal: AbortSignal
+  readonly onEvent?: (event: SyncApplicationEvent) => void | Promise<void>
+}
+
+export type SyncApplicationEvent =
+  | { readonly type: 'source.started'; readonly sequence: number; readonly sourceId: string; readonly mode: SyncMode }
+  | ({ readonly type: 'source.progress'; readonly sequence: number; readonly sourceId: string } & SyncRunProgress)
+  | { readonly type: 'source.completed'; readonly sequence: number; readonly sourceId: string; readonly run: SyncRunResult }
+  | { readonly type: 'source.failed'; readonly sequence: number; readonly sourceId: string; readonly error: CtxindexError; readonly diagnostics: SyncRunFailureDiagnostics }
 ```
 
 ### @ctxindex/cli — sync command boundary
@@ -166,7 +193,9 @@ export async function handleSyncCommand(
 
 The SDK exposes cursor-driven emissions through `SyncContext`; there is no separate emit capability. Core `SyncCoordinator` validates emissions, owns run/lock/checkpoint state, buffers transactional writes, and applies cursor changes only with successful work. `syncSource` binds a stored Source to its loaded Adapter and provider context.
 
-Warnings may stream without invalidating committed state. `SyncCoordinator` is the severity boundary: it aggregates warning emissions independently, retains the original last structured warning at runtime, persists a field-bounded snapshot, and records a terminal thrown failure as one error without discarding earlier warnings. A lock-conflicted attempt records its own run as failed `sync busy`; only explicit cancellation records a cancelled run. Failed-run diagnostics are associated with the original thrown object through a bounded weak channel, preserving error identity and exit translation while allowing the invoking CLI to report the summary. Diff mode exercises the same validation and rolls back data/cursor changes, including current Source sync state. CLI sync orchestration selects Sources, excludes stored `sync_enabled: false` Sources from all-Source runs, rejects a targeted disabled Source before invoking `syncSource`, invokes injected services, and keeps per-Source success/failure output deterministic.
+Warnings may stream without invalidating committed state. `SyncCoordinator` is the severity boundary: it aggregates warning emissions independently, retains the original last structured warning at runtime, persists a field-bounded snapshot, and records a terminal thrown failure as one error without discarding earlier warnings. After each validated Adapter emission it awaits an optional observer with cumulative count-only progress; observer backpressure therefore reaches the Adapter's awaited `emit` call. Progress is an observation of processed emissions, not a committed-state claim. `SyncApplicationService` wraps one or many Source runs with deterministic, monotonically sequenced start/progress/terminal events and awaits the optional observer. Omitting observers preserves the same result and storage behavior.
+
+A lock-conflicted attempt records its own run as failed `sync busy`; only explicit cancellation records a cancelled run. Failed-run diagnostics are associated with the original thrown object through a bounded weak channel, preserving error identity and exit translation while allowing the invoking CLI to report the summary. Diff mode exercises the same validation and rolls back data/cursor changes, including current Source sync state. CLI sync orchestration selects Sources, excludes stored `sync_enabled: false` Sources from all-Source runs, rejects a targeted disabled Source before invoking `syncSource`, invokes injected services, and keeps per-Source success/failure output deterministic.
 
 The thin CLI owns the closed sync argv grammar and preserves help precedence. The root boundary rejects option-like tokens placed before the selected `sync` command before command selection can discard them, while preserving valid global options. The command descriptor forwards mode as an unvalidated string so the parser remains the sole mode-value boundary after command selection. The parser rejects invalid input through the `SyncArgs` union before runtime dependencies open, Source labels resolve, sync execution begins, or storage and provider effects become reachable.
 

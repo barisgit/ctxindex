@@ -66,13 +66,81 @@ export async function loadCliDefinitions(
 
 ```
 
-`LoadExtensionsResult` includes core's passive Extension documentation projection, but current CLI command registration and bundled skills do not render, list, or inline it. Bundled skills remain release-versioned workflow guidance; registry descriptions remain authoritative for interface facts. A CLI or agent presentation surface for Extension documentation requires a separately accepted consumer contract.
+`LoadExtensionsResult` includes core's passive Extension documentation projection, consumed by the docs runtime in direct or selected-daemon mode. Registry descriptions remain authoritative for loaded interface facts. The one portable Agent Skill remains release-versioned workflow guidance and does not inline Extension documentation or loaded schemas.
 
 ### @ctxindex/cli — composition boundary
 
 ```ts
 export async function runCli(args: string[]): Promise<number>;
 ```
+
+### @ctxindex/cli — streamed sync boundary
+
+```ts
+export interface SyncRouteServices {
+  readonly selectDaemon: typeof selectDaemon
+  readonly daemonSync: typeof daemonSync
+}
+
+export async function daemonSync(
+  selection: DaemonSelection,
+  input: RpcSyncInput,
+  signal?: AbortSignal,
+  onEvent?: (event: RpcSyncEvent) => void | Promise<void>,
+): Promise<RpcSyncResult>;
+
+export interface SyncCommandInput {
+  readonly sourceId?: string
+  readonly mode: SyncRunResult['mode']
+  readonly json: boolean
+  readonly format: 'summary' | 'events' | 'compact'
+}
+```
+
+The daemon client manually advances the typed iterator so its terminal return remains available after progress events. It awaits the event sink and returns the iterator during cleanup, allowing cancellation and consumer backpressure to reach the daemon. Once a daemon is selected, stream or transport failure never falls back to direct database access.
+
+The sync runner projects direct-core and daemon-RPC events into one CLI vocabulary. `--format events` writes each event as one JSON line when observed. Human summary and compact modes may write bounded live progress to stderr while preserving terminal stdout. `--format json` suppresses all live writes and emits exactly one terminal JSON document. The terminal result remains the sole owner of stable exit selection.
+
+### @ctxindex/cli — background daemon lifecycle
+
+```ts
+export type DaemonStatusResult =
+  | { readonly status: 'unsupported' }
+  | { readonly status: 'stopped' }
+  | {
+      readonly status: 'starting' | 'stopping' | 'unavailable'
+      readonly instanceId: string
+      readonly pid: number
+      readonly startedAt: string
+    }
+  | { readonly status: 'running'; readonly health: RpcHealthResult }
+
+export interface DaemonStartResult {
+  readonly status: 'running'
+  readonly started: boolean
+  readonly health: RpcHealthResult
+}
+
+export type DaemonStopResult =
+  | {
+      readonly status: 'stopped'
+      readonly alreadyStopped: boolean
+      readonly instanceId?: string
+    }
+  | { readonly status: 'unsupported'; readonly alreadyStopped: true }
+
+export interface DaemonLifecycle {
+  start(signal?: AbortSignal): Promise<DaemonStartResult>
+  status(signal?: AbortSignal): Promise<DaemonStatusResult>
+  stop(signal?: AbortSignal): Promise<DaemonStopResult>
+}
+```
+
+The CLI lifecycle facade resolves only the pinned Bun source entrypoint or an exact packaged/compiled sibling, detaches it with ignored stdin and owner-private startup diagnostics, polls exact discovery plus compatible RPC health to a fixed deadline, and never treats discovery PID as ownership or a signal target. Stop uses typed graceful RPC shutdown for a live instance. Stale cleanup first acquires exclusive lifecycle ownership, then owner-checks discovery and validates the socket before removal.
+
+The lifecycle facade's outer action boundary preserves validated daemon failures, cancellation, and typed pre-init `invalid_args` guidance. Unexpected runtime canonicalization, discovery, or filesystem exceptions are converted to fixed action-specific `daemon_unavailable` messages before command rendering, so raw host paths and OS errors never cross the CLI boundary.
+
+Lifecycle commands are exactly `daemon start`, `daemon status`, and `daemon stop`; no foreground serve alias remains. Ordinary commands preserve the existing explicit discovery/test-override routing and do not autostart until the complete stateful inventory is daemon-routed or admitted to the tested bootstrap/filesystem-only exception allowlist. Once selected, transport loss never falls back to direct SQLite.
 
 ### @ctxindex/cli — shared flag contracts
 
@@ -101,6 +169,23 @@ export function parseFlags(
   options: ParseFlagsOptions = {},
 ): ParsedFlags;
 
+export type OutputFormat = 'pretty' | 'text' | 'json'
+
+export interface OutputSelection {
+  readonly format?: OutputFormat | undefined
+  readonly json?: boolean | undefined
+}
+
+export interface OutputEnvironment {
+  readonly isTTY: boolean
+  readonly columns?: number
+}
+
+export function resolveOutputFormat(
+  selection: OutputSelection,
+  environment?: OutputEnvironment,
+): OutputFormat;
+
 ```
 
 ### @ctxindex/cli — Account arguments
@@ -113,7 +198,7 @@ export type AccountArgs =
       readonly app?: string
       readonly label?: string
     }
-  | { readonly kind: 'list'; readonly json: boolean }
+  | { readonly kind: 'list'; readonly format: OutputFormat }
   | { readonly kind: 'remove'; readonly label: string }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
@@ -149,7 +234,7 @@ export function parseActionArgs(args: string[]): ActionArgs;
 
 ```ts
 export type ArtifactListArgs =
-  | { readonly kind: 'list'; readonly ref: string; readonly json: boolean }
+  | { readonly kind: 'list'; readonly ref: string; readonly format: OutputFormat }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
 
@@ -180,7 +265,7 @@ export type OAuthAppArgs =
       readonly label: string
       readonly fromEnv: true
     }
-  | { readonly kind: 'list'; readonly json: boolean }
+  | { readonly kind: 'list'; readonly format: OutputFormat }
   | {
       readonly kind: 'remove'
       readonly provider: string
@@ -223,13 +308,22 @@ export function parseExportArgs(args: string[]): ExportArgs;
 ### @ctxindex/cli — Extension arguments
 
 ```ts
-export interface ExtensionSelector {
-  readonly id: string
-  readonly version: number
-}
-
 export type ExtensionsArgs =
-  | { readonly kind: 'list'; readonly json: boolean }
+  | { readonly kind: 'list'; readonly format: OutputFormat }
+  | {
+      readonly kind: 'search'
+      readonly query?: string
+      readonly noRefresh: boolean
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'catalog-build'
+      readonly packageRoot: string
+      readonly catalogId?: string
+      readonly output?: string
+      readonly trust: true
+      readonly json: boolean
+    }
   | {
       readonly kind: 'catalog-add'
       readonly name: string
@@ -246,7 +340,7 @@ export type ExtensionsArgs =
   | {
       readonly kind: 'catalog-show'
       readonly name: string
-      readonly extension?: ExtensionSelector
+      readonly extensionId?: string
       readonly noRefresh: boolean
       readonly json: boolean
     }
@@ -263,14 +357,9 @@ export type ExtensionsArgs =
   | {
       readonly kind: 'catalog-install'
       readonly catalog: string
-      readonly extension: ExtensionSelector
+      readonly extensionId: string
       readonly trust: true
       readonly noRefresh: boolean
-      readonly json: boolean
-    }
-  | {
-      readonly kind: 'catalog-uninstall'
-      readonly extension: ExtensionSelector
       readonly json: boolean
     }
   | {
@@ -286,7 +375,7 @@ export type ExtensionsArgs =
       readonly json: boolean
     }
   | {
-      readonly kind: 'direct-uninstall'
+      readonly kind: 'uninstall'
       readonly extensionId: string
       readonly force: boolean
       readonly json: boolean
@@ -301,7 +390,7 @@ export function parseExtensionsArgs(args: string[]): ExtensionsArgs;
 
 ```ts
 export type GetArgs =
-  | { readonly kind: 'get'; readonly ref: string; readonly json: boolean }
+  | { readonly kind: 'get'; readonly ref: string; readonly format: OutputFormat }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
 
@@ -313,7 +402,7 @@ export function parseGetArgs(args: string[]): GetArgs;
 ```ts
 export type RealmArgs =
   | { readonly kind: 'add'; readonly slug: string; readonly name?: string }
-  | { readonly kind: 'list'; readonly json: boolean }
+  | { readonly kind: 'list'; readonly format: OutputFormat }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
 
@@ -334,6 +423,7 @@ export interface ExecuteSearchInput {
   readonly until?: number
   readonly limit?: number
   readonly offset?: number
+  readonly continuation?: string
   readonly explain?: boolean
   readonly localOnly?: boolean
   readonly remote?: boolean
@@ -343,7 +433,7 @@ export type SearchArgs =
   | {
       readonly kind: 'search'
       readonly input: ExecuteSearchInput
-      readonly json: boolean
+      readonly format: OutputFormat
       readonly refs: boolean
     }
   | { readonly kind: 'help' }
@@ -364,23 +454,20 @@ export type SecretsArgs =
 export function parseSecretsArgs(args: string[]): SecretsArgs;
 ```
 
-### @ctxindex/cli — skill arguments
+### @ctxindex/cli — portable Agent Skill
 
 ```ts
-export type SkillsArgs =
-  | { readonly kind: 'list'; readonly json: boolean }
-  | {
-      readonly kind: 'get'
-      readonly name: string
-      readonly inline: boolean
-      readonly json: boolean
-    }
-  | { readonly kind: 'path' }
-  | { readonly kind: 'help' }
-  | { readonly kind: 'unknown'; readonly message: string }
+export interface BundledAgentSkill {
+  readonly name: string
+  readonly description: string
+  readonly byteSize: number
+  readonly content: string
+}
 
-export function parseSkillsArgs(args: string[]): SkillsArgs;
+export function resolveAgentSkill(): BundledAgentSkill;
 ```
+
+`skills/ctxindex/SKILL.md` is the canonical source. A build-time macro validates exact `name` and `description` frontmatter plus a non-empty body, then embeds an immutable value. Runtime command code does not resolve repository paths or maintain a skill registry. `docs get-skill` is the sole command surface; the removed generic `skills` group has no compatibility parser.
 
 ### @ctxindex/cli — Source arguments
 
@@ -398,8 +485,7 @@ export type SourceArgs =
   | {
       readonly kind: 'list'
       readonly realmSlug?: string
-      readonly json: boolean
-      readonly format: 'table' | 'compact'
+      readonly format: OutputFormat
     }
   | { readonly kind: 'remove'; readonly sourceId: string }
   | { readonly kind: 'help' }
@@ -418,8 +504,7 @@ export type StatusArgs =
   | {
       readonly kind: 'status'
       readonly sourceId?: string
-      readonly json: boolean
-      readonly format: 'summary' | 'compact'
+      readonly format: OutputFormat
     }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
@@ -444,13 +529,13 @@ export type SyncArgs =
 export function parseSyncArgs(args: string[]): SyncArgs;
 ```
 
-Sync, status, and Source inventory formatters project core-owned `warningsCount`, `lastWarning`, `errorsCount`, and `lastError` values directly. Failed sync formatting reads bounded diagnostics from core's failure channel while retaining the safe public error message and stable exit. The CLI labels the two severities independently in JSON and readable output and does not reconstruct severity from diagnostic text.
+Sync, status, and Source inventory formatters project core-owned `warningsCount`, `lastWarning`, `errorsCount`, and `lastError` values directly. Failed sync formatting reads bounded diagnostics from core's failure channel while retaining the safe public error message and stable exit. The CLI labels the two severities independently in JSON and readable output and does not reconstruct severity from diagnostic text. Sync retains its existing summary/events/compact/JSON modes until streaming integration deliberately maps pretty to human progress, text to deterministic line-oriented events, and JSON to structured events plus a terminal result.
 
 ### @ctxindex/cli — thread arguments
 
 ```ts
 export type ThreadGetArgs =
-  | { readonly kind: 'get'; readonly ref: string; readonly json: boolean }
+  | { readonly kind: 'get'; readonly ref: string; readonly format: OutputFormat }
   | { readonly kind: 'help' }
   | { readonly kind: 'unknown'; readonly message: string }
 
@@ -476,8 +561,23 @@ Database-backed command dependency setup requires both the persisted config and 
 
 Parser unions are the command boundary. Registry-derived Source config, fields, kinds, exports, and Actions are resolved before service calls rather than duplicated as provider branches. The OAuth surface contains only `oauth-app` and `account` commands: App add requires exact Provider and label plus `--from-env`; Account add accepts an optional `--app`. An explicit label bypasses managed selection, while omission delegates to core's host-policy resolver and feeds the returned exact label through the same OAuth App service resolver. The CLI owns only this branch and static BYOA formatting; it does not infer Apps or reproduce policy, provenance, scope, or Provider logic. No `client` route or alias is parsed. Structured output writes safe projections to stdout and human diagnostics to stderr; App config, credential values, tokens, authorization codes, and secret-store passphrases never enter argv or output.
 
-The Extension command adapter delegates repository, manifest, persistence, refresh policy, and Catalog install behavior to `CatalogService`. Direct lifecycle forms delegate target parsing, package materialization, validation, persistence, and removal guards to `DirectExtensionService`. The parser distinguishes exact `npm|git|local` source kinds from existing Catalog selectors, and install/update emit their in-process trust notice on stderr before acquisition so JSON stdout remains one document. Catalog list/show and install request refresh by default, while `--no-refresh` selects stored state. Startup, loaded-Extension listing, uninstall, and ordinary operations never cross either acquisition boundary.
+The exact launch-critical reads search, get, thread, Artifact list, status, and Source, Realm, Account, OAuth App, and Extension inventories resolve `OutputFormat` before opening services. `--format` is the sole selector with `-f` as its Citty alias; removed `--json` is rejected as unknown. The resolver chooses pretty only for TTY stdout and otherwise chooses text. One presentation module owns compact JSON, deterministic TSV escaping with reserved `\N` nulls, and width-aware presentation. Pretty collections use a horizontal `cli-table3` table only when complete values fit the detected display width; narrow output grapheme-wraps before bounded vertical tables and uses plain labeled cards below the table's structural minimum. Both paths preserve characters and never ellipsize values. Domain formatters continue to own ordered safe projections. Search, get, thread, and Artifact list handlers keep JSON warnings in their result envelope and write warnings to stderr only for pretty/text. Get formats the complete existing Resource envelope and payload; search formats complete Refs; thread emits complete ordered Resource rows with tree depth. Search `--refs` is text-only and rejects explicit pretty/JSON selectors before dependencies. Profile export, describe, sync, and daemon lifecycle retain independent format domains.
+
+The Extension command adapter keeps the Catalog lifecycle, Marketplace projection,
+and trusted installation seams distinct: inert repository/manifest reads delegate
+to `CatalogService`, while Catalog-selected execution delegates to
+`CatalogInstallationService`. Both Catalog-selected and direct lifecycle forms
+ultimately use the same generic package installer, managed materializations, and
+atomic installed-extension record; `DirectExtensionService` remains only the
+thin direct install/update/list/uninstall facade. The parser distinguishes exact
+`npm|git|local` source kinds from configured Catalog selectors, uses stable
+versionless Extension ids, and exposes one origin-neutral uninstall. Catalog
+list/show and install request refresh by default, while `--no-refresh` selects
+stored state. Install/update emit their in-process trust notice on stderr before
+acquisition so JSON stdout remains one document. Startup, loaded-Extension
+listing, uninstall, and ordinary operations never cross either acquisition
+boundary.
 
 ## Verification
 
-Argument tests cover every discriminated parser and invalid form, including optional managed App selection, explicit exact App labels, exact direct source-kind and Extension selection, Catalog/direct separation, zero-effect invalid selection, static BYOA guidance, and rejection of every Client compatibility route. Command tests inject dependency/service interfaces. CLI e2e tests cover empty and config-only initialization guards with no OAuth App configuration or durable-state side effects, readable/JSON stream separation, stable exits, registry-derived help/describe behavior, bundled skills, local Catalog trust, direct package trust, default command-time refresh, stored-snapshot age and `--no-refresh`, observable refresh failure, offline pinned startup/loading, guarded removal, and relocated compiled execution.
+Argument tests cover every discriminated parser and invalid form, including optional managed App selection, explicit exact App labels, exact direct source-kind and Extension selection, Catalog/direct separation, zero-effect invalid selection, static BYOA guidance, and rejection of every Client compatibility route. Command tests inject dependency/service interfaces. CLI e2e tests cover empty and config-only initialization guards with no OAuth App configuration or durable-state side effects, readable/JSON stream separation, stable exits, registry-derived help/describe behavior, the portable bundled Agent Skill, local Catalog trust, direct package trust, default command-time refresh, stored-snapshot age and `--no-refresh`, observable refresh failure, offline pinned startup/loading, guarded removal, and relocated compiled execution.

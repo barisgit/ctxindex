@@ -24,6 +24,6 @@ A full Microsoft Calendar resync now materializes real Outlook.com events after 
 ## Impact
 
 - `packages/profiles`: Calendar Event schema/projections and focused Profile tests.
-- `packages/adapters`: Microsoft Calendar series normalization plus Google/Microsoft canonical time-zone normalization and focused tests.
+- `packages/official`: Microsoft Calendar series normalization plus Google/Microsoft canonical time-zone normalization and focused tests.
 - Compiled multi-provider calendar verification and one isolated private live resync checkpoint.
 - No new dependency, provider scope, provider mutation, core/storage branch, recurrence expansion, mailbox behavior, migration, credential handling, or live fixture in the shared workspace.

@@ -118,7 +118,7 @@ test('oauth-app validates providers and manages safe labeled inventory', async (
     const initialized = await sandbox.run(['init'])
     expect(initialized.exitCode, initialized.stderr).toBe(0)
 
-    const managed = await sandbox.run(['oauth-app', 'list', '--json'])
+    const managed = await sandbox.run(['oauth-app', 'list', '--format', 'json'])
     expect(managed.exitCode, managed.stderr).toBe(0)
     expect(managed.stdout).not.toMatch(
       /clientId|clientSecret|apps\.googleusercontent|GOCSPX|22d1ed12/i,
@@ -131,7 +131,7 @@ test('oauth-app validates providers and manages safe labeled inventory', async (
         provenance: {
           kind: 'extension',
           source: 'builtin',
-          packageName: '@ctxindex/adapters',
+          packageName: '@ctxindex/official',
         },
       },
       {
@@ -141,7 +141,7 @@ test('oauth-app validates providers and manages safe labeled inventory', async (
         provenance: {
           kind: 'extension',
           source: 'builtin',
-          packageName: '@ctxindex/adapters',
+          packageName: '@ctxindex/official',
         },
       },
     ])
@@ -190,11 +190,16 @@ test('oauth-app validates providers and manages safe labeled inventory', async (
 
     const listed = await sandbox.run(['oauth-app', 'list'])
     expect(listed.exitCode, listed.stderr).toBe(0)
-    expect(listed.stdout).toContain('google "work" origin=local')
+    expect(listed.stdout).toContain('google\twork\tlocal\t')
     expect(listed.stdout).not.toContain('canary')
     expect(listed.stdout).not.toContain('keychain:')
 
-    const listedJson = await sandbox.run(['oauth-app', 'list', '--json'])
+    const listedJson = await sandbox.run([
+      'oauth-app',
+      'list',
+      '--format',
+      'json',
+    ])
     expect(listedJson.exitCode, listedJson.stderr).toBe(0)
     expect(listedJson.stdout).not.toContain('canary')
     expect(listedJson.stdout).not.toContain('keychain:')
@@ -209,7 +214,7 @@ test('oauth-app validates providers and manages safe labeled inventory', async (
         provenance: {
           kind: 'extension',
           source: 'builtin',
-          packageName: '@ctxindex/adapters',
+          packageName: '@ctxindex/official',
         },
       },
       {
@@ -231,7 +236,7 @@ test('oauth-app validates providers and manages safe labeled inventory', async (
         provenance: {
           kind: 'extension',
           source: 'builtin',
-          packageName: '@ctxindex/adapters',
+          packageName: '@ctxindex/official',
         },
       },
       {

@@ -1,6 +1,27 @@
 import { describe, expect, spyOn, test } from 'bun:test'
 import { SearchPlanner } from '@ctxindex/core/search'
-import { formatSearchJson, handleSearchCommand } from './search'
+import {
+  formatSearchJson,
+  formatSearchPretty,
+  formatSearchText,
+  handleSearchCommand,
+} from './search'
+
+const longRef = `ctx://source/message/${'immutable-id'.repeat(20)}`
+
+function cardValue(output: string, label: string): string {
+  const chunks: string[] = []
+  let collecting = false
+  for (const line of output.split('\n')) {
+    const cells = line.split('│')
+    if (cells.length !== 4) continue
+    const currentLabel = cells[1]?.trim()
+    if (currentLabel === label) collecting = true
+    else if (currentLabel) collecting = false
+    if (collecting) chunks.push(cells[2]?.trim() ?? '')
+  }
+  return chunks.join('')
+}
 
 describe('search JSON output', () => {
   test('uses the unified deterministic result envelope', () => {
@@ -34,29 +55,67 @@ describe('search JSON output', () => {
         warnings: [],
       }),
     ).toBe(
-      '{"results":[],"pagination":{"offset":20,"limit":20,"hasMore":true},"warnings":[]}',
+      '{"results":[],"warnings":[],"pagination":{"offset":20,"limit":20,"hasMore":true}}',
     )
+  })
+
+  test('keeps long Refs complete in text and narrow pretty output', () => {
+    const result = {
+      results: [
+        {
+          ref: longRef,
+          profile: { id: 'mail.message', version: 1 },
+          sourceId: 'source',
+          origin: 'provider' as const,
+          originRank: 0,
+          title: 'FedEx',
+          summary: null,
+          occurredAt: null,
+          chunks: [],
+        },
+      ],
+      warnings: [],
+    }
+    expect(formatSearchText(result)).toContain(longRef)
+    expect(formatSearchText(result)).toContain('\tFedEx\t\\N\t\\N\t[]')
+    const pretty = formatSearchPretty(result, { columns: 40 })
+    expect(cardValue(pretty, 'Ref')).toBe(longRef)
+    expect(pretty).not.toContain('…')
   })
 
   test('selected daemon search preserves output without opening direct dependencies', async () => {
     const log = spyOn(console, 'log').mockImplementation(() => {})
     let opened = false
     try {
-      const exit = await handleSearchCommand(['needle', '--json'], {
-        selectDaemon: () => ({}) as never,
-        search: async (_selection, input) => {
-          expect(input.text).toBe('needle')
-          return {
-            results: [],
-            warnings: [],
-            pagination: { offset: 0, limit: 20, hasMore: false },
-          }
+      const exit = await handleSearchCommand(
+        {
+          input: { text: 'needle' },
+          format: 'json',
+          refs: false,
         },
-        open: async () => {
-          opened = true
-          throw new Error('direct dependencies opened')
+        {
+          selectDaemon: () => {
+            throw new Error('legacy selection invoked')
+          },
+          ensureDaemonSelection: async () => ({
+            status: 'selected',
+            selection: {} as never,
+            started: true,
+          }),
+          search: async (_selection, input) => {
+            expect(input.text).toBe('needle')
+            return {
+              results: [],
+              warnings: [],
+              pagination: { offset: 0, limit: 20, hasMore: false },
+            }
+          },
+          open: async () => {
+            opened = true
+            throw new Error('direct dependencies opened')
+          },
         },
-      })
+      )
       expect(exit).toBe(0)
       expect(opened).toBe(false)
       expect(log).toHaveBeenCalledWith(
@@ -64,6 +123,39 @@ describe('search JSON output', () => {
       )
     } finally {
       log.mockRestore()
+    }
+  })
+
+  test('JSON search warnings stay only in the stdout envelope', async () => {
+    const log = spyOn(console, 'log').mockImplementation(() => {})
+    const error = spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      expect(
+        await handleSearchCommand(
+          { input: { text: 'needle' }, format: 'json', refs: false },
+          {
+            selectDaemon: () => ({}) as never,
+            search: async () => ({
+              results: [],
+              warnings: [
+                {
+                  sourceId: 'source',
+                  code: 'degraded',
+                  message: 'provider unavailable',
+                },
+              ],
+            }),
+            open: async () => {
+              throw new Error('direct dependencies opened')
+            },
+          },
+        ),
+      ).toBe(0)
+      expect(String(log.mock.calls[0]?.[0])).toContain('"warnings"')
+      expect(error).not.toHaveBeenCalled()
+    } finally {
+      log.mockRestore()
+      error.mockRestore()
     }
   })
 
@@ -77,25 +169,32 @@ describe('search JSON output', () => {
       },
     )
     try {
-      const exit = await handleSearchCommand(['needle', '--remote'], {
-        selectDaemon: () => null,
-        search: async () => {
-          throw new Error('daemon transport invoked')
+      const exit = await handleSearchCommand(
+        {
+          input: { text: 'needle', remote: true },
+          format: 'text',
+          refs: false,
         },
-        open: async () =>
-          ({
-            db: {},
-            registry: { profiles: {} },
-            authService: {},
-            logger: {},
-            sourceService: {
-              resolveSourceId: () => {
-                throw new Error('source selector resolved')
+        {
+          selectDaemon: () => null,
+          search: async () => {
+            throw new Error('daemon transport invoked')
+          },
+          open: async () =>
+            ({
+              db: {},
+              registry: { profiles: {} },
+              authService: {},
+              logger: {},
+              sourceService: {
+                resolveSourceId: () => {
+                  throw new Error('source selector resolved')
+                },
               },
-            },
-            close: async () => {},
-          }) as never,
-      })
+              close: async () => {},
+            }) as never,
+        },
+      )
 
       expect(exit).toBe(130)
       expect(search).toHaveBeenCalledTimes(1)
@@ -121,7 +220,7 @@ describe('search JSON output', () => {
         warnings: [],
       }),
     ).toBe(
-      '{"results":[],"pagination":{"limit":50,"hasMore":true,"continuation":"opaque-next-page"},"warnings":[]}',
+      '{"results":[],"warnings":[],"pagination":{"limit":50,"hasMore":true,"continuation":"opaque-next-page"}}',
     )
   })
 })

@@ -3,6 +3,7 @@ import { CtxindexNotFoundError } from '@ctxindex/core/errors'
 import type { ThreadResult } from '@ctxindex/core/thread'
 import {
   formatThreadJson,
+  formatThreadPretty,
   formatThreadText,
   handleThreadGetCommand,
 } from './thread'
@@ -56,9 +57,25 @@ const result: ThreadResult = {
   warnings: [],
 }
 
+const directDaemon = {
+  select: () => null,
+  get: async () => {
+    throw new Error('daemon transport invoked')
+  },
+}
+
 describe('thread output', () => {
-  test('formats deterministic compact text with tree indentation', () => {
-    expect(formatThreadText(result)).toBe(`${ref}\tRoot\n  ${childRef}`)
+  test('formats complete deterministic text rows and narrow pretty cards', () => {
+    const text = formatThreadText(result)
+    expect(text).toContain('depth\tref\tsourceId\trealmId\tprofile')
+    expect(text).toContain(`0\t${ref}`)
+    expect(text).toContain('{"body":"full payload"}')
+    expect(text).toContain(`1\t${childRef}`)
+    const pretty = formatThreadPretty(result, { columns: 40 })
+    expect(
+      pretty.split('\n').every((line) => Bun.stringWidth(line) <= 40),
+    ).toBe(true)
+    expect(pretty).not.toContain('…')
   })
 
   test('formats the typed JSON envelope with full Resource payloads', () => {
@@ -75,7 +92,9 @@ describe('thread output', () => {
       },
     })
 
-    expect(await handleThreadGetCommand(['--json', ref], open)).toBe(0)
+    expect(
+      await handleThreadGetCommand({ ref, format: 'json' }, open, directDaemon),
+    ).toBe(0)
     expect(log).toHaveBeenCalledWith(formatThreadJson(result))
     expect(closed).toBe(true)
     log.mockRestore()
@@ -86,13 +105,20 @@ describe('thread output', () => {
     let opened = false
     try {
       const exit = await handleThreadGetCommand(
-        ['--json', ref],
+        { ref, format: 'json' },
         async () => {
           opened = true
           throw new Error('direct dependencies opened')
         },
         {
-          select: () => ({}) as never,
+          select: () => {
+            throw new Error('legacy selection invoked')
+          },
+          ensure: async () => ({
+            status: 'selected',
+            selection: {} as never,
+            started: true,
+          }),
           get: async () => result as never,
         },
       )
@@ -119,9 +145,17 @@ describe('thread output', () => {
       }
     }
 
-    expect(await handleThreadGetCommand(['bad-ref'], open)).toBe(2)
+    expect(
+      await handleThreadGetCommand(
+        { ref: 'bad-ref', format: 'text' },
+        open,
+        directDaemon,
+      ),
+    ).toBe(2)
     expect(opens).toBe(0)
-    expect(await handleThreadGetCommand([ref], open)).toBe(2)
+    expect(
+      await handleThreadGetCommand({ ref, format: 'text' }, open, directDaemon),
+    ).toBe(2)
     expect(opens).toBe(1)
     error.mockRestore()
   })

@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import {
   closeSync,
@@ -7,16 +8,36 @@ import {
   lstatSync,
   mkdirSync,
   openSync,
+  realpathSync,
   type Stats,
 } from 'node:fs'
 import { platform, userInfo } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join } from 'node:path'
 import { canonicalizePath } from './identity'
 
 // Darwin open(2) flags. Bun 1.3.14 accepts these through node:fs.openSync but
 // does not expose the O_SHLOCK/O_EXLOCK names on node:fs.constants.
 const O_SHLOCK = 0x10
 const O_EXLOCK = 0x20
+const FLOCK_CONFLICT_EXIT = 73
+const FLOCK_CANDIDATES = [
+  '/usr/bin/flock',
+  '/bin/flock',
+  '/run/current-system/sw/bin/flock',
+] as const
+
+interface FlockSpawnResult {
+  readonly status: number | null
+}
+
+type FlockResolver = () => string | null
+type FileModeSetter = (fd: number, mode: number) => void
+
+type FlockSpawner = (
+  executable: string,
+  args: readonly string[],
+  fd: number,
+) => FlockSpawnResult
 
 export type FileLeaseMode = 'shared' | 'exclusive'
 export type FileLeasePurpose = 'lifecycle' | 'database'
@@ -41,6 +62,9 @@ export interface FileLeaseBackendOptions {
   readonly platform?: ReturnType<typeof platform>
   readonly openFile?: typeof openSync
   readonly currentUid?: number
+  readonly resolveFlock?: FlockResolver
+  readonly setFileMode?: FileModeSetter
+  readonly spawnFlock?: FlockSpawner
 }
 
 interface ActiveLeaseRecord {
@@ -197,6 +221,39 @@ function isUnsupported(error: unknown): boolean {
   )
 }
 
+function resolveSystemFlock(): string | null {
+  for (const candidate of FLOCK_CANDIDATES) {
+    try {
+      const resolved = realpathSync.native(candidate)
+      const stat = lstatSync(resolved)
+      if (
+        isAbsolute(resolved) &&
+        stat.isFile() &&
+        stat.uid === 0 &&
+        (stat.mode & 0o022) === 0 &&
+        (stat.mode & 0o111) !== 0
+      ) {
+        return resolved
+      }
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
+        continue
+      return null
+    }
+  }
+  return null
+}
+
+function spawnSystemFlock(
+  executable: string,
+  args: readonly string[],
+  fd: number,
+): FlockSpawnResult {
+  return spawnSync(executable, args, {
+    stdio: ['ignore', 'ignore', 'ignore', fd],
+  })
+}
+
 class DarwinFileLeaseBackend implements FileLeaseBackend {
   readonly #openFile: typeof openSync
   readonly #currentUid: number
@@ -287,6 +344,156 @@ class DarwinFileLeaseBackend implements FileLeaseBackend {
   }
 }
 
+class LinuxFileLeaseBackend implements FileLeaseBackend {
+  readonly #openFile: typeof openSync
+  readonly #currentUid: number
+  readonly #resolveFlock: FlockResolver
+  readonly #setFileMode: FileModeSetter
+  readonly #spawnFlock: FlockSpawner
+
+  constructor(
+    openFile: typeof openSync,
+    currentUid: number,
+    resolveFlock: FlockResolver,
+    setFileMode: FileModeSetter,
+    spawnFlock: FlockSpawner,
+  ) {
+    this.#openFile = openFile
+    this.#currentUid = currentUid
+    this.#resolveFlock = resolveFlock
+    this.#setFileMode = setFileMode
+    this.#spawnFlock = spawnFlock
+  }
+
+  acquire(input: FileLeaseRequest): FileLease {
+    const request = snapshotLeaseRequest(input)
+    validateDatabaseTarget(request)
+    const path = leasePath(request)
+    const parent = dirname(path)
+    mkdirSync(parent, { mode: 0o700, recursive: true })
+    validateLeaseParent(parent, this.#currentUid)
+    const before = existingStat(path, this.#currentUid)
+    const commonFlags = constants.O_RDWR | constants.O_NOFOLLOW
+    const targetDigest = digestTarget(request)
+    let fd: number
+
+    try {
+      if (before === null) {
+        try {
+          fd = this.#openFile(
+            path,
+            commonFlags | constants.O_CREAT | constants.O_EXCL,
+            0o600,
+          )
+          try {
+            this.#setFileMode(fd, 0o600)
+          } catch (error) {
+            closeSync(fd)
+            throw error
+          }
+        } catch (error) {
+          if (
+            !(
+              error instanceof Error &&
+              'code' in error &&
+              error.code === 'EEXIST'
+            )
+          )
+            throw error
+          fd = this.#openFile(path, commonFlags)
+        }
+      } else {
+        fd = this.#openFile(path, commonFlags)
+      }
+    } catch (error) {
+      if (isUnsupported(error))
+        throw new FileLeaseUnsupportedError('filesystem')
+      throw error
+    }
+
+    try {
+      const after = fstatSync(fd)
+      validateLeaseStat(after, this.#currentUid)
+      if (
+        before !== null &&
+        (before.dev !== after.dev || before.ino !== after.ino)
+      ) {
+        throw new UnsafeFileLeaseError('Lease file changed during acquisition')
+      }
+      const pathname = lstatSync(path)
+      validateLeaseStat(pathname, this.#currentUid)
+      if (pathname.dev !== after.dev || pathname.ino !== after.ino) {
+        throw new UnsafeFileLeaseError('Lease file changed during acquisition')
+      }
+      validateDatabaseTarget(request)
+
+      let executable: string | null
+      try {
+        executable = this.#resolveFlock()
+      } catch {
+        throw new FileLeaseUnsupportedError(
+          'platform',
+          'Retained file leases are unsupported on this platform',
+        )
+      }
+      if (executable === null || !isAbsolute(executable)) {
+        throw new FileLeaseUnsupportedError(
+          'platform',
+          'Retained file leases are unsupported on this platform',
+        )
+      }
+      let result: FlockSpawnResult
+      try {
+        result = this.#spawnFlock(
+          executable,
+          [
+            '-n',
+            '-E',
+            String(FLOCK_CONFLICT_EXIT),
+            request.mode === 'exclusive' ? '-x' : '-s',
+            '3',
+          ],
+          fd,
+        )
+      } catch {
+        throw new FileLeaseUnsupportedError('filesystem')
+      }
+      if (result.status === FLOCK_CONFLICT_EXIT) {
+        throw new FileLeaseConflictError(targetDigest)
+      }
+      if (result.status !== 0) {
+        throw new FileLeaseUnsupportedError('filesystem')
+      }
+
+      const retainedPathname = lstatSync(path)
+      validateLeaseStat(retainedPathname, this.#currentUid)
+      if (
+        retainedPathname.dev !== after.dev ||
+        retainedPathname.ino !== after.ino
+      ) {
+        throw new UnsafeFileLeaseError('Lease file changed during acquisition')
+      }
+      validateDatabaseTarget(request)
+    } catch (error) {
+      closeSync(fd)
+      throw error
+    }
+
+    const record: ActiveLeaseRecord = { request, active: true }
+    const lease: FileLease = {
+      mode: request.mode,
+      targetDigest,
+      release(): void {
+        if (!record.active) return
+        record.active = false
+        closeSync(fd)
+      },
+    }
+    activeLeases.set(lease, record)
+    return lease
+  }
+}
+
 export function assertRetainedDatabaseLeaseTarget(lease: FileLease): void {
   const record = activeLeases.get(lease)
   if (
@@ -322,12 +529,21 @@ export function assertRetainedFileLease(
 export function createFileLeaseBackend(
   options: FileLeaseBackendOptions = {},
 ): FileLeaseBackend {
-  if ((options.platform ?? platform()) !== 'darwin')
-    throw new FileLeaseUnsupportedError('platform')
-  return new DarwinFileLeaseBackend(
-    options.openFile ?? openSync,
-    options.currentUid ?? userInfo().uid,
-  )
+  const selectedPlatform = options.platform ?? platform()
+  const openFile = options.openFile ?? openSync
+  const currentUid = options.currentUid ?? userInfo().uid
+  if (selectedPlatform === 'darwin')
+    return new DarwinFileLeaseBackend(openFile, currentUid)
+  if (selectedPlatform === 'linux') {
+    return new LinuxFileLeaseBackend(
+      openFile,
+      currentUid,
+      options.resolveFlock ?? resolveSystemFlock,
+      options.setFileMode ?? fchmodSync,
+      options.spawnFlock ?? spawnSystemFlock,
+    )
+  }
+  throw new FileLeaseUnsupportedError('platform')
 }
 
 export function acquireFileLease(input: FileLeaseRequest): FileLease {

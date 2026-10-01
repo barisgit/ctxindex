@@ -2,14 +2,18 @@ import { CtxindexValidationError } from '@ctxindex/core/errors'
 import { syncSource } from '@ctxindex/core/source'
 import {
   type FailedSourceSyncResult,
-  mapSyncErrorCode,
   type RunSyncResult,
+  type SyncApplicationEvent,
   SyncApplicationService,
   type SyncRunResult,
   type SyncWarning,
 } from '@ctxindex/core/sync'
-import { parseSyncArgs, syncUsage } from '../args/sync'
+import type { RpcSyncEvent } from '@ctxindex/rpc'
 import { daemonSync, selectDaemon } from '../daemon/client'
+import {
+  ensureDaemonSelection,
+  selectEnsuredDaemonRoute,
+} from '../daemon/ensure'
 import { type CliDeps, openDeps } from '../deps'
 import { mapErrorToExit } from '../format/exit'
 
@@ -25,7 +29,15 @@ export interface SyncServices {
 
 export interface SyncRouteServices {
   readonly selectDaemon: typeof selectDaemon
+  readonly ensureDaemonSelection?: typeof ensureDaemonSelection
   readonly daemonSync: typeof daemonSync
+}
+
+export interface SyncCommandInput {
+  readonly sourceId?: string
+  readonly mode: SyncRunResult['mode']
+  readonly json: boolean
+  readonly format: 'summary' | 'events' | 'compact'
 }
 
 interface SyncWarningOutput {
@@ -66,6 +78,18 @@ interface FailedSourceSync {
 
 type SourceSyncOutput = CompletedSourceSync | FailedSourceSync
 
+type SyncLiveEvent =
+  | Extract<
+      RpcSyncEvent,
+      { readonly type: 'source.started' | 'source.progress' }
+    >
+  | {
+      readonly type: 'source.completed'
+      readonly sourceId: string
+      readonly run: SyncRunResult
+    }
+  | ({ readonly type: 'source.failed' } & Omit<FailedSourceSync, 'status'>)
+
 export interface SyncOutput {
   readonly mode: SyncRunResult['mode']
   readonly results: readonly SourceSyncOutput[]
@@ -73,7 +97,11 @@ export interface SyncOutput {
 }
 
 const defaultServices: SyncServices = { syncSource }
-const defaultRouteServices: SyncRouteServices = { selectDaemon, daemonSync }
+const defaultRouteServices: SyncRouteServices = {
+  selectDaemon,
+  ensureDaemonSelection,
+  daemonSync,
+}
 
 function errorCode(error: unknown): string {
   const code = (error as { code?: unknown }).code
@@ -99,9 +127,82 @@ function failedSource(result: FailedSourceSyncResult): FailedSourceSync {
   }
 }
 
+function rpcLiveEvent(event: RpcSyncEvent): SyncLiveEvent {
+  if (event.type === 'source.started' || event.type === 'source.progress') {
+    return event
+  }
+  if (event.type === 'source.completed') {
+    return {
+      type: 'source.completed',
+      sourceId: event.sourceId,
+      run: {
+        ...event.run,
+        lastWarning: event.run.lastWarning
+          ? rpcWarning(event.run.lastWarning)
+          : null,
+        warnings: event.run.warnings.map(rpcWarning),
+      },
+    }
+  }
+  return {
+    type: 'source.failed',
+    sourceId: event.sourceId,
+    warningsCount: event.diagnostics.warningsCount,
+    lastWarning: event.diagnostics.lastWarning
+      ? rpcWarning(event.diagnostics.lastWarning)
+      : null,
+    errorsCount: event.diagnostics.errorsCount,
+    lastError: event.diagnostics.lastError,
+    error: event.failure,
+    exitCode: mapRpcSyncFailureToExit(event.failure.code),
+  }
+}
+
+function coreLiveEvent(event: SyncApplicationEvent): SyncLiveEvent {
+  if (event.type === 'source.started' || event.type === 'source.progress') {
+    return event
+  }
+  if (event.type === 'source.completed') {
+    return {
+      type: 'source.completed',
+      sourceId: event.sourceId,
+      run: event.run,
+    }
+  }
+  const failed = failedSource({
+    sourceId: event.sourceId,
+    status: 'failed',
+    error: event.error,
+    diagnostics: event.diagnostics,
+  })
+  const { status: _status, ...output } = failed
+  return { type: 'source.failed', ...output }
+}
+
+function renderLiveEvent(
+  event: SyncLiveEvent,
+  format: SyncCommandInput['format'],
+  json: boolean,
+): void {
+  if (json) return
+  if (format === 'events') {
+    console.log(JSON.stringify(event))
+    return
+  }
+  if (event.type === 'source.started') {
+    console.error(`syncing ${event.sourceId} (${event.mode})`)
+  } else if (
+    event.type === 'source.progress' &&
+    (event.processed === 1 || event.processed % 100 === 0)
+  ) {
+    console.error(
+      `syncing ${event.sourceId}: processed=${event.processed} upserts=${event.upserts} removals=${event.removals} warnings=${event.warningsCount}`,
+    )
+  }
+}
+
 export function mapRpcSyncFailureToExit(code: string): number {
-  return mapSyncErrorCode(code as Parameters<typeof mapSyncErrorCode>[0])
-    .exitCode
+  return mapErrorToExit({ code })
 }
 
 export function formatSyncOutput(
@@ -110,6 +211,9 @@ export function formatSyncOutput(
   json: boolean,
 ): string {
   if (json) return JSON.stringify(output)
+  if (output.results.length === 0 && output.warnings.length === 0) {
+    return format === 'events' ? '' : 'No sync-enabled Sources are available.'
+  }
   if (format === 'events') {
     return output.results
       .map((result) =>
@@ -156,24 +260,17 @@ export function formatSyncOutput(
 }
 
 export async function handleSyncCommand(
-  args: string[],
+  parsed: SyncCommandInput,
   open: OpenSyncDeps = openDeps,
   services: SyncServices = defaultServices,
   routes: SyncRouteServices = defaultRouteServices,
 ): Promise<number> {
-  const parsed = parseSyncArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(`${parsed.message}. Try: ${syncUsage}`)
-    return 2
-  }
-
   const controller = new AbortController()
   const cancel = () => controller.abort()
   process.once('SIGINT', cancel)
   let deps: SyncDeps | undefined
   try {
-    const daemon = routes.selectDaemon()
+    const daemon = await selectEnsuredDaemonRoute(routes, controller.signal)
     if (daemon) {
       const result = await routes.daemonSync(
         daemon,
@@ -182,6 +279,8 @@ export async function handleSyncCommand(
           mode: parsed.mode,
         },
         controller.signal,
+        (event) =>
+          renderLiveEvent(rpcLiveEvent(event), parsed.format, parsed.json),
       )
       const results: SourceSyncOutput[] = result.results.map((sourceResult) =>
         sourceResult.status === 'completed'
@@ -217,7 +316,10 @@ export async function handleSyncCommand(
           ...rpcWarning(warning),
         })),
       }
-      const rendered = formatSyncOutput(output, parsed.format, parsed.json)
+      const rendered =
+        parsed.format === 'events' && !parsed.json
+          ? ''
+          : formatSyncOutput(output, parsed.format, parsed.json)
       if (rendered) console.log(rendered)
       return results.reduce(
         (exitCode, item) =>
@@ -243,6 +345,8 @@ export async function handleSyncCommand(
         ...(parsed.sourceId ? { source: parsed.sourceId } : {}),
         mode: parsed.mode,
         signal: controller.signal,
+        onEvent: (event) =>
+          renderLiveEvent(coreLiveEvent(event), parsed.format, parsed.json),
       })
     } catch (error) {
       if (error instanceof CtxindexValidationError) {
@@ -261,7 +365,10 @@ export async function handleSyncCommand(
       results,
       warnings: result.warnings,
     }
-    const rendered = formatSyncOutput(output, parsed.format, parsed.json)
+    const rendered =
+      parsed.format === 'events' && !parsed.json
+        ? ''
+        : formatSyncOutput(output, parsed.format, parsed.json)
     if (rendered) console.log(rendered)
     return results.reduce(
       (exitCode, result) =>

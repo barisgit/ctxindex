@@ -95,6 +95,13 @@ function harness(input: {
   }
 }
 
+const directRoutes: SyncRouteServices = {
+  selectDaemon: () => null,
+  daemonSync: async () => {
+    throw new Error('daemon transport invoked')
+  },
+}
+
 afterEach(() => {
   spyOn(console, 'log').mockRestore()
   spyOn(console, 'error').mockRestore()
@@ -102,6 +109,7 @@ afterEach(() => {
 
 describe('sync command', () => {
   test.each([
+    ['needs_auth', 10],
     ['auth_expired', 10],
     ['auth_revoked', 10],
     ['rate_limited', 20],
@@ -116,60 +124,53 @@ describe('sync command', () => {
     expect(mapRpcSyncFailureToExit(code)).toBe(exitCode)
   })
 
-  test('malformed sync performs zero discovery, transport, or direct open', async () => {
-    spyOn(console, 'error').mockImplementation(() => {})
-    let touched = 0
-    const routes: SyncRouteServices = {
-      selectDaemon: () => {
-        touched += 1
-        return null
-      },
-      daemonSync: async () => {
-        touched += 1
-        throw new Error('must not call transport')
-      },
-    }
-    const setup = harness({})
-    expect(
-      await handleSyncCommand(
-        ['--unknown'],
-        async () => {
-          touched += 1
-          return setup.open()
-        },
-        setup.services,
-        routes,
-      ),
-    ).toBe(2)
-    expect(touched).toBe(0)
-  })
-
   test('selected RPC preserves sync JSON values without an envelope or direct open', async () => {
     const log = spyOn(console, 'log').mockImplementation(() => {})
     let opened = false
     const routes: SyncRouteServices = {
-      selectDaemon: () => ({}) as DaemonSelection,
-      daemonSync: async () => ({
-        mode: 'sync',
-        results: [
-          {
-            sourceId: 'source-a',
-            status: 'completed',
-            run: completed,
-          },
-        ],
-        warnings: [
-          {
-            sourceId: 'source-a',
-            code: 'binary',
-            message: 'Skipped binary file',
-          },
-        ],
+      selectDaemon: () => {
+        throw new Error('legacy selection invoked')
+      },
+      ensureDaemonSelection: async () => ({
+        status: 'selected',
+        selection: {} as DaemonSelection,
+        started: true,
       }),
+      daemonSync: async (_daemon, _input, _signal, onEvent) => {
+        await onEvent?.({
+          type: 'source.started',
+          sequence: 0,
+          sourceId: 'source-a',
+          mode: 'sync',
+        })
+        await onEvent?.({
+          type: 'source.completed',
+          sequence: 1,
+          sourceId: 'source-a',
+          run: completed,
+        })
+        return {
+          mode: 'sync',
+          results: [
+            {
+              sourceId: 'source-a',
+              status: 'completed',
+              run: completed,
+            },
+          ],
+          warnings: [
+            {
+              sourceId: 'source-a',
+              code: 'binary',
+              message: 'Skipped binary file',
+            },
+          ],
+        }
+      },
     }
     expect(
       await handleSyncCommand(
-        ['--json'],
+        { mode: 'sync', json: true, format: 'summary' },
         async () => {
           opened = true
           throw new Error('selected RPC must not open direct deps')
@@ -191,6 +192,7 @@ describe('sync command', () => {
       ],
     })
     expect(String(log.mock.calls[0]?.[0])).not.toContain('"ok"')
+    expect(log).toHaveBeenCalledTimes(1)
   })
 
   test('selected RPC preserves the established failed-sync projection exactly', async () => {
@@ -214,7 +216,7 @@ describe('sync command', () => {
     }
     expect(
       await handleSyncCommand(
-        ['--json'],
+        { mode: 'sync', json: true, format: 'summary' },
         async () => {
           throw new Error('selected RPC must not open direct deps')
         },
@@ -250,7 +252,7 @@ describe('sync command', () => {
     let opened = false
     await expect(
       handleSyncCommand(
-        [],
+        { mode: 'sync', json: false, format: 'summary' },
         async () => {
           opened = true
           throw new Error('must not open')
@@ -291,6 +293,25 @@ describe('sync command', () => {
     expect(formatSyncOutput(output, 'compact', false)).toBe(
       'source-a completed +2 ~1 -0 warnings=1 errors=0\n' +
         'source-a warning=binary Skipped binary file',
+    )
+  })
+
+  test('explains when no sync-enabled Sources are eligible', () => {
+    const output: SyncOutput = {
+      mode: 'sync',
+      results: [],
+      warnings: [],
+    }
+
+    expect(formatSyncOutput(output, 'summary', false)).toBe(
+      'No sync-enabled Sources are available.',
+    )
+    expect(formatSyncOutput(output, 'compact', false)).toBe(
+      'No sync-enabled Sources are available.',
+    )
+    expect(formatSyncOutput(output, 'events', false)).toBe('')
+    expect(JSON.parse(formatSyncOutput(output, 'summary', true))).toEqual(
+      output,
     )
   })
 
@@ -347,9 +368,10 @@ describe('sync command', () => {
 
     expect(
       await handleSyncCommand(
-        ['--source', 'source-a', '--mode', 'diff', '--json'],
+        { sourceId: 'source-a', mode: 'diff', json: true, format: 'summary' },
         setup.open,
         setup.services,
+        directRoutes,
       ),
     ).toBe(0)
     expect(setup.calls).toEqual([{ sourceId: 'source-a', mode: 'diff' }])
@@ -379,9 +401,10 @@ describe('sync command', () => {
 
     expect(
       await handleSyncCommand(
-        ['--source', 'missing'],
+        { sourceId: 'missing', mode: 'sync', json: false, format: 'summary' },
         setup.open,
         setup.services,
+        directRoutes,
       ),
     ).toBe(2)
     expect(setup.calls).toEqual([])
@@ -397,9 +420,15 @@ describe('sync command', () => {
 
     expect(
       await handleSyncCommand(
-        ['--source', 'source-disabled'],
+        {
+          sourceId: 'source-disabled',
+          mode: 'sync',
+          json: false,
+          format: 'summary',
+        },
         setup.open,
         setup.services,
+        directRoutes,
       ),
     ).toBe(2)
     expect(setup.calls).toEqual([])
@@ -421,9 +450,10 @@ describe('sync command', () => {
 
     expect(
       await handleSyncCommand(
-        ['--source', 'source-a', '--json'],
+        { sourceId: 'source-a', mode: 'sync', json: true, format: 'summary' },
         setup.open,
         setup.services,
+        directRoutes,
       ),
     ).toBe(2)
     expect(JSON.parse(String(log.mock.calls[0]?.[0])).results[0]).toEqual({
@@ -469,7 +499,12 @@ describe('sync command', () => {
     })
 
     expect(
-      await handleSyncCommand(['--json'], setup.open, setup.services),
+      await handleSyncCommand(
+        { mode: 'sync', json: true, format: 'summary' },
+        setup.open,
+        setup.services,
+        directRoutes,
+      ),
     ).toBe(50)
     expect(calls).toEqual(['source-b', 'source-c'])
     const output = JSON.parse(String(log.mock.calls[0]?.[0]))
@@ -492,7 +527,7 @@ describe('sync command', () => {
     expect(JSON.stringify(output)).not.toContain('private path')
   })
 
-  test('uses the worst stable exit and renders deterministic completed events', async () => {
+  test('uses the worst stable exit and renders deterministic live events', async () => {
     const log = spyOn(console, 'log').mockImplementation(() => {})
     const setup = harness({
       sources: [source('source-b'), source('source-a')],
@@ -506,16 +541,19 @@ describe('sync command', () => {
 
     expect(
       await handleSyncCommand(
-        ['--format', 'events'],
+        { mode: 'sync', json: false, format: 'events' },
         setup.open,
         setup.services,
+        directRoutes,
       ),
     ).toBe(130)
-    expect(
-      String(log.mock.calls[0]?.[0])
-        .split('\n')
-        .map((line) => JSON.parse(line)),
-    ).toEqual([
+    expect(log.mock.calls.map((call) => JSON.parse(String(call[0])))).toEqual([
+      {
+        type: 'source.started',
+        sequence: 0,
+        sourceId: 'source-a',
+        mode: 'sync',
+      },
       {
         type: 'source.failed',
         sourceId: 'source-a',
@@ -528,6 +566,12 @@ describe('sync command', () => {
           message: 'Sync failed for Source "source-a" (cancelled)',
         },
         exitCode: 130,
+      },
+      {
+        type: 'source.started',
+        sequence: 2,
+        sourceId: 'source-b',
+        mode: 'sync',
       },
       {
         type: 'source.failed',

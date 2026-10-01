@@ -270,7 +270,7 @@ export default function PrivacyPage() {
           Account and request deletion of its stored Grant secrets,{' '}
           <code>ctxindex oauth-app remove &lt;provider&gt; &lt;label&gt;</code>{' '}
           to remove local OAuth App metadata and request deletion of its stored
-          configuration, and <code>ctxindex purge artifacts</code> to remove
+          configuration, and <code>ctxindex artifact purge</code> to remove
           managed Artifact-cache bytes. You can also revoke ctxindex in your
           Google Account or Microsoft account security settings.
         </p>

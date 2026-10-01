@@ -3,6 +3,8 @@ import {
   buildCompiledCliHarness,
   type CompiledCliHarness,
   isolatedChildEnvironment,
+} from './_compiled-cli-harness'
+import {
   mailboxReplayDrivers,
   runMailboxRetrievalArtifactReplay,
 } from './_mailbox-retrieval-artifact-replay.test'

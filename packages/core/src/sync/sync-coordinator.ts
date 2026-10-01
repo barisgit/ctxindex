@@ -1,5 +1,9 @@
 import type { SyncEmission, SyncMode } from '@ctxindex/extension-sdk'
-import { CtxindexAuthError, CtxindexSyncError } from '../errors'
+import {
+  CtxindexAuthError,
+  CtxindexSyncError,
+  normalizeSyncError,
+} from '../errors'
 import { mapSyncErrorCode } from '../exit-codes'
 import { newId } from '../ids'
 import { parseRef } from '../ref/ref'
@@ -12,6 +16,15 @@ export interface SyncRunInput {
   readonly sourceId: string
   readonly mode: SyncMode
   readonly signal: AbortSignal
+  readonly onProgress?: (progress: SyncRunProgress) => void | Promise<void>
+}
+
+export interface SyncRunProgress {
+  readonly processed: number
+  readonly upserts: number
+  readonly removals: number
+  readonly checkpoints: number
+  readonly warningsCount: number
 }
 
 type BufferedEmission = Exclude<SyncEmission, { readonly type: 'warning' }>
@@ -223,6 +236,10 @@ export class SyncCoordinator {
     const emissions: BufferedEmission[] = []
     const warnings: SyncWarning[] = []
     let cursorAfterJson = cursorBeforeJson
+    let processed = 0
+    let upserts = 0
+    let removals = 0
+    let checkpoints = 0
 
     try {
       const cursor =
@@ -235,16 +252,29 @@ export class SyncCoordinator {
         emit: async (value) => {
           if (input.signal.aborted) throw cancelled()
           const emission = parseSyncEmission(value)
+          processed += 1
           if (emission.type === 'warning') {
             warnings.push({
               code: emission.code,
               message: emission.message,
               ...(emission.ref ? { ref: emission.ref } : {}),
             })
-          } else emissions.push(emission)
+          } else {
+            emissions.push(emission)
+            if (emission.type === 'upsertResource') upserts += 1
+            else if (emission.type === 'removeResource') removals += 1
+            else checkpoints += 1
+          }
           if (emission.type === 'checkpoint') {
             cursorAfterJson = JSON.stringify(emission.cursor)
           }
+          await input.onProgress?.({
+            processed,
+            upserts,
+            removals,
+            checkpoints,
+            warningsCount: warnings.length,
+          })
         },
       })
       if (input.signal.aborted) throw cancelled()
@@ -390,20 +420,21 @@ export class SyncCoordinator {
         warnings,
       }
     } catch (cause) {
+      const failure = normalizeSyncError(cause) ?? cause
       const completedAt = Date.now()
       const lastError = bounded(
-        cause instanceof Error ? cause.message : String(cause),
+        failure instanceof Error ? failure.message : String(failure),
       )
       let runStatus: 'failed' | 'cancelled' = 'failed'
       let lastStatus: 'needs_auth' | 'failed' = 'failed'
-      if (cause instanceof CtxindexSyncError) {
-        const mapping = mapSyncErrorCode(cause.code)
+      if (failure instanceof CtxindexSyncError) {
+        const mapping = mapSyncErrorCode(failure.code)
         runStatus = mapping.runStatus
         lastStatus =
           mapping.lastStatus === 'needs_auth' ? 'needs_auth' : 'failed'
       } else if (
-        cause instanceof CtxindexAuthError &&
-        (cause.code === 'needs_auth' || cause.code === 'invalid_grant')
+        failure instanceof CtxindexAuthError &&
+        (failure.code === 'needs_auth' || failure.code === 'invalid_grant')
       ) {
         lastStatus = 'needs_auth'
       }
@@ -455,15 +486,15 @@ export class SyncCoordinator {
           )
           .run(runId)
       })()
-      if (typeof cause === 'object' && cause !== null) {
-        failureDiagnostics.set(cause, {
+      if (typeof failure === 'object' && failure !== null) {
+        failureDiagnostics.set(failure, {
           warningsCount: warnings.length,
           lastWarning: warnings.at(-1) ?? null,
           errorsCount: 1,
           lastError,
         })
       }
-      throw cause
+      throw failure
     }
   }
 }

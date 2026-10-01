@@ -168,4 +168,14 @@ describe('mapErrorToExit', () => {
       ),
     ).toBe(50)
   })
+
+  test.each([
+    ['unsupported_capability', 'other', 2],
+    ['network', 'sync', 30],
+  ] as const)('keeps direct and daemon-routed base failure %s through %s taxonomy on exit %i', (code, taxonomy, exitCode) => {
+    const direct = new CtxindexError(code, code)
+    const daemon = rpcError(taxonomy, code)
+    expect(mapErrorToExit(direct)).toBe(exitCode)
+    expect(mapErrorToExit(daemon)).toBe(exitCode)
+  })
 })

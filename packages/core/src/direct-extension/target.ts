@@ -1,12 +1,16 @@
 import { isAbsolute, resolve } from 'node:path'
 
-export type DirectExtensionSourceKind = 'npm' | 'git' | 'local'
+export type ExtensionPackageSourceKind = 'npm' | 'git' | 'local'
+
+export type DirectExtensionSourceKind = ExtensionPackageSourceKind
+
+export type ExtensionPackageTarget = {
+  readonly kind: 'npm'
+  readonly requestedTarget: string
+}
 
 export type DirectExtensionTarget =
-  | {
-      readonly kind: 'npm'
-      readonly requestedTarget: string
-    }
+  | ExtensionPackageTarget
   | {
       readonly kind: 'git'
       readonly requestedTarget: string

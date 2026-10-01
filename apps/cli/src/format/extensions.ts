@@ -1,19 +1,13 @@
 import type { DirectExtensionInventoryEntry } from '@ctxindex/core'
 import type { ExtensionLoadProvenance } from '@ctxindex/core/extension'
 import { compareReferences, compareStrings } from '@ctxindex/core/registry'
-
-type ProvenanceWithAge = ExtensionLoadProvenance & {
-  readonly snapshotAgeMs?: number
-}
-
-function provenanceText(provenance: ProvenanceWithAge): string {
-  if (provenance.kind === 'builtin') return 'builtin'
-  if (provenance.kind === 'path') return `path ${provenance.path}`
-  if (provenance.kind === 'direct') {
-    return `direct ${provenance.sourceKind} ${provenance.requestedTarget} ${provenance.resolvedIdentity} ${provenance.materializationDigest} installed ${provenance.installedAt} updated ${provenance.updatedAt}`
-  }
-  return `catalog ${provenance.catalog} ${provenance.commit} ${provenance.repository} ${provenance.sourcePath}${provenance.snapshotAgeMs === undefined ? '' : ` age ${provenance.snapshotAgeMs}ms`}`
-}
+import {
+  compactJson,
+  formatPrettyCollection,
+  formatTsv,
+  type OutputColumn,
+  type OutputFormat,
+} from './output'
 
 export function formatExtensions(
   registry: {
@@ -23,9 +17,9 @@ export function formatExtensions(
       adapters: readonly { id: string }[]
     }[]
   },
-  jsonOutput: boolean,
+  format: OutputFormat,
   provenance: readonly ExtensionLoadProvenance[] = [],
-  directInventory: readonly DirectExtensionInventoryEntry[] = [],
+  installedInventory: readonly DirectExtensionInventoryEntry[] = [],
   now = Date.now(),
 ): string {
   const provenanceByIdentity = new Map(
@@ -40,35 +34,64 @@ export function formatExtensions(
     ]),
   )
   const loadedIds = new Set(registry.list().map(({ id }) => id))
-  const directById = new Map(directInventory.map((item) => [item.id, item]))
+  const installedById = new Map(
+    installedInventory.map((item) => [item.id, item]),
+  )
   const extensions = [
     ...registry.list(),
-    ...directInventory
+    ...installedInventory
       .filter(({ id }) => !loadedIds.has(id))
       .map(({ id }) => ({ id, profiles: [], adapters: [] })),
   ]
     .sort((left, right) => compareStrings(left.id, right.id))
     .map((extension) => {
-      const storedDirect = directById.get(extension.id)
+      const storedInstalled = installedById.get(extension.id)
       const loadedSource = provenanceByIdentity.get(extension.id)
-      const loadedDirect =
-        loadedSource?.kind === 'direct' ? loadedSource : undefined
-      const source =
-        storedDirect === undefined
+      const loadedInstalled =
+        loadedSource?.kind === 'direct' || loadedSource?.kind === 'catalog'
           ? loadedSource
-          : (loadedDirect ?? {
-              id: storedDirect.id,
-              kind: 'direct' as const,
-              sourceKind: storedDirect.sourceKind,
-              requestedTarget: storedDirect.requestedTarget,
-              resolvedIdentity: storedDirect.resolvedIdentity,
-              materializationDigest: storedDirect.materializationDigest,
-              installedAt: storedDirect.installedAt,
-              updatedAt: storedDirect.updatedAt,
-            })
+          : undefined
+      const storedSource =
+        storedInstalled?.curation === undefined
+          ? storedInstalled === undefined
+            ? undefined
+            : {
+                id: storedInstalled.id,
+                kind: 'direct' as const,
+                sourceKind: storedInstalled.sourceKind,
+                requestedTarget: storedInstalled.requestedTarget,
+                resolvedIdentity: storedInstalled.resolvedIdentity,
+                materializationDigest: storedInstalled.materializationDigest,
+                installedAt: storedInstalled.installedAt,
+                updatedAt: storedInstalled.updatedAt,
+              }
+          : {
+              id: storedInstalled.id,
+              kind: 'catalog' as const,
+              catalog: storedInstalled.curation.catalog_name,
+              catalogId: storedInstalled.curation.catalog_id,
+              repository: storedInstalled.curation.repository,
+              commit: storedInstalled.curation.commit,
+              snapshotAcquiredAt: storedInstalled.curation.snapshot_acquired_at,
+              snapshotAgeMs: Math.max(
+                0,
+                now - storedInstalled.curation.snapshot_acquired_at,
+              ),
+              sourceLocator: storedInstalled.curation.source_locator,
+              sourceKind: storedInstalled.sourceKind,
+              requestedTarget: storedInstalled.requestedTarget,
+              resolvedIdentity: storedInstalled.resolvedIdentity,
+              materializationDigest: storedInstalled.materializationDigest,
+              installedAt: storedInstalled.installedAt,
+              updatedAt: storedInstalled.updatedAt,
+            }
+      const source =
+        storedInstalled === undefined
+          ? loadedSource
+          : (loadedInstalled ?? storedSource)
       return {
         id: extension.id,
-        ...(storedDirect !== undefined && loadedDirect === undefined
+        ...(storedInstalled !== undefined && loadedInstalled === undefined
           ? { available: false as const }
           : {}),
         profiles: [...extension.profiles]
@@ -80,11 +103,25 @@ export function formatExtensions(
         ...(source === undefined ? {} : { provenance: source }),
       }
     })
-  if (jsonOutput) return JSON.stringify(extensions, null, 2)
-  return extensions
-    .map(
-      (extension) =>
-        `${extension.id}${extension.available === false ? '\tUnavailable' : ''}\tProfiles: ${extension.profiles.map((item) => `${item.id}@${item.version}`).join(', ') || 'none'}\tAdapters: ${extension.adapters.map((item) => item.id).join(', ') || 'none'}${extension.provenance === undefined ? '' : `\tProvenance: ${provenanceText(extension.provenance)}`}`,
-    )
-    .join('\n')
+  if (format === 'json') return compactJson(extensions)
+  const rows = extensions.map((extension) => ({
+    id: extension.id,
+    available: extension.available !== false,
+    profiles: compactJson(extension.profiles),
+    adapters: compactJson(extension.adapters),
+    provenance:
+      extension.provenance === undefined
+        ? 'null'
+        : compactJson(extension.provenance),
+  }))
+  const columns = [
+    { key: 'id', label: 'Extension' },
+    { key: 'available', label: 'Available' },
+    { key: 'profiles', label: 'Profiles' },
+    { key: 'adapters', label: 'Adapters' },
+    { key: 'provenance', label: 'Provenance' },
+  ] satisfies readonly OutputColumn[]
+  return format === 'pretty'
+    ? formatPrettyCollection(columns, rows)
+    : formatTsv(columns, rows)
 }

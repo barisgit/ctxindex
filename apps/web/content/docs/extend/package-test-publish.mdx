@@ -1,0 +1,69 @@
+---
+title: Package, test, install, and publish
+description: Expose plain Extension roots, resolve ordinary dependencies, verify behavior, and distribute through npm, Git, or a local path.
+---
+
+## Package contract
+
+```json
+{
+  "name": "@acme/ctxindex-notes",
+  "version": "1.0.0",
+  "type": "module",
+  "ctxindex": {
+    "extensions": ["./index.ts"]
+  },
+  "dependencies": {
+    "@ctxindex/extension-sdk": "0.1.1",
+    "@ctxindex/profiles": "0.1.1"
+  }
+}
+```
+
+Keeping the authoring entry at `index.ts` is the simplest Git/local workflow; an npm package may point to built JavaScript instead. One module may export multiple Extension roots and a Catalog. Every root is considered; unrelated exports and supporting leaf values do not activate independently. Installation always selects one stable Extension id exactly.
+
+Dependencies are ordinary npm, Git, or local package dependencies. They may export exact Provider/Profile factories for reuse. ctxindex does not fetch missing textual refs or resolve a second Extension dependency graph.
+
+## Test the public seam
+
+At minimum, verify:
+
+1. `package.json` exposes the expected `ctxindex.extensions` modules.
+2. Entry discovery imports and collects the expected plain Extension roots.
+3. Provider/Profile imports are exact and no core runtime package is used in production code.
+4. Capabilities match operations and Actions match Profile declarations.
+5. Operation fixtures validate provider or file input and normalize complete SDK result shapes.
+6. Documentation resolves, contains required routes, and rejects unsafe assets/links.
+
+The standalone reference repository exercises the public packages exactly as an external author does:
+
+```sh
+git clone https://github.com/barisgit/ctxindex-extensions.git
+cd ctxindex-extensions
+bun install --frozen-lockfile
+bun run check
+```
+
+Its [`index.ts`](https://github.com/barisgit/ctxindex-extensions/blob/main/index.ts) demonstrates a Profile, a provider with `auth.none()`, an indexed Adapter, portable `syncError(...)` failures, an Extension root, passive docs, and a Catalog in one file. Its tests use synthetic HTTP responses and never consume GitHub rate limits.
+
+## Install without publishing
+
+```sh
+ctxindex extension install local ./acme-notes acme.notes --format json
+ctxindex extension install git \
+  'git+https://github.com:443/acme/ctxindex-notes.git#<commit>' \
+  acme.notes \
+  --format json
+```
+
+Git and local packages can carry normal dependencies, so npm publication is optional.
+
+## Publish to npm
+
+Publish the package through your normal registry workflow, then install an exact version or deliberately resolved target:
+
+```sh
+ctxindex extension install npm @acme/ctxindex-notes@1.0.0 acme.notes --format json
+```
+
+Installed execution is pinned to immutable managed bytes. Updates are explicit and re-pin the package; startup never re-resolves the mutable target.

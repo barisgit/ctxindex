@@ -87,7 +87,7 @@ export interface CliPackageSmokeResult {
   readonly oauthAppHelpLoaded: true
   readonly preInitStatePreserved: true
   readonly packageExtensionLoaded: true
-  readonly daemonServeAvailable: true
+  readonly daemonLifecycleAvailable: true
 }
 
 export type NativeKeytarProbeStatus = 'loaded' | 'host-libsecret-unavailable'
@@ -510,9 +510,9 @@ export async function smokeCliPackage(
   if (!oauthAppHelp.stdout.includes('ctxindex oauth-app add|list|remove')) {
     throw new Error('Installed CLI help did not expose OAuth App commands')
   }
-  const skills = await cli(['skills', 'get', 'getting-started'])
-  if (!skills.stdout.startsWith('# Getting started with ctxindex')) {
-    throw new Error('Installed CLI could not read its bundled skill')
+  const skill = await cli(['docs', 'get-skill'])
+  if (!skill.stdout.startsWith('---\nname: ctxindex\n')) {
+    throw new Error('Installed CLI could not read its portable Agent Skill')
   }
 
   const keytarMockFile = join(smokeRoot, 'keytar.json')
@@ -575,47 +575,80 @@ export async function smokeCliPackage(
     database.close()
   }
 
-  if (process.platform === 'darwin') {
-    const daemon = Bun.spawn([executable, 'daemon', 'serve'], {
-      cwd: outsideDirectory,
-      env,
-      stdin: 'ignore',
-      stdout: 'pipe',
-      stderr: 'pipe',
-    })
+  if (process.platform === 'darwin' || process.platform === 'linux') {
+    let lifecycleFailure: unknown
+    let startedInstanceId: string | undefined
     try {
-      let ready = false
-      for (let attempt = 0; attempt < 100; attempt += 1) {
-        const probe = await runWithExit(
-          [executable, 'daemon', 'health', '--json'],
-          { cwd: outsideDirectory, env },
+      const started = await runWithExit(
+        [executable, 'daemon', 'start', '--format', 'json'],
+        { cwd: outsideDirectory, env },
+      )
+      if (started.exitCode !== 0) {
+        throw new Error(
+          `Installed CLI background daemon did not become ready: ${started.stderr || started.stdout}`,
         )
-        if (probe.exitCode === 0) {
-          ready = true
-          break
-        }
-        if (daemon.exitCode !== null) break
-        await Bun.sleep(20)
       }
-      if (!ready) {
-        throw new Error('Installed CLI daemon serve did not become ready')
+      const startedOutput = JSON.parse(started.stdout)
+      if (
+        startedOutput.status !== 'running' ||
+        typeof startedOutput.health?.instanceId !== 'string'
+      ) {
+        throw new Error(
+          `Installed CLI background daemon did not become ready: ${started.stderr || started.stdout}`,
+        )
       }
-      await cli(['daemon', 'shutdown', '--json'])
-      if ((await daemon.exited) !== 0) {
-        throw new Error('Installed CLI daemon serve did not exit cleanly')
+      startedInstanceId = startedOutput.health.instanceId
+      const observed = await cli(['daemon', 'status', '--format', 'json'])
+      const observedOutput = JSON.parse(observed.stdout)
+      if (
+        observedOutput.status !== 'running' ||
+        observedOutput.health?.instanceId !== startedInstanceId
+      ) {
+        throw new Error(
+          `Installed CLI background daemon did not survive detached startup: ${observed.stderr || observed.stdout}`,
+        )
       }
+    } catch (error) {
+      lifecycleFailure = error
     } finally {
-      if (daemon.exitCode === null) daemon.kill('SIGKILL')
+      const stopped = await runWithExit(
+        [executable, 'daemon', 'stop', '--format', 'json'],
+        { cwd: outsideDirectory, env },
+      )
+      let stopFailure: unknown
+      if (stopped.exitCode !== 0) {
+        stopFailure = new Error(
+          `Installed CLI background daemon did not stop cleanly: ${stopped.stderr || stopped.stdout}`,
+        )
+      } else {
+        try {
+          const stoppedOutput = JSON.parse(stopped.stdout)
+          if (
+            stoppedOutput.status !== 'stopped' ||
+            (startedInstanceId !== undefined &&
+              (stoppedOutput.alreadyStopped !== false ||
+                stoppedOutput.instanceId !== startedInstanceId))
+          ) {
+            stopFailure = new Error(
+              `Installed CLI background daemon did not stop cleanly: ${stopped.stderr || stopped.stdout}`,
+            )
+          }
+        } catch (error) {
+          stopFailure = error
+        }
+      }
+      lifecycleFailure ??= stopFailure
     }
+    if (lifecycleFailure) throw lifecycleFailure
   } else {
-    const unsupported = await runWithExit([executable, 'daemon', 'serve'], {
+    const unsupported = await runWithExit([executable, 'daemon', 'start'], {
       cwd: outsideDirectory,
       env,
     })
     if (
       unsupported.exitCode !== 50 ||
       unsupported.stderr.trim() !==
-        'The local daemon is unsupported on this platform or filesystem.'
+        'The local daemon is unsupported on this platform.'
     ) {
       throw new Error(
         `Installed CLI daemon did not fail closed on an unsupported host: ${unsupported.stderr || unsupported.stdout}`,
@@ -650,7 +683,7 @@ export async function smokeCliPackage(
         private: true,
         type: 'module',
         ctxindex: { extensions: ['./extension.ts'] },
-        dependencies: { '@ctxindex/extension-sdk': '0.0.0' },
+        dependencies: { '@ctxindex/extension-sdk': '0.1.0' },
       },
       null,
       2,
@@ -665,7 +698,7 @@ export async function smokeCliPackage(
     `[extensions]\npaths = ${JSON.stringify([extensionPath])}\n\n[secrets]\nbackend = "file"\n\n[log]\nlevel = "info"\n\n[log.file]\nrotate = "daily"\nretain_days = 14\ncompress = true\n`,
   )
   const extensions = JSON.parse(
-    (await cli(['extensions', 'list', '--json'])).stdout,
+    (await cli(['extension', 'list', '--format', 'json'])).stdout,
   ) as readonly { readonly id?: string }[]
   if (!extensions.some(({ id }) => id === 'fixture.installed-package')) {
     throw new Error(
@@ -689,7 +722,7 @@ export async function smokeCliPackage(
     oauthAppHelpLoaded: true,
     preInitStatePreserved: true,
     packageExtensionLoaded: true,
-    daemonServeAvailable: true,
+    daemonLifecycleAvailable: true,
   }
 }
 

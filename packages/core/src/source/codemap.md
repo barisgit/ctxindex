@@ -13,7 +13,7 @@ Owns Source lifecycle and Adapter execution boundaries for sync, remote search, 
 
 ## Data & control flow
 
-Add resolves Realm, Adapter id, optional Grant, routing, config, and label before inserting. List/status join Realm/sync state and annotate Adapter availability by id. Label-based commands resolve to stable IDs before remove/sync/search/status/Action operations. Provider operations invoke Adapter methods with controlled fetch and persist validated results; providerless operations run without auth resolution. Remote search returns verified Resources, warnings, and any continuation without interpreting the token. Cache contention preserves provider results, while cancellation and non-contention failures retain their terminal paths. Source deletion cascades Source-owned generic rows.
+Add resolves Realm, Adapter id, optional Grant, routing, config, and label before inserting. List/status join Realm/sync state and annotate Adapter availability by id. Label-based commands resolve to stable IDs before remove/sync/search/status/Action operations. Provider operations invoke Adapter methods with controlled fetch and persist validated results; providerless operations run without auth resolution. Source sync forwards an optional awaited count-only observer into coordination so application/transport backpressure reaches Adapter emission. Remote search returns verified Resources, warnings, and any continuation without interpreting the token. Cache contention preserves provider results, while cancellation and non-contention failures retain their terminal paths. Source deletion cascades Source-owned generic rows.
 
 ## Integration points
 

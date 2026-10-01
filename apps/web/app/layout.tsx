@@ -16,17 +16,33 @@ const mono = JetBrains_Mono({
 })
 
 const homeUrls = pageMetadataUrls('/')
+const homeImageUrls = pageMetadataUrls('/', '/opengraph-image')
+
+const homeDescription =
+  'One local typed CLI for shell-capable agents to search and retrieve mail, calendars, files, and Extension-defined context.'
 
 export const metadata: Metadata = {
   metadataBase: resolveSiteOrigin(),
   title: {
-    default: 'ctxindex — your context, one command away',
+    default: 'ctxindex — local typed context for agents',
     template: '%s | ctxindex',
   },
-  description:
-    'A local personal-context gateway for agents. One deterministic CLI to discover, retrieve, and act on mail, calendars, and files across every account.',
+  description: homeDescription,
   alternates: homeUrls ? { canonical: homeUrls.canonical } : undefined,
-  openGraph: homeUrls ? { url: homeUrls.canonical } : undefined,
+  openGraph: {
+    title: 'ctxindex — local typed context for agents',
+    description: homeDescription,
+    siteName: 'ctxindex',
+    type: 'website',
+    ...(homeUrls ? { url: homeUrls.canonical } : {}),
+    ...(homeImageUrls?.image ? { images: [homeImageUrls.image] } : {}),
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'ctxindex — local typed context for agents',
+    description: homeDescription,
+    ...(homeImageUrls?.image ? { images: [homeImageUrls.image] } : {}),
+  },
 }
 
 export default function Layout({ children }: LayoutProps<'/'>) {

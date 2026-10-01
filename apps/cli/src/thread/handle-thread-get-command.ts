@@ -1,53 +1,48 @@
-import type {
-  ThreadNode,
-  ThreadResult,
-  ThreadService,
-} from '@ctxindex/core/thread'
-import type { RpcThreadGetResult } from '@ctxindex/rpc'
-import { parseThreadGetArgs, threadGetUsage } from '../args/thread-get'
+import { parseRef } from '@ctxindex/core'
+import type { ThreadService } from '@ctxindex/core/thread'
 import { daemonThreadGet, selectDaemon } from '../daemon/client'
+import {
+  ensureDaemonSelection,
+  resolveEnsuredDaemonSelection,
+} from '../daemon/ensure'
 import { openDeps } from '../deps'
 import { mapErrorToExit } from '../format/exit'
+import type { OutputFormat } from '../format/output'
+import {
+  formatThreadJson,
+  formatThreadPretty,
+  formatThreadText,
+} from '../format/thread'
 
 type OpenThreadDeps = () => Promise<{
   readonly threadService: ThreadService
   close(): Promise<void>
 }>
 
-export function formatThreadJson(
-  result: ThreadResult | RpcThreadGetResult,
-): string {
-  return JSON.stringify(result)
+export interface ThreadCommandInput {
+  readonly ref: string
+  readonly format: OutputFormat
 }
 
-function formatNode(
-  node: ThreadNode | RpcThreadGetResult['messages'][number],
-  depth: number,
-  lines: string[],
-): void {
-  lines.push(
-    `${'  '.repeat(depth)}${node.resource.ref}${node.resource.title ? `\t${node.resource.title}` : ''}`,
-  )
-  for (const child of node.children) formatNode(child, depth + 1, lines)
-}
-
-export function formatThreadText(
-  result: ThreadResult | RpcThreadGetResult,
-): string {
-  const lines: string[] = []
-  for (const message of result.messages) formatNode(message, 0, lines)
-  return lines.join('\n')
+export interface ThreadCommandDaemonRoutes {
+  readonly select: typeof selectDaemon
+  readonly ensure?: typeof ensureDaemonSelection
+  readonly get: typeof daemonThreadGet
 }
 
 export async function handleThreadGetCommand(
-  args: string[],
+  input: ThreadCommandInput,
   open: OpenThreadDeps = openDeps,
-  daemon = { select: selectDaemon, get: daemonThreadGet },
+  daemon: ThreadCommandDaemonRoutes = {
+    select: selectDaemon,
+    ensure: ensureDaemonSelection,
+    get: daemonThreadGet,
+  },
 ): Promise<number> {
-  const parsed = parseThreadGetArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(`${parsed.message}. Try: ${threadGetUsage}`)
+  try {
+    parseRef(input.ref)
+  } catch {
+    console.error(`thread: invalid <ref>: ${input.ref}`)
     return 2
   }
 
@@ -56,17 +51,25 @@ export async function handleThreadGetCommand(
   process.once('SIGINT', cancel)
   let deps: Awaited<ReturnType<OpenThreadDeps>> | undefined
   try {
-    const selection = daemon.select()
+    const selection = await resolveEnsuredDaemonSelection(
+      daemon.ensure,
+      daemon.select,
+      controller.signal,
+    )
     const result = selection
-      ? await daemon.get(selection, parsed.ref, controller.signal)
+      ? await daemon.get(selection, input.ref, controller.signal)
       : await (async () => {
           deps = await open()
-          return deps.threadService.get(parsed.ref)
+          return deps.threadService.get(input.ref)
         })()
     console.log(
-      parsed.json ? formatThreadJson(result) : formatThreadText(result),
+      input.format === 'json'
+        ? formatThreadJson(result)
+        : input.format === 'pretty'
+          ? formatThreadPretty(result)
+          : formatThreadText(result),
     )
-    if (!parsed.json) {
+    if (input.format !== 'json') {
       for (const warning of result.warnings) {
         console.error(
           `${warning.code}\tUnavailable Profile ${warning.profileId}@${warning.profileVersion}`,

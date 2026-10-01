@@ -84,7 +84,7 @@ test('relocated compiled host preserves generic managed OAuth acceptance offline
           provenance: {
             kind: 'extension',
             source: 'builtin',
-            packageName: '@ctxindex/adapters',
+            packageName: '@ctxindex/official',
           },
         },
       ],

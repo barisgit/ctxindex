@@ -39,7 +39,7 @@ const managedPolicy = {
   providerId: 'synthetic.oauth',
   label: 'managed',
   extensionId: 'fixture.managed-oauth',
-  distributions: [{ kind: 'bundled', packageName: '@ctxindex/adapters' }],
+  distributions: [{ kind: 'bundled', packageName: '@ctxindex/official' }],
 } as const satisfies ManagedOAuthAppPolicy
 
 const mismatchPolicy = {

@@ -1,11 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { describeAction, runAction } from '@ctxindex/core/action'
 import { CtxindexValidationError } from '@ctxindex/core/errors'
-import {
-  actionDescribeUsage,
-  actionRunUsage,
-  parseActionArgs,
-} from '../args/action'
+import { daemonActionDescribe, daemonActionRun } from '../daemon/client'
+import { ensureDaemonSelection } from '../daemon/ensure'
 import { type CliDeps, openDeps } from '../deps'
 import { formatActionDescribeText, formatActionRunText } from '../format/action'
 import { mapErrorToExit } from '../format/exit'
@@ -19,12 +16,33 @@ type OpenActionDeps = () => Promise<ActionDeps>
 export interface ActionServices {
   readonly describe: typeof describeAction
   readonly run: typeof runAction
+  readonly ensureDaemonSelection?: typeof ensureDaemonSelection
+  readonly daemonDescribe?: typeof daemonActionDescribe
+  readonly daemonRun?: typeof daemonActionRun
 }
 
 const actionServices: ActionServices = {
   describe: describeAction,
   run: runAction,
+  ensureDaemonSelection,
+  daemonDescribe: daemonActionDescribe,
+  daemonRun: daemonActionRun,
 }
+
+export type ActionCommandInput =
+  | {
+      readonly kind: 'describe'
+      readonly actionId: string
+      readonly sourceId: string
+      readonly json: boolean
+    }
+  | {
+      readonly kind: 'run'
+      readonly actionId: string
+      readonly sourceId: string
+      readonly input: string
+      readonly json: boolean
+    }
 
 function invalidInput(): CtxindexValidationError {
   return new CtxindexValidationError(
@@ -48,62 +66,100 @@ export async function parseActionInput(value: string): Promise<unknown> {
 }
 
 export async function handleActionCommand(
-  args: string[],
+  input: ActionCommandInput,
   open: OpenActionDeps = openDeps,
   services: ActionServices = actionServices,
 ): Promise<number> {
-  const parsed = parseActionArgs(args)
-  if (parsed.kind === 'help') return 0
-  if (parsed.kind === 'unknown') {
-    console.error(
-      `${parsed.message}. Try: ${args[0] === 'run' ? actionRunUsage : actionDescribeUsage}`,
-    )
+  if (input.kind === 'describe' && !input.sourceId) {
+    console.error('Action availability describe requires an exact Source')
     return 2
   }
-
   let actionInput: unknown
-  if (parsed.kind === 'run') {
+  if (input.kind === 'run') {
     try {
-      actionInput = await parseActionInput(parsed.input)
+      actionInput = await parseActionInput(input.input)
     } catch (error) {
       console.error(error instanceof Error ? error.message : String(error))
       return mapErrorToExit(error)
     }
   }
 
+  const controller = new AbortController()
+  const cancel = () => controller.abort()
+  process.once('SIGINT', cancel)
   let deps: ActionDeps | undefined
   try {
-    deps = await open()
-    if (parsed.kind === 'describe') {
-      const sourceId = parsed.sourceId
-        ? deps.sourceService.resolveSourceId(parsed.sourceId)
+    const ensured =
+      services.ensureDaemonSelection &&
+      (input.kind === 'run' || input.sourceId !== undefined)
+        ? await services.ensureDaemonSelection(controller.signal)
         : undefined
+    if (ensured?.status === 'selected') {
+      if (input.kind === 'describe') {
+        if (!services.daemonDescribe)
+          throw new Error('Selected daemon Action service missing')
+        const result = await services.daemonDescribe(
+          ensured.selection,
+          { actionId: input.actionId, source: input.sourceId },
+          controller.signal,
+        )
+        console.log(
+          input.json
+            ? JSON.stringify(result)
+            : formatActionDescribeText(result),
+        )
+        return 0
+      }
+      if (!services.daemonRun)
+        throw new Error('Selected daemon Action service missing')
+      const result = await services.daemonRun(
+        ensured.selection,
+        {
+          actionId: input.actionId,
+          source: input.sourceId,
+          actionInput,
+          confirmIrreversible: false,
+        },
+        controller.signal,
+      )
+      console.log(
+        input.json ? JSON.stringify(result) : formatActionRunText(result),
+      )
+      for (const warning of result.warnings) {
+        console.error(`${warning.code}\t${warning.message}`)
+      }
+      return 0
+    }
+
+    deps = await open()
+    if (input.kind === 'describe') {
+      const sourceId = deps.sourceService.resolveSourceId(input.sourceId)
       const result = services.describe({
         db: deps.db,
         registry: deps.registry,
-        actionId: parsed.actionId,
-        ...(sourceId ? { sourceId } : {}),
+        actionId: input.actionId,
+        sourceId,
       })
       console.log(
-        parsed.json ? JSON.stringify(result) : formatActionDescribeText(result),
+        input.json ? JSON.stringify(result) : formatActionDescribeText(result),
       )
       return 0
     }
 
-    const sourceId = deps.sourceService.resolveSourceId(parsed.sourceId)
+    const sourceId = deps.sourceService.resolveSourceId(input.sourceId)
     const result = await services.run({
       db: deps.db,
       registry: deps.registry,
       authService: deps.authService,
       logger: deps.logger,
-      actionId: parsed.actionId,
+      actionId: input.actionId,
       sourceId,
       actionInput,
-      signal: new AbortController().signal,
-      confirmIrreversible: parsed.confirmIrreversible,
+      signal: controller.signal,
+      confirmIrreversible: false,
     })
     console.log(
-      parsed.json ? JSON.stringify(result) : formatActionRunText(result),
+      input.json ? JSON.stringify(result) : formatActionRunText(result),
     )
     for (const warning of result.warnings) {
       console.error(`${warning.code}\t${warning.message}`)
@@ -113,6 +169,7 @@ export async function handleActionCommand(
     console.error(error instanceof Error ? error.message : String(error))
     return mapErrorToExit(error)
   } finally {
+    process.removeListener('SIGINT', cancel)
     await deps?.close()
   }
 }

@@ -1,24 +1,91 @@
 import { expect, test } from 'bun:test'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import {
+  chmod,
+  lstat,
+  mkdir,
+  mkdtemp,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { googleOAuthProvider } from '@ctxindex/adapters'
 import { defaultConfig } from '@ctxindex/core/config'
 import { loadExtensions } from '@ctxindex/core/extension'
 import { openDatabase, runMigrations } from '@ctxindex/core/storage'
 import type { FileLease, FileLeaseBackend } from '@ctxindex/local-daemon'
-import { FileLeaseConflictError } from '@ctxindex/local-daemon'
+import {
+  FileLeaseConflictError,
+  resolveEndpoint,
+  resolveRuntimeIdentity,
+} from '@ctxindex/local-daemon'
+import { googleOAuthProvider } from '@ctxindex/official'
 import {
   isDaemonStartupFailure,
   type StartDaemonOptions,
   startDaemon,
+  validateDaemonOAuthAppConfig,
 } from './runtime'
+
+test('daemon OAuth App config rejects unknown fields without exposing values', () => {
+  const secret = 'private-secret-canary'
+  const attempt = () =>
+    validateDaemonOAuthAppConfig(googleOAuthProvider, {
+      clientId: 'public-id',
+      clientSecret: secret,
+      unexpected: secret,
+    })
+  expect(attempt).toThrow('OAuth App configuration contains an unknown field')
+  try {
+    attempt()
+  } catch (error) {
+    expect(String(error)).not.toContain(secret)
+  }
+})
+
+const emptyDocumentation = {
+  list: () => [],
+  get: () => undefined,
+} as const
 
 function lease(name: string, events: string[]): FileLease {
   return {
     mode: 'exclusive',
     targetDigest: name.padEnd(64, '0'),
     release: () => events.push(`release:${name}`),
+  }
+}
+
+class TestIdleClock {
+  now = 0
+  #nextId = 0
+  readonly #timers = new Map<
+    number,
+    { readonly deadline: number; readonly callback: () => void }
+  >()
+
+  readonly hooks = {
+    now: () => this.now,
+    setTimeout: (callback: () => void, delayMs: number): number => {
+      const id = this.#nextId++
+      this.#timers.set(id, { deadline: this.now + delayMs, callback })
+      return id
+    },
+    clearTimeout: (id: unknown): void => {
+      if (typeof id === 'number') this.#timers.delete(id)
+    },
+  }
+
+  advance(milliseconds: number): void {
+    this.now += milliseconds
+    while (true) {
+      const due = [...this.#timers.entries()]
+        .filter(([, timer]) => timer.deadline <= this.now)
+        .sort((left, right) => left[1].deadline - right[1].deadline)[0]
+      if (!due) return
+      this.#timers.delete(due[0])
+      due[1].callback()
+    }
   }
 }
 
@@ -74,6 +141,7 @@ test('startup failure guard rejects owner-attributed lease conflicts', () => {
 
 test('startup owns leases before one load/open and publishes ready last', async () => {
   const events: string[] = []
+  const idleClock = new TestIdleClock()
   let lifecycleProof: FileLease | undefined
   const leases: FileLeaseBackend = {
     acquire(input) {
@@ -91,6 +159,7 @@ test('startup owns leases before one load/open and publishes ready last', async 
       cacheRoot: '/tmp/ctxd-cache',
     },
     leaseBackend: leases,
+    idleTimer: idleClock.hooks,
     endpointRuntimeRoot: '/tmp/ctxd-runtime',
     hooks: {
       readMatchingMetadata: () => {
@@ -106,7 +175,7 @@ test('startup owns leases before one load/open and publishes ready last', async 
       },
       readInstalled: async () => {
         events.push('installed')
-        return [] as never
+        return { records: [], diagnostics: [] }
       },
       loadExtensions: async ({ localOAuthAppIdentities }) => {
         events.push(`identities:${localOAuthAppIdentities.length}`)
@@ -115,6 +184,26 @@ test('startup owns leases before one load/open and publishes ready last', async 
           registry: {} as never,
           completeRegistry: {} as never,
           diagnostics: [],
+          documentation: {
+            list: () => [
+              {
+                extensionId: 'fixture.docs',
+                path: 'README.md',
+                origin: 'authored' as const,
+                kind: 'markdown' as const,
+                mediaType: 'text/markdown' as const,
+                content: '# Fixture',
+              },
+            ],
+            get: () => ({
+              extensionId: 'fixture.docs',
+              path: 'README.md',
+              origin: 'authored' as const,
+              kind: 'markdown' as const,
+              mediaType: 'text/markdown' as const,
+              content: '# Fixture',
+            }),
+          },
         }
       },
       openDatabase: async () => {
@@ -128,6 +217,22 @@ test('startup owns leases before one load/open and publishes ready last', async 
       composeServices: () => {
         events.push('compose')
         return {
+          secretBackendManager: {
+            getStatus: async () => ({
+              backend: 'file' as const,
+              backends: {
+                file: { available: true, referenceCount: 0 },
+                keychain: { available: false, referenceCount: 0 },
+              },
+            }),
+            switchBackend: async (target: 'keychain' | 'file') => ({
+              backend: target,
+              copied: 0,
+              cleaned: 0,
+              cleanupPending: false,
+              warnings: [],
+            }),
+          },
           syncService: {
             run: async () => ({ mode: 'sync', results: [], warnings: [] }),
           },
@@ -178,7 +283,26 @@ test('startup owns leases before one load/open and publishes ready last', async 
   expect(
     (await daemon.application.system.health({}, daemon.testContext())).ok,
   ).toBe(true)
-  expect(await daemon.close(100)).toEqual({ status: 'complete' })
+  expect(
+    await daemon.application.secrets.status({}, daemon.testContext()),
+  ).toMatchObject({
+    ok: true,
+    value: { backend: 'file' },
+  })
+  expect(
+    await daemon.application.documentation.get(
+      { extensionId: 'fixture.docs', path: 'README.md' },
+      daemon.testContext(),
+    ),
+  ).toMatchObject({
+    ok: true,
+    value: { item: { content: '# Fixture' } },
+  })
+  idleClock.advance(299_999)
+  expect(daemon.application.lifecycle).toBe('ready')
+  idleClock.advance(1)
+  expect(daemon.application.lifecycle).toBe('stopping')
+  await daemon.closed
   expect(events.slice(-7)).toEqual([
     'metadata:stopping',
     'close:db',
@@ -189,6 +313,79 @@ test('startup owns leases before one load/open and publishes ready last', async 
     'release:lifecycle',
   ])
   expect(events.at(-1)).toBe('release:lifecycle')
+})
+
+test.each([
+  'regular',
+  'symlink',
+] as const)('startup fails closed on an unsafe %s endpoint', async (kind) => {
+  const sandbox = await mkdtemp(join(tmpdir(), 'ctxindex-unsafe-endpoint-'))
+  const runtimeRoot = `/tmp/ctxd-unsafe-${process.pid}-${kind}`
+  const roots = {
+    configRoot: join(sandbox, 'config'),
+    dataRoot: join(sandbox, 'data'),
+    stateRoot: join(sandbox, 'state'),
+    cacheRoot: join(sandbox, 'cache'),
+  }
+  await mkdir(runtimeRoot, { recursive: true, mode: 0o700 })
+  await chmod(runtimeRoot, 0o700)
+  const runtime = resolveRuntimeIdentity(roots)
+  const endpoint = resolveEndpoint(runtime.identity, { runtimeRoot }).path
+  const target = join(runtimeRoot, `${kind}-target`)
+  try {
+    await writeFile(target, 'unsafe')
+    if (kind === 'regular') await writeFile(endpoint, 'unsafe')
+    else await symlink(target, endpoint)
+    await expect(
+      startDaemon({
+        roots,
+        endpointRuntimeRoot: runtimeRoot,
+        leaseBackend: {
+          acquire: (input) => lease(input.purpose, []),
+        },
+        hooks: {
+          readMatchingMetadata: () => null,
+          assertDatabaseTarget: () => {},
+          readConfig: async () => ({}) as never,
+          readInstalled: async () => ({ records: [], diagnostics: [] }),
+          loadExtensions: async () => ({
+            registry: {} as never,
+            completeRegistry: {} as never,
+            diagnostics: [],
+            documentation: emptyDocumentation,
+          }),
+          openDatabase: async () => ({ close: () => {} }) as never,
+          runMigrations: async () => {},
+          listLocalOAuthAppIdentities: () => [],
+          composeServices: () => ({
+            syncService: {
+              run: async () => ({
+                mode: 'sync' as const,
+                results: [],
+                warnings: [],
+              }),
+            },
+            sourceService: {
+              resolveSourceId: (value: string) => value,
+              getStatus: () => [],
+            },
+          }),
+          bind: () => {
+            throw new Error('unsafe endpoint reached bind')
+          },
+          writeMetadata: () => {},
+          cleanupMetadata: () => 'removed',
+        },
+      }),
+    ).rejects.toThrow('endpoint is unsafe')
+    const remaining = await lstat(endpoint)
+    expect(
+      kind === 'regular' ? remaining.isFile() : remaining.isSymbolicLink(),
+    ).toBe(true)
+  } finally {
+    await rm(runtimeRoot, { recursive: true, force: true })
+    await rm(sandbox, { recursive: true, force: true })
+  }
 })
 
 test('startup rejects an Extension OAuth App that collides with persisted local identity', async () => {
@@ -214,7 +411,7 @@ test('startup rejects an Extension OAuth App that collides with persisted local 
           readMatchingMetadata: () => null,
           assertDatabaseTarget: () => {},
           readConfig: async () => defaultConfig(),
-          readInstalled: async () => [],
+          readInstalled: async () => ({ records: [], diagnostics: [] }),
           openDatabase,
           runMigrations: async (database) => {
             await runMigrations(database)
@@ -279,11 +476,12 @@ test('a lifecycle-lease loser cannot remove the live daemon endpoint or discover
     readMatchingMetadata: () => null,
     assertDatabaseTarget: () => {},
     readConfig: async () => ({}) as never,
-    readInstalled: async () => [] as never,
+    readInstalled: async () => ({ records: [], diagnostics: [] }),
     loadExtensions: async () => ({
       registry: {} as never,
       completeRegistry: {} as never,
       diagnostics: [],
+      documentation: emptyDocumentation,
     }),
     openDatabase: async () => ({ close: () => {} }) as never,
     runMigrations: async () => {},
@@ -357,11 +555,12 @@ test('non-cooperative request times out while ownership remains, then cleans up 
       readMatchingMetadata: () => null,
       assertDatabaseTarget: () => {},
       readConfig: async () => ({}) as never,
-      readInstalled: async () => [] as never,
+      readInstalled: async () => ({ records: [], diagnostics: [] }),
       loadExtensions: async () => ({
         registry: {} as never,
         completeRegistry: {} as never,
         diagnostics: [],
+        documentation: emptyDocumentation,
       }),
       openDatabase: async () =>
         ({ close: () => events.push('close:db') }) as never,
@@ -402,7 +601,9 @@ test('non-cooperative request times out while ownership remains, then cleans up 
   })
   expect(events).toEqual([])
   settle()
-  await pending
+  const opened = await pending
+  if (!opened.ok) throw new Error('Expected stream admission')
+  await opened.value.next()
   await daemon.closed
   expect(events).toContain('close:db')
   expect(events).toContain('release:database')
@@ -425,11 +626,11 @@ test('startup rollback closes opened resources and releases both leases', async 
         readMatchingMetadata: () => null,
         assertDatabaseTarget: () => {},
         readConfig: async () => ({}) as never,
-        readInstalled: async () => [] as never,
         loadExtensions: async () => ({
           registry: {} as never,
           completeRegistry: {} as never,
           diagnostics: [],
+          documentation: emptyDocumentation,
         }),
         openDatabase: async () =>
           ({ close: () => events.push('close:db') }) as never,
@@ -483,11 +684,12 @@ test('post-open database target assertion closes SQLite before rollback', async 
           if (assertions === 2) throw new Error('database target changed')
         },
         readConfig: async () => ({}) as never,
-        readInstalled: async () => [] as never,
+        readInstalled: async () => ({ records: [], diagnostics: [] }),
         loadExtensions: async () => ({
           registry: {} as never,
           completeRegistry: {} as never,
           diagnostics: [],
+          documentation: emptyDocumentation,
         }),
         openDatabase: async () => {
           events.push('open')
@@ -541,7 +743,7 @@ test('daemon startup loads local Extensions without network acquisition', async 
         readMatchingMetadata: () => null,
         assertDatabaseTarget: () => {},
         readConfig: async () => defaultConfig(),
-        readInstalled: async () => [],
+        readInstalled: async () => ({ records: [], diagnostics: [] }),
         openDatabase: async () => ({ close: () => {} }) as never,
         runMigrations: async () => {},
         listLocalOAuthAppIdentities: () => [],
@@ -569,7 +771,7 @@ test('daemon startup loads local Extensions without network acquisition', async 
   }
 })
 
-test('daemon startup loads direct pins and counts direct record diagnostics', async () => {
+test('daemon startup fails managed loading closed for an invalid record document', async () => {
   const sandbox = await mkdtemp(join(tmpdir(), 'ctxindex-daemon-direct-'))
   const roots = {
     configRoot: join(sandbox, 'config'),
@@ -591,7 +793,12 @@ test('daemon startup loads direct pins and counts direct record diagnostics', as
           source: {
             kind: 'npm',
             requested_target: '@example/direct@^1',
+            package: '@example/direct',
             exact_version: '1.2.3',
+          },
+          dependency_resolution: {
+            format: 'bun.lock@1.3.14',
+            digest: 'b'.repeat(64),
           },
           materialization_digest: 'a'.repeat(64),
           package_root: 'node_modules/@example/direct',
@@ -611,7 +818,6 @@ test('daemon startup loads direct pins and counts direct record diagnostics', as
         readMatchingMetadata: () => null,
         assertDatabaseTarget: () => {},
         readConfig: async () => defaultConfig(),
-        readInstalled: async () => [],
         openDatabase: async () => ({ close: () => {} }) as never,
         runMigrations: async () => {},
         listLocalOAuthAppIdentities: () => [],
@@ -637,7 +843,7 @@ test('daemon startup loads direct pins and counts direct record diagnostics', as
     expect(health).toEqual(
       expect.objectContaining({
         ok: true,
-        value: expect.objectContaining({ extensionDiagnosticsCount: 2 }),
+        value: expect.objectContaining({ extensionDiagnosticsCount: 1 }),
       }),
     )
     await daemon.close(100)

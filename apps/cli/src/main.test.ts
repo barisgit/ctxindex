@@ -1,54 +1,51 @@
 import { afterEach, expect, spyOn, test } from 'bun:test'
-import { rootCommand, runCli } from './main'
+import type { CommandDef } from 'citty'
+import { prepareCommandTree, renderCommandUsage } from './command-model'
+import { createRootCommand, rootCommand, runCli } from './main'
+
+const rootSubCommands = rootCommand.subCommands as Record<string, CommandDef>
 
 afterEach(() => {
   spyOn(console, 'log').mockRestore()
+  spyOn(console, 'error').mockRestore()
 })
 
-test('registers action describe and run as nested root commands', () => {
-  expect(rootCommand.subCommands).toMatchObject({
-    action: {
-      subCommands: {
-        describe: expect.any(Object),
-        run: expect.any(Object),
-      },
-    },
-  })
+test('keeps only Action execution under the action command', () => {
+  expect(rootSubCommands.action).toBeDefined()
+  expect(rootSubCommands.action?.subCommands).toHaveProperty('run')
+  expect(Object.keys(rootSubCommands.action?.subCommands ?? {})).toEqual([
+    'run',
+  ])
+  expect(rootCommand.subCommands).not.toHaveProperty('action.describe')
 })
 
 test('registers export as a root command', () => {
-  expect(rootCommand.subCommands).toMatchObject({ export: expect.any(Object) })
+  expect(rootSubCommands.export).toBeDefined()
 })
 
 test('registers OAuth App commands without a Client alias', () => {
-  expect(rootCommand.subCommands).toMatchObject({
-    'oauth-app': {
-      subCommands: {
-        add: expect.any(Object),
-        list: expect.any(Object),
-        remove: expect.any(Object),
-      },
-    },
-  })
+  expect(rootSubCommands['oauth-app']).toBeDefined()
+  expect(Object.keys(rootSubCommands['oauth-app']?.subCommands ?? {})).toEqual([
+    'add',
+    'list',
+    'remove',
+  ])
   expect(rootCommand.subCommands).not.toHaveProperty('client')
 })
 
-test('registers purge as a root command with artifacts nested beneath it', () => {
-  expect(rootCommand.subCommands).toMatchObject({
-    purge: { subCommands: { artifacts: expect.any(Object) } },
-  })
+test('keeps cache removal with the other Artifact operations', () => {
+  expect(rootSubCommands.artifact).toBeDefined()
+  expect(rootSubCommands.artifact?.subCommands).toHaveProperty('purge')
+  expect(rootCommand.subCommands).not.toHaveProperty('purge')
 })
 
-test('registers explicit foreground daemon lifecycle commands', () => {
-  expect(rootCommand.subCommands).toMatchObject({
-    daemon: {
-      subCommands: {
-        serve: expect.any(Object),
-        health: expect.any(Object),
-        shutdown: expect.any(Object),
-      },
-    },
-  })
+test('registers only background daemon lifecycle commands', () => {
+  expect(rootSubCommands.daemon).toBeDefined()
+  expect(Object.keys(rootSubCommands.daemon?.subCommands ?? {})).toEqual([
+    'start',
+    'status',
+    'stop',
+  ])
 })
 
 test('prints help successfully', async () => {
@@ -63,4 +60,45 @@ test('prints export help successfully', async () => {
 
   expect(await runCli(['export', '--help'])).toBe(0)
   expect(log).toHaveBeenCalled()
+})
+
+test('reference roots accept the package-derived CLI version', async () => {
+  const root = createRootCommand(undefined, '9.9.9')
+  await prepareCommandTree(root)
+  expect(await renderCommandUsage(root)).toContain('ctxindex v9.9.9')
+})
+
+for (const args of [
+  ['get'],
+  ['oauth-app', 'add', 'google', 'work'],
+  ['definitely-not-a-command'],
+] as const) {
+  test(`maps Citty usage failures to stable exit 2: ${args.join(' ')}`, async () => {
+    spyOn(console, 'log').mockImplementation(() => {})
+    spyOn(console, 'error').mockImplementation(() => {})
+
+    expect(await runCli([...args])).toBe(2)
+  })
+}
+
+test('rejects removed --json before initialization or command effects', async () => {
+  const error = spyOn(console, 'error').mockImplementation(() => {})
+
+  expect(
+    await runCli([
+      'get',
+      'ctx://01KXHBNECDAH1T4MJ38X88EPFJ/item/one',
+      '--json',
+    ]),
+  ).toBe(2)
+  expect(error).toHaveBeenCalled()
+})
+
+test('rejects search refs with JSON before initialization or command effects', async () => {
+  const error = spyOn(console, 'error').mockImplementation(() => {})
+
+  expect(await runCli(['search', 'needle', '--refs', '-f', 'json'])).toBe(2)
+  expect(error).toHaveBeenCalledWith(
+    'search: --refs supports only omitted/default text or --format text',
+  )
 })

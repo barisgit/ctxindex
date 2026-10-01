@@ -11,11 +11,14 @@ import type {
   AdapterOperationsFor,
   AdapterSourceContext,
   AnyAdapterDefinition,
+  AnyCatalogDefinition,
   AnyExtensionDefinition,
   AnyOAuthAppDefinition,
   AnyProfileDefinition,
   AnyProviderDefinition,
   ArtifactDescriptor,
+  CatalogDefinition,
+  CatalogEntry,
   DefinitionVersion,
   DocumentationAssetMediaType,
   DocumentationDeclaration,
@@ -24,6 +27,7 @@ import type {
   DocumentationVirtualTreeDeclaration,
   DownloadContext,
   ExtensionDefinition,
+  ExtensionPackageTarget,
   FieldType,
   InferProfilePayload,
   NoneAuth,
@@ -31,6 +35,7 @@ import type {
   OAuth2RegistrationPolicy,
   OAuthAppDefinition,
   OAuthProviderDefinition,
+  PackageExtensionDescriptor,
   ProfileAction,
   ProfileDefinition,
   ProfileExportRenderResult,
@@ -52,6 +57,9 @@ import type {
   SearchRouting,
   SyncContext,
   SyncEmission,
+  SyncError,
+  SyncErrorCode,
+  SyncErrorOptions,
   SyncedResource,
   SyncMode,
 } from './index'
@@ -69,11 +77,14 @@ type PublicTypeSurface = {
   adapterOperationsFor: AdapterOperationsFor<readonly []>
   adapterSourceContext: AdapterSourceContext
   anyAdapterDefinition: AnyAdapterDefinition
+  anyCatalogDefinition: AnyCatalogDefinition
   anyExtensionDefinition: AnyExtensionDefinition
   anyOAuthAppDefinition: AnyOAuthAppDefinition
   anyProfileDefinition: AnyProfileDefinition
   anyProviderDefinition: AnyProviderDefinition
   artifactDescriptor: ArtifactDescriptor
+  catalogDefinition: CatalogDefinition
+  catalogEntry: CatalogEntry
   definitionVersion: DefinitionVersion
   documentationAssetMediaType: DocumentationAssetMediaType
   documentationDeclaration: DocumentationDeclaration
@@ -82,6 +93,7 @@ type PublicTypeSurface = {
   documentationVirtualTreeDeclaration: DocumentationVirtualTreeDeclaration
   downloadContext: DownloadContext
   extensionDefinition: ExtensionDefinition
+  extensionPackageTarget: ExtensionPackageTarget
   fieldType: FieldType
   inferredProfilePayload: InferProfilePayload<AnyProfileDefinition>
   noneAuth: NoneAuth
@@ -89,6 +101,7 @@ type PublicTypeSurface = {
   oauth2RegistrationPolicy: OAuth2RegistrationPolicy
   oauthAppDefinition: OAuthAppDefinition
   oauthProviderDefinition: OAuthProviderDefinition
+  packageExtensionDescriptor: PackageExtensionDescriptor
   profileAction: ProfileAction
   profileDefinition: ProfileDefinition
   profileExportRenderResult: ProfileExportRenderResult
@@ -111,6 +124,9 @@ type PublicTypeSurface = {
   syncedResource: SyncedResource
   syncContext: SyncContext
   syncEmission: SyncEmission
+  syncError: SyncError
+  syncErrorCode: SyncErrorCode
+  syncErrorOptions: SyncErrorOptions
   syncMode: SyncMode
 }
 
@@ -129,11 +145,14 @@ const publicSymbolNames = [
   'AdapterOperationsFor',
   'AdapterSourceContext',
   'AnyAdapterDefinition',
+  'AnyCatalogDefinition',
   'AnyExtensionDefinition',
   'AnyOAuthAppDefinition',
   'AnyProfileDefinition',
   'AnyProviderDefinition',
   'ArtifactDescriptor',
+  'CatalogDefinition',
+  'CatalogEntry',
   'DefinitionVersion',
   'DocumentationAssetMediaType',
   'DocumentationDeclaration',
@@ -142,6 +161,7 @@ const publicSymbolNames = [
   'DocumentationVirtualTreeDeclaration',
   'DownloadContext',
   'ExtensionDefinition',
+  'ExtensionPackageTarget',
   'FieldType',
   'InferProfilePayload',
   'NoneAuth',
@@ -149,6 +169,7 @@ const publicSymbolNames = [
   'OAuth2RegistrationPolicy',
   'OAuthAppDefinition',
   'OAuthProviderDefinition',
+  'PackageExtensionDescriptor',
   'ProfileAction',
   'ProfileDefinition',
   'ProfileExportRenderResult',
@@ -170,15 +191,22 @@ const publicSymbolNames = [
   'SearchRouting',
   'SyncContext',
   'SyncEmission',
+  'SyncError',
+  'SyncErrorCode',
+  'SyncErrorOptions',
   'SyncMode',
   'SyncedResource',
   'auth',
   'defineAdapter',
+  'defineCatalog',
   'defineExtension',
   'defineOAuthApp',
   'defineProfile',
   'defineProvider',
   'docs',
+  'isSyncError',
+  'packageExtension',
+  'syncError',
   'z',
 ]
 
@@ -199,11 +227,15 @@ test('public index exports the exact symbol surface', async () => {
   expect(Object.keys(runtimeSdk).sort()).toEqual([
     'auth',
     'defineAdapter',
+    'defineCatalog',
     'defineExtension',
     'defineOAuthApp',
     'defineProfile',
     'defineProvider',
     'docs',
+    'isSyncError',
+    'packageExtension',
+    'syncError',
     'z',
   ])
 })

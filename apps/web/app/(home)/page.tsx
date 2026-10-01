@@ -1,193 +1,221 @@
 import Link from 'next/link'
-import { BrandLockup } from '@/components/brand-lockup'
-import { Terminal } from '@/components/terminal'
+import { DemoQuickstart } from '@/components/demo-quickstart'
+import { DEMO_VIDEO_READY, DemoVideo } from '@/components/demo-video'
+import { RealmGraph } from '@/components/realm-graph'
+import { SdkExample } from '@/components/sdk-example'
 
-const features = [
-  {
-    title: 'One vocabulary, every provider',
-    body: 'search, get, thread, export, action. Mail, calendars, files, and extension domains answer to the same commands with the same Ref shapes.',
-  },
-  {
-    title: 'Realms keep contexts apart',
-    body: 'personal, company, university. Every Source belongs to exactly one Realm, so agents reason about the right slice of your life.',
-  },
-  {
-    title: 'Built for coding agents',
-    body: 'No MCP server or agent-specific SDK. Deterministic commands, --json output, and stable exit codes are the whole integration contract. Any shell-capable agent already integrates.',
-  },
+const trustBoundaries = [
   {
     title: 'Providers stay canonical',
-    body: 'ctxindex keeps local projections in SQLite for fast search; your mail and files never stop living where they live.',
+    body: 'ctxindex keeps a local, purgeable materialization for fast discovery. Mail, Calendar Events, and files remain in the systems that own them.',
   },
   {
-    title: 'Typed, reversible Actions',
-    body: 'Provider mutations stop at reversible email Drafts. Agents can prepare work for you; they never send on your behalf.',
+    title: 'Access stays explicit',
+    body: 'Every Source belongs to a user-created Realm. Accounts, permissions, and provider operations remain bound to the configured Source.',
   },
   {
-    title: 'Profiles as portable semantics',
-    body: 'Versioned domain contracts define shapes, relations, and Actions once — adapters plug providers into them without core branches.',
+    title: 'Actions stay narrow',
+    body: 'Typed provider mutations currently stop at reversible email Draft create and update. ctxindex never sends mail.',
   },
-]
+] as const
 
 export default function HomePage() {
   return (
-    <main className="flex flex-1 flex-col">
-      {/* Hero */}
-      <section className="relative overflow-hidden border-b border-border-default">
-        <div
-          className="ctx-hero-glow pointer-events-none absolute inset-0"
-          aria-hidden
-        />
-        <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-10 px-6 pt-20 pb-16 md:pt-28">
-          <div className="ctx-fade-up flex flex-col items-center text-center">
-            <div className="mb-8">
-              <BrandLockup orientation="stacked" variant="standard" />
-            </div>
-            <h1 className="max-w-3xl text-ctx-display font-bold tracking-ctx-display">
-              Your context, one command away
-              <span className="text-text-accent">.</span>
-            </h1>
-            <p className="mt-5 max-w-2xl text-lg text-text-secondary">
-              ctxindex is a local personal-context gateway for agents. One
-              deterministic CLI to discover, retrieve, and act on your mail,
-              calendars, and files — across every account, without giving
-              anything up.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Link
-                href="/docs/getting-started"
-                className="ctx-button ctx-button-primary"
-              >
-                Get started
-              </Link>
-              <Link href="/docs" className="ctx-button ctx-button-secondary">
-                Read the docs
-              </Link>
-            </div>
-          </div>
-          <div className="ctx-fade-up w-full max-w-3xl [animation-delay:150ms]">
-            <Terminal />
-          </div>
-        </div>
-      </section>
+    <div className="flex flex-1 flex-col">
+      <section className="border-b border-border-default">
+        <div className="mx-auto w-full max-w-6xl px-6 py-14 text-center md:py-16">
+          <h1 className="ctx-fade-up mx-auto max-w-[24ch] text-ctx-display font-bold tracking-ctx-display">
+            All your context. One command
+            <span className="text-text-accent">.</span>
+          </h1>
+          <p className="ctx-fade-up mx-auto mt-5 max-w-[56ch] text-lg leading-relaxed text-text-secondary [animation-delay:80ms]">
+            Mail, calendars, files — and anything an Extension defines — grouped
+            into Realms, indexed on your machine.
+          </p>
 
-      {/* Features */}
-      <section className="mx-auto w-full max-w-6xl px-6 py-20">
-        <h2 className="text-center text-ctx-section font-bold tracking-ctx-heading">
-          A context layer, not another inbox
-        </h2>
-        <p className="mx-auto mt-3 max-w-xl text-center text-text-secondary">
-          Indexing is a strategy, not the product. The product is one coherent
-          access model over everything you already have.
-        </p>
-        <div className="mt-12 grid gap-px overflow-hidden rounded-xl border border-border-default bg-border-default sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((f) => (
-            <div
-              key={f.title}
-              className="bg-background-primary p-6 transition-colors hover:bg-background-accent"
-            >
-              <h3 className="font-semibold">{f.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-text-secondary">
-                {f.body}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
+          <div className="ctx-fade-up mt-12 hidden sm:block [animation-delay:160ms]">
+            <RealmGraph />
+          </div>
 
-      {/* Agent integration strip */}
-      <section className="border-t border-border-default bg-background-secondary/50">
-        <div className="mx-auto grid w-full max-w-6xl gap-10 px-6 py-20 md:grid-cols-2 md:items-center">
-          <div>
-            <h2 className="text-ctx-section font-bold tracking-ctx-heading">
-              Zero integration work for agents
-            </h2>
-            <p className="mt-4 text-text-secondary">
-              Claude Code, Codex CLI, OpenClaw — any agent that can run a shell
-              command can use ctxindex today. Compose{' '}
-              <code className="rounded bg-background-muted px-1.5 py-0.5 text-sm">
-                search
-              </code>
-              ,{' '}
-              <code className="rounded bg-background-muted px-1.5 py-0.5 text-sm">
-                get
-              </code>
-              , and{' '}
-              <code className="rounded bg-background-muted px-1.5 py-0.5 text-sm">
-                export
-              </code>{' '}
-              with machine-readable output and stable exit codes. Most commands
-              use{' '}
-              <code className="rounded bg-background-muted px-1.5 py-0.5 text-sm">
-                --json
-              </code>
-              ; byte-stream exports use{' '}
-              <code className="rounded bg-background-muted px-1.5 py-0.5 text-sm">
-                --format json
-              </code>
-              .
-            </p>
-            <Link
-              href="/docs/guides/agent-integration"
-              className="mt-6 inline-block text-sm font-semibold text-text-accent hover:underline"
-            >
-              Agent integration guide →
+          <div className="ctx-fade-up mt-10 flex flex-wrap items-center justify-center gap-3 [animation-delay:240ms]">
+            <a href="#try" className="ctx-button ctx-button-primary">
+              Try the no-auth demo
+            </a>
+            <Link href="/docs" className="ctx-button ctx-button-secondary">
+              Read the docs
             </Link>
           </div>
-          <pre className="overflow-x-auto rounded-xl border border-border-default bg-background-primary p-5 font-mono text-[13px] leading-relaxed">
-            <code>{`# what an agent actually runs
-ctxindex search "invoice acme" \\
-  --realm company --json
-
-ctxindex get \\
-  ctx://01J00000000000000000000000/message/stable-message-id \\
-  --json
-
-ctxindex action describe \\
-  communication.message.draft.create \\
-  --source work-mail --json`}</code>
-          </pre>
         </div>
       </section>
 
-      {/* Sections roadmap */}
-      <section className="border-t border-border-default">
-        <div className="mx-auto w-full max-w-6xl px-6 py-14">
-          <p className="mb-6 text-sm font-medium text-text-secondary">
-            Where to go next
-          </p>
-          <div className="grid gap-4 sm:grid-cols-3">
-            {[
-              {
-                href: '/docs',
-                title: 'Documentation',
-                body: 'Concepts, CLI reference, and guides.',
-              },
-              {
-                href: '/docs/examples',
-                title: 'Examples',
-                body: 'Real sessions and agent workflows.',
-              },
-              {
-                href: '/docs/examples/marketplace',
-                title: 'Local Git Catalog',
-                body: 'Discover and install trusted Extensions locally.',
-              },
-            ].map((c) => (
-              <Link
-                key={c.href}
-                href={c.href}
-                className="group rounded-xl border border-border-default bg-background-secondary p-6 transition-colors hover:border-border-accent/50 hover:bg-background-accent"
+      <section id="try" aria-labelledby="try-heading" className="scroll-mt-16">
+        <div className="mx-auto w-full max-w-6xl px-6 py-16 md:py-24">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,0.55fr)_minmax(0,1.45fr)] lg:gap-16">
+            <div>
+              <h2
+                id="try-heading"
+                className="text-ctx-section font-bold tracking-ctx-heading"
               >
-                <h3 className="font-semibold group-hover:text-text-accent">
-                  {c.title}
-                </h3>
-                <p className="mt-1 text-sm text-text-secondary">{c.body}</p>
+                See it work before you connect anything
+              </h2>
+              <p className="mt-4 max-w-[52ch] leading-relaxed text-text-secondary">
+                Connecting real accounts means OAuth consent screens — the wrong
+                first step for a two-minute evaluation. So the repo ships a demo
+                Extension with deterministic fixture data: you run the exact
+                Realm → Source → sync → search motions of a real setup, with
+                zero credentials.
+              </p>
+              <p className="mt-5 text-sm leading-relaxed text-text-secondary">
+                Requires Bun 1.3.14. The demo makes no provider request and
+                creates no Account or Grant — and it doubles as a working
+                example of the Extension SDK below.
+              </p>
+              <Link
+                href="/docs"
+                className="ctx-inline-link mt-5 inline-flex min-h-11 items-center text-sm"
+              >
+                Follow the guided quickstart →
               </Link>
-            ))}
+            </div>
+            <DemoQuickstart />
           </div>
         </div>
       </section>
-    </main>
+
+      <section
+        aria-labelledby="agents-heading"
+        className="border-y border-border-default bg-background-secondary"
+      >
+        <div className="mx-auto grid w-full max-w-6xl gap-10 px-6 py-16 md:py-20 lg:grid-cols-2 lg:gap-16">
+          <div>
+            <h2
+              id="agents-heading"
+              className="text-ctx-section font-bold tracking-ctx-heading"
+            >
+              If an agent can run a shell command, it can use ctxindex
+            </h2>
+            <p className="mt-4 max-w-[60ch] leading-relaxed text-text-secondary">
+              Codex CLI, Claude Code, OpenClaw, and other code-executing agents
+              compose the same commands you do. JSON and stable exit codes form
+              the contract; generated CLI reference provides the exact surface.
+            </p>
+            <Link
+              href="/docs/start/agent-usage"
+              className="ctx-inline-link mt-5 inline-flex min-h-11 items-center text-sm"
+            >
+              Set up agent usage →
+            </Link>
+          </div>
+          <div className="min-w-0 border-y border-border-default py-5">
+            <p className="text-sm font-medium">
+              Give your agent one instruction
+            </p>
+            <blockquote className="mt-4 max-w-[62ch] text-lg leading-relaxed text-text-primary">
+              “Use ctxindex to search the work Realm. Pass returned{' '}
+              <code className="font-mono text-[0.85em] text-text-accent">
+                ctx://
+              </code>{' '}
+              Refs through unchanged, and retrieve only the result you need.”
+            </blockquote>
+            <code className="mt-5 block overflow-x-auto whitespace-nowrap bg-background-muted px-4 py-3 font-mono text-xs text-text-primary">
+              ctxindex search &quot;FedEx invoice&quot; --realm work --format
+              json
+            </code>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="trust-heading">
+        <div className="mx-auto w-full max-w-6xl px-6 py-16 md:py-24">
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,0.6fr)_minmax(0,1.4fr)] lg:gap-16">
+            <div>
+              <h2
+                id="trust-heading"
+                className="text-ctx-section font-bold tracking-ctx-heading"
+              >
+                Local access without taking ownership of your context
+              </h2>
+              <p className="mt-4 max-w-[52ch] leading-relaxed text-text-secondary">
+                ctxindex is a gateway over the places where your context already
+                lives, with explicit boundaries an operator can inspect.
+              </p>
+              <Link
+                href="/docs/use/trust"
+                className="ctx-inline-link mt-5 inline-flex min-h-11 items-center text-sm"
+              >
+                Read the trust model →
+              </Link>
+            </div>
+            <div className="border-t border-border-default">
+              {trustBoundaries.map((boundary) => (
+                <article
+                  key={boundary.title}
+                  className="grid gap-2 border-b border-border-default py-6 sm:grid-cols-[minmax(10rem,0.7fr)_minmax(0,1.3fr)] sm:gap-8"
+                >
+                  <h3 className="font-semibold">{boundary.title}</h3>
+                  <p className="text-sm leading-relaxed text-text-secondary">
+                    {boundary.body}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        aria-labelledby="extensions-heading"
+        className="border-y border-border-default"
+      >
+        <div className="mx-auto w-full max-w-6xl px-6 py-16 md:py-20">
+          <div className="grid gap-10 lg:grid-cols-[minmax(0,0.55fr)_minmax(0,1.45fr)] lg:gap-16">
+            <div>
+              <h2
+                id="extensions-heading"
+                className="text-ctx-section font-bold tracking-ctx-heading"
+              >
+                New context uses the same type-safe Extension SDK
+              </h2>
+              <p className="mt-4 max-w-[52ch] leading-relaxed text-text-secondary">
+                Define Profiles, Source Adapters, Providers, OAuth Apps, and
+                passive documentation as ordinary typed values. Providerless
+                Adapters need no authentication or synthetic Provider.
+              </p>
+              <p className="mt-4 max-w-[52ch] text-sm leading-relaxed text-text-secondary">
+                Extensions are trusted in-process code. Install only packages
+                you trust; they are not sandboxed plugins.
+              </p>
+              <Link
+                href="/docs/extend"
+                className="ctx-button ctx-button-secondary mt-6"
+              >
+                Build an Extension
+              </Link>
+            </div>
+            <SdkExample />
+          </div>
+        </div>
+      </section>
+
+      {DEMO_VIDEO_READY ? (
+        <section aria-labelledby="video-heading">
+          <div className="mx-auto grid w-full max-w-6xl gap-8 px-6 py-16 md:py-24 lg:grid-cols-[minmax(0,0.55fr)_minmax(0,1.45fr)] lg:items-center lg:gap-16">
+            <div>
+              <h2
+                id="video-heading"
+                className="text-ctx-section font-bold tracking-ctx-heading"
+              >
+                See the complete path
+              </h2>
+              <p className="mt-4 max-w-[48ch] leading-relaxed text-text-secondary">
+                Watch the published CLI move from install to a typed result,
+                then hand the Ref to an agent.
+              </p>
+            </div>
+            <DemoVideo />
+          </div>
+        </section>
+      ) : null}
+    </div>
   )
 }
