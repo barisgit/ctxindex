@@ -170,6 +170,7 @@ export interface DaemonApplicationOptions {
   readonly accountService?: DaemonAccountService
   readonly oauthAppService?: DaemonOAuthAppService
   readonly createAuthorizationRequestId?: () => string
+  readonly authorizationStageTimeoutMs?: number
   readonly actionService?: DaemonActionService
   readonly exportService?: DaemonExportService
   readonly artifactService?: Pick<
@@ -254,6 +255,12 @@ interface SecretAccessWaiter {
   readonly mode: 'shared' | 'exclusive'
   readonly resolve: (release: () => void) => void
 }
+
+// An authorization stage (opaque one-use requestId) expires on its own clock so
+// a pending response can never outlive this bound, even when the daemon
+// environment asks the provider loopback listener to wait longer. One hour is
+// the largest loopback timeout a client may request.
+const DEFAULT_AUTHORIZATION_STAGE_TIMEOUT_MS = 60 * 60 * 1000
 
 interface PendingAuthorizationResponse {
   readonly resolve: (value: string | undefined) => void
@@ -1061,15 +1068,31 @@ export class DaemonApplication implements DaemonRpcApplication {
               if (this.#pendingAuthorizationResponses.has(requestId))
                 throw new Error('Authorization request id collision')
               let settle!: (value: string | undefined) => void
-              const response = new Promise<string | undefined>((resolve) => {
-                settle = resolve
-              })
+              let expire!: (error: CtxindexAuthError) => void
+              const response = new Promise<string | undefined>(
+                (resolve, reject) => {
+                  settle = resolve
+                  expire = reject
+                },
+              )
               this.#pendingAuthorizationResponses.set(requestId, {
                 resolve: settle,
               })
               const finish = () => settle(undefined)
               prompt.signal.addEventListener('abort', finish, { once: true })
               signal.addEventListener('abort', finish, { once: true })
+              // Expiry withdraws the stage and fails the whole authorization,
+              // including the loopback listener racing this response.
+              const expiry = setTimeout(() => {
+                this.#pendingAuthorizationResponses.delete(requestId)
+                expire(
+                  new CtxindexAuthError(
+                    'loopback_timeout',
+                    'OAuth authorization stage expired',
+                  ),
+                )
+              }, this.#options.authorizationStageTimeoutMs ??
+                DEFAULT_AUTHORIZATION_STAGE_TIMEOUT_MS)
               try {
                 await emit({
                   type: 'authorization.required',
@@ -1078,6 +1101,7 @@ export class DaemonApplication implements DaemonRpcApplication {
                 })
                 return await response
               } finally {
+                clearTimeout(expiry)
                 prompt.signal.removeEventListener('abort', finish)
                 signal.removeEventListener('abort', finish)
                 this.#pendingAuthorizationResponses.delete(requestId)
