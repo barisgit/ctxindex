@@ -365,7 +365,7 @@ export async function daemonTransferBytes(
   } catch (error) {
     throw invocationError(error, signal, selection)
   }
-  if (!response.ok) throw unavailable(selection)
+  if (!response.ok) throw await transferRejection(response, signal, selection)
   let bytes: Uint8Array
   try {
     // Cancellation or a dropped daemon connection can reject while the body
@@ -401,8 +401,14 @@ export async function daemonTransferToFile(
   )
   const temporaryPath = join(temporaryDirectory, 'content')
   try {
-    await writeFile(temporaryPath, bytes, { mode: 0o600 })
+    await writeFile(temporaryPath, bytes, {
+      mode: 0o600,
+      ...(signal ? { signal } : {}),
+    })
     await chmod(temporaryPath, 0o600)
+    // Cancellation can arrive after the body was consumed. The link is the
+    // publication step, so a cancelled request must stop immediately before it.
+    if (signal?.aborted) throw daemonCancelledError()
     try {
       await link(temporaryPath, outputPath)
     } catch (error) {
@@ -414,9 +420,40 @@ export async function daemonTransferToFile(
       }
       throw error
     }
+  } catch (error) {
+    throw signal?.aborted ? daemonCancelledError() : error
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true })
   }
+}
+
+// A ticket GET is refused with the same declared compatibility failure as RPC;
+// any other refusal stays a bounded daemon-unavailable failure.
+async function transferRejection(
+  response: Response,
+  signal: AbortSignal | undefined,
+  selection: DaemonSelection,
+): Promise<DaemonCliError> {
+  if (signal?.aborted) return daemonCancelledError()
+  if (response.status !== 409) return unavailable(selection)
+  try {
+    const failure = rpcFailureSchema.safeParse(await response.json())
+    if (
+      failure.success &&
+      (failure.data.kind === 'protocol_incompatible' ||
+        failure.data.kind === 'runtime_identity_mismatch')
+    )
+      return new DaemonCliError(failure.data)
+  } catch {}
+  return unavailable(selection)
+}
+
+export function daemonCancelledError(): DaemonCliError {
+  return new DaemonCliError({
+    kind: 'cancelled',
+    code: 'cancelled',
+    message: 'The daemon request was cancelled.',
+  })
 }
 
 function invocationError(
@@ -424,13 +461,7 @@ function invocationError(
   signal: AbortSignal | undefined,
   selection: DaemonSelection,
 ): DaemonCliError {
-  if (signal?.aborted) {
-    return new DaemonCliError({
-      kind: 'cancelled',
-      code: 'cancelled',
-      message: 'The daemon request was cancelled.',
-    })
-  }
+  if (signal?.aborted) return daemonCancelledError()
   const failure = daemonFailureFromDeclaredError(error)
   return failure ? new DaemonCliError(failure) : unavailable(selection)
 }

@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test'
+import { DAEMON_PROTOCOL } from './runtime'
 import { ByteTransferStore } from './transfer'
 import { parseDaemonRequestContext, serveByteTransfer } from './transport'
 
@@ -48,16 +49,64 @@ test('transport serves an exact transfer ticket once without accepting path vari
   const request = new Request(`http://daemon/transfer/${transfer.ticket}`, {
     method: 'GET',
   })
-  const first = serveByteTransfer(request, store)
+  const first = serveByteTransfer(request, compatible, expectations, store)
   expect(first?.status).toBe(200)
   expect(new Uint8Array(await (first as Response).arrayBuffer())).toEqual(
     Uint8Array.of(0, 255, 1),
   )
-  expect(serveByteTransfer(request, store)?.status).toBe(404)
+  expect(
+    serveByteTransfer(request, compatible, expectations, store)?.status,
+  ).toBe(404)
   expect(
     serveByteTransfer(
       new Request(`http://daemon/transfer/${transfer.ticket}/extra`),
+      compatible,
+      expectations,
       store,
     )?.status,
   ).toBe(404)
+})
+
+const expectations = { protocol: DAEMON_PROTOCOL, runtime }
+const compatible = {
+  requestId: 'transfer-request',
+  clientProtocol: DAEMON_PROTOCOL,
+  clientRuntime: runtime,
+}
+
+test('transport rejects incompatible transfer GETs before consuming the ticket', async () => {
+  const store = new ByteTransferStore()
+  const transfer = store.create(Uint8Array.of(7))
+  const request = new Request(`http://daemon/transfer/${transfer.ticket}`)
+  const incompatible = [
+    {
+      context: {
+        ...compatible,
+        clientProtocol: { id: DAEMON_PROTOCOL.id, version: 999 },
+      },
+      kind: 'protocol_incompatible',
+    },
+    {
+      context: {
+        ...compatible,
+        clientRuntime: { ...runtime, tupleDigest: 'b'.repeat(64) },
+      },
+      kind: 'runtime_identity_mismatch',
+    },
+  ]
+
+  for (const { context, kind } of incompatible) {
+    const response = serveByteTransfer(request, context, expectations, store)
+    expect(response?.status).toBe(409)
+    expect(await (response as Response).json()).toMatchObject({
+      kind,
+      code: kind,
+    })
+  }
+
+  const admitted = serveByteTransfer(request, compatible, expectations, store)
+  expect(admitted?.status).toBe(200)
+  expect(new Uint8Array(await (admitted as Response).arrayBuffer())).toEqual(
+    Uint8Array.of(7),
+  )
 })

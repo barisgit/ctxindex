@@ -248,6 +248,51 @@ async function invokeStreamApplication<Yield, Return>(
   return output
 }
 
+const RUNTIME_DIGEST_KEYS = [
+  'tupleDigest',
+  'configDigest',
+  'dataDigest',
+  'stateDigest',
+  'cacheDigest',
+  'databaseDigest',
+] as const
+
+/**
+ * Returns the declared failure for a client that is not exactly compatible
+ * with the daemon, or null when the request may proceed. It is the single
+ * admission rule shared by the RPC middleware and the byte-transfer route, so
+ * both refuse the same clients before any application or ticket state is used.
+ */
+export function rpcCompatibilityFailure(
+  context: RpcTransportContext,
+  expectations: DaemonRouterExpectations,
+): RpcFailure | null {
+  const { clientProtocol, clientRuntime } = context
+  const { protocol, runtime } = expectations
+  if (
+    clientProtocol.id !== protocol.id ||
+    clientProtocol.version !== protocol.version
+  ) {
+    return {
+      kind: 'protocol_incompatible',
+      code: 'protocol_incompatible',
+      message: 'The client protocol is incompatible with this daemon.',
+      clientProtocol,
+      daemonProtocol: protocol,
+    }
+  }
+  if (RUNTIME_DIGEST_KEYS.some((key) => clientRuntime[key] !== runtime[key])) {
+    return {
+      kind: 'runtime_identity_mismatch',
+      code: 'runtime_identity_mismatch',
+      message: 'The client runtime identity does not match this daemon.',
+      clientRuntime,
+      daemonRuntime: runtime,
+    }
+  }
+  return null
+}
+
 function applicationContext(
   context: RpcTransportContext,
   signal: AbortSignal | undefined,
@@ -269,43 +314,11 @@ export function createDaemonRouter(
         throw errors.ctxindex({ data: INTERNAL_FAILURE })
       }
       const requestContext = parsedContext.data
-      if (
-        requestContext.clientProtocol.id !== daemonProtocol.id ||
-        requestContext.clientProtocol.version !== daemonProtocol.version
-      ) {
-        throw errors.protocol_incompatible({
-          data: {
-            kind: 'protocol_incompatible',
-            code: 'protocol_incompatible',
-            message: 'The client protocol is incompatible with this daemon.',
-            clientProtocol: requestContext.clientProtocol,
-            daemonProtocol,
-          },
-        })
-      }
-      if (
-        requestContext.clientRuntime.tupleDigest !==
-          daemonRuntime.tupleDigest ||
-        requestContext.clientRuntime.configDigest !==
-          daemonRuntime.configDigest ||
-        requestContext.clientRuntime.dataDigest !== daemonRuntime.dataDigest ||
-        requestContext.clientRuntime.stateDigest !==
-          daemonRuntime.stateDigest ||
-        requestContext.clientRuntime.cacheDigest !==
-          daemonRuntime.cacheDigest ||
-        requestContext.clientRuntime.databaseDigest !==
-          daemonRuntime.databaseDigest
-      ) {
-        throw errors.runtime_identity_mismatch({
-          data: {
-            kind: 'runtime_identity_mismatch',
-            code: 'runtime_identity_mismatch',
-            message: 'The client runtime identity does not match this daemon.',
-            clientRuntime: requestContext.clientRuntime,
-            daemonRuntime,
-          },
-        })
-      }
+      const failure = rpcCompatibilityFailure(requestContext, {
+        protocol: daemonProtocol,
+        runtime: daemonRuntime,
+      })
+      if (failure) throw declaredError(errors, failure)
       return next({ context: requestContext })
     },
   )
