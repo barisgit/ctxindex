@@ -485,7 +485,7 @@ test('direct Source ownership conflict fails before definition loading', async (
         sourceList: async () => ({ rows: [] }),
         sourceRemove: async () => ({ sourceId: 'unused' }),
         acquireOwnership: () => {
-          throw new DirectDatabaseLeaseConflictError()
+          throw new DirectDatabaseLeaseConflictError('a'.repeat(64))
         },
         loadDefinitions: async () => {
           loadedDefinitions = true
@@ -516,7 +516,7 @@ test('Source add ownership conflict maps to a database lease conflict before dyn
         sourceList: async () => ({ rows: [] }),
         sourceRemove: async () => ({ sourceId: 'unused' }),
         acquireOwnership: () => {
-          throw new DirectDatabaseLeaseConflictError()
+          throw new DirectDatabaseLeaseConflictError('a'.repeat(64))
         },
         loadDefinitions: async () => {
           loadedDefinitions = true

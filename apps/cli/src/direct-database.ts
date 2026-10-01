@@ -18,6 +18,7 @@ import {
 import {
   acquireFileLease,
   assertRetainedDatabaseLeaseTarget,
+  databaseDigest,
   type FileLease,
   FileLeaseConflictError,
   FileLeaseUnsupportedError,
@@ -27,15 +28,19 @@ import {
 let database: CtxindexDatabase | null = null
 let closeDatabase: (() => void) | null = null
 
-// A direct opener blocked by an exclusive daemon owner reports the same bounded
+// A direct opener blocked by an exclusive owner reports the same bounded
 // database_lease_conflict classification (exit 50) as the daemon transport.
+// The lease is holder-neutral, so the diagnostic never attributes the holder to
+// a daemon and names the database only by its canonical digest.
 export class DirectDatabaseLeaseConflictError extends Error {
   readonly code = 'database_lease_conflict'
+  readonly databaseDigest: string
 
-  constructor() {
+  constructor(databaseDigest: string) {
     super(
-      'This command is unavailable while the local daemon owns the database.',
+      `The database is held by another local process/runtime (database=${databaseDigest}).`,
     )
+    this.databaseDigest = databaseDigest
   }
 }
 
@@ -51,8 +56,12 @@ export function acquireSharedDatabaseLease(
     })
   } catch (error) {
     if (error instanceof FileLeaseConflictError) {
-      throw new DirectDatabaseLeaseConflictError()
+      throw new DirectDatabaseLeaseConflictError(databaseDigest(target))
     }
+    // Only a genuinely unsupported OS keeps unleased direct access, because no
+    // daemon can own the database there. An unavailable primitive or
+    // filesystem on a supported platform propagates and fails closed (exit 50)
+    // before any SQLite open.
     if (
       error instanceof FileLeaseUnsupportedError &&
       error.reason === 'platform'
