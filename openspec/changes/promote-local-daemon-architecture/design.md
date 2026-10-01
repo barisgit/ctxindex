@@ -37,7 +37,7 @@ Batching and OpenAPI generation remain deferred because a local Unix-socket prot
 
 ### 3. Stateful families migrate by semantic application service
 
-OAuth App, Account, secret-backend, Artifact, export, Action, purge, and installed-Extension operations receive bounded semantic procedures. Business rules stay in existing or extracted core application services. Interactive OAuth is a staged application flow: the daemon owns provider-neutral authorization state and persistence, while the CLI owns explicit browser launch and loopback callback interaction.
+OAuth App, Account, secret-backend, Artifact, export, Action, purge, and installed-Extension operations receive bounded semantic procedures. Business rules stay in existing or extracted core application services. Interactive OAuth is a staged application flow: the daemon owns provider-neutral authorization state, the loopback callback listener, provider exchange, and persistence, while the CLI owns explicit operator consent, browser launch, and the hidden manual authorization response.
 
 `oauth-app add --from-env` retains its invocation semantics: the CLI reads the exact Provider-declared bounded mapping from its invocation environment and sends it only as the dedicated write-only sensitive input over the existing owner-private local socket. The router validates and delegates it once; middleware, diagnostics, traces, results, and errors never retain or reflect it. The daemon consumes it directly into the configured secret backend and holds no retryable or persistent staging copy. This narrow ingress wins over a second secret-transfer protocol or asking the long-lived daemon to inherit command-specific environment state.
 

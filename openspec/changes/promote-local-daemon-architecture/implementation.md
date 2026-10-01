@@ -38,7 +38,7 @@ apps/cli ──> @ctxindex/local-daemon
 
 `apps/daemon` remains the Bun composition root. It owns runtime startup/close, SQLite, the immutable registry, semantic application orchestration, safe DTO projection, request admission/tracking, transport adapters, and shutdown. Core application services own provider-neutral workflows; Source Adapters own provider I/O.
 
-`apps/cli` owns parsing and locally decidable validation, explicit browser/loopback interaction, the private daemon-client facade, cancellation wiring, byte-transfer client adaptation, readable/JSON formatting, stderr diagnostics, and final exits. It never imports the daemon application or exposes the RPC contract as a public agent API.
+`apps/cli` owns parsing and locally decidable validation, explicit browser launch and manual authorization response, the private daemon-client facade, cancellation wiring, byte-transfer client adaptation, readable/JSON formatting, stderr diagnostics, and final exits. It never imports the daemon application or exposes the RPC contract as a public agent API.
 
 ## Interfaces and Data Flow
 
@@ -63,7 +63,7 @@ The actual injected type remains recursively inferred from `daemonContract`; thi
 
 OAuth App environment import uses one explicitly named sensitive contract input whose fields derive from the selected Provider declaration and remain bounded. The CLI reads those values once, the router validates and delegates once, and the daemon writes them directly through the existing secret application service. The input is excluded from all middleware/logging/tracing hooks, never appears in success or failure data, is never automatically retried, and has no persistent staging record.
 
-OAuth authorization is staged. A daemon procedure prepares bounded authorization metadata and state; after explicit operator consent the CLI owns browser launch and loopback receipt; the daemon validates the returned state/code and performs provider exchange, identity resolution, serialization, and persistence. The stage token is opaque, short-lived, one-use, owner-private, and contains no token or App secret.
+OAuth authorization is staged. A streamed daemon procedure prepares bounded authorization metadata and state, opens the loopback callback listener, and emits the authorization URL with an opaque stage id; after explicit operator consent the CLI owns browser launch and may submit a hidden manual response once against that stage id. The daemon validates whichever state/code arrives first and performs provider exchange, identity resolution, serialization, and persistence. The stage id is opaque, expires on its own bounded clock, is one-use and owner-private, and contains no token or App secret.
 
 Artifact download and export metadata remain unary contract procedures. Bytes flow through a local owner-private transfer adapter with an opaque bounded ticket, cancellation, expected maximum size, atomic destination handling, and deterministic expiry/cleanup. RPC results expose neither cache/provider paths nor byte arrays. The selected transfer mechanism is proven in a focused spike before its DTO is made canonical.
 
