@@ -565,6 +565,21 @@ describe('pure daemon contract', () => {
     expectTypeOf<DaemonRpcApplication['artifact']>().toHaveProperty('purge')
   })
 
+  test('declares exactly the promoted bounded failure kinds', () => {
+    // Direct openers blocked by daemon ownership use database_lease_conflict;
+    // no prototype-only classification remains in the private contract.
+    expect(Object.keys(rpcFailureRegistry)).toEqual([
+      'ctxindex',
+      'daemon_unavailable',
+      'protocol_incompatible',
+      'runtime_identity_mismatch',
+      'database_lease_conflict',
+      'shutdown_timeout',
+      'cancelled',
+      'result_too_large',
+    ])
+  })
+
   test('infers every declared bounded failure variant', () => {
     type ErrorMap = InferContractRouterErrorMap<typeof daemonContract>
     type DeclaredError = ORPCErrorFromErrorMap<ErrorMap>
@@ -589,9 +604,6 @@ describe('pure daemon contract', () => {
     >().toEqualTypeOf<
       Extract<RpcFailure, { kind: 'database_lease_conflict' }>
     >()
-    expectTypeOf<
-      Extract<DeclaredError, { code: 'prototype_unsupported' }>['data']
-    >().toEqualTypeOf<Extract<RpcFailure, { kind: 'prototype_unsupported' }>>()
     expectTypeOf<
       Extract<DeclaredError, { code: 'shutdown_timeout' }>['data']
     >().toEqualTypeOf<Extract<RpcFailure, { kind: 'shutdown_timeout' }>>()
@@ -923,12 +935,6 @@ describe('contract implementation', () => {
         code: 'database_lease_conflict',
         message: 'Busy.',
         databaseDigest: digest,
-      },
-      {
-        kind: 'prototype_unsupported',
-        code: 'prototype_unsupported',
-        message: 'Unsupported.',
-        command: 'artifact',
       },
       {
         kind: 'shutdown_timeout',

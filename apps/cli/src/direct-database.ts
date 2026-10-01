@@ -27,8 +27,10 @@ import {
 let database: CtxindexDatabase | null = null
 let closeDatabase: (() => void) | null = null
 
-export class PrototypeUnsupportedError extends Error {
-  readonly code = 'prototype_unsupported'
+// A direct opener blocked by an exclusive daemon owner reports the same bounded
+// database_lease_conflict classification (exit 50) as the daemon transport.
+export class DirectDatabaseLeaseConflictError extends Error {
+  readonly code = 'database_lease_conflict'
 
   constructor() {
     super(
@@ -49,7 +51,7 @@ export function acquireSharedDatabaseLease(
     })
   } catch (error) {
     if (error instanceof FileLeaseConflictError) {
-      throw new PrototypeUnsupportedError()
+      throw new DirectDatabaseLeaseConflictError()
     }
     if (
       error instanceof FileLeaseUnsupportedError &&
