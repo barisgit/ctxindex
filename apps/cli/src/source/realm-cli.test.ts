@@ -134,7 +134,12 @@ describe('realm-cli integration: CLI subprocess', () => {
     return {
       dir,
       env,
-      cleanup: () => rm(dir, { recursive: true, force: true }),
+      // Commands such as `realm add` ensure an on-demand daemon; stop it before
+      // deleting its roots so it does not linger until idle exit.
+      cleanup: async () => {
+        await spawnCli(['daemon', 'stop'], env)
+        await rm(dir, { recursive: true, force: true })
+      },
     }
   }
 

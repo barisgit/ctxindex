@@ -43,6 +43,11 @@ test('relocated compiled CLI serves product documentation offline', async () => 
           XDG_DATA_HOME: join(sandbox, 'data'),
           XDG_STATE_HOME: join(sandbox, 'state'),
           XDG_CACHE_HOME: join(sandbox, 'cache'),
+          // Explicit roots take precedence over XDG; drop the inherited ones.
+          CTXINDEX_CONFIG_HOME: undefined,
+          CTXINDEX_DATA_HOME: undefined,
+          CTXINDEX_STATE_HOME: undefined,
+          CTXINDEX_CACHE_HOME: undefined,
         },
         stdin: null,
         stdout: 'pipe',

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -59,6 +60,23 @@ function stdinForSpawn(
   return stdin
 }
 
+// Initialized registry reads ensure an on-demand daemon. Signal it before the
+// sandbox roots are deleted so it does not linger detached until idle exit.
+// The discovery record lives in this private sandbox, so its pid is this
+// sandbox's daemon. SIGTERM is the daemon's graceful shutdown path and, unlike
+// `daemon stop`, adds no CLI startup to each test's time budget.
+function stopSandboxDaemon(stateHome: string): void {
+  try {
+    const discovery = readFileSync(join(stateHome, 'daemon/discovery.json'))
+    const { pid } = JSON.parse(discovery.toString()) as { pid?: unknown }
+    if (typeof pid === 'number' && Number.isInteger(pid) && pid > 0) {
+      process.kill(pid, 'SIGTERM')
+    }
+  } catch {
+    // No daemon was started, or it already exited.
+  }
+}
+
 export async function createSandbox(): Promise<Sandbox> {
   const dir = await mkdtemp(join(tmpdir(), 'ctxindex-sandbox-'))
   const env = baseEnv(dir)
@@ -94,6 +112,8 @@ export async function createSandbox(): Promise<Sandbox> {
   async function cleanup(): Promise<void> {
     if (cleaned) return
     cleaned = true
+
+    stopSandboxDaemon(env.CTXINDEX_STATE_HOME)
     await rm(dir, { recursive: true, force: true })
   }
 

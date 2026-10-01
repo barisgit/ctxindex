@@ -1,0 +1,3 @@
+[test]
+# Isolate tests from the developer's real ctxindex runtime; see the preload.
+preload = ["../../scripts/testing/isolate-ctxindex-state.ts"]
