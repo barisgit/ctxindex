@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { resetEnvForTests } from '../config/env-loader'
 import { KeychainBackend } from './keychain'
 import { CtxindexSecretsError } from './types'
 
@@ -12,6 +13,9 @@ describe('KeychainBackend', () => {
     process.env.NODE_ENV = 'test'
     delete process.env.CTXINDEX_KEYTAR_MOCK_FILE
     delete process.env.CTXINDEX_LIVE_TESTS
+    // getEnv() is memoized per process; an earlier test file may have cached
+    // the package-level mock path, which would hide the missing-mock guard.
+    resetEnvForTests()
 
     try {
       await expect(
@@ -25,6 +29,7 @@ describe('KeychainBackend', () => {
       else process.env.CTXINDEX_KEYTAR_MOCK_FILE = previousMock
       if (previousLive === undefined) delete process.env.CTXINDEX_LIVE_TESTS
       else process.env.CTXINDEX_LIVE_TESTS = previousLive
+      resetEnvForTests()
     }
   })
 
