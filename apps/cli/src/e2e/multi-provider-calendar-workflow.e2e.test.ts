@@ -454,7 +454,8 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
         'calendar.event',
         '--field',
         'startTimeZone=Europe/London',
-        '--json',
+        '--format',
+        'json',
       ],
       { env: baseEnv },
     )
@@ -465,7 +466,7 @@ test('compiled CLI isolates Google and Microsoft calendars across exact Realms',
 
     for (const id of ['graph-unknown-zone', 'graph-dst-gap']) {
       const got = await sandbox.run(
-        ['get', '--json', `ctx://${graphSource}/event/${id}`],
+        ['get', '--format', 'json', `ctx://${graphSource}/event/${id}`],
         { env: baseEnv },
       )
       expect(got.exitCode, got.stderr).toBe(0)
