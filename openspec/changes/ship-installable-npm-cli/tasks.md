@@ -30,4 +30,10 @@
 
 ## 6. First publish Human checkpoint
 
-- [ ] 6.1 Human checkpoint: inspect the MIT-licensed final tarball, verify live npm package ownership/version availability, manually bootstrap the exact artifact with owner 2FA, configure npm trusted publisher for `barisgit/ctxindex`, `release.yml`, and `npm-production`, protect that GitHub environment, and explicitly approve later OIDC publishing. Do not publish or request credentials during automated implementation.
+Do not publish or request credentials during automated implementation. Evidence below was checked on 2026-10-01 from public npm registry data and the GitHub API.
+
+- [x] 6.1 Verify live npm package ownership, version availability, and the MIT-licensed tarball. Evidence: `npm view ctxindex` lists maintainer `baris5` and versions `0.1.0` to `0.1.3`, each declaring `license: MIT`. The published `ctxindex-0.1.3.tgz` contains only `package.json`, `LICENSE` (MIT), `README.md`, `dist/ctxindex.mjs`, and `dist/ctxindex-daemon`.
+- [x] 6.2 Bootstrap the first publish manually. Evidence: `release.yml` run 29841258867 for the `0.1.0` version bump failed in its Publish job, and `ctxindex@0.1.0` was then published at 2026-07-21T15:12Z by `baris5`, not by a workflow.
+- [x] 6.3 Configure npm trusted publishing for `barisgit/ctxindex` and `release.yml`. Evidence: `0.1.1` to `0.1.3` were published by `GitHub Actions <npm-oidc-no-reply@github.com>`. The SLSA provenance for `0.1.3` names `.github/workflows/release.yml` on `refs/heads/main`, run 29872926865.
+- [ ] 6.4 Human checkpoint: confirm the details that public data cannot show. These are: the `0.1.0` bootstrap used owner 2FA; it published the exact verified packed artifact; and the npm trusted-publisher record pins environment `npm-production` with **Allowed actions: `npm publish`**.
+- [ ] 6.5 Human checkpoint: protect the `npm-production` GitHub environment and explicitly approve later OIDC publishing. On 2026-10-01, `gh api repos/barisgit/ctxindex/environments` reported `npm-production` with no protection rules and no deployment branch policy, so publish jobs run without an approval gate.

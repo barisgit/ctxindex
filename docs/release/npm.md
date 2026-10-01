@@ -16,7 +16,7 @@ Do not publish these packages manually during normal releases. Bump the intended
 
 1. Validate the current semantic version against the previous commit and query the exact npm version.
 2. Run `bun run ci`, build the CLI, create the allowlisted tarball, verify its SHA-256 checksum, and smoke-install that exact archive.
-3. In the protected `npm-production` environment, download and re-verify the artifact, repeat the registry preflight, and publish with npm trusted publishing.
+3. In the `npm-production` environment, download and re-verify the artifact, repeat the registry preflight, and publish with npm trusted publishing.
 4. Tag the published commit as `v<version>` and attach the same tarball and checksum to its GitHub Release.
 
 The public archive contains the generated manifest, `README.md`, `LICENSE`, `dist/ctxindex.mjs`, and its adjacent `dist/ctxindex-daemon`. `keytar@7.9.0` remains an external runtime dependency so Bun installs the native module for the destination host.
@@ -29,7 +29,9 @@ The publish job re-verifies downloaded checksums and registry state. On a workfl
 
 ## Trusted publishing
 
-Both workflows use npm's GitHub Actions OIDC trusted publishing. Only their publish jobs receive `id-token: write`, and both use the protected `npm-production` GitHub environment. No npm token belongs in repository secrets or workflow configuration.
+Both workflows use npm's GitHub Actions OIDC trusted publishing. Only their publish jobs receive `id-token: write`, and both use the `npm-production` GitHub environment. No npm token belongs in repository secrets or workflow configuration.
+
+The `npm-production` environment is not protected yet. On 2026-10-01 it had no protection rules (such as required reviewers) and no deployment branch policy, so publish jobs run without an approval gate. Protecting it is an open owner step.
 
 Each npm trusted-publisher record must keep **Allowed actions: `npm publish`**.
 
@@ -40,4 +42,4 @@ The npm trusted-publisher records are:
 | `ctxindex` | `barisgit/ctxindex` | `release.yml` | `npm-production` |
 | `@ctxindex/extension-sdk`, `@ctxindex/profiles` | `barisgit/ctxindex` | `publish-packages.yml` | `npm-production` |
 
-If a publisher record, workflow filename, or environment changes, update npm and GitHub together before merging a version bump. Keep the environment protected and preserve exact-artifact verification, registry fail-closed behavior, and dependency ordering.
+If a publisher record, workflow filename, or environment changes, update npm and GitHub together before merging a version bump. Protect the environment, and preserve exact-artifact verification, registry fail-closed behavior, and dependency ordering.
