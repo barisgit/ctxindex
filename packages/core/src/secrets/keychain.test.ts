@@ -13,8 +13,7 @@ describe('KeychainBackend', () => {
     process.env.NODE_ENV = 'test'
     delete process.env.CTXINDEX_KEYTAR_MOCK_FILE
     delete process.env.CTXINDEX_LIVE_TESTS
-    // getEnv() is memoized per process; an earlier test file may have cached
-    // the package-level mock path, which would hide the missing-mock guard.
+    // getEnv() is memoized; an earlier test file may have cached the mock path.
     resetEnvForTests()
 
     try {
