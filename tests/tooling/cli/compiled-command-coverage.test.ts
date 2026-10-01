@@ -8,7 +8,7 @@ import { rootCommand } from '../../../apps/cli/src/main'
 // journey invokes it. command-ownership.test.ts owns the daemon-versus-exception
 // classification; this file only owns compiled coverage.
 
-const ownership = 'apps/cli/src/e2e/compiled-daemon-ownership.e2e.test.ts'
+const ownership = 'apps/daemon/src/e2e/compiled-daemon-ownership.e2e.test.ts'
 const actionArtifact =
   'apps/cli/src/e2e/compiled-daemon-action-artifact.e2e.test.ts'
 const oauthAccount =
@@ -19,6 +19,7 @@ const docs = 'apps/cli/src/e2e/compiled-docs.e2e.test.ts'
 const daemonJourneys = 'apps/daemon/src/e2e/compiled-daemon.e2e.test.ts'
 const extensionRegistry =
   'apps/daemon/src/e2e/compiled-extension-registry.e2e.test.ts'
+const idleExit = 'apps/daemon/src/e2e/compiled-idle-exit.e2e.test.ts'
 
 const compiledLeafJourneys: Readonly<Record<string, readonly string[]>> = {
   // Daemon-owned leaves.
@@ -99,6 +100,10 @@ const compiledPropertyJourneys: Readonly<
   'shutdown timeout retains ownership until shutdown completes': [
     daemonJourneys,
     'concurrent shutdown times out without releasing ownership, then force termination permits restart and backup',
+  ],
+  'automatic idle exit followed by on-demand restart': [
+    idleExit,
+    'the test-only short idle timeout exits a packaged daemon despite status polling, then it restarts',
   ],
 }
 

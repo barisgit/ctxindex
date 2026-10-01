@@ -2,11 +2,69 @@ import { afterAll, beforeAll, expect, test } from 'bun:test'
 import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import {
-  buildCompiledCliHarness,
-  type CliResult,
-  type CompiledCliHarness,
-} from './_compiled-cli-harness'
+
+interface CliResult {
+  readonly stdout: string
+  readonly stderr: string
+  readonly exitCode: number
+}
+
+interface CompiledCliHarness {
+  readonly executable: string
+  run(
+    args: readonly string[],
+    env: Readonly<Record<string, string>>,
+  ): Promise<CliResult>
+  cleanup(): Promise<void>
+}
+
+const repoRoot = join(import.meta.dir, '..', '..', '..', '..')
+
+// The compiled CLI resolves `ctxindex-daemon` beside its own executable, so
+// both binaries are built into one directory, as a release would ship them.
+async function buildCompiledCliHarness(): Promise<CompiledCliHarness> {
+  const dir = await mkdtemp(join(tmpdir(), 'ctxindex-ownership-build-'))
+  const executable = join(dir, 'ctxindex')
+  const builds: readonly (readonly [entrypoint: string, output: string])[] = [
+    ['apps/cli/bin/ctxindex.mjs', executable],
+    ['apps/daemon/src/main.ts', join(dir, 'ctxindex-daemon')],
+  ]
+  await Promise.all(
+    builds.map(async ([entrypoint, output]) => {
+      const build = Bun.spawn(
+        ['bun', 'build', '--compile', entrypoint, '--outfile', output],
+        { cwd: repoRoot, stdout: 'pipe', stderr: 'pipe' },
+      )
+      const [stdout, stderr, exitCode] = await Promise.all([
+        new Response(build.stdout).text(),
+        new Response(build.stderr).text(),
+        build.exited,
+      ])
+      expect(exitCode, `${stdout}\n${stderr}`).toBe(0)
+      await chmod(output, 0o755)
+    }),
+  )
+
+  return {
+    executable,
+    async run(args, env) {
+      const child = Bun.spawn([executable, ...args], {
+        cwd: '/',
+        env,
+        stdin: 'ignore',
+        stdout: 'pipe',
+        stderr: 'pipe',
+      })
+      const [stdout, stderr, exitCode] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited,
+      ])
+      return { stdout, stderr, exitCode }
+    },
+    cleanup: () => rm(dir, { recursive: true, force: true }),
+  }
+}
 
 // Compiled ownership acceptance across the locally runnable daemon-owned
 // command inventory, plus the daemon executable's foreground debug entry.
@@ -38,7 +96,7 @@ function isAlive(pid: number): boolean {
 }
 
 async function isolatedCli() {
-  if (!harness) throw new Error('Compiled CLI harness was not initialized')
+  if (!harness) throw new Error('Compiled executables were not built')
   const compiled = harness
   const dir = await mkdtemp(join(tmpdir(), 'ctxindex-ownership-'))
   // A short root keeps the daemon socket path within the macOS limit.

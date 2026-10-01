@@ -22,7 +22,7 @@ const expectedGates = [
   ],
   [
     'Compiled daemon ownership journey',
-    'apps/cli',
+    'apps/daemon',
     'src/e2e/compiled-daemon-ownership.e2e.test.ts',
   ],
   [
@@ -34,6 +34,11 @@ const expectedGates = [
     'Compiled OAuth Account journey',
     'apps/cli',
     'src/e2e/compiled-oauth-account-lifecycle.e2e.test.ts',
+  ],
+  [
+    'Compiled daemon idle exit journey',
+    'apps/daemon',
+    'src/e2e/compiled-idle-exit.e2e.test.ts',
   ],
 ] as const
 
