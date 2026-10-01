@@ -27,6 +27,11 @@ function sha256(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex')
 }
 
+// Bounded public identity of a canonical SQLite path; never expose the path.
+export function databaseDigest(canonicalDatabasePath: string): string {
+  return sha256(`ctxindex-database-v1|${canonicalDatabasePath}`)
+}
+
 function isMissingPathError(error: unknown): boolean {
   return (
     error instanceof Error &&
@@ -112,7 +117,7 @@ export function resolveRuntimeIdentity(
       dataDigest: sha256(`ctxindex-data-root-v1|${canonicalPaths.dataRoot}`),
       stateDigest: sha256(`ctxindex-state-root-v1|${canonicalPaths.stateRoot}`),
       cacheDigest: sha256(`ctxindex-cache-root-v1|${canonicalPaths.cacheRoot}`),
-      databaseDigest: sha256(`ctxindex-database-v1|${databasePath}`),
+      databaseDigest: databaseDigest(databasePath),
     },
   }
 }

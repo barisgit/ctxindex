@@ -134,7 +134,7 @@ describe('daemon startup over the Linux retained flock backend', () => {
       }),
     )
     expect(failure).toBeInstanceOf(FileLeaseUnsupportedError)
-    expect(failure).toMatchObject({ reason: 'platform' })
+    expect(failure).toMatchObject({ reason: 'primitive' })
     expect(spawned).toBe(false)
   })
 

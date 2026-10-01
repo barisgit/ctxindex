@@ -1,12 +1,16 @@
 import { Database } from 'bun:sqlite'
 import { expect, test } from 'bun:test'
+import { createHash } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { mkdtemp, realpath, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { CtxindexDatabase } from '@ctxindex/core/storage'
 import {
+  createFileLeaseBackend,
   type FileLease,
   FileLeaseConflictError,
+  type FileLeaseRequest,
   FileLeaseUnsupportedError,
 } from '@ctxindex/local-daemon'
 import {
@@ -16,6 +20,7 @@ import {
   readLeasedDirectExtensionSourceBindings,
   readLeasedLocalOAuthAppIdentities,
 } from './direct-database'
+import { mapErrorToExit } from './format/exit'
 
 test('retains the shared lease from before open until after database close', async () => {
   const events: string[] = []
@@ -57,11 +62,16 @@ test('retains the shared lease from before open until after database close', asy
   ])
 })
 
-test('maps exclusive ownership to a database lease conflict before database open', async () => {
+test('maps exclusive ownership to a holder-neutral database lease conflict before database open', async () => {
+  const target = '/tmp/ctxindex-cli-conflict.sqlite'
+  const databaseDigest = createHash('sha256')
+    .update(`ctxindex-database-v1|${target}`, 'utf8')
+    .digest('hex')
   let opened = false
-  await expect(
-    openLeasedDatabase({
-      target: '/tmp/ctxindex-cli-conflict.sqlite',
+  let failure: unknown
+  try {
+    await openLeasedDatabase({
+      target,
       acquire: () => {
         throw new FileLeaseConflictError('a'.repeat(64))
       },
@@ -69,13 +79,20 @@ test('maps exclusive ownership to a database lease conflict before database open
         opened = true
         return {} as CtxindexDatabase
       },
-    }),
-  ).rejects.toMatchObject({
+    })
+  } catch (error) {
+    failure = error
+  }
+
+  expect(failure).toMatchObject({
     constructor: DirectDatabaseLeaseConflictError,
     code: 'database_lease_conflict',
-    message:
-      'This command is unavailable while the local daemon owns the database.',
+    databaseDigest,
+    message: `The database is held by another local process/runtime (database=${databaseDigest}).`,
   })
+  expect(mapErrorToExit(failure)).toBe(50)
+  expect(String(failure)).not.toContain('daemon')
+  expect(String(failure)).not.toContain(target)
   expect(opened).toBe(false)
 })
 
@@ -332,4 +349,95 @@ test('init preserves direct bootstrap on an unsupported platform', async () => {
   })
 
   expect(events).toEqual(['unsupported', 'secrets', 'bootstrap'])
+})
+
+// Real backends with injected platform/helper seams: a supported Linux host
+// whose flock primitive is unavailable must fail closed, while a genuinely
+// unsupported OS keeps the pre-daemon unleased direct behavior.
+const linuxWithoutFlock = createFileLeaseBackend({
+  platform: 'linux',
+  resolveFlock: () => null,
+})
+
+function acquireOnUnsupportedOs(input: FileLeaseRequest): FileLease {
+  return createFileLeaseBackend({ platform: 'win32' }).acquire(input)
+}
+
+async function privateDirectory(): Promise<string> {
+  return realpath(await mkdtemp(join(tmpdir(), 'ctxindex-direct-primitive-')))
+}
+
+test('a missing Linux flock helper fails closed before the SQLite file is created', async () => {
+  const dir = await privateDirectory()
+  const target = join(dir, 'ctxindex.sqlite')
+  try {
+    let failure: unknown
+    try {
+      const runtime = await openLeasedDatabase({
+        target,
+        acquire: (input) => linuxWithoutFlock.acquire(input),
+      })
+      runtime.close()
+    } catch (error) {
+      failure = error
+    }
+
+    expect(failure).toBeInstanceOf(FileLeaseUnsupportedError)
+    expect(failure).toMatchObject({ reason: 'primitive' })
+    expect(mapErrorToExit(failure)).toBe(50)
+    expect(existsSync(target)).toBe(false)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('init fails closed before bootstrap when the Linux flock helper is missing', async () => {
+  const dir = await privateDirectory()
+  const keys = [
+    'CTXINDEX_CONFIG_HOME',
+    'CTXINDEX_DATA_HOME',
+    'CTXINDEX_STATE_HOME',
+    'CTXINDEX_CACHE_HOME',
+  ] as const
+  const saved = keys.map((key) => process.env[key])
+  for (const key of keys) process.env[key] = join(dir, key)
+  const events: string[] = []
+  try {
+    await expect(
+      initializeDirectStorage({
+        acquire: (input) => linuxWithoutFlock.acquire(input),
+        initializeSecrets: async () => {
+          events.push('secrets')
+          return 'file'
+        },
+        bootstrap: async () => {
+          events.push('bootstrap')
+        },
+      }),
+    ).rejects.toMatchObject({ reason: 'primitive' })
+    expect(events).toEqual([])
+  } finally {
+    keys.forEach((key, index) => {
+      const value = saved[index]
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    })
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test('an unsupported OS keeps unleased direct database behavior', async () => {
+  const dir = await privateDirectory()
+  const target = join(dir, 'ctxindex.sqlite')
+  try {
+    const runtime = await openLeasedDatabase({
+      target,
+      acquire: acquireOnUnsupportedOs,
+    })
+    runtime.close()
+
+    expect(existsSync(target)).toBe(true)
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
 })
