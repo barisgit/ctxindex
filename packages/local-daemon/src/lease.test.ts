@@ -25,6 +25,7 @@ import {
   createFileLeaseBackend,
   FileLeaseConflictError,
   type FileLeaseMode,
+  type FileLeasePurpose,
   FileLeaseUnsupportedError,
   leasePath,
 } from './lease'
@@ -51,13 +52,14 @@ function temporaryDirectory(): string {
 async function holder(
   target: string,
   mode: FileLeaseMode,
+  purpose: FileLeasePurpose = 'database',
 ): Promise<Bun.Subprocess> {
   const child = Bun.spawn(
     [
       process.execPath,
       join(import.meta.dir, 'testing', 'lease-holder.ts'),
       target,
-      'database',
+      purpose,
       mode,
     ],
     { stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' },
@@ -81,10 +83,13 @@ function stopHolder(child: Bun.Subprocess): void {
   child.stdin.end()
 }
 
-describe.skipIf(process.platform !== 'darwin')(
-  'Darwin retained file leases',
+// Darwin (O_SHLOCK/O_EXLOCK) and Linux (retained flock(2)) must show the same
+// observable ownership semantics, so the native real-process matrix runs on
+// both. scripts/verify/darwin-daemon-gates.sh runs this file on a Mac.
+describe.skipIf(process.platform !== 'darwin' && process.platform !== 'linux')(
+  'native retained file leases',
   () => {
-    test('uses the Bun node:fs Darwin lock flags and keeps a permanent private regular file', () => {
+    test('acquires through the native primitive and keeps a permanent private regular file', () => {
       const target = join(temporaryDirectory(), 'ctxindex.sqlite')
       const lease = acquireFileLease({
         canonicalTarget: target,
@@ -281,8 +286,10 @@ describe.skipIf(process.platform !== 'darwin')(
       const root = temporaryDirectory()
       const firstData = join(root, 'first')
       const secondData = join(root, 'second')
-      mkdirSync(firstData)
-      mkdirSync(secondData)
+      // Explicit private modes keep the parent check umask-independent (for
+      // example Linux user-private-group umask 0002).
+      mkdirSync(firstData, { mode: 0o700 })
+      mkdirSync(secondData, { mode: 0o700 })
       const firstDatabase = join(firstData, 'ctxindex.sqlite')
       const secondDatabase = join(secondData, 'ctxindex.sqlite')
       let linked = false
@@ -503,6 +510,131 @@ describe.skipIf(process.platform !== 'darwin')(
         }),
       ).toThrow(/changed during acquisition/i)
     })
+
+    test('an in-process second owner conflicts and release permits immediate reacquisition of the same file', () => {
+      const target = join(temporaryDirectory(), 'ctxindex.sqlite')
+      const request = {
+        canonicalTarget: target,
+        purpose: 'database',
+        mode: 'exclusive',
+      } as const
+      const path = leasePath(request)
+      const first = acquireFileLease(request)
+      const inode = lstatSync(path).ino
+
+      // Ownership belongs to the retained open file description, so even the
+      // same process cannot take a second incompatible lease.
+      expect(() => acquireFileLease(request)).toThrow(FileLeaseConflictError)
+      expect(() => acquireFileLease({ ...request, mode: 'shared' })).toThrow(
+        FileLeaseConflictError,
+      )
+
+      first.release()
+      first.release()
+      const second = acquireFileLease(request)
+      expect(lstatSync(path).ino).toBe(inode)
+      second.release()
+      expect(existsSync(path)).toBe(true)
+      expect(lstatSync(path).ino).toBe(inode)
+    })
+
+    test('release unlocks immediately while the holder process remains alive', async () => {
+      const target = join(temporaryDirectory(), 'ctxindex.sqlite')
+      const child = await holder(target, 'exclusive')
+      if (typeof child.stdin !== 'object' || child.stdin === null) {
+        throw new Error('lease holder stdin is unavailable')
+      }
+      child.stdin.write('release\n')
+      await child.stdin.flush()
+      if (!(child.stdout instanceof ReadableStream)) {
+        throw new Error('lease holder stdout is unavailable')
+      }
+      const reader = child.stdout.getReader()
+      const result = await reader.read()
+      reader.releaseLock()
+      expect(
+        result.value ? new TextDecoder().decode(result.value).trim() : '',
+      ).toBe('released')
+      expect(child.exitCode).toBeNull()
+
+      const reacquired = acquireFileLease({
+        canonicalTarget: target,
+        purpose: 'database',
+        mode: 'exclusive',
+      })
+      reacquired.release()
+      expect(child.exitCode).toBeNull()
+      stopHolder(child)
+      await child.exited
+    })
+
+    test('lifecycle and database leases are separate retained owners', async () => {
+      const root = temporaryDirectory()
+      const resolved = resolveRuntimeIdentity({
+        configRoot: join(root, 'config'),
+        dataRoot: join(root, 'data'),
+        stateRoot: join(root, 'state'),
+        cacheRoot: join(root, 'cache'),
+      })
+      const lifecycle = {
+        canonicalTarget: resolved.stateRoot,
+        purpose: 'lifecycle',
+        mode: 'exclusive',
+      } as const
+      const database = {
+        canonicalTarget: resolved.databasePath,
+        purpose: 'database',
+        mode: 'exclusive',
+      } as const
+      expect(leasePath(lifecycle)).not.toBe(leasePath(database))
+
+      const lifecycleHolder = await holder(
+        resolved.stateRoot,
+        'exclusive',
+        'lifecycle',
+      )
+      const databaseLease = acquireFileLease(database)
+      expect(() => acquireFileLease(lifecycle)).toThrow(FileLeaseConflictError)
+      databaseLease.release()
+      stopHolder(lifecycleHolder)
+      await lifecycleHolder.exited
+
+      const databaseHolder = await holder(resolved.databasePath, 'exclusive')
+      const lifecycleLease = acquireFileLease(lifecycle)
+      expect(() => acquireFileLease(database)).toThrow(FileLeaseConflictError)
+      lifecycleLease.release()
+      stopHolder(databaseHolder)
+      await databaseHolder.exited
+    })
+
+    test('rejects pathname replacement of an existing lease file during open', () => {
+      const root = temporaryDirectory()
+      const target = join(root, 'ctxindex.sqlite')
+      const path = leasePath({
+        canonicalTarget: target,
+        purpose: 'database',
+        mode: 'exclusive',
+      })
+      closeSync(openSync(path, 'w', 0o600))
+      let replaced = false
+      const replacingOpen: typeof openSync = (openPath, flags, mode) => {
+        if (!replaced) {
+          replaced = true
+          renameSync(path, `${path}.original`)
+          closeSync(openSync(path, 'w', 0o600))
+        }
+        return openSync(openPath, flags, mode)
+      }
+      const backend = createFileLeaseBackend({ openFile: replacingOpen })
+
+      expect(() =>
+        backend.acquire({
+          canonicalTarget: target,
+          purpose: 'database',
+          mode: 'exclusive',
+        }),
+      ).toThrow(/changed during acquisition/i)
+    })
   },
 )
 
@@ -556,6 +688,35 @@ describe('Linux retained file lease backend', () => {
     expect(() => fstatSync(retainedFd as number)).toThrow()
     expect(existsSync(path)).toBe(true)
     lease.release()
+  })
+
+  test('rejects pathname replacement while the retained flock is taken and closes the fd', () => {
+    const target = join(temporaryDirectory(), 'ctxindex.sqlite')
+    const path = leasePath({
+      canonicalTarget: target,
+      purpose: 'database',
+      mode: 'exclusive',
+    })
+    let lockedFd: number | undefined
+    const backend = createFileLeaseBackend({
+      platform: 'linux',
+      resolveFlock: () => '/usr/bin/flock',
+      spawnFlock: (_executable, _args, fd) => {
+        lockedFd = fd
+        renameSync(path, `${path}.locked`)
+        closeSync(openSync(path, 'w', 0o600))
+        return { status: 0 }
+      },
+    })
+
+    expect(() =>
+      backend.acquire({
+        canonicalTarget: target,
+        purpose: 'database',
+        mode: 'exclusive',
+      }),
+    ).toThrow(/changed during acquisition/i)
+    expect(() => fstatSync(lockedFd as number)).toThrow()
   })
 
   test('maps exit 73 to a holder-neutral conflict and closes the parent fd', () => {
@@ -732,97 +893,6 @@ describe('Linux retained file lease backend', () => {
     expect(spawned).toBe(false)
   })
 })
-
-describe.skipIf(process.platform !== 'linux')(
-  'Linux multi-process retained file leases',
-  () => {
-    test('shared owners block exclusive and an exclusive owner blocks shared', async () => {
-      const target = join(temporaryDirectory(), 'ctxindex.sqlite')
-      const first = await holder(target, 'shared')
-      const second = await holder(target, 'shared')
-
-      expect(() =>
-        acquireFileLease({
-          canonicalTarget: target,
-          purpose: 'database',
-          mode: 'exclusive',
-        }),
-      ).toThrow(FileLeaseConflictError)
-      stopHolder(first)
-      await first.exited
-      expect(() =>
-        acquireFileLease({
-          canonicalTarget: target,
-          purpose: 'database',
-          mode: 'exclusive',
-        }),
-      ).toThrow(FileLeaseConflictError)
-      stopHolder(second)
-      await second.exited
-
-      const exclusive = await holder(target, 'exclusive')
-      expect(() =>
-        acquireFileLease({
-          canonicalTarget: target,
-          purpose: 'database',
-          mode: 'shared',
-        }),
-      ).toThrow(FileLeaseConflictError)
-      stopHolder(exclusive)
-      await exclusive.exited
-    })
-
-    test('SIGKILL releases ownership immediately and preserves the lease file', async () => {
-      const target = join(temporaryDirectory(), 'ctxindex.sqlite')
-      const child = await holder(target, 'exclusive')
-      const path = leasePath({
-        canonicalTarget: target,
-        purpose: 'database',
-        mode: 'exclusive',
-      })
-      child.kill('SIGKILL')
-      await child.exited
-
-      const reacquired = acquireFileLease({
-        canonicalTarget: target,
-        purpose: 'database',
-        mode: 'exclusive',
-      })
-      expect(existsSync(path)).toBe(true)
-      reacquired.release()
-    })
-
-    test('release unlocks immediately while the holder process remains alive', async () => {
-      const target = join(temporaryDirectory(), 'ctxindex.sqlite')
-      const child = await holder(target, 'exclusive')
-      if (typeof child.stdin !== 'object' || child.stdin === null) {
-        throw new Error('lease holder stdin is unavailable')
-      }
-      child.stdin.write('release\n')
-      await child.stdin.flush()
-      if (!(child.stdout instanceof ReadableStream)) {
-        throw new Error('lease holder stdout is unavailable')
-      }
-      const reader = child.stdout.getReader()
-      const result = await reader.read()
-      reader.releaseLock()
-      expect(
-        result.value ? new TextDecoder().decode(result.value).trim() : '',
-      ).toBe('released')
-      expect(child.exitCode).toBeNull()
-
-      const reacquired = acquireFileLease({
-        canonicalTarget: target,
-        purpose: 'database',
-        mode: 'exclusive',
-      })
-      reacquired.release()
-      expect(child.exitCode).toBeNull()
-      stopHolder(child)
-      await child.exited
-    })
-  },
-)
 
 test('unsupported platforms fail closed without exposing a boolean probe', () => {
   try {
