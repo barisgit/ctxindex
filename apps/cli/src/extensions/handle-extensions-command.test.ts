@@ -12,7 +12,7 @@ import type {
 import * as extensionRuntime from '@ctxindex/core/extension'
 import { createExtensionRegistry } from '@ctxindex/core/registry'
 import type { CliDefinitions } from '../definitions'
-import { PrototypeUnsupportedError } from '../direct-database'
+import { DirectDatabaseLeaseConflictError } from '../direct-database'
 import {
   handleExtensionsCommand,
   runWithSigintCancellation,
@@ -722,7 +722,7 @@ test('database ownership conflict remains actionable and exits 50', async () => 
       services({
         catalogs: {
           list: async () => {
-            throw new PrototypeUnsupportedError()
+            throw new DirectDatabaseLeaseConflictError()
           },
         } as unknown as ExtensionCommandServices['catalogs'],
       }),

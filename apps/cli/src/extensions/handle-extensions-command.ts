@@ -5,7 +5,7 @@ import {
 } from '@ctxindex/core'
 import { safeExtensionDiagnostic } from '@ctxindex/core/extension'
 import { printExtensionDiagnostics } from '../definitions'
-import { PrototypeUnsupportedError } from '../direct-database'
+import { DirectDatabaseLeaseConflictError } from '../direct-database'
 import {
   formatCatalog,
   formatCatalogBuild,
@@ -338,7 +338,7 @@ export async function handleExtensionsCommand(
   } catch (error) {
     const caught = error ?? {}
     const code = (caught as { code?: unknown }).code
-    if (caught instanceof PrototypeUnsupportedError) {
+    if (caught instanceof DirectDatabaseLeaseConflictError) {
       console.error(caught.message)
       return mapErrorToExit(caught)
     }
