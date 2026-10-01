@@ -600,6 +600,10 @@ function syncResult(value: RunSyncResult): RpcSyncResult {
   return {
     mode: value.mode,
     results: value.results.map(syncSourceResult),
+    skipped: value.skipped.map(({ sourceId, reason }) => ({
+      sourceId,
+      reason,
+    })),
     warnings: value.warnings.map((entry) => ({
       sourceId: entry.sourceId,
       ...presentWarning(entry),

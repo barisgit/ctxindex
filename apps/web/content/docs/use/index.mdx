@@ -36,11 +36,11 @@ Use the compact default for orientation and request `describe --full --format js
 ## Materialize deliberately
 
 ```sh
-ctxindex sync --source company-mail --format json
-ctxindex status --source company-mail --format json
+ctxindex sync --source company-calendar --format json
+ctxindex status --source company-calendar --format json
 ```
 
-Omit `--source` from `sync` or `status` to select all configured Sources. Sync is a strategy for fast local discovery; it is selected by Source, not Realm. Providers and files remain canonical. Purging local materializations does not delete provider records.
+Omit `--source` from `sync` or `status` to select all configured Sources. Sync runs only Sources that are sync-enabled and whose Adapter supports local sync; it lists the others under `skipped` with reason `disabled` or `unsupported`. Mailbox Sources are searched at the provider, so they report `unsupported`, and naming one with `--source` fails with exit code 2. Sync is a strategy for fast local discovery; it is selected by Source, not Realm. Providers and files remain canonical. Purging local materializations does not delete provider records.
 
 ## Search, then follow the Ref
 

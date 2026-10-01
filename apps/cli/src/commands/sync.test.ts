@@ -64,7 +64,10 @@ function harness(input: {
       profiles: {},
       adapters: {
         get: ({ id }: { id: string }) => {
-          const entry = input.adapters?.[id] ?? { sync: true }
+          const entry =
+            input.adapters && id in input.adapters
+              ? input.adapters[id]
+              : { sync: true }
           if (!entry) return undefined
           return {
             id,
@@ -158,6 +161,7 @@ describe('sync command', () => {
               run: completed,
             },
           ],
+          skipped: [{ sourceId: 'source-b', reason: 'unsupported' }],
           warnings: [
             {
               sourceId: 'source-a',
@@ -183,6 +187,7 @@ describe('sync command', () => {
     expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
       mode: 'sync',
       results: [{ sourceId: 'source-a', status: 'completed', run: completed }],
+      skipped: [{ sourceId: 'source-b', reason: 'unsupported' }],
       warnings: [
         {
           sourceId: 'source-a',
@@ -238,6 +243,7 @@ describe('sync command', () => {
                 },
               },
             ],
+            skipped: [],
             warnings: [],
           }),
         },
@@ -277,6 +283,7 @@ describe('sync command', () => {
     const output: SyncOutput = {
       mode: 'sync',
       results: [{ sourceId: 'source-a', status: 'completed', run: completed }],
+      skipped: [{ sourceId: 'source-b', reason: 'disabled' }],
       warnings: [
         {
           sourceId: 'source-a',
@@ -288,31 +295,100 @@ describe('sync command', () => {
 
     expect(formatSyncOutput(output, 'summary', false)).toBe(
       'source-a\tcompleted\tadded=2\tupdated=1\tdeleted=0\twarnings=1\terrors=0\n' +
+        'source-b\tskipped\treason=disabled\n' +
         'source-a\twarning\tbinary\tSkipped binary file',
     )
     expect(formatSyncOutput(output, 'compact', false)).toBe(
       'source-a completed +2 ~1 -0 warnings=1 errors=0\n' +
+        'source-b skipped reason=disabled\n' +
         'source-a warning=binary Skipped binary file',
     )
   })
 
-  test('explains when no sync-enabled Sources are eligible', () => {
+  test('explains when no Sources are eligible for sync', () => {
     const output: SyncOutput = {
       mode: 'sync',
       results: [],
+      skipped: [
+        { sourceId: 'source-a', reason: 'unsupported' },
+        { sourceId: 'source-b', reason: 'disabled' },
+      ],
       warnings: [],
     }
 
     expect(formatSyncOutput(output, 'summary', false)).toBe(
-      'No sync-enabled Sources are available.',
+      'No Sources are eligible for sync.\n' +
+        'source-a\tskipped\treason=unsupported\n' +
+        'source-b\tskipped\treason=disabled',
     )
     expect(formatSyncOutput(output, 'compact', false)).toBe(
-      'No sync-enabled Sources are available.',
+      'No Sources are eligible for sync.\n' +
+        'source-a skipped reason=unsupported\n' +
+        'source-b skipped reason=disabled',
+    )
+    expect(formatSyncOutput({ ...output, skipped: [] }, 'summary', false)).toBe(
+      'No Sources are eligible for sync.',
     )
     expect(formatSyncOutput(output, 'events', false)).toBe('')
     expect(JSON.parse(formatSyncOutput(output, 'summary', true))).toEqual(
       output,
     )
+  })
+
+  test('zero eligible Sources succeed with identical direct and daemon output', async () => {
+    const sources = [
+      source('source-b', 'sync.adapter', false),
+      source('source-a', 'read.adapter'),
+    ]
+    const setup = harness({
+      sources,
+      adapters: { 'read.adapter': { sync: false } },
+    })
+    const skipped = [
+      { sourceId: 'source-a', reason: 'unsupported' as const },
+      { sourceId: 'source-b', reason: 'disabled' as const },
+    ]
+    const daemonRoutes: SyncRouteServices = {
+      selectDaemon: () => ({}) as DaemonSelection,
+      daemonSync: async () => ({
+        mode: 'sync',
+        results: [],
+        skipped,
+        warnings: [],
+      }),
+    }
+    for (const json of [false, true]) {
+      const rendered: string[] = []
+      for (const routes of [directRoutes, daemonRoutes]) {
+        const log = spyOn(console, 'log').mockImplementation(() => {})
+        expect(
+          await handleSyncCommand(
+            { mode: 'sync', json, format: 'summary' },
+            setup.open,
+            setup.services,
+            routes,
+          ),
+        ).toBe(0)
+        rendered.push(log.mock.calls.map((call) => String(call[0])).join('\n'))
+        log.mockRestore()
+      }
+      expect(rendered[0]).toBe(rendered[1])
+      if (json) {
+        expect(JSON.parse(String(rendered[0]))).toEqual({
+          mode: 'sync',
+          results: [],
+          skipped,
+          warnings: [],
+        })
+      } else {
+        expect(rendered[0]).toBe(
+          'No Sources are eligible for sync.\n' +
+            'source-a\tskipped\treason=unsupported\n' +
+            'source-b\tskipped\treason=disabled',
+        )
+      }
+    }
+    expect(setup.calls).toEqual([])
   })
 
   test('renders warning-then-failure diagnostics in JSON, summary, compact, and events output', () => {
@@ -335,6 +411,7 @@ describe('sync command', () => {
     const output: SyncOutput = {
       mode: 'sync',
       results: [failed],
+      skipped: [],
       warnings: [
         {
           sourceId: 'source-a',
@@ -385,6 +462,7 @@ describe('sync command', () => {
           run: { ...completed, mode: 'diff' },
         },
       ],
+      skipped: [],
       warnings: [
         {
           sourceId: 'source-a',
@@ -438,14 +516,12 @@ describe('sync command', () => {
     expect(setup.closed()).toBe(true)
   })
 
-  test('explicit Source reports a loaded non-sync Adapter as unsupported', async () => {
+  test('rejects an explicit Source whose loaded Adapter cannot sync before provider work', async () => {
     const log = spyOn(console, 'log').mockImplementation(() => {})
+    const error = spyOn(console, 'error').mockImplementation(() => {})
     const setup = harness({
       sources: [source('source-a', 'read.adapter')],
       adapters: { 'read.adapter': { sync: false } },
-      run: async () => {
-        throw new CtxindexError('Adapter detail', 'sync_unsupported')
-      },
     })
 
     expect(
@@ -456,19 +532,12 @@ describe('sync command', () => {
         directRoutes,
       ),
     ).toBe(2)
-    expect(JSON.parse(String(log.mock.calls[0]?.[0])).results[0]).toEqual({
-      sourceId: 'source-a',
-      status: 'failed',
-      warningsCount: 0,
-      lastWarning: null,
-      errorsCount: 1,
-      lastError: 'Sync failed for Source "source-a" (sync_unsupported)',
-      error: {
-        code: 'sync_unsupported',
-        message: 'Sync failed for Source "source-a" (sync_unsupported)',
-      },
-      exitCode: 2,
-    })
+    expect(setup.calls).toEqual([])
+    expect(log).not.toHaveBeenCalled()
+    expect(String(error.mock.calls[0]?.[0])).toBe(
+      'Source Adapter does not support sync: "source-a"',
+    )
+    expect(setup.closed()).toBe(true)
   })
 
   test('all mode is id-ordered, skips loaded non-sync Adapters, includes unavailable Sources, and continues', async () => {
@@ -508,6 +577,10 @@ describe('sync command', () => {
     ).toBe(50)
     expect(calls).toEqual(['source-b', 'source-c'])
     const output = JSON.parse(String(log.mock.calls[0]?.[0]))
+    expect(output.skipped).toEqual([
+      { sourceId: 'source-a', reason: 'unsupported' },
+      { sourceId: 'source-disabled', reason: 'disabled' },
+    ])
     expect(
       output.results.map((item: { sourceId: string }) => item.sourceId),
     ).toEqual(['source-b', 'source-c'])

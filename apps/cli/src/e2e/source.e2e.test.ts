@@ -364,7 +364,10 @@ export default defineExtension({
 
       const allSync = await sandbox.run(['sync', '--format', 'json'])
       expect(allSync.exitCode).toBe(0)
-      expect(JSON.parse(allSync.stdout)).toMatchObject({ results: [] })
+      expect(JSON.parse(allSync.stdout)).toMatchObject({
+        results: [],
+        skipped: [{ sourceId, reason: 'disabled' }],
+      })
 
       const targetedSync = await sandbox.run(['sync', '--source', sourceId])
       expect(targetedSync.exitCode).toBe(2)

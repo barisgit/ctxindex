@@ -115,7 +115,12 @@ function application(overrides: Record<string, unknown> = {}) {
     documentationService: createDocumentationService([]),
     observationTimeoutMs: 25,
     syncService: {
-      run: async () => ({ mode: 'sync', results: [], warnings: [] }),
+      run: async () => ({
+        mode: 'sync',
+        results: [],
+        skipped: [],
+        warnings: [],
+      }),
     },
     sourceService: {
       resolveSourceId: (value: string) => value,
@@ -520,7 +525,8 @@ test('tracks a business request and propagates request cancellation', async () =
           observed = signal
           signal.addEventListener(
             'abort',
-            () => resolve({ mode: 'sync', results: [], warnings: [] }),
+            () =>
+              resolve({ mode: 'sync', results: [], skipped: [], warnings: [] }),
             { once: true },
           )
         }),
@@ -659,7 +665,7 @@ test('backend migration waits for active secret-using business work', async () =
       async search() {
         calls.push('search')
         await searchBlocked
-        return { results: [], warnings: [] }
+        return { results: [], skipped: [], warnings: [] }
       },
     },
     secretBackendManager: {
@@ -850,7 +856,7 @@ test('streams bounded progress in order with one-item producer backpressure', as
           checkpoints: 0,
           warningsCount: 0,
         })
-        return { mode: 'sync' as const, results: [], warnings: [] }
+        return { mode: 'sync' as const, results: [], skipped: [], warnings: [] }
       },
     },
   })
@@ -889,7 +895,7 @@ test('streams bounded progress in order with one-item producer backpressure', as
     done: true,
     value: {
       ok: true,
-      value: { mode: 'sync', results: [], warnings: [] },
+      value: { mode: 'sync', results: [], skipped: [], warnings: [] },
     },
   })
   expect(app.activeRequestCount).toBe(0)
@@ -917,7 +923,7 @@ test('keeps stream activity admitted until the consumer observes its terminal re
     done: true,
     value: {
       ok: true,
-      value: { mode: 'sync', results: [], warnings: [] },
+      value: { mode: 'sync', results: [], skipped: [], warnings: [] },
     },
   })
   expect(app.activeRequestCount).toBe(0)
@@ -950,7 +956,7 @@ test('returning the stream early cancels and settles the producer', async () => 
           sourceId: 'source-1',
           mode: 'sync',
         })
-        return { mode: 'sync', results: [], warnings: [] }
+        return { mode: 'sync', results: [], skipped: [], warnings: [] }
       },
     },
   })
@@ -1162,7 +1168,8 @@ test('shutdown stops admission, cancels active work, and is idempotent', async (
       run: ({ signal }: { signal: AbortSignal }) => {
         operationSignal = signal
         return new Promise((resolve) => {
-          settle = () => resolve({ mode: 'sync', results: [], warnings: [] })
+          settle = () =>
+            resolve({ mode: 'sync', results: [], skipped: [], warnings: [] })
         })
       },
     },
@@ -1194,7 +1201,8 @@ test('idle shutdown waits for active work and resets from admission and settleme
     syncService: {
       run: () =>
         new Promise((resolve) => {
-          settle = () => resolve({ mode: 'sync', results: [], warnings: [] })
+          settle = () =>
+            resolve({ mode: 'sync', results: [], skipped: [], warnings: [] })
         }),
     },
   })
@@ -1243,7 +1251,8 @@ test('business admission at the idle deadline wins atomically over shutdown', as
     syncService: {
       run: () =>
         new Promise((resolve) => {
-          settle = () => resolve({ mode: 'sync', results: [], warnings: [] })
+          settle = () =>
+            resolve({ mode: 'sync', results: [], skipped: [], warnings: [] })
         }),
     },
   })
@@ -1290,6 +1299,7 @@ test('maps core failures and diagnostics without leaking unsafe text', async () 
             },
           },
         ],
+        skipped: [],
         warnings: [],
       }),
     },
@@ -1724,6 +1734,10 @@ test('completed sync warnings and refs preserve direct output through RPC', asyn
           },
         },
       ],
+      skipped: [
+        { sourceId: 'source-2', reason: 'unsupported' as const },
+        { sourceId: 'source-3', reason: 'disabled' as const },
+      ],
       warnings: [{ sourceId: 'source-1', ...publicWarning }],
     },
   }
@@ -1767,6 +1781,7 @@ test('failed sync uses the deterministic public CLI projection through RPC', asy
             },
           },
         ],
+        skipped: [],
         warnings: [],
       }),
     },
@@ -1794,6 +1809,7 @@ test('failed sync uses the deterministic public CLI projection through RPC', asy
           },
         },
       ],
+      skipped: [],
       warnings: [],
     },
   }

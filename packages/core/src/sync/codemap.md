@@ -26,5 +26,5 @@ Coordinates transactional Source synchronization: validates Adapter emissions, s
 
 - Depends on `@ctxindex/extension-sdk` sync contracts plus `packages/core/src/resource/resource-store.ts`, `registry/profile-registry.ts`, `ref/ref.ts`, `errors.ts`, and `exit-codes.ts`.
 - Persists against `sources`, `sync_runs`, `sync_locks`, `sync_run_checkpoints`, and `source_sync_state` declared under `packages/core/src/schema/`.
-- `packages/core/src/source/sync-source.ts` is the Adapter-facing entry. `SyncApplicationService` wraps one or many Source runs with awaited start/progress/terminal events; direct CLI and daemon consumers share that boundary.
+- `packages/core/src/source/sync-source.ts` is the Adapter-facing entry. `SyncApplicationService` wraps one or many Source runs with awaited start/progress/terminal events; direct CLI and daemon consumers share that boundary. It owns selection: all-Source runs skip Sources whose loaded Adapter fails `adapterSupportsSync` (`unsupported`) or whose policy is disabled (`disabled`), and targeted runs reject those Sources before any sync effect.
 - `index.ts` exports `SyncCoordinator` and exit-code mapping through `@ctxindex/core/sync`.

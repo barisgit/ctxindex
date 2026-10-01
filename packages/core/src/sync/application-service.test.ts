@@ -81,7 +81,10 @@ function harness(input: {
     registry: {
       adapters: {
         get: ({ id }: { readonly id: string }) => {
-          const entry = input.adapters?.[id] ?? { sync: true }
+          const entry =
+            input.adapters && id in input.adapters
+              ? input.adapters[id]
+              : { sync: true }
           if (!entry) return undefined
           return {
             capabilities: entry.sync ? ['sync'] : ['retrieve'],
@@ -316,6 +319,77 @@ describe('SyncApplicationService', () => {
       'failed',
       'completed',
     ])
+    expect(result.skipped).toEqual([
+      { sourceId: 'source-a', reason: 'unsupported' },
+      { sourceId: 'source-disabled', reason: 'disabled' },
+    ])
+  })
+
+  test('reports zero eligible Sources without provider work and prefers unsupported over disabled', async () => {
+    const events: string[] = []
+    const setup = harness({
+      sources: [
+        source('source-b', { syncEnabled: false }),
+        source('source-a', { adapterId: 'read.adapter', syncEnabled: false }),
+        source('source-c', { adapterId: 'read.adapter' }),
+      ],
+      adapters: { 'read.adapter': { sync: false } },
+    })
+
+    const result = await setup.service.run({
+      mode: 'sync',
+      signal: new AbortController().signal,
+      onEvent: (event) => {
+        events.push(event.type)
+      },
+    })
+
+    expect(result).toEqual({
+      mode: 'sync',
+      results: [],
+      skipped: [
+        { sourceId: 'source-a', reason: 'unsupported' },
+        { sourceId: 'source-b', reason: 'disabled' },
+        { sourceId: 'source-c', reason: 'unsupported' },
+      ],
+      warnings: [],
+    })
+    expect(setup.calls).toEqual([])
+    expect(events).toEqual([])
+  })
+
+  test('rejects a targeted Source whose loaded Adapter cannot sync before provider work', async () => {
+    for (const syncEnabled of [true, false]) {
+      const setup = harness({
+        sources: [source('mail', { adapterId: 'read.adapter', syncEnabled })],
+        adapters: { 'read.adapter': { sync: false } },
+      })
+      await expect(
+        setup.service.run({
+          source: 'mail',
+          mode: 'sync',
+          signal: new AbortController().signal,
+        }),
+      ).rejects.toEqual(
+        expect.objectContaining({
+          code: 'invalid_filter',
+          message: 'Source Adapter does not support sync: "mail"',
+        }),
+      )
+      expect(setup.calls).toEqual([])
+    }
+  })
+
+  test('targeted sync reports no skipped Sources', async () => {
+    const setup = harness({
+      sources: [source('source-a'), source('source-b', { syncEnabled: false })],
+    })
+    const result = await setup.service.run({
+      source: 'source-a',
+      mode: 'sync',
+      signal: new AbortController().signal,
+    })
+    expect(result.skipped).toEqual([])
   })
 
   test('continues after a typed failure and preserves failure identity with bounded diagnostics', async () => {

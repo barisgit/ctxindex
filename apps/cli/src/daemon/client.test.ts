@@ -616,6 +616,7 @@ test('daemon sync preserves live order, awaited delivery, and the iterator termi
   const terminal: RpcSyncResult = {
     mode: 'sync',
     results: [],
+    skipped: [],
     warnings: [],
   }
   const observed: RpcSyncEvent[] = []
@@ -652,7 +653,12 @@ test('daemon sync preserves live order, awaited delivery, and the iterator termi
 
 test('reconnects once only when the daemon declares rejection before stream admission', async () => {
   const setup = await fixture()
-  const terminal: RpcSyncResult = { mode: 'sync', results: [], warnings: [] }
+  const terminal: RpcSyncResult = {
+    mode: 'sync',
+    results: [],
+    skipped: [],
+    warnings: [],
+  }
   const rejection: RpcFailure = {
     kind: 'daemon_unavailable',
     code: 'daemon_unavailable',
@@ -779,7 +785,7 @@ test('daemon sync returns the iterator on consumer failure and normalizes stream
             syncClient(
               syncIterator(
                 [event],
-                { mode: 'sync', results: [], warnings: [] },
+                { mode: 'sync', results: [], skipped: [], warnings: [] },
                 () => {
                   returned = true
                 },
