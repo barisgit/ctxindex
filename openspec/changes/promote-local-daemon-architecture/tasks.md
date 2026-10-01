@@ -34,13 +34,13 @@
 
 ## 6. Normal ownership cutover
 
-- [ ] 6.1 Extend the compiled daemon journey across the complete stateful-command inventory and safe-exception allowlist, proving one immutable runtime, no selected-daemon fallback, no client SQLite open, stable output/exits, cancellation, restart, shutdown timeout ownership, crash recovery, and no live provider/network dependence.
+- [x] 6.1 Extend the compiled daemon journey across the complete stateful-command inventory and safe-exception allowlist, proving one immutable runtime, no selected-daemon fallback, no client SQLite open, stable output/exits, cancellation, restart, shutdown timeout ownership, crash recovery, and no live provider/network dependence.
 - [ ] 6.2 Remove `prototype_unsupported` from normal command behavior, make daemon ownership the normal stateful path only after every prior slice passes, and retain a deterministic explicit foreground/debug serve path.
-- [ ] 6.3 Open separate issue/OpenSpec follow-ups for service installation/autostart and supervisor policy, enhanced local-client authentication, and backup automation; keep remote access, batching, OpenAPI/SDK generation, queues, and scheduling explicitly deferred.
-- [ ] 6.4 Run the isolated private live workflow across setup, authorization, sync/search/get/thread, Draft Action, Artifact/export, Extension activation boundary, cancellation, shutdown/restart, and direct exceptions; pause for Human acceptance before archive.
+- [x] 6.3 Open separate issue/OpenSpec follow-ups for service installation/autostart and supervisor policy, enhanced local-client authentication, and backup automation; keep remote access, batching, OpenAPI/SDK generation, queues, and scheduling explicitly deferred.
+- [ ] 6.4 Run the isolated private live workflow across setup, authorization, sync/search/get/thread, Draft Action, Artifact/export, Extension activation boundary, cancellation, shutdown/restart, and direct exceptions; pause for Human acceptance before archive. Runbook: `live-checkpoint.md`.
 
 ## 7. Doctrine and final verification
 
-- [ ] 7.1 Promote the accepted doctrine into `local-daemon/implementation.md` and the canonical `module-architecture`, `cli-surface`, `error-taxonomy`, `generic-storage`, `extension-loading`, `oauth-client-management`, `account-grant-management`, `secret-backend-operations`, `retrieval-and-artifacts`, `extension-catalogs`, and `provider-actions` implementation sidecars exactly as listed in `implementation.md`.
-- [ ] 7.2 Refresh affected codemaps through cartography and the readable system projection through system-reference; double-check user/developer documentation against the exact supported platforms and command ownership.
+- [x] 7.1 Promote the accepted doctrine into `local-daemon/implementation.md` and the canonical `module-architecture`, `cli-surface`, `error-taxonomy`, `generic-storage`, `extension-loading`, `oauth-client-management`, `account-grant-management`, `secret-backend-operations`, `retrieval-and-artifacts`, `extension-catalogs`, and `provider-actions` implementation sidecars exactly as listed in `implementation.md`.
+- [x] 7.2 Refresh affected codemaps through cartography and the readable system projection through system-reference; double-check user/developer documentation against the exact supported platforms and command ownership.
 - [ ] 7.3 Run all focused slice gates, `bun run ci`, `bunx openspec validate --all --strict`, `git diff --check`, `openspec-verify-change`, and independent security/architecture reviews; resolve every critical or important finding before archive.

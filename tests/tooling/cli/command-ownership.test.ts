@@ -597,3 +597,181 @@ test('direct ownership guard detects owners, storage, and secret constructors', 
     ].map(reachesDirectOwnership),
   ).toEqual([false, false, false])
 })
+
+// Locally decidable usage failures must be rejected before daemon ensure, and
+// safe exceptions never ensure a daemon. Any ensure would probe the selected
+// endpoint (an explicit override never launches), so the probe socket counts
+// every lifecycle contact without starting a real process.
+const locallyInvalidInvocations: Readonly<Record<string, readonly string[]>> = {
+  'account add': [],
+  'account list': ['--format', 'bogus'],
+  'account remove': [],
+  'oauth-app add': ['google'],
+  'oauth-app list': ['--format', 'bogus'],
+  'oauth-app remove': ['google'],
+  'docs list': ['--format', 'bogus'],
+  'docs get': [],
+  'docs search': [],
+  'action run': ['fixture.action', '--source', 'fixture', '--input', '{bad'],
+  'artifact list': ['not-a-ref'],
+  'artifact download': ['not-a-ref'],
+  'artifact purge': ['--format', 'bogus'],
+  'realm add': ['Not A Slug!'],
+  'realm list': ['--format', 'bogus'],
+  'source add': ['local.directory', '--adapter', 'local.directory'],
+  'source list': ['--format', 'bogus'],
+  'source remove': [],
+  sync: ['--mode', 'bogus'],
+  get: ['not-a-ref'],
+  export: ['not-a-ref', '--format', 'json'],
+  thread: ['not-a-ref'],
+  search: ['fixture', '--since', 'not-a-date'],
+  status: ['--format', 'bogus'],
+  'secrets status': ['--format', 'bogus'],
+  'secrets backend set': ['bogus'],
+  describe: ['bogus-kind'],
+  'extension list': ['--format', 'bogus'],
+}
+
+async function withDaemonProbe(
+  run: (contacts: () => number) => Promise<void>,
+): Promise<void> {
+  const endpoint = join(root, 'probe.sock')
+  let contacts = 0
+  const server = Bun.listen({
+    unix: endpoint,
+    socket: {
+      open(socket) {
+        contacts += 1
+        socket.end()
+      },
+      data() {},
+    },
+  })
+  process.env.CTXINDEX_DAEMON_TEST_ENDPOINT = endpoint
+  try {
+    await run(() => contacts)
+  } finally {
+    server.stop(true)
+  }
+}
+
+test('every daemon-backed command has a locally invalid invocation', () => {
+  expect(Object.keys(locallyInvalidInvocations).sort()).toEqual(
+    Object.keys(daemonInvocations).sort(),
+  )
+})
+
+for (const [command, args] of Object.entries(locallyInvalidInvocations)) {
+  test(`local usage failure precedes daemon ensure: ${command}`, async () => {
+    expect(await runCli(['init'])).toBe(0)
+    await withDaemonProbe(async (contacts) => {
+      expect(await runCli([...command.split(' '), ...args])).toBe(2)
+      expect(contacts()).toBe(0)
+    })
+    expect(await readdir(join(root, 'state'))).not.toContain('daemon')
+  })
+}
+
+// Raw JSON flags are syntax-checked locally; Adapter and Action schemas stay
+// daemon-owned. Rejected values are never echoed back.
+const malformedJsonInvocations: readonly (readonly string[])[] = [
+  [
+    'source',
+    'add',
+    'local.directory',
+    '--realm',
+    'fixture',
+    '--config-json',
+    '{bad',
+  ],
+  ['source', 'add', '--adapter', 'local.directory', '--config-json', '{bad'],
+  ['action', 'run', 'fixture.action', '--source', 'fixture', '--input', '{bad'],
+]
+
+for (const argv of malformedJsonInvocations) {
+  test(`malformed JSON precedes daemon ensure: ${argv.join(' ')}`, async () => {
+    expect(await runCli(['init'])).toBe(0)
+    const error = spyOn(console, 'error')
+    error.mockClear()
+    await withDaemonProbe(async (contacts) => {
+      expect(await runCli([...argv])).toBe(2)
+      expect(contacts()).toBe(0)
+    })
+    expect(error.mock.calls.flat().join('\n')).not.toContain('{bad')
+    expect(await readdir(join(root, 'state'))).not.toContain('daemon')
+  })
+}
+
+test('safe direct exceptions never ensure or launch a daemon', async () => {
+  expect(await runCli(['init'])).toBe(0)
+  await withDaemonProbe(async (contacts) => {
+    for (const argv of [
+      ['docs', 'get-skill', '--output', join(root, 'SKILL.md')],
+      ['extension', 'catalog', 'list', '--format', 'json'],
+    ]) {
+      expect(await runCli(argv)).toBe(0)
+    }
+    expect(contacts()).toBe(0)
+  })
+  delete process.env.CTXINDEX_DAEMON_TEST_ENDPOINT
+  const log = spyOn(console, 'log')
+  log.mockClear()
+  expect(await runCli(['daemon', 'status', '--format', 'json'])).toBe(0)
+  expect(JSON.parse(String(log.mock.calls.at(-1)?.[0]))).toEqual({
+    status: 'stopped',
+  })
+  expect(await readdir(join(root, 'state'))).not.toContain('daemon')
+})
+
+test('the public surface exposes no foreground daemon serving', async () => {
+  const reference = await projectCommandReference(rootCommand)
+  const daemonLeaves = reference.commands
+    .filter(({ path }) => path[1] === 'daemon' && path.length === 3)
+    .map(({ path }) => path[2])
+    .sort()
+  expect(daemonLeaves).toEqual(['start', 'status', 'stop'])
+  expect(
+    reference.commands.filter(({ path }) =>
+      path.some((segment) => /^(serve|foreground|run-daemon)$/.test(segment)),
+    ),
+  ).toEqual([])
+})
+
+// Lifecycle probes (health, ensure readiness, explicit stop) must never count
+// as business activity: only admitted business procedures may hold or reset
+// the daemon idle lifetime, and CLI lifecycle code may only use those probes.
+function classMethodBody(source: string, name: string): string {
+  const start = source.search(new RegExp(`\\n  (?:async )?${name}\\(`))
+  if (start < 0) throw new Error(`Missing DaemonApplication.${name}`)
+  const end = source.indexOf('\n  }\n', start)
+  return source.slice(start, end)
+}
+
+test('lifecycle probes are not business activity', async () => {
+  const application = await Bun.file('apps/daemon/src/application.ts').text()
+  for (const probe of ['health', 'shutdown']) {
+    const body = classMethodBody(application, probe)
+    expect(body).not.toMatch(/#business|#touchIdle|#active\.set/)
+  }
+  // The router maps the probe procedures to exactly those methods.
+  expect(application).toMatch(/health: \(input, context\) => this\.health\(/)
+  expect(application).toMatch(
+    /shutdown: \(input, context\) => this\.shutdown\(/,
+  )
+
+  for (const path of [
+    'apps/cli/src/daemon/lifecycle.ts',
+    'apps/cli/src/daemon/ensure.ts',
+  ]) {
+    const source = await Bun.file(path).text()
+    const clientImports = valueImports(source)
+      .filter(({ specifier }) => specifier === './client')
+      .flatMap(({ names }) => names)
+    expect(
+      clientImports.filter((name) => /^daemon[A-Z]/.test(name)).sort(),
+    ).toEqual(
+      path.endsWith('lifecycle.ts') ? ['daemonHealth', 'daemonShutdown'] : [],
+    )
+  }
+})

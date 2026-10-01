@@ -639,6 +639,52 @@ describe.skipIf(process.platform !== 'darwin' && process.platform !== 'linux')(
 )
 
 describe('Linux retained file lease backend', () => {
+  const unavailableHelpers: Array<[string, () => string | null]> = [
+    ['missing', () => null],
+    ['relative', () => 'flock'],
+    [
+      'unresolvable',
+      () => {
+        throw new Error('secret resolver detail')
+      },
+    ],
+  ]
+
+  test.each(
+    unavailableHelpers,
+  )('a %s flock helper is an unavailable primitive, not an unsupported platform', (_, resolveFlock) => {
+    // Linux is a supported ownership platform: callers treat only reason
+    // 'platform' as "no daemon can own this database", so helper absence must
+    // never be reported as one or direct openers would run unleased.
+    const target = join(temporaryDirectory(), 'ctxindex.sqlite')
+    let spawned = false
+    const backend = createFileLeaseBackend({
+      platform: 'linux',
+      resolveFlock,
+      spawnFlock: () => {
+        spawned = true
+        return { status: 0 }
+      },
+    })
+
+    let failure: unknown
+    try {
+      backend.acquire({
+        canonicalTarget: target,
+        purpose: 'database',
+        mode: 'shared',
+      })
+    } catch (error) {
+      failure = error
+    }
+
+    expect(failure).toBeInstanceOf(FileLeaseUnsupportedError)
+    expect(failure).toMatchObject({ reason: 'primitive' })
+    expect(String(failure)).not.toContain('secret resolver detail')
+    expect(spawned).toBe(false)
+    expect(existsSync(target)).toBe(false)
+  })
+
   test.each([
     ['exclusive', '-x'],
     ['shared', '-s'],

@@ -20,6 +20,7 @@ export {
 export {
   type CanonicalRuntimeIdentity,
   canonicalizePath,
+  databaseDigest,
   type RuntimeIdentity,
   type RuntimePathInput,
   resolveRuntimeIdentity,

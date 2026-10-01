@@ -117,6 +117,10 @@ Keychain writes, deletes, inventory reads, and availability probes share one pro
 
 Reference discovery includes local OAuth App config, private Grant App snapshots, and token references. Switching copies and verifies every target value, transactionally updates database references, atomically commits config, then cleans old copies. Cleanup failure leaves usable target state and a pending warning. Prefix routing keeps mixed references readable across interruption.
 
+## Daemon ownership
+
+Secret status and backend switching run in the daemon through `secrets.status` and `secrets.backend.set`, which share the daemon's one Secret Vault and backend manager. A daemon secret-access barrier lets ordinary business work proceed concurrently in shared mode while a backend switch takes exclusive access, so the copy–verify–commit–cleanup transaction and the daemon's write-backend selection change together; the one-shot `account.respond` bypasses that queue to release an authorization already holding shared access. RPC carries only aggregate availability and reference counts, copy and cleanup counts, and fixed bounded warnings; backend-native errors, references, and values never cross it.
+
 ## Verification
 
-Vault tests cover prefix routing and mixed references. Backend-manager tests cover local App, Grant snapshot, and token traversal, aggregate safe status, ordering, and interruption. Keychain/file tests cover availability, stable probe cleanup retry and scoped-secret non-collision, permissions, encryption, safe errors, cross-instance concurrent mutations, publication failure, successful and failed compensation, and retryable deletion; CLI tests cover stdin/TTY input and redacted status.
+Daemon application tests cover barrier ordering, aggregate-only projections, and redacted backend failures. Vault tests cover prefix routing and mixed references. Backend-manager tests cover local App, Grant snapshot, and token traversal, aggregate safe status, ordering, and interruption. Keychain/file tests cover availability, stable probe cleanup retry and scoped-secret non-collision, permissions, encryption, safe errors, cross-instance concurrent mutations, publication failure, successful and failed compensation, and retryable deletion; CLI tests cover stdin/TTY input and redacted status.

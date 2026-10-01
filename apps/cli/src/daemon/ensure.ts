@@ -5,7 +5,12 @@ import {
   registerDaemonReconnect,
   selectDaemon,
 } from './client'
-import { type DaemonLifecycle, daemonStart, daemonStatus } from './lifecycle'
+import {
+  type DaemonLifecycle,
+  daemonRuntimeKey,
+  daemonStart,
+  daemonStatus,
+} from './lifecycle'
 
 export type DaemonSelectionEnsureResult =
   | {
@@ -17,6 +22,7 @@ export type DaemonSelectionEnsureResult =
 
 export interface DaemonSelectionEnsurerDependencies {
   readonly assertInitialized: () => Promise<void>
+  readonly runtimeKey: () => string
   readonly select: () => DaemonSelection | null
   readonly status: DaemonLifecycle['status']
   readonly start: DaemonLifecycle['start']
@@ -24,6 +30,7 @@ export interface DaemonSelectionEnsurerDependencies {
 
 const defaultDependencies: DaemonSelectionEnsurerDependencies = {
   assertInitialized,
+  runtimeKey: daemonRuntimeKey,
   select: selectDaemon,
   status: daemonStatus,
   start: daemonStart,
@@ -74,7 +81,10 @@ async function waitForEnsure<T>(
 export function createDaemonSelectionEnsurer(
   dependencies: DaemonSelectionEnsurerDependencies = defaultDependencies,
 ): (signal?: AbortSignal) => Promise<DaemonSelectionEnsureResult> {
-  let inFlight: Promise<DaemonSelectionEnsureResult> | undefined
+  // Same-process callers share one ensure per canonical runtime; each caller
+  // keeps its own cancellation while the shared work runs to completion.
+  // Cross-process convergence comes only from retained lifecycle ownership.
+  const inFlight = new Map<string, Promise<DaemonSelectionEnsureResult>>()
 
   const run = async (): Promise<DaemonSelectionEnsureResult> => {
     const status = await dependencies.status()
@@ -104,19 +114,18 @@ export function createDaemonSelectionEnsurer(
     throwIfCancelled(signal)
     await dependencies.assertInitialized()
     throwIfCancelled(signal)
-    if (!inFlight) {
-      const pending = run()
-      inFlight = pending
-      pending.then(
-        () => {
-          if (inFlight === pending) inFlight = undefined
-        },
-        () => {
-          if (inFlight === pending) inFlight = undefined
-        },
-      )
+    const key = dependencies.runtimeKey()
+    let pending = inFlight.get(key)
+    if (!pending) {
+      const started = run()
+      pending = started
+      inFlight.set(key, started)
+      const settle = () => {
+        if (inFlight.get(key) === started) inFlight.delete(key)
+      }
+      started.then(settle, settle)
     }
-    return waitForEnsure(inFlight, signal)
+    return waitForEnsure(pending, signal)
   }
 }
 

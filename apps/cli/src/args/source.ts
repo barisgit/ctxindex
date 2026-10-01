@@ -146,6 +146,19 @@ export function resolveSourceAdapterId(args: SourceAddCommandArgs): string {
   return adapterId
 }
 
+// JSON syntax is locally decidable, so malformed input is a usage error before
+// any daemon lifecycle effect. Adapter schema validation stays daemon-owned,
+// and the rejected value is never echoed.
+export function assertSourceConfigJsonSyntax(args: SourceAddCommandArgs): void {
+  const configJson = args['config-json']
+  if (configJson === undefined) return
+  try {
+    JSON.parse(configJson)
+  } catch {
+    invalid('source add: invalid JSON for --config-json')
+  }
+}
+
 function parsePrimitive(value: string, type: string): unknown {
   if (type === 'json') {
     try {

@@ -406,7 +406,8 @@ async function expectStartFailure(runtime: TestRuntime, pattern: RegExp) {
   expect(result.stderr).toMatch(pattern)
 }
 
-describe.skipIf(process.platform !== 'darwin')(
+// Every platform with a retained-lease backend (Darwin and Linux) runs these.
+describe.skipIf(process.platform !== 'darwin' && process.platform !== 'linux')(
   'compiled local daemon multi-process workflow',
   () => {
     test('background start survives its CLI, converges concurrently, stops idempotently, and recovers after SIGKILL', async () => {
@@ -1025,7 +1026,7 @@ describe.skipIf(process.platform !== 'darwin')(
         ])
         expect(artifactList.exitCode, artifactList.stderr).toBe(2)
         expect(artifactList.stderr).not.toContain(
-          'unavailable while the local daemon owns the database',
+          'held by another local process/runtime',
         )
         const artifactPurge = await runCli(runtime, [
           'artifact',
@@ -1047,7 +1048,10 @@ describe.skipIf(process.platform !== 'darwin')(
           )
           expect(result.stdout).toBe('')
           expect(result.stderr).toContain(
-            'unavailable while the local daemon owns the database',
+            'held by another local process/runtime',
+          )
+          expect(result.stderr).toContain(
+            `database=${resolveRuntimeIdentity(runtime.roots).identity.databaseDigest}`,
           )
         }
 
@@ -1081,7 +1085,7 @@ describe.skipIf(process.platform !== 'darwin')(
         expect(described.stdout).toBe('')
         expect(described.stderr).toContain('Unknown Action: missing.action')
         expect(described.stderr).not.toContain(
-          'unavailable while the local daemon owns the database',
+          'held by another local process/runtime',
         )
 
         const resolved = resolveRuntimeIdentity(runtime.roots)

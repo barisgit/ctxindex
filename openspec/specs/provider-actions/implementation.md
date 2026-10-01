@@ -196,6 +196,10 @@ Gmail Draft identity uses the immutable Draft id; Outlook requests immutable Gra
 
 Draft create may name an ordered, non-empty set of strict managed Artifact Refs. Core supplies a selected-Source resolver that returns only current descriptor metadata and verified cached bytes without provider access. Adapters resolve and validate the complete set before their first fetch, render one deterministic safe MIME mutation, and record ordered `managedAttachmentRefs`. Update never accepts an attachment collection mutation: Microsoft omits attachments from its PATCH, while Gmail replays a locally proven managed set or fails before provider I/O when provenance or bytes are unavailable.
 
+## Daemon ownership
+
+On an advertised platform `action describe` with a Source and `action run` resolve against the daemon's immutable active registry through `action.describe` and `action.run`. The CLI validates locally decidable input before ensuring the daemon; the daemon resolves the Source, delegates once to core Action execution with the request signal, and returns a bounded Resource projection. Draft-only safety, no automatic 401 retry, and no send route are unchanged, and the client composes no runtime.
+
 ## Verification
 
-SDK/registry tests cover declaration-binding consistency. Core and CLI tests cover resolution, validation, confirmation, output checks, and storage. Google/Microsoft Draft and no-send tests assert one mutation, stable identity, replacement semantics, and no retry/send affordance.
+`apps/cli/src/e2e/compiled-daemon-action-artifact.e2e.test.ts` runs Draft Actions through packaged CLI and daemon executables against loopback mocks. SDK/registry tests cover declaration-binding consistency. Core and CLI tests cover resolution, validation, confirmation, output checks, and storage. Google/Microsoft Draft and no-send tests assert one mutation, stable identity, replacement semantics, and no retry/send affordance.

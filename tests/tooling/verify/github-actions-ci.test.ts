@@ -97,7 +97,7 @@ test('pull request CI runs cached fast, integration, and E2E lanes in parallel',
     workflow,
     'e2e',
     'CLI and daemon E2E tests',
-    'bun run test:e2e',
+    'bun run test:e2e -- --concurrency=1',
     20,
   )
 

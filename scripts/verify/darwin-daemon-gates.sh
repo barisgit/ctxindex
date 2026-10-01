@@ -21,6 +21,12 @@ readonly GATES=(
   "Daemon runtime lease suite|apps/daemon|NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-unit.json bun test src/runtime-lease.test.ts"
   "Compiled lease suite|apps/daemon|NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-e2e.json bun run ../../scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' src/e2e/compiled-lease.e2e.test.ts"
   "Darwin compiled daemon journeys|apps/daemon|NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-e2e.json bun run ../../scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' src/e2e/compiled-daemon.e2e.test.ts"
+  "Compiled Extension registry journeys|apps/daemon|NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-e2e.json bun run ../../scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' src/e2e/compiled-extension-registry.e2e.test.ts"
+  "Compiled daemon ownership journey|apps/daemon|NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-e2e.json bun run ../../scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' src/e2e/compiled-daemon-ownership.e2e.test.ts"
+  "Compiled Action and Artifact journey|apps/cli|NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-e2e.json bun run ../../scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' src/e2e/compiled-daemon-action-artifact.e2e.test.ts"
+  "Compiled OAuth Account journey|apps/cli|NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-e2e.json bun run ../../scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' src/e2e/compiled-oauth-account-lifecycle.e2e.test.ts"
+  "Compiled daemon idle exit journey|apps/daemon|NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-e2e.json bun run ../../scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' src/e2e/compiled-idle-exit.e2e.test.ts"
+  "Compiled first-command sync journey|apps/daemon|NODE_ENV=test CTXINDEX_KEYTAR_MOCK_FILE=.turbo/keytar-e2e.json bun run ../../scripts/with-timeout.ts 300 -- bun test --path-ignore-patterns '__none__' src/e2e/compiled-first-command-sync.e2e.test.ts"
 )
 
 if [[ "$(uname -s)" != "Darwin" ]]; then

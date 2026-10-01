@@ -2,7 +2,11 @@ import { afterEach, expect, test } from 'bun:test'
 import {
   chmodSync,
   closeSync,
+  linkSync,
+  mkdirSync,
   mkdtempSync,
+  readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -10,7 +14,10 @@ import {
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { CtxindexError } from '@ctxindex/core/errors'
-import type { DiscoveryMetadata } from '@ctxindex/local-daemon'
+import {
+  acquireFileLease,
+  type DiscoveryMetadata,
+} from '@ctxindex/local-daemon'
 import type { RpcHealthResult } from '@ctxindex/rpc'
 import {
   CLI_DAEMON_PROTOCOL,
@@ -22,6 +29,7 @@ import {
   type DaemonLifecycleDependencies,
   daemonSpawnEnvironment,
   launchBackgroundDaemon,
+  lifecycleOwnershipRetained,
   openDaemonDiagnostics,
   removeStaleDaemonEndpoint,
   resolveDaemonLaunch,
@@ -105,6 +113,7 @@ function dependencies(
     }),
     launch: () => {},
     cleanupStale: () => 'removed',
+    lifecycleRetained: () => false,
     now: () => 0,
     sleep: async () => {},
     timeoutSignal: () => new AbortController().signal,
@@ -235,6 +244,66 @@ test('daemon diagnostics use owner-private directory and file modes', () => {
   expect(statSync(join(root, 'daemon', 'startup.log')).mode & 0o777).toBe(0o600)
 })
 
+test('daemon diagnostics reject a linked target without truncating or chmodding it', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ctxindex-daemon-diagnostics-'))
+  cleanup.push(root)
+  mkdirSync(join(root, 'daemon'), { mode: 0o700 })
+  // A pre-existing startup.log hardlinked to durable state, such as config or
+  // SQLite, must fail closed before any mutation reaches the shared inode.
+  const target = join(root, 'config.toml')
+  writeFileSync(target, 'durable = true\n', { mode: 0o644 })
+  chmodSync(target, 0o644)
+  linkSync(target, join(root, 'daemon', 'startup.log'))
+  let spawned = 0
+
+  expect(() =>
+    launchBackgroundDaemon(['/daemon'], root, {
+      openDiagnostics: openDaemonDiagnostics,
+      closeDescriptor: closeSync,
+      spawn: () => {
+        spawned += 1
+        return { unref: () => {} }
+      },
+    }),
+  ).toThrow('Daemon diagnostics target is unsafe')
+  expect(spawned).toBe(0)
+  expect(readFileSync(target, 'utf8')).toBe('durable = true\n')
+  expect(statSync(target).mode & 0o777).toBe(0o644)
+})
+
+test('daemon diagnostics reject a FIFO without blocking the open', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ctxindex-daemon-diagnostics-'))
+  cleanup.push(root)
+  mkdirSync(join(root, 'daemon'), { mode: 0o700 })
+  const fifo = Bun.spawnSync(['mkfifo', join(root, 'daemon', 'startup.log')])
+  expect(fifo.exitCode).toBe(0)
+  // A blocking open of a reader-less FIFO would hang the whole process, so
+  // the attempt runs in a bounded child process.
+  const probe = Bun.spawnSync({
+    cmd: [
+      process.execPath,
+      '-e',
+      `import { openDaemonDiagnostics } from ${JSON.stringify(join(import.meta.dir, 'lifecycle.ts'))}
+       try { openDaemonDiagnostics(${JSON.stringify(root)}); console.log('opened') }
+       catch { console.log('rejected') }`,
+    ],
+    timeout: 10_000,
+  })
+  expect(probe.stdout.toString().trim()).toBe('rejected')
+  expect(probe.exitCode).toBe(0)
+}, 20_000)
+
+test('daemon diagnostics truncate a previous private log only after validation', () => {
+  const root = mkdtempSync(join(tmpdir(), 'ctxindex-daemon-diagnostics-'))
+  cleanup.push(root)
+  mkdirSync(join(root, 'daemon'), { mode: 0o700 })
+  const log = join(root, 'daemon', 'startup.log')
+  writeFileSync(log, 'previous startup output\n', { mode: 0o644 })
+  closeSync(openDaemonDiagnostics(root))
+  expect(readFileSync(log, 'utf8')).toBe('')
+  expect(statSync(log).mode & 0o777).toBe(0o600)
+})
+
 test('start completes initialization before discovery or launch', async () => {
   const order: string[] = []
   let current: DaemonSelection | null = null
@@ -341,6 +410,140 @@ test('start waits for a stopping owner to release before launching its replaceme
   })
   expect(clock).toBeGreaterThanOrEqual(750)
   expect(launches).toBe(1)
+})
+
+test('start waits for release when health reports stopping before metadata does', async () => {
+  // The owner may fail to rewrite metadata to stopping; its health response
+  // still proves the old instance is draining and owns the lifecycle lease.
+  let current: DaemonSelection | null = selection
+  let clock = 0
+  let launches = 0
+  const lifecycle = createDaemonLifecycle(
+    dependencies({
+      select: () => current,
+      health: async () =>
+        current === selection
+          ? { ...health, lifecycle: 'stopping', ready: false }
+          : health,
+      cleanupStale: () => {
+        if (clock < 500) return 'busy'
+        current = null
+        return 'removed'
+      },
+      launch: () => {
+        launches += 1
+        if (current === null) {
+          current = {
+            ...selection,
+            metadata: { ...metadata, instanceId: 'instance-2' },
+          }
+        }
+      },
+      now: () => clock,
+      sleep: async (milliseconds) => {
+        clock += milliseconds
+      },
+    }),
+  )
+
+  await expect(lifecycle.start()).resolves.toMatchObject({ started: true })
+  expect(clock).toBeGreaterThanOrEqual(500)
+  expect(launches).toBe(1)
+})
+
+test('start waits for retained lifecycle ownership after discovery disappears', async () => {
+  // The runtime removes discovery metadata before releasing its leases. A
+  // replacement launched inside that window loses lifecycle acquisition and
+  // exits, so missing metadata alone must not count as released ownership.
+  let current: DaemonSelection | null = {
+    ...selection,
+    metadata: { ...metadata, lifecycle: 'stopping' },
+  }
+  let clock = 0
+  let launches = 0
+  let ready = 0
+  const ownerRetained = () => clock < 500
+  const lifecycle = createDaemonLifecycle(
+    dependencies({
+      select: () => current,
+      health: async (selected) => {
+        if (selected.metadata?.lifecycle === 'ready') return health
+        throw new DaemonCliError({
+          kind: 'daemon_unavailable',
+          code: 'daemon_unavailable',
+          message: 'The daemon is stopping and is not accepting new work.',
+        })
+      },
+      cleanupStale: () => 'busy',
+      lifecycleRetained: ownerRetained,
+      launch: () => {
+        launches += 1
+        // A replacement that cannot acquire lifecycle ownership exits.
+        if (!ownerRetained()) {
+          ready += 1
+          current = selection
+        }
+      },
+      now: () => clock,
+      sleep: async (milliseconds) => {
+        clock += milliseconds
+        if (clock >= 100 && current?.metadata?.lifecycle === 'stopping') {
+          current = null
+        }
+      },
+    }),
+  )
+
+  await expect(lifecycle.start()).resolves.toMatchObject({
+    status: 'running',
+    started: true,
+  })
+  expect(clock).toBeGreaterThanOrEqual(500)
+  expect({ launches, ready }).toEqual({ launches: 1, ready: 1 })
+})
+
+test('start waits for retained lifecycle ownership when discovery is already absent', async () => {
+  let current: DaemonSelection | null = null
+  let clock = 0
+  let launches = 0
+  const ownerRetained = () => clock < 300
+  const lifecycle = createDaemonLifecycle(
+    dependencies({
+      select: () => current,
+      lifecycleRetained: ownerRetained,
+      launch: () => {
+        launches += 1
+        if (!ownerRetained()) current = selection
+      },
+      now: () => clock,
+      sleep: async (milliseconds) => {
+        clock += milliseconds
+      },
+    }),
+  )
+
+  await expect(lifecycle.start()).resolves.toMatchObject({ started: true })
+  expect(clock).toBeGreaterThanOrEqual(300)
+  expect(launches).toBe(1)
+})
+
+test('lifecycle ownership probe observes a retained lease without claiming it', () => {
+  const stateRoot = realpathSync(
+    mkdtempSync(join(tmpdir(), 'ctxindex-lifecycle-probe-')),
+  )
+  cleanup.push(stateRoot)
+  expect(lifecycleOwnershipRetained(stateRoot)).toBe(false)
+  const owner = acquireFileLease({
+    canonicalTarget: stateRoot,
+    purpose: 'lifecycle',
+    mode: 'exclusive',
+  })
+  try {
+    expect(lifecycleOwnershipRetained(stateRoot)).toBe(true)
+  } finally {
+    owner.release()
+  }
+  expect(lifecycleOwnershipRetained(stateRoot)).toBe(false)
 })
 
 test.each([

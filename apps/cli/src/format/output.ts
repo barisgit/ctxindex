@@ -1,3 +1,4 @@
+import { isatty } from 'node:tty'
 import Table from 'cli-table3'
 
 export const OUTPUT_FORMATS = ['pretty', 'text', 'json'] as const
@@ -21,9 +22,13 @@ export interface OutputEnvironment {
   readonly columns?: number
 }
 
+// `process.stdout` is read only for a terminal: in Bun 1.3.14 touching it makes
+// later console.log writes to a full stdout pipe drop silently, truncating
+// piped command output.
 export function outputEnvironment(): OutputEnvironment {
+  if (!isatty(1)) return { isTTY: false }
   return {
-    isTTY: process.stdout.isTTY === true,
+    isTTY: true,
     ...(process.stdout.columns === undefined
       ? {}
       : { columns: process.stdout.columns }),
