@@ -121,9 +121,10 @@ describe.skipIf(process.platform !== 'linux' && process.platform !== 'darwin')(
         const first = await daemonStart(env)
 
         // Status probes arrive far more often than the idle interval; they must
-        // not count as activity, so the daemon still exits on its own.
+        // not count as activity, so the daemon still exits on its own. A probe
+        // can observe the transient `stopping` state, so poll until `stopped`.
         let status = await daemonStatus(env)
-        while (status.status === 'running' && Date.now() - startedAt < 30_000) {
+        while (status.status !== 'stopped' && Date.now() - startedAt < 30_000) {
           await Bun.sleep(200)
           status = await daemonStatus(env)
         }
