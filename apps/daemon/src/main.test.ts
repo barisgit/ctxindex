@@ -1,5 +1,8 @@
 import { afterEach, expect, spyOn, test } from 'bun:test'
-import { FileLeaseUnsupportedError } from '@ctxindex/local-daemon'
+import {
+  FileLeaseUnsupportedError,
+  UnsafeFileLeaseError,
+} from '@ctxindex/local-daemon'
 import { runForegroundMain } from './main'
 import type { startDaemon } from './runtime'
 
@@ -45,4 +48,17 @@ test('foreground startup renders unsupported lease hosts safely', async () => {
     'The local daemon is unsupported on this platform or filesystem.',
   )
   expect(String(output.mock.calls[0]?.[0])).not.toContain('/Users/person')
+})
+
+test('foreground startup renders unsafe lease files as a bounded actionable failure', async () => {
+  const output = spyOn(console, 'error').mockImplementation(() => {})
+  const start = (async () => {
+    throw new UnsafeFileLeaseError('Lease file must use private mode 0600')
+  }) as typeof startDaemon
+
+  expect(await runForegroundMain(start)).toBe(50)
+  expect(output).toHaveBeenCalledWith(
+    'The local daemon refused an unsafe retained lease: Lease file must use private mode 0600',
+  )
+  expect(String(output.mock.calls[0]?.[0])).not.toContain('stack')
 })

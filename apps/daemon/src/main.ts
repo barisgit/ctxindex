@@ -1,5 +1,8 @@
 import { cacheDir, configDir, dataDir, stateDir } from '@ctxindex/core/paths'
-import { FileLeaseUnsupportedError } from '@ctxindex/local-daemon'
+import {
+  FileLeaseUnsupportedError,
+  UnsafeFileLeaseError,
+} from '@ctxindex/local-daemon'
 import {
   type DaemonStartupFailure,
   isDaemonStartupFailure,
@@ -40,6 +43,14 @@ export async function runForegroundMain(
     if (error instanceof FileLeaseUnsupportedError) {
       console.error(
         'The local daemon is unsupported on this platform or filesystem.',
+      )
+      return 50
+    }
+    if (error instanceof UnsafeFileLeaseError) {
+      // Lease validation messages are constant and path-free, so they are
+      // safe to name in the private startup log as the actionable reason.
+      console.error(
+        `The local daemon refused an unsafe retained lease: ${error.message}`,
       )
       return 50
     }
