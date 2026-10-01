@@ -673,6 +673,36 @@ for (const [command, args] of Object.entries(locallyInvalidInvocations)) {
   })
 }
 
+// Raw JSON flags are syntax-checked locally; Adapter and Action schemas stay
+// daemon-owned. Rejected values are never echoed back.
+const malformedJsonInvocations: readonly (readonly string[])[] = [
+  [
+    'source',
+    'add',
+    'local.directory',
+    '--realm',
+    'fixture',
+    '--config-json',
+    '{bad',
+  ],
+  ['source', 'add', '--adapter', 'local.directory', '--config-json', '{bad'],
+  ['action', 'run', 'fixture.action', '--source', 'fixture', '--input', '{bad'],
+]
+
+for (const argv of malformedJsonInvocations) {
+  test(`malformed JSON precedes daemon ensure: ${argv.join(' ')}`, async () => {
+    expect(await runCli(['init'])).toBe(0)
+    const error = spyOn(console, 'error')
+    error.mockClear()
+    await withDaemonProbe(async (contacts) => {
+      expect(await runCli([...argv])).toBe(2)
+      expect(contacts()).toBe(0)
+    })
+    expect(error.mock.calls.flat().join('\n')).not.toContain('{bad')
+    expect(await readdir(join(root, 'state'))).not.toContain('daemon')
+  })
+}
+
 test('safe direct exceptions never ensure or launch a daemon', async () => {
   expect(await runCli(['init'])).toBe(0)
   await withDaemonProbe(async (contacts) => {

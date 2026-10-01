@@ -1,5 +1,6 @@
 import type { CommandDef } from 'citty'
 import {
+  assertSourceConfigJsonSyntax,
   needsDynamicSourceArgs,
   resolveSourceAdapterId,
   sourceAddArgs,
@@ -52,6 +53,7 @@ export function createSourceCommandRuntime(
         run: ({ args }) =>
           runWithExit(async () => {
             resolveSourceAdapterId(args)
+            assertSourceConfigJsonSyntax(args)
             return handleSourceCommand(
               { kind: 'add', args },
               await route(),
