@@ -807,7 +807,6 @@ export class DaemonApplication implements DaemonRpcApplication {
   >()
   readonly #options: DaemonApplicationOptions
   #lifecycle: RpcHealthResult['lifecycle'] = 'starting'
-  #idleDeadline: number | undefined
   #idleGeneration = 0
   #idleTimerHandle: unknown
   #requestSequence = 0
@@ -925,13 +924,13 @@ export class DaemonApplication implements DaemonRpcApplication {
     if (this.#lifecycle !== 'starting')
       throw new Error('Daemon cannot become ready')
     this.#lifecycle = 'ready'
-    this.#touchIdle(true)
+    this.#armIdle()
   }
 
   beginStopping(): boolean {
     const alreadyStopping = this.#lifecycle === 'stopping'
     this.#lifecycle = 'stopping'
-    this.#clearIdleTimer()
+    this.#disarmIdle()
     for (const request of this.#active.values()) request.controller.abort()
     if (!this.#stoppingNotified) {
       this.#stoppingNotified = true
@@ -1045,7 +1044,6 @@ export class DaemonApplication implements DaemonRpcApplication {
             : [],
         }
       },
-      true,
       'exclusive',
     )
   }
@@ -1130,7 +1128,6 @@ export class DaemonApplication implements DaemonRpcApplication {
         pending.resolve(input.response)
         return { accepted: true }
       },
-      true,
       'none',
     )
   }
@@ -1614,20 +1611,16 @@ export class DaemonApplication implements DaemonRpcApplication {
     input: RpcStatusInput,
     context: RpcRequestContext,
   ): Promise<RpcResult<RpcStatusResult>> {
-    return this.#business(
-      context,
-      async () => {
-        const sourceId = input.source
-          ? this.#options.sourceService.resolveSourceId(input.source)
-          : undefined
-        return {
-          rows: this.#options.sourceService
-            .getStatus(sourceId ? { sourceId } : {})
-            .map(statusRow),
-        }
-      },
-      false,
-    )
+    return this.#business(context, async () => {
+      const sourceId = input.source
+        ? this.#options.sourceService.resolveSourceId(input.source)
+        : undefined
+      return {
+        rows: this.#options.sourceService
+          .getStatus(sourceId ? { sourceId } : {})
+          .map(statusRow),
+      }
+    })
   }
 
   async shutdown(
@@ -1650,7 +1643,6 @@ export class DaemonApplication implements DaemonRpcApplication {
   #business<T>(
     context: RpcRequestContext,
     invoke: (signal: AbortSignal) => Promise<T>,
-    resetsIdle = true,
     secretAccess: 'shared' | 'exclusive' | 'none' = 'shared',
   ): Promise<RpcResult<T>> {
     if (this.#lifecycle !== 'ready')
@@ -1666,7 +1658,7 @@ export class DaemonApplication implements DaemonRpcApplication {
       settle = resolve
     })
     this.#active.set(key, { controller, settled })
-    this.#touchIdle(resetsIdle)
+    this.#disarmIdle()
 
     const operation = () => {
       controller.signal.throwIfAborted()
@@ -1707,7 +1699,7 @@ export class DaemonApplication implements DaemonRpcApplication {
         context.signal.removeEventListener('abort', cancel)
         this.#active.delete(key)
         settle()
-        this.#touchIdle(resetsIdle)
+        this.#armIdle()
       })
   }
 
@@ -1779,7 +1771,7 @@ export class DaemonApplication implements DaemonRpcApplication {
       settle = resolve
     })
     this.#active.set(key, { controller, settled })
-    this.#touchIdle(true)
+    this.#disarmIdle()
 
     let finalized = false
     const finalize = (): void => {
@@ -1788,7 +1780,7 @@ export class DaemonApplication implements DaemonRpcApplication {
       context.signal.removeEventListener('abort', cancel)
       this.#active.delete(key)
       settle()
-      this.#touchIdle(true)
+      this.#armIdle()
     }
     const producer = this.#withSecretAccess('shared', () => {
       controller.signal.throwIfAborted()
@@ -1883,24 +1875,32 @@ export class DaemonApplication implements DaemonRpcApplication {
     return Promise.resolve({ ok: true, value: iterator })
   }
 
-  #touchIdle(resetDeadline: boolean): void {
+  // Idle lifetime is owned by the business request tracker (`#active`). The
+  // timer is armed only while the daemon is ready with zero admitted business
+  // requests, is disarmed by every admission, and restarts one full interval
+  // after the final settlement. Health and shutdown never touch it. Admission
+  // and expiry are both synchronous, so expiry either observes an admitted
+  // request (and leaves it alone) or closes admission before the next one.
+  #armIdle(): void {
     const timeoutMs = this.#options.idleTimeoutMs
+    if (timeoutMs === undefined || this.#options.idleTimer === undefined) return
+    if (this.#lifecycle !== 'ready' || this.#active.size > 0) return
+    this.#disarmIdle()
+    this.#scheduleIdleExpiry(this.#options.idleTimer.now() + timeoutMs)
+  }
+
+  #scheduleIdleExpiry(deadline: number): void {
     const timer = this.#options.idleTimer
-    if (timeoutMs === undefined || timer === undefined) return
-    if (this.#lifecycle !== 'ready') return
-    if (resetDeadline || this.#idleDeadline === undefined) {
-      this.#idleDeadline = timer.now() + timeoutMs
-    }
-    this.#clearIdleTimer()
-    const deadline = this.#idleDeadline
+    if (timer === undefined) return
     const generation = this.#idleGeneration
     this.#idleTimerHandle = timer.setTimeout(
       () => {
         if (generation !== this.#idleGeneration) return
         this.#idleTimerHandle = undefined
         if (this.#lifecycle !== 'ready' || this.#active.size > 0) return
+        // Host timers may fire marginally early; never expire before the deadline.
         if (timer.now() < deadline) {
-          this.#touchIdle(false)
+          this.#scheduleIdleExpiry(deadline)
           return
         }
         this.beginStopping()
@@ -1909,7 +1909,7 @@ export class DaemonApplication implements DaemonRpcApplication {
     )
   }
 
-  #clearIdleTimer(): void {
+  #disarmIdle(): void {
     this.#idleGeneration++
     if (this.#idleTimerHandle === undefined) return
     this.#options.idleTimer?.clearTimeout(this.#idleTimerHandle)

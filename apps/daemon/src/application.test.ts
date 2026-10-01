@@ -1226,7 +1226,9 @@ test('idle shutdown waits for active work and resets from admission and settleme
   expect(stopping).toEqual([3_000])
 })
 
-test('health and status observation do not extend the idle deadline', async () => {
+// Source status.get is business activity (see idle-lifecycle.test.ts); only
+// lifecycle health probes are excluded from idle accounting.
+test('health observation does not extend the idle deadline', async () => {
   const clock = new TestIdleClock()
   const app = application({
     idleTimeoutMs: 1_000,
@@ -1236,7 +1238,6 @@ test('health and status observation do not extend the idle deadline', async () =
   clock.advance(900)
 
   expect((await app.system.health({}, context('idle-health'))).ok).toBe(true)
-  expect((await app.status.get({}, context('idle-status'))).ok).toBe(true)
   clock.advance(100)
 
   expect(app.lifecycle).toBe('stopping')

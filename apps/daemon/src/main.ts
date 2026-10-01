@@ -4,6 +4,7 @@ import {
   UnsafeFileLeaseError,
 } from '@ctxindex/local-daemon'
 import {
+  DAEMON_IDLE_TIMEOUT_MS,
   type DaemonStartupFailure,
   isDaemonStartupFailure,
   startDaemon,
@@ -12,7 +13,22 @@ import { installSignalHandlers } from './signals'
 
 type StartDaemon = typeof startDaemon
 
+/**
+ * Internal test-only control that lets compiled journeys observe automatic idle
+ * exit without waiting five minutes. It is not user configuration: it can only
+ * shorten the fixed production lifetime, and malformed values are ignored.
+ */
+export function testIdleTimeoutMs(
+  env: NodeJS.ProcessEnv = process.env,
+): number | undefined {
+  const raw = env.CTXINDEX_TEST_DAEMON_IDLE_TIMEOUT_MS
+  if (raw === undefined || !/^[1-9][0-9]{0,8}$/.test(raw)) return undefined
+  const value = Number(raw)
+  return value < DAEMON_IDLE_TIMEOUT_MS ? value : undefined
+}
+
 export async function main(start: StartDaemon = startDaemon): Promise<void> {
+  const idleTimeoutMs = testIdleTimeoutMs()
   const daemon = await start({
     roots: {
       configRoot: configDir(),
@@ -23,6 +39,7 @@ export async function main(start: StartDaemon = startDaemon): Promise<void> {
     ...(process.env.CTXINDEX_DAEMON_RUNTIME_ROOT
       ? { endpointRuntimeRoot: process.env.CTXINDEX_DAEMON_RUNTIME_ROOT }
       : {}),
+    ...(idleTimeoutMs === undefined ? {} : { idleTimeoutMs }),
   })
   const removeSignals = installSignalHandlers(daemon)
   await daemon.closed

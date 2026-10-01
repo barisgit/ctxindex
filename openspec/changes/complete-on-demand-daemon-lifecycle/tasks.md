@@ -19,14 +19,14 @@
 
 ## 4. Activity-aware idle shutdown
 
-- [ ] 4.1 Add failing deterministic-clock tests for idle-from-readiness, reset after the last overlapping request settles, active unary work beyond five minutes, health/status/ensure non-activity, admission racing expiry, explicit stop before expiry, signal/idle/explicit shutdown convergence, and ownership retention on shutdown timeout.
-- [ ] 4.2 Implement request-tracker-owned business activity and the idle controller: arm only at zero active business requests, disarm on admission, rearm after final settlement, atomically stop admission on expiry, and invoke the existing graceful shutdown coordinator.
-- [ ] 4.3 Prove every completion, domain failure, cancellation, disconnect, early return, producer failure, startup failure, and shutdown path settles activity and timers exactly once without leaked handles or premature lease/SQLite release.
+- [x] 4.1 Add failing deterministic-clock tests for idle-from-readiness, reset after the last overlapping request settles, active unary work beyond five minutes, health/status/ensure non-activity, admission racing expiry, explicit stop before expiry, signal/idle/explicit shutdown convergence, and ownership retention on shutdown timeout.
+- [x] 4.2 Implement request-tracker-owned business activity and the idle controller: arm only at zero active business requests, disarm on admission, rearm after final settlement, atomically stop admission on expiry, and invoke the existing graceful shutdown coordinator.
+- [x] 4.3 Prove every completion, domain failure, cancellation, disconnect, early return, producer failure, startup failure, and shutdown path settles activity and timers exactly once without leaked handles or premature lease/SQLite release.
 
 ## 5. Typed sync streaming and packaged journeys
 
 - [ ] 5.1 Add failing sync tests in which the first command automatically starts the daemon and preserves typed ordered progress plus one terminal outcome, bounded producer backpressure, native cancellation, and stable CLI presentation/exits.
-- [ ] 5.2 Extend stream tests across an idle duration for slow production, backpressured consumption, cancellation, disconnect, iterator return, and producer error; prove the stream suppresses idle shutdown until request/iterator settlement and then starts one fresh idle interval.
+- [x] 5.2 Extend stream tests across an idle duration for slow production, backpressured consumption, cancellation, disconnect, iterator return, and producer error; prove the stream suppresses idle shutdown until request/iterator settlement and then starts one fresh idle interval.
 - [ ] 5.3 Pass compiled Darwin and Linux CLI/daemon journeys covering first-command startup, compatible reuse, sync streaming, concurrent commands, status without startup/keepalive, automatic idle exit with a test-only short timeout, restart after idle, explicit stop, crash recovery, and zero direct SQLite opens after ensure.
 
 ## 6. Doctrine, documentation, and final verification
