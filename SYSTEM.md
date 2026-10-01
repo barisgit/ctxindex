@@ -3,10 +3,18 @@
 > **NON-NORMATIVE.** This is a readable projection of the current system. If it
 > conflicts with `openspec/specs/<capability>/spec.md`, the capability spec wins.
 >
-> **Last refreshed:** 2026-07-22
+> **Last refreshed:** 2026-10-01
 >
-> **Sources consulted:** `CONTEXT.md`; current specs/sidecars; active daemon,
-> managed-App, portable-skill, and npm-distribution changes; affected codemaps.
+> **Sources consulted:** `CONTEXT.md`; capability specs under
+> `openspec/specs/` and their adjacent `implementation.md` sidecars (see
+> section 13). This refresh rechecked daemon, storage, CLI, OAuth App, and
+> distribution statements against `local-daemon`, `generic-storage`,
+> `cli-surface`, and `oauth-client-management`. The active changes
+> `complete-on-demand-daemon-lifecycle`, `promote-local-daemon-architecture`,
+> `provide-official-oauth-apps`, and `ship-installable-npm-cli` were read only
+> to label work that is not yet canonical. Code on `main` was spot-checked for
+> the daemon and managed-App statements. Other sections carry forward from the
+> 2026-07-22 refresh.
 
 ## 1. 10-minute tour
 
@@ -26,16 +34,28 @@ ctxindex search "project plan" --realm personal
 ctxindex get 'ctx://<source-id>/<adapter-owned-suffix>'
 ```
 
-Stateful commands ensure one compatible local daemon automatically. The daemon
-owns SQLite, the active Extension registry, provider access, and long-running
-work; it exits after five idle minutes and restarts on demand. `daemon
-start|status|stop` remain explicit operational controls.
+Canonical specs define one owner-private background daemon per runtime,
+managed by `ctxindex daemon start|status|stop`. When a daemon is selected,
+Realm, Source, `sync`, `status`, `search`, `get`, and `thread` run inside it.
+The daemon owns SQLite and one immutable Extension registry, and the CLI opens
+no database. If a selected daemon becomes unreachable, those commands fail with
+exit `50` instead of falling back. Other stateful commands still run directly,
+and they stop with exit `50` while a daemon owns the database.
+
+The automatic lifecycle is not canonical yet. The active change
+`complete-on-demand-daemon-lifecycle` defines it: stateful commands start the
+daemon on demand, the daemon exits after five idle minutes, and Linux gets the
+same ownership guarantees. Code on `main` already contains parts of this
+behavior, but none of the change's tasks are checked off. Treat it as
+provisional until the change is verified (section 12).
 
 Two data paths return the same Resource and Ref model:
 
 ```mermaid
 flowchart LR
-  Agent --> CLI --> D[Local daemon] --> Core[Provider-neutral core]
+  Agent --> CLI
+  CLI -- daemon-routed commands --> D[Local daemon] --> Core[Provider-neutral core]
+  CLI -- direct commands --> Core
   Core --> DB[(SQLite and caches)]
   Core --> A[Source Adapter] --> Canonical[Provider or files]
   A -- sync --> DB
@@ -89,8 +109,12 @@ bodies, paths, stacks, and transport internals. Realms are not security bounds.
 Extensions are trusted in-process code. Repository, author-build, and install
 trust are separate. Startup uses immutable bytes and performs no refresh.
 
-The owner-private daemon uses retained leases on Darwin/Linux. Unsupported
-platforms retain explicit direct behavior rather than unsafe ownership.
+The daemon's endpoint and metadata are owner-private. Retained kernel leases
+ensure that one runtime owns a database: a daemon holds it exclusively, and
+direct commands hold it shared. Canonical specs define that lease backend for
+Darwin only. On a platform without a verified backend, `daemon start` fails
+with an actionable error, and ordinary commands keep their direct behavior. A
+Linux backend exists in code, but its contract is still in active changes.
 
 ## 5. Extension architecture
 
@@ -119,8 +143,8 @@ flowchart LR
 
 OAuth App identity is exact `(provider id, label)`. Extensions may ship public
 metadata; users may add BYOA config from Provider-declared environment variables.
-Host policy can select one exact managed default but cannot change identity or
-Adapter scopes.
+`oauth-app add` and `account add --app` take an exact App label. The CLI never
+defaults or guesses the label, even when a Provider has only one App.
 
 Authorization uses Provider base scopes plus the active Adapter union.
 Reauthorization updates the Grant; Account removal leaves Sources `needs_auth`.
@@ -128,8 +152,12 @@ Reauthorization updates the Grant; Account removal leaves Sources `needs_auth`.
 The PKCE flow normally opens a browser. For a remote shell, the CLI accepts the
 redirect URL or code through hidden stdin; secrets never become arguments.
 
-Managed Google/Microsoft metadata ships publicly; provider policy may still
-reject it, so BYOA remains available.
+Managed defaults are not canonical yet. The active change
+`provide-official-oauth-apps` is implemented except for its provider Human
+checkpoints. Under it, host release policy may select one exact managed App,
+such as public Google or Microsoft App metadata, when `--app` is omitted. That
+policy cannot change App identity or Adapter scopes. Provider policy may still
+reject a managed App, so BYOA remains available.
 
 ## 7. Search and sync behavior
 
@@ -202,9 +230,39 @@ denied, `50` other bounded failure, and `130` cancellation.
 - The runtime is currently Bun-based; Node compatibility is not promised.
 - Provider verification and organizational tenant policy remain external to the
   local architecture.
+- Not yet canonical, because their contracts are in active changes:
+  - automatic daemon startup, shutdown after five idle minutes, and Linux
+    daemon ownership (`complete-on-demand-daemon-lifecycle`; partly present in
+    code, with no tasks verified);
+  - routing every remaining stateful command through the daemon
+    (`promote-local-daemon-architecture`);
+  - managed OAuth App defaults (`provide-official-oauth-apps`; awaiting
+    provider Human checkpoints).
+- The published `ctxindex` npm package has no canonical capability spec yet.
+  Its packaging and release contract lives in the active change
+  `ship-installable-npm-cli`; `cli-distribution` has only a sidecar.
 
 ## 13. Source index
 
-Sections 1–12 distill `CONTEXT.md` and matching capability directories under
-`openspec/specs/`. Sidecars describe package seams, codemaps describe layout,
-and milestone files are historical only.
+Paths below are capability directories under `openspec/specs/`. Each has a
+`spec.md`, except `cli-distribution`, `official-oauth-apps`, and
+`github-issues-demo`, which so far have only `implementation.md` sidecars. Sidecars describe package seams,
+codemaps describe layout, and milestone files are historical only.
+
+| Section | Sources |
+| --- | --- |
+| 1. Tour | `CONTEXT.md`; `cli-surface`, `local-daemon`, `sync-operations`, `search-routing`, `documentation-consumption` |
+| 2. Overview | `CONTEXT.md`; `module-architecture`, `cli-surface` |
+| 3. Domain model | `CONTEXT.md`; `core-model` |
+| 4. Trust boundaries | `secret-backend-operations`, `generic-storage`, `local-daemon`, `extension-installation`, `extension-loading` |
+| 5. Extensions | `extension-loading`, `extension-installation`, `extension-catalogs`, `extension-documentation`, `extension-sdk-distribution`, `documentation-consumption`, `module-architecture` |
+| 6. OAuth and Realms | `oauth-client-management`, `account-grant-management`, `realm-and-source-management`, `cli-surface`; planned: `provide-official-oauth-apps` change, `official-oauth-apps` sidecar |
+| 7. Search and sync | `search-routing`, `sync-operations`, `daemon-operation-streams`, `retrieval-and-artifacts` |
+| 8. Provider coverage | `microsoft-graph-adapters`, `google-calendar-adapter`, `calendar-context`, `profile-vocabulary`, `retrieval-and-artifacts` |
+| 9. Actions and Drafts | `provider-actions`, `profile-vocabulary` |
+| 10. Storage | `generic-storage`, `core-model`, `retrieval-and-artifacts` |
+| 11. CLI and exits | `cli-surface`, `error-taxonomy`, `documentation-consumption` |
+| 12. Limitations | The capabilities above; active changes `complete-on-demand-daemon-lifecycle`, `promote-local-daemon-architecture`, `provide-official-oauth-apps`, `ship-installable-npm-cli` |
+
+`docs-web-surface` (the website) and the `github-issues-demo` sidecar (an
+external example) do not add to this projection.
